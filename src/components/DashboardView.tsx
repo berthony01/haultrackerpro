@@ -12,14 +12,14 @@ export function DashboardView({ loads }: DashboardViewProps) {
   const weekLoads = getCurrentWeekLoads(loads);
   const monthLoads = getCurrentMonthLoads(loads);
   const weekEstimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const weekActual = weekLoads.reduce((s, l) => s + Number(l.actual_pay ?? 0), 0);
+  const weekActual = weekLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
   const monthEstimated = monthLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const monthActual = monthLoads.reduce((s, l) => s + Number(l.actual_pay ?? 0), 0);
+  const monthActual = monthLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
   const weekMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const monthMiles = monthLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const weekSummaries = getWeekSummaries(loads).slice(0, 4);
 
-  const paidWeekLoads = weekLoads.filter(l => l.actual_pay != null);
+  const paidWeekLoads = weekLoads.filter(l => l.actual_pay_received != null);
   const weekDiff = paidWeekLoads.length > 0 ? weekActual - paidWeekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0) : null;
 
   return (
@@ -52,7 +52,7 @@ export function DashboardView({ loads }: DashboardViewProps) {
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">This Month</h2>
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Est. Earnings" value={formatCurrency(monthEstimated)} icon={DollarSign} />
-          <StatCard label="Actual Paid" value={formatCurrency(monthActual)} icon={DollarSign} subtitle={monthActual > 0 ? `${monthLoads.filter(l => l.actual_pay != null).length} paid` : 'No payments yet'} />
+          <StatCard label="Actual Paid" value={formatCurrency(monthActual)} icon={DollarSign} subtitle={monthActual > 0 ? `${monthLoads.filter(l => l.actual_pay_received != null).length} paid` : 'No payments yet'} />
           <StatCard label="Total Miles" value={formatNumber(monthMiles)} icon={Route} />
           <StatCard label="Avg $/Mile" value={monthMiles > 0 ? formatCurrency(monthEstimated / monthMiles) : '$0'} icon={TrendingUp} />
         </div>

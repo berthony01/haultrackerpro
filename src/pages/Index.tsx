@@ -6,6 +6,7 @@ import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
 import { LoadsListView } from '@/components/LoadsListView';
 import { ReportsView } from '@/components/ReportsView';
+import { Onboarding } from '@/components/Onboarding';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -19,6 +20,8 @@ const Index = () => {
 
   // For dashboard/reports we want all loads (no date filter)
   const allLoadsQuery = useLoads();
+
+  const showOnboarding = !isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
 
   const handleAddLoad = (data: LoadInsert) => {
     addLoad.mutate(data, {
@@ -72,27 +75,33 @@ const Index = () => {
       </header>
 
       <main className="px-4 py-5 max-w-lg mx-auto">
-        {page === 'dashboard' && <DashboardView loads={allLoadsQuery.loads} />}
-        {page === 'add' && (
-          <div className="animate-fade-in">
-            <LoadForm
-              onSubmit={editingLoad ? handleUpdateLoad : handleAddLoad}
-              onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : undefined}
-              initialData={editingLoad || undefined}
-              loading={addLoad.isPending || updateLoad.isPending}
-            />
-          </div>
+        {showOnboarding ? (
+          <Onboarding onGetStarted={() => setPage('add')} />
+        ) : (
+          <>
+            {page === 'dashboard' && <DashboardView loads={allLoadsQuery.loads} />}
+            {page === 'add' && (
+              <div className="animate-fade-in">
+                <LoadForm
+                  onSubmit={editingLoad ? handleUpdateLoad : handleAddLoad}
+                  onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : undefined}
+                  initialData={editingLoad || undefined}
+                  loading={addLoad.isPending || updateLoad.isPending}
+                />
+              </div>
+            )}
+            {page === 'loads' && (
+              <LoadsListView
+                loads={loads}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onDateRangeChange={(from, to) => setDateRange({ from, to })}
+                isLoading={isLoading}
+              />
+            )}
+            {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} />}
+          </>
         )}
-        {page === 'loads' && (
-          <LoadsListView
-            loads={loads}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onDateRangeChange={(from, to) => setDateRange({ from, to })}
-            isLoading={isLoading}
-          />
-        )}
-        {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} />}
       </main>
 
       <BottomNav active={page} onNavigate={handleNavigate} />

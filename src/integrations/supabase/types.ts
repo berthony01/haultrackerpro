@@ -16,16 +16,18 @@ export type Database = {
     Tables: {
       loads: {
         Row: {
-          actual_pay: number | null
+          actual_pay_received: number | null
           created_at: string
-          date: string
           deadhead_miles: number
           detention_fee: number
-          dropoff: string
+          dropoff_location: string
           estimated_pay: number | null
           id: string
+          load_date: string
           loaded_miles: number
-          pickup: string
+          notes: string | null
+          other_fees: number
+          pickup_location: string
           rate_per_mile: number
           status: string
           updated_at: string
@@ -33,16 +35,18 @@ export type Database = {
           wait_fee: number
         }
         Insert: {
-          actual_pay?: number | null
+          actual_pay_received?: number | null
           created_at?: string
-          date: string
           deadhead_miles?: number
           detention_fee?: number
-          dropoff: string
+          dropoff_location: string
           estimated_pay?: number | null
           id?: string
+          load_date: string
           loaded_miles?: number
-          pickup: string
+          notes?: string | null
+          other_fees?: number
+          pickup_location: string
           rate_per_mile?: number
           status?: string
           updated_at?: string
@@ -50,16 +54,18 @@ export type Database = {
           wait_fee?: number
         }
         Update: {
-          actual_pay?: number | null
+          actual_pay_received?: number | null
           created_at?: string
-          date?: string
           deadhead_miles?: number
           detention_fee?: number
-          dropoff?: string
+          dropoff_location?: string
           estimated_pay?: number | null
           id?: string
+          load_date?: string
           loaded_miles?: number
-          pickup?: string
+          notes?: string | null
+          other_fees?: number
+          pickup_location?: string
           rate_per_mile?: number
           status?: string
           updated_at?: string

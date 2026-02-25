@@ -13,6 +13,12 @@ export interface WeekSummary {
   avgRatePerMile: number;
 }
 
-export function calculateEstimatedPay(loadedMiles: number, ratePerMile: number, waitFee: number, detentionFee: number): number {
-  return (loadedMiles * ratePerMile) + waitFee + detentionFee;
+export function calculateEstimatedPay(
+  loadedMiles: number,
+  ratePerMile: number,
+  waitFee: number,
+  detentionFee: number,
+  otherFees: number
+): number {
+  return (loadedMiles * ratePerMile) + waitFee + detentionFee + otherFees;
 }

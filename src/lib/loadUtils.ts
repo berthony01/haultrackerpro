@@ -6,7 +6,7 @@ export function getWeekSummaries(loads: Load[]): WeekSummary[] {
   const weekMap = new Map<string, Load[]>();
 
   loads.forEach(load => {
-    const date = parseISO(load.date);
+    const date = parseISO(load.load_date);
     const weekStart = startOfWeek(date, { weekStartsOn: 1 });
     const key = weekStart.toISOString();
     if (!weekMap.has(key)) weekMap.set(key, []);
@@ -19,7 +19,7 @@ export function getWeekSummaries(loads: Load[]): WeekSummary[] {
     const end = endOfWeek(start, { weekStartsOn: 1 });
     const totalLoadedMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
     const totalEstimatedPay = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-    const totalActualPay = weekLoads.reduce((s, l) => s + Number(l.actual_pay ?? 0), 0);
+    const totalActualPay = weekLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
     summaries.push({
       weekLabel: `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`,
       startDate: start.toISOString(),
@@ -41,7 +41,7 @@ export function getCurrentWeekLoads(loads: Load[]): Load[] {
   const start = startOfWeek(now, { weekStartsOn: 1 });
   const end = endOfWeek(now, { weekStartsOn: 1 });
   return loads.filter(l => {
-    const d = parseISO(l.date);
+    const d = parseISO(l.load_date);
     return isWithinInterval(d, { start, end });
   });
 }
@@ -51,7 +51,7 @@ export function getCurrentMonthLoads(loads: Load[]): Load[] {
   const start = startOfMonth(now);
   const end = endOfMonth(now);
   return loads.filter(l => {
-    const d = parseISO(l.date);
+    const d = parseISO(l.load_date);
     return isWithinInterval(d, { start, end });
   });
 }
@@ -65,10 +65,10 @@ export function formatNumber(num: number): string {
 }
 
 export function exportToCSV(loads: Load[], filename: string) {
-  const headers = ['Date', 'Pickup', 'Drop-off', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Estimated Pay', 'Actual Pay', 'Status'];
+  const headers = ['Date', 'Pickup', 'Drop-off', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Notes', 'Estimated Pay', 'Actual Pay', 'Status'];
   const rows = loads.map(l => [
-    l.date, l.pickup, l.dropoff, l.loaded_miles, l.deadhead_miles,
-    l.rate_per_mile, l.wait_fee, l.detention_fee, l.estimated_pay, l.actual_pay ?? '', l.status
+    l.load_date, l.pickup_location, l.dropoff_location, l.loaded_miles, l.deadhead_miles,
+    l.rate_per_mile, l.wait_fee, l.detention_fee, l.other_fees, l.notes ?? '', l.estimated_pay, l.actual_pay_received ?? '', l.status
   ]);
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
