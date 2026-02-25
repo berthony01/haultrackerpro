@@ -2,10 +2,13 @@ import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { formatCurrency, formatNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus } from 'lucide-react';
+import { PerformanceTrends } from '@/components/PerformanceTrends';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval, format } from 'date-fns';
 
 interface DashboardViewProps {
@@ -72,6 +75,21 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
     .filter(l => l.actual_pay_received == null)
     .reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
 
+  // Deadhead percentage
+  const totalMiles = loadedMiles + deadheadMiles;
+  const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
+  const deadheadColor = deadheadPct < 15 ? 'success' : deadheadPct < 30 ? 'warning' : 'destructive';
+
+  // Check if closeout should be suggested
+  const isSunday = new Date().getDay() === 0;
+  const thisWeekLoadCount = useMemo(() => {
+    const now = new Date();
+    const ws = startOfWeek(now, { weekStartsOn: 1 });
+    const we = endOfWeek(now, { weekStartsOn: 1 });
+    return loads.filter(l => isWithinInterval(parseISO(l.load_date), { start: ws, end: we })).length;
+  }, [loads]);
+  const showCloseoutButton = isSunday || thisWeekLoadCount >= 7;
+
   return (
     <div className="space-y-5 animate-fade-in">
       <div>
@@ -123,7 +141,24 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
             />
             <StatCard label="Loads Done" value={completedLoads.length.toString()} icon={Truck} />
             <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
-            <StatCard label="Deadhead Miles" value={formatNumber(deadheadMiles)} icon={MapPin} />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <StatCard
+                      label="Deadhead %"
+                      value={`${deadheadPct.toFixed(1)}%`}
+                      icon={MapPin}
+                      subtitle={`${formatNumber(deadheadMiles)} mi`}
+                      variant={deadheadColor === 'success' ? 'success' : deadheadColor === 'warning' ? 'warning' : 'danger'}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">High deadhead reduces profit.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {knownDifference != null && (
               <StatCard
                 label="Known Difference"
@@ -155,6 +190,20 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
               />
             )}
           </div>
+
+          {/* Closeout Button */}
+          {(showCloseoutButton || true) && onNavigate && (
+            <Button
+              variant="outline"
+              className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-transform"
+              onClick={() => onNavigate('closeout')}
+            >
+              <ClipboardCheck className="h-5 w-5" /> Closeout This Week
+            </Button>
+          )}
+
+          {/* Performance Trends */}
+          <PerformanceTrends loads={loads} />
 
           {/* Last Updated */}
           {loads.length > 0 && (

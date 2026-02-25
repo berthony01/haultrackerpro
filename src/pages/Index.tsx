@@ -8,6 +8,8 @@ import { LoadsListView } from '@/components/LoadsListView';
 import { ReportsView } from '@/components/ReportsView';
 import { SettingsView } from '@/components/SettingsView';
 import { Onboarding } from '@/components/Onboarding';
+import { WeeklyCloseout } from '@/components/WeeklyCloseout';
+import { SmartReminders } from '@/components/SmartReminders';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -19,6 +21,7 @@ const Index = () => {
   const [page, setPage] = useState('dashboard');
   const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
+  const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
 
   const allLoadsQuery = useLoads();
 
@@ -91,11 +94,30 @@ const Index = () => {
       </header>
 
       <main className="px-4 py-5 max-w-lg mx-auto">
+        {/* Smart Reminders */}
+        {!showOnboarding && page === 'dashboard' && (
+          <div className="mb-4">
+            <SmartReminders
+              loads={allLoadsQuery.loads}
+              onNavigate={handleNavigate}
+              onDismiss={(key) => setDismissedReminders(prev => new Set(prev).add(key))}
+              dismissed={dismissedReminders}
+            />
+          </div>
+        )}
+
         {showOnboarding ? (
           <Onboarding onGetStarted={() => setPage('add')} />
         ) : (
           <>
             {page === 'dashboard' && <DashboardView loads={allLoadsQuery.loads} isLoading={allLoadsQuery.isLoading} onNavigate={handleNavigate} />}
+            {page === 'closeout' && (
+              <WeeklyCloseout
+                loads={allLoadsQuery.loads}
+                onNavigate={handleNavigate}
+                onBack={() => setPage('dashboard')}
+              />
+            )}
             {page === 'add' && (
               <div className="animate-fade-in">
                 <LoadForm
