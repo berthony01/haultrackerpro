@@ -18,10 +18,9 @@ const Index = () => {
   const [page, setPage] = useState('dashboard');
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
 
-  // For dashboard/reports we want all loads (no date filter)
   const allLoadsQuery = useLoads();
 
-  const showOnboarding = !isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
+  const showOnboarding = !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
 
   const handleAddLoad = (data: LoadInsert) => {
     addLoad.mutate(data, {
@@ -54,7 +53,6 @@ const Index = () => {
   const handleDuplicate = (load: Load) => {
     setEditingLoad(null);
     setPage('add');
-    // Pre-fill form with duplicated data by creating a fake "initial" load with today's date
     const dup: Load = { ...load, id: '', load_date: new Date().toISOString().split('T')[0], actual_pay_received: null, status: 'pending' };
     setEditingLoad(dup);
   };
@@ -70,19 +68,20 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-secondary text-secondary-foreground">
-        <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
+    <div className="min-h-screen bg-background pb-24">
+      {/* Dark header */}
+      <header className="sticky top-0 z-40 bg-secondary">
+        <div className="flex items-center justify-between px-4 py-3.5 max-w-lg mx-auto">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-primary p-1.5">
+            <div className="rounded-xl bg-primary p-2 shadow-primary">
               <Truck className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-base font-black font-heading tracking-tight">HaulTracker</h1>
-              <p className="text-[10px] text-secondary-foreground/60 font-medium uppercase tracking-wider">Load & Pay Manager</p>
+              <h1 className="text-base font-black font-heading tracking-tight text-secondary-foreground">HaulTracker</h1>
+              <p className="text-[10px] text-secondary-foreground/50 font-semibold uppercase tracking-widest">Load & Pay Manager</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="text-secondary-foreground/60 hover:text-secondary-foreground" onClick={signOut}>
+          <Button variant="ghost" size="icon" className="text-secondary-foreground/40 hover:text-secondary-foreground rounded-xl h-10 w-10" onClick={signOut}>
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
@@ -93,7 +92,7 @@ const Index = () => {
           <Onboarding onGetStarted={() => setPage('add')} />
         ) : (
           <>
-            {page === 'dashboard' && <DashboardView loads={allLoadsQuery.loads} />}
+            {page === 'dashboard' && <DashboardView loads={allLoadsQuery.loads} isLoading={allLoadsQuery.isLoading} onNavigate={handleNavigate} />}
             {page === 'add' && (
               <div className="animate-fade-in">
                 <LoadForm

@@ -1,4 +1,4 @@
-import { Truck, Clock, ArrowRight } from 'lucide-react';
+import { Truck, ArrowRight, DollarSign, BarChart3, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -6,52 +6,51 @@ interface OnboardingProps {
   onGetStarted: () => void;
 }
 
+const features = [
+  { icon: DollarSign, color: 'text-primary', label: 'Track every load with estimated pay' },
+  { icon: BarChart3, color: 'text-success', label: 'Compare estimated vs actual pay received' },
+  { icon: FileText, color: 'text-warning', label: 'Weekly & monthly summaries at a glance' },
+];
+
 export function Onboarding({ onGetStarted }: OnboardingProps) {
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="text-center space-y-3 pt-4">
-        <div className="inline-flex items-center justify-center rounded-2xl bg-primary p-4 mx-auto">
-          <Truck className="h-10 w-10 text-primary-foreground" />
+    <div className="space-y-8 animate-fade-in pt-4">
+      {/* Hero */}
+      <div className="text-center space-y-4">
+        <div className="inline-flex items-center justify-center rounded-3xl bg-secondary p-5 mx-auto shadow-primary">
+          <Truck className="h-12 w-12 text-primary" />
         </div>
-        <h1 className="text-3xl font-black font-heading tracking-tight">Welcome to HaulTracker!</h1>
-        <p className="text-muted-foreground">Your loads. Your money. All tracked.</p>
+        <div>
+          <h1 className="text-3xl font-black font-heading tracking-tight">Welcome to<br /><span className="text-gradient">HaulTracker</span></h1>
+          <p className="text-muted-foreground mt-2 text-sm">Your loads. Your money. All tracked.</p>
+        </div>
       </div>
 
-      <Card className="border-2 border-primary/20 shadow-lg">
-        <CardContent className="p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/10 p-2">
-              <Clock className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="font-bold text-lg">Log your first load in under 30 seconds</p>
-              <p className="text-sm text-muted-foreground">Just enter pickup, drop-off, miles, and rate — we do the math.</p>
-            </div>
-          </div>
+      {/* Feature cards */}
+      <div className="space-y-3">
+        {features.map((f, i) => (
+          <Card key={i} className="shadow-card animate-slide-up" style={{ animationDelay: `${i * 100}ms` }}>
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="rounded-xl bg-muted p-3 shrink-0">
+                <f.icon className={`h-5 w-5 ${f.color}`} />
+              </div>
+              <p className="text-sm font-semibold">{f.label}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-          <ul className="space-y-2 text-sm text-muted-foreground pl-1">
-            <li className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-              Track every load with estimated pay
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />
-              Compare estimated vs actual pay received
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-warning shrink-0" />
-              Weekly & monthly summaries at a glance
-            </li>
-          </ul>
+      {/* CTA */}
+      <Button
+        className="w-full h-14 text-base font-bold gap-2 rounded-2xl shadow-primary active:scale-[0.98] transition-transform"
+        onClick={onGetStarted}
+      >
+        Log Your First Load <ArrowRight className="h-5 w-5" />
+      </Button>
 
-          <Button
-            className="w-full h-12 text-base font-bold gap-2"
-            onClick={onGetStarted}
-          >
-            Log Your First Load <ArrowRight className="h-4 w-4" />
-          </Button>
-        </CardContent>
-      </Card>
+      <p className="text-center text-xs text-muted-foreground">
+        Takes less than 30 seconds — just enter miles and rate.
+      </p>
     </div>
   );
 }

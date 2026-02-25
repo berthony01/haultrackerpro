@@ -14,28 +14,43 @@ const navItems = [
 
 export function BottomNav({ active, onNavigate }: BottomNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-bottom">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-secondary border-t border-border/30 safe-area-bottom">
+      <div className="flex items-center justify-around h-[72px] max-w-lg mx-auto px-2">
         {navItems.map(item => {
           const isActive = active === item.id;
           const isAdd = item.id === 'add';
+
+          if (isAdd) {
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                className="flex flex-col items-center justify-center -mt-6"
+              >
+                <div className="rounded-2xl bg-primary text-primary-foreground w-14 h-14 flex items-center justify-center shadow-primary animate-pulse-glow active:scale-95 transition-transform">
+                  <Plus className="h-7 w-7" strokeWidth={2.5} />
+                </div>
+                <span className="text-[10px] font-bold text-primary mt-1">Log Load</span>
+              </button>
+            );
+          }
+
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors ${
-                isAdd
-                  ? 'bg-primary text-primary-foreground rounded-full w-12 h-12 flex items-center justify-center -mt-4 shadow-lg'
-                  : isActive
+              className={`flex flex-col items-center gap-1 min-w-[56px] min-h-[48px] justify-center rounded-xl px-3 py-2 transition-all active:scale-95 ${
+                isActive
                   ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+                  : 'text-secondary-foreground/50 hover:text-secondary-foreground/80'
               }`}
             >
-              <item.icon className={isAdd ? 'h-6 w-6' : 'h-5 w-5'} />
-              {!isAdd && (
-                <span className={`text-[10px] font-semibold ${isActive ? 'text-primary' : ''}`}>
-                  {item.label}
-                </span>
+              <item.icon className="h-5 w-5" />
+              <span className={`text-[10px] font-semibold ${isActive ? 'text-primary' : ''}`}>
+                {item.label}
+              </span>
+              {isActive && (
+                <div className="h-0.5 w-4 rounded-full bg-primary -mt-0.5" />
               )}
             </button>
           );

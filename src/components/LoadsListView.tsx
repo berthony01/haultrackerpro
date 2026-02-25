@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
-import { LoadCard } from '@/components/LoadCard';
+import { LoadCard, LoadCardSkeleton } from '@/components/LoadCard';
 import { LoadDetailSheet } from '@/components/LoadDetailSheet';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Truck, Search } from 'lucide-react';
@@ -65,12 +65,18 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
       </div>
 
       {isLoading ? (
-        <div className="py-12 text-center text-muted-foreground">Loading...</div>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <LoadCardSkeleton key={i} />
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed border-2">
-          <CardContent className="p-8 text-center">
-            <Truck className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="font-semibold">No loads found</p>
+        <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
+          <CardContent className="py-12 text-center">
+            <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-4 mb-4">
+              <Truck className="h-10 w-10 text-muted-foreground/40" />
+            </div>
+            <p className="font-bold text-lg">No loads found</p>
             <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters</p>
           </CardContent>
         </Card>
