@@ -64,6 +64,75 @@ export function formatNumber(num: number): string {
   return new Intl.NumberFormat('en-US').format(Math.round(num));
 }
 
+// US state abbreviations for location formatting
+const US_STATES: Record<string, string> = {
+  alabama:'AL',alaska:'AK',arizona:'AZ',arkansas:'AR',california:'CA',colorado:'CO',
+  connecticut:'CT',delaware:'DE',florida:'FL',georgia:'GA',hawaii:'HI',idaho:'ID',
+  illinois:'IL',indiana:'IN',iowa:'IA',kansas:'KS',kentucky:'KY',louisiana:'LA',
+  maine:'ME',maryland:'MD',massachusetts:'MA',michigan:'MI',minnesota:'MN',
+  mississippi:'MS',missouri:'MO',montana:'MT',nebraska:'NE',nevada:'NV',
+  'new hampshire':'NH','new jersey':'NJ','new mexico':'NM','new york':'NY',
+  'north carolina':'NC','north dakota':'ND',ohio:'OH',oklahoma:'OK',oregon:'OR',
+  pennsylvania:'PA','rhode island':'RI','south carolina':'SC','south dakota':'SD',
+  tennessee:'TN',texas:'TX',utah:'UT',vermont:'VT',virginia:'VA',washington:'WA',
+  'west virginia':'WV',wisconsin:'WI',wyoming:'WY',
+};
+
+const STATE_ABBRS = new Set(Object.values(US_STATES));
+
+function toTitleCase(s: string): string {
+  return s.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
+}
+
+/**
+ * Formats a location string to "City, ST" format.
+ * Handles: "las vegas nv", "las vegas, nv", "Las Vegas NV", "kenosha wi" etc.
+ */
+export function formatLocation(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+
+  // Split on comma if present, otherwise split on whitespace
+  let parts: string[];
+  if (trimmed.includes(',')) {
+    parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
+  } else {
+    parts = trimmed.split(/\s+/);
+  }
+
+  if (parts.length < 2) return toTitleCase(trimmed);
+
+  const lastPart = parts[parts.length - 1].toLowerCase();
+
+  // Check if last part is a 2-letter state abbreviation
+  if (lastPart.length === 2 && STATE_ABBRS.has(lastPart.toUpperCase())) {
+    const city = toTitleCase(parts.slice(0, -1).join(' '));
+    return `${city}, ${lastPart.toUpperCase()}`;
+  }
+
+  // Check if last 2 parts form a state name (e.g., "new york")
+  if (parts.length >= 3) {
+    const twoWordState = `${parts[parts.length - 2]} ${lastPart}`.toLowerCase();
+    if (US_STATES[twoWordState]) {
+      const city = toTitleCase(parts.slice(0, -2).join(' '));
+      return `${city}, ${US_STATES[twoWordState]}`;
+    }
+  }
+
+  // Check if last part is a full state name
+  if (US_STATES[lastPart]) {
+    const city = toTitleCase(parts.slice(0, -1).join(' '));
+    return `${city}, ${US_STATES[lastPart]}`;
+  }
+
+  // Already has comma — just title-case city, uppercase last part if 2 chars
+  if (raw.includes(',') && parts.length === 2 && parts[1].length === 2) {
+    return `${toTitleCase(parts[0])}, ${parts[1].toUpperCase()}`;
+  }
+
+  return toTitleCase(trimmed);
+}
+
 function escapeCSV(val: string | number | null | undefined): string {
   const s = String(val ?? '');
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;

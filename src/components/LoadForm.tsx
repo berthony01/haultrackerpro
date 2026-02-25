@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCurrency } from '@/lib/loadUtils';
+import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { calculateEstimatedPay } from '@/lib/types';
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -85,8 +85,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormP
     const finalStatus = saveAsPending ? 'pending' : form.status;
     onSubmit({
       load_date: form.load_date,
-      pickup_location: form.pickup_location.trim(),
-      dropoff_location: form.dropoff_location.trim(),
+      pickup_location: formatLocation(form.pickup_location),
+      dropoff_location: formatLocation(form.dropoff_location),
       loaded_miles: parseFloat(form.loaded_miles) || 0,
       deadhead_miles: parseFloat(form.deadhead_miles) || 0,
       rate_per_mile: parseFloat(form.rate_per_mile) || 0,
