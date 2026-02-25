@@ -42,7 +42,9 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
       toast.error('Enter a valid amount');
       return;
     }
-    onUpdate(load.id, { actual_pay_received: val });
+    const updates: LoadUpdate = { actual_pay_received: val };
+    if (load.status === 'pending') updates.status = 'completed';
+    onUpdate(load.id, updates);
     setEditingPay(false);
     toast.success('Actual pay updated');
   };
@@ -153,7 +155,16 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
             )}
           </div>
 
-          {/* Fee breakdown */}
+          {/* Mark as Paid CTA */}
+          {actual == null && load.status !== 'cancelled' && !editingPay && (
+            <Button
+              className="w-full gap-2 rounded-xl shadow-primary active:scale-95 transition-transform h-11 text-sm font-bold"
+              onClick={startEditPay}
+            >
+              <DollarSign className="h-4 w-4" /> Mark as Paid
+            </Button>
+          )}
+
           <div className="space-y-1 text-xs text-muted-foreground">
             <p className="font-medium text-foreground text-sm mb-1">Fee Breakdown</p>
             <div className="flex justify-between"><span>Rate/Mile</span><span className="font-mono">${load.rate_per_mile}/mi</span></div>
