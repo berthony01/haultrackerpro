@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
-import { formatCurrency } from '@/lib/loadUtils';
+import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -83,12 +83,12 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-success shrink-0" />
-              <span className="text-sm font-medium">{load.pickup_location}</span>
+              <span className="text-sm font-medium">{formatLocation(load.pickup_location)}</span>
             </div>
             <div className="ml-2 border-l-2 border-dashed border-muted-foreground/30 h-4" />
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-destructive shrink-0" />
-              <span className="text-sm font-medium">{load.dropoff_location}</span>
+              <span className="text-sm font-medium">{formatLocation(load.dropoff_location)}</span>
             </div>
           </div>
 
