@@ -17,6 +17,7 @@ const Index = () => {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const { loads, isLoading, addLoad, updateLoad, deleteLoad } = useLoads(dateRange);
   const [page, setPage] = useState('dashboard');
+  const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
 
   const allLoadsQuery = useLoads();
@@ -63,8 +64,9 @@ const Index = () => {
     setPage('add');
   };
 
-  const handleNavigate = (p: string) => {
+  const handleNavigate = (p: string, options?: { filter?: string }) => {
     if (p !== 'add') setEditingLoad(null);
+    setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
     setPage(p);
   };
 
@@ -114,6 +116,7 @@ const Index = () => {
                 onDuplicate={handleDuplicate}
                 onDateRangeChange={(from, to) => setDateRange({ from, to })}
                 isLoading={isLoading}
+                initialPayFilter={loadsPayFilter}
               />
             )}
             {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} />}
