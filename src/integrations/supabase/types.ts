@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      feedback_responses: {
+        Row: {
+          created_at: string
+          id: string
+          loads_count: number
+          response: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          loads_count?: number
+          response: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          loads_count?: number
+          response?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       loads: {
         Row: {
           actual_pay_received: number | null
@@ -140,6 +164,60 @@ export type Database = {
           updated_at?: string
           user_id?: string
           week_start_day?: string
+        }
+        Relationships: []
+      }
+      weekly_snapshots: {
+        Row: {
+          created_at: string
+          deadhead_percentage: number
+          finalized_at: string
+          id: string
+          known_difference: number
+          total_actual_pay: number
+          total_deadhead_miles: number
+          total_estimated_pay: number
+          total_loaded_miles: number
+          total_loads: number
+          unpaid_count: number
+          unpaid_estimated: number
+          user_id: string
+          week_end: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          deadhead_percentage?: number
+          finalized_at?: string
+          id?: string
+          known_difference?: number
+          total_actual_pay?: number
+          total_deadhead_miles?: number
+          total_estimated_pay?: number
+          total_loaded_miles?: number
+          total_loads?: number
+          unpaid_count?: number
+          unpaid_estimated?: number
+          user_id: string
+          week_end: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          deadhead_percentage?: number
+          finalized_at?: string
+          id?: string
+          known_difference?: number
+          total_actual_pay?: number
+          total_deadhead_miles?: number
+          total_estimated_pay?: number
+          total_loaded_miles?: number
+          total_loads?: number
+          unpaid_count?: number
+          unpaid_estimated?: number
+          user_id?: string
+          week_end?: string
+          week_start?: string
         }
         Relationships: []
       }
