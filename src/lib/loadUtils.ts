@@ -1,4 +1,5 @@
 import { Load } from '@/hooks/useLoads';
+import type { Expense } from '@/hooks/useExpenses';
 import { WeekSummary } from '@/lib/types';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
@@ -152,6 +153,45 @@ export function exportToCSV(loads: Load[], filename: string) {
       l.status, l.notes ?? ''
     ].map(escapeCSV);
   });
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: string = 'profit-report') {
+  const totalRevenue = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? l.estimated_pay ?? 0), 0);
+  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const totalMiles = loads.reduce((s, l) => s + Number(l.loaded_miles) + Number(l.deadhead_miles), 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
+
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Estimated Pay', 'Actual Pay', 'Linked Expenses', 'Net Load Profit'];
+  const rows = loads.map(l => {
+    const est = Number(l.estimated_pay ?? 0);
+    const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
+    const linkedExp = expenses.filter(e => e.linked_load_id === l.id).reduce((s, e) => s + Number(e.amount), 0);
+    const pay = act ?? est;
+    const netLoadProfit = pay - linkedExp;
+    return [
+      l.load_date, l.pickup_location, l.dropoff_location,
+      est.toFixed(2), act != null ? act.toFixed(2) : '',
+      linkedExp.toFixed(2), netLoadProfit.toFixed(2),
+    ].map(escapeCSV);
+  });
+
+  // Summary rows
+  rows.push([]);
+  rows.push(['SUMMARY'].map(escapeCSV));
+  rows.push(['Total Revenue', '', '', '', totalRevenue.toFixed(2), '', ''].map(escapeCSV));
+  rows.push(['Total Expenses', '', '', '', '', totalExpenses.toFixed(2), ''].map(escapeCSV));
+  rows.push(['Net Profit', '', '', '', '', '', netProfit.toFixed(2)].map(escapeCSV));
+  rows.push(['Net $/Mile', '', '', '', '', '', netPerMile.toFixed(2)].map(escapeCSV));
+
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);

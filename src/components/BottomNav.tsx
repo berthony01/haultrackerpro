@@ -31,7 +31,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
                 <div className="rounded-2xl bg-primary text-primary-foreground w-[56px] h-[56px] flex items-center justify-center shadow-primary animate-pulse-glow active:scale-90 transition-transform duration-150">
                   <Plus className="h-7 w-7" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-bold text-primary mt-1.5">Log Load</span>
+                <span className="text-[10px] font-bold text-primary mt-1.5">Add</span>
               </button>
             );
           }

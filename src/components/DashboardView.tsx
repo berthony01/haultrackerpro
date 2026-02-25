@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
+import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency, formatNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 import { PerformanceTrends } from '@/components/PerformanceTrends';
+import { ProfitOverview } from '@/components/ProfitOverview';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ import { Shield } from 'lucide-react';
 
 interface DashboardViewProps {
   loads: Load[];
+  expenses?: Expense[];
   isLoading?: boolean;
   onNavigate?: (page: string, options?: { filter?: string }) => void;
 }
@@ -41,7 +44,7 @@ function getPresetRange(key: PresetKey): { start: Date; end: Date } {
   }
 }
 
-export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: DashboardViewProps) {
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -62,6 +65,22 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
       return isWithinInterval(d, { start, end });
     });
   }, [loads, activePreset, customFrom, customTo]);
+
+  const filteredExpenses = useMemo(() => {
+    if (activePreset === 'custom') {
+      return expenses.filter(e => {
+        const d = e.expense_date;
+        if (customFrom && d < customFrom) return false;
+        if (customTo && d > customTo) return false;
+        return true;
+      });
+    }
+    const { start, end } = getPresetRange(activePreset);
+    return expenses.filter(e => {
+      const d = parseISO(e.expense_date);
+      return isWithinInterval(d, { start, end });
+    });
+  }, [expenses, activePreset, customFrom, customTo]);
 
   const estimated = filteredLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const actual = filteredLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
@@ -193,6 +212,9 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
               />
             )}
           </div>
+
+          {/* Profit Overview */}
+          <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} />
 
           {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
+import { Expense } from '@/hooks/useExpenses';
 import { LoadCard, LoadCardSkeleton } from '@/components/LoadCard';
 import { LoadDetailSheet } from '@/components/LoadDetailSheet';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input';
 
 interface LoadsListViewProps {
   loads: Load[];
+  expenses?: Expense[];
   onEdit: (load: Load) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, data: LoadUpdate) => void;
@@ -20,7 +22,7 @@ interface LoadsListViewProps {
   initialPayFilter?: string;
 }
 
-export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, onDateRangeChange, isLoading, initialPayFilter }: LoadsListViewProps) {
+export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate, onDuplicate, onDateRangeChange, isLoading, initialPayFilter }: LoadsListViewProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [payFilter, setPayFilter] = useState(initialPayFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,6 +108,7 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
 
       <LoadDetailSheet
         load={selectedLoad}
+        expenses={expenses}
         open={!!selectedLoad}
         onOpenChange={open => { if (!open) setSelectedLoad(null); }}
         onEdit={onEdit}

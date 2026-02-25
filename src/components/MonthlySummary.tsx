@@ -1,18 +1,20 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
+import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency, formatNumber, exportToCSV, exportToPDF } from '@/lib/loadUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, DollarSign, Route, TrendingUp, TrendingDown, Trophy, AlertTriangle, FileSpreadsheet, Download } from 'lucide-react';
+import { ArrowLeft, Calendar, DollarSign, Route, TrendingUp, TrendingDown, Trophy, AlertTriangle, FileSpreadsheet, Download, Fuel } from 'lucide-react';
 import { startOfMonth, endOfMonth, subMonths, format, parseISO, isWithinInterval } from 'date-fns';
 
 interface MonthlySummaryProps {
   loads: Load[];
+  expenses?: Expense[];
   onBack: () => void;
 }
 
-export function MonthlySummary({ loads, onBack }: MonthlySummaryProps) {
+export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryProps) {
   const months = useMemo(() => {
     const now = new Date();
     return [0, 1, 2].map(offset => {
@@ -22,9 +24,12 @@ export function MonthlySummary({ loads, onBack }: MonthlySummaryProps) {
       const monthLoads = loads.filter(l =>
         isWithinInterval(parseISO(l.load_date), { start, end })
       );
-      return { label: format(d, 'MMMM yyyy'), start, end, loads: monthLoads, offset };
+      const monthExpenses = expenses.filter(e =>
+        isWithinInterval(parseISO(e.expense_date), { start, end })
+      );
+      return { label: format(d, 'MMMM yyyy'), start, end, loads: monthLoads, expenses: monthExpenses, offset };
     });
-  }, [loads]);
+  }, [loads, expenses]);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -39,13 +44,13 @@ export function MonthlySummary({ loads, onBack }: MonthlySummaryProps) {
       </div>
 
       {months.map(month => (
-        <MonthCard key={month.label} label={month.label} loads={month.loads} allLoads={loads} />
+        <MonthCard key={month.label} label={month.label} loads={month.loads} expenses={month.expenses} allLoads={loads} />
       ))}
     </div>
   );
 }
 
-function MonthCard({ label, loads }: { label: string; loads: Load[]; allLoads: Load[] }) {
+function MonthCard({ label, loads, expenses = [] }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[] }) {
   const stats = useMemo(() => {
     const nonCancelled = loads.filter(l => l.status !== 'cancelled');
     const estimated = nonCancelled.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
@@ -58,14 +63,31 @@ function MonthCard({ label, loads }: { label: string; loads: Load[]; allLoads: L
     const totalMiles = loadedMiles + deadheadMiles;
     const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
 
-    const sorted = [...nonCancelled].sort(
-      (a, b) => Number(b.estimated_pay ?? 0) - Number(a.estimated_pay ?? 0)
-    );
-    const highest = sorted[0] ?? null;
-    const lowest = sorted.length > 1 ? sorted[sorted.length - 1] : null;
+    // Gross revenue: actual for paid + estimated for unpaid
+    const grossRevenue = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
+      nonCancelled.filter(l => l.actual_pay_received == null).reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+    const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
+    const netProfit = grossRevenue - totalExpenses;
+    const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
 
-    return { estimated, actual, difference, loadedMiles, deadheadPct, highest, lowest, totalLoads: nonCancelled.length, paidCount: paidLoads.length };
-  }, [loads]);
+    // Fuel cost per mile
+    const fuelExpenses = expenses.filter(e => e.category === 'Fuel');
+    const totalFuelCost = fuelExpenses.reduce((s, e) => s + Number(e.amount), 0);
+    const totalGallons = fuelExpenses.reduce((s, e) => s + Number(e.gallons ?? 0), 0);
+    const fuelCostPerMile = totalMiles > 0 && totalFuelCost > 0 ? totalFuelCost / totalMiles : null;
+
+    // Net profit per load for highest/lowest
+    const loadsWithProfit = nonCancelled.map(l => {
+      const pay = l.actual_pay_received != null ? Number(l.actual_pay_received) : Number(l.estimated_pay ?? 0);
+      const linkedExp = expenses.filter(e => e.linked_load_id === l.id).reduce((s, e) => s + Number(e.amount), 0);
+      return { ...l, netProfit: pay - linkedExp };
+    });
+    const sortedByProfit = [...loadsWithProfit].sort((a, b) => b.netProfit - a.netProfit);
+    const highest = sortedByProfit[0] ?? null;
+    const lowest = sortedByProfit.length > 1 ? sortedByProfit[sortedByProfit.length - 1] : null;
+
+    return { estimated, actual, grossRevenue, totalExpenses, netProfit, netPerMile, fuelCostPerMile, totalGallons, difference, loadedMiles, deadheadPct, highest, lowest, totalLoads: nonCancelled.length, paidCount: paidLoads.length };
+  }, [loads, expenses]);
 
   if (loads.length === 0) {
     return (
@@ -92,29 +114,37 @@ function MonthCard({ label, loads }: { label: string; loads: Load[]; allLoads: L
         {/* Earnings Grid */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg bg-secondary p-3">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Estimated</p>
-            <p className="text-lg font-black font-mono text-primary">{formatCurrency(stats.estimated)}</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Gross Revenue</p>
+            <p className="text-lg font-black font-mono text-primary">{formatCurrency(stats.grossRevenue)}</p>
           </div>
           <div className="rounded-lg bg-secondary p-3">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Actual</p>
-            <p className="text-lg font-black font-mono text-foreground">
-              {stats.paidCount > 0 ? formatCurrency(stats.actual) : '—'}
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Expenses</p>
+            <p className="text-lg font-black font-mono text-destructive">
+              {stats.totalExpenses > 0 ? formatCurrency(stats.totalExpenses) : '—'}
             </p>
           </div>
-          {stats.difference != null && (
-            <div className={`rounded-lg p-3 ${stats.difference >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Difference</p>
-              <p className={`text-lg font-black font-mono ${stats.difference >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {stats.difference >= 0 ? '+' : ''}{formatCurrency(stats.difference)}
-              </p>
-            </div>
-          )}
+          <div className={`rounded-lg p-3 ${stats.netProfit >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Net Profit</p>
+            <p className={`text-lg font-black font-mono ${stats.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {formatCurrency(stats.netProfit)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-secondary p-3">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Net $/Mile</p>
+            <p className="text-lg font-black font-mono">{formatCurrency(stats.netPerMile)}</p>
+          </div>
           <div className="rounded-lg bg-secondary p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Deadhead %</p>
             <p className={`text-lg font-black font-mono ${stats.deadheadPct < 15 ? 'text-success' : stats.deadheadPct < 30 ? 'text-warning' : 'text-destructive'}`}>
               {stats.deadheadPct.toFixed(1)}%
             </p>
           </div>
+          {stats.fuelCostPerMile != null && (
+            <div className="rounded-lg bg-secondary p-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Fuel $/Mile</p>
+              <p className="text-lg font-black font-mono">{formatCurrency(stats.fuelCostPerMile)}</p>
+            </div>
+          )}
         </div>
 
         {/* Best / Worst Loads */}
@@ -122,8 +152,8 @@ function MonthCard({ label, loads }: { label: string; loads: Load[]; allLoads: L
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs">
               <Trophy className="h-3.5 w-3.5 text-primary" />
-              <span className="text-muted-foreground">Highest:</span>
-              <span className="font-bold">{formatCurrency(Number(stats.highest.estimated_pay ?? 0))}</span>
+              <span className="text-muted-foreground">Highest Profit:</span>
+              <span className="font-bold">{formatCurrency(stats.highest.netProfit)}</span>
               <span className="text-muted-foreground truncate">
                 {stats.highest.pickup_location} → {stats.highest.dropoff_location}
               </span>
@@ -131,8 +161,8 @@ function MonthCard({ label, loads }: { label: string; loads: Load[]; allLoads: L
             {stats.lowest && stats.lowest.id !== stats.highest.id && (
               <div className="flex items-center gap-2 text-xs">
                 <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground">Lowest:</span>
-                <span className="font-bold">{formatCurrency(Number(stats.lowest.estimated_pay ?? 0))}</span>
+                <span className="text-muted-foreground">Lowest Profit:</span>
+                <span className="font-bold">{formatCurrency(stats.lowest.netProfit)}</span>
                 <span className="text-muted-foreground truncate">
                   {stats.lowest.pickup_location} → {stats.lowest.dropoff_location}
                 </span>

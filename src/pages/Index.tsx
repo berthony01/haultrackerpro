@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
+import { useExpenses, ExpenseInsert } from '@/hooks/useExpenses';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeedback } from '@/hooks/useFeedback';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
+import { ExpenseForm } from '@/components/ExpenseForm';
+import { AddActionModal } from '@/components/AddActionModal';
 import { LoadsListView } from '@/components/LoadsListView';
 import { ReportsView } from '@/components/ReportsView';
 import { SettingsView } from '@/components/SettingsView';
@@ -27,8 +30,10 @@ const Index = () => {
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const allLoadsQuery = useLoads();
+  const allExpensesQuery = useExpenses();
 
   useEffect(() => {
     if (
@@ -46,6 +51,13 @@ const Index = () => {
   const handleAddLoad = (data: LoadInsert) => {
     addLoad.mutate(data, {
       onSuccess: () => { toast.success('Load logged successfully!'); setPage('loads'); },
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const handleAddExpense = (data: ExpenseInsert) => {
+    allExpensesQuery.addExpense.mutate(data, {
+      onSuccess: () => { toast.success('Expense saved!'); setPage('dashboard'); },
       onError: (e) => toast.error(e.message),
     });
   };
@@ -84,9 +96,23 @@ const Index = () => {
   };
 
   const handleNavigate = (p: string, options?: { filter?: string }) => {
-    if (p !== 'add') setEditingLoad(null);
+    if (p === 'add') {
+      // Show modal to pick load or expense
+      setShowAddModal(true);
+      return;
+    }
+    setEditingLoad(null);
     setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
     setPage(p);
+  };
+
+  const handleAddLoadFromModal = () => {
+    setEditingLoad(null);
+    setPage('add');
+  };
+
+  const handleAddExpenseFromModal = () => {
+    setPage('add_expense');
   };
 
   return (
@@ -125,10 +151,17 @@ const Index = () => {
         )}
 
         {showOnboarding ? (
-          <Onboarding onGetStarted={() => setPage('add')} />
+          <Onboarding onGetStarted={() => { setEditingLoad(null); setPage('add'); }} />
         ) : (
           <>
-            {page === 'dashboard' && <DashboardView loads={allLoadsQuery.loads} isLoading={allLoadsQuery.isLoading} onNavigate={handleNavigate} />}
+            {page === 'dashboard' && (
+              <DashboardView
+                loads={allLoadsQuery.loads}
+                expenses={allExpensesQuery.expenses}
+                isLoading={allLoadsQuery.isLoading}
+                onNavigate={handleNavigate}
+              />
+            )}
             {page === 'closeout' && (
               <WeeklyCloseout
                 loads={allLoadsQuery.loads}
@@ -140,16 +173,27 @@ const Index = () => {
               <div className="animate-fade-in">
                 <LoadForm
                   onSubmit={editingLoad && editingLoad.id ? handleUpdateLoad : handleAddLoad}
-                  onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : undefined}
+                  onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : () => setPage('dashboard')}
                   initialData={editingLoad || undefined}
                   loading={addLoad.isPending || updateLoad.isPending}
                   recentLoads={allLoadsQuery.loads}
                 />
               </div>
             )}
+            {page === 'add_expense' && (
+              <div className="animate-fade-in">
+                <ExpenseForm
+                  onSubmit={handleAddExpense}
+                  onCancel={() => setPage('dashboard')}
+                  loading={allExpensesQuery.addExpense.isPending}
+                  loads={allLoadsQuery.loads}
+                />
+              </div>
+            )}
             {page === 'loads' && (
               <LoadsListView
                 loads={loads}
+                expenses={allExpensesQuery.expenses}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onUpdate={handleQuickUpdate}
@@ -159,14 +203,32 @@ const Index = () => {
                 initialPayFilter={loadsPayFilter}
               />
             )}
-            {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} onNavigate={handleNavigate} />}
-            {page === 'monthly' && <MonthlySummary loads={allLoadsQuery.loads} onBack={() => setPage('reports')} />}
+            {page === 'reports' && (
+              <ReportsView
+                loads={allLoadsQuery.loads}
+                expenses={allExpensesQuery.expenses}
+                onNavigate={handleNavigate}
+              />
+            )}
+            {page === 'monthly' && (
+              <MonthlySummary
+                loads={allLoadsQuery.loads}
+                expenses={allExpensesQuery.expenses}
+                onBack={() => setPage('reports')}
+              />
+            )}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
         )}
       </main>
 
       <BottomNav active={page} onNavigate={handleNavigate} />
+      <AddActionModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onAddLoad={handleAddLoadFromModal}
+        onAddExpense={handleAddExpenseFromModal}
+      />
       <FeedbackModal
         totalLoads={allLoadsQuery.loads.length}
         open={showFeedback}
