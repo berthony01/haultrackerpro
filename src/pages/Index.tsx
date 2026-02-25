@@ -6,6 +6,7 @@ import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
 import { LoadsListView } from '@/components/LoadsListView';
 import { ReportsView } from '@/components/ReportsView';
+import { SettingsView } from '@/components/SettingsView';
 import { Onboarding } from '@/components/Onboarding';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -115,6 +116,7 @@ const Index = () => {
               />
             )}
             {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} />}
+            {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
         )}
       </main>
