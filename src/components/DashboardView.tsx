@@ -67,7 +67,10 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
   const paidLoads = filteredLoads.filter(l => l.actual_pay_received != null);
   const missingPayCount = filteredLoads.filter(l => l.actual_pay_received == null).length;
   const paidEstimated = paidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const difference = paidLoads.length > 0 ? actual - paidEstimated : null;
+  const knownDifference = paidLoads.length > 0 ? actual - paidEstimated : null;
+  const unpaidEstimated = filteredLoads
+    .filter(l => l.actual_pay_received == null)
+    .reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -121,14 +124,25 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
             <StatCard label="Loads Done" value={completedLoads.length.toString()} icon={Truck} />
             <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
             <StatCard label="Deadhead Miles" value={formatNumber(deadheadMiles)} icon={MapPin} />
-            {difference != null ? (
+            {knownDifference != null && (
               <StatCard
-                label="Difference"
-                value={`${difference >= 0 ? '+' : ''}${formatCurrency(difference)}`}
-                icon={difference >= 0 ? TrendingUp : TrendingDown}
-                subtitle={difference >= 0 ? 'Overpaid' : 'Underpaid'}
+                label="Known Difference"
+                value={`${knownDifference >= 0 ? '+' : ''}${formatCurrency(knownDifference)}`}
+                icon={knownDifference >= 0 ? TrendingUp : TrendingDown}
+                subtitle={knownDifference >= 0 ? 'Overpaid' : 'Underpaid'}
+                variant={knownDifference >= 0 ? 'success' : 'danger'}
               />
-            ) : (
+            )}
+            {missingPayCount > 0 && (
+              <StatCard
+                label="Unpaid / Unknown"
+                value={formatCurrency(unpaidEstimated)}
+                icon={AlertTriangle}
+                subtitle={`${missingPayCount} load${missingPayCount > 1 ? 's' : ''} missing actual pay`}
+                variant="warning"
+              />
+            )}
+            {knownDifference == null && missingPayCount === 0 && (
               <StatCard
                 label="Avg $/Mile"
                 value={loadedMiles > 0 ? formatCurrency(estimated / loadedMiles) : '$0'}
@@ -137,19 +151,8 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
             )}
           </div>
 
-          {/* Insight Alert */}
-          {missingPayCount > 0 && (
-            <Card className="border-warning/30 bg-warning/5 shadow-card">
-              <CardContent className="p-3.5 flex items-center gap-3">
-                <div className="rounded-lg bg-warning/10 p-2 shrink-0">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Missing Actual Pay for <span className="font-bold text-foreground">{missingPayCount} load{missingPayCount > 1 ? 's' : ''}</span>
-                </p>
-              </CardContent>
-            </Card>
-          )}
+
+
 
           {/* Empty State */}
           {filteredLoads.length === 0 && (
