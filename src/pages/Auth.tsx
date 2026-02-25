@@ -40,7 +40,7 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center rounded-2xl bg-primary p-3 mx-auto">
             <Truck className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-black font-heading tracking-tight">HaulTracker</h1>
+          <h1 className="text-3xl font-black font-heading tracking-tight">HaulTrackerPro</h1>
           <p className="text-sm text-muted-foreground">Load & Pay Manager</p>
         </div>
 

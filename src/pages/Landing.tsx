@@ -14,9 +14,9 @@ const features = [
 
 const faqs = [
   { q: 'Is my data secure?', a: 'Yes. All data is encrypted in transit and stored securely. We never sell or share your data with third parties.' },
-  { q: 'Do I need accounting knowledge?', a: 'Not at all. Just enter your loads and expenses — HaulTracker does the math for you automatically.' },
+  { q: 'Do I need accounting knowledge?', a: 'Not at all. Just enter your loads and expenses — HaulTrackerPro does the math for you automatically.' },
   { q: 'Is it really free?', a: 'Yes. Unlimited loads, expenses, weekly summaries, and exports. No credit card required.' },
-  { q: 'How is this different from a spreadsheet?', a: 'HaulTracker gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
+  { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
 ];
 
 export default function Landing() {
