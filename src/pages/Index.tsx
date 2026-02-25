@@ -4,6 +4,7 @@ import { useExpenses, ExpenseInsert } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeedback } from '@/hooks/useFeedback';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
@@ -17,13 +18,16 @@ import { WeeklyCloseout } from '@/components/WeeklyCloseout';
 import { SmartReminders } from '@/components/SmartReminders';
 import { MonthlySummary } from '@/components/MonthlySummary';
 import { FeedbackModal } from '@/components/FeedbackModal';
+import { OnboardingModal } from '@/components/OnboardingModal';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { responses: feedbackResponses } = useFeedback();
+  const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const { loads, isLoading, addLoad, updateLoad, deleteLoad } = useLoads(dateRange);
   const [page, setPage] = useState('dashboard');
@@ -32,6 +36,7 @@ const Index = () => {
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
   const [showFeedback, setShowFeedback] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
   const allLoadsQuery = useLoads();
   const allExpensesQuery = useExpenses();
@@ -50,6 +55,22 @@ const Index = () => {
       return () => clearTimeout(timer);
     }
   }, [allLoadsQuery.isLoading, allLoadsQuery.loads.length, feedbackResponses.length]);
+
+  // Show onboarding modal for first-time users
+  useEffect(() => {
+    if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
+      setShowOnboardingModal(true);
+    }
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length]);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboardingModal(false);
+    if (user) {
+      await supabase.from('user_settings').update({ onboarding_completed: true }).eq('user_id', user.id);
+    }
+    setEditingLoad(null);
+    setPage('add');
+  };
 
   const showOnboarding = !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
 
@@ -259,6 +280,10 @@ const Index = () => {
         totalLoads={allLoadsQuery.loads.length}
         open={showFeedback}
         onClose={() => setShowFeedback(false)}
+      />
+      <OnboardingModal
+        open={showOnboardingModal}
+        onComplete={handleOnboardingComplete}
       />
     </div>
   );

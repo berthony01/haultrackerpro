@@ -240,10 +240,15 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: D
             </p>
           )}
 
-          {/* Confidence footer */}
-          <div className="flex items-center justify-center gap-1.5 py-2">
-            <Shield className="h-3 w-3 text-muted-foreground/40" />
-            <p className="text-[10px] text-muted-foreground/40">Your data is securely stored and private.</p>
+          {/* Disclaimer + Confidence footer */}
+          <div className="text-center space-y-1.5 py-2">
+            <p className="text-[10px] text-muted-foreground/50">
+              HaulTracker provides tracking tools only. Always verify financial and tax information.
+            </p>
+            <div className="flex items-center justify-center gap-1.5">
+              <Shield className="h-3 w-3 text-muted-foreground/40" />
+              <p className="text-[10px] text-muted-foreground/40">Your data is securely stored and private.</p>
+            </div>
           </div>
 
           {/* Empty State */}

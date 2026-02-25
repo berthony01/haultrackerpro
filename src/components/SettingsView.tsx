@@ -6,8 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { DeleteAccountModal } from '@/components/DeleteAccountModal';
+import { SendFeedbackModal } from '@/components/SendFeedbackModal';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SettingsViewProps {
   onBack: () => void;
@@ -24,15 +28,26 @@ const proFeatures = [
   { label: 'Multi-Truck / Team Mode', desc: 'Track multiple trucks/drivers under one account' },
 ];
 
+const freePlanIncludes = [
+  'Unlimited loads',
+  'Unlimited expenses',
+  'Standard exports',
+  'Weekly summaries',
+];
+
 export function SettingsView({ onBack }: SettingsViewProps) {
   const { settings, isLoading, updateSettings } = useUserSettings();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [ratePerMile, setRatePerMile] = useState('');
   const [otherFees, setOtherFees] = useState('');
   const [weekStart, setWeekStart] = useState('');
   const [currency, setCurrency] = useState('');
   const [initialized, setInitialized] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Sync from loaded settings once
   if (settings && !initialized) {
@@ -55,6 +70,45 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     });
   };
 
+  const handleExportData = async () => {
+    if (!user) return;
+    setExporting(true);
+    try {
+      const [loads, expenses, stops, snapshots, feedback, profile] = await Promise.all([
+        supabase.from('loads').select('*').eq('user_id', user.id),
+        supabase.from('expenses').select('*').eq('user_id', user.id),
+        supabase.from('load_stops').select('*').eq('user_id', user.id),
+        supabase.from('weekly_snapshots').select('*').eq('user_id', user.id),
+        supabase.from('feedback_responses').select('*').eq('user_id', user.id),
+        supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+      ]);
+
+      const exportData = {
+        exported_at: new Date().toISOString(),
+        profile: profile.data,
+        loads: loads.data ?? [],
+        expenses: expenses.data ?? [],
+        load_stops: stops.data ?? [],
+        weekly_snapshots: snapshots.data ?? [],
+        feedback_responses: feedback.data ?? [],
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `haultracker_full_export_${dateStr}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Data exported successfully!');
+    } catch (err: any) {
+      toast.error(err.message || 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -70,13 +124,31 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Account info */}
       <Card className="shadow-card">
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold mb-2">Account</p>
-          <p className="text-sm font-medium truncate">{user?.email}</p>
-          <div className="flex items-center gap-2 mt-1.5">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Account</p>
+          <div className="flex items-center gap-2">
+            <Lock className="h-3.5 w-3.5 text-muted-foreground/50" />
+            <p className="text-sm font-medium truncate">{user?.email}</p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
+            <Shield className="h-3 w-3" /> Encrypted in transit
+          </p>
+          <div className="flex items-center gap-2 mt-1">
             <span className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase tracking-wider">
               Free Plan
             </span>
+          </div>
+          <div className="pt-2 space-y-1">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
+            {freePlanIncludes.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <CheckCircle className="h-3 w-3 text-success" />
+                <p className="text-xs text-muted-foreground">{item}</p>
+              </div>
+            ))}
+            <p className="text-[10px] text-muted-foreground/60 pt-1">
+              Pro will unlock advanced analytics, tax tools, and integrations.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -91,28 +163,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               <Label className="text-xs font-semibold">Default Rate/Mile</Label>
               <div className="relative">
                 <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={ratePerMile}
-                  onChange={e => setRatePerMile(e.target.value)}
-                  className="h-10 pl-8 text-sm rounded-xl"
-                />
+                <Input type="number" step="0.01" placeholder="0.00" value={ratePerMile} onChange={e => setRatePerMile(e.target.value)} className="h-10 pl-8 text-sm rounded-xl" />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Default Other Fees</Label>
               <div className="relative">
                 <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={otherFees}
-                  onChange={e => setOtherFees(e.target.value)}
-                  className="h-10 pl-8 text-sm rounded-xl"
-                />
+                <Input type="number" step="0.01" placeholder="0.00" value={otherFees} onChange={e => setOtherFees(e.target.value)} className="h-10 pl-8 text-sm rounded-xl" />
               </div>
             </div>
           </div>
@@ -121,9 +179,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Week Starts On</Label>
               <Select value={weekStart} onValueChange={setWeekStart}>
-                <SelectTrigger className="h-10 text-sm rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sunday">Sunday</SelectItem>
                   <SelectItem value="monday">Monday</SelectItem>
@@ -134,9 +190,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger className="h-10 text-sm rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="CAD">CAD (C$)</SelectItem>
@@ -147,13 +201,62 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             </div>
           </div>
 
-          <Button
-            className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform"
-            onClick={handleSave}
-            disabled={updateSettings.isPending || isLoading}
-          >
+          <Button className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
             {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Data Management */}
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Data</p>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" onClick={handleExportData} disabled={exporting}>
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exporting...' : 'Export All My Data'}
+          </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 text-destructive border-destructive/30 hover:bg-destructive/5" onClick={() => setShowDeleteModal(true)}>
+            <Trash2 className="h-4 w-4" />
+            Delete Account
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Support */}
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Support</p>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => setShowFeedbackModal(true)}>
+            <MessageSquare className="h-4 w-4 text-primary" /> Send Feedback
+          </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => setShowFeedbackModal(true)}>
+            <Bug className="h-4 w-4 text-destructive" /> Report a Bug
+          </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/faq')}>
+            <HelpCircle className="h-4 w-4 text-warning" /> FAQ
+          </Button>
+          <div className="flex items-center gap-2 pt-1">
+            <Mail className="h-3.5 w-3.5 text-muted-foreground/50" />
+            <p className="text-xs text-muted-foreground">support@haultracker.app</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Legal */}
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Legal</p>
+          <Button variant="ghost" className="w-full h-10 rounded-xl font-semibold gap-2 justify-between text-sm" onClick={() => navigate('/terms')}>
+            <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Terms of Service</span>
+            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50" />
+          </Button>
+          <Button variant="ghost" className="w-full h-10 rounded-xl font-semibold gap-2 justify-between text-sm" onClick={() => navigate('/privacy')}>
+            <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> Privacy Policy</span>
+            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50" />
+          </Button>
+          <p className="text-[10px] text-muted-foreground/50 pt-1">
+            HaulTracker provides tracking tools only. Always verify financial and tax information with qualified professionals.
+          </p>
         </CardContent>
       </Card>
 
@@ -187,6 +290,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modals */}
+      <DeleteAccountModal open={showDeleteModal} onOpenChange={setShowDeleteModal} />
+      <SendFeedbackModal open={showFeedbackModal} onOpenChange={setShowFeedbackModal} />
     </div>
   );
 }
