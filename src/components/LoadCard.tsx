@@ -20,7 +20,7 @@ const statusStyles: Record<string, string> = {
 
 export function LoadCard({ load, onEdit, onDelete }: LoadCardProps) {
   const estimated = Number(load.estimated_pay ?? 0);
-  const actual = load.actual_pay != null ? Number(load.actual_pay) : null;
+  const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
   const diff = actual != null ? actual - estimated : null;
 
   return (
@@ -31,7 +31,7 @@ export function LoadCard({ load, onEdit, onDelete }: LoadCardProps) {
             <div className="flex items-center gap-2 mb-2">
               <Route className="h-4 w-4 text-primary shrink-0" />
               <span className="text-xs font-medium text-muted-foreground">
-                {format(parseISO(load.date), 'MMM d, yyyy')}
+                {format(parseISO(load.load_date), 'MMM d, yyyy')}
               </span>
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusStyles[load.status] ?? ''}`}>
                 {load.status}
@@ -40,11 +40,11 @@ export function LoadCard({ load, onEdit, onDelete }: LoadCardProps) {
             <div className="space-y-1 mb-3">
               <div className="flex items-center gap-1.5 text-sm">
                 <MapPin className="h-3 w-3 text-success shrink-0" />
-                <span className="truncate font-medium">{load.pickup}</span>
+                <span className="truncate font-medium">{load.pickup_location}</span>
               </div>
               <div className="flex items-center gap-1.5 text-sm">
                 <MapPin className="h-3 w-3 text-destructive shrink-0" />
-                <span className="truncate font-medium">{load.dropoff}</span>
+                <span className="truncate font-medium">{load.dropoff_location}</span>
               </div>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -52,6 +52,9 @@ export function LoadCard({ load, onEdit, onDelete }: LoadCardProps) {
               <span>{load.deadhead_miles} mi DH</span>
               <span>${load.rate_per_mile}/mi</span>
             </div>
+            {load.notes && (
+              <p className="text-xs text-muted-foreground mt-2 italic truncate">📝 {load.notes}</p>
+            )}
           </div>
           <div className="text-right shrink-0">
             <p className="text-xs text-muted-foreground">Est.</p>

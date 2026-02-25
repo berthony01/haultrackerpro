@@ -70,7 +70,7 @@ export function ReportsView({ loads }: ReportsViewProps) {
                   </div>
                   <Button variant="ghost" size="sm" className="mt-2 w-full text-xs" onClick={() => {
                     const weekLoads = loads.filter(l => {
-                      const d = new Date(l.date);
+                      const d = new Date(l.load_date);
                       return d >= new Date(s.startDate) && d <= new Date(s.endDate);
                     });
                     exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`);
