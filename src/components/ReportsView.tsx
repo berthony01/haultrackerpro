@@ -1,16 +1,30 @@
+import { useState } from 'react';
 import { Load } from '@/hooks/useLoads';
-import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, getCurrentMonthLoads } from '@/lib/loadUtils';
+import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, getCurrentMonthLoads } from '@/lib/loadUtils';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter } from 'lucide-react';
+import { parseISO, isWithinInterval } from 'date-fns';
 
 interface ReportsViewProps {
   loads: Load[];
 }
 
 export function ReportsView({ loads }: ReportsViewProps) {
-  const summaries = getWeekSummaries(loads);
+  const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
+
+  const filteredLoads = loads.filter(l => {
+    if (!dateRange.from && !dateRange.to) return true;
+    const d = parseISO(l.load_date);
+    const start = dateRange.from ? parseISO(dateRange.from) : new Date(0);
+    const end = dateRange.to ? parseISO(dateRange.to) : new Date('2099-12-31');
+    return isWithinInterval(d, { start, end });
+  });
+
+  const summaries = getWeekSummaries(filteredLoads);
   const monthLoads = getCurrentMonthLoads(loads);
+  const hasFilter = !!(dateRange.from || dateRange.to);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -19,21 +33,45 @@ export function ReportsView({ loads }: ReportsViewProps) {
         <p className="text-sm text-muted-foreground">Export and review summaries</p>
       </div>
 
-      <div className="grid gap-3">
-        <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(loads, 'all-loads')} disabled={loads.length === 0}>
-          <Download className="h-5 w-5 text-primary" />
-          <div className="text-left">
-            <p className="font-semibold text-sm">Export All Loads</p>
-            <p className="text-xs text-muted-foreground">{loads.length} loads as CSV</p>
-          </div>
-        </Button>
-        <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(monthLoads, 'monthly-loads')} disabled={monthLoads.length === 0}>
-          <FileText className="h-5 w-5 text-primary" />
-          <div className="text-left">
-            <p className="font-semibold text-sm">Export This Month</p>
-            <p className="text-xs text-muted-foreground">{monthLoads.length} loads as CSV</p>
-          </div>
-        </Button>
+      <DateRangeFilter onRangeChange={(from, to) => setDateRange({ from, to })} />
+
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Export Options</h2>
+        <div className="grid gap-3">
+          <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(loads, 'all-loads')} disabled={loads.length === 0}>
+            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            <div className="text-left">
+              <p className="font-semibold text-sm">Export All Loads (CSV)</p>
+              <p className="text-xs text-muted-foreground">{loads.length} loads</p>
+            </div>
+          </Button>
+
+          {hasFilter && (
+            <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(filteredLoads, 'filtered-loads')} disabled={filteredLoads.length === 0}>
+              <Filter className="h-5 w-5 text-primary" />
+              <div className="text-left">
+                <p className="font-semibold text-sm">Export Filtered Loads (CSV)</p>
+                <p className="text-xs text-muted-foreground">{filteredLoads.length} loads in range</p>
+              </div>
+            </Button>
+          )}
+
+          <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(monthLoads, 'monthly-summary')} disabled={monthLoads.length === 0}>
+            <FileText className="h-5 w-5 text-primary" />
+            <div className="text-left">
+              <p className="font-semibold text-sm">Export Monthly Summary (CSV)</p>
+              <p className="text-xs text-muted-foreground">{monthLoads.length} loads this month</p>
+            </div>
+          </Button>
+
+          <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads')} disabled={loads.length === 0}>
+            <Download className="h-5 w-5 text-destructive" />
+            <div className="text-left">
+              <p className="font-semibold text-sm">Export as PDF</p>
+              <p className="text-xs text-muted-foreground">{hasFilter ? `${filteredLoads.length} filtered loads` : `${loads.length} loads`}</p>
+            </div>
+          </Button>
+        </div>
       </div>
 
       {summaries.length > 0 && (
