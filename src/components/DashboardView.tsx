@@ -2,14 +2,15 @@ import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { formatCurrency, formatNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
+import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 import { PerformanceTrends } from '@/components/PerformanceTrends';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval, format } from 'date-fns';
+import { Shield } from 'lucide-react';
 
 interface DashboardViewProps {
   loads: Load[];
@@ -75,12 +76,10 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
     .filter(l => l.actual_pay_received == null)
     .reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
 
-  // Deadhead percentage
   const totalMiles = loadedMiles + deadheadMiles;
   const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
   const deadheadColor = deadheadPct < 15 ? 'success' : deadheadPct < 30 ? 'warning' : 'destructive';
 
-  // Check if closeout should be suggested
   const isSunday = new Date().getDay() === 0;
   const thisWeekLoadCount = useMemo(() => {
     const now = new Date();
@@ -91,11 +90,14 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
   const showCloseoutButton = isSunday || thisWeekLoadCount >= 7;
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-black font-heading">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
+
+      {/* Weekly Focus Card — always visible at top */}
+      {!isLoading && <WeeklyFocusCard loads={loads} />}
 
       {/* Date Range Filter */}
       <div className="space-y-2">
@@ -105,7 +107,7 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
               key={p.key}
               variant={activePreset === p.key ? 'default' : 'outline'}
               size="sm"
-              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-transform ${activePreset === p.key ? 'shadow-primary' : ''}`}
+              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
               onClick={() => setActivePreset(p.key)}
             >
               {p.label}
@@ -113,7 +115,7 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
           ))}
         </div>
         {showCustom && (
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center animate-fade-in">
             <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
             <span className="text-xs text-muted-foreground">to</span>
             <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
@@ -132,12 +134,13 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} />
+            <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} size="large" />
             <StatCard
               label="Actual Earnings"
               value={formatCurrency(actual)}
               icon={DollarSign}
               subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
+              size="large"
             />
             <StatCard label="Loads Done" value={completedLoads.length.toString()} icon={Truck} />
             <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
@@ -174,10 +177,10 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
                 onClick={() => onNavigate?.('loads', { filter: 'missing_pay' })}
               >
                 <StatCard
-                  label="Unpaid / Unknown"
+                  label="Pending Payment"
                   value={formatCurrency(unpaidEstimated)}
                   icon={AlertTriangle}
-                  subtitle={`${missingPayCount} load${missingPayCount > 1 ? 's' : ''} — tap to view`}
+                  subtitle={`${missingPayCount} load${missingPayCount > 1 ? 's' : ''} — tap to review`}
                   variant="warning"
                 />
               </div>
@@ -191,14 +194,14 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
             )}
           </div>
 
-          {/* Closeout Button */}
+          {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (
             <Button
               variant="outline"
-              className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-transform"
+              className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
               onClick={() => onNavigate('closeout')}
             >
-              <ClipboardCheck className="h-5 w-5" /> Closeout This Week
+              <ClipboardCheck className="h-5 w-5" /> Finalize Weekly Summary
             </Button>
           )}
 
@@ -215,19 +218,27 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
             </p>
           )}
 
+          {/* Confidence footer */}
+          <div className="flex items-center justify-center gap-1.5 py-2">
+            <Shield className="h-3 w-3 text-muted-foreground/40" />
+            <p className="text-[10px] text-muted-foreground/40">Your data is securely stored and private.</p>
+          </div>
 
           {/* Empty State */}
           {filteredLoads.length === 0 && (
             <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
-              <CardContent className="py-12 text-center">
-                <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-4 mb-4">
-                  <Truck className="h-10 w-10 text-muted-foreground/40" />
+              <CardContent className="py-14 text-center">
+                <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
+                  <Truck className="h-12 w-12 text-muted-foreground/30" />
                 </div>
-                <p className="font-bold text-lg">No loads in this period</p>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">Try a different date range or log a new load</p>
+                <p className="font-bold text-lg">No loads for this period</p>
+                <p className="text-sm text-muted-foreground mt-1.5 mb-5 leading-relaxed">
+                  You haven't logged any loads for this date range.<br />
+                  Start tracking to see your earnings here.
+                </p>
                 {onNavigate && (
-                  <Button className="gap-2 rounded-xl shadow-primary active:scale-95 transition-transform" onClick={() => onNavigate('add')}>
-                    <Plus className="h-4 w-4" /> Log a Load
+                  <Button className="gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
+                    <Plus className="h-4 w-4" /> Log Your First Load
                   </Button>
                 )}
               </CardContent>

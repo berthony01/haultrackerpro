@@ -46,7 +46,7 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
     if (load.status === 'pending') updates.status = 'completed';
     onUpdate(load.id, updates);
     setEditingPay(false);
-    toast.success('Actual pay updated');
+    toast.success('Payment recorded');
   };
 
   const handleMarkCancelled = () => {
@@ -94,28 +94,28 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
 
           {/* Miles */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-muted p-3">
-              <p className="text-xs text-muted-foreground">Loaded Miles</p>
+            <div className="rounded-xl bg-muted p-3">
+              <p className="text-label">Loaded Miles</p>
               <p className="text-lg font-bold font-mono">{load.loaded_miles}</p>
             </div>
-            <div className="rounded-lg bg-muted p-3">
-              <p className="text-xs text-muted-foreground">Deadhead Miles</p>
+            <div className="rounded-xl bg-muted p-3">
+              <p className="text-label">Deadhead Miles</p>
               <p className="text-lg font-bold font-mono">{load.deadhead_miles}</p>
             </div>
           </div>
 
           {/* Pay */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-lg bg-primary/5 p-3">
+            <div className="flex items-center justify-between rounded-xl bg-primary/5 p-3">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">Estimated Pay</span>
               </div>
-              <span className="text-lg font-black font-mono text-primary">{formatCurrency(estimated)}</span>
+              <span className="text-value-lg text-primary">{formatCurrency(estimated)}</span>
             </div>
 
             {/* Editable Actual Pay */}
-            <div className="flex items-center justify-between rounded-lg bg-muted p-3">
+            <div className="flex items-center justify-between rounded-xl bg-muted p-3">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
                 <span className="text-sm font-medium">Actual Pay</span>
@@ -128,7 +128,7 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
                     min="0"
                     value={actualPayInput}
                     onChange={e => setActualPayInput(e.target.value)}
-                    className="h-8 w-28 text-sm font-mono text-right"
+                    className="h-8 w-28 text-sm font-mono text-right rounded-lg"
                     autoFocus
                   />
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSaveActualPay}>
@@ -143,7 +143,7 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
             </div>
 
             {diff != null && (
-              <div className={`flex items-center justify-between rounded-lg p-3 ${diff >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
+              <div className={`flex items-center justify-between rounded-xl p-3 ${diff >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
                 <div className="flex items-center gap-2">
                   {diff >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
                   <span className="text-sm font-medium">Difference</span>
@@ -155,13 +155,13 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
             )}
           </div>
 
-          {/* Mark as Paid CTA */}
+          {/* Record Payment CTA */}
           {actual == null && load.status !== 'cancelled' && !editingPay && (
             <Button
-              className="w-full gap-2 rounded-xl shadow-primary active:scale-95 transition-transform h-11 text-sm font-bold"
+              className="w-full gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200 h-11 text-sm font-bold"
               onClick={startEditPay}
             >
-              <DollarSign className="h-4 w-4" /> Mark as Paid
+              <DollarSign className="h-4 w-4" /> Record Payment
             </Button>
           )}
 
@@ -175,34 +175,34 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
 
           {/* Notes */}
           {load.notes && (
-            <div className="rounded-lg bg-muted p-3">
+            <div className="rounded-xl bg-muted p-3">
               <div className="flex items-center gap-2 mb-1">
                 <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground">Notes</span>
               </div>
-              <p className="text-sm">{load.notes}</p>
+              <p className="text-sm leading-relaxed">{load.notes}</p>
             </div>
           )}
 
           {/* Actions */}
           <div className="space-y-2 pt-2 pb-4">
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={() => { onOpenChange(false); onEdit(load); }}>
+              <Button className="flex-1 rounded-xl" onClick={() => { onOpenChange(false); onEdit(load); }}>
                 <Pencil className="h-4 w-4 mr-1" /> Edit Load
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => { onOpenChange(false); onDuplicate(load); }}>
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => { onOpenChange(false); onDuplicate(load); }}>
                 <Copy className="h-4 w-4 mr-1" /> Duplicate
               </Button>
             </div>
             <div className="flex gap-2">
               {load.status !== 'cancelled' && (
-                <Button variant="outline" className="flex-1 text-destructive hover:text-destructive" onClick={handleMarkCancelled}>
-                  <Ban className="h-4 w-4 mr-1" /> Mark Cancelled
+                <Button variant="outline" className="flex-1 text-destructive hover:text-destructive rounded-xl" onClick={handleMarkCancelled}>
+                  <Ban className="h-4 w-4 mr-1" /> Cancel Load
                 </Button>
               )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className={load.status !== 'cancelled' ? '' : 'flex-1'}>
+                  <Button variant="destructive" className={`rounded-xl ${load.status !== 'cancelled' ? '' : 'flex-1'}`}>
                     <Trash2 className="h-4 w-4 mr-1" /> Delete
                   </Button>
                 </AlertDialogTrigger>

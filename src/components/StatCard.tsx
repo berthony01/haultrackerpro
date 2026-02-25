@@ -7,28 +7,30 @@ interface StatCardProps {
   icon: LucideIcon;
   subtitle?: string;
   variant?: 'default' | 'success' | 'danger' | 'warning';
+  size?: 'default' | 'large';
 }
 
 const variantStyles: Record<string, { icon: string; bg: string }> = {
   default: { icon: 'text-primary', bg: 'bg-primary/10' },
-  success: { icon: 'text-green-500', bg: 'bg-green-500/10' },
+  success: { icon: 'text-success', bg: 'bg-success/10' },
   danger: { icon: 'text-destructive', bg: 'bg-destructive/10' },
   warning: { icon: 'text-warning', bg: 'bg-warning/10' },
 };
 
-export function StatCard({ label, value, icon: Icon, subtitle, variant = 'default' }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, subtitle, variant = 'default', size = 'default' }: StatCardProps) {
   const styles = variantStyles[variant] || variantStyles.default;
+  const isLarge = size === 'large';
   return (
-    <Card className="shadow-card hover:shadow-card-hover transition-shadow duration-200 animate-scale-in">
-      <CardContent className="p-4">
+    <Card className="card-premium shadow-card hover:shadow-card-hover transition-all duration-300 animate-scale-in">
+      <CardContent className={isLarge ? 'p-5' : 'p-4'}>
         <div className="flex items-start gap-3">
-          <div className={`rounded-xl ${styles.bg} p-2.5 shrink-0`}>
-            <Icon className={`h-5 w-5 ${styles.icon}`} />
+          <div className={`rounded-xl ${styles.bg} ${isLarge ? 'p-3' : 'p-2.5'} shrink-0`}>
+            <Icon className={`${isLarge ? 'h-6 w-6' : 'h-5 w-5'} ${styles.icon}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{label}</p>
-            <p className="text-xl font-black font-mono truncate mt-0.5">{value}</p>
-            {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
+            <p className="text-label">{label}</p>
+            <p className={`${isLarge ? 'text-value-xl' : 'text-value-lg'} truncate mt-0.5`}>{value}</p>
+            {subtitle && <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{subtitle}</p>}
           </div>
         </div>
       </CardContent>

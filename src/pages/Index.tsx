@@ -30,7 +30,6 @@ const Index = () => {
 
   const allLoadsQuery = useLoads();
 
-  // Trigger feedback modal at 10 loads if not already submitted
   useEffect(() => {
     if (
       !allLoadsQuery.isLoading &&
@@ -46,7 +45,7 @@ const Index = () => {
 
   const handleAddLoad = (data: LoadInsert) => {
     addLoad.mutate(data, {
-      onSuccess: () => { toast.success('Load logged!'); setPage('loads'); },
+      onSuccess: () => { toast.success('Load logged successfully!'); setPage('loads'); },
       onError: (e) => toast.error(e.message),
     });
   };
@@ -92,7 +91,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Dark header */}
+      {/* Premium header */}
       <header className="sticky top-0 z-40 bg-secondary">
         <div className="flex items-center justify-between px-4 py-3.5 max-w-lg mx-auto">
           <div className="flex items-center gap-3">
@@ -100,11 +99,13 @@ const Index = () => {
               <Truck className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-base font-black font-heading tracking-tight text-secondary-foreground">HaulTracker</h1>
-              <p className="text-[10px] text-secondary-foreground/50 font-semibold uppercase tracking-widest">Load & Pay Manager</p>
+              <h1 className="text-base font-black font-heading tracking-tight text-secondary-foreground">
+                Haul<span className="text-primary">Tracker</span>
+              </h1>
+              <p className="text-[10px] text-secondary-foreground/40 font-semibold uppercase tracking-[0.2em]">Load & Pay Manager</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="text-secondary-foreground/40 hover:text-secondary-foreground rounded-xl h-10 w-10" onClick={signOut}>
+          <Button variant="ghost" size="icon" className="text-secondary-foreground/30 hover:text-secondary-foreground rounded-xl h-10 w-10" onClick={signOut}>
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
