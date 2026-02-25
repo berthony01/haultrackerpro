@@ -139,13 +139,18 @@ function escapeCSV(val: string | number | null | undefined): string {
 }
 
 export function exportToCSV(loads: Load[], filename: string) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Fees', 'Estimated Pay', 'Actual Pay', 'Difference', 'Status', 'Notes'];
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay', 'Actual Pay', 'Difference', 'Status', 'Notes'];
   const rows = loads.map(l => {
-    const fees = Number(l.wait_fee) + Number(l.detention_fee) + Number(l.other_fees);
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
-    const diff = act != null ? act - est : null;
-    return [l.load_date, l.pickup_location, l.dropoff_location, l.loaded_miles, l.deadhead_miles, l.rate_per_mile, fees.toFixed(2), est.toFixed(2), act != null ? act.toFixed(2) : '', diff != null ? diff.toFixed(2) : '', l.status, l.notes ?? ''].map(escapeCSV);
+    const diff = act != null ? (act - est).toFixed(2) : '';
+    return [
+      l.load_date, l.pickup_location, l.dropoff_location,
+      l.loaded_miles, l.deadhead_miles, l.rate_per_mile,
+      Number(l.wait_fee).toFixed(2), Number(l.detention_fee).toFixed(2), Number(l.other_fees).toFixed(2),
+      est.toFixed(2), act != null ? act.toFixed(2) : '', diff,
+      l.status, l.notes ?? ''
+    ].map(escapeCSV);
   });
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -158,15 +163,15 @@ export function exportToCSV(loads: Load[], filename: string) {
 }
 
 export function exportToPDF(loads: Load[], filename: string) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Miles', 'Est Pay', 'Act Pay', 'Diff', 'Status'];
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Ld Mi', 'DH Mi', '$/Mi', 'Wait', 'Det.', 'Other', 'Est Pay', 'Act Pay', 'Diff', 'Status'];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
     const diff = act != null ? act - est : null;
-    return [l.load_date, l.pickup_location, l.dropoff_location, String(l.loaded_miles), `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '-', diff != null ? `$${diff.toFixed(2)}` : '-', l.status];
+    return [l.load_date, l.pickup_location, l.dropoff_location, String(l.loaded_miles), String(l.deadhead_miles), `$${Number(l.rate_per_mile).toFixed(2)}`, `$${Number(l.wait_fee).toFixed(2)}`, `$${Number(l.detention_fee).toFixed(2)}`, `$${Number(l.other_fees).toFixed(2)}`, `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', diff != null ? `$${diff.toFixed(2)}` : '', l.status];
   });
 
-  const colWidths = [65, 80, 80, 40, 55, 55, 50, 55];
+  const colWidths = [48, 58, 58, 28, 28, 30, 34, 34, 34, 45, 45, 40, 40];
   const pageW = 595;
   const pageH = 842;
   const marginX = 30;
