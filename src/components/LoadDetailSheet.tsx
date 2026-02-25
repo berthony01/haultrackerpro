@@ -1,17 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
+import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText, Copy, Ban, Check } from 'lucide-react';
+import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText, Copy, Ban, Check, Receipt } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
 interface LoadDetailSheetProps {
   load: Load | null;
+  expenses?: Expense[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit: (load: Load) => void;
@@ -26,15 +28,24 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
-export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, onUpdate, onDuplicate }: LoadDetailSheetProps) {
+export function LoadDetailSheet({ load, expenses = [], open, onOpenChange, onEdit, onDelete, onUpdate, onDuplicate }: LoadDetailSheetProps) {
   const [actualPayInput, setActualPayInput] = useState('');
   const [editingPay, setEditingPay] = useState(false);
+
+  const linkedExpenses = useMemo(() => {
+    if (!load) return [];
+    return expenses.filter(e => e.linked_load_id === load.id);
+  }, [expenses, load]);
+
+  const linkedExpensesTotal = linkedExpenses.reduce((s, e) => s + Number(e.amount), 0);
 
   if (!load) return null;
 
   const estimated = Number(load.estimated_pay ?? 0);
   const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
   const diff = actual != null ? actual - estimated : null;
+  const payBase = actual ?? estimated;
+  const netLoadProfit = payBase - linkedExpensesTotal;
 
   const handleSaveActualPay = () => {
     const val = parseFloat(actualPayInput);
@@ -172,6 +183,27 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, on
             {Number(load.detention_fee) > 0 && <div className="flex justify-between"><span>Detention Fee</span><span className="font-mono">{formatCurrency(Number(load.detention_fee))}</span></div>}
             {Number(load.other_fees) > 0 && <div className="flex justify-between"><span>Other Fees</span><span className="font-mono">{formatCurrency(Number(load.other_fees))}</span></div>}
           </div>
+
+          {/* Linked Expenses & Net Load Profit */}
+          {linkedExpenses.length > 0 && (
+            <div className="space-y-2">
+              <p className="font-medium text-foreground text-sm flex items-center gap-1.5">
+                <Receipt className="h-3.5 w-3.5 text-primary" /> Linked Expenses
+              </p>
+              {linkedExpenses.map(e => (
+                <div key={e.id} className="flex justify-between text-xs text-muted-foreground">
+                  <span>{e.category}{e.notes ? ` — ${e.notes}` : ''}</span>
+                  <span className="font-mono text-destructive">-{formatCurrency(Number(e.amount))}</span>
+                </div>
+              ))}
+              <div className={`flex items-center justify-between rounded-xl p-3 ${netLoadProfit >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                <span className="text-sm font-medium">Net Load Profit</span>
+                <span className={`text-lg font-bold font-mono ${netLoadProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatCurrency(netLoadProfit)}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           {load.notes && (

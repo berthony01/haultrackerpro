@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { Load } from '@/hooks/useLoads';
-import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, getCurrentMonthLoads } from '@/lib/loadUtils';
+import { Expense } from '@/hooks/useExpenses';
+import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, getCurrentMonthLoads } from '@/lib/loadUtils';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet, Filter, Calendar } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp } from 'lucide-react';
 import { parseISO, isWithinInterval } from 'date-fns';
 
 interface ReportsViewProps {
   loads: Load[];
+  expenses?: Expense[];
   onNavigate?: (page: string) => void;
 }
 
-export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
+export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewProps) {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
 
   const filteredLoads = loads.filter(l => {
@@ -83,6 +85,14 @@ export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
             <div className="text-left">
               <p className="font-semibold text-sm">Export as PDF</p>
               <p className="text-xs text-muted-foreground">{hasFilter ? `${filteredLoads.length} filtered loads` : `${loads.length} loads`}</p>
+            </div>
+          </Button>
+
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportProfitCSV(filteredLoads.length > 0 ? filteredLoads : loads, expenses)} disabled={loads.length === 0}>
+            <TrendingUp className="h-5 w-5 text-success" />
+            <div className="text-left">
+              <p className="font-semibold text-sm">Export Profit Report (CSV)</p>
+              <p className="text-xs text-muted-foreground">Includes expenses & net profit</p>
             </div>
           </Button>
         </div>
