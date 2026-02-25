@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import { useAuth } from '@/hooks/useAuth';
+import { useFeedback } from '@/hooks/useFeedback';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
@@ -11,20 +12,35 @@ import { Onboarding } from '@/components/Onboarding';
 import { WeeklyCloseout } from '@/components/WeeklyCloseout';
 import { SmartReminders } from '@/components/SmartReminders';
 import { MonthlySummary } from '@/components/MonthlySummary';
+import { FeedbackModal } from '@/components/FeedbackModal';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const Index = () => {
   const { signOut } = useAuth();
+  const { responses: feedbackResponses } = useFeedback();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const { loads, isLoading, addLoad, updateLoad, deleteLoad } = useLoads(dateRange);
   const [page, setPage] = useState('dashboard');
   const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const allLoadsQuery = useLoads();
+
+  // Trigger feedback modal at 10 loads if not already submitted
+  useEffect(() => {
+    if (
+      !allLoadsQuery.isLoading &&
+      allLoadsQuery.loads.length >= 10 &&
+      feedbackResponses.length === 0
+    ) {
+      const timer = setTimeout(() => setShowFeedback(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [allLoadsQuery.isLoading, allLoadsQuery.loads.length, feedbackResponses.length]);
 
   const showOnboarding = !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
 
@@ -150,6 +166,11 @@ const Index = () => {
       </main>
 
       <BottomNav active={page} onNavigate={handleNavigate} />
+      <FeedbackModal
+        totalLoads={allLoadsQuery.loads.length}
+        open={showFeedback}
+        onClose={() => setShowFeedback(false)}
+      />
     </div>
   );
 };
