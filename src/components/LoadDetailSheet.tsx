@@ -1,10 +1,14 @@
-import { Load } from '@/hooks/useLoads';
+import { useState } from 'react';
+import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { formatCurrency } from '@/lib/loadUtils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText, Copy, Ban, Check } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { toast } from 'sonner';
 
 interface LoadDetailSheetProps {
   load: Load | null;
@@ -12,6 +16,8 @@ interface LoadDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (load: Load) => void;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, data: LoadUpdate) => void;
+  onDuplicate: (load: Load) => void;
 }
 
 const statusStyles: Record<string, string> = {
@@ -20,15 +26,40 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
-export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete }: LoadDetailSheetProps) {
+export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete, onUpdate, onDuplicate }: LoadDetailSheetProps) {
+  const [actualPayInput, setActualPayInput] = useState('');
+  const [editingPay, setEditingPay] = useState(false);
+
   if (!load) return null;
 
   const estimated = Number(load.estimated_pay ?? 0);
   const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
   const diff = actual != null ? actual - estimated : null;
 
+  const handleSaveActualPay = () => {
+    const val = parseFloat(actualPayInput);
+    if (isNaN(val) || val < 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    onUpdate(load.id, { actual_pay_received: val });
+    setEditingPay(false);
+    toast.success('Actual pay updated');
+  };
+
+  const handleMarkCancelled = () => {
+    onUpdate(load.id, { status: 'cancelled', notes: load.notes || 'Cancelled by dispatcher' });
+    onOpenChange(false);
+    toast.success('Load marked as cancelled');
+  };
+
+  const startEditPay = () => {
+    setActualPayInput(actual?.toString() ?? '');
+    setEditingPay(true);
+  };
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(o) => { if (!o) setEditingPay(false); onOpenChange(o); }}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
         <SheetHeader className="text-left pb-2">
           <div className="flex items-center justify-between">
@@ -81,28 +112,44 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete }: 
               <span className="text-lg font-black font-mono text-primary">{formatCurrency(estimated)}</span>
             </div>
 
-            {actual != null && (
-              <>
-                <div className="flex items-center justify-between rounded-lg bg-muted p-3">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    <span className="text-sm font-medium">Actual Pay</span>
-                  </div>
-                  <span className="text-lg font-bold font-mono">{formatCurrency(actual)}</span>
+            {/* Editable Actual Pay */}
+            <div className="flex items-center justify-between rounded-lg bg-muted p-3">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span className="text-sm font-medium">Actual Pay</span>
+              </div>
+              {editingPay ? (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={actualPayInput}
+                    onChange={e => setActualPayInput(e.target.value)}
+                    className="h-8 w-28 text-sm font-mono text-right"
+                    autoFocus
+                  />
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSaveActualPay}>
+                    <Check className="h-4 w-4 text-success" />
+                  </Button>
                 </div>
-                <div className={`flex items-center justify-between rounded-lg p-3 ${diff! >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
-                  <div className="flex items-center gap-2">
-                    {diff! >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
-                    <span className="text-sm font-medium">Difference</span>
-                  </div>
-                  <span className={`text-lg font-bold font-mono ${diff! >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {diff! >= 0 ? '+' : ''}{formatCurrency(diff!)}
-                  </span>
+              ) : (
+                <button onClick={startEditPay} className="text-lg font-bold font-mono hover:underline cursor-pointer">
+                  {actual != null ? formatCurrency(actual) : <span className="text-xs text-muted-foreground italic">Tap to enter</span>}
+                </button>
+              )}
+            </div>
+
+            {diff != null && (
+              <div className={`flex items-center justify-between rounded-lg p-3 ${diff >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                <div className="flex items-center gap-2">
+                  {diff >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
+                  <span className="text-sm font-medium">Difference</span>
                 </div>
-              </>
-            )}
-            {actual == null && (
-              <p className="text-xs text-muted-foreground italic">No actual pay entered yet</p>
+                <span className={`text-lg font-bold font-mono ${diff >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                </span>
+              </div>
             )}
           </div>
 
@@ -127,13 +174,43 @@ export function LoadDetailSheet({ load, open, onOpenChange, onEdit, onDelete }: 
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-2 pb-4">
-            <Button className="flex-1" onClick={() => { onOpenChange(false); onEdit(load); }}>
-              <Pencil className="h-4 w-4 mr-1" /> Edit Load
-            </Button>
-            <Button variant="destructive" size="icon" onClick={() => { onOpenChange(false); onDelete(load.id); }}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
+          <div className="space-y-2 pt-2 pb-4">
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => { onOpenChange(false); onEdit(load); }}>
+                <Pencil className="h-4 w-4 mr-1" /> Edit Load
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => { onOpenChange(false); onDuplicate(load); }}>
+                <Copy className="h-4 w-4 mr-1" /> Duplicate
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              {load.status !== 'cancelled' && (
+                <Button variant="outline" className="flex-1 text-destructive hover:text-destructive" onClick={handleMarkCancelled}>
+                  <Ban className="h-4 w-4 mr-1" /> Mark Cancelled
+                </Button>
+              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className={load.status !== 'cancelled' ? '' : 'flex-1'}>
+                    <Trash2 className="h-4 w-4 mr-1" /> Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this load?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently remove the load from {load.pickup_location} to {load.dropoff_location} on {format(parseISO(load.load_date), 'MMM d, yyyy')}. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { onOpenChange(false); onDelete(load.id); }}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
       </SheetContent>

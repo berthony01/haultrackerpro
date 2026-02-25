@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Load } from '@/hooks/useLoads';
+import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { LoadCard } from '@/components/LoadCard';
 import { LoadDetailSheet } from '@/components/LoadDetailSheet';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
@@ -12,11 +12,13 @@ interface LoadsListViewProps {
   loads: Load[];
   onEdit: (load: Load) => void;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, data: LoadUpdate) => void;
+  onDuplicate: (load: Load) => void;
   onDateRangeChange: (from?: string, to?: string) => void;
   isLoading?: boolean;
 }
 
-export function LoadsListView({ loads, onEdit, onDelete, onDateRangeChange, isLoading }: LoadsListViewProps) {
+export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, onDateRangeChange, isLoading }: LoadsListViewProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
@@ -86,6 +88,8 @@ export function LoadsListView({ loads, onEdit, onDelete, onDateRangeChange, isLo
         onOpenChange={open => { if (!open) setSelectedLoad(null); }}
         onEdit={onEdit}
         onDelete={onDelete}
+        onUpdate={onUpdate}
+        onDuplicate={onDuplicate}
       />
     </div>
   );
