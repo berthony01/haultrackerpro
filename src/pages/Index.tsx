@@ -10,6 +10,7 @@ import { SettingsView } from '@/components/SettingsView';
 import { Onboarding } from '@/components/Onboarding';
 import { WeeklyCloseout } from '@/components/WeeklyCloseout';
 import { SmartReminders } from '@/components/SmartReminders';
+import { MonthlySummary } from '@/components/MonthlySummary';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -141,7 +142,8 @@ const Index = () => {
                 initialPayFilter={loadsPayFilter}
               />
             )}
-            {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} />}
+            {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} onNavigate={handleNavigate} />}
+            {page === 'monthly' && <MonthlySummary loads={allLoadsQuery.loads} onBack={() => setPage('reports')} />}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
         )}

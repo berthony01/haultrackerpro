@@ -4,14 +4,15 @@ import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPD
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet, Filter } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter, Calendar } from 'lucide-react';
 import { parseISO, isWithinInterval } from 'date-fns';
 
 interface ReportsViewProps {
   loads: Load[];
+  onNavigate?: (page: string) => void;
 }
 
-export function ReportsView({ loads }: ReportsViewProps) {
+export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
 
   const filteredLoads = loads.filter(l => {
@@ -34,6 +35,17 @@ export function ReportsView({ loads }: ReportsViewProps) {
       </div>
 
       <DateRangeFilter onRangeChange={(from, to) => setDateRange({ from, to })} />
+
+      {/* Monthly Summary Button */}
+      {onNavigate && (
+        <Button
+          variant="outline"
+          className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-transform"
+          onClick={() => onNavigate('monthly')}
+        >
+          <Calendar className="h-5 w-5" /> Month Summary
+        </Button>
+      )}
 
       <div>
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Export Options</h2>
