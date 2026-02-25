@@ -83,7 +83,7 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
       ) : (
         <div className="space-y-3">
           {filtered.map(load => (
-            <LoadCard key={load.id} load={load} onEdit={onEdit} onDelete={onDelete} onTap={() => setSelectedLoad(load)} />
+            <LoadCard key={load.id} load={load} onEdit={onEdit} onDelete={onDelete} onUpdate={onUpdate} onTap={() => setSelectedLoad(load)} />
           ))}
         </div>
       )}

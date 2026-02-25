@@ -1,15 +1,19 @@
-import { Load } from '@/hooks/useLoads';
+import { useState } from 'react';
+import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Pencil, Trash2, ChevronRight } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MapPin, Pencil, Trash2, ChevronRight, DollarSign, Check, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { toast } from 'sonner';
 
 interface LoadCardProps {
   load: Load;
   onEdit: (load: Load) => void;
   onDelete: (id: string) => void;
+  onUpdate?: (id: string, data: LoadUpdate) => void;
   onTap?: () => void;
 }
 
@@ -19,10 +23,29 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
-export function LoadCard({ load, onEdit, onDelete, onTap }: LoadCardProps) {
+export function LoadCard({ load, onEdit, onDelete, onUpdate, onTap }: LoadCardProps) {
+  const [showPayInput, setShowPayInput] = useState(false);
+  const [payValue, setPayValue] = useState('');
+
   const estimated = Number(load.estimated_pay ?? 0);
   const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
   const diff = actual != null ? actual - estimated : null;
+  const showAddPay = actual == null && load.status !== 'cancelled';
+
+  const handleSavePay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const val = parseFloat(payValue);
+    if (isNaN(val) || val < 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    const updates: LoadUpdate = { actual_pay_received: val };
+    if (load.status === 'pending') updates.status = 'completed';
+    onUpdate?.(load.id, updates);
+    setShowPayInput(false);
+    setPayValue('');
+    toast.success('Actual pay saved');
+  };
 
   return (
     <Card
@@ -89,11 +112,50 @@ export function LoadCard({ load, onEdit, onDelete, onTap }: LoadCardProps) {
           </div>
         </div>
 
+        {/* Add Actual Pay CTA */}
+        {showAddPay && !showPayInput && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full mt-3 h-9 text-xs font-semibold gap-1.5 rounded-xl border-primary/30 text-primary hover:bg-primary/5 active:scale-95 transition-transform"
+            onClick={(e) => { e.stopPropagation(); setPayValue(estimated.toString()); setShowPayInput(true); }}
+          >
+            <DollarSign className="h-3.5 w-3.5" /> Add Actual Pay
+          </Button>
+        )}
+
+        {/* Inline pay input */}
+        {showPayInput && (
+          <div className="flex items-center gap-2 mt-3" onClick={e => e.stopPropagation()}>
+            <div className="relative flex-1">
+              <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={payValue}
+                onChange={e => setPayValue(e.target.value)}
+                className="h-9 text-sm font-mono pl-8 rounded-xl"
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+            <Button size="icon" className="h-9 w-9 rounded-xl shrink-0" onClick={handleSavePay}>
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl shrink-0" onClick={(e) => { e.stopPropagation(); setShowPayInput(false); }}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         {/* Tap hint */}
-        <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-border/50">
-          <span className="text-[10px] text-muted-foreground/60 font-medium">Tap for details</span>
-          <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
-        </div>
+        {!showPayInput && (
+          <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-border/50">
+            <span className="text-[10px] text-muted-foreground/60 font-medium">Tap for details</span>
+            <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
