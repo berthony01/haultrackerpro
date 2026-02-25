@@ -172,7 +172,7 @@ const Index = () => {
             </div>
             <div>
               <h1 className="text-base font-black font-heading tracking-tight text-secondary-foreground">
-                Haul<span className="text-primary">Tracker</span>
+                Haul<span className="text-primary">TrackerPro</span>
               </h1>
               <p className="text-[10px] text-secondary-foreground/40 font-semibold uppercase tracking-[0.2em]">Load & Pay Manager</p>
             </div>
