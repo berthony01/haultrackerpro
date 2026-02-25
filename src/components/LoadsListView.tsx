@@ -16,15 +16,21 @@ interface LoadsListViewProps {
   onDuplicate: (load: Load) => void;
   onDateRangeChange: (from?: string, to?: string) => void;
   isLoading?: boolean;
+  initialPayFilter?: string;
 }
 
-export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, onDateRangeChange, isLoading }: LoadsListViewProps) {
+export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, onDateRangeChange, isLoading, initialPayFilter }: LoadsListViewProps) {
   const [statusFilter, setStatusFilter] = useState('all');
+  const [payFilter, setPayFilter] = useState(initialPayFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
 
   const filtered = loads.filter(l => {
     if (statusFilter !== 'all' && l.status !== statusFilter) return false;
+    if (payFilter === 'missing_pay') {
+      if (l.status === 'cancelled') return false;
+      if (l.actual_pay_received != null) return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       if (!l.pickup_location.toLowerCase().includes(q) && !l.dropoff_location.toLowerCase().includes(q)) return false;
@@ -52,7 +58,7 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-32 h-8 text-xs">
+          <SelectTrigger className="w-28 h-8 text-xs">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -60,6 +66,15 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={payFilter} onValueChange={setPayFilter}>
+          <SelectTrigger className="w-28 h-8 text-xs">
+            <SelectValue placeholder="All pay" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Pay</SelectItem>
+            <SelectItem value="missing_pay">Missing Pay</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -11,7 +11,7 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYea
 interface DashboardViewProps {
   loads: Load[];
   isLoading?: boolean;
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, options?: { filter?: string }) => void;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
@@ -134,13 +134,18 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
               />
             )}
             {missingPayCount > 0 && (
-              <StatCard
-                label="Unpaid / Unknown"
-                value={formatCurrency(unpaidEstimated)}
-                icon={AlertTriangle}
-                subtitle={`${missingPayCount} load${missingPayCount > 1 ? 's' : ''} missing actual pay`}
-                variant="warning"
-              />
+              <div
+                className="cursor-pointer active:scale-95 transition-transform"
+                onClick={() => onNavigate?.('loads', { filter: 'missing_pay' })}
+              >
+                <StatCard
+                  label="Unpaid / Unknown"
+                  value={formatCurrency(unpaidEstimated)}
+                  icon={AlertTriangle}
+                  subtitle={`${missingPayCount} load${missingPayCount > 1 ? 's' : ''} — tap to view`}
+                  variant="warning"
+                />
+              </div>
             )}
             {knownDifference == null && missingPayCount === 0 && (
               <StatCard
