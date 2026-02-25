@@ -98,6 +98,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          created_at: string
+          currency: string
+          default_other_fees: number | null
+          default_rate_per_mile: number | null
+          id: string
+          updated_at: string
+          user_id: string
+          week_start_day: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          default_other_fees?: number | null
+          default_rate_per_mile?: number | null
+          id?: string
+          updated_at?: string
+          user_id: string
+          week_start_day?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          default_other_fees?: number | null
+          default_rate_per_mile?: number | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+          week_start_day?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

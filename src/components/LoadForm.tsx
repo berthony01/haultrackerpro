@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Load, LoadInsert } from '@/hooks/useLoads';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,16 +19,18 @@ interface LoadFormProps {
 }
 
 export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormProps) {
+  const { settings } = useUserSettings();
+
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
     pickup_location: initialData?.pickup_location || '',
     dropoff_location: initialData?.dropoff_location || '',
     loaded_miles: initialData?.loaded_miles?.toString() || '',
     deadhead_miles: initialData?.deadhead_miles?.toString() || '',
-    rate_per_mile: initialData?.rate_per_mile?.toString() || '',
+    rate_per_mile: initialData?.rate_per_mile?.toString() || (settings?.default_rate_per_mile?.toString() ?? ''),
     wait_fee: initialData?.wait_fee?.toString() || '0',
     detention_fee: initialData?.detention_fee?.toString() || '0',
-    other_fees: initialData?.other_fees?.toString() || '0',
+    other_fees: initialData?.other_fees?.toString() || (settings?.default_other_fees?.toString() ?? '0'),
     actual_pay_received: initialData?.actual_pay_received?.toString() || '',
     notes: initialData?.notes || '',
     status: initialData?.status || 'completed',
