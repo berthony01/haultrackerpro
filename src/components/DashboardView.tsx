@@ -1,93 +1,149 @@
+import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
-import { getCurrentWeekLoads, getCurrentMonthLoads, formatCurrency, formatNumber, getWeekSummaries } from '@/lib/loadUtils';
+import { formatCurrency, formatNumber } from '@/lib/loadUtils';
 import { StatCard } from '@/components/StatCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval } from 'date-fns';
 
 interface DashboardViewProps {
   loads: Load[];
 }
 
-export function DashboardView({ loads }: DashboardViewProps) {
-  const weekLoads = getCurrentWeekLoads(loads);
-  const monthLoads = getCurrentMonthLoads(loads);
-  const weekEstimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const weekActual = weekLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
-  const monthEstimated = monthLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const monthActual = monthLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
-  const weekMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const monthMiles = monthLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const weekSummaries = getWeekSummaries(loads).slice(0, 4);
+type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
 
-  const paidWeekLoads = weekLoads.filter(l => l.actual_pay_received != null);
-  const weekDiff = paidWeekLoads.length > 0 ? weekActual - paidWeekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0) : null;
+const presets: { key: PresetKey; label: string }[] = [
+  { key: 'this_week', label: 'This Week' },
+  { key: 'last_week', label: 'Last Week' },
+  { key: 'this_month', label: 'This Month' },
+  { key: 'last_month', label: 'Last Month' },
+  { key: 'this_year', label: 'This Year' },
+  { key: 'custom', label: 'Custom' },
+];
+
+function getPresetRange(key: PresetKey): { start: Date; end: Date } {
+  const now = new Date();
+  switch (key) {
+    case 'this_week': return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+    case 'last_week': { const lw = subWeeks(now, 1); return { start: startOfWeek(lw, { weekStartsOn: 1 }), end: endOfWeek(lw, { weekStartsOn: 1 }) }; }
+    case 'this_month': return { start: startOfMonth(now), end: endOfMonth(now) };
+    case 'last_month': { const lm = subMonths(now, 1); return { start: startOfMonth(lm), end: endOfMonth(lm) }; }
+    case 'this_year': return { start: startOfYear(now), end: endOfYear(now) };
+    default: return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+  }
+}
+
+export function DashboardView({ loads }: DashboardViewProps) {
+  const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const showCustom = activePreset === 'custom';
+
+  const filteredLoads = useMemo(() => {
+    if (activePreset === 'custom') {
+      return loads.filter(l => {
+        const d = l.load_date;
+        if (customFrom && d < customFrom) return false;
+        if (customTo && d > customTo) return false;
+        return true;
+      });
+    }
+    const { start, end } = getPresetRange(activePreset);
+    return loads.filter(l => {
+      const d = parseISO(l.load_date);
+      return isWithinInterval(d, { start, end });
+    });
+  }, [loads, activePreset, customFrom, customTo]);
+
+  const estimated = filteredLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const actual = filteredLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
+  const loadedMiles = filteredLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
+  const deadheadMiles = filteredLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
+  const completedLoads = filteredLoads.filter(l => l.status === 'completed' || l.status === 'Completed');
+  const paidLoads = filteredLoads.filter(l => l.actual_pay_received != null);
+  const missingPayCount = filteredLoads.filter(l => l.actual_pay_received == null).length;
+  const paidEstimated = paidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const difference = paidLoads.length > 0 ? actual - paidEstimated : null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <div>
         <h1 className="text-2xl font-black font-heading">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
 
-      <div>
-        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">This Week</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Est. Earnings" value={formatCurrency(weekEstimated)} icon={DollarSign} />
-          <StatCard label="Loads" value={weekLoads.length.toString()} icon={Truck} />
-          <StatCard label="Loaded Miles" value={formatNumber(weekMiles)} icon={Route} />
-          {weekDiff != null ? (
-            <StatCard
-              label="Pay Diff"
-              value={`${weekDiff >= 0 ? '+' : ''}${formatCurrency(weekDiff)}`}
-              icon={weekDiff >= 0 ? TrendingUp : TrendingDown}
-              subtitle={weekDiff >= 0 ? 'Overpaid' : 'Underpaid'}
-            />
-          ) : (
-            <StatCard label="Avg/Load" value={weekLoads.length > 0 ? formatCurrency(weekEstimated / weekLoads.length) : '$0'} icon={TrendingUp} />
-          )}
+      {/* Date Range Filter */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map(p => (
+            <Button
+              key={p.key}
+              variant={activePreset === p.key ? 'default' : 'outline'}
+              size="sm"
+              className="text-xs h-7 px-2.5"
+              onClick={() => setActivePreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
         </div>
-      </div>
-
-      <div>
-        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">This Month</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Est. Earnings" value={formatCurrency(monthEstimated)} icon={DollarSign} />
-          <StatCard label="Actual Paid" value={formatCurrency(monthActual)} icon={DollarSign} subtitle={monthActual > 0 ? `${monthLoads.filter(l => l.actual_pay_received != null).length} paid` : 'No payments yet'} />
-          <StatCard label="Total Miles" value={formatNumber(monthMiles)} icon={Route} />
-          <StatCard label="Avg $/Mile" value={monthMiles > 0 ? formatCurrency(monthEstimated / monthMiles) : '$0'} icon={TrendingUp} />
-        </div>
-      </div>
-
-      {weekSummaries.length > 0 && (
-        <div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Recent Weeks</h2>
-          <div className="space-y-2">
-            {weekSummaries.map(w => (
-              <Card key={w.startDate}>
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{w.weekLabel}</p>
-                    <p className="text-xs text-muted-foreground">{w.totalLoads} loads · {formatNumber(w.totalLoadedMiles)} mi</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black font-mono text-primary">{formatCurrency(w.totalEstimatedPay)}</p>
-                    {w.totalActualPay > 0 && (
-                      <p className="text-xs font-mono text-muted-foreground">Actual: {formatCurrency(w.totalActualPay)}</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        {showCustom && (
+          <div className="flex gap-2 items-center">
+            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-8 text-xs flex-1" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-8 text-xs flex-1" />
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} />
+        <StatCard
+          label="Actual Earnings"
+          value={formatCurrency(actual)}
+          icon={DollarSign}
+          subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
+        />
+        <StatCard label="Loads Completed" value={completedLoads.length.toString()} icon={Truck} />
+        <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
+        <StatCard label="Deadhead Miles" value={formatNumber(deadheadMiles)} icon={MapPin} />
+        {difference != null ? (
+          <StatCard
+            label="Difference"
+            value={`${difference >= 0 ? '+' : ''}${formatCurrency(difference)}`}
+            icon={difference >= 0 ? TrendingUp : TrendingDown}
+            subtitle={difference >= 0 ? 'Overpaid' : 'Underpaid'}
+          />
+        ) : (
+          <StatCard
+            label="Avg $/Mile"
+            value={loadedMiles > 0 ? formatCurrency(estimated / loadedMiles) : '$0'}
+            icon={TrendingUp}
+          />
+        )}
+      </div>
+
+      {/* Insight Lines */}
+      {missingPayCount > 0 && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-3 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              You are missing Actual Pay for <span className="font-semibold text-foreground">{missingPayCount} load{missingPayCount > 1 ? 's' : ''}</span>
+            </p>
+          </CardContent>
+        </Card>
       )}
 
-      {loads.length === 0 && (
+      {filteredLoads.length === 0 && (
         <Card className="border-dashed border-2">
           <CardContent className="p-8 text-center">
             <Truck className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="font-semibold">No loads logged yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Tap the + button to log your first load</p>
+            <p className="font-semibold">No loads in this period</p>
+            <p className="text-sm text-muted-foreground mt-1">Try a different date range or log a new load</p>
           </CardContent>
         </Card>
       )}
