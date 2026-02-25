@@ -10,6 +10,7 @@ interface LoadCardProps {
   load: Load;
   onEdit: (load: Load) => void;
   onDelete: (id: string) => void;
+  onTap?: () => void;
 }
 
 const statusStyles: Record<string, string> = {
@@ -18,13 +19,13 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
-export function LoadCard({ load, onEdit, onDelete }: LoadCardProps) {
+export function LoadCard({ load, onEdit, onDelete, onTap }: LoadCardProps) {
   const estimated = Number(load.estimated_pay ?? 0);
   const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
   const diff = actual != null ? actual - estimated : null;
 
   return (
-    <Card className="animate-slide-up hover:shadow-md transition-shadow">
+    <Card className="animate-slide-up hover:shadow-md transition-shadow cursor-pointer" onClick={onTap}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -73,10 +74,10 @@ export function LoadCard({ load, onEdit, onDelete }: LoadCardProps) {
               </>
             )}
             <div className="flex gap-1 mt-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(load)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(load); }}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(load.id)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(load.id); }}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
