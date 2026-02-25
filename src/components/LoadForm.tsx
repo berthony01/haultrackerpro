@@ -10,8 +10,9 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { calculateEstimatedPay } from '@/lib/types';
-import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Zap, RotateCcw, Copy } from 'lucide-react';
+import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { SmartChips } from '@/components/SmartChips';
 
 interface LoadFormProps {
   onSubmit: (data: LoadInsert) => void;
@@ -172,41 +173,23 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Quick Default Chips */}
           {!initialData && (
-            <div className="flex flex-wrap gap-1.5">
-              {settings?.default_rate_per_mile != null && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="text-[11px] h-7 px-2.5 rounded-xl gap-1 active:scale-95 transition-transform"
-                  onClick={handleUseDefaultRate}
-                >
-                  <Zap className="h-3 w-3" /> Default Rate
-                </Button>
-              )}
-              {lastLoad && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-[11px] h-7 px-2.5 rounded-xl gap-1 active:scale-95 transition-transform"
-                    onClick={handleUseLastRate}
-                  >
-                    <RotateCcw className="h-3 w-3" /> Last Rate
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-[11px] h-7 px-2.5 rounded-xl gap-1 active:scale-95 transition-transform"
-                    onClick={handleCopyLastLoad}
-                  >
-                    <Copy className="h-3 w-3" /> Copy Last Load
-                  </Button>
-                </>
-              )}
-            </div>
+            <SmartChips
+              settings={settings}
+              lastLoad={lastLoad}
+              recentLoads={recentLoads}
+              onUseDefaultRate={handleUseDefaultRate}
+              onUseLastRate={handleUseLastRate}
+              onCopyLastLoad={handleCopyLastLoad}
+              onApplyLane={(pickup, dropoff) => {
+                update('pickup_location', pickup);
+                update('dropoff_location', dropoff);
+                toast.success('Common lane applied');
+              }}
+              onApplyRate={(rate) => {
+                update('rate_per_mile', rate.toString());
+                toast.success('Common rate applied');
+              }}
+            />
           )}
 
           <div className="grid grid-cols-2 gap-4">
