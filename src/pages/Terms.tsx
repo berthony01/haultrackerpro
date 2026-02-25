@@ -18,31 +18,31 @@ export default function Terms() {
       </header>
 
       <main className="px-4 py-6 max-w-2xl mx-auto space-y-6 text-sm leading-relaxed text-foreground">
-        <h2 className="text-2xl font-black font-heading">HaulTracker Terms of Service</h2>
+        <h2 className="text-2xl font-black font-heading">HaulTrackerPro Terms of Service</h2>
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">1. Acceptance of Terms</h3>
-          <p className="text-muted-foreground">By accessing or using HaulTracker, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the service.</p>
+          <p className="text-muted-foreground">By accessing or using HaulTrackerPro, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the service.</p>
         </section>
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">2. Description of Service</h3>
-          <p className="text-muted-foreground">HaulTracker provides load tracking, expense tracking, and financial tracking tools for owner-operators and lease operators in the trucking industry. The service helps users log loads, track pay, manage expenses, and generate reports.</p>
+          <p className="text-muted-foreground">HaulTrackerPro provides load tracking, expense tracking, and financial tracking tools for owner-operators and lease operators in the trucking industry. The service helps users log loads, track pay, manage expenses, and generate reports.</p>
         </section>
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">3. No Financial, Tax, or Legal Advice</h3>
-          <p className="text-muted-foreground">HaulTracker does NOT provide tax, financial, or legal advice. All calculations, reports, and summaries are provided as tracking tools only. You should consult qualified professionals for tax, financial, and legal matters.</p>
+          <p className="text-muted-foreground">HaulTrackerPro does NOT provide tax, financial, or legal advice. All calculations, reports, and summaries are provided as tracking tools only. You should consult qualified professionals for tax, financial, and legal matters.</p>
         </section>
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">4. Data Accuracy Disclaimer</h3>
-          <p className="text-muted-foreground">Users are solely responsible for the accuracy of all data entered into HaulTracker. You should verify all calculations, exports, and reports independently before relying on them for business or tax purposes.</p>
+          <p className="text-muted-foreground">Users are solely responsible for the accuracy of all data entered into HaulTrackerPro. You should verify all calculations, exports, and reports independently before relying on them for business or tax purposes.</p>
         </section>
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">5. Limitation of Liability</h3>
-          <p className="text-muted-foreground">HaulTracker is not liable for any financial loss, missed payments, tax errors, or other damages arising from the use of this service. The service is provided "as is" without warranties of any kind.</p>
+          <p className="text-muted-foreground">HaulTrackerPro is not liable for any financial loss, missed payments, tax errors, or other damages arising from the use of this service. The service is provided "as is" without warranties of any kind.</p>
         </section>
 
         <section className="space-y-2">
@@ -67,7 +67,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">10. Contact Information</h3>
-          <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultracker.app.</p>
+          <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.app.</p>
         </section>
 
         <p className="text-xs text-muted-foreground/60 pt-4 border-t border-border">

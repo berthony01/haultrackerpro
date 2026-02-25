@@ -18,7 +18,7 @@ export default function Privacy() {
       </header>
 
       <main className="px-4 py-6 max-w-2xl mx-auto space-y-6 text-sm leading-relaxed text-foreground">
-        <h2 className="text-2xl font-black font-heading">HaulTracker Privacy Policy</h2>
+        <h2 className="text-2xl font-black font-heading">HaulTrackerPro Privacy Policy</h2>
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">1. Information We Collect</h3>
@@ -33,7 +33,7 @@ export default function Privacy() {
         <section className="space-y-2">
           <h3 className="text-base font-bold">2. How We Use Information</h3>
           <ul className="list-disc list-inside text-muted-foreground space-y-1">
-            <li>Provide and maintain the HaulTracker service</li>
+            <li>Provide and maintain the HaulTrackerPro service</li>
             <li>Generate reports and summaries for your use</li>
             <li>Improve product features and user experience</li>
             <li>Internal analytics to understand usage patterns</li>
@@ -66,7 +66,7 @@ export default function Privacy() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">7. Contact Information</h3>
-          <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultracker.app.</p>
+          <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.app.</p>
         </section>
 
         <p className="text-xs text-muted-foreground/60 pt-4 border-t border-border">

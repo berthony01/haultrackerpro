@@ -98,7 +98,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       const a = document.createElement('a');
       const dateStr = new Date().toISOString().split('T')[0];
       a.href = url;
-      a.download = `haultracker_full_export_${dateStr}.json`;
+      a.download = `haultrackerpro_full_export_${dateStr}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success('Data exported successfully!');
@@ -237,7 +237,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </Button>
           <div className="flex items-center gap-2 pt-1">
             <Mail className="h-3.5 w-3.5 text-muted-foreground/50" />
-            <p className="text-xs text-muted-foreground">support@haultracker.app</p>
+            <p className="text-xs text-muted-foreground">support@haultrackerpro.app</p>
           </div>
         </CardContent>
       </Card>
@@ -255,7 +255,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50" />
           </Button>
           <p className="text-[10px] text-muted-foreground/50 pt-1">
-            HaulTracker provides tracking tools only. Always verify financial and tax information with qualified professionals.
+            HaulTrackerPro provides tracking tools only. Always verify financial and tax information with qualified professionals.
           </p>
         </CardContent>
       </Card>

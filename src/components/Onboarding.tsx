@@ -21,7 +21,7 @@ export function Onboarding({ onGetStarted }: OnboardingProps) {
           <Truck className="h-12 w-12 text-primary" />
         </div>
         <div>
-          <h1 className="text-3xl font-black font-heading tracking-tight">Welcome to<br /><span className="text-gradient">HaulTracker</span></h1>
+          <h1 className="text-3xl font-black font-heading tracking-tight">Welcome to<br /><span className="text-gradient">HaulTrackerPro</span></h1>
           <p className="text-muted-foreground mt-2 text-sm">Your loads. Your money. All tracked.</p>
         </div>
       </div>
