@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { formatCurrency, formatNumber } from '@/lib/loadUtils';
-import { StatCard } from '@/components/StatCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin } from 'lucide-react';
+import { StatCard, StatCardSkeleton } from '@/components/StatCard';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYea
 
 interface DashboardViewProps {
   loads: Load[];
+  isLoading?: boolean;
+  onNavigate?: (page: string) => void;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
@@ -35,7 +37,7 @@ function getPresetRange(key: PresetKey): { start: Date; end: Date } {
   }
 }
 
-export function DashboardView({ loads }: DashboardViewProps) {
+export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewProps) {
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -82,7 +84,7 @@ export function DashboardView({ loads }: DashboardViewProps) {
               key={p.key}
               variant={activePreset === p.key ? 'default' : 'outline'}
               size="sm"
-              className="text-xs h-7 px-2.5"
+              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-transform ${activePreset === p.key ? 'shadow-primary' : ''}`}
               onClick={() => setActivePreset(p.key)}
             >
               {p.label}
@@ -91,61 +93,82 @@ export function DashboardView({ loads }: DashboardViewProps) {
         </div>
         {showCustom && (
           <div className="flex gap-2 items-center">
-            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-8 text-xs flex-1" />
+            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
             <span className="text-xs text-muted-foreground">to</span>
-            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-8 text-xs flex-1" />
+            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
           </div>
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} />
-        <StatCard
-          label="Actual Earnings"
-          value={formatCurrency(actual)}
-          icon={DollarSign}
-          subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
-        />
-        <StatCard label="Loads Completed" value={completedLoads.length.toString()} icon={Truck} />
-        <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
-        <StatCard label="Deadhead Miles" value={formatNumber(deadheadMiles)} icon={MapPin} />
-        {difference != null ? (
-          <StatCard
-            label="Difference"
-            value={`${difference >= 0 ? '+' : ''}${formatCurrency(difference)}`}
-            icon={difference >= 0 ? TrendingUp : TrendingDown}
-            subtitle={difference >= 0 ? 'Overpaid' : 'Underpaid'}
-          />
-        ) : (
-          <StatCard
-            label="Avg $/Mile"
-            value={loadedMiles > 0 ? formatCurrency(estimated / loadedMiles) : '$0'}
-            icon={TrendingUp}
-          />
-        )}
-      </div>
+      {/* Loading skeletons */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} />
+            <StatCard
+              label="Actual Earnings"
+              value={formatCurrency(actual)}
+              icon={DollarSign}
+              subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
+            />
+            <StatCard label="Loads Done" value={completedLoads.length.toString()} icon={Truck} />
+            <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
+            <StatCard label="Deadhead Miles" value={formatNumber(deadheadMiles)} icon={MapPin} />
+            {difference != null ? (
+              <StatCard
+                label="Difference"
+                value={`${difference >= 0 ? '+' : ''}${formatCurrency(difference)}`}
+                icon={difference >= 0 ? TrendingUp : TrendingDown}
+                subtitle={difference >= 0 ? 'Overpaid' : 'Underpaid'}
+              />
+            ) : (
+              <StatCard
+                label="Avg $/Mile"
+                value={loadedMiles > 0 ? formatCurrency(estimated / loadedMiles) : '$0'}
+                icon={TrendingUp}
+              />
+            )}
+          </div>
 
-      {/* Insight Lines */}
-      {missingPayCount > 0 && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="p-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              You are missing Actual Pay for <span className="font-semibold text-foreground">{missingPayCount} load{missingPayCount > 1 ? 's' : ''}</span>
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          {/* Insight Alert */}
+          {missingPayCount > 0 && (
+            <Card className="border-warning/30 bg-warning/5 shadow-card">
+              <CardContent className="p-3.5 flex items-center gap-3">
+                <div className="rounded-lg bg-warning/10 p-2 shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Missing Actual Pay for <span className="font-bold text-foreground">{missingPayCount} load{missingPayCount > 1 ? 's' : ''}</span>
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-      {filteredLoads.length === 0 && (
-        <Card className="border-dashed border-2">
-          <CardContent className="p-8 text-center">
-            <Truck className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="font-semibold">No loads in this period</p>
-            <p className="text-sm text-muted-foreground mt-1">Try a different date range or log a new load</p>
-          </CardContent>
-        </Card>
+          {/* Empty State */}
+          {filteredLoads.length === 0 && (
+            <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
+              <CardContent className="py-12 text-center">
+                <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-4 mb-4">
+                  <Truck className="h-10 w-10 text-muted-foreground/40" />
+                </div>
+                <p className="font-bold text-lg">No loads in this period</p>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">Try a different date range or log a new load</p>
+                {onNavigate && (
+                  <Button className="gap-2 rounded-xl shadow-primary active:scale-95 transition-transform" onClick={() => onNavigate('add')}>
+                    <Plus className="h-4 w-4" /> Log a Load
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );

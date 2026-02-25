@@ -3,7 +3,7 @@ import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Pencil, Trash2, Route } from 'lucide-react';
+import { MapPin, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface LoadCardProps {
@@ -25,62 +25,99 @@ export function LoadCard({ load, onEdit, onDelete, onTap }: LoadCardProps) {
   const diff = actual != null ? actual - estimated : null;
 
   return (
-    <Card className="animate-slide-up hover:shadow-md transition-shadow cursor-pointer" onClick={onTap}>
+    <Card
+      className="shadow-card hover:shadow-card-hover transition-all duration-200 cursor-pointer active:scale-[0.98] animate-slide-up"
+      onClick={onTap}
+    >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <Route className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-xs font-medium text-muted-foreground">
+            {/* Date + Status row */}
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-xs font-semibold text-muted-foreground">
                 {format(parseISO(load.load_date), 'MMM d, yyyy')}
               </span>
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusStyles[load.status] ?? ''}`}>
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
                 {load.status}
               </Badge>
             </div>
-            <div className="space-y-1 mb-3">
-              <div className="flex items-center gap-1.5 text-sm">
-                <MapPin className="h-3 w-3 text-success shrink-0" />
+
+            {/* Route */}
+            <div className="space-y-1.5 mb-3">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-success shrink-0" />
                 <span className="truncate font-medium">{load.pickup_location}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-sm">
-                <MapPin className="h-3 w-3 text-destructive shrink-0" />
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-destructive shrink-0" />
                 <span className="truncate font-medium">{load.dropoff_location}</span>
               </div>
             </div>
+
+            {/* Stats row */}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>{load.loaded_miles} mi loaded</span>
-              <span>{load.deadhead_miles} mi DH</span>
+              <span className="font-medium">{load.loaded_miles} mi</span>
+              <span>{load.deadhead_miles} DH</span>
               <span>${load.rate_per_mile}/mi</span>
             </div>
-            {load.notes && (
-              <p className="text-xs text-muted-foreground mt-2 italic truncate">📝 {load.notes}</p>
-            )}
           </div>
-          <div className="text-right shrink-0">
-            <p className="text-xs text-muted-foreground">Est.</p>
-            <p className="text-lg font-black font-mono text-primary">
+
+          {/* Pay column */}
+          <div className="text-right shrink-0 flex flex-col items-end">
+            <p className="text-lg font-black font-mono text-primary leading-tight">
               {formatCurrency(estimated)}
             </p>
+            <p className="text-[10px] text-muted-foreground">estimated</p>
             {actual != null && (
-              <>
-                <p className="text-xs text-muted-foreground mt-1">Actual</p>
-                <p className={`text-sm font-bold font-mono ${actual >= estimated ? 'text-success' : 'text-destructive'}`}>
+              <div className="mt-1.5">
+                <p className={`text-sm font-bold font-mono leading-tight ${actual >= estimated ? 'text-success' : 'text-destructive'}`}>
                   {formatCurrency(actual)}
                 </p>
-                <p className={`text-[10px] font-mono ${diff! >= 0 ? 'text-success' : 'text-destructive'}`}>
+                <p className={`text-[10px] font-mono font-semibold ${diff! >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {diff! >= 0 ? '+' : ''}{formatCurrency(diff!)}
                 </p>
-              </>
+              </div>
             )}
-            <div className="flex gap-1 mt-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(load); }}>
+            <div className="flex gap-1 mt-2.5">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(load); }}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(load.id); }}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(load.id); }}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Tap hint */}
+        <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-border/50">
+          <span className="text-[10px] text-muted-foreground/60 font-medium">Tap for details</span>
+          <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function LoadCardSkeleton() {
+  return (
+    <Card className="shadow-card">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 space-y-3">
+            <div className="flex gap-2">
+              <div className="skeleton-shimmer h-4 w-20 rounded" />
+              <div className="skeleton-shimmer h-4 w-16 rounded" />
+            </div>
+            <div className="space-y-2">
+              <div className="skeleton-shimmer h-4 w-40 rounded" />
+              <div className="skeleton-shimmer h-4 w-36 rounded" />
+            </div>
+            <div className="skeleton-shimmer h-3 w-28 rounded" />
+          </div>
+          <div className="space-y-2 text-right">
+            <div className="skeleton-shimmer h-6 w-20 rounded ml-auto" />
+            <div className="skeleton-shimmer h-3 w-12 rounded ml-auto" />
           </div>
         </div>
       </CardContent>
