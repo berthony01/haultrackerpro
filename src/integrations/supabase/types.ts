@@ -63,6 +63,7 @@ export type Database = {
       }
       feedback_responses: {
         Row: {
+          category: string | null
           created_at: string
           id: string
           loads_count: number
@@ -70,6 +71,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           id?: string
           loads_count?: number
@@ -77,6 +79,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           id?: string
           loads_count?: number
@@ -232,6 +235,7 @@ export type Database = {
           default_other_fees: number | null
           default_rate_per_mile: number | null
           id: string
+          onboarding_completed: boolean
           updated_at: string
           user_id: string
           week_start_day: string
@@ -242,6 +246,7 @@ export type Database = {
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           id?: string
+          onboarding_completed?: boolean
           updated_at?: string
           user_id: string
           week_start_day?: string
@@ -252,6 +257,7 @@ export type Database = {
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           id?: string
+          onboarding_completed?: boolean
           updated_at?: string
           user_id?: string
           week_start_day?: string
