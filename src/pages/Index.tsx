@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLoads, Load, LoadInsert } from '@/hooks/useLoads';
+import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
@@ -45,6 +45,20 @@ const Index = () => {
     });
   };
 
+  const handleQuickUpdate = (id: string, data: LoadUpdate) => {
+    updateLoad.mutate({ id, data }, {
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const handleDuplicate = (load: Load) => {
+    setEditingLoad(null);
+    setPage('add');
+    // Pre-fill form with duplicated data by creating a fake "initial" load with today's date
+    const dup: Load = { ...load, id: '', load_date: new Date().toISOString().split('T')[0], actual_pay_received: null, status: 'pending' };
+    setEditingLoad(dup);
+  };
+
   const handleEdit = (load: Load) => {
     setEditingLoad(load);
     setPage('add');
@@ -83,7 +97,7 @@ const Index = () => {
             {page === 'add' && (
               <div className="animate-fade-in">
                 <LoadForm
-                  onSubmit={editingLoad ? handleUpdateLoad : handleAddLoad}
+                  onSubmit={editingLoad && editingLoad.id ? handleUpdateLoad : handleAddLoad}
                   onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : undefined}
                   initialData={editingLoad || undefined}
                   loading={addLoad.isPending || updateLoad.isPending}
@@ -95,6 +109,8 @@ const Index = () => {
                 loads={loads}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
+                onUpdate={handleQuickUpdate}
+                onDuplicate={handleDuplicate}
                 onDateRangeChange={(from, to) => setDateRange({ from, to })}
                 isLoading={isLoading}
               />
