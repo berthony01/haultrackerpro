@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
-import { formatCurrency } from '@/lib/loadUtils';
+import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -69,11 +69,11 @@ export function LoadCard({ load, onEdit, onDelete, onUpdate, onTap }: LoadCardPr
             <div className="space-y-1.5 mb-3">
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-success shrink-0" />
-                <span className="truncate font-medium">{load.pickup_location}</span>
+                <span className="truncate font-medium">{formatLocation(load.pickup_location)}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-2 h-2 rounded-full bg-destructive shrink-0" />
-                <span className="truncate font-medium">{load.dropoff_location}</span>
+                <span className="truncate font-medium">{formatLocation(load.dropoff_location)}</span>
               </div>
             </div>
 
