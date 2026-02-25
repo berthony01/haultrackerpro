@@ -1,4 +1,4 @@
-import { Load } from '@/lib/types';
+import { Load } from '@/hooks/useLoads';
 import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, getCurrentMonthLoads } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,24 +20,14 @@ export function ReportsView({ loads }: ReportsViewProps) {
       </div>
 
       <div className="grid gap-3">
-        <Button
-          variant="outline"
-          className="h-14 justify-start gap-3"
-          onClick={() => exportToCSV(loads, 'all-loads')}
-          disabled={loads.length === 0}
-        >
+        <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(loads, 'all-loads')} disabled={loads.length === 0}>
           <Download className="h-5 w-5 text-primary" />
           <div className="text-left">
             <p className="font-semibold text-sm">Export All Loads</p>
             <p className="text-xs text-muted-foreground">{loads.length} loads as CSV</p>
           </div>
         </Button>
-        <Button
-          variant="outline"
-          className="h-14 justify-start gap-3"
-          onClick={() => exportToCSV(monthLoads, 'monthly-loads')}
-          disabled={monthLoads.length === 0}
-        >
+        <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(monthLoads, 'monthly-loads')} disabled={monthLoads.length === 0}>
           <FileText className="h-5 w-5 text-primary" />
           <div className="text-left">
             <p className="font-semibold text-sm">Export This Month</p>
@@ -55,7 +45,14 @@ export function ReportsView({ loads }: ReportsViewProps) {
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-2">
                     <p className="font-semibold text-sm">{s.weekLabel}</p>
-                    <p className="font-black font-mono text-primary">{formatCurrency(s.totalPay)}</p>
+                    <div className="text-right">
+                      <p className="font-black font-mono text-primary">{formatCurrency(s.totalEstimatedPay)}</p>
+                      {s.totalActualPay > 0 && (
+                        <p className={`text-xs font-mono ${s.totalActualPay >= s.totalEstimatedPay ? 'text-success' : 'text-destructive'}`}>
+                          Actual: {formatCurrency(s.totalActualPay)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                     <div>
@@ -71,18 +68,13 @@ export function ReportsView({ loads }: ReportsViewProps) {
                       <p>Avg $/mi</p>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 w-full text-xs"
-                    onClick={() => {
-                      const weekLoads = loads.filter(l => {
-                        const d = new Date(l.date);
-                        return d >= new Date(s.startDate) && d <= new Date(s.endDate);
-                      });
-                      exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`);
-                    }}
-                  >
+                  <Button variant="ghost" size="sm" className="mt-2 w-full text-xs" onClick={() => {
+                    const weekLoads = loads.filter(l => {
+                      const d = new Date(l.date);
+                      return d >= new Date(s.startDate) && d <= new Date(s.endDate);
+                    });
+                    exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`);
+                  }}>
                     <Download className="h-3 w-3 mr-1" /> Export Week
                   </Button>
                 </CardContent>

@@ -1,37 +1,45 @@
 import { useState } from 'react';
-import { useLoads } from '@/hooks/useLoads';
-import { Load } from '@/lib/types';
+import { useLoads, Load, LoadInsert } from '@/hooks/useLoads';
+import { useAuth } from '@/hooks/useAuth';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
 import { LoadsListView } from '@/components/LoadsListView';
 import { ReportsView } from '@/components/ReportsView';
-import { Truck } from 'lucide-react';
+import { Truck, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const Index = () => {
-  const { loads, addLoad, updateLoad, deleteLoad } = useLoads();
+  const { signOut } = useAuth();
+  const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
+  const { loads, isLoading, addLoad, updateLoad, deleteLoad } = useLoads(dateRange);
   const [page, setPage] = useState('dashboard');
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
 
-  const handleAddLoad = (data: Omit<Load, 'id' | 'totalPay' | 'createdAt'>) => {
-    addLoad(data);
-    toast.success('Load logged successfully!');
-    setPage('loads');
+  // For dashboard/reports we want all loads (no date filter)
+  const allLoadsQuery = useLoads();
+
+  const handleAddLoad = (data: LoadInsert) => {
+    addLoad.mutate(data, {
+      onSuccess: () => { toast.success('Load logged!'); setPage('loads'); },
+      onError: (e) => toast.error(e.message),
+    });
   };
 
-  const handleUpdateLoad = (data: Omit<Load, 'id' | 'totalPay' | 'createdAt'>) => {
-    if (editingLoad) {
-      updateLoad(editingLoad.id, data);
-      toast.success('Load updated!');
-      setEditingLoad(null);
-      setPage('loads');
-    }
+  const handleUpdateLoad = (data: LoadInsert) => {
+    if (!editingLoad) return;
+    updateLoad.mutate({ id: editingLoad.id, data }, {
+      onSuccess: () => { toast.success('Load updated!'); setEditingLoad(null); setPage('loads'); },
+      onError: (e) => toast.error(e.message),
+    });
   };
 
   const handleDelete = (id: string) => {
-    deleteLoad(id);
-    toast.success('Load deleted');
+    deleteLoad.mutate(id, {
+      onSuccess: () => toast.success('Load deleted'),
+      onError: (e) => toast.error(e.message),
+    });
   };
 
   const handleEdit = (load: Load) => {
@@ -46,35 +54,45 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-secondary text-secondary-foreground">
-        <div className="flex items-center gap-3 px-4 py-3 max-w-lg mx-auto">
-          <div className="rounded-lg bg-primary p-1.5">
-            <Truck className="h-5 w-5 text-primary-foreground" />
+        <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary p-1.5">
+              <Truck className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-base font-black font-heading tracking-tight">HaulTracker</h1>
+              <p className="text-[10px] text-secondary-foreground/60 font-medium uppercase tracking-wider">Load & Pay Manager</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base font-black font-heading tracking-tight">HaulTracker</h1>
-            <p className="text-[10px] text-secondary-foreground/60 font-medium uppercase tracking-wider">Load & Pay Manager</p>
-          </div>
+          <Button variant="ghost" size="icon" className="text-secondary-foreground/60 hover:text-secondary-foreground" onClick={signOut}>
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </header>
 
-      {/* Content */}
       <main className="px-4 py-5 max-w-lg mx-auto">
-        {page === 'dashboard' && <DashboardView loads={loads} />}
+        {page === 'dashboard' && <DashboardView loads={allLoadsQuery.loads} />}
         {page === 'add' && (
           <div className="animate-fade-in">
             <LoadForm
               onSubmit={editingLoad ? handleUpdateLoad : handleAddLoad}
               onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : undefined}
               initialData={editingLoad || undefined}
+              loading={addLoad.isPending || updateLoad.isPending}
             />
           </div>
         )}
         {page === 'loads' && (
-          <LoadsListView loads={loads} onEdit={handleEdit} onDelete={handleDelete} />
+          <LoadsListView
+            loads={loads}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onDateRangeChange={(from, to) => setDateRange({ from, to })}
+            isLoading={isLoading}
+          />
         )}
-        {page === 'reports' && <ReportsView loads={loads} />}
+        {page === 'reports' && <ReportsView loads={allLoadsQuery.loads} />}
       </main>
 
       <BottomNav active={page} onNavigate={handleNavigate} />

@@ -1,16 +1,5 @@
-export interface Load {
-  id: string;
-  date: string;
-  pickup: string;
-  dropoff: string;
-  loadedMiles: number;
-  deadheadMiles: number;
-  ratePerMile: number;
-  waitFee: number;
-  detentionFee: number;
-  totalPay: number;
-  createdAt: string;
-}
+// Re-export the DB-driven Load type from the hook
+export type { Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 
 export interface WeekSummary {
   weekLabel: string;
@@ -19,14 +8,11 @@ export interface WeekSummary {
   totalLoads: number;
   totalLoadedMiles: number;
   totalDeadheadMiles: number;
-  totalPay: number;
+  totalEstimatedPay: number;
+  totalActualPay: number;
   avgRatePerMile: number;
 }
 
-export function calculateTotalPay(load: Omit<Load, 'id' | 'totalPay' | 'createdAt'>): number {
-  return (load.loadedMiles * load.ratePerMile) + load.waitFee + load.detentionFee;
-}
-
-export function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+export function calculateEstimatedPay(loadedMiles: number, ratePerMile: number, waitFee: number, detentionFee: number): number {
+  return (loadedMiles * ratePerMile) + waitFee + detentionFee;
 }
