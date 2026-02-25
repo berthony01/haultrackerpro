@@ -6,7 +6,7 @@ import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapP
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval, format } from 'date-fns';
 
 interface DashboardViewProps {
   loads: Load[];
@@ -156,7 +156,15 @@ export function DashboardView({ loads, isLoading, onNavigate }: DashboardViewPro
             )}
           </div>
 
-
+          {/* Last Updated */}
+          {loads.length > 0 && (
+            <p className="text-[10px] text-muted-foreground/50 text-center">
+              Last updated: {format(
+                new Date(Math.max(...loads.map(l => new Date(l.updated_at).getTime()))),
+                'MMM d, h:mm a'
+              )}
+            </p>
+          )}
 
 
           {/* Empty State */}
