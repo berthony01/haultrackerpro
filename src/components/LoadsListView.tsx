@@ -3,8 +3,9 @@ import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { LoadCard, LoadCardSkeleton } from '@/components/LoadCard';
 import { LoadDetailSheet } from '@/components/LoadDetailSheet';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Truck, Search } from 'lucide-react';
+import { Truck, Search, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 
@@ -42,7 +43,7 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
     <div className="space-y-4 animate-fade-in">
       <div>
         <h1 className="text-2xl font-black font-heading">My Loads</h1>
-        <p className="text-sm text-muted-foreground">{filtered.length} loads</p>
+        <p className="text-sm text-muted-foreground">{filtered.length} load{filtered.length !== 1 ? 's' : ''}</p>
       </div>
 
       <DateRangeFilter onRangeChange={onDateRangeChange} />
@@ -54,11 +55,11 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
             placeholder="Search city or state..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="h-8 text-xs pl-8"
+            className="h-8 text-xs pl-8 rounded-xl"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-28 h-8 text-xs">
+          <SelectTrigger className="w-28 h-8 text-xs rounded-xl">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -69,12 +70,12 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
           </SelectContent>
         </Select>
         <Select value={payFilter} onValueChange={setPayFilter}>
-          <SelectTrigger className="w-28 h-8 text-xs">
+          <SelectTrigger className="w-28 h-8 text-xs rounded-xl">
             <SelectValue placeholder="All pay" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Pay</SelectItem>
-            <SelectItem value="missing_pay">Missing Pay</SelectItem>
+            <SelectItem value="missing_pay">Pending Pay</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -87,12 +88,12 @@ export function LoadsListView({ loads, onEdit, onDelete, onUpdate, onDuplicate, 
         </div>
       ) : filtered.length === 0 ? (
         <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
-          <CardContent className="py-12 text-center">
-            <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-4 mb-4">
-              <Truck className="h-10 w-10 text-muted-foreground/40" />
+          <CardContent className="py-14 text-center">
+            <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
+              <Truck className="h-12 w-12 text-muted-foreground/30" />
             </div>
-            <p className="font-bold text-lg">No loads found</p>
-            <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters</p>
+            <p className="font-bold text-lg">No loads match your filters</p>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">Try adjusting your date range or filters above.</p>
           </CardContent>
         </Card>
       ) : (

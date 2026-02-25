@@ -31,7 +31,9 @@ export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-black font-heading">Reports</h1>
-        <p className="text-sm text-muted-foreground">Export and review summaries</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Export summaries for payroll, tax, or carrier disputes.
+        </p>
       </div>
 
       <DateRangeFilter onRangeChange={(from, to) => setDateRange({ from, to })} />
@@ -40,17 +42,17 @@ export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
       {onNavigate && (
         <Button
           variant="outline"
-          className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-transform"
+          className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
           onClick={() => onNavigate('monthly')}
         >
-          <Calendar className="h-5 w-5" /> Month Summary
+          <Calendar className="h-5 w-5" /> Monthly Summary
         </Button>
       )}
 
       <div>
-        <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Export Options</h2>
+        <h2 className="text-label mb-3">Export Options</h2>
         <div className="grid gap-3">
-          <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(loads, 'all-loads')} disabled={loads.length === 0}>
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(loads, 'all-loads')} disabled={loads.length === 0}>
             <FileSpreadsheet className="h-5 w-5 text-primary" />
             <div className="text-left">
               <p className="font-semibold text-sm">Export All Loads (CSV)</p>
@@ -59,7 +61,7 @@ export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
           </Button>
 
           {hasFilter && (
-            <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(filteredLoads, 'filtered-loads')} disabled={filteredLoads.length === 0}>
+            <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(filteredLoads, 'filtered-loads')} disabled={filteredLoads.length === 0}>
               <Filter className="h-5 w-5 text-primary" />
               <div className="text-left">
                 <p className="font-semibold text-sm">Export Filtered Loads (CSV)</p>
@@ -68,7 +70,7 @@ export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
             </Button>
           )}
 
-          <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToCSV(monthLoads, 'monthly-summary')} disabled={monthLoads.length === 0}>
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(monthLoads, 'monthly-summary')} disabled={monthLoads.length === 0}>
             <FileText className="h-5 w-5 text-primary" />
             <div className="text-left">
               <p className="font-semibold text-sm">Export Monthly Summary (CSV)</p>
@@ -76,7 +78,7 @@ export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
             </div>
           </Button>
 
-          <Button variant="outline" className="h-14 justify-start gap-3" onClick={() => exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads')} disabled={loads.length === 0}>
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads')} disabled={loads.length === 0}>
             <Download className="h-5 w-5 text-destructive" />
             <div className="text-left">
               <p className="font-semibold text-sm">Export as PDF</p>
@@ -88,15 +90,15 @@ export function ReportsView({ loads, onNavigate }: ReportsViewProps) {
 
       {summaries.length > 0 && (
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Weekly Breakdown</h2>
+          <h2 className="text-label mb-3">Weekly Breakdown</h2>
           <div className="space-y-2">
             {summaries.map(s => (
-              <Card key={s.startDate}>
+              <Card key={s.startDate} className="card-premium">
                 <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-3">
                     <p className="font-semibold text-sm">{s.weekLabel}</p>
                     <div className="text-right">
-                      <p className="font-black font-mono text-primary">{formatCurrency(s.totalEstimatedPay)}</p>
+                      <p className="text-value-lg text-primary">{formatCurrency(s.totalEstimatedPay)}</p>
                       {s.totalActualPay > 0 && (
                         <p className={`text-xs font-mono ${s.totalActualPay >= s.totalEstimatedPay ? 'text-success' : 'text-destructive'}`}>
                           Actual: {formatCurrency(s.totalActualPay)}

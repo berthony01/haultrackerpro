@@ -27,7 +27,7 @@ export function SmartReminders({ loads, onNavigate, onDismiss, dismissed }: Smar
     banners.push({
       key: 'unpaid',
       icon: <AlertTriangle className="h-4 w-4" />,
-      text: `You have ${unpaidCount} unpaid load${unpaidCount > 1 ? 's' : ''}.`,
+      text: `${unpaidCount} load${unpaidCount > 1 ? 's' : ''} pending payment entry.`,
       action: () => onNavigate('loads', { filter: 'missing_pay' }),
       actionLabel: 'Review',
       color: 'bg-warning/10 text-warning border-warning/20',
@@ -38,9 +38,9 @@ export function SmartReminders({ loads, onNavigate, onDismiss, dismissed }: Smar
     banners.push({
       key: 'closeout',
       icon: <Calendar className="h-4 w-4" />,
-      text: "Don't forget to close out your week.",
+      text: "Ready to finalize your weekly summary.",
       action: () => onNavigate('closeout'),
-      actionLabel: 'Close Out',
+      actionLabel: 'Finalize',
       color: 'bg-primary/10 text-primary border-primary/20',
     });
   }
@@ -50,15 +50,15 @@ export function SmartReminders({ loads, onNavigate, onDismiss, dismissed }: Smar
   return (
     <div className="space-y-2">
       {banners.map(b => (
-        <div key={b.key} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${b.color}`}>
+        <div key={b.key} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm animate-fade-in ${b.color}`}>
           {b.icon}
-          <span className="flex-1 font-medium text-xs">{b.text}</span>
+          <span className="flex-1 font-medium text-xs leading-tight">{b.text}</span>
           {b.action && (
-            <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={b.action}>
+            <Button variant="ghost" size="sm" className="h-6 text-xs px-2 font-bold" onClick={b.action}>
               {b.actionLabel}
             </Button>
           )}
-          <button onClick={() => onDismiss(b.key)} className="opacity-60 hover:opacity-100">
+          <button onClick={() => onDismiss(b.key)} className="opacity-40 hover:opacity-100 transition-opacity">
             <X className="h-3 w-3" />
           </button>
         </div>

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { useWeeklySnapshots } from '@/hooks/useWeeklySnapshots';
 import { formatCurrency, formatNumber, getCurrentWeekLoads } from '@/lib/loadUtils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -56,7 +56,7 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
     }, {
       onSuccess: () => {
         setFinalized(true);
-        toast.success('Week finalized!');
+        toast.success('Weekly summary finalized!');
       },
       onError: (e) => toast.error(e.message),
     });
@@ -66,20 +66,20 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
     return (
       <div className="space-y-6 animate-fade-in text-center py-8">
         <div className="inline-flex items-center justify-center rounded-full bg-success/10 p-6 mb-2">
-          <CheckCircle2 className="h-16 w-16 text-success animate-scale-in" />
+          <CheckCircle2 className="h-16 w-16 text-success animate-check-bounce" />
         </div>
-        <h2 className="text-2xl font-black font-heading">Week Closed Out!</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-2xl font-black font-heading">Week Finalized!</h2>
+        <p className="text-muted-foreground leading-relaxed">
           {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
         </p>
         <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
-          <Card><CardContent className="p-3 text-center">
-            <p className="text-xs text-muted-foreground">Loads</p>
-            <p className="text-xl font-black font-mono">{weekLoads.length}</p>
+          <Card className="card-premium"><CardContent className="p-3 text-center">
+            <p className="text-label">Loads</p>
+            <p className="text-value-lg">{weekLoads.length}</p>
           </CardContent></Card>
-          <Card><CardContent className="p-3 text-center">
-            <p className="text-xs text-muted-foreground">Estimated</p>
-            <p className="text-xl font-black font-mono text-primary">{formatCurrency(estimated)}</p>
+          <Card className="card-premium"><CardContent className="p-3 text-center">
+            <p className="text-label">Estimated</p>
+            <p className="text-value-lg text-primary">{formatCurrency(estimated)}</p>
           </CardContent></Card>
         </div>
         <Button className="rounded-xl shadow-primary" onClick={onBack}>Back to Dashboard</Button>
@@ -94,7 +94,7 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-black font-heading">Weekly Closeout</h1>
+          <h1 className="text-2xl font-black font-heading">Finalize Weekly Summary</h1>
           <p className="text-sm text-muted-foreground">
             {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
           </p>
@@ -103,51 +103,53 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
 
       {weekLoads.length === 0 ? (
         <Card className="border-dashed border-2 border-muted-foreground/20">
-          <CardContent className="py-12 text-center">
-            <Truck className="h-10 w-10 text-muted-foreground/40 mx-auto mb-4" />
+          <CardContent className="py-14 text-center">
+            <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
+              <Truck className="h-12 w-12 text-muted-foreground/30" />
+            </div>
             <p className="font-bold text-lg">No loads this week</p>
-            <p className="text-sm text-muted-foreground mt-1">Log some loads first</p>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">Log some loads to finalize your weekly summary.</p>
           </CardContent>
         </Card>
       ) : (
         <>
           {/* Summary Metrics */}
           <div className="grid grid-cols-2 gap-3">
-            <Card>
+            <Card className="card-premium">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <DollarSign className="h-4 w-4 text-primary" />
-                  <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Est. Earnings</p>
+                  <p className="text-label">Est. Earnings</p>
                 </div>
-                <p className="text-xl font-black font-mono">{formatCurrency(estimated)}</p>
+                <p className="text-value-lg">{formatCurrency(estimated)}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="card-premium">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <DollarSign className="h-4 w-4 text-success" />
-                  <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Actual Earnings</p>
+                  <p className="text-label">Actual Earnings</p>
                 </div>
-                <p className="text-xl font-black font-mono">{formatCurrency(actual)}</p>
+                <p className="text-value-lg">{formatCurrency(actual)}</p>
                 <p className="text-[11px] text-muted-foreground">{paidLoads.length} paid</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="card-premium">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Truck className="h-4 w-4 text-primary" />
-                  <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Total Loads</p>
+                  <p className="text-label">Total Loads</p>
                 </div>
-                <p className="text-xl font-black font-mono">{weekLoads.length}</p>
+                <p className="text-value-lg">{weekLoads.length}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="card-premium">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Route className="h-4 w-4 text-primary" />
-                  <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Known Diff</p>
+                  <p className="text-label">Known Diff</p>
                 </div>
-                <p className={`text-xl font-black font-mono ${knownDifference >= 0 ? 'text-success' : 'text-destructive'}`}>
+                <p className={`text-value-lg ${knownDifference >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {knownDifference >= 0 ? '+' : ''}{formatCurrency(knownDifference)}
                 </p>
               </CardContent>
@@ -155,7 +157,7 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
           </div>
 
           {/* Deadhead */}
-          <Card>
+          <Card className="card-premium">
             <CardContent className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -176,7 +178,7 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
                   <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="font-bold text-sm">
-                      You have {unpaidLoads.length} load{unpaidLoads.length > 1 ? 's' : ''} missing actual pay.
+                      {unpaidLoads.length} load{unpaidLoads.length > 1 ? 's' : ''} pending payment entry.
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Estimated total: {formatCurrency(unpaidEstimated)}
@@ -187,7 +189,7 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
                       className="mt-2 text-xs rounded-xl"
                       onClick={() => onNavigate('loads', { filter: 'missing_pay' })}
                     >
-                      Review Missing Loads
+                      Review Pending Loads
                     </Button>
                   </div>
                 </div>
@@ -205,12 +207,12 @@ export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProp
                   onCheckedChange={(v) => setConfirmed(v === true)}
                   className="mt-0.5"
                 />
-                <label htmlFor="confirm-closeout" className="text-sm cursor-pointer leading-snug">
+                <label htmlFor="confirm-closeout" className="text-sm cursor-pointer leading-relaxed">
                   I have entered all known actual payments.
                 </label>
               </div>
               <Button
-                className="w-full h-12 text-base font-bold rounded-xl shadow-primary"
+                className="w-full h-12 text-base font-bold rounded-xl shadow-primary active:scale-95 transition-all duration-200"
                 disabled={!confirmed || saveSnapshot.isPending}
                 onClick={handleFinalize}
               >

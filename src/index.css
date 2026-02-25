@@ -35,7 +35,7 @@
     --input: 220 13% 87%;
     --ring: 25 95% 53%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
     --success: 152 60% 42%;
     --success-foreground: 0 0% 100%;
@@ -62,9 +62,11 @@
     --font-body: 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    --shadow-card: 0 1px 3px 0 hsl(220 25% 10% / 0.06), 0 1px 2px -1px hsl(220 25% 10% / 0.06);
-    --shadow-card-hover: 0 4px 12px -2px hsl(220 25% 10% / 0.1), 0 2px 6px -2px hsl(220 25% 10% / 0.08);
+    --shadow-card: 0 1px 3px 0 hsl(220 25% 10% / 0.05), 0 1px 2px -1px hsl(220 25% 10% / 0.04);
+    --shadow-card-hover: 0 8px 24px -4px hsl(220 25% 10% / 0.1), 0 4px 8px -2px hsl(220 25% 10% / 0.06);
+    --shadow-elevated: 0 12px 32px -6px hsl(220 25% 10% / 0.12), 0 6px 12px -4px hsl(220 25% 10% / 0.08);
     --shadow-primary: 0 4px 14px -3px hsl(25 95% 53% / 0.4);
+    --shadow-premium: 0 0 0 1px hsl(25 95% 53% / 0.08), 0 8px 24px -4px hsl(25 95% 53% / 0.12);
   }
 
   .dark {
@@ -98,8 +100,10 @@
     --ring: 25 95% 53%;
 
     --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.2);
-    --shadow-card-hover: 0 4px 12px -2px hsl(0 0% 0% / 0.3);
+    --shadow-card-hover: 0 8px 24px -4px hsl(0 0% 0% / 0.3);
+    --shadow-elevated: 0 12px 32px -6px hsl(0 0% 0% / 0.4);
     --shadow-primary: 0 4px 14px -3px hsl(25 95% 53% / 0.3);
+    --shadow-premium: 0 0 0 1px hsl(25 95% 53% / 0.1), 0 8px 24px -4px hsl(25 95% 53% / 0.15);
   }
 }
 
@@ -110,11 +114,13 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    line-height: 1.6;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     @apply font-bold tracking-tight;
+    line-height: 1.2;
   }
 }
 
@@ -137,8 +143,24 @@
   .shadow-card-hover {
     box-shadow: var(--shadow-card-hover);
   }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
   .shadow-primary {
     box-shadow: var(--shadow-primary);
+  }
+  .shadow-premium {
+    box-shadow: var(--shadow-premium);
+  }
+  /* Premium value typography */
+  .text-value-lg {
+    @apply text-2xl font-black font-mono tracking-tight;
+  }
+  .text-value-xl {
+    @apply text-3xl font-black font-mono tracking-tighter;
+  }
+  .text-label {
+    @apply text-[10px] text-muted-foreground font-semibold uppercase tracking-widest;
   }
 }
 
@@ -166,5 +188,40 @@
   /* Safe area for bottom nav */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Premium card gradient overlay */
+  .card-premium {
+    @apply relative overflow-hidden;
+  }
+  .card-premium::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--primary) / 0.03) 0%,
+      transparent 50%,
+      hsl(var(--primary) / 0.01) 100%
+    );
+  }
+
+  /* Green pulse for payment updates */
+  @keyframes green-pulse {
+    0% { box-shadow: 0 0 0 0 hsl(152 60% 42% / 0.4); }
+    70% { box-shadow: 0 0 0 6px hsl(152 60% 42% / 0); }
+    100% { box-shadow: 0 0 0 0 hsl(152 60% 42% / 0); }
+  }
+  .animate-green-pulse {
+    animation: green-pulse 0.6s ease-out;
+  }
+
+  /* Success checkmark animation */
+  @keyframes check-bounce {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .animate-check-bounce {
+    animation: check-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 }
