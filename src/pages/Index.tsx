@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import { useExpenses, ExpenseInsert } from '@/hooks/useExpenses';
+import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeedback } from '@/hooks/useFeedback';
 import { BottomNav } from '@/components/BottomNav';
@@ -34,6 +35,10 @@ const Index = () => {
 
   const allLoadsQuery = useLoads();
   const allExpensesQuery = useExpenses();
+  const loadStopsHook = useLoadStops();
+
+  // Editing stops state
+  const [editingStops, setEditingStops] = useState<LoadStopInput[]>([]);
 
   useEffect(() => {
     if (
@@ -48,9 +53,15 @@ const Index = () => {
 
   const showOnboarding = !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
 
-  const handleAddLoad = (data: LoadInsert) => {
+  const handleAddLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     addLoad.mutate(data, {
-      onSuccess: () => { toast.success('Load logged successfully!'); setPage('loads'); },
+      onSuccess: (result) => {
+        if (stops && stops.length > 0 && result?.id) {
+          loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
+        }
+        toast.success('Load logged successfully!');
+        setPage('loads');
+      },
       onError: (e) => toast.error(e.message),
     });
   };
@@ -62,10 +73,17 @@ const Index = () => {
     });
   };
 
-  const handleUpdateLoad = (data: LoadInsert) => {
+  const handleUpdateLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     if (!editingLoad) return;
     updateLoad.mutate({ id: editingLoad.id, data }, {
-      onSuccess: () => { toast.success('Load updated!'); setEditingLoad(null); setPage('loads'); },
+      onSuccess: () => {
+        // Save stops (delete+reinsert)
+        loadStopsHook.saveStopsForLoad.mutate({ loadId: editingLoad.id, stops: stops ?? [] });
+        toast.success('Load updated!');
+        setEditingLoad(null);
+        setEditingStops([]);
+        setPage('loads');
+      },
       onError: (e) => toast.error(e.message),
     });
   };
@@ -85,29 +103,36 @@ const Index = () => {
 
   const handleDuplicate = (load: Load) => {
     setEditingLoad(null);
+    setEditingStops([]);
     setPage('add');
     const dup: Load = { ...load, id: '', load_date: new Date().toISOString().split('T')[0], actual_pay_received: null, status: 'pending' };
     setEditingLoad(dup);
+    // Copy stops from original
+    const origStops = loadStopsHook.getStopsForLoad(load.id);
+    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes })));
   };
 
   const handleEdit = (load: Load) => {
     setEditingLoad(load);
+    const origStops = loadStopsHook.getStopsForLoad(load.id);
+    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes })));
     setPage('add');
   };
 
   const handleNavigate = (p: string, options?: { filter?: string }) => {
     if (p === 'add') {
-      // Show modal to pick load or expense
       setShowAddModal(true);
       return;
     }
     setEditingLoad(null);
+    setEditingStops([]);
     setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
     setPage(p);
   };
 
   const handleAddLoadFromModal = () => {
     setEditingLoad(null);
+    setEditingStops([]);
     setPage('add');
   };
 
@@ -173,8 +198,9 @@ const Index = () => {
               <div className="animate-fade-in">
                 <LoadForm
                   onSubmit={editingLoad && editingLoad.id ? handleUpdateLoad : handleAddLoad}
-                  onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : () => setPage('dashboard')}
+                  onCancel={editingLoad ? () => { setEditingLoad(null); setEditingStops([]); setPage('loads'); } : () => setPage('dashboard')}
                   initialData={editingLoad || undefined}
+                  initialStops={editingStops.length > 0 ? editingStops : undefined}
                   loading={addLoad.isPending || updateLoad.isPending}
                   recentLoads={allLoadsQuery.loads}
                 />

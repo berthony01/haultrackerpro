@@ -85,6 +85,50 @@ export type Database = {
         }
         Relationships: []
       }
+      load_stops: {
+        Row: {
+          created_at: string
+          detention_minutes: number | null
+          id: string
+          load_id: string
+          location: string
+          stop_order: number
+          stop_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detention_minutes?: number | null
+          id?: string
+          load_id: string
+          location: string
+          stop_order: number
+          stop_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detention_minutes?: number | null
+          id?: string
+          load_id?: string
+          location?: string
+          stop_order?: number
+          stop_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_stops_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loads: {
         Row: {
           actual_pay_received: number | null

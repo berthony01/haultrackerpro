@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
+import { useLoadStops } from '@/hooks/useLoadStops';
 import { LoadCard, LoadCardSkeleton } from '@/components/LoadCard';
 import { LoadDetailSheet } from '@/components/LoadDetailSheet';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Truck, Search, Plus } from 'lucide-react';
+import { Truck, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 
@@ -27,6 +27,9 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
   const [payFilter, setPayFilter] = useState(initialPayFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
+
+  const loadIds = loads.map(l => l.id);
+  const { stops } = useLoadStops(loadIds);
 
   const filtered = loads.filter(l => {
     if (statusFilter !== 'all' && l.status !== statusFilter) return false;
@@ -101,7 +104,15 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       ) : (
         <div className="space-y-3">
           {filtered.map(load => (
-            <LoadCard key={load.id} load={load} onEdit={onEdit} onDelete={onDelete} onUpdate={onUpdate} onTap={() => setSelectedLoad(load)} />
+            <LoadCard
+              key={load.id}
+              load={load}
+              stops={stops.filter(s => s.load_id === load.id)}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onUpdate={onUpdate}
+              onTap={() => setSelectedLoad(load)}
+            />
           ))}
         </div>
       )}
@@ -109,6 +120,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       <LoadDetailSheet
         load={selectedLoad}
         expenses={expenses}
+        stops={stops}
         open={!!selectedLoad}
         onOpenChange={open => { if (!open) setSelectedLoad(null); }}
         onEdit={onEdit}
