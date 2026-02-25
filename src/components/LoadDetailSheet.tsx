@@ -1,19 +1,21 @@
 import { useState, useMemo } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
+import { LoadStop } from '@/hooks/useLoadStops';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText, Copy, Ban, Check, Receipt } from 'lucide-react';
+import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText, Copy, Ban, Check, Receipt, Navigation } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
 interface LoadDetailSheetProps {
   load: Load | null;
   expenses?: Expense[];
+  stops?: LoadStop[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit: (load: Load) => void;
@@ -28,7 +30,7 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
-export function LoadDetailSheet({ load, expenses = [], open, onOpenChange, onEdit, onDelete, onUpdate, onDuplicate }: LoadDetailSheetProps) {
+export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenChange, onEdit, onDelete, onUpdate, onDuplicate }: LoadDetailSheetProps) {
   const [actualPayInput, setActualPayInput] = useState('');
   const [editingPay, setEditingPay] = useState(false);
 
@@ -36,6 +38,11 @@ export function LoadDetailSheet({ load, expenses = [], open, onOpenChange, onEdi
     if (!load) return [];
     return expenses.filter(e => e.linked_load_id === load.id);
   }, [expenses, load]);
+
+  const loadStops = useMemo(() => {
+    if (!load) return [];
+    return stops.filter(s => s.load_id === load.id).sort((a, b) => a.stop_order - b.stop_order);
+  }, [stops, load]);
 
   const linkedExpensesTotal = linkedExpenses.reduce((s, e) => s + Number(e.amount), 0);
 
@@ -46,6 +53,10 @@ export function LoadDetailSheet({ load, expenses = [], open, onOpenChange, onEdi
   const diff = actual != null ? actual - estimated : null;
   const payBase = actual ?? estimated;
   const netLoadProfit = payBase - linkedExpensesTotal;
+
+  // Build full route string
+  const routeParts = [load.pickup_location, ...loadStops.map(s => s.location), load.dropoff_location];
+  const routeString = routeParts.map(formatLocation).join(' → ');
 
   const handleSaveActualPay = () => {
     const val = parseFloat(actualPayInput);
@@ -96,12 +107,36 @@ export function LoadDetailSheet({ load, expenses = [], open, onOpenChange, onEdi
               <MapPin className="h-4 w-4 text-success shrink-0" />
               <span className="text-sm font-medium">{formatLocation(load.pickup_location)}</span>
             </div>
+            {loadStops.map((stop, i) => (
+              <div key={stop.id} className="ml-2">
+                <div className="border-l-2 border-dashed border-primary/30 h-3" />
+                <div className="flex items-center gap-2 -mt-0.5">
+                  <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="text-sm">{formatLocation(stop.location)}</span>
+                  <Badge variant="secondary" className="text-[9px] px-1 py-0">{stop.stop_type}</Badge>
+                  {stop.detention_minutes != null && stop.detention_minutes > 0 && (
+                    <span className="text-[10px] text-muted-foreground">{stop.detention_minutes} min det.</span>
+                  )}
+                </div>
+              </div>
+            ))}
             <div className="ml-2 border-l-2 border-dashed border-muted-foreground/30 h-4" />
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-destructive shrink-0" />
               <span className="text-sm font-medium">{formatLocation(load.dropoff_location)}</span>
             </div>
           </div>
+
+          {/* Full route summary if multi-stop */}
+          {loadStops.length > 0 && (
+            <div className="rounded-xl bg-muted p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Navigation className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Full Route</span>
+              </div>
+              <p className="text-xs leading-relaxed">{routeString}</p>
+            </div>
+          )}
 
           {/* Miles */}
           <div className="grid grid-cols-2 gap-3">
@@ -125,7 +160,6 @@ export function LoadDetailSheet({ load, expenses = [], open, onOpenChange, onEdi
               <span className="text-value-lg text-primary">{formatCurrency(estimated)}</span>
             </div>
 
-            {/* Editable Actual Pay */}
             <div className="flex items-center justify-between rounded-xl bg-muted p-3">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />

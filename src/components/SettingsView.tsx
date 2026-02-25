@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, BarChart3, Bell, Shield, ArrowLeft } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SettingsViewProps {
@@ -14,10 +14,14 @@ interface SettingsViewProps {
 }
 
 const proFeatures = [
-  { icon: BarChart3, label: 'Advanced Analytics', desc: 'Detailed charts and trend analysis' },
-  { icon: Bell, label: 'Smart Alerts', desc: 'Get notified on missing payments' },
-  { icon: Shield, label: 'Priority Support', desc: 'Direct help when you need it' },
-  { icon: Crown, label: 'Unlimited Exports', desc: 'PDF reports with custom branding' },
+  { label: 'Tax Mode', desc: 'Quarterly estimates, deductions summary, mileage reports' },
+  { label: 'Receipt Vault', desc: 'Upload receipts, auto-categorize, attach to loads/expenses' },
+  { label: 'Smart Alerts 2.0', desc: 'Late pay reminders, low rate warnings, high deadhead warnings' },
+  { label: 'Lane Intelligence', desc: 'Best-paying lanes, avg $/mile by lane, seasonal trends' },
+  { label: 'Driver Scorecard', desc: 'Weekly performance grade, profit per mile, deadhead targets' },
+  { label: 'Advanced Exports', desc: 'Branded PDF, dispute packet, custom fields' },
+  { label: 'Integrations', desc: 'QuickBooks export, fuel card CSV import' },
+  { label: 'Multi-Truck / Team Mode', desc: 'Track multiple trucks/drivers under one account' },
 ];
 
 export function SettingsView({ onBack }: SettingsViewProps) {
@@ -155,24 +159,29 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Pro Features Coming Soon */}
       <Card className="shadow-card border-primary/20 overflow-hidden">
-        <div className="bg-gradient-to-r from-primary/10 to-warning/10 px-4 py-3 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">Pro Features Coming Soon</p>
+        <div className="bg-gradient-to-r from-primary/10 to-warning/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <p className="text-xs font-bold uppercase tracking-wider text-primary">Pro Features Coming Soon</p>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            We're building Pro in public. These features are planned and will roll out in phases.
+          </p>
         </div>
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-4 space-y-2">
           {proFeatures.map((f, i) => (
-            <div key={i} className="flex items-center gap-3 opacity-70">
-              <div className="rounded-xl bg-muted p-2.5 shrink-0">
-                <f.icon className="h-4 w-4 text-muted-foreground" />
+            <div key={i} className="flex items-start gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
+              <div className="rounded-lg bg-muted p-1.5 shrink-0 mt-0.5">
+                <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold">{f.label}</p>
-                <p className="text-xs text-muted-foreground">{f.desc}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
               </div>
             </div>
           ))}
           <div className="pt-2">
-            <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" disabled>
+            <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 opacity-60 cursor-not-allowed" disabled>
               <Crown className="h-4 w-4" /> Upgrade to Pro — Coming Soon
             </Button>
           </div>

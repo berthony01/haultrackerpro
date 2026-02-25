@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Load, LoadInsert } from '@/hooks/useLoads';
+import { LoadStopInput } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,16 +14,18 @@ import { calculateEstimatedPay } from '@/lib/types';
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
+import { MultiStopEditor } from '@/components/MultiStopEditor';
 
 interface LoadFormProps {
-  onSubmit: (data: LoadInsert) => void;
+  onSubmit: (data: LoadInsert, stops?: LoadStopInput[]) => void;
   onCancel?: () => void;
   initialData?: Load;
+  initialStops?: LoadStopInput[];
   loading?: boolean;
   recentLoads?: Load[];
 }
 
-export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads = [] }: LoadFormProps) {
+export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [] }: LoadFormProps) {
   const { settings } = useUserSettings();
   const lastLoad = recentLoads[0] ?? null;
 
@@ -41,6 +44,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads
     status: initialData?.status || 'completed',
   });
 
+  const [multiStop, setMultiStop] = useState((initialStops && initialStops.length > 0) || false);
+  const [stops, setStops] = useState<LoadStopInput[]>(initialStops ?? []);
+  const [stopErrors, setStopErrors] = useState<Record<number, string>>({});
   const [saveAsPending, setSaveAsPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -74,8 +80,18 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads
     if (form.other_fees && parseFloat(form.other_fees) < 0) errs.other_fees = 'Cannot be negative';
     if (form.actual_pay_received && parseFloat(form.actual_pay_received) < 0) errs.actual_pay_received = 'Cannot be negative';
 
+    // Validate stops
+    const sErrs: Record<number, string> = {};
+    if (multiStop) {
+      stops.forEach((s, i) => {
+        if (!s.location.trim()) sErrs[i] = 'Location is required';
+        if (s.detention_minutes != null && s.detention_minutes < 0) sErrs[i] = 'Detention cannot be negative';
+      });
+    }
+
     setErrors(errs);
-    if (Object.keys(errs).length > 0) {
+    setStopErrors(sErrs);
+    if (Object.keys(errs).length > 0 || Object.keys(sErrs).length > 0) {
       toast.error('Please fix the errors before submitting');
       return false;
     }
@@ -86,6 +102,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads
     e.preventDefault();
     if (!validate()) return;
     const finalStatus = saveAsPending ? 'pending' : form.status;
+
+    // Format stop locations
+    const formattedStops = multiStop ? stops.map((s, i) => ({
+      ...s,
+      stop_order: i + 1,
+      location: formatLocation(s.location),
+    })) : [];
+
     onSubmit({
       load_date: form.load_date,
       pickup_location: formatLocation(form.pickup_location),
@@ -99,7 +123,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads
       actual_pay_received: form.actual_pay_received ? parseFloat(form.actual_pay_received) : null,
       notes: form.notes.trim() || null,
       status: finalStatus,
-    });
+    }, formattedStops);
   };
 
   const update = (key: string, value: string) => {
@@ -225,6 +249,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads
             <Input id="dropoff_location" placeholder="Atlanta, GA" value={form.dropoff_location} onChange={e => update('dropoff_location', e.target.value)} required />
             <FieldError field="dropoff_location" />
           </div>
+
+          {/* Multi-stop toggle */}
+          <div className="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Multi-stop load?</p>
+              <p className="text-xs text-muted-foreground">Add intermediate stops</p>
+            </div>
+            <Switch checked={multiStop} onCheckedChange={setMultiStop} />
+          </div>
+
+          {multiStop && (
+            <MultiStopEditor stops={stops} onChange={setStops} errors={stopErrors} />
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

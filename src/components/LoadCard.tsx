@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import { LoadStop } from '@/hooks/useLoadStops';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 
 interface LoadCardProps {
   load: Load;
+  stops?: LoadStop[];
   onEdit: (load: Load) => void;
   onDelete: (id: string) => void;
   onUpdate?: (id: string, data: LoadUpdate) => void;
@@ -23,7 +25,7 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
-export function LoadCard({ load, onEdit, onDelete, onUpdate, onTap }: LoadCardProps) {
+export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: LoadCardProps) {
   const [showPayInput, setShowPayInput] = useState(false);
   const [payValue, setPayValue] = useState('');
 
@@ -31,6 +33,7 @@ export function LoadCard({ load, onEdit, onDelete, onUpdate, onTap }: LoadCardPr
   const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
   const diff = actual != null ? actual - estimated : null;
   const showAddPay = actual == null && load.status !== 'cancelled';
+  const stopsCount = stops.length;
 
   const handleSavePay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -63,6 +66,11 @@ export function LoadCard({ load, onEdit, onDelete, onUpdate, onTap }: LoadCardPr
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
                 {load.status}
               </Badge>
+              {stopsCount > 0 && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold">
+                  +{stopsCount} stop{stopsCount !== 1 ? 's' : ''}
+                </Badge>
+              )}
             </div>
 
             {/* Route */}

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
+import { useLoadStops } from '@/hooks/useLoadStops';
 import { formatCurrency, formatNumber, exportToCSV, exportToPDF } from '@/lib/loadUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ interface MonthlySummaryProps {
 }
 
 export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryProps) {
+  const { stops } = useLoadStops();
   const months = useMemo(() => {
     const now = new Date();
     return [0, 1, 2].map(offset => {
@@ -44,13 +46,13 @@ export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryP
       </div>
 
       {months.map(month => (
-        <MonthCard key={month.label} label={month.label} loads={month.loads} expenses={month.expenses} allLoads={loads} />
+        <MonthCard key={month.label} label={month.label} loads={month.loads} expenses={month.expenses} allLoads={loads} allStops={stops} />
       ))}
     </div>
   );
 }
 
-function MonthCard({ label, loads, expenses = [] }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[] }) {
+function MonthCard({ label, loads, expenses = [], allStops = [] }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[] }) {
   const stats = useMemo(() => {
     const nonCancelled = loads.filter(l => l.status !== 'cancelled');
     const estimated = nonCancelled.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
@@ -177,7 +179,7 @@ function MonthCard({ label, loads, expenses = [] }: { label: string; loads: Load
             variant="outline"
             size="sm"
             className="flex-1 gap-1.5 text-xs rounded-xl"
-            onClick={() => exportToCSV(loads, `month-${label.replace(/\s/g, '-')}`)}
+            onClick={() => exportToCSV(loads, `month-${label.replace(/\s/g, '-')}`, allStops)}
           >
             <FileSpreadsheet className="h-3.5 w-3.5" /> CSV
           </Button>
@@ -185,7 +187,7 @@ function MonthCard({ label, loads, expenses = [] }: { label: string; loads: Load
             variant="outline"
             size="sm"
             className="flex-1 gap-1.5 text-xs rounded-xl"
-            onClick={() => exportToPDF(loads, `month-${label.replace(/\s/g, '-')}`)}
+            onClick={() => exportToPDF(loads, `month-${label.replace(/\s/g, '-')}`, allStops)}
           >
             <Download className="h-3.5 w-3.5" /> PDF
           </Button>
