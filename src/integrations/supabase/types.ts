@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      loads: {
+        Row: {
+          actual_pay: number | null
+          created_at: string
+          date: string
+          deadhead_miles: number
+          detention_fee: number
+          dropoff: string
+          estimated_pay: number | null
+          id: string
+          loaded_miles: number
+          pickup: string
+          rate_per_mile: number
+          status: string
+          updated_at: string
+          user_id: string
+          wait_fee: number
+        }
+        Insert: {
+          actual_pay?: number | null
+          created_at?: string
+          date: string
+          deadhead_miles?: number
+          detention_fee?: number
+          dropoff: string
+          estimated_pay?: number | null
+          id?: string
+          loaded_miles?: number
+          pickup: string
+          rate_per_mile?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+          wait_fee?: number
+        }
+        Update: {
+          actual_pay?: number | null
+          created_at?: string
+          date?: string
+          deadhead_miles?: number
+          detention_fee?: number
+          dropoff?: string
+          estimated_pay?: number | null
+          id?: string
+          loaded_miles?: number
+          pickup?: string
+          rate_per_mile?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+          wait_fee?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

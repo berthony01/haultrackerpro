@@ -1,50 +1,79 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Load, calculateTotalPay, generateId } from '@/lib/types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
-const STORAGE_KEY = 'haul-tracker-loads';
+export type Load = Tables<'loads'>;
+export type LoadInsert = Omit<TablesInsert<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay'>;
+export type LoadUpdate = Omit<TablesUpdate<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay'>;
 
-function getStoredLoads(): Load[] {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
+interface DateRange {
+  from?: string;
+  to?: string;
 }
 
-function storeLoads(loads: Load[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(loads));
-}
+export function useLoads(dateRange?: DateRange) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-export function useLoads() {
-  const [loads, setLoads] = useState<Load[]>(getStoredLoads);
+  const loadsQuery = useQuery({
+    queryKey: ['loads', user?.id, dateRange?.from, dateRange?.to],
+    queryFn: async () => {
+      if (!user) return [];
+      let query = supabase
+        .from('loads')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
 
-  useEffect(() => {
-    storeLoads(loads);
-  }, [loads]);
+      if (dateRange?.from) query = query.gte('date', dateRange.from);
+      if (dateRange?.to) query = query.lte('date', dateRange.to);
 
-  const addLoad = useCallback((data: Omit<Load, 'id' | 'totalPay' | 'createdAt'>) => {
-    const newLoad: Load = {
-      ...data,
-      id: generateId(),
-      totalPay: calculateTotalPay(data),
-      createdAt: new Date().toISOString(),
-    };
-    setLoads(prev => [newLoad, ...prev]);
-    return newLoad;
-  }, []);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
 
-  const updateLoad = useCallback((id: string, data: Omit<Load, 'id' | 'totalPay' | 'createdAt'>) => {
-    setLoads(prev => prev.map(l => l.id === id ? {
-      ...l,
-      ...data,
-      totalPay: calculateTotalPay(data),
-    } : l));
-  }, []);
+  const addLoad = useMutation({
+    mutationFn: async (data: LoadInsert) => {
+      if (!user) throw new Error('Not authenticated');
+      const { data: result, error } = await supabase
+        .from('loads')
+        .insert({ ...data, user_id: user.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loads'] }),
+  });
 
-  const deleteLoad = useCallback((id: string) => {
-    setLoads(prev => prev.filter(l => l.id !== id));
-  }, []);
+  const updateLoad = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: LoadUpdate }) => {
+      const { error } = await supabase
+        .from('loads')
+        .update(data)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loads'] }),
+  });
 
-  return { loads, addLoad, updateLoad, deleteLoad };
+  const deleteLoad = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('loads').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loads'] }),
+  });
+
+  return {
+    loads: loadsQuery.data ?? [],
+    isLoading: loadsQuery.isLoading,
+    addLoad,
+    updateLoad,
+    deleteLoad,
+  };
 }

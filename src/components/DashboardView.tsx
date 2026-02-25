@@ -1,8 +1,8 @@
-import { Load } from '@/lib/types';
+import { Load } from '@/hooks/useLoads';
 import { getCurrentWeekLoads, getCurrentMonthLoads, formatCurrency, formatNumber, getWeekSummaries } from '@/lib/loadUtils';
 import { StatCard } from '@/components/StatCard';
-import { DollarSign, Route, Truck, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface DashboardViewProps {
   loads: Load[];
@@ -11,11 +11,16 @@ interface DashboardViewProps {
 export function DashboardView({ loads }: DashboardViewProps) {
   const weekLoads = getCurrentWeekLoads(loads);
   const monthLoads = getCurrentMonthLoads(loads);
-  const weekPay = weekLoads.reduce((s, l) => s + l.totalPay, 0);
-  const monthPay = monthLoads.reduce((s, l) => s + l.totalPay, 0);
-  const weekMiles = weekLoads.reduce((s, l) => s + l.loadedMiles, 0);
-  const monthMiles = monthLoads.reduce((s, l) => s + l.loadedMiles, 0);
+  const weekEstimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const weekActual = weekLoads.reduce((s, l) => s + Number(l.actual_pay ?? 0), 0);
+  const monthEstimated = monthLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const monthActual = monthLoads.reduce((s, l) => s + Number(l.actual_pay ?? 0), 0);
+  const weekMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
+  const monthMiles = monthLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const weekSummaries = getWeekSummaries(loads).slice(0, 4);
+
+  const paidWeekLoads = weekLoads.filter(l => l.actual_pay != null);
+  const weekDiff = paidWeekLoads.length > 0 ? weekActual - paidWeekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0) : null;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -27,20 +32,29 @@ export function DashboardView({ loads }: DashboardViewProps) {
       <div>
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">This Week</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Earnings" value={formatCurrency(weekPay)} icon={DollarSign} />
+          <StatCard label="Est. Earnings" value={formatCurrency(weekEstimated)} icon={DollarSign} />
           <StatCard label="Loads" value={weekLoads.length.toString()} icon={Truck} />
           <StatCard label="Loaded Miles" value={formatNumber(weekMiles)} icon={Route} />
-          <StatCard label="Avg/Load" value={weekLoads.length > 0 ? formatCurrency(weekPay / weekLoads.length) : '$0'} icon={TrendingUp} />
+          {weekDiff != null ? (
+            <StatCard
+              label="Pay Diff"
+              value={`${weekDiff >= 0 ? '+' : ''}${formatCurrency(weekDiff)}`}
+              icon={weekDiff >= 0 ? TrendingUp : TrendingDown}
+              subtitle={weekDiff >= 0 ? 'Overpaid' : 'Underpaid'}
+            />
+          ) : (
+            <StatCard label="Avg/Load" value={weekLoads.length > 0 ? formatCurrency(weekEstimated / weekLoads.length) : '$0'} icon={TrendingUp} />
+          )}
         </div>
       </div>
 
       <div>
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">This Month</h2>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Earnings" value={formatCurrency(monthPay)} icon={DollarSign} />
-          <StatCard label="Loads" value={monthLoads.length.toString()} icon={Truck} />
+          <StatCard label="Est. Earnings" value={formatCurrency(monthEstimated)} icon={DollarSign} />
+          <StatCard label="Actual Paid" value={formatCurrency(monthActual)} icon={DollarSign} subtitle={monthActual > 0 ? `${monthLoads.filter(l => l.actual_pay != null).length} paid` : 'No payments yet'} />
           <StatCard label="Total Miles" value={formatNumber(monthMiles)} icon={Route} />
-          <StatCard label="Avg $/Mile" value={monthMiles > 0 ? formatCurrency(monthPay / monthMiles) : '$0'} icon={TrendingUp} />
+          <StatCard label="Avg $/Mile" value={monthMiles > 0 ? formatCurrency(monthEstimated / monthMiles) : '$0'} icon={TrendingUp} />
         </div>
       </div>
 
@@ -55,7 +69,12 @@ export function DashboardView({ loads }: DashboardViewProps) {
                     <p className="text-sm font-semibold">{w.weekLabel}</p>
                     <p className="text-xs text-muted-foreground">{w.totalLoads} loads · {formatNumber(w.totalLoadedMiles)} mi</p>
                   </div>
-                  <p className="text-lg font-black font-mono text-primary">{formatCurrency(w.totalPay)}</p>
+                  <div className="text-right">
+                    <p className="text-lg font-black font-mono text-primary">{formatCurrency(w.totalEstimatedPay)}</p>
+                    {w.totalActualPay > 0 && (
+                      <p className="text-xs font-mono text-muted-foreground">Actual: {formatCurrency(w.totalActualPay)}</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
