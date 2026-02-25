@@ -101,6 +101,7 @@ const Index = () => {
                   onCancel={editingLoad ? () => { setEditingLoad(null); setPage('loads'); } : undefined}
                   initialData={editingLoad || undefined}
                   loading={addLoad.isPending || updateLoad.isPending}
+                  recentLoads={allLoadsQuery.loads}
                 />
               </div>
             )}
