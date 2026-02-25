@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { calculateEstimatedPay } from '@/lib/types';
-import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle } from 'lucide-react';
+import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Zap, RotateCcw, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LoadFormProps {
@@ -18,10 +18,12 @@ interface LoadFormProps {
   onCancel?: () => void;
   initialData?: Load;
   loading?: boolean;
+  recentLoads?: Load[];
 }
 
-export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormProps) {
+export function LoadForm({ onSubmit, onCancel, initialData, loading, recentLoads = [] }: LoadFormProps) {
   const { settings } = useUserSettings();
+  const lastLoad = recentLoads[0] ?? null;
 
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
@@ -104,12 +106,52 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormP
     if (errors[key]) setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
   };
 
+  const handleUseDefaultRate = () => {
+    if (settings?.default_rate_per_mile != null) {
+      update('rate_per_mile', settings.default_rate_per_mile.toString());
+      toast.success('Default rate applied');
+    }
+  };
+
+  const handleUseLastRate = () => {
+    if (lastLoad) {
+      update('rate_per_mile', lastLoad.rate_per_mile.toString());
+      toast.success('Last rate applied');
+    }
+  };
+
+  const handleCopyLastLoad = () => {
+    if (!lastLoad) return;
+    setForm({
+      load_date: new Date().toISOString().split('T')[0],
+      pickup_location: lastLoad.pickup_location,
+      dropoff_location: lastLoad.dropoff_location,
+      loaded_miles: lastLoad.loaded_miles.toString(),
+      deadhead_miles: lastLoad.deadhead_miles.toString(),
+      rate_per_mile: lastLoad.rate_per_mile.toString(),
+      wait_fee: lastLoad.wait_fee.toString(),
+      detention_fee: lastLoad.detention_fee.toString(),
+      other_fees: lastLoad.other_fees.toString(),
+      actual_pay_received: '',
+      notes: lastLoad.notes || '',
+      status: 'pending',
+    });
+    setSaveAsPending(true);
+    toast.success('Last load copied');
+  };
+
   const FieldError = ({ field }: { field: string }) =>
     errors[field] ? (
       <p className="text-xs text-destructive flex items-center gap-1 mt-0.5">
         <AlertCircle className="h-3 w-3" /> {errors[field]}
       </p>
     ) : null;
+
+  const numericProps = {
+    inputMode: 'decimal' as const,
+    pattern: '[0-9]*\\.?[0-9]*',
+    min: '0',
+  };
 
   return (
     <Card className="border-2 border-primary/20 shadow-lg">
@@ -128,6 +170,45 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormP
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Quick Default Chips */}
+          {!initialData && (
+            <div className="flex flex-wrap gap-1.5">
+              {settings?.default_rate_per_mile != null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-[11px] h-7 px-2.5 rounded-xl gap-1 active:scale-95 transition-transform"
+                  onClick={handleUseDefaultRate}
+                >
+                  <Zap className="h-3 w-3" /> Default Rate
+                </Button>
+              )}
+              {lastLoad && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-[11px] h-7 px-2.5 rounded-xl gap-1 active:scale-95 transition-transform"
+                    onClick={handleUseLastRate}
+                  >
+                    <RotateCcw className="h-3 w-3" /> Last Rate
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-[11px] h-7 px-2.5 rounded-xl gap-1 active:scale-95 transition-transform"
+                    onClick={handleCopyLastLoad}
+                  >
+                    <Copy className="h-3 w-3" /> Copy Last Load
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="load_date">Date</Label>
@@ -165,12 +246,12 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormP
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="loaded_miles">Loaded Miles</Label>
-              <Input id="loaded_miles" type="number" step="0.1" min="0" placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
+              <Input id="loaded_miles" type="number" step="0.1" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
               <FieldError field="loaded_miles" />
             </div>
             <div>
               <Label htmlFor="deadhead_miles">Deadhead Miles</Label>
-              <Input id="deadhead_miles" type="number" step="0.1" min="0" placeholder="0" value={form.deadhead_miles} onChange={e => update('deadhead_miles', e.target.value)} />
+              <Input id="deadhead_miles" type="number" step="0.1" {...numericProps} placeholder="0" value={form.deadhead_miles} onChange={e => update('deadhead_miles', e.target.value)} />
               <FieldError field="deadhead_miles" />
             </div>
           </div>
@@ -179,30 +260,30 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormP
             <Label htmlFor="rate_per_mile" className="flex items-center gap-1">
               <DollarSign className="h-3 w-3 text-primary" /> Rate Per Mile
             </Label>
-            <Input id="rate_per_mile" type="number" step="0.01" min="0" placeholder="0.00" value={form.rate_per_mile} onChange={e => update('rate_per_mile', e.target.value)} required />
+            <Input id="rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.rate_per_mile} onChange={e => update('rate_per_mile', e.target.value)} required />
             <FieldError field="rate_per_mile" />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label htmlFor="wait_fee" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" /> Wait
+                <Clock className="h-3 w-3" /> Wait Fee
               </Label>
-              <Input id="wait_fee" type="number" step="0.01" min="0" placeholder="0" value={form.wait_fee} onChange={e => update('wait_fee', e.target.value)} />
+              <Input id="wait_fee" type="number" step="0.01" {...numericProps} placeholder="0" value={form.wait_fee} onChange={e => update('wait_fee', e.target.value)} />
               <FieldError field="wait_fee" />
             </div>
             <div>
               <Label htmlFor="detention_fee" className="flex items-center gap-1">
                 <Clock className="h-3 w-3" /> Detention
               </Label>
-              <Input id="detention_fee" type="number" step="0.01" min="0" placeholder="0" value={form.detention_fee} onChange={e => update('detention_fee', e.target.value)} />
+              <Input id="detention_fee" type="number" step="0.01" {...numericProps} placeholder="0" value={form.detention_fee} onChange={e => update('detention_fee', e.target.value)} />
               <FieldError field="detention_fee" />
             </div>
             <div>
               <Label htmlFor="other_fees" className="flex items-center gap-1">
-                <DollarSign className="h-3 w-3" /> Other
+                <DollarSign className="h-3 w-3" /> Other Fees
               </Label>
-              <Input id="other_fees" type="number" step="0.01" min="0" placeholder="0" value={form.other_fees} onChange={e => update('other_fees', e.target.value)} />
+              <Input id="other_fees" type="number" step="0.01" {...numericProps} placeholder="0" value={form.other_fees} onChange={e => update('other_fees', e.target.value)} />
               <FieldError field="other_fees" />
             </div>
           </div>
@@ -212,7 +293,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, loading }: LoadFormP
             <Label htmlFor="actual_pay_received" className="flex items-center gap-1">
               <DollarSign className="h-3 w-3 text-success" /> Actual Pay Received
             </Label>
-            <Input id="actual_pay_received" type="number" step="0.01" min="0" placeholder="Leave blank if not yet paid" value={form.actual_pay_received} onChange={e => update('actual_pay_received', e.target.value)} />
+            <Input id="actual_pay_received" type="number" step="0.01" {...numericProps} placeholder="Leave blank if not yet paid" value={form.actual_pay_received} onChange={e => update('actual_pay_received', e.target.value)} />
             <FieldError field="actual_pay_received" />
           </div>
 
