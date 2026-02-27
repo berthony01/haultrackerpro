@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency, formatNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 import { PerformanceTrends } from '@/components/PerformanceTrends';
 import { ProfitOverview } from '@/components/ProfitOverview';
+import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,6 +47,7 @@ function getPresetRange(key: PresetKey): { start: Date; end: Date } {
 }
 
 export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: DashboardViewProps) {
+  const { settings } = useUserSettings();
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -215,6 +218,11 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: D
 
           {/* Profit Overview */}
           <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} />
+
+          {/* Tax Estimate */}
+          <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} />
+
+          {/* Finalize Weekly Summary Button */}
 
           {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (
