@@ -147,8 +147,8 @@ export function buildStopsSummary(load: Load, stops: LoadStop[]): string {
     .map(formatLocation).join(' → ');
 }
 
-export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] = []) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay', 'Actual Pay', 'Difference', 'Status', 'Notes'];
+export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay', 'Actual Pay', 'Difference', 'Status', 'Notes', 'Company Name', 'Company Start Date'];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
@@ -159,7 +159,8 @@ export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] =
       l.loaded_miles, l.deadhead_miles, l.rate_per_mile,
       Number(l.wait_fee).toFixed(2), Number(l.detention_fee).toFixed(2), Number(l.other_fees).toFixed(2),
       est.toFixed(2), act != null ? act.toFixed(2) : '', diff,
-      l.status, l.notes ?? ''
+      l.status, l.notes ?? '',
+      companyMeta?.companyName ?? '', companyMeta?.companyStartDate ?? ''
     ].map(escapeCSV);
   });
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -172,14 +173,14 @@ export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] =
   URL.revokeObjectURL(url);
 }
 
-export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: string = 'profit-report', stops: LoadStop[] = []) {
+export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: string = 'profit-report', stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
   const totalRevenue = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? l.estimated_pay ?? 0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const totalMiles = loads.reduce((s, l) => s + Number(l.loaded_miles) + Number(l.deadhead_miles), 0);
   const netProfit = totalRevenue - totalExpenses;
   const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
 
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Estimated Pay', 'Actual Pay', 'Linked Expenses', 'Net Load Profit'];
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Estimated Pay', 'Actual Pay', 'Linked Expenses', 'Net Load Profit', 'Company Name', 'Company Start Date'];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
@@ -191,16 +192,17 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
       l.load_date, l.pickup_location, l.dropoff_location, summary,
       est.toFixed(2), act != null ? act.toFixed(2) : '',
       linkedExp.toFixed(2), netLoadProfit.toFixed(2),
+      companyMeta?.companyName ?? '', companyMeta?.companyStartDate ?? ''
     ].map(escapeCSV);
   });
 
   // Summary rows
   rows.push([]);
   rows.push(['SUMMARY'].map(escapeCSV));
-  rows.push(['Total Revenue', '', '', '', totalRevenue.toFixed(2), '', '', ''].map(escapeCSV));
-  rows.push(['Total Expenses', '', '', '', '', '', totalExpenses.toFixed(2), ''].map(escapeCSV));
-  rows.push(['Net Profit', '', '', '', '', '', '', netProfit.toFixed(2)].map(escapeCSV));
-  rows.push(['Net $/Mile', '', '', '', '', '', '', netPerMile.toFixed(2)].map(escapeCSV));
+  rows.push(['Total Revenue', '', '', '', totalRevenue.toFixed(2), '', '', '', '', ''].map(escapeCSV));
+  rows.push(['Total Expenses', '', '', '', '', '', totalExpenses.toFixed(2), '', '', ''].map(escapeCSV));
+  rows.push(['Net Profit', '', '', '', '', '', '', netProfit.toFixed(2), '', ''].map(escapeCSV));
+  rows.push(['Net $/Mile', '', '', '', '', '', '', netPerMile.toFixed(2), '', ''].map(escapeCSV));
 
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -212,7 +214,7 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
   URL.revokeObjectURL(url);
 }
 
-export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] = []) {
+export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
   const headers = ['Date', 'Pickup', 'Dropoff', 'Ld Mi', 'DH Mi', '$/Mi', 'Wait', 'Det.', 'Other', 'Est Pay', 'Act Pay', 'Diff', 'Status'];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
@@ -235,7 +237,13 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
 
   const startPage = () => {
     y = 50;
-    currentContent += `BT /F1 14 Tf ${marginX} ${pageH - 30} Td (${filename} - Page ${page}) Tj ET\n`;
+    const titleParts = [filename, `Page ${page}`];
+    if (companyMeta?.companyName) titleParts.unshift(companyMeta.companyName);
+    currentContent += `BT /F1 14 Tf ${marginX} ${pageH - 30} Td (${titleParts.join(' - ')}) Tj ET\n`;
+    if (companyMeta?.companyStartDate && page === 1) {
+      currentContent += `BT /F1 8 Tf ${marginX} ${pageH - 44} Td (Company Start: ${companyMeta.companyStartDate}) Tj ET\n`;
+      y += 10;
+    }
     // Header row
     let x = marginX;
     headers.forEach((h, i) => {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, getCurrentMonthLoads } from '@/lib/loadUtils';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,6 +19,12 @@ interface ReportsViewProps {
 export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewProps) {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const { stops } = useLoadStops();
+  const { settings } = useUserSettings();
+
+  const companyMeta = {
+    companyName: settings?.company_name ?? undefined,
+    companyStartDate: settings?.company_start_date ?? undefined,
+  };
 
   const filteredLoads = loads.filter(l => {
     if (!dateRange.from && !dateRange.to) return true;
@@ -56,7 +63,7 @@ export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewPro
       <div>
         <h2 className="text-label mb-3">Export Options</h2>
         <div className="grid gap-3">
-          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(loads, 'all-loads', stops)} disabled={loads.length === 0}>
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(loads, 'all-loads', stops, companyMeta)} disabled={loads.length === 0}>
             <FileSpreadsheet className="h-5 w-5 text-primary" />
             <div className="text-left">
               <p className="font-semibold text-sm">Export All Loads (CSV)</p>
@@ -65,7 +72,7 @@ export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewPro
           </Button>
 
           {hasFilter && (
-            <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(filteredLoads, 'filtered-loads', stops)} disabled={filteredLoads.length === 0}>
+            <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(filteredLoads, 'filtered-loads', stops, companyMeta)} disabled={filteredLoads.length === 0}>
               <Filter className="h-5 w-5 text-primary" />
               <div className="text-left">
                 <p className="font-semibold text-sm">Export Filtered Loads (CSV)</p>
@@ -74,7 +81,7 @@ export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewPro
             </Button>
           )}
 
-          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(monthLoads, 'monthly-summary', stops)} disabled={monthLoads.length === 0}>
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToCSV(monthLoads, 'monthly-summary', stops, companyMeta)} disabled={monthLoads.length === 0}>
             <FileText className="h-5 w-5 text-primary" />
             <div className="text-left">
               <p className="font-semibold text-sm">Export Monthly Summary (CSV)</p>
@@ -82,7 +89,7 @@ export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewPro
             </div>
           </Button>
 
-          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads', stops)} disabled={loads.length === 0}>
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads', stops, companyMeta)} disabled={loads.length === 0}>
             <Download className="h-5 w-5 text-destructive" />
             <div className="text-left">
               <p className="font-semibold text-sm">Export as PDF</p>
@@ -90,7 +97,7 @@ export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewPro
             </div>
           </Button>
 
-          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportProfitCSV(filteredLoads.length > 0 ? filteredLoads : loads, expenses, 'profit-report', stops)} disabled={loads.length === 0}>
+          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportProfitCSV(filteredLoads.length > 0 ? filteredLoads : loads, expenses, 'profit-report', stops, companyMeta)} disabled={loads.length === 0}>
             <TrendingUp className="h-5 w-5 text-success" />
             <div className="text-left">
               <p className="font-semibold text-sm">Export Profit Report (CSV)</p>
@@ -137,7 +144,7 @@ export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewPro
                       const d = new Date(l.load_date);
                       return d >= new Date(s.startDate) && d <= new Date(s.endDate);
                     });
-                    exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`, stops);
+                    exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`, stops, companyMeta);
                   }}>
                     <Download className="h-3 w-3 mr-1" /> Export Week
                   </Button>

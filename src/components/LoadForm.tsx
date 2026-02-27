@@ -29,6 +29,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const { settings } = useUserSettings();
   const lastLoad = recentLoads[0] ?? null;
 
+  const isPercentagePay = settings?.pay_type === 'percentage';
+
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
     pickup_location: initialData?.pickup_location || '',
@@ -42,6 +44,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     actual_pay_received: initialData?.actual_pay_received?.toString() || '',
     notes: initialData?.notes || '',
     status: initialData?.status || 'completed',
+    gross_revenue: (initialData as any)?.gross_revenue?.toString() || '',
   });
 
   const [multiStop, setMultiStop] = useState((initialStops && initialStops.length > 0) || false);
@@ -54,6 +57,13 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const estimated = useMemo(() => {
     if (isCancelled) return 0;
+    // Percentage-based pay calculation
+    if (isPercentagePay && form.gross_revenue && settings?.pay_percentage) {
+      const grossRev = parseFloat(form.gross_revenue) || 0;
+      const pct = Number(settings.pay_percentage) / 100;
+      return grossRev * pct + (parseFloat(form.wait_fee) || 0) + (parseFloat(form.detention_fee) || 0) + (parseFloat(form.other_fees) || 0);
+    }
+    // CPM-based pay calculation (default)
     return calculateEstimatedPay(
       parseFloat(form.loaded_miles) || 0,
       parseFloat(form.rate_per_mile) || 0,
@@ -61,7 +71,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       parseFloat(form.detention_fee) || 0,
       parseFloat(form.other_fees) || 0
     );
-  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, isCancelled]);
+  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage]);
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
@@ -123,6 +133,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       actual_pay_received: form.actual_pay_received ? parseFloat(form.actual_pay_received) : null,
       notes: form.notes.trim() || null,
       status: finalStatus,
+      gross_revenue: form.gross_revenue ? parseFloat(form.gross_revenue) : null,
     }, formattedStops);
   };
 
@@ -160,6 +171,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       actual_pay_received: '',
       notes: lastLoad.notes || '',
       status: 'pending',
+      gross_revenue: (lastLoad as any).gross_revenue?.toString() || '',
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
@@ -283,6 +295,18 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <Input id="rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.rate_per_mile} onChange={e => update('rate_per_mile', e.target.value)} required />
             <FieldError field="rate_per_mile" />
           </div>
+
+          {/* Gross Revenue field for Percentage pay type */}
+          {isPercentagePay && (
+            <div>
+              <Label htmlFor="gross_revenue" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-warning" /> Gross Load Revenue ($)
+              </Label>
+              <Input id="gross_revenue" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.gross_revenue} onChange={e => update('gross_revenue', e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-0.5">Enter the total load revenue to estimate your percentage pay.</p>
+              <FieldError field="gross_revenue" />
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div>

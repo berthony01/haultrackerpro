@@ -6,7 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { DeleteAccountModal } from '@/components/DeleteAccountModal';
@@ -44,6 +48,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [otherFees, setOtherFees] = useState('');
   const [weekStart, setWeekStart] = useState('');
   const [currency, setCurrency] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [payType, setPayType] = useState('cpm');
+  const [payPercentage, setPayPercentage] = useState('');
+  const [companyStartDate, setCompanyStartDate] = useState<Date | undefined>(undefined);
   const [initialized, setInitialized] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -55,15 +63,30 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setOtherFees(settings.default_other_fees?.toString() ?? '');
     setWeekStart(settings.week_start_day ?? 'sunday');
     setCurrency(settings.currency ?? 'USD');
+    setCompanyName(settings.company_name ?? '');
+    setPayType(settings.pay_type ?? 'cpm');
+    setPayPercentage(settings.pay_percentage?.toString() ?? '');
+    setCompanyStartDate(settings.company_start_date ? parseISO(settings.company_start_date) : undefined);
     setInitialized(true);
   }
 
   const handleSave = () => {
+    if (payType === 'percentage' && payPercentage) {
+      const pct = Number(payPercentage);
+      if (pct < 0 || pct > 100) {
+        toast.error('Pay percentage must be between 0 and 100');
+        return;
+      }
+    }
     updateSettings.mutate({
       default_rate_per_mile: ratePerMile ? Number(ratePerMile) : null,
       default_other_fees: otherFees ? Number(otherFees) : null,
       week_start_day: weekStart,
       currency,
+      company_name: companyName.trim() || null,
+      pay_type: payType,
+      pay_percentage: payType === 'percentage' && payPercentage ? Number(payPercentage) : null,
+      company_start_date: companyStartDate ? format(companyStartDate, 'yyyy-MM-dd') : null,
     }, {
       onSuccess: () => toast.success('Settings saved!'),
       onError: (e) => toast.error(e.message),
@@ -199,6 +222,62 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <Button className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
+            {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Company & Pay */}
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+            <Building2 className="h-3.5 w-3.5" /> Company & Pay
+          </p>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Company Name</Label>
+            <Input placeholder="Example: ABC Logistics" value={companyName} onChange={e => setCompanyName(e.target.value)} className="h-10 text-sm rounded-xl" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Pay Type</Label>
+              <Select value={payType} onValueChange={setPayType}>
+                <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cpm">Rate per Mile (CPM)</SelectItem>
+                  <SelectItem value="percentage">Percentage (%)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {payType === 'percentage' && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Driver Pay Percentage (%)</Label>
+                <div className="relative">
+                  <Percent className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input type="number" step="1" min="0" max="100" placeholder="e.g. 30" value={payPercentage} onChange={e => setPayPercentage(e.target.value)} className="h-10 pl-8 text-sm rounded-xl" />
+                </div>
+                <p className="text-[10px] text-muted-foreground">Example: 30 for 30%</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Company Start Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full h-10 justify-start text-left font-normal rounded-xl text-sm", !companyStartDate && "text-muted-foreground")}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {companyStartDate ? format(companyStartDate, 'PPP') : 'Optional'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent mode="single" selected={companyStartDate} onSelect={setCompanyStartDate} initialFocus className={cn("p-3 pointer-events-auto")} />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <Button className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>

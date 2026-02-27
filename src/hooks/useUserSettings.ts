@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 export type UserSettings = Tables<'user_settings'>;
-export type UserSettingsUpdate = Pick<TablesUpdate<'user_settings'>, 'default_rate_per_mile' | 'default_other_fees' | 'week_start_day' | 'currency'>;
+export type UserSettingsUpdate = Pick<TablesUpdate<'user_settings'>, 'default_rate_per_mile' | 'default_other_fees' | 'week_start_day' | 'currency' | 'company_name' | 'pay_type' | 'pay_percentage' | 'company_start_date'>;
 
 export function useUserSettings() {
   const { user } = useAuth();
