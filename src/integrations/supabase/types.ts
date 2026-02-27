@@ -140,6 +140,7 @@ export type Database = {
           detention_fee: number
           dropoff_location: string
           estimated_pay: number | null
+          gross_revenue: number | null
           id: string
           load_date: string
           loaded_miles: number
@@ -159,6 +160,7 @@ export type Database = {
           detention_fee?: number
           dropoff_location: string
           estimated_pay?: number | null
+          gross_revenue?: number | null
           id?: string
           load_date: string
           loaded_miles?: number
@@ -178,6 +180,7 @@ export type Database = {
           detention_fee?: number
           dropoff_location?: string
           estimated_pay?: number | null
+          gross_revenue?: number | null
           id?: string
           load_date?: string
           loaded_miles?: number
@@ -230,34 +233,46 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          company_name: string | null
+          company_start_date: string | null
           created_at: string
           currency: string
           default_other_fees: number | null
           default_rate_per_mile: number | null
           id: string
           onboarding_completed: boolean
+          pay_percentage: number | null
+          pay_type: string
           updated_at: string
           user_id: string
           week_start_day: string
         }
         Insert: {
+          company_name?: string | null
+          company_start_date?: string | null
           created_at?: string
           currency?: string
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           id?: string
           onboarding_completed?: boolean
+          pay_percentage?: number | null
+          pay_type?: string
           updated_at?: string
           user_id: string
           week_start_day?: string
         }
         Update: {
+          company_name?: string | null
+          company_start_date?: string | null
           created_at?: string
           currency?: string
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           id?: string
           onboarding_completed?: boolean
+          pay_percentage?: number | null
+          pay_type?: string
           updated_at?: string
           user_id?: string
           week_start_day?: string
