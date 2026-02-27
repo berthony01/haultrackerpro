@@ -15,6 +15,8 @@ import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle } from 'luci
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
+import { PasteLoadParser } from '@/components/PasteLoadParser';
+import { ParsedLoadData } from '@/lib/parseLoadText';
 
 interface LoadFormProps {
   onSubmit: (data: LoadInsert, stops?: LoadStopInput[]) => void;
@@ -224,6 +226,21 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               onApplyRate={(rate) => {
                 update('rate_per_mile', rate.toString());
                 toast.success('Common rate applied');
+              }}
+            />
+          )}
+
+          {/* Paste Load Parser */}
+          {!initialData && (
+            <PasteLoadParser
+              onParsed={(data: ParsedLoadData) => {
+                if (data.pickup_location) update('pickup_location', data.pickup_location);
+                if (data.dropoff_location) update('dropoff_location', data.dropoff_location);
+                if (data.loaded_miles) update('loaded_miles', data.loaded_miles);
+                if (data.deadhead_miles) update('deadhead_miles', data.deadhead_miles);
+                if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
+                if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
+                if (data.load_date) update('load_date', data.load_date);
               }}
             />
           )}
