@@ -233,46 +233,67 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          buffer_percent: number | null
           company_name: string | null
           company_start_date: string | null
           created_at: string
           currency: string
           default_other_fees: number | null
           default_rate_per_mile: number | null
+          federal_tax_percent: number | null
           id: string
+          include_se_tax: boolean | null
           onboarding_completed: boolean
           pay_percentage: number | null
           pay_type: string
+          se_tax_percent: number | null
+          state_tax_percent: number | null
+          tax_base_type: string | null
+          tax_estimator_enabled: boolean
           updated_at: string
           user_id: string
           week_start_day: string
         }
         Insert: {
+          buffer_percent?: number | null
           company_name?: string | null
           company_start_date?: string | null
           created_at?: string
           currency?: string
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
+          federal_tax_percent?: number | null
           id?: string
+          include_se_tax?: boolean | null
           onboarding_completed?: boolean
           pay_percentage?: number | null
           pay_type?: string
+          se_tax_percent?: number | null
+          state_tax_percent?: number | null
+          tax_base_type?: string | null
+          tax_estimator_enabled?: boolean
           updated_at?: string
           user_id: string
           week_start_day?: string
         }
         Update: {
+          buffer_percent?: number | null
           company_name?: string | null
           company_start_date?: string | null
           created_at?: string
           currency?: string
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
+          federal_tax_percent?: number | null
           id?: string
+          include_se_tax?: boolean | null
           onboarding_completed?: boolean
           pay_percentage?: number | null
           pay_type?: string
+          se_tax_percent?: number | null
+          state_tax_percent?: number | null
+          tax_base_type?: string | null
+          tax_estimator_enabled?: boolean
           updated_at?: string
           user_id?: string
           week_start_day?: string
