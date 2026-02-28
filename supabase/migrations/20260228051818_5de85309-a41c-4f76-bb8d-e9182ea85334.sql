@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN stripe_subscription_id text;
