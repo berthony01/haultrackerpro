@@ -3,6 +3,11 @@
  * No AI. User always reviews before saving.
  */
 
+export interface ParsedStopData {
+  location: string;
+  stop_type: string;
+}
+
 export interface ParsedLoadData {
   pickup_location?: string;
   dropoff_location?: string;
@@ -12,6 +17,9 @@ export interface ParsedLoadData {
   gross_revenue?: string;
   load_date?: string;
   notes?: string;
+  multiStopDetected?: boolean;
+  detectedStopsCount?: number;
+  stops?: ParsedStopData[];
 }
 
 /** Strip $ and commas from a number string */
@@ -132,6 +140,39 @@ export function parseLoadText(text: string): ParsedLoadData {
   // --- Date ---
   const dateStr = tryParseDate(t);
   if (dateStr) result.load_date = dateStr;
+
+  // --- Numbered Stop Detection (e.g. "1#:", "2#:", "3#:") ---
+  const stopMarkers = t.match(/\b\d+#:\s*/g);
+  if (stopMarkers && stopMarkers.length >= 2) {
+    result.multiStopDetected = true;
+    result.detectedStopsCount = stopMarkers.length;
+
+    // Split into stop blocks
+    const blocks = t.split(/(?=\b\d+#:\s*)/).filter(b => /^\d+#:/.test(b.trim()));
+    const parsedStops: ParsedStopData[] = [];
+
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      // Try city, ST ZIP pattern
+      let cityMatch = block.match(/([A-Za-z .'-]+,\s*[A-Z]{2})\s*\d{5}/);
+      // Fallback: city, ST without zip
+      if (!cityMatch) cityMatch = block.match(/([A-Za-z .'-]+,\s*[A-Z]{2})\b/);
+      const location = cityMatch ? cityMatch[1].trim() : block.replace(/^\d+#:\s*/, '').split('\n')[0].trim();
+
+      let stop_type = 'Stop';
+      if (i === 0) stop_type = 'Pickup';
+      else if (i === blocks.length - 1) stop_type = 'Drop';
+
+      if (location) parsedStops.push({ location, stop_type });
+    }
+
+    if (parsedStops.length >= 2) {
+      result.stops = parsedStops;
+      // Set pickup/dropoff for compatibility
+      result.pickup_location = parsedStops[0].location;
+      result.dropoff_location = parsedStops[parsedStops.length - 1].location;
+    }
+  }
 
   return result;
 }

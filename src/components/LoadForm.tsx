@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { calculateEstimatedPay } from '@/lib/types';
-import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle } from 'lucide-react';
+import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
@@ -54,6 +54,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [stopErrors, setStopErrors] = useState<Record<number, string>>({});
   const [saveAsPending, setSaveAsPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [multiStopBanner, setMultiStopBanner] = useState<string | null>(null);
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
@@ -241,6 +242,17 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
                 if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
                 if (data.load_date) update('load_date', data.load_date);
+                // Multi-stop auto-detection
+                if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
+                  setMultiStop(true);
+                  setStops(data.stops.map((s, i) => ({
+                    stop_order: i + 1,
+                    location: s.location,
+                    stop_type: s.stop_type,
+                    detention_minutes: null,
+                  })));
+                  setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
+                }
               }}
             />
           )}
@@ -278,6 +290,17 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <Input id="dropoff_location" placeholder="Atlanta, GA" value={form.dropoff_location} onChange={e => update('dropoff_location', e.target.value)} required />
             <FieldError field="dropoff_location" />
           </div>
+
+          {/* Multi-stop auto-detection banner */}
+          {multiStopBanner && (
+            <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2.5 text-sm text-primary">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>{multiStopBanner}</span>
+              <button type="button" className="ml-auto" onClick={() => setMultiStopBanner(null)}>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Multi-stop toggle */}
           <div className="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
