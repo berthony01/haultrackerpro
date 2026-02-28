@@ -16,6 +16,8 @@ export function useAdmin() {
       return;
     }
 
+    setIsLoading(true);
+
     const check = async () => {
       const { data, error } = await supabase
         .from('admin_users')
