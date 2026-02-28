@@ -54,14 +54,20 @@ serve(async (req) => {
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found");
-      // Update profile to free
-      await supabaseClient.from("profiles").update({
-        subscription_status: "free",
-        subscription_plan: null,
-        stripe_customer_id: null,
-        stripe_subscription_id: null,
-        subscription_expires_at: null,
-      }).eq("user_id", user.id);
+      // Check if user has a manual override (admin-set pro status)
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("subscription_status")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (profile?.subscription_status === "pro") {
+        logStep("Manual pro override found, preserving status");
+        return new Response(JSON.stringify({ subscribed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
 
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -97,6 +103,21 @@ serve(async (req) => {
       }).eq("user_id", user.id);
     } else {
       logStep("No active subscription");
+      // Check for manual override before resetting
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("subscription_status")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (profile?.subscription_status === "pro") {
+        logStep("Manual pro override found, preserving status");
+        return new Response(JSON.stringify({ subscribed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+
       await supabaseClient.from("profiles").update({
         subscription_status: "free",
         subscription_plan: null,
