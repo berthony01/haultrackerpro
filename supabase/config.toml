@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.admin-api]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.check-pro-access]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
