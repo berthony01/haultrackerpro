@@ -250,6 +250,8 @@ export type Database = {
           state_tax_percent: number | null
           tax_base_type: string | null
           tax_estimator_enabled: boolean
+          tax_reminder_offsets: number[] | null
+          tax_reminders_enabled: boolean
           updated_at: string
           user_id: string
           week_start_day: string
@@ -272,6 +274,8 @@ export type Database = {
           state_tax_percent?: number | null
           tax_base_type?: string | null
           tax_estimator_enabled?: boolean
+          tax_reminder_offsets?: number[] | null
+          tax_reminders_enabled?: boolean
           updated_at?: string
           user_id: string
           week_start_day?: string
@@ -294,6 +298,8 @@ export type Database = {
           state_tax_percent?: number | null
           tax_base_type?: string | null
           tax_estimator_enabled?: boolean
+          tax_reminder_offsets?: number[] | null
+          tax_reminders_enabled?: boolean
           updated_at?: string
           user_id?: string
           week_start_day?: string

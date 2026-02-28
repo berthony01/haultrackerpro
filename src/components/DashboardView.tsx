@@ -8,6 +8,7 @@ import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 import { PerformanceTrends } from '@/components/PerformanceTrends';
 import { ProfitOverview } from '@/components/ProfitOverview';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
+import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -117,6 +118,9 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: D
         <h1 className="text-2xl font-black font-heading">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
+
+      {/* Quarterly Tax Reminder Banner */}
+      {!isLoading && <TaxReminderBanner settings={settings} />}
 
       {/* Weekly Focus Card — always visible at top */}
       {!isLoading && <WeeklyFocusCard loads={loads} />}

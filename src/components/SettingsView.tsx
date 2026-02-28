@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { SendFeedbackModal } from '@/components/SendFeedbackModal';
 import { TaxPlannerSettings } from '@/components/TaxPlannerSettings';
+import { QuarterlyReminderSettings } from '@/components/QuarterlyReminderSettings';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SettingsViewProps {
@@ -293,6 +294,18 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         onSave={(updates) => {
           updateSettings.mutate(updates, {
             onSuccess: () => toast.success('Tax settings saved!'),
+            onError: (e) => toast.error(e.message),
+          });
+        }}
+        isPending={updateSettings.isPending}
+      />
+
+      {/* Quarterly Tax Reminders */}
+      <QuarterlyReminderSettings
+        settings={settings}
+        onSave={(updates) => {
+          updateSettings.mutate(updates as any, {
+            onSuccess: () => toast.success('Reminder settings saved!'),
             onError: (e) => toast.error(e.message),
           });
         }}
