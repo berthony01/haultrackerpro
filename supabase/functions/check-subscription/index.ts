@@ -78,21 +78,29 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
-    const subscriptions = await stripe.subscriptions.list({
+    // Check for both active AND trialing subscriptions
+    const activeSubscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: "active",
       limit: 1,
     });
 
-    const hasActiveSub = subscriptions.data.length > 0;
+    const trialingSubscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "trialing",
+      limit: 1,
+    });
+
+    const subscription = activeSubscriptions.data[0] || trialingSubscriptions.data[0];
+    const hasActiveSub = !!subscription;
     let subscriptionEnd = null;
     let productId = null;
 
     if (hasActiveSub) {
-      const subscription = subscriptions.data[0];
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       productId = subscription.items.data[0].price.product;
-      logStep("Active subscription found", { subscriptionId: subscription.id, productId, endDate: subscriptionEnd });
+      const isTrial = subscription.status === "trialing";
+      logStep("Subscription found", { subscriptionId: subscription.id, status: subscription.status, isTrial, productId, endDate: subscriptionEnd });
 
       await supabaseClient.from("profiles").update({
         subscription_status: "pro",
@@ -102,7 +110,7 @@ serve(async (req) => {
         subscription_expires_at: subscriptionEnd,
       }).eq("user_id", user.id);
     } else {
-      logStep("No active subscription");
+      logStep("No active or trialing subscription");
       // Check for manual override before resetting
       const { data: profile } = await supabaseClient
         .from("profiles")
