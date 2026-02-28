@@ -25,9 +25,10 @@ interface LoadFormProps {
   initialStops?: LoadStopInput[];
   loading?: boolean;
   recentLoads?: Load[];
+  isPro?: boolean;
 }
 
-export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [] }: LoadFormProps) {
+export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [], isPro = false }: LoadFormProps) {
   const { settings } = useUserSettings();
   const lastLoad = recentLoads[0] ?? null;
 
@@ -234,6 +235,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           {/* Paste Load Parser */}
           {!initialData && (
             <PasteLoadParser
+              isPro={isPro}
               onParsed={(data: ParsedLoadData) => {
                 if (data.pickup_location) update('pickup_location', data.pickup_location);
                 if (data.dropoff_location) update('dropoff_location', data.dropoff_location);

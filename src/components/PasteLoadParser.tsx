@@ -7,9 +7,36 @@ import { toast } from 'sonner';
 
 interface PasteLoadParserProps {
   onParsed: (data: ParsedLoadData) => void;
+  isPro?: boolean;
 }
 
-export function PasteLoadParser({ onParsed }: PasteLoadParserProps) {
+const WEEKLY_PARSE_LIMIT = 5;
+const PARSE_STORAGE_KEY = 'htp_parse_usage';
+
+function getWeeklyParseCount(): number {
+  try {
+    const stored = localStorage.getItem(PARSE_STORAGE_KEY);
+    if (!stored) return 0;
+    const { count, weekStart } = JSON.parse(stored);
+    const now = new Date();
+    const currentWeekStart = new Date(now);
+    currentWeekStart.setDate(now.getDate() - now.getDay());
+    currentWeekStart.setHours(0, 0, 0, 0);
+    if (weekStart !== currentWeekStart.toISOString()) return 0;
+    return count;
+  } catch { return 0; }
+}
+
+function incrementParseCount() {
+  const now = new Date();
+  const currentWeekStart = new Date(now);
+  currentWeekStart.setDate(now.getDate() - now.getDay());
+  currentWeekStart.setHours(0, 0, 0, 0);
+  const current = getWeeklyParseCount();
+  localStorage.setItem(PARSE_STORAGE_KEY, JSON.stringify({ count: current + 1, weekStart: currentWeekStart.toISOString() }));
+}
+
+export function PasteLoadParser({ onParsed, isPro = false }: PasteLoadParserProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [stopsDetectedCount, setStopsDetectedCount] = useState<number | null>(null);
@@ -19,12 +46,17 @@ export function PasteLoadParser({ onParsed }: PasteLoadParserProps) {
       toast.error('Paste some load info first');
       return;
     }
+    if (!isPro && getWeeklyParseCount() >= WEEKLY_PARSE_LIMIT) {
+      toast.error(`Free limit reached (${WEEKLY_PARSE_LIMIT}/week). Upgrade to Pro for unlimited parsing.`);
+      return;
+    }
     const parsed = parseLoadText(text);
     const fieldCount = Object.values(parsed).filter(Boolean).length;
     if (fieldCount === 0) {
       toast.error('Could not extract any fields. Try a different format.');
       return;
     }
+    if (!isPro) incrementParseCount();
     onParsed(parsed);
     const extra = parsed.multiStopDetected ? ` (${parsed.detectedStopsCount} stops detected)` : '';
     toast.success(`Filled ${fieldCount} field${fieldCount > 1 ? 's' : ''}${extra} — please review`);

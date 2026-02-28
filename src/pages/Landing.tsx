@@ -4,18 +4,26 @@ import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 
-const features = [
+const freeFeatures = [
   { icon: Truck, title: 'Load Tracking', desc: 'Log every load with miles, rate, fees, and multi-stop details in seconds.' },
   { icon: Receipt, title: 'Expense Tracking', desc: 'Track fuel, maintenance, tolls, and every cost that eats into your profit.' },
   { icon: Calculator, title: 'Net Profit Calculation', desc: 'See real net profit per load — not just gross revenue.' },
-  { icon: Download, title: 'Professional Exports', desc: 'Export clean reports for tax prep, disputes, or your own records.' },
   { icon: Route, title: 'Deadhead Awareness', desc: 'Know your deadhead percentage and how it impacts your bottom line.' },
+  { icon: Download, title: 'CSV Exports', desc: 'Export clean load summaries for tax prep or your own records.' },
+];
+
+const proFeatures = [
+  { icon: AlertTriangle, title: 'Smart Alerts 2.0', desc: 'Advanced alerts catch profit drops, RPM dips, and high expense ratios.' },
+  { icon: BarChart3, title: 'Driver Scorecard', desc: 'Get graded across 5 performance metrics with tier rankings from Bronze to Platinum.' },
+  { icon: FileText, title: 'Weekly Closeout', desc: 'Lock in weekly summaries with pay variance and deadhead tracking.' },
+  { icon: Download, title: 'Advanced Exports', desc: 'PDF exports and profit reports with full expense breakdowns.' },
+  { icon: TrendingUp, title: 'Unlimited Paste Parser', desc: 'Auto-fill load forms from pasted text — unlimited for Pro users.' },
 ];
 
 const faqs = [
   { q: 'Is my data secure?', a: 'Yes. All data is encrypted in transit and stored securely. We never sell or share your data with third parties.' },
   { q: 'Do I need accounting knowledge?', a: 'Not at all. Just enter your loads and expenses — HaulTrackerPro does the math for you automatically.' },
-  { q: 'Is it really free?', a: 'Yes. Unlimited loads, expenses, weekly summaries, and exports. No credit card required.' },
+  { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks advanced features for $15/month or $120/year.' },
   { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
 ];
 
@@ -84,7 +92,7 @@ export default function Landing() {
                 </Button>
               </div>
               <div className="flex items-center gap-6 pt-2">
-                {['No credit card', 'Free forever', 'Setup in 30s'].map(t => (
+                {['No credit card', 'Free plan available', 'Pro from $15/mo'].map(t => (
                   <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
                     <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'hsl(152, 60%, 42%)' }} /> {t}
                   </span>
@@ -141,12 +149,12 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Free Features Section */}
       <section id="features" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              One Dashboard.{' '}
+              Free Plan.{' '}
               <span style={{ color: 'hsl(25, 95%, 53%)' }}>Total Financial Clarity.</span>
             </h2>
             <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
@@ -154,7 +162,7 @@ export default function Landing() {
             </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {features.map((f, i) => (
+            {freeFeatures.map((f, i) => (
               <div key={i} className="group p-6 rounded-2xl border transition-all duration-300 hover:border-opacity-60" style={{
                 background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)',
               }}>
@@ -166,11 +174,39 @@ export default function Landing() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Pro Features Section */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Go Pro.{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Drive Smarter.</span>
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Advanced insights starting at $15/month or $120/year. Upgrade when you're ready.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {proFeatures.map((f, i) => (
+              <div key={i} className="group p-6 rounded-2xl border transition-all duration-300" style={{
+                background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.3)',
+              }}>
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
+                  <f.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-base font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{f.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
           <div className="text-center mt-12">
-            <Button onClick={goToAuth} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
+            <Button onClick={() => navigate('/pricing')} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
               background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
             }}>
-              Start Tracking Smarter Today <ArrowRight className="h-5 w-5" />
+              View Pricing <ArrowRight className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -264,7 +300,7 @@ export default function Landing() {
             <span style={{ color: 'hsl(25, 95%, 53%)' }}>Start Knowing.</span>
           </h2>
           <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Join drivers who track every load, every expense, and every dollar — for free.
+            Join drivers who track every load, every expense, and every dollar. Free plan available — Pro from $15/month.
           </p>
           <Button onClick={goToAuth} size="lg" className="text-lg font-bold rounded-2xl h-14 px-10 gap-2" style={{
             background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',

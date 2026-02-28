@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin } from 'lucide-react';
+import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock } from 'lucide-react';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -14,14 +14,43 @@ interface WeeklyCloseoutProps {
   loads: Load[];
   onNavigate: (page: string, options?: { filter?: string }) => void;
   onBack: () => void;
+  isPro?: boolean;
 }
 
-export function WeeklyCloseout({ loads, onNavigate, onBack }: WeeklyCloseoutProps) {
+export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: WeeklyCloseoutProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [finalized, setFinalized] = useState(false);
   const { saveSnapshot } = useWeeklySnapshots();
-
   const weekLoads = useMemo(() => getCurrentWeekLoads(loads), [loads]);
+
+  if (!isPro) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={onBack}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-black font-heading">Weekly Closeout</h1>
+            <p className="text-sm text-muted-foreground">Finalize your weekly summary</p>
+          </div>
+        </div>
+        <Card className="shadow-card">
+          <CardContent className="py-12 text-center">
+            <Lock className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+            <p className="text-lg font-bold">Unlock Weekly Closeout</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
+              Finalize your week with pay variance tracking, deadhead analysis, and snapshot history.
+            </p>
+            <Button size="sm" className="mt-5 rounded-xl" disabled>
+              Upgrade to Pro
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
 
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
