@@ -22,6 +22,7 @@ export const featureList: FeatureCategory[] = [
       { icon: DollarSign, title: 'Estimated vs Actual Pay', description: 'Compare what you expected to earn against what you actually received to catch pay discrepancies.' },
       { icon: Calculator, title: 'Net Profit Calculation', description: 'See real net profit per load after all expenses — not just gross revenue.' },
       { icon: Route, title: 'Deadhead Awareness', description: 'Track deadhead miles and percentage to understand how empty miles impact your earnings.' },
+      { icon: Sparkles, title: 'Multi-Stop Auto-Detection', description: 'Paste load details with numbered stops (1#:, 2#:) and the system auto-detects multi-stop loads, toggles multi-stop mode, and pre-fills stop locations.' },
     ],
   },
   {
@@ -64,7 +65,7 @@ export const featureList: FeatureCategory[] = [
   {
     category: 'Pro Features',
     features: [
-      { icon: AlertCircle, title: 'Smart Alerts 2.0', description: 'Intelligent alerts for negative profit, high deadhead, low RPM, missing payments, and expense ratio warnings.' },
+      { icon: AlertCircle, title: 'Smart Alerts 2.0', description: 'Tiered alert system — basic alerts (negative profit, high deadhead, missing pay) are free for all users. Advanced insights (profit trends, RPM analysis, expense ratio warnings) require Pro.' },
       { icon: Trophy, title: 'Driver Scorecard', description: 'Overall performance score (0–100) with tier badges and 5 metric breakdowns: RPM, deadhead, expenses, profit trend, and logging streak.' },
     ],
   },
