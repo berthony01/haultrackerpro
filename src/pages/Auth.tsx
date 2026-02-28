@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Truck, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function Auth() {
@@ -98,7 +99,33 @@ export default function Auth() {
               </Button>
             </form>
 
-            <div className="mt-4 text-center">
+            {mode === 'login' && (
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!form.email) {
+                      toast.error('Enter your email first, then click Forgot password');
+                      return;
+                    }
+                    try {
+                      const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
+                        redirectTo: `${window.location.origin}/reset-password`,
+                      });
+                      if (error) throw error;
+                      toast.success('Check your email for a password reset link!');
+                    } catch (err: any) {
+                      toast.error(err.message || 'Failed to send reset email');
+                    }
+                  }}
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            <div className="mt-3 text-center">
               <button
                 type="button"
                 onClick={() => setMode(m => m === 'login' ? 'signup' : 'login')}

@@ -193,12 +193,17 @@ export default function Pricing() {
                 </span>
               )}
             </div>
-            <Button onClick={handleUpgrade} disabled={loading} className="w-full rounded-xl font-bold mb-6 gap-2" style={{
+            <Button onClick={handleUpgrade} disabled={loading} className="w-full rounded-xl font-bold mb-2 gap-2" style={{
               background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
               boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)'
             }}>
               {loading ? 'Loading...' : 'Upgrade to Pro'} {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
+            <p className="text-center text-xs font-semibold mb-6 px-3 py-1.5 rounded-full mx-auto w-fit" style={{
+              background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)'
+            }}>
+              ✨ 14-day free trial included
+            </p>
             <p className="text-xs mb-4 font-semibold" style={{ color: 'hsl(25, 95%, 60%)' }}>
               Everything in Free, plus:
             </p>
