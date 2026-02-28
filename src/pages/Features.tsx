@@ -32,7 +32,7 @@ export default function Features() {
               All <span style={{ color: 'hsl(25, 95%, 53%)' }}>Features</span>
             </h1>
             <p className="mt-3 text-base max-w-lg" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Everything HaulTrackerPro offers — all free, no credit card required.
+              Everything HaulTrackerPro offers — from free essentials to Pro-tier analytics.
             </p>
           </div>
           <Button onClick={downloadFeatureSheet} variant="outline" className="gap-2 rounded-xl font-bold shrink-0" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
