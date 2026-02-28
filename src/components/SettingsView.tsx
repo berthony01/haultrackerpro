@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -67,6 +67,22 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [isPro, setIsPro] = useState(false);
+
+  // Check subscription status
+  useEffect(() => {
+    if (!user) return;
+    const checkSub = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('check-subscription');
+        setIsPro(data?.subscribed === true);
+      } catch {
+        const { data: profile } = await supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle();
+        setIsPro(profile?.subscription_status === 'pro');
+      }
+    };
+    checkSub();
+  }, [user]);
 
   // Sync from loaded settings once
   if (settings && !initialized) {
@@ -168,22 +184,30 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <Shield className="h-3 w-3" /> Encrypted in transit
           </p>
           <div className="flex items-center gap-2 mt-1">
-            <span className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase tracking-wider">
-              Free Plan
+            <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isPro ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'}`}>
+              {isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
             </span>
           </div>
-          <div className="pt-2 space-y-1">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
-            {freePlanIncludes.map((item, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <CheckCircle className="h-3 w-3 text-success" />
-                <p className="text-xs text-muted-foreground">{item}</p>
-              </div>
-            ))}
-            <p className="text-[10px] text-muted-foreground/60 pt-1">
-              Pro will unlock advanced analytics, tax tools, and integrations.
-            </p>
-          </div>
+          {!isPro && (
+            <div className="pt-2 space-y-1">
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
+              {freePlanIncludes.map((item, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-success" />
+                  <p className="text-xs text-muted-foreground">{item}</p>
+                </div>
+              ))}
+              <p className="text-[10px] text-muted-foreground/60 pt-1">
+                Pro will unlock advanced analytics, tax tools, and integrations.
+              </p>
+            </div>
+          )}
+          {isPro && (
+            <div className="pt-2 space-y-1">
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Pro Plan Active</p>
+              <p className="text-xs text-muted-foreground">All features unlocked including advanced alerts, scorecard, exports, and unlimited parsing.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
