@@ -18,6 +18,7 @@ import { SendFeedbackModal } from '@/components/SendFeedbackModal';
 import { TaxPlannerSettings } from '@/components/TaxPlannerSettings';
 import { QuarterlyReminderSettings } from '@/components/QuarterlyReminderSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdmin } from '@/hooks/useAdmin';
 
 interface SettingsViewProps {
   onBack: () => void;
@@ -37,6 +38,17 @@ const freePlanIncludes = [
   'Standard exports',
   'Weekly summaries',
 ];
+
+function AdminDashboardLink() {
+  const { isAdmin } = useAdmin();
+  const navigate = useNavigate();
+  if (!isAdmin) return null;
+  return (
+    <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/admin')}>
+      <Shield className="h-4 w-4 text-primary" /> Admin Dashboard
+    </Button>
+  );
+}
 
 export function SettingsView({ onBack }: SettingsViewProps) {
   const { settings, isLoading, updateSettings } = useUserSettings();
@@ -340,6 +352,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/features')}>
             <Sparkles className="h-4 w-4 text-primary" /> View All Features
           </Button>
+          <AdminDashboardLink />
           <div className="flex items-center gap-2 pt-1">
             <Mail className="h-3.5 w-3.5 text-muted-foreground/50" />
             <p className="text-xs text-muted-foreground">support@haultrackerpro.app</p>
