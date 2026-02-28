@@ -50,15 +50,23 @@ const Index = () => {
   const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses);
   const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses);
 
-  // Pro gating — use subscription_status from profiles (default 'free')
-  // For now, treat 'pro' and 'trial' as pro-enabled
+  // Pro gating — check subscription via Stripe on mount
   const [isPro, setIsPro] = useState(false);
   useEffect(() => {
     if (!user) return;
-    supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => {
-        setIsPro(data?.subscription_status === 'pro' || data?.subscription_status === 'trial');
-      });
+    const checkSub = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('check-subscription');
+        setIsPro(data?.subscribed === true);
+      } catch {
+        // Fallback to profile status
+        const { data: profile } = await supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle();
+        setIsPro(profile?.subscription_status === 'pro' || profile?.subscription_status === 'trial');
+      }
+    };
+    checkSub();
+    const interval = setInterval(checkSub, 60000);
+    return () => clearInterval(interval);
   }, [user]);
 
   // Editing stops state
