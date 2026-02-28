@@ -67,21 +67,29 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [isPro, setIsPro] = useState(false);
+  const [isPro, setIsPro] = useState<boolean | null>(null);
 
-  // Check subscription status
+  // Check subscription status — read profile first (instant), then confirm via edge function
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setIsPro(false); return; }
+    let cancelled = false;
     const checkSub = async () => {
+      // Instant read from profile to avoid flash
+      const { data: profile } = await supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle();
+      if (cancelled) return;
+      const profileIsPro = profile?.subscription_status === 'pro';
+      setIsPro(profileIsPro);
+
+      // Then confirm via edge function
       try {
         const { data } = await supabase.functions.invoke('check-subscription');
-        setIsPro(data?.subscribed === true);
+        if (!cancelled) setIsPro(data?.subscribed === true);
       } catch {
-        const { data: profile } = await supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle();
-        setIsPro(profile?.subscription_status === 'pro');
+        // keep profile value
       }
     };
     checkSub();
+    return () => { cancelled = true; };
   }, [user]);
 
   // Sync from loaded settings once
@@ -184,9 +192,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <Shield className="h-3 w-3" /> Encrypted in transit
           </p>
           <div className="flex items-center gap-2 mt-1">
-            <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isPro ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'}`}>
-              {isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
-            </span>
+            {isPro === null ? (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Checking plan…
+              </span>
+            ) : (
+              <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isPro ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'}`}>
+                {isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
+              </span>
+            )}
           </div>
           {!isPro && (
             <div className="pt-2 space-y-1">
