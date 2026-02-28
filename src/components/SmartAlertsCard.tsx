@@ -34,40 +34,16 @@ const severityConfig: Record<AlertSeverity, { icon: typeof AlertTriangle; color:
 };
 
 export function SmartAlertsCard({ alerts, onDismiss, onNavigate, onViewAll, isPro = false }: SmartAlertsCardProps) {
-  if (!isPro) {
-    return (
-      <Card className="shadow-card overflow-hidden">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-primary/10 p-1.5">
-                <Bell className="h-4 w-4 text-primary" />
-              </div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Smart Alerts</p>
-            </div>
-            <Badge variant="outline" className="text-[10px] gap-1 border-primary/30 text-primary">
-              <Lock className="h-2.5 w-2.5" /> Pro
-            </Badge>
-          </div>
-          <div className="rounded-xl bg-muted/50 p-4 text-center">
-            <Lock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-muted-foreground">Unlock Smart Alerts</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">
-              Get notified about low RPM, high deadhead, missing payments, and more.
-            </p>
-            <Button size="sm" className="mt-3 rounded-xl text-xs" disabled>
-              Upgrade to Pro
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (alerts.length === 0) return null;
 
-  const visible = alerts.slice(0, 3);
-  const remaining = alerts.length - 3;
+  const basicAlerts = alerts.filter(a => a.tier === 'basic');
+  const advancedAlerts = alerts.filter(a => a.tier === 'advanced');
+  const visibleAlerts = isPro ? alerts : basicAlerts;
+  const visible = visibleAlerts.slice(0, 3);
+  const remaining = visibleAlerts.length - 3;
+  const hasLockedAlerts = !isPro && advancedAlerts.length > 0;
+
+  if (visibleAlerts.length === 0 && !hasLockedAlerts) return null;
 
   return (
     <Card className="shadow-card overflow-hidden">
@@ -79,9 +55,9 @@ export function SmartAlertsCard({ alerts, onDismiss, onNavigate, onViewAll, isPr
             </div>
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Smart Alerts</p>
           </div>
-          {alerts.length > 0 && (
+          {visibleAlerts.length > 0 && (
             <Badge variant="secondary" className="text-[10px]">
-              {alerts.length}
+              {visibleAlerts.length}
             </Badge>
           )}
         </div>
@@ -116,6 +92,29 @@ export function SmartAlertsCard({ alerts, onDismiss, onNavigate, onViewAll, isPr
               </div>
             );
           })}
+
+          {/* Locked preview for advanced alerts (free users) */}
+          {hasLockedAlerts && (
+            <div className="rounded-xl bg-muted/50 p-3 flex gap-3 items-start opacity-70">
+              <Lock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-bold leading-tight text-muted-foreground">
+                    {advancedAlerts.length} Advanced Alert{advancedAlerts.length > 1 ? 's' : ''}
+                  </p>
+                  <Badge variant="outline" className="text-[9px] gap-0.5 border-primary/30 text-primary">
+                    <Lock className="h-2 w-2" /> Pro
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-relaxed">
+                  Unlock advanced performance insights with Pro.
+                </p>
+                <Button size="sm" className="mt-1.5 rounded-xl text-[10px] h-6 px-2" disabled>
+                  Upgrade to Pro
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {(remaining > 0 || onViewAll) && (

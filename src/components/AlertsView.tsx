@@ -2,7 +2,7 @@ import { SmartAlert, AlertSeverity } from '@/hooks/useSmartAlerts';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, AlertCircle, Info, X, ArrowLeft, Bell, ChevronRight, Filter } from 'lucide-react';
+import { AlertTriangle, AlertCircle, Info, X, ArrowLeft, Bell, ChevronRight, Lock } from 'lucide-react';
 import { useState } from 'react';
 
 interface AlertsViewProps {
@@ -10,6 +10,7 @@ interface AlertsViewProps {
   onDismiss: (dedupeKey: string) => void;
   onNavigate?: (page: string) => void;
   onBack: () => void;
+  isPro?: boolean;
 }
 
 const severityConfig: Record<AlertSeverity, { icon: typeof AlertTriangle; color: string; bg: string; label: string }> = {
@@ -18,10 +19,16 @@ const severityConfig: Record<AlertSeverity, { icon: typeof AlertTriangle; color:
   info: { icon: Info, color: 'text-primary', bg: 'bg-primary/10', label: 'Info' },
 };
 
-export function AlertsView({ alerts, onDismiss, onNavigate, onBack }: AlertsViewProps) {
+export function AlertsView({ alerts, onDismiss, onNavigate, onBack, isPro = false }: AlertsViewProps) {
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | 'all'>('all');
 
   const filtered = severityFilter === 'all' ? alerts : alerts.filter(a => a.severity === severityFilter);
+
+  const basicAlerts = filtered.filter(a => a.tier === 'basic');
+  const advancedAlerts = filtered.filter(a => a.tier === 'advanced');
+  const visibleAlerts = isPro ? filtered : basicAlerts;
+
+  const totalVisible = isPro ? alerts.length : alerts.filter(a => a.tier === 'basic').length;
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -31,7 +38,7 @@ export function AlertsView({ alerts, onDismiss, onNavigate, onBack }: AlertsView
         </Button>
         <div>
           <h1 className="text-2xl font-black font-heading">Smart Alerts</h1>
-          <p className="text-sm text-muted-foreground">{alerts.length} active alert{alerts.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-muted-foreground">{totalVisible} active alert{totalVisible !== 1 ? 's' : ''}</p>
         </div>
       </div>
 
@@ -50,7 +57,7 @@ export function AlertsView({ alerts, onDismiss, onNavigate, onBack }: AlertsView
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {visibleAlerts.length === 0 && (!isPro ? advancedAlerts.length === 0 : true) ? (
         <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
           <CardContent className="py-12 text-center">
             <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-4">
@@ -64,7 +71,8 @@ export function AlertsView({ alerts, onDismiss, onNavigate, onBack }: AlertsView
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map(alert => {
+          {/* Visible (basic for free, all for pro) alerts */}
+          {visibleAlerts.map(alert => {
             const config = severityConfig[alert.severity];
             const Icon = config.icon;
             return (
@@ -98,6 +106,39 @@ export function AlertsView({ alerts, onDismiss, onNavigate, onBack }: AlertsView
                           {alert.ctaLabel} <ChevronRight className="h-3 w-3" />
                         </Button>
                       )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {/* Locked advanced alerts for free users */}
+          {!isPro && advancedAlerts.map(alert => {
+            const config = severityConfig[alert.severity];
+            return (
+              <Card key={alert.dedupeKey} className="shadow-card animate-fade-in opacity-70">
+                <CardContent className="p-0">
+                  <div className="rounded-xl bg-muted/50 p-4 flex gap-3 items-start">
+                    <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <Badge variant="outline" className="text-[9px] mb-1 text-muted-foreground border-muted-foreground/20">
+                            {config.label}
+                          </Badge>
+                          <p className="text-sm font-bold leading-tight text-muted-foreground">{alert.title}</p>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] gap-0.5 border-primary/30 text-primary shrink-0">
+                          <Lock className="h-2 w-2" /> Pro
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
+                        Unlock advanced performance insights with Pro.
+                      </p>
+                      <Button size="sm" className="mt-2 rounded-xl text-[10px] h-7 px-3" disabled>
+                        Upgrade to Pro
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

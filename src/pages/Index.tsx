@@ -289,6 +289,7 @@ const Index = () => {
                 onDismiss={(key) => smartAlerts.dismissAlert.mutate(key)}
                 onNavigate={handleNavigate}
                 onBack={() => setPage('dashboard')}
+                isPro={isPro}
               />
             )}
             {page === 'scorecard' && (

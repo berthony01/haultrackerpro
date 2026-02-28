@@ -7,10 +7,12 @@ import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, differenceInDays } from 'date-fns';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
+export type AlertTier = 'basic' | 'advanced';
 
 export interface SmartAlert {
   type: string;
   severity: AlertSeverity;
+  tier: AlertTier;
   title: string;
   message: string;
   ctaLabel?: string;
@@ -56,6 +58,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] 
     alerts.push({
       type: 'negative_profit',
       severity: 'critical',
+      tier: 'basic',
       title: 'Negative Profit This Week',
       message: `You're spending more than you're earning this week. Revenue: $${thisWeekRevenue.toFixed(0)}, Expenses: $${thisWeekExpenses.toFixed(0)}.`,
       ctaLabel: 'View Expenses',
@@ -69,9 +72,10 @@ export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] 
     const dropPct = ((lastWeekProfit - thisWeekProfit) / lastWeekProfit) * 100;
     if (dropPct >= 20) {
       alerts.push({
-        type: 'profit_drop',
-        severity: 'warning',
-        title: 'Profit Dropped This Week',
+      type: 'profit_drop',
+      severity: 'warning',
+      tier: 'advanced',
+      title: 'Profit Dropped This Week',
         message: `Profit is down ${dropPct.toFixed(0)}% compared to last week.`,
         ctaLabel: 'View Dashboard',
         ctaRoute: 'dashboard',
@@ -88,6 +92,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] 
     alerts.push({
       type: 'high_deadhead',
       severity: 'warning',
+      tier: 'basic',
       title: 'High Deadhead This Week',
       message: `Your deadhead ratio is ${((totalDH / totalMi) * 100).toFixed(1)}%. Aim for under 20%.`,
       ctaLabel: 'View Loads',
@@ -106,6 +111,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] 
     alerts.push({
       type: 'low_rpm',
       severity: 'warning',
+      tier: 'advanced',
       title: 'Low Rate Per Mile',
       message: `This week's RPM ($${thisWeekRPM.toFixed(2)}) is ${(((avg30RPM - thisWeekRPM) / avg30RPM) * 100).toFixed(0)}% below your 30-day average ($${avg30RPM.toFixed(2)}).`,
       ctaLabel: 'Review Loads',
@@ -119,6 +125,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] 
     alerts.push({
       type: 'high_expense_ratio',
       severity: 'warning',
+      tier: 'advanced',
       title: 'High Expense Ratio',
       message: `Expenses are ${((thisWeekExpenses / thisWeekRevenue) * 100).toFixed(0)}% of revenue this week. Target below 70%.`,
       ctaLabel: 'View Reports',
@@ -135,6 +142,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] 
     alerts.push({
       type: 'missing_pay',
       severity: 'info',
+      tier: 'basic',
       title: 'Missing Pay Records',
       message: `${missingPayLoads.length} load${missingPayLoads.length > 1 ? 's' : ''} older than 7 days still missing actual pay.`,
       ctaLabel: 'Review',
