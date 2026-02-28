@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Load, LoadInsert } from '@/hooks/useLoads';
 import { LoadStopInput } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -49,6 +49,17 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     status: initialData?.status || 'completed',
     gross_revenue: (initialData as any)?.gross_revenue?.toString() || '',
   });
+
+  // Sync default settings when they load asynchronously (only for new loads)
+  useEffect(() => {
+    if (!initialData && settings) {
+      setForm(prev => ({
+        ...prev,
+        rate_per_mile: prev.rate_per_mile || (settings.default_rate_per_mile?.toString() ?? ''),
+        other_fees: prev.other_fees === '0' || prev.other_fees === '' ? (settings.default_other_fees?.toString() ?? '0') : prev.other_fees,
+      }));
+    }
+  }, [settings, initialData]);
 
   const [multiStop, setMultiStop] = useState((initialStops && initialStops.length > 0) || false);
   const [stops, setStops] = useState<LoadStopInput[]>(initialStops ?? []);
