@@ -1,4 +1,4 @@
-import { Truck, Receipt, Calculator, Route, ClipboardPaste, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2 } from 'lucide-react';
+import { Truck, Receipt, Calculator, Route, ClipboardPaste, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2, AlertCircle, Trophy } from 'lucide-react';
 
 export interface Feature {
   icon: typeof Truck;
@@ -59,6 +59,13 @@ export const featureList: FeatureCategory[] = [
       { icon: Globe, title: 'Multi-Currency Support', description: 'Select your preferred currency for all financial displays and exports.' },
       { icon: Building2, title: 'Company Profile', description: 'Store your company name and start date for use in reports and exports.' },
       { icon: UserCheck, title: 'Guided Onboarding', description: 'Step-by-step setup wizard to configure your account and start tracking in under 30 seconds.' },
+    ],
+  },
+  {
+    category: 'Pro Features',
+    features: [
+      { icon: AlertCircle, title: 'Smart Alerts 2.0', description: 'Intelligent alerts for negative profit, high deadhead, low RPM, missing payments, and expense ratio warnings.' },
+      { icon: Trophy, title: 'Driver Scorecard', description: 'Overall performance score (0–100) with tier badges and 5 metric breakdowns: RPM, deadhead, expenses, profit trend, and logging streak.' },
     ],
   },
   {

@@ -231,6 +231,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_alerts: {
+        Row: {
+          created_at: string
+          dedupe_key: string
+          dismissed_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dedupe_key: string
+          dismissed_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dedupe_key?: string
+          dismissed_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           buffer_percent: number | null

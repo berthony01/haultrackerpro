@@ -9,7 +9,8 @@ import { PerformanceTrends } from '@/components/PerformanceTrends';
 import { ProfitOverview } from '@/components/ProfitOverview';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck } from 'lucide-react';
+import { SmartAlertsCard } from '@/components/SmartAlertsCard';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,8 @@ interface DashboardViewProps {
   expenses?: Expense[];
   isLoading?: boolean;
   onNavigate?: (page: string, options?: { filter?: string }) => void;
+  smartAlerts?: { alerts: any[]; dismissAlert: { mutate: (key: string) => void } };
+  isPro?: boolean;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
@@ -47,7 +50,7 @@ function getPresetRange(key: PresetKey): { start: Date; end: Date } {
   }
 }
 
-export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
@@ -124,6 +127,17 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: D
 
       {/* Weekly Focus Card — always visible at top */}
       {!isLoading && <WeeklyFocusCard loads={loads} />}
+
+      {/* Smart Alerts Card */}
+      {!isLoading && smartAlerts && (
+        <SmartAlertsCard
+          alerts={smartAlerts.alerts}
+          onDismiss={(key) => smartAlerts.dismissAlert.mutate(key)}
+          onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
+          onViewAll={onNavigate ? () => onNavigate('alerts') : undefined}
+          isPro={isPro}
+        />
+      )}
 
       {/* Date Range Filter */}
       <div className="space-y-2">
@@ -227,8 +241,6 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: D
           <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} />
 
           {/* Finalize Weekly Summary Button */}
-
-          {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (
             <Button
               variant="outline"
@@ -236,6 +248,17 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate }: D
               onClick={() => onNavigate('closeout')}
             >
               <ClipboardCheck className="h-5 w-5" /> Finalize Weekly Summary
+            </Button>
+          )}
+
+          {/* Driver Scorecard CTA */}
+          {onNavigate && (
+            <Button
+              variant="outline"
+              className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
+              onClick={() => onNavigate('scorecard')}
+            >
+              <Trophy className="h-5 w-5" /> View Driver Scorecard
             </Button>
           )}
 
