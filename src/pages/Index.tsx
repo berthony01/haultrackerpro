@@ -5,6 +5,8 @@ import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { useSmartAlerts } from '@/hooks/useSmartAlerts';
+import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
@@ -19,6 +21,8 @@ import { SmartReminders } from '@/components/SmartReminders';
 import { MonthlySummary } from '@/components/MonthlySummary';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
+import { AlertsView } from '@/components/AlertsView';
+import { DriverScorecard } from '@/components/DriverScorecard';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -41,6 +45,21 @@ const Index = () => {
   const allLoadsQuery = useLoads();
   const allExpensesQuery = useExpenses();
   const loadStopsHook = useLoadStops();
+
+  // Smart Alerts & Scorecard
+  const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses);
+  const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses);
+
+  // Pro gating — use subscription_status from profiles (default 'free')
+  // For now, treat 'pro' and 'trial' as pro-enabled
+  const [isPro, setIsPro] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => {
+        setIsPro(data?.subscription_status === 'pro' || data?.subscription_status === 'trial');
+      });
+  }, [user]);
 
   // Editing stops state
   const [editingStops, setEditingStops] = useState<LoadStopInput[]>([]);
@@ -98,7 +117,6 @@ const Index = () => {
     if (!editingLoad) return;
     updateLoad.mutate({ id: editingLoad.id, data }, {
       onSuccess: () => {
-        // Save stops (delete+reinsert)
         loadStopsHook.saveStopsForLoad.mutate({ loadId: editingLoad.id, stops: stops ?? [] });
         toast.success('Load updated!');
         setEditingLoad(null);
@@ -128,7 +146,6 @@ const Index = () => {
     setPage('add');
     const dup: Load = { ...load, id: '', load_date: new Date().toISOString().split('T')[0], actual_pay_received: null, status: 'pending' };
     setEditingLoad(dup);
-    // Copy stops from original
     const origStops = loadStopsHook.getStopsForLoad(load.id);
     setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes })));
   };
@@ -206,6 +223,8 @@ const Index = () => {
                 expenses={allExpensesQuery.expenses}
                 isLoading={allLoadsQuery.isLoading}
                 onNavigate={handleNavigate}
+                smartAlerts={smartAlerts}
+                isPro={isPro}
               />
             )}
             {page === 'closeout' && (
@@ -262,6 +281,21 @@ const Index = () => {
                 loads={allLoadsQuery.loads}
                 expenses={allExpensesQuery.expenses}
                 onBack={() => setPage('reports')}
+              />
+            )}
+            {page === 'alerts' && (
+              <AlertsView
+                alerts={smartAlerts.alerts}
+                onDismiss={(key) => smartAlerts.dismissAlert.mutate(key)}
+                onNavigate={handleNavigate}
+                onBack={() => setPage('dashboard')}
+              />
+            )}
+            {page === 'scorecard' && (
+              <DriverScorecard
+                scorecard={scorecard}
+                onBack={() => setPage('dashboard')}
+                isPro={isPro}
               />
             )}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
