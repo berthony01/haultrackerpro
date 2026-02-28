@@ -1,40 +1,22 @@
 
 
-## Plan: Feature Overview Page + Downloadable Feature Sheet
+## Analysis
 
-### Approach
+The downloadable feature sheet already exists — it's the **"Download Feature Sheet"** button on the `/features` page. It generates a Markdown file client-side from `src/lib/featureList.ts`. You can access it at `/features` or via the "View All Features" button in Settings > Support.
 
-1. **Create a centralized feature data file** (`src/lib/featureList.ts`) — a single array of all platform features with category, title, and description. This becomes the single source of truth that both the page and the download use. When a new feature is added, only this file needs updating.
+### Missing Features from the Feature List
 
-2. **Create `/features` page** (`src/pages/Features.tsx`) — a public, unauthenticated page (like Terms/Privacy/FAQ) using the same dark theme as the Landing page. It renders features grouped by category from the centralized data file. Includes a "Download Feature Sheet" button.
+Two recently added features need to be reflected in `featureList.ts` (which automatically updates both the page and the download):
 
-3. **Add download logic** — client-side generation of a `.txt` or `.md` file from the same feature data array. No server needed.
+1. **Multi-Stop Auto-Detection** (Load & Expense Management) — The numbered-stop paste parser (`1#:`, `2#:`) that auto-toggles multi-stop mode. Not listed.
 
-4. **Register the route** in `App.tsx` as a public route (`/features`).
+2. **Smart Alerts description update** — Smart Alerts 2.0 now has a tiered model (basic alerts free, advanced alerts Pro-only). The current description doesn't mention this.
 
-5. **Add navigation links** — add "Features" link to the Landing page footer and navbar, and a link in the Settings Support section.
+### Plan
 
-### Implementation Steps
+1. **Add "Multi-Stop Auto-Detection"** entry to the "Load & Expense Management" category in `src/lib/featureList.ts` with a `ClipboardPaste` or `Sparkles` icon.
 
-1. **Create `src/lib/featureList.ts`** with categorized feature entries:
-   - Load & Expense Management (7 items: CRUD, multi-stop, paste parser, actual vs estimated, etc.)
-   - Dashboard & Analytics (5 items: profit overview, smart chips, weekly focus, performance trends, filters)
-   - Tax Tools (3 items: set-aside planner, quarterly reminders, calendar export)
-   - Reports & Exports (4 items: CSV, PDF, JSON, date range filtering)
-   - Settings & Customization (5 items: pay types, week start, currency, company profile, onboarding)
-   - Account & Security (3 items: auth, data export, delete account)
+2. **Update Smart Alerts 2.0 description** in the "Pro Features" category to reflect the tiered access model (basic alerts free, advanced insights Pro).
 
-2. **Create `src/pages/Features.tsx`** — public page matching Landing dark theme, grouped feature cards, download button at top.
-
-3. **Update `src/App.tsx`** — add `<Route path="/features" element={<Features />} />`.
-
-4. **Update `src/pages/Landing.tsx`** — add "Features" to footer links and optionally to nav.
-
-5. **Update `src/components/SettingsView.tsx`** — add a "View All Features" button in the Support card that navigates to `/features`.
-
-### Technical Details
-
-- The download generates a Markdown file client-side using `Blob` + `URL.createObjectURL`, same pattern as the existing JSON export in Settings.
-- No database changes. No new dependencies. No modifications to existing calculations or logic.
-- The Features page is fully static — no auth required, no data fetching.
+No other files need changing — the Features page and download function already read from `featureList`, so both update automatically.
 
