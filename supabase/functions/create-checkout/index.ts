@@ -47,6 +47,17 @@ serve(async (req) => {
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
       logStep("Existing Stripe customer found", { customerId });
+
+      // Prevent double subscription
+      const activeSubs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
+      const trialSubs = await stripe.subscriptions.list({ customer: customerId, status: 'trialing', limit: 1 });
+      if (activeSubs.data.length > 0 || trialSubs.data.length > 0) {
+        logStep("User already has active/trialing subscription");
+        return new Response(JSON.stringify({ error: "You already have an active subscription. Manage it from your account settings." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
     }
 
     const origin = req.headers.get("origin") || "https://haultrackerpro.lovable.app";

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { parseLoadText, ParsedLoadData } from '@/lib/parseLoadText';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ClipboardPaste, ChevronDown, ChevronUp, Sparkles, X, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PasteLoadParserProps {
   onParsed: (data: ParsedLoadData) => void;
@@ -11,44 +12,50 @@ interface PasteLoadParserProps {
 }
 
 const WEEKLY_PARSE_LIMIT = 5;
-const PARSE_STORAGE_KEY = 'htp_parse_usage';
 
-function getWeeklyParseCount(): number {
-  try {
-    const stored = localStorage.getItem(PARSE_STORAGE_KEY);
-    if (!stored) return 0;
-    const { count, weekStart } = JSON.parse(stored);
-    const now = new Date();
-    const currentWeekStart = new Date(now);
-    currentWeekStart.setDate(now.getDate() - now.getDay());
-    currentWeekStart.setHours(0, 0, 0, 0);
-    if (weekStart !== currentWeekStart.toISOString()) return 0;
-    return count;
-  } catch { return 0; }
-}
-
-function incrementParseCount() {
+function getWeekStart(): string {
   const now = new Date();
-  const currentWeekStart = new Date(now);
-  currentWeekStart.setDate(now.getDate() - now.getDay());
-  currentWeekStart.setHours(0, 0, 0, 0);
-  const current = getWeeklyParseCount();
-  localStorage.setItem(PARSE_STORAGE_KEY, JSON.stringify({ count: current + 1, weekStart: currentWeekStart.toISOString() }));
+  const d = new Date(now);
+  d.setDate(now.getDate() - now.getDay());
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
 export function PasteLoadParser({ onParsed, isPro = false }: PasteLoadParserProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [stopsDetectedCount, setStopsDetectedCount] = useState<number | null>(null);
+  const [weeklyCount, setWeeklyCount] = useState<number | null>(null);
 
-  const handleParse = () => {
+  useEffect(() => {
+    if (isPro) return;
+    const fetchCount = async () => {
+      const weekStart = getWeekStart();
+      const { count, error } = await supabase
+        .from('parse_usage')
+        .select('*', { count: 'exact', head: true })
+        .gte('used_at', weekStart);
+      if (!error && count !== null) setWeeklyCount(count);
+    };
+    fetchCount();
+  }, [isPro]);
+
+  const handleParse = async () => {
     if (!text.trim()) {
       toast.error('Paste some load info first');
       return;
     }
-    if (!isPro && getWeeklyParseCount() >= WEEKLY_PARSE_LIMIT) {
-      toast.error(`Free limit reached (${WEEKLY_PARSE_LIMIT}/week). Upgrade to Pro for unlimited parsing.`);
-      return;
+    if (!isPro) {
+      // Re-check server count before allowing
+      const weekStart = getWeekStart();
+      const { count } = await supabase
+        .from('parse_usage')
+        .select('*', { count: 'exact', head: true })
+        .gte('used_at', weekStart);
+      if (count !== null && count >= WEEKLY_PARSE_LIMIT) {
+        toast.error(`Free limit reached (${WEEKLY_PARSE_LIMIT}/week). Upgrade to Pro for unlimited parsing.`);
+        return;
+      }
     }
     const parsed = parseLoadText(text);
     const fieldCount = Object.values(parsed).filter(Boolean).length;
@@ -56,7 +63,10 @@ export function PasteLoadParser({ onParsed, isPro = false }: PasteLoadParserProp
       toast.error('Could not extract any fields. Try a different format.');
       return;
     }
-    if (!isPro) incrementParseCount();
+    if (!isPro) {
+      await supabase.from('parse_usage').insert({ user_id: (await supabase.auth.getUser()).data.user?.id });
+      setWeeklyCount((prev) => (prev ?? 0) + 1);
+    }
     onParsed(parsed);
     const extra = parsed.multiStopDetected ? ` (${parsed.detectedStopsCount} stops detected)` : '';
     toast.success(`Filled ${fieldCount} field${fieldCount > 1 ? 's' : ''}${extra} — please review`);
