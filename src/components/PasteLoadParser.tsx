@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { parseLoadText, ParsedLoadData } from '@/lib/parseLoadText';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { ClipboardPaste, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
+import { ClipboardPaste, ChevronDown, ChevronUp, Sparkles, X, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PasteLoadParserProps {
@@ -12,6 +12,7 @@ interface PasteLoadParserProps {
 export function PasteLoadParser({ onParsed }: PasteLoadParserProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const [stopsDetectedCount, setStopsDetectedCount] = useState<number | null>(null);
 
   const handleParse = () => {
     if (!text.trim()) {
@@ -25,7 +26,9 @@ export function PasteLoadParser({ onParsed }: PasteLoadParserProps) {
       return;
     }
     onParsed(parsed);
-    toast.success(`Filled ${fieldCount} field${fieldCount > 1 ? 's' : ''} — please review`);
+    const extra = parsed.multiStopDetected ? ` (${parsed.detectedStopsCount} stops detected)` : '';
+    toast.success(`Filled ${fieldCount} field${fieldCount > 1 ? 's' : ''}${extra} — please review`);
+    setStopsDetectedCount(parsed.multiStopDetected ? (parsed.detectedStopsCount ?? null) : null);
     setText('');
     setOpen(false);
   };
