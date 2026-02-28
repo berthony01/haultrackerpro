@@ -240,6 +240,7 @@ const Index = () => {
                 loads={allLoadsQuery.loads}
                 onNavigate={handleNavigate}
                 onBack={() => setPage('dashboard')}
+                isPro={isPro}
               />
             )}
             {page === 'add' && (
@@ -251,6 +252,7 @@ const Index = () => {
                   initialStops={editingStops.length > 0 ? editingStops : undefined}
                   loading={addLoad.isPending || updateLoad.isPending}
                   recentLoads={allLoadsQuery.loads}
+                  isPro={isPro}
                 />
               </div>
             )}
@@ -282,6 +284,7 @@ const Index = () => {
                 loads={allLoadsQuery.loads}
                 expenses={allExpensesQuery.expenses}
                 onNavigate={handleNavigate}
+                isPro={isPro}
               />
             )}
             {page === 'monthly' && (

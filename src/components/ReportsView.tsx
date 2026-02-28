@@ -7,16 +7,19 @@ import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPD
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { parseISO, isWithinInterval } from 'date-fns';
+import { toast } from 'sonner';
 
 interface ReportsViewProps {
   loads: Load[];
   expenses?: Expense[];
   onNavigate?: (page: string) => void;
+  isPro?: boolean;
 }
 
-export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewProps) {
+export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }: ReportsViewProps) {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const { stops } = useLoadStops();
   const { settings } = useUserSettings();
@@ -89,21 +92,33 @@ export function ReportsView({ loads, expenses = [], onNavigate }: ReportsViewPro
             </div>
           </Button>
 
-          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads', stops, companyMeta)} disabled={loads.length === 0}>
-            <Download className="h-5 w-5 text-destructive" />
-            <div className="text-left">
-              <p className="font-semibold text-sm">Export as PDF</p>
-              <p className="text-xs text-muted-foreground">{hasFilter ? `${filteredLoads.length} filtered loads` : `${loads.length} loads`}</p>
-            </div>
-          </Button>
+          <div className="relative">
+            <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl w-full" onClick={() => {
+              if (!isPro) { toast.error('PDF export is a Pro feature. Upgrade to unlock.'); return; }
+              exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads', stops, companyMeta);
+            }} disabled={loads.length === 0}>
+              <Download className="h-5 w-5 text-destructive" />
+              <div className="text-left flex-1">
+                <p className="font-semibold text-sm">Export as PDF</p>
+                <p className="text-xs text-muted-foreground">{hasFilter ? `${filteredLoads.length} filtered loads` : `${loads.length} loads`}</p>
+              </div>
+              {!isPro && <Badge variant="outline" className="text-[9px] gap-0.5 border-primary/30 text-primary shrink-0"><Lock className="h-2 w-2" /> Pro</Badge>}
+            </Button>
+          </div>
 
-          <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl" onClick={() => exportProfitCSV(filteredLoads.length > 0 ? filteredLoads : loads, expenses, 'profit-report', stops, companyMeta)} disabled={loads.length === 0}>
-            <TrendingUp className="h-5 w-5 text-success" />
-            <div className="text-left">
-              <p className="font-semibold text-sm">Export Profit Report (CSV)</p>
-              <p className="text-xs text-muted-foreground">Includes expenses & net profit</p>
-            </div>
-          </Button>
+          <div className="relative">
+            <Button variant="outline" className="h-14 justify-start gap-3 rounded-xl w-full" onClick={() => {
+              if (!isPro) { toast.error('Profit reports are a Pro feature. Upgrade to unlock.'); return; }
+              exportProfitCSV(filteredLoads.length > 0 ? filteredLoads : loads, expenses, 'profit-report', stops, companyMeta);
+            }} disabled={loads.length === 0}>
+              <TrendingUp className="h-5 w-5 text-success" />
+              <div className="text-left flex-1">
+                <p className="font-semibold text-sm">Export Profit Report (CSV)</p>
+                <p className="text-xs text-muted-foreground">Includes expenses & net profit</p>
+              </div>
+              {!isPro && <Badge variant="outline" className="text-[9px] gap-0.5 border-primary/30 text-primary shrink-0"><Lock className="h-2 w-2" /> Pro</Badge>}
+            </Button>
+          </div>
         </div>
       </div>
 

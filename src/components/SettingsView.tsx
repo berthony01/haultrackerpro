@@ -24,14 +24,11 @@ interface SettingsViewProps {
 }
 
 const proFeatures = [
-  { label: 'Tax Mode', desc: 'Quarterly estimates, deductions summary, mileage reports' },
-  { label: 'Receipt Vault', desc: 'Upload receipts, auto-categorize, attach to loads/expenses' },
-  { label: 'Smart Alerts 2.0', desc: 'Late pay reminders, low rate warnings, high deadhead warnings' },
-  { label: 'Lane Intelligence', desc: 'Best-paying lanes, avg $/mile by lane, seasonal trends' },
-  { label: 'Driver Scorecard', desc: 'Weekly performance grade, profit per mile, deadhead targets' },
-  { label: 'Advanced Exports', desc: 'Branded PDF, dispute packet, custom fields' },
-  { label: 'Integrations', desc: 'QuickBooks export, fuel card CSV import' },
-  { label: 'Multi-Truck / Team Mode', desc: 'Track multiple trucks/drivers under one account' },
+  { label: 'Smart Alerts 2.0', desc: 'Advanced alerts: profit drops, RPM dips, high expense ratio warnings' },
+  { label: 'Driver Scorecard', desc: 'Performance grade across RPM, deadhead, expenses, profit trend & streak' },
+  { label: 'Weekly Closeout', desc: 'Finalize weekly summaries with pay variance and deadhead tracking' },
+  { label: 'Advanced Exports', desc: 'PDF exports and profit reports with expense breakdowns' },
+  { label: 'Unlimited Paste Load Parser', desc: 'Unlimited auto-fill from pasted load details (free: 5/week)' },
 ];
 
 const freePlanIncludes = [
@@ -368,15 +365,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </CardContent>
       </Card>
 
-      {/* Pro Features Coming Soon */}
+      {/* Pro Plan Features */}
       <Card className="shadow-card border-primary/20 overflow-hidden">
         <div className="bg-gradient-to-r from-primary/10 to-warning/10 px-4 py-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">Pro Features Coming Soon</p>
+            <Crown className="h-4 w-4 text-primary" />
+            <p className="text-xs font-bold uppercase tracking-wider text-primary">Pro Plan Features</p>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            We're building Pro in public. These features are planned and will roll out in phases.
+            Unlock advanced insights for $15/month or $120/year.
           </p>
         </div>
         <CardContent className="p-4 space-y-2">
@@ -392,8 +389,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             </div>
           ))}
           <div className="pt-2">
-            <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 opacity-60 cursor-not-allowed" disabled>
-              <Crown className="h-4 w-4" /> Upgrade to Pro — Coming Soon
+            <Button className="w-full h-11 rounded-xl font-bold gap-2" onClick={() => navigate('/pricing')}>
+              <Crown className="h-4 w-4" /> View Pricing & Upgrade
             </Button>
           </div>
         </CardContent>

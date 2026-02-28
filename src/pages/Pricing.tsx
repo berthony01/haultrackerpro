@@ -13,50 +13,45 @@ const freeFeatures = [
   'Unlimited load logging',
   'Expense tracking',
   'Net profit per load',
-  'Weekly closeout summaries',
   'Estimated vs actual pay tracking',
   'Deadhead % awareness',
-  'Basic smart alerts (5/week)',
-  'CSV & PDF exports',
+  'Basic smart alerts',
+  'CSV exports',
   'Multi-stop load support',
   'Pay variance detection',
   'Mobile-optimized dashboard',
+  'Paste Load Parser (5/week)',
 ];
 
 const proFeatures = [
-  'Unlimited smart alerts',
-  'Driver Scorecard & grades',
-  'Advanced performance trends',
-  'Tax estimation engine',
-  'Quarterly tax reminders',
-  'Priority feature requests',
-  'Advanced export templates',
-  'Lane profitability insights',
+  'Smart Alerts 2.0 (advanced insights)',
+  'Driver Scorecard & tier grades',
+  'Weekly Closeout summaries',
+  'Advanced exports (PDF + Profit Reports)',
+  'Unlimited Paste Load Parser',
 ];
 
 const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Load logging', free: 'Unlimited', pro: 'Unlimited' },
   { feature: 'Expense tracking', free: '✓', pro: '✓' },
   { feature: 'Net profit calculation', free: '✓', pro: '✓' },
-  { feature: 'Weekly closeouts', free: '✓', pro: '✓' },
   { feature: 'Est. vs actual pay', free: '✓', pro: '✓' },
   { feature: 'Deadhead awareness', free: '✓', pro: '✓' },
   { feature: 'Multi-stop loads', free: '✓', pro: '✓' },
-  { feature: 'CSV & PDF exports', free: 'Basic', pro: 'Advanced templates' },
-  { feature: 'Smart alerts', free: '5 per week', pro: 'Unlimited' },
+  { feature: 'CSV exports', free: '✓', pro: '✓' },
+  { feature: 'PDF exports', free: '—', pro: '✓' },
+  { feature: 'Profit reports', free: '—', pro: '✓' },
+  { feature: 'Smart alerts', free: 'Basic only', pro: 'All (advanced included)' },
   { feature: 'Driver Scorecard', free: '—', pro: '✓' },
-  { feature: 'Performance trends', free: '—', pro: '✓' },
-  { feature: 'Tax estimator', free: '—', pro: '✓' },
-  { feature: 'Quarterly tax reminders', free: '—', pro: '✓' },
-  { feature: 'Lane profitability', free: '—', pro: '✓' },
-  { feature: 'Priority support', free: '—', pro: '✓' },
+  { feature: 'Weekly Closeout', free: '—', pro: '✓' },
+  { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
 ];
 
 const whyProPoints = [
-  { icon: TrendingUp, title: 'Protect Your Margins', desc: 'Unlimited alerts catch revenue leaks before they become habits.' },
-  { icon: BarChart3, title: 'Data-Driven Decisions', desc: 'Scorecard grades and trends show exactly where to improve.' },
-  { icon: Target, title: 'Tax Season Ready', desc: 'Built-in tax estimates and quarterly reminders — no surprises in April.' },
-  { icon: Zap, title: 'Stay Accountable', desc: 'Weekly performance tracking keeps you focused on profitability.' },
+  { icon: TrendingUp, title: 'Protect Your Margins', desc: 'Advanced alerts catch profit drops, RPM dips, and expense spikes before they become habits.' },
+  { icon: BarChart3, title: 'Know Your Score', desc: 'Driver Scorecard grades your performance across 5 metrics so you know where to improve.' },
+  { icon: Target, title: 'Close Every Week Strong', desc: 'Weekly Closeout locks in your numbers with pay variance and deadhead tracking.' },
+  { icon: Zap, title: 'Save Time on Data Entry', desc: 'Unlimited Paste Load Parser auto-fills forms from raw load details instantly.' },
 ];
 
 export default function Pricing() {
