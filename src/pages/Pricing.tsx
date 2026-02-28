@@ -6,8 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const MONTHLY_PRICE_ID = 'price_1T5sunRMbAB2h8sV3iJfzoau';
-const ANNUAL_PRICE_ID = 'price_1T5suoRMbAB2h8sV577giQ6x';
+const MONTHLY_PRICE_ID = 'price_1T5tNXRMbAB2h8sVWM3N4mbU';
+const ANNUAL_PRICE_ID = 'price_1T5tNZRMbAB2h8sVyYAcAQbg';
 
 const freeFeatures = [
   'Unlimited load logging',
