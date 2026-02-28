@@ -281,6 +281,7 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-5">
             {[
+              { label: 'Features', href: '/features' },
               { label: 'Terms', href: '/terms' },
               { label: 'Privacy', href: '/privacy' },
               { label: 'FAQ', href: '/faq' },
