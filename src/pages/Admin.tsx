@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useAuth } from '@/hooks/useAuth';
@@ -135,6 +135,7 @@ export default function Admin() {
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
   const [feedbackCategory, setFeedbackCategory] = useState('all');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const initialFetchDone = useRef(false);
 
   useEffect(() => {
     if (!adminLoading && !isAdmin) navigate('/', { replace: true });
@@ -150,7 +151,8 @@ export default function Admin() {
   }, [api]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && !initialFetchDone.current) {
+      initialFetchDone.current = true;
       api.get('overview').then(setOverview);
       api.get('list-admins').then(setAdmins);
       fetchFeedback();
