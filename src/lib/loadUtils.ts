@@ -4,13 +4,29 @@ import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
-export function getWeekSummaries(loads: Load[]): WeekSummary[] {
+/** Convert user setting string ('sunday', 'monday', etc.) to date-fns weekStartsOn number (0=Sun, 1=Mon, ...) */
+export function weekStartDayToNumber(day?: string | null): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+  const map: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
+    sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+    thursday: 4, friday: 5, saturday: 6,
+  };
+  return map[(day ?? 'sunday').toLowerCase()] ?? 0;
+}
+
+/** Get the pay-week range for the week containing `date` */
+export function getPayWeekRange(date: Date, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0) {
+  const start = startOfWeek(date, { weekStartsOn });
+  const end = endOfWeek(date, { weekStartsOn });
+  return { start, end };
+}
+
+export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): WeekSummary[] {
   const weekMap = new Map<string, Load[]>();
 
   loads.forEach(load => {
     const date = parseISO(load.load_date);
-    const weekStart = startOfWeek(date, { weekStartsOn: 1 });
-    const key = weekStart.toISOString();
+    const ws = startOfWeek(date, { weekStartsOn });
+    const key = ws.toISOString();
     if (!weekMap.has(key)) weekMap.set(key, []);
     weekMap.get(key)!.push(load);
   });
@@ -18,7 +34,7 @@ export function getWeekSummaries(loads: Load[]): WeekSummary[] {
   const summaries: WeekSummary[] = [];
   weekMap.forEach((weekLoads, key) => {
     const start = parseISO(key);
-    const end = endOfWeek(start, { weekStartsOn: 1 });
+    const end = endOfWeek(start, { weekStartsOn });
     const totalLoadedMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
     const totalEstimatedPay = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
     const totalActualPay = weekLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
@@ -38,10 +54,10 @@ export function getWeekSummaries(loads: Load[]): WeekSummary[] {
   return summaries.sort((a, b) => b.startDate.localeCompare(a.startDate));
 }
 
-export function getCurrentWeekLoads(loads: Load[]): Load[] {
+export function getCurrentWeekLoads(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): Load[] {
   const now = new Date();
-  const start = startOfWeek(now, { weekStartsOn: 1 });
-  const end = endOfWeek(now, { weekStartsOn: 1 });
+  const start = startOfWeek(now, { weekStartsOn });
+  const end = endOfWeek(now, { weekStartsOn });
   return loads.filter(l => {
     const d = parseISO(l.load_date);
     return isWithinInterval(d, { start, end });

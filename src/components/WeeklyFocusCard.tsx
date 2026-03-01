@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
-import { formatCurrency, formatNumber, getCurrentWeekLoads } from '@/lib/loadUtils';
+import { formatCurrency, formatNumber, getCurrentWeekLoads, weekStartDayToNumber } from '@/lib/loadUtils';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { DollarSign, Truck, TrendingUp, TrendingDown, MapPin } from 'lucide-react';
 
@@ -9,7 +10,9 @@ interface WeeklyFocusCardProps {
 }
 
 export function WeeklyFocusCard({ loads }: WeeklyFocusCardProps) {
-  const weekLoads = useMemo(() => getCurrentWeekLoads(loads), [loads]);
+  const { settings } = useUserSettings();
+  const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
+  const weekLoads = useMemo(() => getCurrentWeekLoads(loads, weekStartsOn), [loads, weekStartsOn]);
 
   const estimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const paidLoads = weekLoads.filter(l => l.actual_pay_received != null);

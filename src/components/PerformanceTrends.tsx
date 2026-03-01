@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
-import { formatCurrency } from '@/lib/loadUtils';
+import { formatCurrency, weekStartDayToNumber } from '@/lib/loadUtils';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, format, subDays } from 'date-fns';
@@ -11,6 +12,8 @@ interface PerformanceTrendsProps {
 }
 
 export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
+  const { settings } = useUserSettings();
+  const wso = weekStartDayToNumber(settings?.week_start_day);
   const { weeklyData, avg30Earnings, avg30PerMile, hasEnoughData } = useMemo(() => {
     const now = new Date();
     const thirtyDaysAgo = subDays(now, 30);
@@ -18,8 +21,8 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
     const weeks = [];
     for (let i = 3; i >= 0; i--) {
       const ref = subWeeks(now, i);
-      const start = startOfWeek(ref, { weekStartsOn: 1 });
-      const end = endOfWeek(ref, { weekStartsOn: 1 });
+      const start = startOfWeek(ref, { weekStartsOn: wso });
+      const end = endOfWeek(ref, { weekStartsOn: wso });
       const weekLoads = loads.filter(l => {
         const d = parseISO(l.load_date);
         return isWithinInterval(d, { start, end });
@@ -44,7 +47,7 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
       avg30PerMile: totalMiles > 0 ? totalEst / totalMiles : 0,
       hasEnoughData: loads.length >= 3,
     };
-  }, [loads]);
+  }, [loads, wso]);
 
   if (!hasEnoughData) {
     return (
