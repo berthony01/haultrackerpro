@@ -15,6 +15,7 @@ import Features from "./pages/Features";
 import Pricing from "./pages/Pricing";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/install" element={<Install />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
