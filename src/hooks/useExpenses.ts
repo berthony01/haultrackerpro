@@ -79,6 +79,19 @@ export function useExpenses(dateRange?: DateRange) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses'] }),
   });
 
+  const updateExpense = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ExpenseInsert }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('expenses')
+        .update({ ...data, user_id: user.id } as any)
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses'] }),
+  });
+
   const deleteExpense = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('expenses').delete().eq('id', id);
@@ -91,6 +104,7 @@ export function useExpenses(dateRange?: DateRange) {
     expenses: expensesQuery.data ?? [],
     isLoading: expensesQuery.isLoading,
     addExpense,
+    updateExpense,
     deleteExpense,
   };
 }

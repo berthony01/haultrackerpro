@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ExpenseInsert, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
+import { useState, useEffect } from 'react';
+import { ExpenseInsert, Expense, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { Load } from '@/hooks/useLoads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,18 +16,34 @@ interface ExpenseFormProps {
   onCancel?: () => void;
   loading?: boolean;
   loads?: Load[];
+  initialData?: Expense | null;
 }
 
-export function ExpenseForm({ onSubmit, onCancel, loading, loads = [] }: ExpenseFormProps) {
+export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialData }: ExpenseFormProps) {
+  const isEdit = !!initialData;
+
   const [form, setForm] = useState({
-    expense_date: new Date().toISOString().split('T')[0],
-    category: '',
-    amount: '',
-    gallons: '',
-    linked_load_id: '',
-    notes: '',
+    expense_date: initialData?.expense_date ?? new Date().toISOString().split('T')[0],
+    category: initialData?.category ?? '',
+    amount: initialData?.amount?.toString() ?? '',
+    gallons: initialData?.gallons?.toString() ?? '',
+    linked_load_id: initialData?.linked_load_id ?? '',
+    notes: initialData?.notes ?? '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (initialData) {
+      setForm({
+        expense_date: initialData.expense_date,
+        category: initialData.category,
+        amount: initialData.amount.toString(),
+        gallons: initialData.gallons?.toString() ?? '',
+        linked_load_id: initialData.linked_load_id ?? '',
+        notes: initialData.notes ?? '',
+      });
+    }
+  }, [initialData]);
 
   const isFuel = form.category === 'Fuel';
 
@@ -80,7 +96,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [] }: Expense
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl font-heading flex items-center gap-2">
             <Receipt className="h-5 w-5 text-primary" />
-            Add Expense
+            {isEdit ? 'Edit Expense' : 'Add Expense'}
           </CardTitle>
           {onCancel && (
             <Button variant="ghost" size="icon" onClick={onCancel}>
@@ -127,7 +143,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [] }: Expense
 
           <div>
             <Label htmlFor="linked_load">Link to Load (optional)</Label>
-            <Select value={form.linked_load_id} onValueChange={v => update('linked_load_id', v === 'none' ? '' : v)}>
+            <Select value={form.linked_load_id || 'none'} onValueChange={v => update('linked_load_id', v === 'none' ? '' : v)}>
               <SelectTrigger><SelectValue placeholder="No link" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No link</SelectItem>
@@ -146,7 +162,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [] }: Expense
           </div>
 
           <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
-            {loading ? 'Saving...' : 'Save Expense'}
+            {loading ? 'Saving...' : isEdit ? 'Update Expense' : 'Save Expense'}
           </Button>
         </form>
       </CardContent>

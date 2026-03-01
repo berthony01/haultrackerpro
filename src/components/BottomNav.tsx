@@ -1,4 +1,4 @@
-import { LayoutDashboard, Plus, FileText, Truck, Settings } from 'lucide-react';
+import { LayoutDashboard, Plus, FileText, Truck, Settings, Receipt } from 'lucide-react';
 
 interface BottomNavProps {
   active: string;
@@ -7,8 +7,9 @@ interface BottomNavProps {
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'loads', label: 'My Loads', icon: Truck },
-  { id: 'add', label: 'Log Load', icon: Plus },
+  { id: 'loads', label: 'Loads', icon: Truck },
+  { id: 'add', label: 'Add', icon: Plus },
+  { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'reports', label: 'Reports', icon: FileText },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
