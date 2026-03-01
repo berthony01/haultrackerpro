@@ -22,6 +22,10 @@ serve(async (req) => {
     logStep("ERROR", { message: "STRIPE_SECRET_KEY not set" });
     return new Response("Server error", { status: 500 });
   }
+  if (!webhookSecret) {
+    logStep("ERROR", { message: "STRIPE_WEBHOOK_SECRET not set" });
+    return new Response("Server misconfiguration", { status: 500 });
+  }
 
   const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
@@ -35,19 +39,12 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
-
-    if (webhookSecret) {
-      const signature = req.headers.get("stripe-signature");
-      if (!signature) {
-        logStep("ERROR", { message: "No stripe-signature header" });
-        return new Response("No signature", { status: 400 });
-      }
-      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-    } else {
-      // Fallback: parse without signature verification (not recommended for production)
-      logStep("WARNING: No STRIPE_WEBHOOK_SECRET set, skipping signature verification");
-      event = JSON.parse(body);
+    const signature = req.headers.get("stripe-signature");
+    if (!signature) {
+      logStep("ERROR", { message: "No stripe-signature header" });
+      return new Response("No signature", { status: 400 });
     }
+    event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
     logStep("Event received", { type: event.type, id: event.id });
   } catch (err) {
