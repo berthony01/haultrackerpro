@@ -29,7 +29,7 @@ export function StatCard({ label, value, icon: Icon, subtitle, variant = 'defaul
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-label">{label}</p>
-            <p className={`${isLarge ? 'text-value-xl' : 'text-value-lg'} truncate mt-0.5`}>{value}</p>
+            <p className={`${isLarge ? 'text-value-xl' : 'text-value-lg'} mt-0.5 break-words`}>{value}</p>
             {subtitle && <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{subtitle}</p>}
           </div>
         </div>
