@@ -198,6 +198,31 @@ Deno.serve(async (req) => {
       return json(data || {});
     }
 
+    if (action === "list-feedback") {
+      const category = url.searchParams.get("category") || "";
+      let query = adminDb
+        .from("feedback_responses")
+        .select("id, user_id, response, category, loads_count, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (category) {
+        query = query.eq("category", category);
+      }
+      const { data: feedbackRows } = await query;
+
+      // Get emails for user_ids
+      const { data: authUsers } = await adminDb.auth.admin.listUsers({ perPage: 1000 });
+      const emailMap = new Map<string, string>();
+      authUsers?.users?.forEach((u) => emailMap.set(u.id, u.email || ""));
+
+      const enriched = (feedbackRows || []).map((f) => ({
+        ...f,
+        email: emailMap.get(f.user_id) || "unknown",
+      }));
+
+      return json(enriched);
+    }
+
     return json({ error: "Unknown action" }, 400);
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
