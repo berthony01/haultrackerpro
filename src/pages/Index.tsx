@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
-import { useExpenses, ExpenseInsert } from '@/hooks/useExpenses';
+import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeedback } from '@/hooks/useFeedback';
@@ -12,6 +12,7 @@ import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { AddActionModal } from '@/components/AddActionModal';
+import { ExpensesListView } from '@/components/ExpensesListView';
 import { LoadsListView } from '@/components/LoadsListView';
 import { ReportsView } from '@/components/ReportsView';
 import { SettingsView } from '@/components/SettingsView';
@@ -37,6 +38,7 @@ const Index = () => {
   const [page, setPage] = useState('dashboard');
   const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
   const [showFeedback, setShowFeedback] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -116,9 +118,29 @@ const Index = () => {
 
   const handleAddExpense = (data: ExpenseInsert) => {
     allExpensesQuery.addExpense.mutate(data, {
-      onSuccess: () => { toast.success('Expense saved!'); setPage('dashboard'); },
+      onSuccess: () => { toast.success('Expense saved!'); setEditingExpense(null); setPage('expenses'); },
       onError: (e) => toast.error(e.message),
     });
+  };
+
+  const handleUpdateExpense = (data: ExpenseInsert) => {
+    if (!editingExpense) return;
+    allExpensesQuery.updateExpense.mutate({ id: editingExpense.id, data }, {
+      onSuccess: () => { toast.success('Expense updated!'); setEditingExpense(null); setPage('expenses'); },
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    allExpensesQuery.deleteExpense.mutate(id, {
+      onSuccess: () => toast.success('Expense deleted'),
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const handleEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setPage('add_expense');
   };
 
   const handleUpdateLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
@@ -172,6 +194,7 @@ const Index = () => {
     }
     setEditingLoad(null);
     setEditingStops([]);
+    setEditingExpense(null);
     setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
     setPage(p);
   };
@@ -183,6 +206,7 @@ const Index = () => {
   };
 
   const handleAddExpenseFromModal = () => {
+    setEditingExpense(null);
     setPage('add_expense');
   };
 
@@ -259,12 +283,23 @@ const Index = () => {
             {page === 'add_expense' && (
               <div className="animate-fade-in">
                 <ExpenseForm
-                  onSubmit={handleAddExpense}
-                  onCancel={() => setPage('dashboard')}
-                  loading={allExpensesQuery.addExpense.isPending}
+                  onSubmit={editingExpense ? handleUpdateExpense : handleAddExpense}
+                  onCancel={() => { setEditingExpense(null); setPage('expenses'); }}
+                  loading={allExpensesQuery.addExpense.isPending || allExpensesQuery.updateExpense.isPending}
                   loads={allLoadsQuery.loads}
+                  initialData={editingExpense}
                 />
               </div>
+            )}
+            {page === 'expenses' && (
+              <ExpensesListView
+                expenses={allExpensesQuery.expenses}
+                loads={allLoadsQuery.loads}
+                onEdit={handleEditExpense}
+                onDelete={handleDeleteExpense}
+                isLoading={allExpensesQuery.isLoading}
+                onBack={() => setPage('dashboard')}
+              />
             )}
             {page === 'loads' && (
               <LoadsListView
