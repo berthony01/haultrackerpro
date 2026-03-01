@@ -27,10 +27,10 @@ export function StatCard({ label, value, icon: Icon, subtitle, variant = 'defaul
           <div className={`rounded-xl ${styles.bg} ${isLarge ? 'p-3' : 'p-2.5'} shrink-0`}>
             <Icon className={`${isLarge ? 'h-6 w-6' : 'h-5 w-5'} ${styles.icon}`} />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-label">{label}</p>
-            <p className={`${isLarge ? 'text-value-xl' : 'text-value-lg'} mt-0.5 break-words`}>{value}</p>
-            {subtitle && <p className="text-[11px] text-muted-foreground mt-1 leading-tight">{subtitle}</p>}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p className="text-label truncate">{label}</p>
+            <p className={`${isLarge ? 'text-value-xl' : 'text-value-lg'} mt-0.5 whitespace-nowrap`} style={{ fontSize: 'clamp(1rem, 5vw, 1.5rem)' }}>{value}</p>
+            {subtitle && <p className="text-[11px] text-muted-foreground mt-1 leading-tight truncate">{subtitle}</p>}
           </div>
         </div>
       </CardContent>
