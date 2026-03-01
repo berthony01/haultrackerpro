@@ -34,7 +34,7 @@ export default function Landing() {
   const goToAuth = () => navigate('/auth');
 
   return (
-    <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
@@ -42,14 +42,14 @@ export default function Landing() {
             <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm" style={{ color: 'hsl(220, 10%, 70%)' }}>
+          <div className="flex items-center gap-1 sm:gap-3">
+            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Pricing
             </Button>
-            <Button variant="ghost" onClick={goToAuth} className="text-sm" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <Button variant="ghost" onClick={goToAuth} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Sign In
             </Button>
-            <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+            <Button onClick={goToAuth} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
               Start Free
             </Button>
           </div>
@@ -106,7 +106,7 @@ export default function Landing() {
               }}>
                 <img src={dashboardMockup} alt="HaulTrackerPro dashboard showing load tracking, net profit, and weekly earnings chart" className="w-full" />
               </div>
-              <div className="absolute -bottom-4 -right-4 w-32 h-32 rounded-full blur-3xl pointer-events-none" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }} />
+              <div className="absolute -bottom-4 right-0 w-32 h-32 rounded-full blur-3xl pointer-events-none" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }} />
             </div>
           </div>
         </div>
