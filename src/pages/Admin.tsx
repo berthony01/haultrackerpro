@@ -140,22 +140,22 @@ export default function Admin() {
     if (!adminLoading && !isAdmin) navigate('/', { replace: true });
   }, [adminLoading, isAdmin, navigate]);
 
-  useEffect(() => {
-    if (isAdmin) {
-      api.get('overview').then(setOverview);
-      api.get('list-admins').then(setAdmins);
-      fetchFeedback();
-    }
-  }, [isAdmin, api]);
-
-  const fetchFeedback = async (category?: string) => {
+  const fetchFeedback = useCallback(async (category?: string) => {
     setFeedbackLoading(true);
     const params: Record<string, string> = {};
     if (category && category !== 'all') params.category = category;
     const data = await api.get('list-feedback', params);
     setFeedback(Array.isArray(data) ? data : []);
     setFeedbackLoading(false);
-  };
+  }, [api]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      api.get('overview').then(setOverview);
+      api.get('list-admins').then(setAdmins);
+      fetchFeedback();
+    }
+  }, [isAdmin, api, fetchFeedback]);
 
   const searchUsers = async () => {
     const data = await api.get('search-users', { email: userSearch });
