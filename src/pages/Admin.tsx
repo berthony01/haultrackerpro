@@ -75,29 +75,33 @@ function useAdminApi() {
 
   const get = useCallback(async (action: string, params?: Record<string, string>) => {
     const session = (await supabase.auth.getSession()).data.session;
+    if (!session?.access_token) return null;
     const queryParams = new URLSearchParams({ action, ...params });
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-api?${queryParams}`;
     const res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${session?.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       },
     });
+    if (!res.ok) return null;
     return res.json();
   }, []);
 
   const post = useCallback(async (action: string, body: unknown) => {
     const session = (await supabase.auth.getSession()).data.session;
+    if (!session?.access_token) return null;
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-api?action=${action}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session?.access_token}`,
+        Authorization: `Bearer ${session.access_token}`,
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });
+    if (!res.ok) return null;
     return res.json();
   }, []);
 
