@@ -2,19 +2,24 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import { weekStartDayToNumber } from '@/lib/loadUtils';
 
 interface DateRangeFilterProps {
   onRangeChange: (from?: string, to?: string) => void;
 }
 
-const presets = [
-  { label: 'This Week', getRange: () => ({ from: startOfWeek(new Date(), { weekStartsOn: 1 }), to: endOfWeek(new Date(), { weekStartsOn: 1 }) }) },
-  { label: 'This Month', getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
-  { label: 'This Year', getRange: () => ({ from: startOfYear(new Date()), to: endOfYear(new Date()) }) },
-  { label: 'All Time', getRange: () => ({ from: undefined, to: undefined }) },
-];
-
 export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
+  const { settings } = useUserSettings();
+  const wso = weekStartDayToNumber(settings?.week_start_day);
+
+  const presets = [
+    { label: 'This Week', getRange: () => ({ from: startOfWeek(new Date(), { weekStartsOn: wso }), to: endOfWeek(new Date(), { weekStartsOn: wso }) }) },
+    { label: 'This Month', getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
+    { label: 'This Year', getRange: () => ({ from: startOfYear(new Date()), to: endOfYear(new Date()) }) },
+    { label: 'All Time', getRange: () => ({ from: undefined, to: undefined }) },
+  ];
+
   const [active, setActive] = useState('All Time');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, differenceInDays } from 'date-fns';
+import { weekStartDayToNumber } from '@/lib/loadUtils';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertTier = 'basic' | 'advanced';
@@ -20,23 +21,23 @@ export interface SmartAlert {
   dedupeKey: string;
 }
 
-function getWeekRange(weeksAgo: number) {
+function getWeekRange(weeksAgo: number, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0) {
   const now = new Date();
   const ref = subWeeks(now, weeksAgo);
-  return { start: startOfWeek(ref, { weekStartsOn: 1 }), end: endOfWeek(ref, { weekStartsOn: 1 }) };
+  return { start: startOfWeek(ref, { weekStartsOn }), end: endOfWeek(ref, { weekStartsOn }) };
 }
 
 function filterByRange(loads: Load[], start: Date, end: Date) {
   return loads.filter(l => isWithinInterval(parseISO(l.load_date), { start, end }));
 }
 
-export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] {
+export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): SmartAlert[] {
   const alerts: SmartAlert[] = [];
   const now = new Date();
 
   // Current week loads/expenses
-  const thisWeek = getWeekRange(0);
-  const lastWeek = getWeekRange(1);
+  const thisWeek = getWeekRange(0, weekStartsOn);
+  const lastWeek = getWeekRange(1, weekStartsOn);
   const thisWeekLoads = filterByRange(loads, thisWeek.start, thisWeek.end);
   const lastWeekLoads = filterByRange(loads, lastWeek.start, lastWeek.end);
 
@@ -158,9 +159,10 @@ export function computeAlerts(loads: Load[], expenses: Expense[]): SmartAlert[] 
   return alerts;
 }
 
-export function useSmartAlerts(loads: Load[], expenses: Expense[]) {
+export function useSmartAlerts(loads: Load[], expenses: Expense[], weekStartDay?: string | null) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const wso = weekStartDayToNumber(weekStartDay);
 
   const dismissedQuery = useQuery({
     queryKey: ['alert_dismissals', user?.id],
@@ -187,7 +189,7 @@ export function useSmartAlerts(loads: Load[], expenses: Expense[]) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert_dismissals'] }),
   });
 
-  const allAlerts = useMemo(() => computeAlerts(loads, expenses), [loads, expenses]);
+  const allAlerts = useMemo(() => computeAlerts(loads, expenses, wso), [loads, expenses, wso]);
   const dismissedKeys = new Set(dismissedQuery.data ?? []);
   const activeAlerts = allAlerts.filter(a => !dismissedKeys.has(a.dedupeKey));
 

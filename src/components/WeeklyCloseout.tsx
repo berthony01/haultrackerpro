@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { useWeeklySnapshots } from '@/hooks/useWeeklySnapshots';
-import { formatCurrency, formatNumber, getCurrentWeekLoads } from '@/lib/loadUtils';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import { formatCurrency, formatNumber, getCurrentWeekLoads, weekStartDayToNumber } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +22,9 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
   const [confirmed, setConfirmed] = useState(false);
   const [finalized, setFinalized] = useState(false);
   const { saveSnapshot } = useWeeklySnapshots();
-  const weekLoads = useMemo(() => getCurrentWeekLoads(loads), [loads]);
+  const { settings } = useUserSettings();
+  const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
+  const weekLoads = useMemo(() => getCurrentWeekLoads(loads, weekStartsOn), [loads, weekStartsOn]);
 
   if (!isPro) {
     return (
@@ -53,8 +56,8 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
 
 
   const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(now, { weekStartsOn });
+  const weekEnd = endOfWeek(now, { weekStartsOn });
 
   const estimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const paidLoads = weekLoads.filter(l => l.actual_pay_received != null);

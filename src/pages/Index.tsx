@@ -47,8 +47,8 @@ const Index = () => {
   const loadStopsHook = useLoadStops();
 
   // Smart Alerts & Scorecard
-  const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses);
-  const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses);
+  const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
+  const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
 
   // Pro gating — check subscription via Stripe on mount
   const [isPro, setIsPro] = useState(false);

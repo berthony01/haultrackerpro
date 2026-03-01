@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { formatCurrency, formatNumber } from '@/lib/loadUtils';
+import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 import { PerformanceTrends } from '@/components/PerformanceTrends';
@@ -38,20 +38,21 @@ const presets: { key: PresetKey; label: string }[] = [
   { key: 'custom', label: 'Custom' },
 ];
 
-function getPresetRange(key: PresetKey): { start: Date; end: Date } {
+function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): { start: Date; end: Date } {
   const now = new Date();
   switch (key) {
-    case 'this_week': return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
-    case 'last_week': { const lw = subWeeks(now, 1); return { start: startOfWeek(lw, { weekStartsOn: 1 }), end: endOfWeek(lw, { weekStartsOn: 1 }) }; }
+    case 'this_week': return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
+    case 'last_week': { const lw = subWeeks(now, 1); return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) }; }
     case 'this_month': return { start: startOfMonth(now), end: endOfMonth(now) };
     case 'last_month': { const lm = subMonths(now, 1); return { start: startOfMonth(lm), end: endOfMonth(lm) }; }
     case 'this_year': return { start: startOfYear(now), end: endOfYear(now) };
-    default: return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+    default: return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
   }
 }
 
 export function DashboardView({ loads, expenses = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
+  const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -66,12 +67,12 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
         return true;
       });
     }
-    const { start, end } = getPresetRange(activePreset);
+    const { start, end } = getPresetRange(activePreset, weekStartsOn);
     return loads.filter(l => {
       const d = parseISO(l.load_date);
       return isWithinInterval(d, { start, end });
     });
-  }, [loads, activePreset, customFrom, customTo]);
+  }, [loads, activePreset, customFrom, customTo, weekStartsOn]);
 
   const filteredExpenses = useMemo(() => {
     if (activePreset === 'custom') {
@@ -82,12 +83,12 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
         return true;
       });
     }
-    const { start, end } = getPresetRange(activePreset);
+    const { start, end } = getPresetRange(activePreset, weekStartsOn);
     return expenses.filter(e => {
       const d = parseISO(e.expense_date);
       return isWithinInterval(d, { start, end });
     });
-  }, [expenses, activePreset, customFrom, customTo]);
+  }, [expenses, activePreset, customFrom, customTo, weekStartsOn]);
 
   const estimated = filteredLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const actual = filteredLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
@@ -106,14 +107,14 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
   const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
   const deadheadColor = deadheadPct < 15 ? 'success' : deadheadPct < 30 ? 'warning' : 'destructive';
 
-  const isSunday = new Date().getDay() === 0;
+  const isLastDayOfPayWeek = new Date().getDay() === ((weekStartsOn + 6) % 7);
   const thisWeekLoadCount = useMemo(() => {
     const now = new Date();
-    const ws = startOfWeek(now, { weekStartsOn: 1 });
-    const we = endOfWeek(now, { weekStartsOn: 1 });
+    const ws = startOfWeek(now, { weekStartsOn });
+    const we = endOfWeek(now, { weekStartsOn });
     return loads.filter(l => isWithinInterval(parseISO(l.load_date), { start: ws, end: we })).length;
-  }, [loads]);
-  const showCloseoutButton = isSunday || thisWeekLoadCount >= 7;
+  }, [loads, weekStartsOn]);
+  const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
   return (
     <div className="space-y-6 animate-fade-in">

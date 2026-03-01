@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, subWeeks, parseISO, differenceInCalendarWeeks, isWithinInterval, endOfWeek } from 'date-fns';
+import { weekStartDayToNumber } from '@/lib/loadUtils';
 
 export type Tier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 
@@ -25,7 +26,7 @@ function getTier(score: number): Tier {
   return 'Bronze';
 }
 
-export function computeScorecard(loads: Load[], expenses: Expense[]): ScorecardResult {
+export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): ScorecardResult {
   const now = new Date();
   const last30Loads = loads.filter(l => {
     const d = parseISO(l.load_date);
@@ -60,8 +61,8 @@ export function computeScorecard(loads: Load[], expenses: Expense[]): ScorecardR
   const expDetail = totalRev > 0 ? `${expRatio.toFixed(0)}% of revenue` : 'No revenue data';
 
   // 4. Profit Trend (0–20)
-  const thisWeek = { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
-  const lastWeek = { start: startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }), end: endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }) };
+  const thisWeek = { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
+  const lastWeek = { start: startOfWeek(subWeeks(now, 1), { weekStartsOn }), end: endOfWeek(subWeeks(now, 1), { weekStartsOn }) };
   const twLoads = loads.filter(l => isWithinInterval(parseISO(l.load_date), thisWeek));
   const lwLoads = loads.filter(l => isWithinInterval(parseISO(l.load_date), lastWeek));
   const twRev = twLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
@@ -85,8 +86,8 @@ export function computeScorecard(loads: Load[], expenses: Expense[]): ScorecardR
   // Consecutive weeks with ≥ 1 load, counting backwards from current week
   let streak = 0;
   for (let w = 0; w < 52; w++) {
-    const ws = startOfWeek(subWeeks(now, w), { weekStartsOn: 1 });
-    const we = endOfWeek(subWeeks(now, w), { weekStartsOn: 1 });
+    const ws = startOfWeek(subWeeks(now, w), { weekStartsOn });
+    const we = endOfWeek(subWeeks(now, w), { weekStartsOn });
     const hasLoad = loads.some(l => isWithinInterval(parseISO(l.load_date), { start: ws, end: we }));
     if (hasLoad) streak++;
     else break;
@@ -110,6 +111,7 @@ export function computeScorecard(loads: Load[], expenses: Expense[]): ScorecardR
   };
 }
 
-export function useDriverScorecard(loads: Load[], expenses: Expense[]) {
-  return useMemo(() => computeScorecard(loads, expenses), [loads, expenses]);
+export function useDriverScorecard(loads: Load[], expenses: Expense[], weekStartDay?: string | null) {
+  const wso = weekStartDayToNumber(weekStartDay);
+  return useMemo(() => computeScorecard(loads, expenses, wso), [loads, expenses, wso]);
 }
