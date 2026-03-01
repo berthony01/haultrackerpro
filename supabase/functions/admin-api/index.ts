@@ -93,7 +93,9 @@ Deno.serve(async (req) => {
     }
 
     if (action === "search-users") {
-      const email = url.searchParams.get("email") || "";
+      const rawEmail = url.searchParams.get("email") || "";
+      // Sanitize: limit length, strip SQL wildcards/special chars
+      const email = rawEmail.slice(0, 255).replace(/[%_\\]/g, "");
       const { data: profiles } = await adminDb
         .from("profiles")
         .select("user_id, display_name, subscription_status, subscription_plan, created_at")
