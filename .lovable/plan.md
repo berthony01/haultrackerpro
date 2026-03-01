@@ -1,37 +1,27 @@
 
 
-## Add PWA (Installable Web App) Support
+## Add Feedback Tab to Admin Dashboard
 
-### What this does
-Allows users to install HaulTrackerPro to their phone's home screen directly from the browser. It will launch like a native app with its own icon and splash screen.
+**Problem:** User feedback (suggestions, bugs, questions) is saved to `feedback_responses` table but there's no way to view it. The Admin Dashboard has no Feedback tab.
 
 ### Steps
 
-1. **Install `vite-plugin-pwa`** and configure it in `vite.config.ts` with:
-   - App name: "HaulTrackerPro"
-   - Theme color matching the existing brand
-   - Manifest with icons (192x192 and 512x512)
-   - `navigateFallbackDenylist: [/^\/~oauth/]` to protect auth redirects
-   - Register type: autoUpdate
+1. **Add `list-feedback` action to the `admin-api` edge function**
+   - Query `feedback_responses` joined with `profiles` (or auth metadata) to get user email
+   - Return: id, user_id, response, category, loads_count, created_at
+   - Sort by newest first, limit 100
 
-2. **Add PWA icons** to `public/` directory (generated from existing favicon)
-
-3. **Add mobile meta tags** to `index.html`:
-   - `apple-mobile-web-app-capable`
-   - `apple-mobile-web-app-status-bar-style`
-   - `theme-color`
-
-4. **Create `/install` page** with instructions for installing the app, including a browser install prompt trigger button
-
-5. **Add route** for `/install` in `App.tsx`
+2. **Add a "Feedback" tab to `src/pages/Admin.tsx`**
+   - New tab with `MessageSquare` icon alongside existing tabs (5-column grid)
+   - Fetch feedback via `api.get('list-feedback')` when tab is active
+   - Display a table with columns: Date, User Email (if available), Category, Message
+   - Add category filter dropdown (all / suggestion / bug / question / great / needs_improvement / found_bug)
+   - Show empty state when no feedback exists
 
 ### Files touched
-- `vite.config.ts` — add PWA plugin config
-- `index.html` — add meta tags
-- `public/` — add manifest icons
-- `src/pages/Install.tsx` — new install instructions page
-- `src/App.tsx` — add `/install` route
+- `supabase/functions/admin-api/index.ts` — add `list-feedback` handler
+- `src/pages/Admin.tsx` — add Feedback tab UI
 
 ### Not touched
-- No changes to theme, layout, business logic, dashboard, settings, or any existing features
+- No changes to theme, settings, dashboard, or any other existing features
 
