@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface OverviewData {
@@ -46,6 +47,16 @@ interface BillingData {
   subscription_expires_at?: string;
   stripe_customer_id?: string;
   stripe_subscription_id?: string;
+}
+
+interface FeedbackRow {
+  id: string;
+  user_id: string;
+  email: string;
+  response: string;
+  category: string | null;
+  loads_count: number;
+  created_at: string;
 }
 
 function useAdminApi() {
@@ -120,6 +131,11 @@ export default function Admin() {
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [billingUserId, setBillingUserId] = useState('');
 
+  // Feedback
+  const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
+  const [feedbackCategory, setFeedbackCategory] = useState('all');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+
   useEffect(() => {
     if (!adminLoading && !isAdmin) navigate('/', { replace: true });
   }, [adminLoading, isAdmin, navigate]);
@@ -128,8 +144,18 @@ export default function Admin() {
     if (isAdmin) {
       api.get('overview').then(setOverview);
       api.get('list-admins').then(setAdmins);
+      fetchFeedback();
     }
   }, [isAdmin, api]);
+
+  const fetchFeedback = async (category?: string) => {
+    setFeedbackLoading(true);
+    const params: Record<string, string> = {};
+    if (category && category !== 'all') params.category = category;
+    const data = await api.get('list-feedback', params);
+    setFeedback(Array.isArray(data) ? data : []);
+    setFeedbackLoading(false);
+  };
 
   const searchUsers = async () => {
     const data = await api.get('search-users', { email: userSearch });
@@ -209,11 +235,12 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-4">
+          <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
             <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
             <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
+            <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
           </TabsList>
 
           {/* OVERVIEW */}
@@ -428,6 +455,57 @@ export default function Admin() {
             )}
             {!billingData && (
               <p className="text-sm text-muted-foreground text-center py-4">Search for a user to view billing info.</p>
+            )}
+          </TabsContent>
+
+          {/* FEEDBACK */}
+          <TabsContent value="feedback" className="space-y-3">
+            <div className="flex gap-2 items-center">
+              <Select value={feedbackCategory} onValueChange={(val) => { setFeedbackCategory(val); fetchFeedback(val); }}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="great">Great</SelectItem>
+                  <SelectItem value="needs_improvement">Needs Improvement</SelectItem>
+                  <SelectItem value="found_bug">Found Bug</SelectItem>
+                  <SelectItem value="suggestion">Suggestion</SelectItem>
+                  <SelectItem value="bug">Bug</SelectItem>
+                  <SelectItem value="question">Question</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground ml-auto">{feedback.length} results</span>
+            </div>
+            {feedbackLoading ? (
+              <p className="text-muted-foreground text-center py-8">Loading...</p>
+            ) : feedback.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No feedback found.</p>
+            ) : (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Message</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {feedback.map((f) => (
+                      <TableRow key={f.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(f.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs max-w-[120px] truncate">{f.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs">{f.category || '—'}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[200px]">{f.response}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
             )}
           </TabsContent>
         </Tabs>
