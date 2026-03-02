@@ -1,33 +1,12 @@
 
 
-## Plan: Bottom Navigation Redesign (2 + FAB + 2)
+## Analysis
 
-### Changes Required
+The `text-foreground` color on the dark `bg-secondary` background still lacks contrast. The app's theme uses amber/orange as its primary accent color (`--primary: 25 95% 53%`). Using `text-primary` will make the value pop with the brand color while ensuring strong contrast against the dark secondary background.
 
-**1. `src/components/BottomNav.tsx`** — Refactor nav items from 6 (with Reports) to 5 (4 tabs + center FAB):
-- Left: Dashboard, Loads
-- Center: Add (FAB)
-- Right: Expenses, Settings
-- Remove Reports tab entirely
-- Add `aria-label` attributes to all buttons
-- Keep existing FAB styling (elevated, orange, pulse-glow)
-- Ensure consistent `min-w-[64px]` touch targets and no label wrapping
+## Plan
 
-**2. `src/components/DashboardView.tsx`** — Add a "View Reports" button/card:
-- Insert a "View Reports" button alongside the existing "Finalize Weekly Summary" and "View Driver Scorecard" buttons (same styling pattern)
-- Uses `FileText` icon, calls `onNavigate('reports')`
+**File: `src/components/ProfitOverview.tsx`**
 
-**3. `src/pages/Index.tsx`** — No routing changes needed. The `page` state and `handleNavigate` already support all routes. The `BottomNav` active state is driven by the `page` string, which remains unchanged. Reports navigation will now come from Dashboard instead of BottomNav.
-
-### Technical Details
-
-**BottomNav tab array change:**
-```
-Before: [Dashboard, Loads, Add, Expenses, Reports, Settings] (6 items → 2+FAB+3)
-After:  [Dashboard, Loads, Add, Expenses, Settings] (5 items → 2+FAB+2)
-```
-
-**Dashboard Reports button** — inserted between the existing "Finalize Weekly Summary" and "View Driver Scorecard" buttons using the same `variant="outline"` full-width button pattern already in use.
-
-**No changes to:** routing, state management, permissions, theme colors, AddActionModal, or any other components.
+Change the Net $/Mile value color from `text-foreground` to `text-primary` (the amber/orange brand color). This matches how Gross Revenue already uses `text-primary` in the same component, creating visual consistency while ensuring the value is clearly readable.
 
