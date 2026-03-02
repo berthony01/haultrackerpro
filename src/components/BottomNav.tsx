@@ -1,4 +1,4 @@
-import { LayoutDashboard, Plus, FileText, Truck, Settings, Receipt } from 'lucide-react';
+import { LayoutDashboard, Plus, Truck, Settings, Receipt } from 'lucide-react';
 
 interface BottomNavProps {
   active: string;
@@ -10,7 +10,6 @@ const navItems = [
   { id: 'loads', label: 'Loads', icon: Truck },
   { id: 'add', label: 'Add', icon: Plus },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
-  { id: 'reports', label: 'Reports', icon: FileText },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -27,6 +26,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
+                aria-label="Add new load or expense"
                 className="flex flex-col items-center justify-center -mt-7"
               >
                 <div className="rounded-2xl bg-primary text-primary-foreground w-[56px] h-[56px] flex items-center justify-center shadow-primary animate-pulse-glow active:scale-90 transition-transform duration-150">
@@ -41,7 +41,8 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center gap-1 min-w-[56px] min-h-[48px] justify-center rounded-xl px-3 py-2 transition-all duration-200 active:scale-90 ${
+              aria-label={item.label}
+              className={`flex flex-col items-center gap-1 min-w-[64px] min-h-[48px] justify-center rounded-xl px-3 py-2 transition-all duration-200 active:scale-90 ${
                 isActive
                   ? 'text-primary'
                   : 'text-secondary-foreground/40 hover:text-secondary-foreground/70'

@@ -10,7 +10,7 @@ import { ProfitOverview } from '@/components/ProfitOverview';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -249,6 +249,17 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
               onClick={() => onNavigate('closeout')}
             >
               <ClipboardCheck className="h-5 w-5" /> Finalize Weekly Summary
+            </Button>
+          )}
+
+          {/* View Reports */}
+          {onNavigate && (
+            <Button
+              variant="outline"
+              className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
+              onClick={() => onNavigate('reports')}
+            >
+              <FileText className="h-5 w-5" /> View Reports
             </Button>
           )}
 
