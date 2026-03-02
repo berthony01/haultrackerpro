@@ -69,7 +69,7 @@ export function ProfitOverview({ loads, expenses }: ProfitOverviewProps) {
           </div>
           <div className="rounded-xl bg-secondary p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Net $/Mile</p>
-            <p className="text-lg font-black font-mono text-foreground">{formatCurrency(netPerMile)}</p>
+            <p className="text-lg font-black font-mono text-primary">{formatCurrency(netPerMile)}</p>
           </div>
         </div>
       </CardContent>
