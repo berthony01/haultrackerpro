@@ -1,25 +1,33 @@
 
 
-## Problem
+## Plan: Bottom Navigation Redesign (2 + FAB + 2)
 
-The price IDs hardcoded in `src/pages/Pricing.tsx` do not exist in your Stripe account. They were likely placeholder values. Your Stripe account has products from other projects but no "HaulTrackerPro" products with $15/month or $120/year pricing.
+### Changes Required
 
-## Plan
+**1. `src/components/BottomNav.tsx`** — Refactor nav items from 6 (with Reports) to 5 (4 tabs + center FAB):
+- Left: Dashboard, Loads
+- Center: Add (FAB)
+- Right: Expenses, Settings
+- Remove Reports tab entirely
+- Add `aria-label` attributes to all buttons
+- Keep existing FAB styling (elevated, orange, pulse-glow)
+- Ensure consistent `min-w-[64px]` touch targets and no label wrapping
 
-### Step 1: Create two Stripe prices for HaulTrackerPro
+**2. `src/components/DashboardView.tsx`** — Add a "View Reports" button/card:
+- Insert a "View Reports" button alongside the existing "Finalize Weekly Summary" and "View Driver Scorecard" buttons (same styling pattern)
+- Uses `FileText` icon, calls `onNavigate('reports')`
 
-Using the Stripe tools, create:
-- **HaulTrackerPro Pro Monthly** — $15.00/month recurring
-- **HaulTrackerPro Pro Annual** — $120.00/year recurring
+**3. `src/pages/Index.tsx`** — No routing changes needed. The `page` state and `handleNavigate` already support all routes. The `BottomNav` active state is driven by the `page` string, which remains unchanged. Reports navigation will now come from Dashboard instead of BottomNav.
 
-### Step 2: Update `src/pages/Pricing.tsx`
+### Technical Details
 
-Replace the two invalid constants with the real price IDs returned from Step 1:
-
-```typescript
-const MONTHLY_PRICE_ID = '<new_monthly_price_id>';
-const ANNUAL_PRICE_ID = '<new_annual_price_id>';
+**BottomNav tab array change:**
+```
+Before: [Dashboard, Loads, Add, Expenses, Reports, Settings] (6 items → 2+FAB+3)
+After:  [Dashboard, Loads, Add, Expenses, Settings] (5 items → 2+FAB+2)
 ```
 
-No other code changes needed. The edge function, CORS, auth flow, and error handling are all correct — the only issue is invalid price IDs.
+**Dashboard Reports button** — inserted between the existing "Finalize Weekly Summary" and "View Driver Scorecard" buttons using the same `variant="outline"` full-width button pattern already in use.
+
+**No changes to:** routing, state management, permissions, theme colors, AddActionModal, or any other components.
 
