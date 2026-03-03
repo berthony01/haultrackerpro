@@ -265,7 +265,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 {portalLoading ? 'Opening billing portal…' : 'Manage Subscription'}
               </Button>
             </>
-          ) : (
+          ) : isPro === false ? (
             <>
               <p className="text-xs text-muted-foreground">You're on the Free plan. Upgrade to unlock all Pro features.</p>
               <Button className="w-full h-11 rounded-xl font-bold gap-2" onClick={() => navigate('/pricing')}>
