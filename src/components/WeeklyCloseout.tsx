@@ -22,6 +22,7 @@ interface WeeklyCloseoutProps {
 export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: WeeklyCloseoutProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [finalized, setFinalized] = useState(false);
+  const navigate = useNavigate();
   const { saveSnapshot } = useWeeklySnapshots();
   const { settings } = useUserSettings();
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
