@@ -54,7 +54,12 @@ export default function Features() {
                   <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
                     <f.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
                   </div>
-                  <h3 className="text-sm font-bold mb-1.5" style={{ color: 'hsl(0, 0%, 100%)' }}>{f.title}</h3>
+                  <h3 className="text-sm font-bold mb-1.5 flex items-center gap-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
+                    {f.title}
+                    {f.pro && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 60%)' }}>Pro</span>
+                    )}
+                  </h3>
                   <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{f.description}</p>
                 </div>
               ))}
