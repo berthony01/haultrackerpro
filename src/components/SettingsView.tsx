@@ -207,7 +207,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               </span>
             )}
           </div>
-          {!isPro && (
+          {isPro === false && (
             <div className="pt-2 space-y-1">
               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
               {freePlanIncludes.map((item, i) => (
@@ -265,14 +265,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 {portalLoading ? 'Opening billing portal…' : 'Manage Subscription'}
               </Button>
             </>
-          ) : (
+          ) : isPro === false ? (
             <>
               <p className="text-xs text-muted-foreground">You're on the Free plan. Upgrade to unlock all Pro features.</p>
               <Button className="w-full h-11 rounded-xl font-bold gap-2" onClick={() => navigate('/pricing')}>
                 <Crown className="h-4 w-4" /> Upgrade to Pro
               </Button>
             </>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
