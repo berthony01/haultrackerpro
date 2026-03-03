@@ -68,6 +68,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [isPro, setIsPro] = useState<boolean | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   // Check subscription status — read profile first (instant), then confirm via edge function
   useEffect(() => {
