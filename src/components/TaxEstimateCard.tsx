@@ -13,7 +13,7 @@ interface TaxEstimateCardProps {
   isPro?: boolean;
 }
 
-export function TaxEstimateCard({ loads, expenses, settings }: TaxEstimateCardProps) {
+export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: TaxEstimateCardProps) {
   const result = useMemo(() => {
     if (!settings?.tax_estimator_enabled) return null;
 
