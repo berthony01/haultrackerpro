@@ -224,61 +224,79 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
           )}
         </div>
 
-        {/* Chart 3: Avg RPM Trend */}
-        <div>
-          <p className="text-label mb-2">Avg Rate Per Mile</p>
-          {hasLoadedMiles ? (
-            <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 87%)" opacity={0.3} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={mutedStroke} />
-                <YAxis tick={{ fontSize: 10 }} stroke={mutedStroke} tickFormatter={v => `$${v}`} width={45} />
-                <Tooltip content={<CurrencyTooltip />} />
-                <Line type="monotone" dataKey="rpm" name="RPM" stroke={successColor} strokeWidth={2} dot={false} connectNulls={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState message="RPM requires loaded miles" />
-          )}
-        </div>
+        {isPro ? (
+          <>
+            {/* Chart 3: Avg RPM Trend */}
+            <div>
+              <p className="text-label mb-2">Avg Rate Per Mile</p>
+              {hasLoadedMiles ? (
+                <ResponsiveContainer width="100%" height={140}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 87%)" opacity={0.3} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={mutedStroke} />
+                    <YAxis tick={{ fontSize: 10 }} stroke={mutedStroke} tickFormatter={v => `$${v}`} width={45} />
+                    <Tooltip content={<CurrencyTooltip />} />
+                    <Line type="monotone" dataKey="rpm" name="RPM" stroke={successColor} strokeWidth={2} dot={false} connectNulls={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState message="RPM requires loaded miles" />
+              )}
+            </div>
 
-        {/* Chart 4: Deadhead % Trend */}
-        <div>
-          <p className="text-label mb-2">Deadhead % Trend</p>
-          {hasDeadhead ? (
-            <ResponsiveContainer width="100%" height={140}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 87%)" opacity={0.3} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={mutedStroke} />
-                <YAxis tick={{ fontSize: 10 }} stroke={mutedStroke} tickFormatter={v => `${v}%`} width={40} />
-                <Tooltip content={<PercentTooltip />} />
-                <Line type="monotone" dataKey="deadheadPct" name="Deadhead %" stroke={warningColor} strokeWidth={2} dot={false} connectNulls={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState message="Deadhead tracking not available for this period" />
-          )}
-        </div>
+            {/* Chart 4: Deadhead % Trend */}
+            <div>
+              <p className="text-label mb-2">Deadhead % Trend</p>
+              {hasDeadhead ? (
+                <ResponsiveContainer width="100%" height={140}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 87%)" opacity={0.3} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={mutedStroke} />
+                    <YAxis tick={{ fontSize: 10 }} stroke={mutedStroke} tickFormatter={v => `${v}%`} width={40} />
+                    <Tooltip content={<PercentTooltip />} />
+                    <Line type="monotone" dataKey="deadheadPct" name="Deadhead %" stroke={warningColor} strokeWidth={2} dot={false} connectNulls={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState message="Deadhead tracking not available for this period" />
+              )}
+            </div>
 
-        {/* Chart 5: Expense Breakdown by Category */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <BarChart3 className="h-3 w-3 text-muted-foreground" />
-            <p className="text-label">Expense Breakdown</p>
+            {/* Chart 5: Expense Breakdown by Category */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="h-3 w-3 text-muted-foreground" />
+                <p className="text-label">Expense Breakdown</p>
+              </div>
+              {expenseBreakdown.length > 0 ? (
+                <ResponsiveContainer width="100%" height={Math.max(100, expenseBreakdown.length * 32)}>
+                  <BarChart data={expenseBreakdown} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
+                    <XAxis type="number" tick={{ fontSize: 10 }} stroke={mutedStroke} tickFormatter={v => `$${v}`} />
+                    <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} stroke={mutedStroke} width={70} />
+                    <Tooltip content={<CurrencyTooltip />} />
+                    <Bar dataKey="amount" name="Amount" fill={primaryColor} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState message="No expenses for this period" />
+              )}
+            </div>
+          </>
+        ) : (
+          /* Single combined locked card for free users */
+          <div className="relative rounded-xl border border-primary/20 bg-muted/30 p-5 text-center space-y-3">
+            <Lock className="h-6 w-6 text-muted-foreground mx-auto" />
+            <p className="text-sm font-bold">Advanced Performance Insights (Pro Only)</p>
+            <ul className="text-xs text-muted-foreground space-y-1 text-left mx-auto max-w-[220px]">
+              <li>• RPM trend analysis</li>
+              <li>• Deadhead percentage tracking</li>
+              <li>• Expense breakdown insights</li>
+            </ul>
+            <Button size="sm" className="rounded-xl font-bold gap-1.5" onClick={() => navigate('/pricing')}>
+              <Crown className="h-3.5 w-3.5" /> Start Free Trial
+            </Button>
           </div>
-          {expenseBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={Math.max(100, expenseBreakdown.length * 32)}>
-              <BarChart data={expenseBreakdown} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
-                <XAxis type="number" tick={{ fontSize: 10 }} stroke={mutedStroke} tickFormatter={v => `$${v}`} />
-                <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} stroke={mutedStroke} width={70} />
-                <Tooltip content={<CurrencyTooltip />} />
-                <Bar dataKey="amount" name="Amount" fill={primaryColor} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState message="No expenses for this period" />
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
   );

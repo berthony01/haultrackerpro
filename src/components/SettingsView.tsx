@@ -403,6 +403,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           });
         }}
         isPending={updateSettings.isPending}
+        isPro={isPro ?? false}
       />
 
       {/* Data Management */}
