@@ -73,9 +73,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
   // Check subscription status — admin users get Pro immediately, others check profile + edge function
   useEffect(() => {
-    if (!user) { setIsPro(false); return; }
-    if (isAdminLoading) return; // keep isPro as null ("Checking plan…") until admin status resolves
-    if (isAdmin) { setIsPro(true); return; } // admin users are always Pro — skip async checks
+    if (isAdminLoading) return; // wait for admin+auth to resolve first
+    if (isAdmin) { setIsPro(true); return; } // admin → Pro immediately
+    if (!user) { setIsPro(false); return; } // no user after auth loaded → Free
 
     let cancelled = false;
     const checkSub = async () => {
