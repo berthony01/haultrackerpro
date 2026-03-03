@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Truck, DollarSign, ClipboardCheck, ArrowRight } from 'lucide-react';
+import { Truck, DollarSign, ClipboardCheck, ArrowRight, Settings } from 'lucide-react';
 
 interface OnboardingModalProps {
   open: boolean;
   onComplete: () => void;
+  onNavigateSettings?: () => void;
 }
 
 const slides = [
@@ -14,6 +15,13 @@ const slides = [
     title: 'Track Every Load',
     description: 'Log your loads in seconds — miles, rate, locations, and fees. Keep a complete record of every haul.',
     color: 'bg-primary/10 text-primary',
+  },
+  {
+    icon: Settings,
+    title: 'Set Your Default Rate',
+    description: 'Set your default rate per mile so profit calculations are accurate from the start.',
+    color: 'bg-accent/10 text-accent-foreground',
+    hasSettingsLink: true,
   },
   {
     icon: DollarSign,
@@ -29,7 +37,7 @@ const slides = [
   },
 ];
 
-export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
+export function OnboardingModal({ open, onComplete, onNavigateSettings }: OnboardingModalProps) {
   const [step, setStep] = useState(0);
   const isLast = step === slides.length - 1;
   const slide = slides[step];
@@ -53,6 +61,16 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
             <h2 className="text-xl font-black font-heading">{slide.title}</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">{slide.description}</p>
           </div>
+
+          {/* Settings link on rate slide */}
+          {slide.hasSettingsLink && onNavigateSettings && (
+            <button
+              onClick={onNavigateSettings}
+              className="text-sm font-semibold text-primary hover:underline transition-colors"
+            >
+              Set My Default Rate →
+            </button>
+          )}
 
           {/* Dots */}
           <div className="flex items-center justify-center gap-2 pt-2">

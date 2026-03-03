@@ -373,6 +373,7 @@ const Index = () => {
       <OnboardingModal
         open={showOnboardingModal}
         onComplete={handleOnboardingComplete}
+        onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
       />
     </div>
   );

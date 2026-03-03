@@ -2,14 +2,17 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Receipt, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TrendingUp, TrendingDown, Receipt, DollarSign, Info, Plus } from 'lucide-react';
 
 interface ProfitOverviewProps {
   loads: Load[];
   expenses: Expense[];
+  onAddExpense?: () => void;
 }
 
-export function ProfitOverview({ loads, expenses }: ProfitOverviewProps) {
+export function ProfitOverview({ loads, expenses, onAddExpense }: ProfitOverviewProps) {
   const paidLoads = loads.filter(l => l.actual_pay_received != null);
   const hasActual = paidLoads.length > 0;
 
@@ -29,9 +32,19 @@ export function ProfitOverview({ loads, expenses }: ProfitOverviewProps) {
   if (expenses.length === 0) {
     return (
       <Card className="border-dashed border-2 border-muted-foreground/20">
-        <CardContent className="py-6 text-center">
-          <Receipt className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+        <CardContent className="py-6 text-center space-y-3">
+          <Receipt className="h-8 w-8 text-muted-foreground/30 mx-auto" />
           <p className="text-sm text-muted-foreground">Add expenses to calculate true profit.</p>
+          {onAddExpense && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 rounded-xl"
+              onClick={onAddExpense}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add First Expense
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -43,7 +56,19 @@ export function ProfitOverview({ loads, expenses }: ProfitOverviewProps) {
     <Card className="card-premium border-primary/10">
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-label">Profit Overview</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-label">Profit Overview</p>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">Net Profit = Load Revenue − Expenses</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-3">

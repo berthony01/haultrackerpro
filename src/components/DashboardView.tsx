@@ -239,7 +239,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
           </div>
 
           {/* Profit Overview */}
-          <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} />
+          <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined} />
 
           {/* Tax Estimate */}
           <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
