@@ -88,7 +88,13 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       // Then confirm via edge function
       try {
         const { data } = await supabase.functions.invoke('check-subscription');
-        if (!cancelled) setIsPro(data?.subscribed === true);
+        if (!cancelled) {
+          if (data?.subscribed === true) {
+            setIsPro(true);
+          } else if (!profileIsPro) {
+            setIsPro(false);
+          }
+        }
       } catch {
         // keep profile value
       }
