@@ -272,7 +272,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 <Crown className="h-4 w-4" /> Upgrade to Pro
               </Button>
             </>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
