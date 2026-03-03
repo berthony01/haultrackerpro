@@ -10,6 +10,7 @@ interface TaxEstimateCardProps {
   loads: Load[];
   expenses: Expense[];
   settings: UserSettings | null;
+  isPro?: boolean;
 }
 
 export function TaxEstimateCard({ loads, expenses, settings }: TaxEstimateCardProps) {
