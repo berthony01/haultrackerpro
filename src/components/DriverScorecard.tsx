@@ -52,7 +52,7 @@ export function DriverScorecard({ scorecard, onBack, isPro = false }: DriverScor
                 </Badge>
               ))}
             </div>
-            <Button size="sm" className="mt-5 rounded-xl" disabled>
+            <Button size="sm" className="mt-5 rounded-xl" onClick={() => navigate('/pricing')}>
               Upgrade to Pro
             </Button>
           </CardContent>
