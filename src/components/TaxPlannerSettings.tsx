@@ -5,14 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calculator, AlertTriangle } from 'lucide-react';
+import { Calculator, AlertTriangle, Crown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import type { UserSettings, UserSettingsUpdate } from '@/hooks/useUserSettings';
 
 interface TaxPlannerSettingsProps {
   settings: UserSettings | null;
   onSave: (updates: UserSettingsUpdate) => void;
   isPending: boolean;
+  isPro?: boolean;
 }
 
 export function TaxPlannerSettings({ settings, onSave, isPending }: TaxPlannerSettingsProps) {
