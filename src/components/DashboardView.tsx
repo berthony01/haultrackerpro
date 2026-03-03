@@ -242,7 +242,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
           <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} />
 
           {/* Tax Estimate */}
-          <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} />
+          <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
 
           {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (
