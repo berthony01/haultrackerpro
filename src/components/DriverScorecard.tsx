@@ -22,6 +22,7 @@ const tierConfig: Record<Tier, { color: string; bg: string; emoji: string }> = {
 const metricIcons = [TrendingUp, Route, DollarSign, Target, Flame];
 
 export function DriverScorecard({ scorecard, onBack, isPro = false }: DriverScorecardProps) {
+  const navigate = useNavigate();
   const tier = tierConfig[scorecard.tier];
 
   if (!isPro) {
