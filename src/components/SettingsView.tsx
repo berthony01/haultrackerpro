@@ -207,7 +207,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               </span>
             )}
           </div>
-          {!isPro && (
+          {isPro === false && (
             <div className="pt-2 space-y-1">
               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
               {freePlanIncludes.map((item, i) => (
