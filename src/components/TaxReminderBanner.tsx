@@ -11,6 +11,7 @@ interface TaxReminderBannerProps {
   settings: UserSettings | null;
   estimatedTaxSetAside?: number | null;
   onViewTaxSummary?: () => void;
+  isPro?: boolean;
 }
 
 export function TaxReminderBanner({ settings, estimatedTaxSetAside, onViewTaxSummary }: TaxReminderBannerProps) {
