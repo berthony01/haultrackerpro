@@ -6,6 +6,7 @@ import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUt
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 import { PerformanceTrends } from '@/components/PerformanceTrends';
+import { PerformanceCharts } from '@/components/PerformanceCharts';
 import { ProfitOverview } from '@/components/ProfitOverview';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
@@ -276,6 +277,9 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
 
           {/* Performance Trends */}
           <PerformanceTrends loads={loads} />
+
+          {/* Performance Charts */}
+          <PerformanceCharts loads={loads} expenses={expenses} />
 
           {/* Last Updated */}
           {loads.length > 0 && (
