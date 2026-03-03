@@ -24,7 +24,8 @@ const OFFSET_OPTIONS = [
   { value: 0, label: 'On due date' },
 ];
 
-export function QuarterlyReminderSettings({ settings, onSave, isPending }: QuarterlyReminderSettingsProps) {
+export function QuarterlyReminderSettings({ settings, onSave, isPending, isPro = false }: QuarterlyReminderSettingsProps) {
+  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(false);
   const [offsets, setOffsets] = useState<number[]>([14, 7, 1, 0]);
   const [initialized, setInitialized] = useState(false);
