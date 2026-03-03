@@ -1,44 +1,49 @@
 
 
-## Plan: Performance Metrics Charts Section
+## Fix: Edge function overrides profile-based Pro status
 
-### Overview
+### Root Cause
 
-Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
+The edge function logs show every `check-subscription` call fails with **"Auth session missing!"** — meaning the Supabase session token isn't ready when the function is invoked. The edge function returns `{subscribed: false}` with HTTP 200 (not an error), so line 91 **overwrites** the correct profile-based `isPro = true` with `false`.
 
-### New File: `src/components/PerformanceCharts.tsx`
+Flow:
+1. Line 83-86: Profile query finds `subscription_status = 'pro'` → `setIsPro(true)` ✓
+2. Line 90-91: Edge function fails auth silently, returns `{subscribed: false}` → `setIsPro(false)` ✗
 
-A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
+This affects both admin users (if `isAdmin` resolves late) and regular Pro subscribers.
 
-1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
+### Fix (1 file, lines 88-94)
 
-2. **Bucket logic** — Based on selected range:
-   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
-   - This Year → monthly buckets ("Jan", "Feb", ...)
+**File: `src/components/SettingsView.tsx`**
 
-3. **5 Charts** (all using Recharts, already installed):
+Change the edge function logic to **never downgrade** a profile-confirmed Pro status. Only use the edge function result to *upgrade* from free to pro:
 
-   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
+```typescript
+// Then confirm via edge function
+try {
+  const { data } = await supabase.functions.invoke('check-subscription');
+  if (!cancelled) {
+    // Only update if edge function gives a definitive answer
+    // Never downgrade a profile-confirmed Pro (edge fn may lack auth token)
+    if (data?.subscribed === true) {
+      setIsPro(true);
+    } else if (!profileIsPro) {
+      setIsPro(false);
+    }
+    // If profileIsPro=true but edge says false, keep profile value (trust DB)
+  }
+} catch {
+  // keep profile value
+}
+```
 
-   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
+This ensures:
+- If the profile says Pro, the edge function can't override it to Free (handles auth-missing edge case)
+- If the profile says Free but the edge function confirms a subscription, it upgrades to Pro
+- If both agree on Free, it stays Free
 
-   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
-
-   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
-
-   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
-
-4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
-
-5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
-
-### Modified File: `src/components/DashboardView.tsx`
-
-- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
-- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
-
-### No Other Changes
-
-- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
-- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/components/SettingsView.tsx` | Lines 88-94: Edge function result no longer overrides profile-confirmed Pro |
 
