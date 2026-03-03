@@ -236,7 +236,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
             <CreditCard className="h-3.5 w-3.5" /> Billing
           </p>
-          {isPro ? (
+          {isAdmin ? (
+            <p className="text-xs text-muted-foreground">Pro access granted via admin role. No billing required.</p>
+          ) : isPro ? (
             <>
               <p className="text-xs text-muted-foreground">Manage your subscription, update payment method, or view invoices.</p>
               <Button
