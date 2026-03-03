@@ -65,6 +65,36 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_automation_logs: {
+        Row: {
+          created_at: string
+          id: string
+          parse_confidence: number | null
+          parsed_json: Json | null
+          raw_text: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parse_confidence?: number | null
+          parsed_json?: Json | null
+          raw_text?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parse_confidence?: number | null
+          parsed_json?: Json | null
+          raw_text?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number

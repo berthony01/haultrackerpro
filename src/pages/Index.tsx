@@ -288,6 +288,7 @@ const Index = () => {
                   loading={allExpensesQuery.addExpense.isPending || allExpensesQuery.updateExpense.isPending}
                   loads={allLoadsQuery.loads}
                   initialData={editingExpense}
+                  isPro={isPro}
                 />
               </div>
             )}
