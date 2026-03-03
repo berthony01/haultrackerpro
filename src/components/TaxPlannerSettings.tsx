@@ -17,7 +17,8 @@ interface TaxPlannerSettingsProps {
   isPro?: boolean;
 }
 
-export function TaxPlannerSettings({ settings, onSave, isPending }: TaxPlannerSettingsProps) {
+export function TaxPlannerSettings({ settings, onSave, isPending, isPro = false }: TaxPlannerSettingsProps) {
+  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(settings?.tax_estimator_enabled ?? false);
   const [federal, setFederal] = useState(settings?.federal_tax_percent?.toString() ?? '');
   const [state, setState] = useState(settings?.state_tax_percent?.toString() ?? '');
