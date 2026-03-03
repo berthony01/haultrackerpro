@@ -14,7 +14,7 @@ interface TaxReminderBannerProps {
   isPro?: boolean;
 }
 
-export function TaxReminderBanner({ settings, estimatedTaxSetAside, onViewTaxSummary }: TaxReminderBannerProps) {
+export function TaxReminderBanner({ settings, estimatedTaxSetAside, onViewTaxSummary, isPro = false }: TaxReminderBannerProps) {
   const [dismissedDates, setDismissedDates] = useState<string[]>([]);
 
   const reminders = useMemo(() => {
