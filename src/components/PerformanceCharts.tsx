@@ -74,7 +74,8 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-export function PerformanceCharts({ loads, expenses }: Props) {
+export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
+  const navigate = useNavigate();
   const { settings } = useUserSettings();
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const [activeRange, setActiveRange] = useState<Range>('week');
