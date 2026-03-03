@@ -127,7 +127,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
       </div>
 
       {/* Quarterly Tax Reminder Banner */}
-      {!isLoading && <TaxReminderBanner settings={settings} />}
+      {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
 
       {/* Weekly Focus Card — always visible at top */}
       {!isLoading && <WeeklyFocusCard loads={loads} />}
