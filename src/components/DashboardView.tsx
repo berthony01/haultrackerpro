@@ -11,13 +11,14 @@ import { ProfitOverview } from '@/components/ProfitOverview';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Crown, Lock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval, format } from 'date-fns';
 import { Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface DashboardViewProps {
   loads: Load[];
@@ -53,6 +54,7 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
 
 export function DashboardView({ loads, expenses = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
+  const navigate = useNavigate();
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
@@ -125,7 +127,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
       </div>
 
       {/* Quarterly Tax Reminder Banner */}
-      {!isLoading && <TaxReminderBanner settings={settings} />}
+      {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
 
       {/* Weekly Focus Card — always visible at top */}
       {!isLoading && <WeeklyFocusCard loads={loads} />}
@@ -240,7 +242,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
           <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} />
 
           {/* Tax Estimate */}
-          <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} />
+          <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
 
           {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (
@@ -275,11 +277,28 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
             </Button>
           )}
 
+          {/* Pro Insight Teaser — free users only */}
+          {!isPro && (
+            <Card className="shadow-card border-primary/20">
+              <CardContent className="p-4 text-center space-y-2">
+                <div className="flex items-center justify-center gap-1.5">
+                  <Crown className="h-4 w-4 text-warning" />
+                  <p className="text-sm font-bold">Pro Insight</p>
+                </div>
+                <p className="text-xs text-muted-foreground">Your Driver Performance Score is available in Pro.</p>
+                <p className="text-lg font-black font-mono text-muted-foreground/30 select-none blur-md">87 / 100</p>
+                <Button size="sm" className="rounded-xl font-bold gap-1.5" onClick={() => navigate('/pricing')}>
+                  <Crown className="h-3.5 w-3.5" /> Start Free Trial
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Performance Trends */}
           <PerformanceTrends loads={loads} />
 
           {/* Performance Charts */}
-          <PerformanceCharts loads={loads} expenses={expenses} />
+          <PerformanceCharts loads={loads} expenses={expenses} isPro={isPro} />
 
           {/* Last Updated */}
           {loads.length > 0 && (

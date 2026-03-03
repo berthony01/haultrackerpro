@@ -11,9 +11,10 @@ interface TaxReminderBannerProps {
   settings: UserSettings | null;
   estimatedTaxSetAside?: number | null;
   onViewTaxSummary?: () => void;
+  isPro?: boolean;
 }
 
-export function TaxReminderBanner({ settings, estimatedTaxSetAside, onViewTaxSummary }: TaxReminderBannerProps) {
+export function TaxReminderBanner({ settings, estimatedTaxSetAside, onViewTaxSummary, isPro = false }: TaxReminderBannerProps) {
   const [dismissedDates, setDismissedDates] = useState<string[]>([]);
 
   const reminders = useMemo(() => {
@@ -28,7 +29,7 @@ export function TaxReminderBanner({ settings, estimatedTaxSetAside, onViewTaxSum
     r => !dismissedDates.includes(r.date.toISOString())
   );
 
-  if (visibleReminders.length === 0) return null;
+  if (visibleReminders.length === 0 || !isPro) return null;
 
   return (
     <div className="space-y-2">

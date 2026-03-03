@@ -5,17 +5,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calculator, AlertTriangle } from 'lucide-react';
+import { Calculator, AlertTriangle, Crown, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import type { UserSettings, UserSettingsUpdate } from '@/hooks/useUserSettings';
 
 interface TaxPlannerSettingsProps {
   settings: UserSettings | null;
   onSave: (updates: UserSettingsUpdate) => void;
   isPending: boolean;
+  isPro?: boolean;
 }
 
-export function TaxPlannerSettings({ settings, onSave, isPending }: TaxPlannerSettingsProps) {
+export function TaxPlannerSettings({ settings, onSave, isPending, isPro = false }: TaxPlannerSettingsProps) {
+  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(settings?.tax_estimator_enabled ?? false);
   const [federal, setFederal] = useState(settings?.federal_tax_percent?.toString() ?? '');
   const [state, setState] = useState(settings?.state_tax_percent?.toString() ?? '');
@@ -85,6 +88,7 @@ export function TaxPlannerSettings({ settings, onSave, isPending }: TaxPlannerSe
 
         {enabled && (
           <div className="space-y-4 animate-fade-in">
+            {/* Federal & State — visible to all */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Federal Set-Aside (%)</Label>
@@ -114,55 +118,72 @@ export function TaxPlannerSettings({ settings, onSave, isPending }: TaxPlannerSe
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold">Include Self-Employment Tax</Label>
-                <Switch checked={includeSe} onCheckedChange={setIncludeSe} />
-              </div>
-              {includeSe && (
-                <div className="space-y-1.5 animate-fade-in">
-                  <Label className="text-xs font-semibold">SE Tax Rate (%)</Label>
+            {isPro ? (
+              <>
+                {/* SE Tax — Pro only */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Include Self-Employment Tax</Label>
+                    <Switch checked={includeSe} onCheckedChange={setIncludeSe} />
+                  </div>
+                  {includeSe && (
+                    <div className="space-y-1.5 animate-fade-in">
+                      <Label className="text-xs font-semibold">SE Tax Rate (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="20"
+                        placeholder="15.3"
+                        value={sePercent}
+                        onChange={e => setSePercent(e.target.value)}
+                        className="h-10 text-sm rounded-xl"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Buffer — Pro only */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Extra Buffer (%)</Label>
                   <Input
                     type="number"
                     step="0.1"
                     min="0"
                     max="20"
-                    placeholder="15.3"
-                    value={sePercent}
-                    onChange={e => setSePercent(e.target.value)}
+                    placeholder="2"
+                    value={buffer}
+                    onChange={e => setBuffer(e.target.value)}
                     className="h-10 text-sm rounded-xl"
                   />
+                  <p className="text-[10px] text-muted-foreground">Safety cushion added to estimate</p>
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Extra Buffer (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                max="20"
-                placeholder="2"
-                value={buffer}
-                onChange={e => setBuffer(e.target.value)}
-                className="h-10 text-sm rounded-xl"
-              />
-              <p className="text-[10px] text-muted-foreground">Safety cushion added to estimate</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Calculation Base</Label>
-              <Select value={baseType} onValueChange={setBaseType}>
-                <SelectTrigger className="h-10 text-sm rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="net">Net Profit</SelectItem>
-                  <SelectItem value="gross">Gross Income</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                {/* Calculation Base — Pro only */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Calculation Base</Label>
+                  <Select value={baseType} onValueChange={setBaseType}>
+                    <SelectTrigger className="h-10 text-sm rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="net">Net Profit</SelectItem>
+                      <SelectItem value="gross">Gross Income</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              /* Locked overlay for free users */
+              <div className="relative rounded-xl border border-primary/20 bg-muted/30 p-4 text-center space-y-2">
+                <Lock className="h-5 w-5 text-muted-foreground mx-auto" />
+                <p className="text-sm font-semibold">Unlock full tax planning & quarterly breakdown with Pro.</p>
+                <p className="text-xs text-muted-foreground">SE tax, buffer, calculation base, and quarterly reminders.</p>
+                <Button size="sm" className="rounded-xl font-bold gap-1.5 mt-1" onClick={() => navigate('/pricing')}>
+                  <Crown className="h-3.5 w-3.5" /> Start Free Trial
+                </Button>
+              </div>
+            )}
 
             <Button
               className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform"

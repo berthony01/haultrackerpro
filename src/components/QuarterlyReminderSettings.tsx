@@ -5,14 +5,16 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CalendarClock, Download } from 'lucide-react';
+import { CalendarClock, Download, Crown, Lock } from 'lucide-react';
 import { downloadIcsFile, getQuarterlyDueDates } from '@/lib/taxCalendar';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface QuarterlyReminderSettingsProps {
   settings: UserSettings | null;
   onSave: (updates: { tax_reminders_enabled: boolean; tax_reminder_offsets: number[] }) => void;
   isPending: boolean;
+  isPro?: boolean;
 }
 
 const OFFSET_OPTIONS = [
@@ -22,7 +24,8 @@ const OFFSET_OPTIONS = [
   { value: 0, label: 'On due date' },
 ];
 
-export function QuarterlyReminderSettings({ settings, onSave, isPending }: QuarterlyReminderSettingsProps) {
+export function QuarterlyReminderSettings({ settings, onSave, isPending, isPro = false }: QuarterlyReminderSettingsProps) {
+  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(false);
   const [offsets, setOffsets] = useState<number[]>([14, 7, 1, 0]);
   const [initialized, setInitialized] = useState(false);
@@ -46,6 +49,26 @@ export function QuarterlyReminderSettings({ settings, onSave, isPending }: Quart
 
   const year = new Date().getFullYear();
   const dueDates = getQuarterlyDueDates(year);
+
+  if (!isPro) {
+    return (
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5" /> Quarterly Estimated Tax Reminders
+          </p>
+          <div className="relative rounded-xl border border-primary/20 bg-muted/30 p-4 text-center space-y-2">
+            <Lock className="h-5 w-5 text-muted-foreground mx-auto" />
+            <p className="text-sm font-semibold">Quarterly tax reminders are available in Pro.</p>
+            <p className="text-xs text-muted-foreground">Get notified before IRS quarterly deadlines with recommended set-aside amounts.</p>
+            <Button size="sm" className="rounded-xl font-bold gap-1.5 mt-1" onClick={() => navigate('/pricing')}>
+              <Crown className="h-3.5 w-3.5" /> Start Free Trial
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-card">
