@@ -11,47 +11,52 @@ const ANNUAL_PRICE_ID = 'price_1T6CKFI2TXbeuHi4ukgdi2Md';
 
 const freeFeatures = [
   'Unlimited load logging',
-  'Expense tracking',
-  'Net profit per load',
-  'Estimated vs actual pay tracking',
-  'Deadhead % awareness',
-  'Basic smart alerts',
-  'CSV exports',
+  'Unlimited expense tracking',
+  'Net profit per load calculation',
+  'Estimated vs actual pay comparison',
   'Multi-stop load support',
-  'Pay variance detection',
-  'Mobile-optimized dashboard',
-  'Paste Load Parser (5/week)',
+  'Basic smart alerts',
+  '2 Performance Charts (Net Profit & Revenue vs Expenses)',
+  'Basic Tax Set-Aside estimate (single total)',
+  'CSV exports',
+  'Paste Load Parser (5 per week)',
+  'Custom week start day',
 ];
 
 const proFeatures = [
-  'Smart Alerts 2.0 (advanced insights)',
-  'Driver Scorecard & tier grades',
-  'Weekly Closeout summaries',
-  'Advanced exports (PDF + Profit Reports)',
-  'Unlimited Paste Load Parser',
+  'AI Voice Expense Logging',
+  'AI Receipt & Screenshot Scanning',
+  'Paste Load Parser (Unlimited)',
+  'RPM, Deadhead % & Expense Breakdown Charts',
+  'Driver Performance Scorecard',
+  'Weekly Closeout Snapshots',
+  'Full Tax Breakdown & Quarterly Schedule',
+  'Advanced Smart Alerts (profit drops, RPM dips)',
+  'PDF Exports & Profit Reports',
 ];
 
 const comparisonRows: { feature: string; free: string; pro: string }[] = [
-  { feature: 'Load logging', free: 'Unlimited', pro: 'Unlimited' },
-  { feature: 'Expense tracking', free: '✓', pro: '✓' },
-  { feature: 'Net profit calculation', free: '✓', pro: '✓' },
+  { feature: 'Load & expense logging', free: 'Unlimited', pro: 'Unlimited' },
+  { feature: 'Net profit per load', free: '✓', pro: '✓' },
   { feature: 'Est. vs actual pay', free: '✓', pro: '✓' },
-  { feature: 'Deadhead awareness', free: '✓', pro: '✓' },
   { feature: 'Multi-stop loads', free: '✓', pro: '✓' },
-  { feature: 'CSV exports', free: '✓', pro: '✓' },
-  { feature: 'PDF exports', free: '—', pro: '✓' },
-  { feature: 'Profit reports', free: '—', pro: '✓' },
-  { feature: 'Smart alerts', free: 'Basic only', pro: 'All (advanced included)' },
+  { feature: 'Smart alerts', free: 'Basic', pro: 'All (advanced included)' },
+  { feature: 'Performance charts', free: '2 charts', pro: 'All 5 charts' },
+  { feature: 'Tax planning', free: 'Total estimate only', pro: 'Full breakdown + quarterly' },
+  { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
+  { feature: 'AI Voice Logging', free: '—', pro: '✓' },
+  { feature: 'AI Receipt Scanning', free: '—', pro: '✓' },
   { feature: 'Driver Scorecard', free: '—', pro: '✓' },
   { feature: 'Weekly Closeout', free: '—', pro: '✓' },
-  { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
+  { feature: 'CSV exports', free: '✓', pro: '✓' },
+  { feature: 'PDF exports & reports', free: '—', pro: '✓' },
 ];
 
 const whyProPoints = [
-  { icon: TrendingUp, title: 'Protect Your Margins', desc: 'Advanced alerts catch profit drops, RPM dips, and expense spikes before they become habits.' },
-  { icon: BarChart3, title: 'Know Your Score', desc: 'Driver Scorecard grades your performance across 5 metrics so you know where to improve.' },
-  { icon: Target, title: 'Close Every Week Strong', desc: 'Weekly Closeout locks in your numbers with pay variance and deadhead tracking.' },
-  { icon: Zap, title: 'Save Time on Data Entry', desc: 'Unlimited Paste Load Parser auto-fills forms from raw load details instantly.' },
+  { icon: Zap, title: 'Log Expenses in Seconds', desc: 'Use voice or receipt scan — no manual typing required.' },
+  { icon: BarChart3, title: 'See What Others Miss', desc: 'Performance trends most drivers never track: RPM, deadhead %, expense breakdown.' },
+  { icon: Target, title: 'Plan Taxes with Confidence', desc: 'Full federal, state, and SE tax breakdown with quarterly payment schedule.' },
+  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout snapshots lock in your numbers with pay variance tracking.' },
 ];
 
 export default function Pricing() {
@@ -108,11 +113,11 @@ export default function Pricing() {
         }} />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-8 text-center relative">
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-            Simple Pricing.{' '}
-            <span style={{ color: 'hsl(25, 95%, 53%)' }}>Built for Independent Drivers.</span>
+            Stop Driving Blind.{' '}
+            <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Start free, upgrade when you're ready for advanced insights that protect your bottom line.
+            HaulTrackerPro helps owner-operators track profit, automate bookkeeping, and plan taxes with confidence.
           </p>
         </div>
       </section>
@@ -197,7 +202,7 @@ export default function Pricing() {
               background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
               boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)'
             }}>
-              {loading ? 'Loading...' : 'Upgrade to Pro'} {!loading && <ArrowRight className="h-4 w-4" />}
+              {loading ? 'Loading...' : 'Start Free Trial'} {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
             <p className="text-center text-xs font-semibold mb-6 px-3 py-1.5 rounded-full mx-auto w-fit" style={{
               background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)'
@@ -295,7 +300,7 @@ export default function Pricing() {
               background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
               boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.5)'
             }}>
-              {loading ? 'Loading...' : 'Upgrade to Pro'} {!loading && <ArrowRight className="h-5 w-5" />}
+              {loading ? 'Loading...' : 'Start Free Trial'} {!loading && <ArrowRight className="h-5 w-5" />}
             </Button>
           </div>
         </div>
