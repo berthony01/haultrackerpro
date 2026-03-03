@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -68,6 +68,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [isPro, setIsPro] = useState<boolean | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   // Check subscription status — read profile first (instant), then confirm via edge function
   useEffect(() => {
@@ -221,6 +222,50 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Pro Plan Active</p>
               <p className="text-xs text-muted-foreground">All features unlocked including advanced alerts, scorecard, exports, and unlimited parsing.</p>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Billing */}
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+            <CreditCard className="h-3.5 w-3.5" /> Billing
+          </p>
+          {isPro ? (
+            <>
+              <p className="text-xs text-muted-foreground">Manage your subscription, update payment method, or view invoices.</p>
+              <Button
+                variant="outline"
+                className="w-full h-11 rounded-xl font-bold gap-2"
+                disabled={portalLoading}
+                onClick={async () => {
+                  setPortalLoading(true);
+                  try {
+                    const { data, error } = await supabase.functions.invoke('customer-portal');
+                    if (error) throw error;
+                    if (data?.url) {
+                      window.location.href = data.url;
+                    } else {
+                      throw new Error('No portal URL returned');
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message || 'Could not open billing portal');
+                    setPortalLoading(false);
+                  }
+                }}
+              >
+                <CreditCard className="h-4 w-4" />
+                {portalLoading ? 'Opening billing portal…' : 'Manage Subscription'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">You're on the Free plan. Upgrade to unlock all Pro features.</p>
+              <Button className="w-full h-11 rounded-xl font-bold gap-2" onClick={() => navigate('/pricing')}>
+                <Crown className="h-4 w-4" /> Upgrade to Pro
+              </Button>
+            </>
           )}
         </CardContent>
       </Card>

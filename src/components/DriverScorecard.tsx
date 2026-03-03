@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, Trophy, TrendingUp, Route, DollarSign, Flame, Target, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface DriverScorecardProps {
   scorecard: ScorecardResult;
@@ -21,6 +22,7 @@ const tierConfig: Record<Tier, { color: string; bg: string; emoji: string }> = {
 const metricIcons = [TrendingUp, Route, DollarSign, Target, Flame];
 
 export function DriverScorecard({ scorecard, onBack, isPro = false }: DriverScorecardProps) {
+  const navigate = useNavigate();
   const tier = tierConfig[scorecard.tier];
 
   if (!isPro) {
@@ -50,7 +52,7 @@ export function DriverScorecard({ scorecard, onBack, isPro = false }: DriverScor
                 </Badge>
               ))}
             </div>
-            <Button size="sm" className="mt-5 rounded-xl" disabled>
+            <Button size="sm" className="mt-5 rounded-xl" onClick={() => navigate('/pricing')}>
               Upgrade to Pro
             </Button>
           </CardContent>

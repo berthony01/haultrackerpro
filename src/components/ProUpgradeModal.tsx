@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Crown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface ProUpgradeModalProps {
   open: boolean;
@@ -9,6 +10,8 @@ interface ProUpgradeModalProps {
 }
 
 export function ProUpgradeModal({ open, onOpenChange, featureName }: ProUpgradeModalProps) {
+  const navigate = useNavigate();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
@@ -26,8 +29,7 @@ export function ProUpgradeModal({ open, onOpenChange, featureName }: ProUpgradeM
           onClick={() => {
             onOpenChange(false);
             window.location.hash = '';
-            // Navigate to pricing — using window since we don't have router access
-            window.open('/pricing', '_blank');
+            navigate('/pricing');
           }}
         >
           <Crown className="h-4 w-4 mr-2" />

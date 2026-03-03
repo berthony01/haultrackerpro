@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock } from 'lucide-react';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface WeeklyCloseoutProps {
@@ -21,6 +22,7 @@ interface WeeklyCloseoutProps {
 export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: WeeklyCloseoutProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [finalized, setFinalized] = useState(false);
+  const navigate = useNavigate();
   const { saveSnapshot } = useWeeklySnapshots();
   const { settings } = useUserSettings();
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
@@ -45,7 +47,7 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
             <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
               Finalize your week with pay variance tracking, deadhead analysis, and snapshot history.
             </p>
-            <Button size="sm" className="mt-5 rounded-xl" disabled>
+            <Button size="sm" className="mt-5 rounded-xl" onClick={() => navigate('/pricing')}>
               Upgrade to Pro
             </Button>
           </CardContent>
