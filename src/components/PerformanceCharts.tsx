@@ -12,11 +12,13 @@ import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
   parseISO, isWithinInterval, format, eachDayOfInterval, eachMonthOfInterval,
 } from 'date-fns';
-import { TrendingUp, BarChart3 } from 'lucide-react';
+import { TrendingUp, BarChart3, Crown, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Props {
   loads: Load[];
   expenses: Expense[];
+  isPro?: boolean;
 }
 
 type Range = 'week' | 'month' | 'year';
