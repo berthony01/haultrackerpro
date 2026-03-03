@@ -29,7 +29,7 @@ export function TaxReminderBanner({ settings, estimatedTaxSetAside, onViewTaxSum
     r => !dismissedDates.includes(r.date.toISOString())
   );
 
-  if (visibleReminders.length === 0) return null;
+  if (visibleReminders.length === 0 || !isPro) return null;
 
   return (
     <div className="space-y-2">

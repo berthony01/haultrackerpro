@@ -50,6 +50,26 @@ export function QuarterlyReminderSettings({ settings, onSave, isPending, isPro =
   const year = new Date().getFullYear();
   const dueDates = getQuarterlyDueDates(year);
 
+  if (!isPro) {
+    return (
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5" /> Quarterly Estimated Tax Reminders
+          </p>
+          <div className="relative rounded-xl border border-primary/20 bg-muted/30 p-4 text-center space-y-2">
+            <Lock className="h-5 w-5 text-muted-foreground mx-auto" />
+            <p className="text-sm font-semibold">Quarterly tax reminders are available in Pro.</p>
+            <p className="text-xs text-muted-foreground">Get notified before IRS quarterly deadlines with recommended set-aside amounts.</p>
+            <Button size="sm" className="rounded-xl font-bold gap-1.5 mt-1" onClick={() => navigate('/pricing')}>
+              <Crown className="h-3.5 w-3.5" /> Start Free Trial
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="shadow-card">
       <CardContent className="p-4 space-y-4">

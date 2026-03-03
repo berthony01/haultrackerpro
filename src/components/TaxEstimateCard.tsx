@@ -54,9 +54,11 @@ export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: Ta
         <p className="text-lg font-black font-mono text-warning">
           {formatCurrency(result.estimatedTax)}
         </p>
-        <p className="text-[10px] text-muted-foreground mt-1">
-          Profit After Est. Tax: <span className="font-mono font-bold text-foreground">{formatCurrency(result.profitAfterTax)}</span>
-        </p>
+        {isPro && (
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Profit After Est. Tax: <span className="font-mono font-bold text-foreground">{formatCurrency(result.profitAfterTax)}</span>
+          </p>
+        )}
         <p className="text-[9px] text-muted-foreground/50 mt-1">
           Estimate only — not tax advice.
         </p>
