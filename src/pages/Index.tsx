@@ -109,7 +109,14 @@ const Index = () => {
         if (stops && stops.length > 0 && result?.id) {
           loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
         }
-        toast.success('Load logged successfully!');
+        if (allExpensesQuery.expenses.length === 0) {
+          toast.success('Load logged!', {
+            description: 'Now log your first expense to see real net profit.',
+            action: { label: 'Add Expense', onClick: () => { setPage('add_expense'); } },
+          });
+        } else {
+          toast.success('Load logged successfully!');
+        }
         setPage('loads');
       },
       onError: (e) => toast.error(e.message),
@@ -366,6 +373,7 @@ const Index = () => {
       <OnboardingModal
         open={showOnboardingModal}
         onComplete={handleOnboardingComplete}
+        onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
       />
     </div>
   );

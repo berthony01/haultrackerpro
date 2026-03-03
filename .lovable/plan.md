@@ -1,92 +1,44 @@
 
 
-## Audit Findings
+## Plan: Performance Metrics Charts Section
 
-**Current onboarding behavior:**
+### Overview
 
-1. **OnboardingModal** (3-slide carousel): Introduces load tracking, expense/profit concept, and weekly closeouts. Final CTA: "Log Your First Load" → navigates to add-load form.
-2. **Onboarding** (empty-state hero on dashboard): Shows when 0 loads exist. CTA: "Log Your First Load".
-3. After onboarding completes, `onboarding_completed` flag is set in `user_settings`.
+Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
 
-**What's missing:**
-- No prompt to set a default rate per mile before logging the first load.
-- No prompt to log a first expense after the first load is saved.
-- No explanation of how Net Profit is calculated (Revenue - Expenses = Net).
-- The `ProfitOverview` component shows an empty state ("Add expenses to calculate true profit") but no actionable CTA button.
+### New File: `src/components/PerformanceCharts.tsx`
 
----
+A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
 
-## Plan
+1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
 
-### 1. OnboardingModal — Add "Set Default Rate" step (slide 2 of 4)
+2. **Bucket logic** — Based on selected range:
+   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
+   - This Year → monthly buckets ("Jan", "Feb", ...)
 
-**File: `src/components/OnboardingModal.tsx`**
+3. **5 Charts** (all using Recharts, already installed):
 
-Insert a new slide at position index 1 (between "Track Every Load" and "Know Your Real Profit"):
-- Icon: `Settings` (from lucide)
-- Title: "Set Your Default Rate"
-- Description: "Set your default rate per mile so profit calculations are accurate from the start."
-- No special button on this slide — the normal Next/Skip flow continues.
+   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
 
-Update the final slide CTA to remain "Log Your First Load".
+   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
 
-Also accept an optional `onNavigateSettings` callback prop. On the new slide, add a small secondary link: "Set My Default Rate →" that calls `onNavigateSettings` (which will navigate to settings page). This is optional — the user can skip.
+   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
 
-**File: `src/pages/Index.tsx`**
+   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
 
-Pass `onNavigateSettings` to `OnboardingModal`:
-```
-onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
-```
+   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
 
-### 2. Post-first-load expense nudge
+4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
 
-**File: `src/pages/Index.tsx`**
+5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
 
-In `handleAddLoad` `onSuccess`, after the toast, check if `allExpensesQuery.expenses.length === 0`. If so, show a toast with an action:
-```
-toast.success('Load logged!', {
-  description: 'Now log your first expense to see real net profit.',
-  action: { label: 'Add Expense', onClick: () => { setPage('add_expense'); } }
-});
-```
-This replaces the existing `toast.success('Load logged successfully!')` only when expenses are empty.
+### Modified File: `src/components/DashboardView.tsx`
 
-### 3. Profit explanation tooltip on ProfitOverview
+- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
+- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
 
-**File: `src/components/ProfitOverview.tsx`**
+### No Other Changes
 
-Next to the "Profit Overview" label (line 46), add an info icon with a tooltip:
-```
-<TooltipProvider><Tooltip><TooltipTrigger>
-  <Info className="h-3.5 w-3.5 text-muted-foreground/50" />
-</TooltipTrigger><TooltipContent>
-  Net Profit = Load Revenue − Expenses
-</TooltipContent></Tooltip></TooltipProvider>
-```
-
-Also update the empty-state card (line 29-37) to include a CTA button "Add First Expense" that calls an `onAddExpense` callback. Accept `onAddExpense?: () => void` prop.
-
-**File: `src/components/DashboardView.tsx`**
-
-Pass `onAddExpense={() => onNavigate?.('add')}` — actually this should trigger add_expense:
-```
-<ProfitOverview loads={...} expenses={...} onAddExpense={() => onNavigate?.('add_expense')} />
-```
-Wait — `onNavigate` with `'add_expense'` won't work since `handleNavigate` in Index.tsx routes `'add'` to the AddActionModal. Let me check... Actually looking at Index.tsx, `handleNavigate` checks `if (p === 'add')` to show the modal, but `'add_expense'` goes through to `setPage('add_expense')` directly. So passing `() => onNavigate?.('add_expense')` is correct — but we need to make sure DashboardView's onNavigate prop allows this.
-
-Looking at the code, `onNavigate` already accepts any string page name and Index.tsx sets the page directly for anything other than `'add'`. So `onNavigate('add_expense')` will work.
-
-Pass to ProfitOverview: `onAddExpense={() => onNavigate?.('add_expense')}`
-
-### 4. Files Modified
-
-| File | Change |
-|------|--------|
-| `OnboardingModal.tsx` | Add "Set Default Rate" slide + optional settings link |
-| `Index.tsx` | Pass settings nav callback; expense nudge toast after first load |
-| `ProfitOverview.tsx` | Add profit formula tooltip + "Add First Expense" CTA in empty state |
-| `DashboardView.tsx` | Wire `onAddExpense` to ProfitOverview |
-
-No database, calculation, theme, layout, or route changes.
+- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
+- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
 
