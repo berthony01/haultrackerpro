@@ -5,14 +5,16 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CalendarClock, Download } from 'lucide-react';
+import { CalendarClock, Download, Crown, Lock } from 'lucide-react';
 import { downloadIcsFile, getQuarterlyDueDates } from '@/lib/taxCalendar';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface QuarterlyReminderSettingsProps {
   settings: UserSettings | null;
   onSave: (updates: { tax_reminders_enabled: boolean; tax_reminder_offsets: number[] }) => void;
   isPending: boolean;
+  isPro?: boolean;
 }
 
 const OFFSET_OPTIONS = [
