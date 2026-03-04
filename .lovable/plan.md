@@ -1,36 +1,44 @@
 
 
-## Plan: Make Landing Page the Root Route
+## Plan: Performance Metrics Charts Section
 
-### Current State
-- `/` → ProtectedRoute → Index (dashboard) — unauthenticated users redirect to `/landing`
-- `/landing` → AuthRoute → Landing
+### Overview
 
-### Changes
+Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
 
-**1. `src/App.tsx`** — Swap routing:
-- `/` renders Landing inside a new `PublicRoute` wrapper (shows Landing for unauthenticated, redirects to `/dashboard` for authenticated)
-- `/dashboard` becomes the new ProtectedRoute for Index (the app dashboard)
-- `/landing` redirects to `/` via `<Navigate to="/" replace />`
-- `ProtectedRoute` redirects unauthenticated users to `/` instead of `/landing`
-- `AdminRoute` redirects to `/dashboard` instead of `/`
+### New File: `src/components/PerformanceCharts.tsx`
 
-**2. `src/pages/Landing.tsx`** — No changes needed (no self-referencing navigation)
+A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
 
-**3. `src/pages/Features.tsx`** — Change `navigate('/landing')` → `navigate('/')`
+1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
 
-**4. `src/pages/Pricing.tsx`** — Change `navigate('/landing')` → `navigate('/')`
+2. **Bucket logic** — Based on selected range:
+   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
+   - This Year → monthly buckets ("Jan", "Feb", ...)
 
-**5. Internal nav links** — Any other references to `/landing` across the codebase will be updated to `/` (the search found only Features.tsx and Pricing.tsx).
+3. **5 Charts** (all using Recharts, already installed):
 
-### Route Table After Change
+   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
 
-| Path | Component | Guard |
-|------|-----------|-------|
-| `/` | Landing | Public (auth users → `/dashboard`) |
-| `/landing` | Redirect → `/` | None |
-| `/dashboard` | Index | ProtectedRoute (unauth → `/`) |
-| `/auth` | Auth | AuthRoute |
-| `/admin` | Admin | AdminRoute |
-| All others | Unchanged | Unchanged |
+   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
+
+   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
+
+   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
+
+   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
+
+4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
+
+5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
+
+### Modified File: `src/components/DashboardView.tsx`
+
+- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
+- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
+
+### No Other Changes
+
+- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
+- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
 
