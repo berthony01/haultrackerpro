@@ -97,7 +97,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
   const actual = filteredLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
   const loadedMiles = filteredLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const deadheadMiles = filteredLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const completedLoads = filteredLoads.filter(l => l.status === 'completed' || l.status === 'Completed');
+  
   const paidLoads = filteredLoads.filter(l => l.actual_pay_received != null);
   const missingPayCount = filteredLoads.filter(l => l.actual_pay_received == null).length;
   const paidEstimated = paidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
@@ -186,7 +186,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
               subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
               size="large"
             />
-            <StatCard label="Loads Done" value={completedLoads.length.toString()} icon={Truck} />
+            <StatCard label="Total Loads" value={filteredLoads.length.toString()} icon={Truck} />
             <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
             <TooltipProvider>
               <Tooltip>
