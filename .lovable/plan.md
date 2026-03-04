@@ -1,44 +1,49 @@
 
 
-## Plan: Performance Metrics Charts Section
+## Plan: Fix Landing Page Nav Overflow + Update Feature Highlights
 
-### Overview
+### Issue 1: Nav Bar Crowding on Mobile (from screenshot)
 
-Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
+The nav has 4 items (Features, Pricing, Sign In, Start Free) that overflow on small screens. The "Start Free" button gets cut off.
 
-### New File: `src/components/PerformanceCharts.tsx`
+**Fix in `src/pages/Landing.tsx` (lines 39-60)**:
+- Hide "Features" and "Sign In" text links on mobile (show only on `sm:` and up)
+- Keep "Pricing" visible as it's key for conversion
+- Keep "Start Free" button but make it more compact on mobile
+- Use `hidden sm:inline-flex` on Features and Sign In buttons
 
-A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
+### Issue 2: Landing Page Feature Lists Out of Sync
 
-1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
+The hardcoded `freeFeatures` and `proFeatures` arrays (lines 7-21) are missing key features that have been added:
 
-2. **Bucket logic** — Based on selected range:
-   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
-   - This Year → monthly buckets ("Jan", "Feb", ...)
+**Free features missing**: Multi-Stop Loads, Paste Parser (5/week), Estimated vs Actual Pay, Tax Set-Aside estimate
+**Pro features missing**: AI Voice Logging, AI Receipt Scanning, RPM Trend Analysis, Full Tax Breakdown
 
-3. **5 Charts** (all using Recharts, already installed):
+**Fix**: Update both arrays to better represent the current feature set. Keep it to 5-6 highlights each (landing page shouldn't list everything — that's what /features is for), but swap in the most compelling ones:
 
-   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
+Free (updated):
+- Load Tracking (keep)
+- Expense Tracking (keep)
+- Net Profit Calculation (keep)
+- Multi-Stop Loads (add — key differentiator)
+- Paste Load Parser (5/week) (add — shows automation even on free)
+- CSV Exports (keep)
 
-   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
+Pro (updated):
+- AI Voice Expense Logging (add — strongest Pro selling point)
+- AI Receipt Scanning (add — automation story)
+- Driver Scorecard (keep)
+- Weekly Closeout (keep)
+- Unlimited Paste Parser (keep)
+- Advanced Performance Charts (add — replaces Smart Alerts as more visual)
 
-   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
+### Issue 3: Features Page
 
-   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
+The Features page (`/features`) renders directly from `featureList.ts`, so it is already up to date with all current features. No changes needed.
 
-   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
+### Files to Edit
 
-4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
-
-5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
-
-### Modified File: `src/components/DashboardView.tsx`
-
-- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
-- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
-
-### No Other Changes
-
-- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
-- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
+| File | Change |
+|------|--------|
+| `src/pages/Landing.tsx` | Fix nav overflow on mobile; update free/pro feature highlight arrays |
 
