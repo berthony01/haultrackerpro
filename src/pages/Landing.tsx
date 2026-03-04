@@ -45,13 +45,13 @@ export default function Landing() {
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
-            <Button variant="ghost" onClick={() => navigate('/features')} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <Button variant="ghost" onClick={() => navigate('/features')} className="hidden sm:inline-flex text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Features
             </Button>
             <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Pricing
             </Button>
-            <Button variant="ghost" onClick={goToAuth} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <Button variant="ghost" onClick={goToAuth} className="hidden sm:inline-flex text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Sign In
             </Button>
             <Button onClick={goToAuth} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
