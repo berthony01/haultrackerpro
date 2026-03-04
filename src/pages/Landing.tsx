@@ -8,16 +8,18 @@ const freeFeatures = [
   { icon: Truck, title: 'Load Tracking', desc: 'Log every load with miles, rate, fees, and multi-stop details in seconds.' },
   { icon: Receipt, title: 'Expense Tracking', desc: 'Track fuel, maintenance, tolls, and every cost that eats into your profit.' },
   { icon: Calculator, title: 'Net Profit Calculation', desc: 'See real net profit per load — not just gross revenue.' },
-  { icon: Route, title: 'Deadhead Awareness', desc: 'Know your deadhead percentage and how it impacts your bottom line.' },
+  { icon: MapPin, title: 'Multi-Stop Loads', desc: 'Add pickup and drop-off stops with detention tracking for complex routes.' },
+  { icon: ClipboardPaste, title: 'Paste Load Parser', desc: 'Paste load details from any source and auto-fill the form — 5 free per week.' },
   { icon: Download, title: 'CSV Exports', desc: 'Export clean load summaries for tax prep or your own records.' },
 ];
 
 const proFeatures = [
-  { icon: AlertTriangle, title: 'Smart Alerts 2.0', desc: 'Advanced alerts catch profit drops, RPM dips, and high expense ratios.' },
+  { icon: Mic, title: 'AI Voice Logging', desc: 'Speak your expenses naturally — AI parses amount, category, and notes instantly.' },
+  { icon: Camera, title: 'AI Receipt Scanning', desc: 'Snap a photo of any receipt and auto-fill expense details with OCR.' },
   { icon: BarChart3, title: 'Driver Scorecard', desc: 'Get graded across 5 performance metrics with tier rankings from Bronze to Platinum.' },
   { icon: FileText, title: 'Weekly Closeout', desc: 'Lock in weekly summaries with pay variance and deadhead tracking.' },
-  { icon: Download, title: 'Advanced Exports', desc: 'PDF exports and profit reports with full expense breakdowns.' },
   { icon: TrendingUp, title: 'Unlimited Paste Parser', desc: 'Auto-fill load forms from pasted text — unlimited for Pro users.' },
+  { icon: BarChart3, title: 'Performance Charts', desc: 'RPM trends, expense breakdowns, and advanced analytics to drive smarter decisions.' },
 ];
 
 const faqs = [
