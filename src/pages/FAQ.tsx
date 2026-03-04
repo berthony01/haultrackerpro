@@ -32,6 +32,18 @@ const faqs = [
     question: 'How does multi-stop tracking work?',
     answer: 'When logging a load, toggle "Multi-stop load?" to add intermediate stops between pickup and drop-off. Each stop can have a type (Pickup, Stop, Drop) and optional detention minutes. Loaded miles and deadhead miles remain totals for the whole load.',
   },
+  {
+    question: 'What\'s included in the 14-day free trial?',
+    answer: 'The free trial gives you full access to every Pro feature: Weekly Closeouts, Driver Scorecard, unlimited paste parsing, advanced exports (PDF & profit reports), Smart Alerts 2.0, and tax planning tools. No restrictions — try everything before you commit.',
+  },
+  {
+    question: 'How do I upgrade to Pro?',
+    answer: 'Go to Settings → tap "Upgrade to Pro" or visit the Pricing page. You can choose monthly ($15/mo) or annual ($120/yr — save $60). Both start with a 14-day free trial. Payment is handled securely through Stripe.',
+  },
+  {
+    question: 'Can I cancel my Pro subscription?',
+    answer: 'Yes, anytime. Go to Settings → Billing → Manage Billing to open your billing portal. Cancel there and you\'ll keep Pro access until the end of your current billing period. You can always re-subscribe later.',
+  },
 ];
 
 export default function FAQ() {

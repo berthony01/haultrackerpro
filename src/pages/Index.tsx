@@ -3,6 +3,7 @@ import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
@@ -31,6 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const { signOut, user } = useAuth();
+  const { isAdmin } = useAdmin();
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
@@ -52,24 +54,40 @@ const Index = () => {
   const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
   const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
 
-  // Pro gating — check subscription via Stripe on mount
+  // Pro gating — admin bypass + profile-first + edge function upgrade only
   const [isPro, setIsPro] = useState(false);
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setIsPro(false); return; }
+
+    // Admin users are always Pro
+    if (isAdmin) { setIsPro(true); return; }
+
     const checkSub = async () => {
+      // 1. Check profile first for instant detection
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_status')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const profileIsPro = profile?.subscription_status === 'pro' || profile?.subscription_status === 'trial';
+      if (profileIsPro) setIsPro(true);
+
+      // 2. Edge function can only upgrade, never downgrade a profile-confirmed Pro
       try {
         const { data } = await supabase.functions.invoke('check-subscription');
-        setIsPro(data?.subscribed === true);
+        if (data?.subscribed === true) {
+          setIsPro(true);
+        } else if (!profileIsPro) {
+          setIsPro(false);
+        }
       } catch {
-        // Fallback to profile status
-        const { data: profile } = await supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle();
-        setIsPro(profile?.subscription_status === 'pro' || profile?.subscription_status === 'trial');
+        // On error, keep profile-based status
       }
     };
     checkSub();
     const interval = setInterval(checkSub, 60000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isAdmin]);
 
   // Editing stops state
   const [editingStops, setEditingStops] = useState<LoadStopInput[]>([]);
