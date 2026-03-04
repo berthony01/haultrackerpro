@@ -45,7 +45,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { isAdmin, isLoading } = useAdmin();
   if (loading || isLoading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>;
-  if (!user || !isAdmin) return <Navigate to="/" replace />;
+  if (!user || !isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
