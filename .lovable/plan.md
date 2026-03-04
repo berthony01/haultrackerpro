@@ -1,44 +1,70 @@
 
 
-## Plan: Performance Metrics Charts Section
+## Full Audit: Issues Found and Fixes
 
-### Overview
+### Issue 1: Index.tsx `isPro` — Same Bug as SettingsView (Critical)
 
-Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
+**Problem**: `src/pages/Index.tsx` lines 54-72 has the same vulnerability that was fixed in SettingsView. The edge function `check-subscription` returns `{subscribed: false}` when the auth header is missing (race condition), which overwrites a valid profile-based Pro status. Admin users also get no special handling here.
 
-### New File: `src/components/PerformanceCharts.tsx`
+**Fix**: Apply the same pattern used in SettingsView:
+- Import and use `useAdmin`
+- Check admin status first (admin = Pro immediately)
+- Read profile first for instant Pro detection
+- Only let edge function *upgrade* to Pro, never downgrade a profile-confirmed Pro
 
-A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
+**File**: `src/pages/Index.tsx` (lines 54-72)
 
-1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
+---
 
-2. **Bucket logic** — Based on selected range:
-   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
-   - This Year → monthly buckets ("Jan", "Feb", ...)
+### Issue 2: Landing Page Missing Features Link in Nav
 
-3. **5 Charts** (all using Recharts, already installed):
+**Problem**: `src/pages/Landing.tsx` nav bar (line 46) has Pricing and Sign In but no Features link, even though `/features` exists and is linked in the footer.
 
-   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
+**Fix**: Add a "Features" nav button alongside Pricing.
 
-   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
+**File**: `src/pages/Landing.tsx` (line 46)
 
-   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
+---
 
-   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
+### Issue 3: FAQ Page — Missing Pro-Related Questions
 
-   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
+**Problem**: The FAQ page (`src/pages/FAQ.tsx`) doesn't cover common questions about Pro subscriptions, free trials, or how upgrades work, which are important for user conversion and support.
 
-4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
+**Fix**: Add FAQ entries for:
+- "What's included in the free trial?"
+- "How do I upgrade to Pro?"
+- "Can I cancel my subscription?"
 
-5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
+**File**: `src/pages/FAQ.tsx`
 
-### Modified File: `src/components/DashboardView.tsx`
+---
 
-- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
-- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
+### Issue 4: Pricing Page — "Start Free Trial" Opens in New Tab
 
-### No Other Changes
+**Problem**: `src/pages/Pricing.tsx` line 81 uses `window.open(data.url, '_blank')` for checkout, which can be blocked by popup blockers and is inconsistent with the SettingsView billing portal which uses `window.location.href`.
 
-- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
-- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
+**Fix**: Change to `window.location.href = data.url` for consistent behavior.
+
+**File**: `src/pages/Pricing.tsx` (line 81)
+
+---
+
+### No Other Breaking Issues Found
+
+- **`completedLoads` reference**: Fully removed — no remaining references in codebase
+- **Feature pages**: Landing, Features, and Pricing feature lists are consistent with each other and with the actual feature set in `featureList.ts`
+- **Edge function `check-subscription`**: Already handles manual Pro overrides (profile check) and trialing status correctly on the backend side
+- **Database schema**: Load default status is `'completed'`, which aligns with the dashboard "Total Loads" fix
+- **Routing**: All routes exist and are properly guarded (auth, admin, public)
+- **RLS policies**: All tables have appropriate policies
+- **Pro gating in components**: All Pro-gated components (PerformanceCharts, WeeklyCloseout, DriverScorecard, TaxPlannerSettings) receive `isPro` prop correctly from Index.tsx — but they depend on Issue 1 being fixed
+
+### Summary of Changes
+
+| File | Change | Priority |
+|------|--------|----------|
+| `src/pages/Index.tsx` | Fix `isPro` logic (admin + profile-first + no downgrade) | Critical |
+| `src/pages/Landing.tsx` | Add Features link to nav | Low |
+| `src/pages/FAQ.tsx` | Add Pro/subscription FAQ entries | Low |
+| `src/pages/Pricing.tsx` | Fix checkout redirect (same-tab) | Medium |
 
