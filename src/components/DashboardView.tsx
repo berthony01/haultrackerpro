@@ -186,7 +186,7 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
               subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
               size="large"
             />
-            <StatCard label="Loads Done" value={completedLoads.length.toString()} icon={Truck} />
+            <StatCard label="Total Loads" value={filteredLoads.length.toString()} icon={Truck} />
             <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
             <TooltipProvider>
               <Tooltip>
