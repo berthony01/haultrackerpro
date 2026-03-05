@@ -85,6 +85,7 @@ const App = () => (
           <Route path="/truck-driver-per-diem" element={<TruckDriverPerDiem />} />
           <Route path="/owner-operator-salary" element={<OwnerOperatorSalary />} />
           <Route path="/trucking-cost-per-mile" element={<TruckingCostPerMile />} />
+          <Route path="/trucking-expenses-list" element={<TruckingExpensesList />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
