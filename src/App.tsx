@@ -21,6 +21,7 @@ import OwnerOperatorExpenseTracker from "./pages/OwnerOperatorExpenseTracker";
 import TruckingProfitCalculator from "./pages/TruckingProfitCalculator";
 import TruckerBookkeepingGuide from "./pages/TruckerBookkeepingGuide";
 import TruckDriverExpenses from "./pages/TruckDriverExpenses";
+import TruckDriverPerDiem from "./pages/TruckDriverPerDiem";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
