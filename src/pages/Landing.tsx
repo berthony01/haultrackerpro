@@ -1,4 +1,4 @@
-import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Calculator, Receipt, Route, Download, Mic, Camera, MapPin, ClipboardPaste } from 'lucide-react';
+import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Calculator, Receipt, Route, Download, Mic, Camera, MapPin, ClipboardPaste, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
@@ -33,6 +33,7 @@ const faqs = [
 export default function Landing() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const goToAuth = () => navigate('/auth');
 
@@ -63,21 +64,65 @@ export default function Landing() {
             <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </div>
-          <div className="flex items-center gap-1 sm:gap-3">
-            <Button variant="ghost" onClick={() => navigate('/features')} className="hidden sm:inline-flex text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-3">
+            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Features
             </Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Pricing
             </Button>
-            <Button variant="ghost" onClick={goToAuth} className="hidden sm:inline-flex text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Sign In
             </Button>
-            <Button onClick={goToAuth} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+            <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
               Start Free
             </Button>
           </div>
+          {/* Mobile nav */}
+          <div className="flex sm:hidden items-center gap-2">
+            <Button onClick={goToAuth} className="text-xs font-bold rounded-xl px-3" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+              Start Free
+            </Button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg"
+              aria-label="Toggle menu"
+              style={{ color: 'hsl(220, 10%, 70%)' }}
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
+        {/* Mobile menu panel */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t animate-in slide-in-from-top-2 duration-200" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+            <div className="flex flex-col px-4 py-4 space-y-1">
+              {[
+                { label: 'Features', href: '/features' },
+                { label: 'Pricing', href: '/pricing' },
+                { label: 'FAQ', href: '/faq' },
+                { label: 'Sign In', href: '/auth' },
+              ].map(item => (
+                <button
+                  key={item.href}
+                  onClick={() => { setMobileMenuOpen(false); navigate(item.href); }}
+                  className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
+                  style={{ color: 'hsl(220, 10%, 70%)' }}
+                >
+                  {item.label}
+                </button>
+              ))}
+              <Button
+                onClick={() => { setMobileMenuOpen(false); goToAuth(); }}
+                className="w-full mt-2 text-sm font-bold rounded-xl"
+                style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
+              >
+                Start Free <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}
@@ -338,47 +383,54 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
-              {[
-                { label: 'Features', href: '/features' },
-                { label: 'Pricing', href: '/pricing' },
-                { label: 'FAQ', href: '/faq' },
-              ].map(link => (
-                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                  {link.label}
-                </a>
-              ))}
+          {/* Desktop: 3-column, Mobile: stacked */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-4">
+            <div className="text-center sm:text-left">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
+              <div className="flex justify-center sm:block gap-4 sm:gap-0">
+                {[
+                  { label: 'Features', href: '/features' },
+                  { label: 'Pricing', href: '/pricing' },
+                  { label: 'FAQ', href: '/faq' },
+                ].map(link => (
+                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
-              {[
-                { label: 'Trucking Finance Guides', href: '/trucking-finance-guides' },
-                { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
-                { label: 'Expense Tracker', href: '/owner-operator-expense-tracker' },
-                { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
-                { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
-                { label: 'Bookkeeping Guide', href: '/trucker-bookkeeping-guide' },
-              ].map(link => (
-                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                  {link.label}
-                </a>
-              ))}
+            <div className="text-center sm:text-left">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
+              <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:block max-w-xs mx-auto sm:max-w-none sm:mx-0">
+                {[
+                  { label: 'Finance Guides', href: '/trucking-finance-guides' },
+                  { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
+                  { label: 'Expense Tracker', href: '/owner-operator-expense-tracker' },
+                  { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
+                  { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
+                  { label: 'Bookkeeping', href: '/trucker-bookkeeping-guide' },
+                ].map(link => (
+                  <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline text-center sm:text-left py-1.5 sm:py-0 sm:mb-1.5 rounded-md" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Legal</p>
-              {[
-                { label: 'Terms', href: '/terms' },
-                { label: 'Privacy', href: '/privacy' },
-              ].map(link => (
-                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                  {link.label}
-                </a>
-              ))}
+            <div className="text-center sm:text-left">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Legal</p>
+              <div className="flex justify-center sm:block gap-4 sm:gap-0">
+                {[
+                  { label: 'Terms', href: '/terms' },
+                  { label: 'Privacy', href: '/privacy' },
+                ].map(link => (
+                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-4 border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+          <div className="flex items-center justify-center sm:justify-start gap-2 pt-4 border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
             <Shield className="h-4 w-4" style={{ color: 'hsl(220, 10%, 40%)' }} />
             <span className="text-xs" style={{ color: 'hsl(220, 10%, 40%)' }}>© {new Date().getFullYear()} HaulTrackerPro. All rights reserved.</span>
           </div>
