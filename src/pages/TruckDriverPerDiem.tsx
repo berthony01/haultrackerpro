@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Receipt, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 export default function TruckDriverPerDiem() {
   const navigate = useNavigate();
