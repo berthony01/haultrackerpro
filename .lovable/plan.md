@@ -1,49 +1,44 @@
 
 
-## SEO Safety Tweaks
+## Plan: Performance Metrics Charts Section
 
-Four targeted changes before the full SEO implementation.
+### Overview
 
-### 1. `/landing` duplicate URL — Already handled
-Route line 61 in `App.tsx` already redirects `/landing → /` with `replace`. No code change needed. The SEOHead implementation will add `<link rel="canonical" href="https://haultrackerpro.com/">` on the landing page, which fully covers this.
+Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
 
-### 2. OG/Twitter image — Use stable self-hosted asset
-Current `index.html` points to a long Google Cloud Storage URL (`.webp`). This is fragile and not ideal for social crawlers.
+### New File: `src/components/PerformanceCharts.tsx`
 
-**Action**: Copy or reference the existing social image as `/public/og-image.png` (or keep the current asset but reference it with the production domain). Since we don't have a local `og-image.png` yet:
-- Keep using the current hosted image URL for now in `index.html` defaults
-- In `SEOHead.tsx`, default the `image` prop to `https://haultrackerpro.com/og-image.png`
-- Create a reminder: once you have a final OG image, place it at `public/og-image.png`
+A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
 
-**Alternatively** — if the user wants to use the existing image immediately, the SEOHead default can point to the current GCS URL. But best practice is a self-hosted absolute URL.
+1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
 
-### 3. `robots.txt` — Match real private routes
-Current `robots.txt` allows everything with no disallows. Update to match actual app routes:
+2. **Bucket logic** — Based on selected range:
+   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
+   - This Year → monthly buckets ("Jan", "Feb", ...)
 
-```
-User-agent: *
-Allow: /
-Disallow: /dashboard
-Disallow: /auth
-Disallow: /admin
-Disallow: /reset-password
-Disallow: /install
+3. **5 Charts** (all using Recharts, already installed):
 
-Sitemap: https://haultrackerpro.com/sitemap.xml
-```
+   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
 
-`/settings` is not a standalone route (it's a tab inside `/dashboard`), so no need to disallow it separately.
+   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
 
-### 4. Canonical base URL consistency
-Use `https://haultrackerpro.com` (no `www`, no trailing variations) as the single canonical base in `SEOHead.tsx`. All canonical URLs, OG URLs, and sitemap URLs will use this base.
+   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
 
-### Files to Edit
+   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
 
-| File | Change |
-|------|--------|
-| `public/robots.txt` | Replace with proper disallow rules + sitemap |
-| `index.html` | Update og:image/twitter:image to `https://haultrackerpro.com/og-image.png`, remove TODO comments |
-| `src/components/SEOHead.tsx` (to be created) | Use `https://haultrackerpro.com` as canonical base, default image to `https://haultrackerpro.com/og-image.png` |
+   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
 
-No routing changes needed — `/landing` redirect already exists.
+4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
+
+5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
+
+### Modified File: `src/components/DashboardView.tsx`
+
+- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
+- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
+
+### No Other Changes
+
+- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
+- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
 

@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import SEOHead from '@/components/SEOHead';
 
 export default function Privacy() {
   const navigate = useNavigate();
@@ -8,6 +9,7 @@ export default function Privacy() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title="Privacy Policy | HaulTrackerPro" description="Privacy policy explaining how HaulTrackerPro protects user data." path="/privacy" />
       <header className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
           <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={() => navigate(-1)}>

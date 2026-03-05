@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, Share, MoreVertical, Plus, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import SEOHead from '@/components/SEOHead';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -38,6 +39,7 @@ const Install = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-lg mx-auto">
+      <SEOHead title="Install | HaulTrackerPro" description="Install the app." path="/install" noindex />
       <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-muted-foreground mb-6 text-sm">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>

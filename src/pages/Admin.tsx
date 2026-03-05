@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '@/hooks/useAdmin';
+import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -231,6 +232,7 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title="Admin | HaulTrackerPro" description="Admin dashboard." path="/admin" noindex />
       <div className="max-w-4xl mx-auto p-4 space-y-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/')}>

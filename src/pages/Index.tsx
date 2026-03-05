@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
+import SEOHead from '@/components/SEOHead';
 import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useAuth } from '@/hooks/useAuth';
@@ -237,6 +238,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
       {/* Premium header */}
       <header className="sticky top-0 z-40 bg-secondary">
         <div className="flex items-center justify-between px-4 py-3.5 max-w-lg mx-auto">
