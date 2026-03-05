@@ -6,10 +6,12 @@ import SEOHead from '@/components/SEOHead';
 const expenses = [
   { icon: '🅿️', name: 'Parking', desc: 'Truck stop parking, rest area fees, and shipper/receiver lot charges.' },
   { icon: '🛣️', name: 'Tolls', desc: 'Highway tolls, bridge fees, and turnpike charges across routes.' },
+  { icon: '⛽', name: 'Fuel', desc: 'Diesel fuel costs for daily driving, deadhead miles, and long-haul routes.' },
   { icon: '🧰', name: 'Truck Supplies', desc: 'Straps, tarps, chains, bungees, and other load-securing gear.' },
   { icon: '🔧', name: 'Maintenance', desc: 'Oil changes, tire replacements, brake repairs, and preventive upkeep.' },
-  { icon: '🍔', name: 'Meals', desc: 'Food and per diem expenses while away from your tax home overnight.' },
   { icon: '📱', name: 'Communication Costs', desc: 'Cell phone bills, mobile hotspots, and data plans used for dispatch and load boards.' },
+  { icon: '🧹', name: 'Cleaning Supplies', desc: 'Truck wash, interior cleaning products, and laundry on the road.' },
+  { icon: '🍔', name: 'Food While on the Road', desc: 'Meals and per diem expenses while away from your tax home overnight.' },
 ];
 
 export default function OwnerOperatorExpenseTracker() {
@@ -18,14 +20,14 @@ export default function OwnerOperatorExpenseTracker() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Owner Operator Expense Tracker (Simple Trucking Expense Management)"
-        description="Track trucking expenses, fuel costs, parking, and supplies easily with a digital expense tracker built for owner operators."
+        title="Owner Operator Expense Tracker | Track Trucking Expenses Easily"
+        description="Track trucking expenses like parking, tolls, maintenance, and supplies with an expense tracker designed for owner operators."
         path="/owner-operator-expense-tracker"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'Article',
-          headline: 'Owner Operator Expense Tracker (Simple Trucking Expense Management)',
-          description: 'Track trucking expenses, fuel costs, parking, and supplies easily with a digital expense tracker built for owner operators.',
+          headline: 'Owner Operator Expense Tracker | Track Trucking Expenses Easily',
+          description: 'Track trucking expenses like parking, tolls, maintenance, and supplies with an expense tracker designed for owner operators.',
           author: { '@type': 'Organization', name: 'HaulTrackerPro' },
         }}
       />
@@ -102,7 +104,7 @@ export default function OwnerOperatorExpenseTracker() {
 
         {/* CTA */}
         <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track expenses automatically with HaulTrackerPro.</h2>
+          <h2 className="text-xl font-black font-heading">Start Tracking Trucking Expenses Today</h2>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             View Pricing <ArrowRight className="h-4 w-4" />
           </Button>
