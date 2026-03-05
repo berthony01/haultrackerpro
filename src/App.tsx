@@ -79,6 +79,7 @@ const App = () => (
           <Route path="/trucking-profit-calculator" element={<TruckingProfitCalculator />} />
           <Route path="/trucker-bookkeeping-guide" element={<TruckerBookkeepingGuide />} />
           <Route path="/truck-driver-expenses" element={<TruckDriverExpenses />} />
+          <Route path="/truck-driver-per-diem" element={<TruckDriverPerDiem />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
