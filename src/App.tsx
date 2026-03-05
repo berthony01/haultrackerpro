@@ -24,6 +24,7 @@ import TruckDriverExpenses from "./pages/TruckDriverExpenses";
 import TruckDriverPerDiem from "./pages/TruckDriverPerDiem";
 import OwnerOperatorSalary from "./pages/OwnerOperatorSalary";
 import TruckingCostPerMile from "./pages/TruckingCostPerMile";
+import TruckingExpensesList from "./pages/TruckingExpensesList";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
