@@ -383,47 +383,54 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
-              {[
-                { label: 'Features', href: '/features' },
-                { label: 'Pricing', href: '/pricing' },
-                { label: 'FAQ', href: '/faq' },
-              ].map(link => (
-                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                  {link.label}
-                </a>
-              ))}
+          {/* Desktop: 3-column, Mobile: stacked */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-4">
+            <div className="text-center sm:text-left">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
+              <div className="flex justify-center sm:block gap-4 sm:gap-0">
+                {[
+                  { label: 'Features', href: '/features' },
+                  { label: 'Pricing', href: '/pricing' },
+                  { label: 'FAQ', href: '/faq' },
+                ].map(link => (
+                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
-              {[
-                { label: 'Trucking Finance Guides', href: '/trucking-finance-guides' },
-                { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
-                { label: 'Expense Tracker', href: '/owner-operator-expense-tracker' },
-                { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
-                { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
-                { label: 'Bookkeeping Guide', href: '/trucker-bookkeeping-guide' },
-              ].map(link => (
-                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                  {link.label}
-                </a>
-              ))}
+            <div className="text-center sm:text-left">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
+              <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:block max-w-xs mx-auto sm:max-w-none sm:mx-0">
+                {[
+                  { label: 'Finance Guides', href: '/trucking-finance-guides' },
+                  { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
+                  { label: 'Expense Tracker', href: '/owner-operator-expense-tracker' },
+                  { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
+                  { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
+                  { label: 'Bookkeeping', href: '/trucker-bookkeeping-guide' },
+                ].map(link => (
+                  <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline text-center sm:text-left py-1.5 sm:py-0 sm:mb-1.5 rounded-md" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Legal</p>
-              {[
-                { label: 'Terms', href: '/terms' },
-                { label: 'Privacy', href: '/privacy' },
-              ].map(link => (
-                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                  {link.label}
-                </a>
-              ))}
+            <div className="text-center sm:text-left">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Legal</p>
+              <div className="flex justify-center sm:block gap-4 sm:gap-0">
+                {[
+                  { label: 'Terms', href: '/terms' },
+                  { label: 'Privacy', href: '/privacy' },
+                ].map(link => (
+                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-4 border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+          <div className="flex items-center justify-center sm:justify-start gap-2 pt-4 border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
             <Shield className="h-4 w-4" style={{ color: 'hsl(220, 10%, 40%)' }} />
             <span className="text-xs" style={{ color: 'hsl(220, 10%, 40%)' }}>© {new Date().getFullYear()} HaulTrackerPro. All rights reserved.</span>
           </div>
