@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, TrendingUp, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs for daily driving, deadhead miles, and long-haul routes.' },
@@ -153,6 +154,8 @@ export default function OwnerOperatorSalary() {
             Start Free <Sparkles className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/owner-operator-salary" />
       </main>
     </div>
   );

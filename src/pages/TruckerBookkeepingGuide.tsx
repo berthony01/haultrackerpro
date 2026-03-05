@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, BarChart3, ClipboardList, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 const trackItems = [
   { icon: '📦', name: 'Loads & Revenue', desc: 'Every load picked up, delivered, and invoiced — with rate per mile and total pay.' },
@@ -126,6 +127,8 @@ export default function TruckerBookkeepingGuide() {
             Start Free <Sparkles className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/trucker-bookkeeping-guide" />
       </main>
     </div>
   );

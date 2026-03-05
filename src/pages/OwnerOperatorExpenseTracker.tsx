@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ClipboardList, DollarSign, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 const expenses = [
   { icon: '🅿️', name: 'Parking', desc: 'Truck stop parking, rest area fees, and shipper/receiver lot charges.' },
@@ -109,6 +110,8 @@ export default function OwnerOperatorExpenseTracker() {
             View Pricing <ArrowRight className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/owner-operator-expense-tracker" />
       </main>
     </div>
   );
