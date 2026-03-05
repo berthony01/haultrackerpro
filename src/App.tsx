@@ -23,6 +23,7 @@ import TruckerBookkeepingGuide from "./pages/TruckerBookkeepingGuide";
 import TruckDriverExpenses from "./pages/TruckDriverExpenses";
 import TruckDriverPerDiem from "./pages/TruckDriverPerDiem";
 import OwnerOperatorSalary from "./pages/OwnerOperatorSalary";
+import TruckingCostPerMile from "./pages/TruckingCostPerMile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,7 @@ const App = () => (
           <Route path="/truck-driver-expenses" element={<TruckDriverExpenses />} />
           <Route path="/truck-driver-per-diem" element={<TruckDriverPerDiem />} />
           <Route path="/owner-operator-salary" element={<OwnerOperatorSalary />} />
+          <Route path="/trucking-cost-per-mile" element={<TruckingCostPerMile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
