@@ -69,6 +69,7 @@ const App = () => (
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/install" element={<Install />} />
+          <Route path="/truck-driver-tax-deductions" element={<TruckDriverTaxDeductions />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
