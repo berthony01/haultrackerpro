@@ -17,6 +17,7 @@ import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import Install from "./pages/Install";
 import TruckDriverTaxDeductions from "./pages/TruckDriverTaxDeductions";
+import OwnerOperatorExpenseTracker from "./pages/OwnerOperatorExpenseTracker";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +71,7 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/install" element={<Install />} />
           <Route path="/truck-driver-tax-deductions" element={<TruckDriverTaxDeductions />} />
+          <Route path="/owner-operator-expense-tracker" element={<OwnerOperatorExpenseTracker />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
