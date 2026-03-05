@@ -19,6 +19,7 @@ import Install from "./pages/Install";
 import TruckDriverTaxDeductions from "./pages/TruckDriverTaxDeductions";
 import OwnerOperatorExpenseTracker from "./pages/OwnerOperatorExpenseTracker";
 import TruckingProfitCalculator from "./pages/TruckingProfitCalculator";
+import TruckerBookkeepingGuide from "./pages/TruckerBookkeepingGuide";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
