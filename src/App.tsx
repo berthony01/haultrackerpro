@@ -89,6 +89,7 @@ const App = () => (
           <Route path="/trucking-cost-per-mile" element={<TruckingCostPerMile />} />
           <Route path="/trucking-expenses-list" element={<TruckingExpensesList />} />
           <Route path="/owner-operator-expenses-list" element={<OwnerOperatorExpensesList />} />
+          <Route path="/trucking-finance-guides" element={<TruckingFinanceGuides />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
