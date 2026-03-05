@@ -20,14 +20,14 @@ export default function TruckDriverTaxDeductions() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Truck Driver Tax Deductions (Complete Owner Operator Guide)"
-        description="Learn the most common tax deductions for truck drivers and owner operators including food, parking, truck supplies, and more. Reduce your taxable income legally."
+        title="Truck Driver Tax Deductions (Complete Guide for Owner Operators)"
+        description="Learn the most common tax deductions for truck drivers including parking, food, supplies, and equipment. Reduce your taxable income legally."
         path="/truck-driver-tax-deductions"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'Article',
-          headline: 'Truck Driver Tax Deductions (Complete Owner Operator Guide)',
-          description: 'Learn the most common tax deductions for truck drivers and owner operators.',
+          headline: 'Truck Driver Tax Deductions (Complete Guide for Owner Operators)',
+          description: 'Learn the most common tax deductions for truck drivers including parking, food, supplies, and equipment.',
           author: { '@type': 'Organization', name: 'HaulTrackerPro' },
         }}
       />
@@ -119,7 +119,8 @@ export default function TruckDriverTaxDeductions() {
 
         {/* Section 5 — CTA */}
         <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track every expense automatically with HaulTrackerPro.</h2>
+          <h2 className="text-xl font-black font-heading">Track Every Deduction Automatically</h2>
+          <p className="text-muted-foreground max-w-lg mx-auto">HaulTrackerPro helps truck drivers track expenses and reduce tax stress.</p>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             View Pricing <ArrowRight className="h-4 w-4" />
           </Button>
