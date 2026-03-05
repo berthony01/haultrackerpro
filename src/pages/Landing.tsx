@@ -128,7 +128,7 @@ export default function Landing() {
                 borderColor: 'hsl(220, 16%, 18%)',
                 boxShadow: '0 32px 64px -16px hsl(0, 0%, 0%, 0.5), 0 0 0 1px hsl(220, 16%, 16%)'
               }}>
-                <img src={dashboardMockup} alt="HaulTrackerPro dashboard showing load tracking, net profit, and weekly earnings chart" className="w-full" />
+                <img src={dashboardMockup} alt="HaulTrackerPro dashboard showing load tracking, net profit, and weekly earnings chart" className="w-full" loading="lazy" />
               </div>
               <div className="absolute -bottom-4 right-0 w-32 h-32 rounded-full blur-3xl pointer-events-none" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }} />
             </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, Check, Minus, Truck, Shield, TrendingUp, Target, BarChart3, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';

@@ -7,6 +7,7 @@ import { Truck, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import SEOHead from '@/components/SEOHead';
 
 export default function ResetPassword() {
   const navigate = useNavigate();

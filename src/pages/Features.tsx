@@ -2,12 +2,14 @@ import { ArrowLeft, Download, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { featureList, downloadFeatureSheet } from '@/lib/featureList';
+import SEOHead from '@/components/SEOHead';
 
 export default function Features() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
+      <SEOHead title="Features | HaulTrackerPro" description="Track loads, expenses, profit, and taxes with tools built specifically for truck drivers." path="/features" />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
