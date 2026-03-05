@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Truck, DollarSign, BarChart3, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs for daily driving, deadhead miles, and long-haul routes — often the largest single expense.' },
