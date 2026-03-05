@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
+import SEOHead from '@/components/SEOHead';
 
 const freeFeatures = [
   { icon: Truck, title: 'Load Tracking', desc: 'Log every load with miles, rate, fees, and multi-stop details in seconds.' },
