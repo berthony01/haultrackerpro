@@ -16,6 +16,7 @@ import Pricing from "./pages/Pricing";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import Install from "./pages/Install";
+import TruckDriverTaxDeductions from "./pages/TruckDriverTaxDeductions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/install" element={<Install />} />
+          <Route path="/truck-driver-tax-deductions" element={<TruckDriverTaxDeductions />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
