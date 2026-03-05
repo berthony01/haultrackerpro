@@ -64,21 +64,65 @@ export default function Landing() {
             <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </div>
-          <div className="flex items-center gap-1 sm:gap-3">
-            <Button variant="ghost" onClick={() => navigate('/features')} className="hidden sm:inline-flex text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-3">
+            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Features
             </Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Pricing
             </Button>
-            <Button variant="ghost" onClick={goToAuth} className="hidden sm:inline-flex text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Sign In
             </Button>
-            <Button onClick={goToAuth} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+            <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
               Start Free
             </Button>
           </div>
+          {/* Mobile nav */}
+          <div className="flex sm:hidden items-center gap-2">
+            <Button onClick={goToAuth} className="text-xs font-bold rounded-xl px-3" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+              Start Free
+            </Button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg"
+              aria-label="Toggle menu"
+              style={{ color: 'hsl(220, 10%, 70%)' }}
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
+        {/* Mobile menu panel */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t animate-in slide-in-from-top-2 duration-200" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+            <div className="flex flex-col px-4 py-4 space-y-1">
+              {[
+                { label: 'Features', href: '/features' },
+                { label: 'Pricing', href: '/pricing' },
+                { label: 'FAQ', href: '/faq' },
+                { label: 'Sign In', href: '/auth' },
+              ].map(item => (
+                <button
+                  key={item.href}
+                  onClick={() => { setMobileMenuOpen(false); navigate(item.href); }}
+                  className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
+                  style={{ color: 'hsl(220, 10%, 70%)' }}
+                >
+                  {item.label}
+                </button>
+              ))}
+              <Button
+                onClick={() => { setMobileMenuOpen(false); goToAuth(); }}
+                className="w-full mt-2 text-sm font-bold rounded-xl"
+                style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
+              >
+                Start Free <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}
