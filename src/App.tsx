@@ -17,6 +17,7 @@ import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import Install from "./pages/Install";
 import TruckDriverTaxDeductions from "./pages/TruckDriverTaxDeductions";
+import OwnerOperatorExpenseTracker from "./pages/OwnerOperatorExpenseTracker";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
