@@ -38,6 +38,24 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
+      <SEOHead
+        title="HaulTrackerPro | Load, Expense & Profit Tracker for Truck Drivers"
+        description="HaulTrackerPro helps owner-operators and 1099 truck drivers track loads, log expenses, and see real net profit."
+        path="/"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "HaulTrackerPro",
+          "applicationCategory": "FinanceApplication",
+          "operatingSystem": "Web",
+          "description": "Track loads, expenses, and real net profit for owner-operators and lease drivers.",
+          "url": "https://haultrackerpro.com",
+          "offers": [
+            { "@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free" },
+            { "@type": "Offer", "price": "15", "priceCurrency": "USD", "name": "Pro Monthly" }
+          ]
+        }}
+      />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
