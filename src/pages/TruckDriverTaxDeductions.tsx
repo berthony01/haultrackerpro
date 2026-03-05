@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Receipt, DollarSign, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 const deductions = [
   { icon: '🅿️', name: 'Truck Parking', desc: 'Paid parking at truck stops, rest areas, and shipper/receiver lots.' },

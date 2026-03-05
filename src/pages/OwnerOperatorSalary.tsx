@@ -154,6 +154,8 @@ export default function OwnerOperatorSalary() {
             Start Free <Sparkles className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/owner-operator-salary" />
       </main>
     </div>
   );

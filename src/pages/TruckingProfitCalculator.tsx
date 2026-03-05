@@ -132,6 +132,8 @@ export default function TruckingProfitCalculator() {
             Start Free <ArrowRight className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/trucking-profit-calculator" />
       </main>
     </div>
   );

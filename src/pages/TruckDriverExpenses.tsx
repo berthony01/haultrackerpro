@@ -112,6 +112,8 @@ export default function TruckDriverExpenses() {
             Start Free <Sparkles className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/truck-driver-expenses" />
       </main>
     </div>
   );

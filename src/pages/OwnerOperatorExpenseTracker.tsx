@@ -110,6 +110,8 @@ export default function OwnerOperatorExpenseTracker() {
             View Pricing <ArrowRight className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/owner-operator-expense-tracker" />
       </main>
     </div>
   );

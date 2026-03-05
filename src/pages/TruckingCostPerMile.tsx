@@ -155,6 +155,8 @@ export default function TruckingCostPerMile() {
             Start Free <Sparkles className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/trucking-cost-per-mile" />
       </main>
     </div>
   );

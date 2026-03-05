@@ -127,6 +127,8 @@ export default function TruckerBookkeepingGuide() {
             Start Free <Sparkles className="h-4 w-4" />
           </Button>
         </section>
+
+        <RelatedGuidesSection currentPath="/trucker-bookkeeping-guide" />
       </main>
     </div>
   );
