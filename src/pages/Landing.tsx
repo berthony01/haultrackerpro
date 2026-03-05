@@ -181,6 +181,79 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* How It Works */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              How It Works
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Three simple steps to track your trucking business like a real business.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {[
+              { step: '1', title: 'Log Your Loads', desc: 'Enter pickup, drop-off, miles, and pay. Multi-stop supported.' },
+              { step: '2', title: 'Track Every Expense', desc: 'Fuel, parking, tolls, maintenance, food, supplies. Keep it all organized.' },
+              { step: '3', title: 'Know Your Real Profit', desc: 'See profit per load, weekly summaries, and tax-ready exports.' },
+            ].map((item, i) => (
+              <div key={i} className="p-6 rounded-2xl border text-center" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                <div className="h-10 w-10 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-black" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+                  {item.step}
+                </div>
+                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-10">
+            <p className="text-sm mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>Ready to track your real profit?</p>
+            <Button onClick={() => navigate('/pricing')} className="text-sm font-bold rounded-xl px-6" style={{
+              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
+            }}>
+              Start Free
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Who It's For */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Who It's For
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Built for drivers who need clear numbers, not spreadsheets.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {[
+              { icon: Truck, title: 'Owner-Operators', desc: 'Track profit per load, cost per mile, and business expenses in one dashboard.' },
+              { icon: Route, title: 'Lease Operators', desc: 'Stay on top of weekly pay, deductions, and expenses without the paperwork headaches.' },
+              { icon: FileText, title: '1099 Company Drivers', desc: 'Organize expenses and tax set-aside estimates so you\'re prepared for tax season.' },
+            ].map((item, i) => (
+              <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-10">
+            {['No credit card required', 'Free plan available', 'Mobile-first', 'Set up in minutes'].map(t => (
+              <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
+                <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'hsl(152, 60%, 42%)' }} /> {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Problem Section */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
