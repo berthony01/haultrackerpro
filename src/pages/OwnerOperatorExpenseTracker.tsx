@@ -20,14 +20,14 @@ export default function OwnerOperatorExpenseTracker() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Owner Operator Expense Tracker (Simple Trucking Expense Management)"
-        description="Track trucking expenses, fuel costs, parking, and supplies easily with a digital expense tracker built for owner operators."
+        title="Owner Operator Expense Tracker | Track Trucking Expenses Easily"
+        description="Track trucking expenses like parking, tolls, maintenance, and supplies with an expense tracker designed for owner operators."
         path="/owner-operator-expense-tracker"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'Article',
-          headline: 'Owner Operator Expense Tracker (Simple Trucking Expense Management)',
-          description: 'Track trucking expenses, fuel costs, parking, and supplies easily with a digital expense tracker built for owner operators.',
+          headline: 'Owner Operator Expense Tracker | Track Trucking Expenses Easily',
+          description: 'Track trucking expenses like parking, tolls, maintenance, and supplies with an expense tracker designed for owner operators.',
           author: { '@type': 'Organization', name: 'HaulTrackerPro' },
         }}
       />
