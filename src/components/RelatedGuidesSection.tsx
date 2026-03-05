@@ -11,6 +11,7 @@ const guides = [
   { path: '/owner-operator-salary', title: 'Owner Operator Salary' },
   { path: '/truck-driver-expenses', title: 'Truck Driver Expenses' },
   { path: '/trucking-expenses-list', title: 'Trucking Expenses List' },
+  { path: '/owner-operator-expenses-list', title: 'Owner Operator Expenses List' },
 ];
 
 interface Props {
