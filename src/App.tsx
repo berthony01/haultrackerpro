@@ -26,6 +26,7 @@ import OwnerOperatorSalary from "./pages/OwnerOperatorSalary";
 import TruckingCostPerMile from "./pages/TruckingCostPerMile";
 import TruckingExpensesList from "./pages/TruckingExpensesList";
 import OwnerOperatorExpensesList from "./pages/OwnerOperatorExpensesList";
+import TruckingFinanceGuides from "./pages/TruckingFinanceGuides";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
