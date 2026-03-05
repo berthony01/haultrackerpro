@@ -337,23 +337,50 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
+              {[
+                { label: 'Features', href: '/features' },
+                { label: 'Pricing', href: '/pricing' },
+                { label: 'FAQ', href: '/faq' },
+              ].map(link => (
+                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                  {link.label}
+                </a>
+              ))}
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
+              {[
+                { label: 'Trucking Finance Guides', href: '/trucking-finance-guides' },
+                { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
+                { label: 'Expense Tracker', href: '/owner-operator-expense-tracker' },
+                { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
+                { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
+                { label: 'Bookkeeping Guide', href: '/trucker-bookkeeping-guide' },
+              ].map(link => (
+                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                  {link.label}
+                </a>
+              ))}
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>Legal</p>
+              {[
+                { label: 'Terms', href: '/terms' },
+                { label: 'Privacy', href: '/privacy' },
+              ].map(link => (
+                <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline mb-1.5" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-4 border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
             <Shield className="h-4 w-4" style={{ color: 'hsl(220, 10%, 40%)' }} />
             <span className="text-xs" style={{ color: 'hsl(220, 10%, 40%)' }}>© {new Date().getFullYear()} HaulTrackerPro. All rights reserved.</span>
-          </div>
-          <div className="flex items-center gap-5">
-            {[
-              { label: 'Features', href: '/features' },
-              { label: 'Pricing', href: '/pricing' },
-              { label: 'Terms', href: '/terms' },
-              { label: 'Privacy', href: '/privacy' },
-              { label: 'FAQ', href: '/faq' },
-            ].map(link => (
-              <a key={link.href} href={link.href} className="text-xs font-medium hover:underline" style={{ color: 'hsl(220, 10%, 50%)' }}>
-                {link.label}
-              </a>
-            ))}
           </div>
         </div>
       </footer>
