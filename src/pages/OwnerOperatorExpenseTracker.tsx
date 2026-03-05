@@ -6,10 +6,12 @@ import SEOHead from '@/components/SEOHead';
 const expenses = [
   { icon: '🅿️', name: 'Parking', desc: 'Truck stop parking, rest area fees, and shipper/receiver lot charges.' },
   { icon: '🛣️', name: 'Tolls', desc: 'Highway tolls, bridge fees, and turnpike charges across routes.' },
+  { icon: '⛽', name: 'Fuel', desc: 'Diesel fuel costs for daily driving, deadhead miles, and long-haul routes.' },
   { icon: '🧰', name: 'Truck Supplies', desc: 'Straps, tarps, chains, bungees, and other load-securing gear.' },
   { icon: '🔧', name: 'Maintenance', desc: 'Oil changes, tire replacements, brake repairs, and preventive upkeep.' },
-  { icon: '🍔', name: 'Meals', desc: 'Food and per diem expenses while away from your tax home overnight.' },
   { icon: '📱', name: 'Communication Costs', desc: 'Cell phone bills, mobile hotspots, and data plans used for dispatch and load boards.' },
+  { icon: '🧹', name: 'Cleaning Supplies', desc: 'Truck wash, interior cleaning products, and laundry on the road.' },
+  { icon: '🍔', name: 'Food While on the Road', desc: 'Meals and per diem expenses while away from your tax home overnight.' },
 ];
 
 export default function OwnerOperatorExpenseTracker() {
