@@ -52,6 +52,7 @@ export default function FAQ() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title="FAQ | HaulTrackerPro" description="Answers to common questions about tracking loads, expenses, and profit." path="/faq" />
       <header className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
           <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={() => navigate(-1)}>

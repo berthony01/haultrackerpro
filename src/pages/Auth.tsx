@@ -36,6 +36,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <SEOHead title="Login | HaulTrackerPro" description="Sign in to HaulTrackerPro." path="/auth" noindex />
       <div className="w-full max-w-sm space-y-8">
         {/* Brand */}
         <div className="text-center space-y-2">

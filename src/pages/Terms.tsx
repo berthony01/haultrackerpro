@@ -9,6 +9,7 @@ export default function Terms() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title="Terms of Service | HaulTrackerPro" description="Terms and conditions for using HaulTrackerPro." path="/terms" />
       <header className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
           <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={() => navigate(-1)}>

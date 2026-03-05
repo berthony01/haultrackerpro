@@ -57,6 +57,7 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <SEOHead title="Reset Password | HaulTrackerPro" description="Reset your password." path="/reset-password" noindex />
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center rounded-2xl bg-primary p-3 mx-auto">
