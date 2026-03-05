@@ -23,6 +23,7 @@ import TruckerBookkeepingGuide from "./pages/TruckerBookkeepingGuide";
 import TruckDriverExpenses from "./pages/TruckDriverExpenses";
 import TruckDriverPerDiem from "./pages/TruckDriverPerDiem";
 import OwnerOperatorSalary from "./pages/OwnerOperatorSalary";
+import TruckingCostPerMile from "./pages/TruckingCostPerMile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
