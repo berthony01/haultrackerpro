@@ -104,7 +104,7 @@ export default function OwnerOperatorExpenseTracker() {
 
         {/* CTA */}
         <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track expenses automatically with HaulTrackerPro.</h2>
+          <h2 className="text-xl font-black font-heading">Start Tracking Trucking Expenses Today</h2>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             View Pricing <ArrowRight className="h-4 w-4" />
           </Button>
