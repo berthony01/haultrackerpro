@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Receipt, DollarSign, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, Receipt, DollarSign, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 const deductions = [
   { icon: '🅿️', name: 'Truck Parking', desc: 'Paid parking at truck stops, rest areas, and shipper/receiver lots.' },
@@ -76,6 +77,10 @@ export default function TruckDriverTaxDeductions() {
           </div>
         </section>
 
+        <ProblemSolutionSection />
+
+        <MidPageCTA />
+
         {/* Why Drivers Overpay */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -105,13 +110,9 @@ export default function TruckDriverTaxDeductions() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track Your Trucking Deductions Automatically</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <Sparkles className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/truck-driver-tax-deductions" />
       </main>

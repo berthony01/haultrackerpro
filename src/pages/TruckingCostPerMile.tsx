@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Gauge, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, Gauge, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs that fluctuate with routes, speed, and market prices.' },
@@ -91,6 +92,8 @@ export default function TruckingCostPerMile() {
           </div>
         </section>
 
+        <ProblemSolutionSection />
+
         {/* Example Calculation */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -117,6 +120,8 @@ export default function TruckingCostPerMile() {
             and your cost is $0.90, you're netting $0.60 per mile. Without this number, you're guessing.
           </p>
         </section>
+
+        <MidPageCTA />
 
         {/* Why Drivers Lose Money */}
         <section>
@@ -148,13 +153,9 @@ export default function TruckingCostPerMile() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track Your Trucking Costs Automatically</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <Sparkles className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/trucking-cost-per-mile" />
       </main>

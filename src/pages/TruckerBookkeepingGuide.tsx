@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BookOpen, BarChart3, ClipboardList, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, BarChart3, ClipboardList, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 const trackItems = [
   { icon: '📦', name: 'Loads & Revenue', desc: 'Every load picked up, delivered, and invoiced — with rate per mile and total pay.' },
@@ -90,6 +91,10 @@ export default function TruckerBookkeepingGuide() {
           </div>
         </section>
 
+        <ProblemSolutionSection />
+
+        <MidPageCTA />
+
         {/* The Problem */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -120,13 +125,9 @@ export default function TruckerBookkeepingGuide() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Simplify Your Trucking Bookkeeping</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <Sparkles className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/trucker-bookkeeping-guide" />
       </main>
