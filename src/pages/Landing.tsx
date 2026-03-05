@@ -33,6 +33,7 @@ const faqs = [
 export default function Landing() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const goToAuth = () => navigate('/auth');
 
