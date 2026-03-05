@@ -20,14 +20,14 @@ export default function TruckDriverTaxDeductions() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Truck Driver Tax Deductions (Complete Owner Operator Guide)"
-        description="Learn the most common tax deductions for truck drivers and owner operators including food, parking, truck supplies, and more. Reduce your taxable income legally."
+        title="Truck Driver Tax Deductions (Complete Guide for Owner Operators)"
+        description="Learn the most common tax deductions for truck drivers including parking, food, supplies, and equipment. Reduce your taxable income legally."
         path="/truck-driver-tax-deductions"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'Article',
-          headline: 'Truck Driver Tax Deductions (Complete Owner Operator Guide)',
-          description: 'Learn the most common tax deductions for truck drivers and owner operators.',
+          headline: 'Truck Driver Tax Deductions (Complete Guide for Owner Operators)',
+          description: 'Learn the most common tax deductions for truck drivers including parking, food, supplies, and equipment.',
           author: { '@type': 'Organization', name: 'HaulTrackerPro' },
         }}
       />
