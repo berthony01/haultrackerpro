@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Receipt, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, Receipt, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 export default function TruckDriverPerDiem() {
   const navigate = useNavigate();
@@ -76,6 +77,8 @@ export default function TruckDriverPerDiem() {
           </p>
         </section>
 
+        <ProblemSolutionSection />
+
         {/* Example Calculation */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -102,6 +105,8 @@ export default function TruckDriverPerDiem() {
             earnings. The actual tax savings depend on your total income and tax bracket.
           </p>
         </section>
+
+        <MidPageCTA />
 
         {/* Why Drivers Miss It */}
         <section>
@@ -134,13 +139,9 @@ export default function TruckDriverPerDiem() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track Your Trucking Expenses and Deductions</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <Sparkles className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/truck-driver-per-diem" />
       </main>

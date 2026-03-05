@@ -3,6 +3,7 @@ import { ArrowLeft, TrendingUp, HelpCircle, DollarSign, Calculator, CheckCircle,
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs for loaded and deadhead miles across every route.' },
@@ -90,6 +91,8 @@ export default function TruckingProfitCalculator() {
           </div>
         </section>
 
+        <ProblemSolutionSection />
+
         {/* Example Profit Calculation */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -112,6 +115,8 @@ export default function TruckingProfitCalculator() {
           </div>
         </section>
 
+        <MidPageCTA />
+
         {/* Solution */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -125,13 +130,9 @@ export default function TruckingProfitCalculator() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Know Your Real Trucking Profit</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <ArrowRight className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/trucking-profit-calculator" />
       </main>

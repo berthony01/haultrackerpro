@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, DollarSign, BarChart3, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ClipboardList, DollarSign, BarChart3, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs for loaded miles, deadhead miles, and idling — often the largest single expense.' },
@@ -82,6 +83,8 @@ export default function TruckingExpensesList() {
           </div>
         </section>
 
+        <ProblemSolutionSection />
+
         {/* Fixed vs Variable */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -117,6 +120,8 @@ export default function TruckingExpensesList() {
           </div>
         </section>
 
+        <MidPageCTA />
+
         {/* Why Tracking Matters */}
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -139,13 +144,9 @@ export default function TruckingExpensesList() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track Every Trucking Expense Automatically</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <Sparkles className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/trucking-expenses-list" />
       </main>

@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, TrendingUp, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs for daily driving, deadhead miles, and long-haul routes.' },
@@ -91,6 +92,8 @@ export default function OwnerOperatorSalary() {
           </div>
         </section>
 
+        <ProblemSolutionSection />
+
         {/* Example Income Breakdown */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -117,6 +120,8 @@ export default function OwnerOperatorSalary() {
             it's impossible to know how much of your revenue you actually keep.
           </p>
         </section>
+
+        <MidPageCTA />
 
         {/* Why Drivers Miscalculate */}
         <section>
@@ -147,13 +152,9 @@ export default function OwnerOperatorSalary() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Understand Your Real Trucking Income</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <Sparkles className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/owner-operator-salary" />
       </main>

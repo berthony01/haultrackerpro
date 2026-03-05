@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, DollarSign, AlertTriangle, Calculator, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ClipboardList, DollarSign, AlertTriangle, Calculator, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { ProblemSolutionSection, MidPageCTA, ProductProofSection, FinalCTASection } from '@/components/SEOConversionSections';
 
 const commonExpenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs for loaded miles, deadhead miles, and idling — typically the largest expense.' },
@@ -85,6 +86,8 @@ export default function OwnerOperatorExpensesList() {
           </div>
         </section>
 
+        <ProblemSolutionSection />
+
         {/* Hidden Expenses */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -106,6 +109,8 @@ export default function OwnerOperatorExpensesList() {
             ))}
           </div>
         </section>
+
+        <MidPageCTA />
 
         {/* Example Breakdown */}
         <section>
@@ -159,13 +164,9 @@ export default function OwnerOperatorExpensesList() {
           </p>
         </section>
 
-        {/* Final CTA */}
-        <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Know Your Real Trucking Profit</h2>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <Sparkles className="h-4 w-4" />
-          </Button>
-        </section>
+        <ProductProofSection />
+
+        <FinalCTASection />
 
         <RelatedGuidesSection currentPath="/owner-operator-expenses-list" />
       </main>
