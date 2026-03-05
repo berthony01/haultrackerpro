@@ -1,4 +1,4 @@
-import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Calculator, Receipt, Route, Download, Mic, Camera, MapPin, ClipboardPaste } from 'lucide-react';
+import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Calculator, Receipt, Route, Download, Mic, Camera, MapPin, ClipboardPaste, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
