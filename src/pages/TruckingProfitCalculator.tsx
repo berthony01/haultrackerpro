@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, TrendingUp, HelpCircle, DollarSign, Calculator, CheckCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs for loaded and deadhead miles across every route.' },
