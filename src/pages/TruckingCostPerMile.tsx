@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Gauge, DollarSign, Calculator, AlertTriangle, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import RelatedGuidesSection from '@/components/RelatedGuidesSection';
 
 const expenses = [
   { icon: '⛽', name: 'Fuel', desc: 'Diesel costs that fluctuate with routes, speed, and market prices.' },
