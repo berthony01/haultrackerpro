@@ -119,7 +119,8 @@ export default function TruckDriverTaxDeductions() {
 
         {/* Section 5 — CTA */}
         <section className="text-center py-8 space-y-4">
-          <h2 className="text-xl font-black font-heading">Track every expense automatically with HaulTrackerPro.</h2>
+          <h2 className="text-xl font-black font-heading">Track Every Deduction Automatically</h2>
+          <p className="text-muted-foreground max-w-lg mx-auto">HaulTrackerPro helps truck drivers track expenses and reduce tax stress.</p>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             View Pricing <ArrowRight className="h-4 w-4" />
           </Button>
