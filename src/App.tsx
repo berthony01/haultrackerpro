@@ -18,6 +18,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Install from "./pages/Install";
 import TruckDriverTaxDeductions from "./pages/TruckDriverTaxDeductions";
 import OwnerOperatorExpenseTracker from "./pages/OwnerOperatorExpenseTracker";
+import TruckingProfitCalculator from "./pages/TruckingProfitCalculator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
