@@ -37,6 +37,7 @@ import TruckingMileageExpenseGuide from "./pages/TruckingMileageExpenseGuide";
 import TruckerCostPerMileBreakdown from "./pages/TruckerCostPerMileBreakdown";
 import OwnerOperatorOperatingCosts from "./pages/OwnerOperatorOperatingCosts";
 import TruckDriverOperatingExpenses from "./pages/TruckDriverOperatingExpenses";
+import TruckingCostPerMileCalculator from "./pages/TruckingCostPerMileCalculator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
