@@ -12,6 +12,16 @@ const guides = [
   { path: '/truck-driver-expenses', title: 'Truck Driver Expenses' },
   { path: '/trucking-expenses-list', title: 'Trucking Expenses List' },
   { path: '/owner-operator-expenses-list', title: 'Owner Operator Expenses List' },
+  { path: '/fuel-cost-per-mile-trucking', title: 'Fuel Cost Per Mile Trucking' },
+  { path: '/trucking-maintenance-cost-per-mile', title: 'Trucking Maintenance Cost Per Mile' },
+  { path: '/truck-driver-fuel-expenses', title: 'Truck Driver Fuel Expenses' },
+  { path: '/trucking-expense-categories', title: 'Trucking Expense Categories' },
+  { path: '/owner-operator-tax-write-offs', title: 'Owner Operator Tax Write-Offs' },
+  { path: '/trucker-fuel-cost-calculator', title: 'Trucker Fuel Cost Calculator' },
+  { path: '/trucking-mileage-expense-guide', title: 'Trucking Mileage Expense Guide' },
+  { path: '/trucker-cost-per-mile-breakdown', title: 'Trucker Cost Per Mile Breakdown' },
+  { path: '/owner-operator-operating-costs', title: 'Owner Operator Operating Costs' },
+  { path: '/truck-driver-operating-expenses', title: 'Truck Driver Operating Expenses' },
 ];
 
 interface Props {

@@ -100,6 +100,16 @@ const App = () => (
           <Route path="/trucking-expenses-list" element={<TruckingExpensesList />} />
           <Route path="/owner-operator-expenses-list" element={<OwnerOperatorExpensesList />} />
           <Route path="/trucking-finance-guides" element={<TruckingFinanceGuides />} />
+          <Route path="/fuel-cost-per-mile-trucking" element={<FuelCostPerMileTrucking />} />
+          <Route path="/trucking-maintenance-cost-per-mile" element={<TruckingMaintenanceCostPerMile />} />
+          <Route path="/truck-driver-fuel-expenses" element={<TruckDriverFuelExpenses />} />
+          <Route path="/trucking-expense-categories" element={<TruckingExpenseCategories />} />
+          <Route path="/owner-operator-tax-write-offs" element={<OwnerOperatorTaxWriteOffs />} />
+          <Route path="/trucker-fuel-cost-calculator" element={<TruckerFuelCostCalculator />} />
+          <Route path="/trucking-mileage-expense-guide" element={<TruckingMileageExpenseGuide />} />
+          <Route path="/trucker-cost-per-mile-breakdown" element={<TruckerCostPerMileBreakdown />} />
+          <Route path="/owner-operator-operating-costs" element={<OwnerOperatorOperatingCosts />} />
+          <Route path="/truck-driver-operating-expenses" element={<TruckDriverOperatingExpenses />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
