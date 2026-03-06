@@ -37,6 +37,7 @@ import TruckingMileageExpenseGuide from "./pages/TruckingMileageExpenseGuide";
 import TruckerCostPerMileBreakdown from "./pages/TruckerCostPerMileBreakdown";
 import OwnerOperatorOperatingCosts from "./pages/OwnerOperatorOperatingCosts";
 import TruckDriverOperatingExpenses from "./pages/TruckDriverOperatingExpenses";
+import TruckingCostPerMileCalculator from "./pages/TruckingCostPerMileCalculator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -110,6 +111,7 @@ const App = () => (
           <Route path="/trucker-cost-per-mile-breakdown" element={<TruckerCostPerMileBreakdown />} />
           <Route path="/owner-operator-operating-costs" element={<OwnerOperatorOperatingCosts />} />
           <Route path="/truck-driver-operating-expenses" element={<TruckDriverOperatingExpenses />} />
+          <Route path="/trucking-cost-per-mile-calculator" element={<TruckingCostPerMileCalculator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

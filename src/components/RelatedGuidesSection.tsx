@@ -22,6 +22,7 @@ const guides = [
   { path: '/trucker-cost-per-mile-breakdown', title: 'Trucker Cost Per Mile Breakdown' },
   { path: '/owner-operator-operating-costs', title: 'Owner Operator Operating Costs' },
   { path: '/truck-driver-operating-expenses', title: 'Truck Driver Operating Expenses' },
+  { path: '/trucking-cost-per-mile-calculator', title: 'Trucking Cost Per Mile Calculator' },
 ];
 
 interface Props {
