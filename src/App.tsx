@@ -27,6 +27,16 @@ import TruckingCostPerMile from "./pages/TruckingCostPerMile";
 import TruckingExpensesList from "./pages/TruckingExpensesList";
 import OwnerOperatorExpensesList from "./pages/OwnerOperatorExpensesList";
 import TruckingFinanceGuides from "./pages/TruckingFinanceGuides";
+import FuelCostPerMileTrucking from "./pages/FuelCostPerMileTrucking";
+import TruckingMaintenanceCostPerMile from "./pages/TruckingMaintenanceCostPerMile";
+import TruckDriverFuelExpenses from "./pages/TruckDriverFuelExpenses";
+import TruckingExpenseCategories from "./pages/TruckingExpenseCategories";
+import OwnerOperatorTaxWriteOffs from "./pages/OwnerOperatorTaxWriteOffs";
+import TruckerFuelCostCalculator from "./pages/TruckerFuelCostCalculator";
+import TruckingMileageExpenseGuide from "./pages/TruckingMileageExpenseGuide";
+import TruckerCostPerMileBreakdown from "./pages/TruckerCostPerMileBreakdown";
+import OwnerOperatorOperatingCosts from "./pages/OwnerOperatorOperatingCosts";
+import TruckDriverOperatingExpenses from "./pages/TruckDriverOperatingExpenses";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -90,6 +100,16 @@ const App = () => (
           <Route path="/trucking-expenses-list" element={<TruckingExpensesList />} />
           <Route path="/owner-operator-expenses-list" element={<OwnerOperatorExpensesList />} />
           <Route path="/trucking-finance-guides" element={<TruckingFinanceGuides />} />
+          <Route path="/fuel-cost-per-mile-trucking" element={<FuelCostPerMileTrucking />} />
+          <Route path="/trucking-maintenance-cost-per-mile" element={<TruckingMaintenanceCostPerMile />} />
+          <Route path="/truck-driver-fuel-expenses" element={<TruckDriverFuelExpenses />} />
+          <Route path="/trucking-expense-categories" element={<TruckingExpenseCategories />} />
+          <Route path="/owner-operator-tax-write-offs" element={<OwnerOperatorTaxWriteOffs />} />
+          <Route path="/trucker-fuel-cost-calculator" element={<TruckerFuelCostCalculator />} />
+          <Route path="/trucking-mileage-expense-guide" element={<TruckingMileageExpenseGuide />} />
+          <Route path="/trucker-cost-per-mile-breakdown" element={<TruckerCostPerMileBreakdown />} />
+          <Route path="/owner-operator-operating-costs" element={<OwnerOperatorOperatingCosts />} />
+          <Route path="/truck-driver-operating-expenses" element={<TruckDriverOperatingExpenses />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
