@@ -254,6 +254,52 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Free Calculators */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Free Trucking Calculators
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Quick tools to help owner-operators understand real trucking profits.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {[
+              { icon: Calculator, title: 'Trucking Cost Per Mile Calculator', desc: 'Calculate the real operating cost of your truck per mile.', href: '/trucking-cost-per-mile-calculator' },
+              { icon: DollarSign, title: 'Trucking Load Profit Calculator', desc: 'See if a load is actually profitable before accepting it.', href: '/trucking-load-profit-calculator' },
+            ].map((card, i) => (
+              <button
+                key={i}
+                onClick={() => navigate(card.href)}
+                className="p-6 rounded-2xl border text-left transition-all hover:scale-[1.02] hover:border-[hsl(25,95%,53%,0.3)]"
+                style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}
+              >
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                  <card.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{card.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{card.desc}</p>
+                <span className="inline-flex items-center gap-1 mt-4 text-sm font-semibold" style={{ color: 'hsl(25, 95%, 53%)' }}>
+                  Try It Free <ArrowRight className="h-4 w-4" />
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="text-center mt-10 space-y-4">
+            <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              HaulTrackerPro automatically calculates these metrics for every load you run.
+            </p>
+            <Button onClick={() => navigate('/pricing')} className="text-sm font-bold rounded-xl px-6" style={{
+              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
+            }}>
+              Start Tracking Free <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Problem Section */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
