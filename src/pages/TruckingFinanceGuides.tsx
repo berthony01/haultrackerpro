@@ -1,21 +1,40 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, Receipt, TrendingUp, DollarSign, Truck, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Receipt, TrendingUp, DollarSign, Truck, Sparkles, Gauge, MapPin, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
-import { FinalCTASection } from '@/components/SEOConversionSections';
 
-const categories = [
+const sections = [
   {
     title: 'Tax & Deductions',
     icon: Receipt,
     guides: [
       { path: '/truck-driver-tax-deductions', title: 'Truck Driver Tax Deductions' },
       { path: '/truck-driver-per-diem', title: 'Truck Driver Per Diem' },
-      { path: '/truck-driver-expenses', title: 'Truck Driver Expenses' },
+      { path: '/owner-operator-tax-write-offs', title: 'Owner Operator Tax Write-Offs' },
     ],
   },
   {
-    title: 'Profit & Salary',
+    title: 'Expenses & Bookkeeping',
+    icon: DollarSign,
+    guides: [
+      { path: '/truck-driver-expenses', title: 'Truck Driver Expenses' },
+      { path: '/trucking-expense-categories', title: 'Trucking Expense Categories' },
+      { path: '/owner-operator-expenses-list', title: 'Owner Operator Expenses List' },
+      { path: '/truck-driver-operating-expenses', title: 'Truck Driver Operating Expenses' },
+    ],
+  },
+  {
+    title: 'Cost Per Mile',
+    icon: Gauge,
+    guides: [
+      { path: '/trucking-cost-per-mile', title: 'Trucking Cost Per Mile' },
+      { path: '/trucker-cost-per-mile-breakdown', title: 'Trucker Cost Per Mile Breakdown' },
+      { path: '/fuel-cost-per-mile-trucking', title: 'Fuel Cost Per Mile Trucking' },
+      { path: '/trucking-maintenance-cost-per-mile', title: 'Trucking Maintenance Cost Per Mile' },
+    ],
+  },
+  {
+    title: 'Profit & Income',
     icon: TrendingUp,
     guides: [
       { path: '/owner-operator-salary', title: 'Owner Operator Salary' },
@@ -23,20 +42,11 @@ const categories = [
     ],
   },
   {
-    title: 'Expense Management',
-    icon: DollarSign,
+    title: 'Operations',
+    icon: MapPin,
     guides: [
-      { path: '/owner-operator-expense-tracker', title: 'Owner Operator Expense Tracker' },
-      { path: '/trucking-expenses-list', title: 'Trucking Expenses List' },
-      { path: '/owner-operator-expenses-list', title: 'Owner Operator Expenses List' },
-    ],
-  },
-  {
-    title: 'Operations & Cost',
-    icon: Truck,
-    guides: [
-      { path: '/trucking-cost-per-mile', title: 'Trucking Cost Per Mile' },
-      { path: '/trucker-bookkeeping-guide', title: 'Trucker Bookkeeping Guide' },
+      { path: '/trucking-mileage-expense-guide', title: 'Trucking Mileage Expense Guide' },
+      { path: '/owner-operator-operating-costs', title: 'Owner Operator Operating Costs' },
     ],
   },
 ];
@@ -47,14 +57,14 @@ export default function TruckingFinanceGuides() {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title="Trucking Finance Guides | HaulTrackerPro Knowledge Hub"
-        description="Browse free trucking finance guides covering tax deductions, expenses, profit calculators, cost per mile, bookkeeping, and more for owner operators."
+        title="Trucking Finance Guides for Owner Operators"
+        description="Learn trucking expenses, cost per mile, tax deductions, and owner operator finances. Practical guides to help truck drivers understand real profit."
         path="/trucking-finance-guides"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'CollectionPage',
-          headline: 'Trucking Finance Guides | HaulTrackerPro Knowledge Hub',
-          description: 'Browse free trucking finance guides covering tax deductions, expenses, profit calculators, cost per mile, bookkeeping, and more for owner operators.',
+          headline: 'Trucking Finance Guides for Owner Operators',
+          description: 'Learn trucking expenses, cost per mile, tax deductions, and owner operator finances. Practical guides to help truck drivers understand real profit.',
           author: { '@type': 'Organization', name: 'HaulTrackerPro' },
         }}
       />
@@ -74,17 +84,21 @@ export default function TruckingFinanceGuides() {
           <div className="flex justify-center">
             <BookOpen className="h-10 w-10 text-primary" />
           </div>
-          <h2 className="text-3xl font-black font-heading">Trucking Finance Knowledge Hub</h2>
+          <h2 className="text-3xl font-black font-heading">Trucking Finance Guides</h2>
           <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Free guides covering everything owner operators and truck drivers need to know about expenses, taxes, profit, and running a trucking business.
+            Practical guides to help owner-operators and truck drivers understand expenses, taxes, and real profit.
           </p>
-          <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Tracking Free <ArrowRight className="h-4 w-4" />
-          </Button>
+        </section>
+
+        {/* Introduction */}
+        <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <p className="text-muted-foreground leading-relaxed">
+            Trucking is a business — and running it profitably means understanding where your money goes. From fuel and maintenance to tax deductions and per diem, every dollar matters. These guides break down the financial side of trucking so owner-operators, lease operators, and company drivers can track expenses accurately, calculate real profit per load, and keep more of what they earn.
+          </p>
         </section>
 
         {/* Category Sections */}
-        {categories.map((cat) => {
+        {sections.map((cat) => {
           const Icon = cat.icon;
           return (
             <section key={cat.title}>
@@ -97,7 +111,7 @@ export default function TruckingFinanceGuides() {
                   <Link
                     key={g.path}
                     to={g.path}
-                    className="flex items-center justify-between gap-3 p-4 rounded-xl border border-border bg-card shadow-card hover:border-primary/40 transition-colors group"
+                    className="flex items-center justify-between gap-3 p-4 rounded-xl border border-border bg-card shadow-sm hover:border-primary/40 transition-colors group"
                   >
                     <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                       {g.title}
@@ -110,18 +124,25 @@ export default function TruckingFinanceGuides() {
           );
         })}
 
-        {/* Mid-page CTA */}
-        <section className="rounded-xl border border-primary/20 bg-primary/5 p-6 text-center space-y-3">
-          <h2 className="text-xl font-black font-heading">Track Your Trucking Finances Automatically</h2>
+        {/* CTA */}
+        <section className="text-center py-8 space-y-4 rounded-xl border border-primary/20 bg-primary/5 p-6">
+          <Truck className="h-10 w-10 text-primary mx-auto" />
+          <h2 className="text-xl font-black font-heading">Stop Guessing Your Trucking Profit</h2>
           <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
-            HaulTrackerPro helps truck drivers track loads, expenses, and profit in one simple dashboard.
+            Track every load, expense, and mile in one dashboard. HaulTrackerPro gives you real numbers so you can run your trucking business with confidence.
           </p>
+          <div className="flex flex-wrap justify-center gap-4 text-xs text-muted-foreground pt-2">
+            {['No credit card required', 'Free plan available', 'Mobile-first', 'Set up in minutes'].map((t) => (
+              <span key={t} className="flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                {t}
+              </span>
+            ))}
+          </div>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
-            Start Free <ArrowRight className="h-4 w-4" />
+            Start Free <Sparkles className="h-4 w-4" />
           </Button>
         </section>
-
-        <FinalCTASection />
       </main>
     </div>
   );
