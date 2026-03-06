@@ -27,6 +27,16 @@ import TruckingCostPerMile from "./pages/TruckingCostPerMile";
 import TruckingExpensesList from "./pages/TruckingExpensesList";
 import OwnerOperatorExpensesList from "./pages/OwnerOperatorExpensesList";
 import TruckingFinanceGuides from "./pages/TruckingFinanceGuides";
+import FuelCostPerMileTrucking from "./pages/FuelCostPerMileTrucking";
+import TruckingMaintenanceCostPerMile from "./pages/TruckingMaintenanceCostPerMile";
+import TruckDriverFuelExpenses from "./pages/TruckDriverFuelExpenses";
+import TruckingExpenseCategories from "./pages/TruckingExpenseCategories";
+import OwnerOperatorTaxWriteOffs from "./pages/OwnerOperatorTaxWriteOffs";
+import TruckerFuelCostCalculator from "./pages/TruckerFuelCostCalculator";
+import TruckingMileageExpenseGuide from "./pages/TruckingMileageExpenseGuide";
+import TruckerCostPerMileBreakdown from "./pages/TruckerCostPerMileBreakdown";
+import OwnerOperatorOperatingCosts from "./pages/OwnerOperatorOperatingCosts";
+import TruckDriverOperatingExpenses from "./pages/TruckDriverOperatingExpenses";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
