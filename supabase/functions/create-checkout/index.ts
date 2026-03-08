@@ -11,6 +11,12 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CREATE-CHECKOUT] ${step}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
+/** Map plan keys to environment variable names for price IDs */
+const PLAN_KEY_TO_ENV: Record<string, string> = {
+  pro_monthly: "STRIPE_PRO_MONTHLY_PRICE_ID",
+  pro_yearly: "STRIPE_PRO_YEARLY_PRICE_ID",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -36,8 +42,45 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    const { priceId } = await req.json();
-    if (!priceId) throw new Error("priceId is required");
+    const body = await req.json();
+    // Support both planKey (new) and priceId (legacy)
+    let priceId: string | undefined;
+    const planKey = body.planKey as string | undefined;
+
+    if (planKey) {
+      const envVar = PLAN_KEY_TO_ENV[planKey];
+      if (!envVar) {
+        return new Response(JSON.stringify({ error: `Invalid plan key: ${planKey}` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+      priceId = Deno.env.get(envVar);
+      if (!priceId) {
+        return new Response(JSON.stringify({ error: `Price ID not configured for plan: ${planKey}` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
+      logStep("Resolved plan key to price ID", { planKey, priceId });
+    } else if (body.priceId) {
+      // Legacy support — validate against known price IDs
+      priceId = body.priceId as string;
+      const knownPriceIds = Object.values(PLAN_KEY_TO_ENV)
+        .map((env) => Deno.env.get(env))
+        .filter(Boolean);
+      if (!knownPriceIds.includes(priceId)) {
+        logStep("Warning: legacy priceId not in known list", { priceId });
+        // Still allow — backward compat
+      }
+    }
+
+    if (!priceId) {
+      return new Response(JSON.stringify({ error: "planKey or priceId is required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
     logStep("Price ID received", { priceId });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
@@ -72,7 +115,7 @@ serve(async (req) => {
       },
       success_url: `${origin}/?checkout=success`,
       cancel_url: `${origin}/pricing`,
-      metadata: { user_id: user.id },
+      metadata: { user_id: user.id, plan_key: planKey || "legacy" },
     });
 
     logStep("Checkout session created", { sessionId: session.id });

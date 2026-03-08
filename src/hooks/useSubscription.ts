@@ -1,0 +1,121 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
+import { isProStatus, PlanKey } from '@/lib/billing/plans';
+
+export interface SubscriptionState {
+  isLoading: boolean;
+  isPro: boolean;
+  isTrialing: boolean;
+  planKey: PlanKey;
+  status: string;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: string | null;
+  trialEnd: string | null;
+  refetch: () => void;
+}
+
+export function useSubscription(): SubscriptionState {
+  const { user } = useAuth();
+  const { isAdmin, isLoading: isAdminLoading } = useAdmin();
+  const [isLoading, setIsLoading] = useState(true);
+  const [planKey, setPlanKey] = useState<PlanKey>('free');
+  const [status, setStatus] = useState('free');
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
+  const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
+  const [trialEnd, setTrialEnd] = useState<string | null>(null);
+
+  const fetchSubscription = useCallback(async () => {
+    if (!user) {
+      setPlanKey('free');
+      setStatus('free');
+      setCancelAtPeriodEnd(false);
+      setCurrentPeriodEnd(null);
+      setTrialEnd(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // Admin override — always Pro
+    if (isAdmin) {
+      setPlanKey('pro_monthly');
+      setStatus('active');
+      setCancelAtPeriodEnd(false);
+      setCurrentPeriodEnd(null);
+      setTrialEnd(null);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Read from subscriptions table (canonical source)
+      const { data: sub } = await supabase
+        .from('subscriptions' as any)
+        .select('plan_key, status, cancel_at_period_end, current_period_end, trial_end')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (sub) {
+        setPlanKey((sub as any).plan_key || 'free');
+        setStatus((sub as any).status || 'free');
+        setCancelAtPeriodEnd((sub as any).cancel_at_period_end || false);
+        setCurrentPeriodEnd((sub as any).current_period_end || null);
+        setTrialEnd((sub as any).trial_end || null);
+      }
+
+      // Also trigger edge function to sync with Stripe (can only upgrade, never downgrade admin/manual overrides)
+      try {
+        const { data } = await supabase.functions.invoke('check-subscription');
+        if (data?.subscribed === true) {
+          // Re-read subscription after edge function may have updated it
+          const { data: freshSub } = await supabase
+            .from('subscriptions' as any)
+            .select('plan_key, status, cancel_at_period_end, current_period_end, trial_end')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (freshSub) {
+            setPlanKey((freshSub as any).plan_key || 'free');
+            setStatus((freshSub as any).status || 'free');
+            setCancelAtPeriodEnd((freshSub as any).cancel_at_period_end || false);
+            setCurrentPeriodEnd((freshSub as any).current_period_end || null);
+            setTrialEnd((freshSub as any).trial_end || null);
+          }
+        } else if (sub && !isProStatus((sub as any).status)) {
+          // Only downgrade if DB already shows non-pro
+          setPlanKey('free');
+          setStatus('free');
+        }
+        // If sub shows pro but edge says no → keep DB value (manual override)
+      } catch {
+        // Keep DB-based state on error
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (isAdminLoading) return;
+    fetchSubscription();
+    const interval = setInterval(fetchSubscription, 60000);
+    return () => clearInterval(interval);
+  }, [fetchSubscription, isAdminLoading]);
+
+  const isPro = isAdmin || isProStatus(status);
+  const isTrialing = status === 'trialing';
+
+  return {
+    isLoading,
+    isPro,
+    isTrialing,
+    planKey,
+    status,
+    cancelAtPeriodEnd,
+    currentPeriodEnd,
+    trialEnd,
+    refetch: fetchSubscription,
+  };
+}

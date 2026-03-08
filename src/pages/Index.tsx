@@ -9,6 +9,7 @@ import { useFeedback } from '@/hooks/useFeedback';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
+import { useSubscription } from '@/hooks/useSubscription';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
@@ -55,40 +56,20 @@ const Index = () => {
   const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
   const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
 
-  // Pro gating — admin bypass + profile-first + edge function upgrade only
-  const [isPro, setIsPro] = useState(false);
+  // Pro gating — canonical subscription hook
+  const subscription = useSubscription();
+  const isPro = subscription.isPro;
+
+  // Handle checkout success return
   useEffect(() => {
-    if (!user) { setIsPro(false); return; }
-
-    // Admin users are always Pro
-    if (isAdmin) { setIsPro(true); return; }
-
-    const checkSub = async () => {
-      // 1. Check profile first for instant detection
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('subscription_status')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      const profileIsPro = profile?.subscription_status === 'pro' || profile?.subscription_status === 'trial';
-      if (profileIsPro) setIsPro(true);
-
-      // 2. Edge function can only upgrade, never downgrade a profile-confirmed Pro
-      try {
-        const { data } = await supabase.functions.invoke('check-subscription');
-        if (data?.subscribed === true) {
-          setIsPro(true);
-        } else if (!profileIsPro) {
-          setIsPro(false);
-        }
-      } catch {
-        // On error, keep profile-based status
-      }
-    };
-    checkSub();
-    const interval = setInterval(checkSub, 60000);
-    return () => clearInterval(interval);
-  }, [user, isAdmin]);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      toast.success('Welcome to Pro! Your subscription is now active.', { duration: 5000 });
+      subscription.refetch();
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   // Editing stops state
   const [editingStops, setEditingStops] = useState<LoadStopInput[]>([]);

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -67,41 +68,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [isPro, setIsPro] = useState<boolean | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
-
-  // Check subscription status — admin users get Pro immediately, others check profile + edge function
-  useEffect(() => {
-    if (isAdminLoading) return; // wait for admin+auth to resolve first
-    if (isAdmin) { setIsPro(true); return; } // admin → Pro immediately
-    if (!user) { setIsPro(false); return; } // no user after auth loaded → Free
-
-    let cancelled = false;
-    const checkSub = async () => {
-      // Instant read from profile to avoid flash
-      const { data: profile } = await supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle();
-      if (cancelled) return;
-      const profileIsPro = profile?.subscription_status === 'pro';
-      setIsPro(profileIsPro);
-
-      // Then confirm via edge function
-      try {
-        const { data } = await supabase.functions.invoke('check-subscription');
-        if (!cancelled) {
-          if (data?.subscribed === true) {
-            setIsPro(true);
-          } else if (!profileIsPro) {
-            setIsPro(false);
-          }
-        }
-      } catch {
-        // keep profile value
-      }
-    };
-    checkSub();
-    return () => { cancelled = true; };
-  }, [user, isAdmin, isAdminLoading]);
+  const subscription = useSubscription();
+  const isPro = subscription.isPro;
 
   // Sync from loaded settings once
   if (settings && !initialized) {
@@ -203,17 +173,17 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <Shield className="h-3 w-3" /> Encrypted in transit
           </p>
           <div className="flex items-center gap-2 mt-1">
-            {isPro === null ? (
+            {subscription.isLoading ? (
               <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Checking plan…
               </span>
             ) : (
               <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isPro ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'}`}>
-                {isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
+                {subscription.isTrialing ? <><Crown className="h-3 w-3" /> Pro Trial</> : isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
               </span>
             )}
           </div>
-          {isPro === false && (
+          {!isPro && !subscription.isLoading && (
             <div className="pt-2 space-y-1">
               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
               {freePlanIncludes.map((item, i) => (
@@ -227,10 +197,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               </p>
             </div>
           )}
-          {isPro && (
+          {isPro && !subscription.isLoading && (
             <div className="pt-2 space-y-1">
-              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Pro Plan Active</p>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                {subscription.isTrialing ? 'Pro Trial Active' : 'Pro Plan Active'}
+              </p>
               <p className="text-xs text-muted-foreground">All features unlocked including advanced alerts, scorecard, exports, and unlimited parsing.</p>
+              {subscription.isTrialing && subscription.trialEnd && (
+                <p className="text-xs text-warning/80">Trial ends: {format(parseISO(subscription.trialEnd), 'PPP')}</p>
+              )}
             </div>
           )}
         </CardContent>
@@ -247,6 +222,19 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           ) : isPro ? (
             <>
               <p className="text-xs text-muted-foreground">Manage your subscription, update payment method, or view invoices.</p>
+              {subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
+                <div className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                  <p className="text-xs text-warning">
+                    Your Pro access remains active until {format(parseISO(subscription.currentPeriodEnd), 'PPP')}.
+                  </p>
+                </div>
+              )}
+              {!subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && !subscription.isTrialing && (
+                <p className="text-[10px] text-muted-foreground">
+                  Renews: {format(parseISO(subscription.currentPeriodEnd), 'PPP')}
+                </p>
+              )}
               <Button
                 variant="outline"
                 className="w-full h-11 rounded-xl font-bold gap-2"
@@ -271,7 +259,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 {portalLoading ? 'Opening billing portal…' : 'Manage Subscription'}
               </Button>
             </>
-          ) : isPro === false ? (
+          ) : !subscription.isLoading ? (
             <>
               <p className="text-xs text-muted-foreground">You're on the Free plan. Upgrade to unlock all Pro features.</p>
               <Button className="w-full h-11 rounded-xl font-bold gap-2" onClick={() => navigate('/pricing')}>

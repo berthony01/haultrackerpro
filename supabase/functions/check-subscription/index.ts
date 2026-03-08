@@ -11,6 +11,15 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
+/** Resolve plan_key from a Stripe price ID */
+function resolvePlanKey(priceId: string): string {
+  const monthlyPriceId = Deno.env.get("STRIPE_PRO_MONTHLY_PRICE_ID");
+  const yearlyPriceId = Deno.env.get("STRIPE_PRO_YEARLY_PRICE_ID");
+  if (priceId === monthlyPriceId) return "pro_monthly";
+  if (priceId === yearlyPriceId) return "pro_yearly";
+  return "pro_monthly";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -49,20 +58,34 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Check for manual override in subscriptions table first
+    const { data: existingSub } = await supabaseClient
+      .from("subscriptions")
+      .select("status, plan_key")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found");
-      // Check if user has a manual override (admin-set pro status)
+      // Check for manual override
+      if (existingSub?.status === "active" || existingSub?.status === "trialing") {
+        logStep("Manual override found in subscriptions table, preserving");
+        return new Response(JSON.stringify({ subscribed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+      // Also check profiles for legacy manual overrides
       const { data: profile } = await supabaseClient
         .from("profiles")
         .select("subscription_status")
         .eq("user_id", user.id)
         .maybeSingle();
-
       if (profile?.subscription_status === "pro") {
-        logStep("Manual pro override found, preserving status");
+        logStep("Manual pro override found in profiles, preserving");
         return new Response(JSON.stringify({ subscribed: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
@@ -78,7 +101,6 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
-    // Check for both active AND trialing subscriptions
     const activeSubscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: "active",
@@ -97,14 +119,38 @@ serve(async (req) => {
     let productId = null;
 
     if (hasActiveSub) {
+      const priceId = subscription.items.data[0]?.price?.id || "";
+      const planKey = resolvePlanKey(priceId);
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
+      const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
+      const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;
+      const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
       productId = subscription.items.data[0].price.product;
       const isTrial = subscription.status === "trialing";
       logStep("Subscription found", { subscriptionId: subscription.id, status: subscription.status, isTrial, productId, endDate: subscriptionEnd });
 
+      // Upsert subscriptions table
+      await supabaseClient
+        .from("subscriptions")
+        .upsert({
+          user_id: user.id,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscription.id,
+          stripe_price_id: priceId,
+          plan_key: planKey,
+          status: subscription.status,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+          current_period_start: subscriptionStart,
+          current_period_end: subscriptionEnd,
+          trial_start: trialStart,
+          trial_end: trialEnd,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+
+      // Backward compat profiles
       await supabaseClient.from("profiles").update({
         subscription_status: "pro",
-        subscription_plan: "pro",
+        subscription_plan: planKey,
         stripe_customer_id: customerId,
         stripe_subscription_id: subscription.id,
         subscription_expires_at: subscriptionEnd,
@@ -112,19 +158,43 @@ serve(async (req) => {
     } else {
       logStep("No active or trialing subscription");
       // Check for manual override before resetting
-      const { data: profile } = await supabaseClient
-        .from("profiles")
-        .select("subscription_status")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (profile?.subscription_status === "pro") {
-        logStep("Manual pro override found, preserving status");
+      if (existingSub?.status === "active" || existingSub?.status === "trialing") {
+        logStep("Manual override found, preserving status");
         return new Response(JSON.stringify({ subscribed: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         });
       }
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("subscription_status")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (profile?.subscription_status === "pro") {
+        logStep("Manual pro override in profiles, preserving");
+        return new Response(JSON.stringify({ subscribed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+
+      // Reset both tables
+      await supabaseClient
+        .from("subscriptions")
+        .upsert({
+          user_id: user.id,
+          stripe_customer_id: customerId,
+          plan_key: "free",
+          status: "free",
+          cancel_at_period_end: false,
+          stripe_subscription_id: null,
+          stripe_price_id: null,
+          current_period_start: null,
+          current_period_end: null,
+          trial_start: null,
+          trial_end: null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
 
       await supabaseClient.from("profiles").update({
         subscription_status: "free",

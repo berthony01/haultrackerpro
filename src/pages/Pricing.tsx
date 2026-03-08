@@ -6,9 +6,7 @@ import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-const MONTHLY_PRICE_ID = 'price_1T6CKEI2TXbeuHi4TRGgvYlU';
-const ANNUAL_PRICE_ID = 'price_1T6CKFI2TXbeuHi4ukgdi2Md';
+import { PLANS } from '@/lib/billing/plans';
 
 const freeFeatures = [
   'Unlimited load logging',
@@ -73,10 +71,12 @@ export default function Pricing() {
     }
     setLoading(true);
     try {
+      const planKey = annual ? 'pro_yearly' : 'pro_monthly';
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { priceId: annual ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID },
+        body: { planKey },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       if (data?.url) {
         window.location.href = data.url;
       }
