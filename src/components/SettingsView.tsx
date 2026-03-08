@@ -222,6 +222,19 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           ) : isPro ? (
             <>
               <p className="text-xs text-muted-foreground">Manage your subscription, update payment method, or view invoices.</p>
+              {subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
+                <div className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                  <p className="text-xs text-warning">
+                    Your Pro access remains active until {format(parseISO(subscription.currentPeriodEnd), 'PPP')}.
+                  </p>
+                </div>
+              )}
+              {!subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && !subscription.isTrialing && (
+                <p className="text-[10px] text-muted-foreground">
+                  Renews: {format(parseISO(subscription.currentPeriodEnd), 'PPP')}
+                </p>
+              )}
               <Button
                 variant="outline"
                 className="w-full h-11 rounded-xl font-bold gap-2"
@@ -246,7 +259,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 {portalLoading ? 'Opening billing portal…' : 'Manage Subscription'}
               </Button>
             </>
-          ) : isPro === false ? (
+          ) : !subscription.isLoading ? (
             <>
               <p className="text-xs text-muted-foreground">You're on the Free plan. Upgrade to unlock all Pro features.</p>
               <Button className="w-full h-11 rounded-xl font-bold gap-2" onClick={() => navigate('/pricing')}>
