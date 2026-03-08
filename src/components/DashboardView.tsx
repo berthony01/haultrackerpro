@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
+import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
@@ -11,6 +12,7 @@ import { ProfitOverview } from '@/components/ProfitOverview';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
+import { FuelAnalyticsCard } from '@/components/FuelAnalyticsCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Crown, Lock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
