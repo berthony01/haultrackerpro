@@ -205,14 +205,14 @@ export function CSVImport({ isPro }: CSVImportProps) {
                 <div key={field} className="space-y-1">
                   <Label className="text-[10px] font-semibold capitalize">{field.replace(/_/g, ' ')}</Label>
                   <Select
-                    value={mapping[field]?.toString() ?? ''}
-                    onValueChange={(v) => updateMapping(field, v)}
+                    value={mapping[field] != null && mapping[field] >= 0 ? mapping[field].toString() : 'unmapped'}
+                    onValueChange={(v) => updateMapping(field, v === 'unmapped' ? '' : v)}
                   >
                     <SelectTrigger className="h-9 text-xs rounded-lg">
                       <SelectValue placeholder="Select column" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">-- Not mapped --</SelectItem>
+                      <SelectItem value="unmapped">-- Not mapped --</SelectItem>
                       {headers.map((h, i) => (
                         <SelectItem key={i} value={i.toString()}>{h}</SelectItem>
                       ))}
