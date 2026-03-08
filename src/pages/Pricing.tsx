@@ -71,10 +71,12 @@ export default function Pricing() {
     }
     setLoading(true);
     try {
+      const planKey = annual ? 'pro_yearly' : 'pro_monthly';
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { priceId: annual ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID },
+        body: { planKey },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       if (data?.url) {
         window.location.href = data.url;
       }
