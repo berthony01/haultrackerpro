@@ -9,6 +9,7 @@ import { useFeedback } from '@/hooks/useFeedback';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
+import { useSubscription } from '@/hooks/useSubscription';
 import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
