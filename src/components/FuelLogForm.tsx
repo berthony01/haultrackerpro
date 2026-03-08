@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FuelLogInsert, FuelLog } from '@/hooks/useFuelLogs';
 import { Load } from '@/hooks/useLoads';
 import { Card, CardContent } from '@/components/ui/card';

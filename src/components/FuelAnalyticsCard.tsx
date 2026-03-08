@@ -3,7 +3,7 @@ import { Load } from '@/hooks/useLoads';
 import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Fuel, TrendingUp, Percent, Crown, Lock } from 'lucide-react';
+import { Fuel, Crown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface FuelAnalyticsCardProps {

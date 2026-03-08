@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Fuel, Pencil, Trash2, Search, ArrowLeft, Calendar, Gauge, Link } from 'lucide-react';
+import { Fuel, Pencil, Trash2, Search, ArrowLeft, Gauge, Link } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface FuelLogsListViewProps {
