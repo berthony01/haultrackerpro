@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 interface DashboardViewProps {
   loads: Load[];
   expenses?: Expense[];
+  fuelLogs?: FuelLog[];
   isLoading?: boolean;
   onNavigate?: (page: string, options?: { filter?: string }) => void;
   smartAlerts?: { alerts: any[]; dismissAlert: { mutate: (key: string) => void } };
