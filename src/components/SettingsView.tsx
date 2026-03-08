@@ -173,17 +173,17 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <Shield className="h-3 w-3" /> Encrypted in transit
           </p>
           <div className="flex items-center gap-2 mt-1">
-            {isPro === null ? (
+            {subscription.isLoading ? (
               <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Checking plan…
               </span>
             ) : (
               <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isPro ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'}`}>
-                {isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
+                {subscription.isTrialing ? <><Crown className="h-3 w-3" /> Pro Trial</> : isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
               </span>
             )}
           </div>
-          {isPro === false && (
+          {!isPro && !subscription.isLoading && (
             <div className="pt-2 space-y-1">
               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
               {freePlanIncludes.map((item, i) => (
@@ -197,10 +197,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               </p>
             </div>
           )}
-          {isPro && (
+          {isPro && !subscription.isLoading && (
             <div className="pt-2 space-y-1">
-              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Pro Plan Active</p>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                {subscription.isTrialing ? 'Pro Trial Active' : 'Pro Plan Active'}
+              </p>
               <p className="text-xs text-muted-foreground">All features unlocked including advanced alerts, scorecard, exports, and unlimited parsing.</p>
+              {subscription.isTrialing && subscription.trialEnd && (
+                <p className="text-xs text-warning/80">Trial ends: {format(parseISO(subscription.trialEnd), 'PPP')}</p>
+              )}
             </div>
           )}
         </CardContent>
