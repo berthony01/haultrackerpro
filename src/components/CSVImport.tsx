@@ -212,7 +212,7 @@ export function CSVImport({ isPro }: CSVImportProps) {
                       <SelectValue placeholder="Select column" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">-- Not mapped --</SelectItem>
+                      <SelectItem value="unmapped">-- Not mapped --</SelectItem>
                       {headers.map((h, i) => (
                         <SelectItem key={i} value={i.toString()}>{h}</SelectItem>
                       ))}
