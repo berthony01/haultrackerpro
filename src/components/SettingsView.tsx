@@ -68,41 +68,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [isPro, setIsPro] = useState<boolean | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
-
-  // Check subscription status — admin users get Pro immediately, others check profile + edge function
-  useEffect(() => {
-    if (isAdminLoading) return; // wait for admin+auth to resolve first
-    if (isAdmin) { setIsPro(true); return; } // admin → Pro immediately
-    if (!user) { setIsPro(false); return; } // no user after auth loaded → Free
-
-    let cancelled = false;
-    const checkSub = async () => {
-      // Instant read from profile to avoid flash
-      const { data: profile } = await supabase.from('profiles').select('subscription_status').eq('user_id', user.id).maybeSingle();
-      if (cancelled) return;
-      const profileIsPro = profile?.subscription_status === 'pro';
-      setIsPro(profileIsPro);
-
-      // Then confirm via edge function
-      try {
-        const { data } = await supabase.functions.invoke('check-subscription');
-        if (!cancelled) {
-          if (data?.subscribed === true) {
-            setIsPro(true);
-          } else if (!profileIsPro) {
-            setIsPro(false);
-          }
-        }
-      } catch {
-        // keep profile value
-      }
-    };
-    checkSub();
-    return () => { cancelled = true; };
-  }, [user, isAdmin, isAdminLoading]);
+  const subscription = useSubscription();
+  const isPro = subscription.isPro;
 
   // Sync from loaded settings once
   if (settings && !initialized) {
