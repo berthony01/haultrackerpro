@@ -244,6 +244,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           {/* Profit Overview */}
           <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined} />
 
+          {/* Fuel Analytics */}
+          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={filteredLoads} isPro={isPro} onNavigate={onNavigate} />
+
           {/* Tax Estimate */}
           <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
 
