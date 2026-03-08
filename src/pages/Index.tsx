@@ -60,6 +60,17 @@ const Index = () => {
   const subscription = useSubscription();
   const isPro = subscription.isPro;
 
+  // Handle checkout success return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      toast.success('Welcome to Pro! Your subscription is now active.', { duration: 5000 });
+      subscription.refetch();
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   // Editing stops state
   const [editingStops, setEditingStops] = useState<LoadStopInput[]>([]);
 
