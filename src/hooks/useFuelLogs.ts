@@ -63,7 +63,7 @@ export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
         .select()
         .single();
       if (error) throw error;
-      return result as FuelLog;
+      return result as unknown as FuelLog;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fuel_logs'] }),
   });
