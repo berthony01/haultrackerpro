@@ -407,6 +407,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         isPro={isPro ?? false}
       />
 
+      {/* CSV Import */}
+      <CSVImport isPro={isPro ?? false} />
+
       {/* Data Management */}
       <Card className="shadow-card">
         <CardContent className="p-4 space-y-3">
