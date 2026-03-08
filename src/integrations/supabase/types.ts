@@ -169,6 +169,59 @@ export type Database = {
         }
         Relationships: []
       }
+      fuel_logs: {
+        Row: {
+          created_at: string
+          date: string
+          gallons: number
+          id: string
+          linked_load_id: string | null
+          notes: string | null
+          odometer: number | null
+          price_per_gallon: number
+          station: string | null
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          gallons: number
+          id?: string
+          linked_load_id?: string | null
+          notes?: string | null
+          odometer?: number | null
+          price_per_gallon: number
+          station?: string | null
+          total_cost: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          gallons?: number
+          id?: string
+          linked_load_id?: string | null
+          notes?: string | null
+          odometer?: number | null
+          price_per_gallon?: number
+          station?: string | null
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_logs_linked_load_id_fkey"
+            columns: ["linked_load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       load_stops: {
         Row: {
           created_at: string

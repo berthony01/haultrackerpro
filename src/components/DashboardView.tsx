@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
+import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
@@ -11,6 +12,7 @@ import { ProfitOverview } from '@/components/ProfitOverview';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
+import { FuelAnalyticsCard } from '@/components/FuelAnalyticsCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Crown, Lock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 interface DashboardViewProps {
   loads: Load[];
   expenses?: Expense[];
+  fuelLogs?: FuelLog[];
   isLoading?: boolean;
   onNavigate?: (page: string, options?: { filter?: string }) => void;
   smartAlerts?: { alerts: any[]; dismissAlert: { mutate: (key: string) => void } };
@@ -52,7 +55,7 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
   }
 }
 
-export function DashboardView({ loads, expenses = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
   const navigate = useNavigate();
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
@@ -240,6 +243,9 @@ export function DashboardView({ loads, expenses = [], isLoading, onNavigate, sma
 
           {/* Profit Overview */}
           <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined} />
+
+          {/* Fuel Analytics */}
+          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={filteredLoads} isPro={isPro} onNavigate={onNavigate} />
 
           {/* Tax Estimate */}
           <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />

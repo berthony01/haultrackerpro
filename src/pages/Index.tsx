@@ -3,6 +3,7 @@ import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import SEOHead from '@/components/SEOHead';
 import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
+import { useFuelLogs, FuelLogInsert, FuelLog } from '@/hooks/useFuelLogs';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useFeedback } from '@/hooks/useFeedback';
@@ -14,6 +15,8 @@ import { BottomNav } from '@/components/BottomNav';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
 import { ExpenseForm } from '@/components/ExpenseForm';
+import { FuelLogForm } from '@/components/FuelLogForm';
+import { FuelLogsListView } from '@/components/FuelLogsListView';
 import { AddActionModal } from '@/components/AddActionModal';
 import { ExpensesListView } from '@/components/ExpensesListView';
 import { LoadsListView } from '@/components/LoadsListView';
@@ -43,6 +46,7 @@ const Index = () => {
   const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editingFuelLog, setEditingFuelLog] = useState<FuelLog | null>(null);
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set());
   const [showFeedback, setShowFeedback] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -50,6 +54,7 @@ const Index = () => {
 
   const allLoadsQuery = useLoads();
   const allExpensesQuery = useExpenses();
+  const allFuelLogsQuery = useFuelLogs();
   const loadStopsHook = useLoadStops();
 
   // Smart Alerts & Scorecard
@@ -66,7 +71,6 @@ const Index = () => {
     if (params.get('checkout') === 'success') {
       toast.success('Welcome to Pro! Your subscription is now active.', { duration: 5000 });
       subscription.refetch();
-      // Clean up URL
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -150,6 +154,34 @@ const Index = () => {
     setPage('add_expense');
   };
 
+  // Fuel log handlers
+  const handleAddFuelLog = (data: FuelLogInsert) => {
+    allFuelLogsQuery.addFuelLog.mutate(data, {
+      onSuccess: () => { toast.success('Fuel log saved!'); setEditingFuelLog(null); setPage('fuel'); },
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const handleUpdateFuelLog = (data: FuelLogInsert) => {
+    if (!editingFuelLog) return;
+    allFuelLogsQuery.updateFuelLog.mutate({ id: editingFuelLog.id, data }, {
+      onSuccess: () => { toast.success('Fuel log updated!'); setEditingFuelLog(null); setPage('fuel'); },
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const handleDeleteFuelLog = (id: string) => {
+    allFuelLogsQuery.deleteFuelLog.mutate(id, {
+      onSuccess: () => toast.success('Fuel log deleted'),
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const handleEditFuelLog = (log: FuelLog) => {
+    setEditingFuelLog(log);
+    setPage('add_fuel');
+  };
+
   const handleUpdateLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     if (!editingLoad) return;
     updateLoad.mutate({ id: editingLoad.id, data }, {
@@ -202,6 +234,7 @@ const Index = () => {
     setEditingLoad(null);
     setEditingStops([]);
     setEditingExpense(null);
+    setEditingFuelLog(null);
     setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
     setPage(p);
   };
@@ -215,6 +248,11 @@ const Index = () => {
   const handleAddExpenseFromModal = () => {
     setEditingExpense(null);
     setPage('add_expense');
+  };
+
+  const handleAddFuelFromModal = () => {
+    setEditingFuelLog(null);
+    setPage('add_fuel');
   };
 
   return (
@@ -261,6 +299,7 @@ const Index = () => {
               <DashboardView
                 loads={allLoadsQuery.loads}
                 expenses={allExpensesQuery.expenses}
+                fuelLogs={allFuelLogsQuery.fuelLogs}
                 isLoading={allLoadsQuery.isLoading}
                 onNavigate={handleNavigate}
                 smartAlerts={smartAlerts}
@@ -299,6 +338,27 @@ const Index = () => {
                   isPro={isPro}
                 />
               </div>
+            )}
+            {page === 'add_fuel' && (
+              <div className="animate-fade-in">
+                <FuelLogForm
+                  onSubmit={editingFuelLog ? handleUpdateFuelLog : handleAddFuelLog}
+                  onCancel={() => { setEditingFuelLog(null); setPage('fuel'); }}
+                  loading={allFuelLogsQuery.addFuelLog.isPending || allFuelLogsQuery.updateFuelLog.isPending}
+                  loads={allLoadsQuery.loads}
+                  initialData={editingFuelLog}
+                />
+              </div>
+            )}
+            {page === 'fuel' && (
+              <FuelLogsListView
+                fuelLogs={allFuelLogsQuery.fuelLogs}
+                loads={allLoadsQuery.loads}
+                onEdit={handleEditFuelLog}
+                onDelete={handleDeleteFuelLog}
+                isLoading={allFuelLogsQuery.isLoading}
+                onBack={() => setPage('dashboard')}
+              />
             )}
             {page === 'expenses' && (
               <ExpensesListView
@@ -365,6 +425,7 @@ const Index = () => {
         onOpenChange={setShowAddModal}
         onAddLoad={handleAddLoadFromModal}
         onAddExpense={handleAddExpenseFromModal}
+        onAddFuelLog={handleAddFuelFromModal}
       />
       <FeedbackModal
         totalLoads={allLoadsQuery.loads.length}

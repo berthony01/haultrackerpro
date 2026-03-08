@@ -18,6 +18,7 @@ import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { SendFeedbackModal } from '@/components/SendFeedbackModal';
 import { TaxPlannerSettings } from '@/components/TaxPlannerSettings';
 import { QuarterlyReminderSettings } from '@/components/QuarterlyReminderSettings';
+import { CSVImport } from '@/components/CSVImport';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
 
@@ -405,6 +406,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         isPending={updateSettings.isPending}
         isPro={isPro ?? false}
       />
+
+      {/* CSV Import */}
+      <CSVImport isPro={isPro ?? false} />
 
       {/* Data Management */}
       <Card className="shadow-card">
