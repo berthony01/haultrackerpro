@@ -157,12 +157,12 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
           {recentLoads.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Link to Load (optional)</Label>
-              <Select value={linkedLoadId} onValueChange={setLinkedLoadId}>
+              <Select value={linkedLoadId || 'none'} onValueChange={(v) => setLinkedLoadId(v === 'none' ? '' : v)}>
                 <SelectTrigger className="h-11 rounded-xl">
                   <SelectValue placeholder="Select a load" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No link</SelectItem>
+                  <SelectItem value="none">No link</SelectItem>
                   {recentLoads.map((load) => (
                     <SelectItem key={load.id} value={load.id}>
                       {format(new Date(load.load_date), 'MMM d')} — {load.pickup_location.split(',')[0]} → {load.dropoff_location.split(',')[0]}
