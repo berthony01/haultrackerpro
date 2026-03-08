@@ -414,7 +414,7 @@ const Index = () => {
                 isPro={isPro}
               />
             )}
-            {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} isPro={isPro} />}
+            {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
         )}
       </main>
