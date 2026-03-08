@@ -6,9 +6,7 @@ import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-const MONTHLY_PRICE_ID = 'price_1T6CKEI2TXbeuHi4TRGgvYlU';
-const ANNUAL_PRICE_ID = 'price_1T6CKFI2TXbeuHi4ukgdi2Md';
+import { PLANS } from '@/lib/billing/plans';
 
 const freeFeatures = [
   'Unlimited load logging',
