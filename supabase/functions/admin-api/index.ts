@@ -134,7 +134,15 @@ Deno.serve(async (req) => {
       if (!targetUserId || !["free", "pro"].includes(newStatus)) {
         return json({ error: "Invalid parameters" }, 400);
       }
+      // Update both profiles (legacy) and subscriptions (canonical)
       await adminDb.from("profiles").update({ subscription_status: newStatus }).eq("user_id", targetUserId);
+      await adminDb.from("subscriptions").upsert({
+        user_id: targetUserId,
+        plan_key: newStatus === "pro" ? "pro_monthly" : "free",
+        status: newStatus === "pro" ? "active" : "free",
+        cancel_at_period_end: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
       await adminDb.from("admin_audit_log").insert({
         admin_user_id: userId,
         action: "set-plan-override",
