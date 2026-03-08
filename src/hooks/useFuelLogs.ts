@@ -49,7 +49,7 @@ export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
       
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as FuelLog[];
+      return (data ?? []) as unknown as FuelLog[];
     },
     enabled: !!user,
   });
