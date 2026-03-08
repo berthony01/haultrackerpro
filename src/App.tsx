@@ -39,6 +39,8 @@ import OwnerOperatorOperatingCosts from "./pages/OwnerOperatorOperatingCosts";
 import TruckDriverOperatingExpenses from "./pages/TruckDriverOperatingExpenses";
 import TruckingCostPerMileCalculator from "./pages/TruckingCostPerMileCalculator";
 import TruckingLoadProfitCalculator from "./pages/TruckingLoadProfitCalculator";
+import ToolsLoadProfitCalculator from "./pages/tools/LoadProfitCalculator";
+import ToolsFuelCostPerMile from "./pages/tools/FuelCostPerMileCalculator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
