@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, format } from 'date-fns';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber } from '@/lib/loadUtils';
 
@@ -15,7 +15,9 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
 
   const presets = [
     { label: 'This Week', getRange: () => ({ from: startOfWeek(new Date(), { weekStartsOn: wso }), to: endOfWeek(new Date(), { weekStartsOn: wso }) }) },
+    { label: 'Last Week', getRange: () => { const lw = subWeeks(new Date(), 1); return { from: startOfWeek(lw, { weekStartsOn: wso }), to: endOfWeek(lw, { weekStartsOn: wso }) }; } },
     { label: 'This Month', getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
+    { label: 'Last Month', getRange: () => { const lm = subMonths(new Date(), 1); return { from: startOfMonth(lm), to: endOfMonth(lm) }; } },
     { label: 'This Year', getRange: () => ({ from: startOfYear(new Date()), to: endOfYear(new Date()) }) },
     { label: 'All Time', getRange: () => ({ from: undefined, to: undefined }) },
   ];

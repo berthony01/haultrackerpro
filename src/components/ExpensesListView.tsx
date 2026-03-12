@@ -131,20 +131,41 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
       </div>
 
       {/* Total Summary */}
-      <Card className="card-premium shadow-card">
-        <CardContent className="p-4 flex items-center gap-3">
-          <div className="rounded-xl bg-primary/10 p-2.5 shrink-0">
-            <CircleDollarSign className="h-5 w-5 text-primary" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-label">Total Expenses (filtered)</p>
-            <p className="text-value-lg mt-0.5 whitespace-nowrap" style={{ fontSize: 'clamp(1rem, 5vw, 1.5rem)' }}>
-              {formatCurrency(totalFiltered)}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{filtered.length} expense{filtered.length !== 1 ? 's' : ''}</p>
-          </div>
-        </CardContent>
-      </Card>
+      {(() => {
+        const catTotals = filtered.reduce((acc, e) => {
+          acc[e.category] = (acc[e.category] || 0) + Number(e.amount);
+          return acc;
+        }, {} as Record<string, number>);
+        const topCats = Object.entries(catTotals)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3);
+
+        return (
+          <Card className="card-premium shadow-card">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 p-2.5 shrink-0">
+                <CircleDollarSign className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-label">Total Expenses (filtered)</p>
+                <p className="text-value-lg mt-0.5 whitespace-nowrap" style={{ fontSize: 'clamp(1rem, 5vw, 1.5rem)' }}>
+                  {formatCurrency(totalFiltered)}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{filtered.length} expense{filtered.length !== 1 ? 's' : ''}</p>
+                {topCats.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {topCats.map(([cat, amt]) => (
+                      <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                        {cat}: {formatCurrency(amt)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Date Presets */}
       <div className="space-y-2">
