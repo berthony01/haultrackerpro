@@ -24,6 +24,7 @@ const guides = [
   { path: '/truck-driver-operating-expenses', title: 'Truck Driver Operating Expenses' },
   { path: '/trucking-cost-per-mile-calculator', title: 'Trucking Cost Per Mile Calculator' },
   { path: '/trucking-load-profit-calculator', title: 'Trucking Load Profit Calculator' },
+  { path: '/how-to-use-haultrackerpro', title: 'How to Use HaulTrackerPro' },
 ];
 
 interface Props {
