@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
 import { LoadCard, LoadCardSkeleton } from '@/components/LoadCard';
 import { LoadDetailSheet } from '@/components/LoadDetailSheet';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Truck, Search } from 'lucide-react';
+import { Truck, Search, TrendingUp, Route, Hash, DollarSign } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { formatCurrency, formatNumber } from '@/lib/loadUtils';
 
 interface LoadsListViewProps {
   loads: Load[];
