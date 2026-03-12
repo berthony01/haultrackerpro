@@ -1,44 +1,39 @@
 
 
-## Plan: Performance Metrics Charts Section
+## Plan: Add Grand Total Summary Cards to Loads, Expenses, and Fuel Logs Pages
 
-### Overview
+### What and Why
 
-Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
+When a driver selects a date preset (This Week, Last Week, etc.), they currently see a filtered list but no aggregated totals for the Loads page. The Expenses page already has a total card but could be enhanced. Adding a summary card right below the date filter gives instant context about the selected period.
 
-### New File: `src/components/PerformanceCharts.tsx`
+### Changes
 
-A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
+#### 1. `src/components/LoadsListView.tsx` — Add summary card
 
-1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
+After the date filter and search/filter row, insert a summary card showing:
+- **Total Loads** (count of filtered)
+- **Total Revenue** (sum of `gross_revenue` or `estimated_pay`)
+- **Total Miles** (sum of `loaded_miles`)
+- **Avg $/mile** (revenue / miles)
 
-2. **Bucket logic** — Based on selected range:
-   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
-   - This Year → monthly buckets ("Jan", "Feb", ...)
+Compute these from the `filtered` array. Use the existing `formatCurrency` and `formatNumber` helpers. Style with `card-premium shadow-card` matching the Expenses page total card — a compact horizontal grid of 4 stats.
 
-3. **5 Charts** (all using Recharts, already installed):
+#### 2. `src/components/ExpensesListView.tsx` — Enhance existing summary
 
-   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
+The existing total card already shows total amount and count. Enhance it minimally by adding a **category breakdown** row showing top 2-3 categories with amounts (compact inline badges). This keeps it informative without clutter.
 
-   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
+#### 3. `src/components/FuelLogsListView.tsx` — Already has totals
 
-   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
+This page already shows total cost and total gallons. No changes needed.
 
-   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
+#### 4. `src/components/DateRangeFilter.tsx` — Add "Last Week" and "Last Month" presets
 
-   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
+Currently the Loads page DateRangeFilter only has: This Week, This Month, This Year, All Time, Custom. Add **Last Week** and **Last Month** presets to match the Expenses page which already has them.
 
-4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
+### Technical Details
 
-5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
-
-### Modified File: `src/components/DashboardView.tsx`
-
-- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
-- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
-
-### No Other Changes
-
-- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
-- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
+- Import `formatCurrency`, `formatNumber` from `@/lib/loadUtils`
+- Import `subWeeks`, `subMonths` from `date-fns` in DateRangeFilter
+- Summary computations use existing filtered array — no new queries
+- No database changes, no new files, no billing changes
 
