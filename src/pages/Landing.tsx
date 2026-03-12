@@ -523,6 +523,7 @@ export default function Landing() {
               <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:block max-w-xs mx-auto sm:max-w-none sm:mx-0">
                 {[
                   { label: 'Finance Guides', href: '/trucking-finance-guides' },
+                  { label: 'How to Use', href: '/how-to-use-haultrackerpro' },
                   { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
                   { label: 'Expense Tracker', href: '/owner-operator-expense-tracker' },
                   { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
