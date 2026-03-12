@@ -54,7 +54,51 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
 
       <DateRangeFilter onRangeChange={onDateRangeChange} />
 
-      <div className="flex gap-2">
+      {/* Summary Card */}
+      {(() => {
+        const totalLoads = filtered.length;
+        const totalRevenue = filtered.reduce((s, l) => s + (l.gross_revenue ?? l.estimated_pay ?? 0), 0);
+        const totalMiles = filtered.reduce((s, l) => s + (l.loaded_miles || 0), 0);
+        const avgPerMile = totalMiles > 0 ? totalRevenue / totalMiles : 0;
+
+        return totalLoads > 0 ? (
+          <Card className="card-premium shadow-card">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <Hash className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <p className="text-lg font-black">{totalLoads}</p>
+                  <p className="text-[10px] text-muted-foreground">Loads</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <DollarSign className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <p className="text-lg font-black">{formatCurrency(totalRevenue)}</p>
+                  <p className="text-[10px] text-muted-foreground">Revenue</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <Route className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <p className="text-lg font-black">{formatNumber(totalMiles)}</p>
+                  <p className="text-[10px] text-muted-foreground">Miles</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <p className="text-lg font-black">${avgPerMile.toFixed(2)}</p>
+                  <p className="text-[10px] text-muted-foreground">Avg $/mi</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
+
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
