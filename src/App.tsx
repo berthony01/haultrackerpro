@@ -41,6 +41,7 @@ import TruckingCostPerMileCalculator from "./pages/TruckingCostPerMileCalculator
 import TruckingLoadProfitCalculator from "./pages/TruckingLoadProfitCalculator";
 import ToolsLoadProfitCalculator from "./pages/tools/LoadProfitCalculator";
 import ToolsFuelCostPerMile from "./pages/tools/FuelCostPerMileCalculator";
+import HowToUseHaulTrackerPro from "./pages/HowToUseHaulTrackerPro";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -118,6 +119,7 @@ const App = () => (
           <Route path="/trucking-load-profit-calculator" element={<TruckingLoadProfitCalculator />} />
           <Route path="/tools/load-profit-calculator" element={<ToolsLoadProfitCalculator />} />
           <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
+          <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

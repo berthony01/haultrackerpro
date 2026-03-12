@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle, BookOpen } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -440,6 +440,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </Button>
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/features')}>
             <Sparkles className="h-4 w-4 text-primary" /> View All Features
+          </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/how-to-use-haultrackerpro')}>
+            <BookOpen className="h-4 w-4 text-primary" /> User Guide
           </Button>
           <AdminDashboardLink />
           <div className="flex items-center gap-2 pt-1">
