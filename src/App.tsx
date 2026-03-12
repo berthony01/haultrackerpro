@@ -119,6 +119,7 @@ const App = () => (
           <Route path="/trucking-load-profit-calculator" element={<TruckingLoadProfitCalculator />} />
           <Route path="/tools/load-profit-calculator" element={<ToolsLoadProfitCalculator />} />
           <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
+          <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
