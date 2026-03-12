@@ -20,7 +20,7 @@ const driverTypes = [
   {
     title: '1099 Company Drivers',
     icon: ClipboardList,
-    description: 'Running under someone else's authority doesn't mean you can skip bookkeeping. Track your pay, per diem, fuel, and deductible expenses to stay tax-ready year-round.',
+    description: 'Running under someone else\'s authority doesn\'t mean you can skip bookkeeping. Track your pay, per diem, fuel, and deductible expenses to stay tax-ready year-round.',
   },
 ];
 
