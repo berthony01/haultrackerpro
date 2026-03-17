@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
-import { formatCurrency, formatNumber, exportToCSV, exportToPDF } from '@/lib/loadUtils';
+import { formatCurrency, formatNumber, exportToCSV, exportToPDF, getEffectiveDate } from '@/lib/loadUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
