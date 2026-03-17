@@ -88,7 +88,7 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
   for (let w = 0; w < 52; w++) {
     const ws = startOfWeek(subWeeks(now, w), { weekStartsOn });
     const we = endOfWeek(subWeeks(now, w), { weekStartsOn });
-    const hasLoad = loads.some(l => isWithinInterval(parseISO(l.load_date), { start: ws, end: we }));
+    const hasLoad = loads.some(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start: ws, end: we }));
     if (hasLoad) streak++;
     else break;
   }

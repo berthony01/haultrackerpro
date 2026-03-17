@@ -274,21 +274,32 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="load_date">Date</Label>
-              <Input id="load_date" type="date" value={form.load_date} onChange={e => update('load_date', e.target.value)} required />
+              <Label htmlFor="load_date">Pickup Date</Label>
+              <Input id="load_date" type="date" value={form.load_date} onChange={e => {
+                update('load_date', e.target.value);
+                // Auto-set dropoff date if not manually set or same as old pickup
+                if (!form.dropoff_date || form.dropoff_date === form.load_date) {
+                  update('dropoff_date', e.target.value);
+                }
+              }} required />
               <FieldError field="load_date" />
             </div>
             <div>
-              <Label htmlFor="status">Status</Label>
-              <Select value={form.status} onValueChange={v => { update('status', v); if (v === 'cancelled' && !form.notes) update('notes', 'Cancelled by dispatcher'); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="dropoff_date">Drop-off Date</Label>
+              <Input id="dropoff_date" type="date" value={form.dropoff_date || form.load_date} onChange={e => update('dropoff_date', e.target.value)} />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="status">Status</Label>
+            <Select value={form.status} onValueChange={v => { update('status', v); if (v === 'cancelled' && !form.notes) update('notes', 'Cancelled by dispatcher'); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

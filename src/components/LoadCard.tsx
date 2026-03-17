@@ -61,7 +61,9 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
             {/* Date + Status row */}
             <div className="flex items-center gap-2 mb-2.5">
               <span className="text-xs font-semibold text-muted-foreground">
-                {format(parseISO(load.load_date), 'MMM d, yyyy')}
+                {(load as any).dropoff_date && (load as any).dropoff_date !== load.load_date
+                  ? `${format(parseISO(load.load_date), 'MMM d')} → ${format(parseISO((load as any).dropoff_date), 'MMM d, yyyy')}`
+                  : format(parseISO(load.load_date), 'MMM d, yyyy')}
               </span>
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
                 {load.status}

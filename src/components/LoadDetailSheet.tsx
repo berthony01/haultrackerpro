@@ -95,10 +95,18 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
         </SheetHeader>
 
         <div className="space-y-5 pt-2">
-          {/* Date */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{format(parseISO(load.load_date), 'EEEE, MMM d, yyyy')}</span>
+          {/* Dates */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4" />
+              <span>Pickup: {format(parseISO(load.load_date), 'EEEE, MMM d, yyyy')}</span>
+            </div>
+            {(load as any).dropoff_date && (load as any).dropoff_date !== load.load_date && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>Delivery: {format(parseISO((load as any).dropoff_date), 'EEEE, MMM d, yyyy')}</span>
+              </div>
+            )}
           </div>
 
           {/* Route */}

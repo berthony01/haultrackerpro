@@ -24,7 +24,7 @@ export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryP
       const start = startOfMonth(d);
       const end = endOfMonth(d);
       const monthLoads = loads.filter(l =>
-        isWithinInterval(parseISO(l.load_date), { start, end })
+        isWithinInterval(parseISO(getEffectiveDate(l)), { start, end })
       );
       const monthExpenses = expenses.filter(e =>
         isWithinInterval(parseISO(e.expense_date), { start, end })

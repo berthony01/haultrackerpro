@@ -36,7 +36,7 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
       });
     }
 
-    const last30 = loads.filter(l => parseISO(l.load_date) >= thirtyDaysAgo);
+    const last30 = loads.filter(l => parseISO(getEffectiveDate(l)) >= thirtyDaysAgo);
     const totalEst = last30.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
     const totalMiles = last30.reduce((s, l) => s + Number(l.loaded_miles), 0);
     const weeksCount = Math.max(1, Math.ceil(last30.length > 0 ? 4 : 1));

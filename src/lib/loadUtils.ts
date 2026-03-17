@@ -74,7 +74,7 @@ export function getCurrentMonthLoads(loads: Load[]): Load[] {
   const start = startOfMonth(now);
   const end = endOfMonth(now);
   return loads.filter(l => {
-    const d = parseISO(l.load_date);
+    const d = parseISO(getEffectiveDate(l));
     return isWithinInterval(d, { start, end });
   });
 }

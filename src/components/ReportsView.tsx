@@ -31,7 +31,7 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
 
   const filteredLoads = loads.filter(l => {
     if (!dateRange.from && !dateRange.to) return true;
-    const d = parseISO(l.load_date);
+    const d = parseISO(getEffectiveDate(l));
     const start = dateRange.from ? parseISO(dateRange.from) : new Date(0);
     const end = dateRange.to ? parseISO(dateRange.to) : new Date('2099-12-31');
     return isWithinInterval(d, { start, end });
