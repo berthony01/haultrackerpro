@@ -272,6 +272,7 @@ export type Database = {
           created_at: string
           deadhead_miles: number
           detention_fee: number
+          dropoff_date: string | null
           dropoff_location: string
           estimated_pay: number | null
           gross_revenue: number | null
@@ -292,6 +293,7 @@ export type Database = {
           created_at?: string
           deadhead_miles?: number
           detention_fee?: number
+          dropoff_date?: string | null
           dropoff_location: string
           estimated_pay?: number | null
           gross_revenue?: number | null
@@ -312,6 +314,7 @@ export type Database = {
           created_at?: string
           deadhead_miles?: number
           detention_fee?: number
+          dropoff_date?: string | null
           dropoff_location?: string
           estimated_pay?: number | null
           gross_revenue?: number | null
