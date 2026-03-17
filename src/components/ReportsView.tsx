@@ -3,7 +3,7 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, getCurrentMonthLoads } from '@/lib/loadUtils';
+import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, getCurrentMonthLoads, getEffectiveDate } from '@/lib/loadUtils';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
