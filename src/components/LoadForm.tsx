@@ -177,6 +177,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (!lastLoad) return;
     setForm({
       load_date: new Date().toISOString().split('T')[0],
+      dropoff_date: '',
       pickup_location: lastLoad.pickup_location,
       dropoff_location: lastLoad.dropoff_location,
       loaded_miles: lastLoad.loaded_miles.toString(),
