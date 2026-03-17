@@ -24,7 +24,7 @@ export function useLoads(dateRange?: DateRange) {
         .from('loads')
         .select('*')
         .eq('user_id', user.id)
-        .order('load_date', { ascending: false });
+        .order('dropoff_date', { ascending: false });
 
       if (dateRange?.from) query = query.gte('load_date', dateRange.from);
       if (dateRange?.to) query = query.lte('load_date', dateRange.to);
