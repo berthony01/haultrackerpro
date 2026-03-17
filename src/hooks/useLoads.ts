@@ -4,8 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Load = Tables<'loads'>;
-export type LoadInsert = Omit<TablesInsert<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay' | 'gross_revenue'> & { gross_revenue?: number | null };
-export type LoadUpdate = Omit<TablesUpdate<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay'>;
+export type LoadInsert = Omit<TablesInsert<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay' | 'gross_revenue'> & { gross_revenue?: number | null; dropoff_date?: string | null };
+export type LoadUpdate = Omit<TablesUpdate<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay'> & { dropoff_date?: string | null };
 
 interface DateRange {
   from?: string;
