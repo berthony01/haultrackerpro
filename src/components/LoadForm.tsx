@@ -138,6 +138,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
     onSubmit({
       load_date: form.load_date,
+      dropoff_date: form.dropoff_date || form.load_date,
       pickup_location: formatLocation(form.pickup_location),
       dropoff_location: formatLocation(form.dropoff_location),
       loaded_miles: parseFloat(form.loaded_miles) || 0,
@@ -150,7 +151,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       notes: form.notes.trim() || null,
       status: finalStatus,
       gross_revenue: form.gross_revenue ? parseFloat(form.gross_revenue) : null,
-    }, formattedStops);
+    } as any, formattedStops);
   };
 
   const update = (key: string, value: string) => {
