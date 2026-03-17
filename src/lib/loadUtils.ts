@@ -29,7 +29,7 @@ export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 
   const weekMap = new Map<string, Load[]>();
 
   loads.forEach(load => {
-    const date = parseISO(load.load_date);
+    const date = parseISO(getEffectiveDate(load));
     const ws = startOfWeek(date, { weekStartsOn });
     const key = ws.toISOString();
     if (!weekMap.has(key)) weekMap.set(key, []);
