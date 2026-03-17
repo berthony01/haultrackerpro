@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, subWeeks, parseISO, differenceInCalendarWeeks, isWithinInterval, endOfWeek } from 'date-fns';
-import { weekStartDayToNumber } from '@/lib/loadUtils';
+import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
 
 export type Tier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 
