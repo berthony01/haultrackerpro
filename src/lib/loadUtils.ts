@@ -64,7 +64,7 @@ export function getCurrentWeekLoads(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 |
   const start = startOfWeek(now, { weekStartsOn });
   const end = endOfWeek(now, { weekStartsOn });
   return loads.filter(l => {
-    const d = parseISO(l.load_date);
+    const d = parseISO(getEffectiveDate(l));
     return isWithinInterval(d, { start, end });
   });
 }
