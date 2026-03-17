@@ -24,7 +24,7 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
       const start = startOfWeek(ref, { weekStartsOn: wso });
       const end = endOfWeek(ref, { weekStartsOn: wso });
       const weekLoads = loads.filter(l => {
-        const d = parseISO(l.load_date);
+        const d = parseISO(getEffectiveDate(l));
         return isWithinInterval(d, { start, end });
       });
       const est = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
