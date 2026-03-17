@@ -36,6 +36,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
+    dropoff_date: (initialData as any)?.dropoff_date || '',
     pickup_location: initialData?.pickup_location || '',
     dropoff_location: initialData?.dropoff_location || '',
     loaded_miles: initialData?.loaded_miles?.toString() || '',
