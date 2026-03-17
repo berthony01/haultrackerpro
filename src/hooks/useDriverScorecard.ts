@@ -29,7 +29,7 @@ function getTier(score: number): Tier {
 export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): ScorecardResult {
   const now = new Date();
   const last30Loads = loads.filter(l => {
-    const d = parseISO(l.load_date);
+    const d = parseISO(getEffectiveDate(l));
     return (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24) <= 30;
   });
 
