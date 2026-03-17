@@ -63,8 +63,8 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
   // 4. Profit Trend (0–20)
   const thisWeek = { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
   const lastWeek = { start: startOfWeek(subWeeks(now, 1), { weekStartsOn }), end: endOfWeek(subWeeks(now, 1), { weekStartsOn }) };
-  const twLoads = loads.filter(l => isWithinInterval(parseISO(l.load_date), thisWeek));
-  const lwLoads = loads.filter(l => isWithinInterval(parseISO(l.load_date), lastWeek));
+  const twLoads = loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), thisWeek));
+  const lwLoads = loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), lastWeek));
   const twRev = twLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const lwRev = lwLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const twExp = expenses.filter(e => isWithinInterval(parseISO(e.expense_date), thisWeek)).reduce((s, e) => s + Number(e.amount), 0);
