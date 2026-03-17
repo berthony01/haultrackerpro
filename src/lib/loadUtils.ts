@@ -4,6 +4,11 @@ import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
+/** Get the effective date for grouping — uses dropoff_date if available, otherwise load_date */
+export function getEffectiveDate(load: Load): string {
+  return (load as any).dropoff_date ?? load.load_date;
+}
+
 /** Convert user setting string ('sunday', 'monday', etc.) to date-fns weekStartsOn number (0=Sun, 1=Mon, ...) */
 export function weekStartDayToNumber(day?: string | null): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   const map: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
@@ -24,7 +29,7 @@ export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 
   const weekMap = new Map<string, Load[]>();
 
   loads.forEach(load => {
-    const date = parseISO(load.load_date);
+    const date = parseISO(getEffectiveDate(load));
     const ws = startOfWeek(date, { weekStartsOn });
     const key = ws.toISOString();
     if (!weekMap.has(key)) weekMap.set(key, []);
@@ -59,7 +64,7 @@ export function getCurrentWeekLoads(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 |
   const start = startOfWeek(now, { weekStartsOn });
   const end = endOfWeek(now, { weekStartsOn });
   return loads.filter(l => {
-    const d = parseISO(l.load_date);
+    const d = parseISO(getEffectiveDate(l));
     return isWithinInterval(d, { start, end });
   });
 }
@@ -69,7 +74,7 @@ export function getCurrentMonthLoads(loads: Load[]): Load[] {
   const start = startOfMonth(now);
   const end = endOfMonth(now);
   return loads.filter(l => {
-    const d = parseISO(l.load_date);
+    const d = parseISO(getEffectiveDate(l));
     return isWithinInterval(d, { start, end });
   });
 }

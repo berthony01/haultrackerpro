@@ -36,6 +36,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
+    dropoff_date: (initialData as any)?.dropoff_date || '',
     pickup_location: initialData?.pickup_location || '',
     dropoff_location: initialData?.dropoff_location || '',
     loaded_miles: initialData?.loaded_miles?.toString() || '',
@@ -137,6 +138,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
     onSubmit({
       load_date: form.load_date,
+      dropoff_date: form.dropoff_date || form.load_date,
       pickup_location: formatLocation(form.pickup_location),
       dropoff_location: formatLocation(form.dropoff_location),
       loaded_miles: parseFloat(form.loaded_miles) || 0,
@@ -149,7 +151,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       notes: form.notes.trim() || null,
       status: finalStatus,
       gross_revenue: form.gross_revenue ? parseFloat(form.gross_revenue) : null,
-    }, formattedStops);
+    } as any, formattedStops);
   };
 
   const update = (key: string, value: string) => {
@@ -175,6 +177,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (!lastLoad) return;
     setForm({
       load_date: new Date().toISOString().split('T')[0],
+      dropoff_date: '',
       pickup_location: lastLoad.pickup_location,
       dropoff_location: lastLoad.dropoff_location,
       loaded_miles: lastLoad.loaded_miles.toString(),
@@ -272,21 +275,32 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="load_date">Date</Label>
-              <Input id="load_date" type="date" value={form.load_date} onChange={e => update('load_date', e.target.value)} required />
+              <Label htmlFor="load_date">Pickup Date</Label>
+              <Input id="load_date" type="date" value={form.load_date} onChange={e => {
+                update('load_date', e.target.value);
+                // Auto-set dropoff date if not manually set or same as old pickup
+                if (!form.dropoff_date || form.dropoff_date === form.load_date) {
+                  update('dropoff_date', e.target.value);
+                }
+              }} required />
               <FieldError field="load_date" />
             </div>
             <div>
-              <Label htmlFor="status">Status</Label>
-              <Select value={form.status} onValueChange={v => { update('status', v); if (v === 'cancelled' && !form.notes) update('notes', 'Cancelled by dispatcher'); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="dropoff_date">Drop-off Date</Label>
+              <Input id="dropoff_date" type="date" value={form.dropoff_date || form.load_date} onChange={e => update('dropoff_date', e.target.value)} />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="status">Status</Label>
+            <Select value={form.status} onValueChange={v => { update('status', v); if (v === 'cancelled' && !form.notes) update('notes', 'Cancelled by dispatcher'); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

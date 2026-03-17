@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
-import { formatCurrency, weekStartDayToNumber } from '@/lib/loadUtils';
+import { formatCurrency, weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
@@ -24,7 +24,7 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
       const start = startOfWeek(ref, { weekStartsOn: wso });
       const end = endOfWeek(ref, { weekStartsOn: wso });
       const weekLoads = loads.filter(l => {
-        const d = parseISO(l.load_date);
+        const d = parseISO(getEffectiveDate(l));
         return isWithinInterval(d, { start, end });
       });
       const est = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
@@ -36,7 +36,7 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
       });
     }
 
-    const last30 = loads.filter(l => parseISO(l.load_date) >= thirtyDaysAgo);
+    const last30 = loads.filter(l => parseISO(getEffectiveDate(l)) >= thirtyDaysAgo);
     const totalEst = last30.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
     const totalMiles = last30.reduce((s, l) => s + Number(l.loaded_miles), 0);
     const weeksCount = Math.max(1, Math.ceil(last30.length > 0 ? 4 : 1));

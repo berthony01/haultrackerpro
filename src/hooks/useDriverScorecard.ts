@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, subWeeks, parseISO, differenceInCalendarWeeks, isWithinInterval, endOfWeek } from 'date-fns';
-import { weekStartDayToNumber } from '@/lib/loadUtils';
+import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
 
 export type Tier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 
@@ -29,7 +29,7 @@ function getTier(score: number): Tier {
 export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): ScorecardResult {
   const now = new Date();
   const last30Loads = loads.filter(l => {
-    const d = parseISO(l.load_date);
+    const d = parseISO(getEffectiveDate(l));
     return (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24) <= 30;
   });
 
@@ -63,8 +63,8 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
   // 4. Profit Trend (0–20)
   const thisWeek = { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
   const lastWeek = { start: startOfWeek(subWeeks(now, 1), { weekStartsOn }), end: endOfWeek(subWeeks(now, 1), { weekStartsOn }) };
-  const twLoads = loads.filter(l => isWithinInterval(parseISO(l.load_date), thisWeek));
-  const lwLoads = loads.filter(l => isWithinInterval(parseISO(l.load_date), lastWeek));
+  const twLoads = loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), thisWeek));
+  const lwLoads = loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), lastWeek));
   const twRev = twLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const lwRev = lwLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const twExp = expenses.filter(e => isWithinInterval(parseISO(e.expense_date), thisWeek)).reduce((s, e) => s + Number(e.amount), 0);
@@ -88,7 +88,7 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
   for (let w = 0; w < 52; w++) {
     const ws = startOfWeek(subWeeks(now, w), { weekStartsOn });
     const we = endOfWeek(subWeeks(now, w), { weekStartsOn });
-    const hasLoad = loads.some(l => isWithinInterval(parseISO(l.load_date), { start: ws, end: we }));
+    const hasLoad = loads.some(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start: ws, end: we }));
     if (hasLoad) streak++;
     else break;
   }

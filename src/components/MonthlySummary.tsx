@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
-import { formatCurrency, formatNumber, exportToCSV, exportToPDF } from '@/lib/loadUtils';
+import { formatCurrency, formatNumber, exportToCSV, exportToPDF, getEffectiveDate } from '@/lib/loadUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,7 @@ export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryP
       const start = startOfMonth(d);
       const end = endOfMonth(d);
       const monthLoads = loads.filter(l =>
-        isWithinInterval(parseISO(l.load_date), { start, end })
+        isWithinInterval(parseISO(getEffectiveDate(l)), { start, end })
       );
       const monthExpenses = expenses.filter(e =>
         isWithinInterval(parseISO(e.expense_date), { start, end })
