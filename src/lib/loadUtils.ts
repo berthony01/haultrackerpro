@@ -4,6 +4,11 @@ import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
+/** Get the effective date for grouping — uses dropoff_date if available, otherwise load_date */
+export function getEffectiveDate(load: Load): string {
+  return (load as any).dropoff_date ?? load.load_date;
+}
+
 /** Convert user setting string ('sunday', 'monday', etc.) to date-fns weekStartsOn number (0=Sun, 1=Mon, ...) */
 export function weekStartDayToNumber(day?: string | null): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   const map: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
