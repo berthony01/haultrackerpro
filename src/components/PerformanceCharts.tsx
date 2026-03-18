@@ -83,7 +83,7 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
   const { start, end } = useMemo(() => getRange(activeRange, weekStartsOn), [activeRange, weekStartsOn]);
 
   const filteredLoads = useMemo(
-    () => loads.filter(l => isWithinInterval(parseISO(l.load_date), { start, end })),
+    () => loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start, end })),
     [loads, start, end]
   );
   const filteredExpenses = useMemo(
