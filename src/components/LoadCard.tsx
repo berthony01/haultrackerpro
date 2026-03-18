@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
-import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
 import { LoadStop } from '@/hooks/useLoadStops';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
