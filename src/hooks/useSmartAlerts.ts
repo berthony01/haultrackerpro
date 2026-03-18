@@ -28,7 +28,7 @@ function getWeekRange(weeksAgo: number, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
 }
 
 function filterByRange(loads: Load[], start: Date, end: Date) {
-  return loads.filter(l => isWithinInterval(parseISO(l.load_date), { start, end }));
+  return loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start, end }));
 }
 
 export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): SmartAlert[] {
