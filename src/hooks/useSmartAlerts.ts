@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, differenceInDays } from 'date-fns';
-import { weekStartDayToNumber } from '@/lib/loadUtils';
+import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertTier = 'basic' | 'advanced';
