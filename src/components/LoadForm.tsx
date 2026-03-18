@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import { DateInput } from '@/components/ui/date-input';
 import { calculateEstimatedPay } from '@/lib/types';
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
