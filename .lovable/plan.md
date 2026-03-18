@@ -1,55 +1,44 @@
 
 
-## Plan: Complete Drop-off Date Logic Correction
+## Plan: Performance Metrics Charts Section
 
-### Problem
+### Overview
 
-Several files still use `load_date` (pickup date) for period-based filtering instead of the drop-off date. Additionally, the database query in `useLoads.ts` filters on `dropoff_date` directly, which will exclude legacy loads where `dropoff_date` is `NULL`.
+Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
 
-### Files & Changes
+### New File: `src/components/PerformanceCharts.tsx`
 
-#### 1. `src/hooks/useLoads.ts` — Fix database query for NULL dropoff_date
+A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
 
-The query currently does `.order('dropoff_date')` and `.gte('dropoff_date', ...)`. Legacy loads with `NULL` dropoff_date will be excluded from date-filtered queries. Fix by using `coalesce` via a raw filter or switching to client-side filtering after fetching, OR by ordering/filtering on `load_date` as fallback. The safest approach: fetch all loads without server-side date filtering (loads are user-scoped and bounded), then filter client-side using `getEffectiveDate`. This avoids the NULL problem entirely.
+1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
 
-- Remove `.gte('dropoff_date', ...)` and `.lte('dropoff_date', ...)` server-side filters
-- Change `.order('dropoff_date', ...)` to `.order('load_date', { ascending: false })` (safe default sort)
-- Move date filtering to the consumer side (already done in DashboardView, etc.)
+2. **Bucket logic** — Based on selected range:
+   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
+   - This Year → monthly buckets ("Jan", "Feb", ...)
 
-Alternatively, keep server-side filtering but use `.or()` to handle NULL: filter on `dropoff_date` OR `load_date` when `dropoff_date` is null. This is more complex in Supabase JS. The simplest safe fix: fetch all user loads, sort client-side.
+3. **5 Charts** (all using Recharts, already installed):
 
-#### 2. `src/hooks/useSmartAlerts.ts` — 3 instances of `l.load_date`
+   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
 
-- Line 31: `filterByRange` function uses `l.load_date` → change to use `getEffectiveDate(l)`
-- Line 106: `last30Loads` filter uses `l.load_date` → change to `getEffectiveDate(l)`
-- Line 140: missing pay filter uses `l.load_date` → change to `getEffectiveDate(l)`
-- Add import for `getEffectiveDate`
+   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
 
-#### 3. `src/components/ReportsView.tsx` — Line 159
+   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
 
-- The "Export Week" button filters loads using `l.load_date` → change to `getEffectiveDate(l)`
-- Add `getEffectiveDate` to the existing import from `@/lib/loadUtils`
+   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
 
-#### 4. `src/pages/Index.tsx` — Line 216
+   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
 
-- Load duplication sets `load_date` on the duplicate. This is fine — it's setting form data for a new load, not period assignment. No change needed.
+4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
 
-### What's already correct
+5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
 
-- `DashboardView.tsx` — already uses `getEffectiveDate`
-- `PerformanceTrends.tsx` — already uses `getEffectiveDate`
-- `PerformanceCharts.tsx` — already uses `getEffectiveDate`
-- `MonthlySummary.tsx` — already uses `getEffectiveDate`
-- `useDriverScorecard.ts` — already uses `getEffectiveDate`
-- `WeeklyFocusCard.tsx` — uses `getCurrentWeekLoads` which uses `getEffectiveDate`
-- `WeeklyCloseout.tsx` — uses `getCurrentWeekLoads` which uses `getEffectiveDate`
-- `LoadForm.tsx` — form field handling, not period logic
-- `loadUtils.ts` exports — all use `getEffectiveDate`
+### Modified File: `src/components/DashboardView.tsx`
 
-### Summary
+- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
+- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
 
-3 files need changes, all are small targeted fixes:
-1. **`useLoads.ts`** — fix NULL-safe query
-2. **`useSmartAlerts.ts`** — 3 lines using `load_date` for period filtering
-3. **`ReportsView.tsx`** — 1 line using `load_date` in week export filter
+### No Other Changes
+
+- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
+- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
 

@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, differenceInDays } from 'date-fns';
-import { weekStartDayToNumber } from '@/lib/loadUtils';
+import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertTier = 'basic' | 'advanced';
@@ -28,7 +28,7 @@ function getWeekRange(weeksAgo: number, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
 }
 
 function filterByRange(loads: Load[], start: Date, end: Date) {
-  return loads.filter(l => isWithinInterval(parseISO(l.load_date), { start, end }));
+  return loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start, end }));
 }
 
 export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): SmartAlert[] {
@@ -103,7 +103,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   }
 
   // 4. RPM below 30-day average by ≥ 15%
-  const last30Loads = loads.filter(l => differenceInDays(now, parseISO(l.load_date)) <= 30);
+  const last30Loads = loads.filter(l => differenceInDays(now, parseISO(getEffectiveDate(l))) <= 30);
   const avg30Miles = last30Loads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const avg30Rev = last30Loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const avg30RPM = avg30Miles > 0 ? avg30Rev / avg30Miles : 0;
@@ -137,7 +137,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
 
   // 6. Missing actual pay older than 7 days
   const missingPayLoads = loads.filter(
-    l => l.actual_pay_received == null && differenceInDays(now, parseISO(l.load_date)) > 7
+    l => l.actual_pay_received == null && differenceInDays(now, parseISO(getEffectiveDate(l))) > 7
   );
   if (missingPayLoads.length > 0) {
     alerts.push({
