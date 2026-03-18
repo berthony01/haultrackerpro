@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { weekStartDayToNumber, formatCurrency, formatNumber } from '@/lib/loadUtils';
+import { weekStartDayToNumber, formatCurrency, formatNumber, getEffectiveDate } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -83,7 +83,7 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
   const { start, end } = useMemo(() => getRange(activeRange, weekStartsOn), [activeRange, weekStartsOn]);
 
   const filteredLoads = useMemo(
-    () => loads.filter(l => isWithinInterval(parseISO(l.load_date), { start, end })),
+    () => loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start, end })),
     [loads, start, end]
   );
   const filteredExpenses = useMemo(
@@ -111,8 +111,9 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
   const chartData = useMemo(() => {
     return buckets.map(b => {
       const bLoads = filteredLoads.filter(l => {
-        if (activeRange === 'year') return l.load_date.startsWith(b.key);
-        return l.load_date === b.key;
+        const ed = getEffectiveDate(l);
+        if (activeRange === 'year') return ed.startsWith(b.key);
+        return ed === b.key;
       });
       const bExpenses = filteredExpenses.filter(e => {
         if (activeRange === 'year') return e.expense_date.startsWith(b.key);

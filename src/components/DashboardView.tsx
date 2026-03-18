@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
+import { getEffectiveDate } from '@/lib/loadUtils';
 import { Expense } from '@/hooks/useExpenses';
 import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -67,7 +68,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const filteredLoads = useMemo(() => {
     if (activePreset === 'custom') {
       return loads.filter(l => {
-        const d = l.load_date;
+        const d = getEffectiveDate(l);
         if (customFrom && d < customFrom) return false;
         if (customTo && d > customTo) return false;
         return true;
@@ -75,7 +76,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     }
     const { start, end } = getPresetRange(activePreset, weekStartsOn);
     return loads.filter(l => {
-      const d = parseISO(l.load_date);
+      const d = parseISO(getEffectiveDate(l));
       return isWithinInterval(d, { start, end });
     });
   }, [loads, activePreset, customFrom, customTo, weekStartsOn]);
@@ -118,7 +119,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     const now = new Date();
     const ws = startOfWeek(now, { weekStartsOn });
     const we = endOfWeek(now, { weekStartsOn });
-    return loads.filter(l => isWithinInterval(parseISO(l.load_date), { start: ws, end: we })).length;
+    return loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start: ws, end: we })).length;
   }, [loads, weekStartsOn]);
   const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
