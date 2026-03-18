@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { weekStartDayToNumber, formatCurrency, formatNumber } from '@/lib/loadUtils';
+import { weekStartDayToNumber, formatCurrency, formatNumber, getEffectiveDate } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
