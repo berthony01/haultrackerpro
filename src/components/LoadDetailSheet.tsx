@@ -284,7 +284,7 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete this load?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will permanently remove the load from {load.pickup_location} to {load.dropoff_location} on {format(parseISO(load.load_date), 'MMM d, yyyy')}. This action cannot be undone.
+                      This will permanently remove the load from {load.pickup_location} to {load.dropoff_location} on {format(parseISO(getEffectiveDate(load)), 'MMM d, yyyy')}. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
