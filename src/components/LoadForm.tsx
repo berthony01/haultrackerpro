@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import { DateInput } from '@/components/ui/date-input';
 import { calculateEstimatedPay } from '@/lib/types';
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -276,18 +277,17 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="load_date">Pickup Date</Label>
-              <Input id="load_date" type="date" value={form.load_date} onChange={e => {
-                update('load_date', e.target.value);
-                // Auto-set dropoff date if not manually set or same as old pickup
+              <DateInput id="load_date" value={form.load_date} onChange={(val) => {
+                update('load_date', val);
                 if (!form.dropoff_date || form.dropoff_date === form.load_date) {
-                  update('dropoff_date', e.target.value);
+                  update('dropoff_date', val);
                 }
-              }} required />
+              }} />
               <FieldError field="load_date" />
             </div>
             <div>
               <Label htmlFor="dropoff_date">Drop-off Date</Label>
-              <Input id="dropoff_date" type="date" value={form.dropoff_date || form.load_date} onChange={e => update('dropoff_date', e.target.value)} />
+              <DateInput id="dropoff_date" value={form.dropoff_date || form.load_date} onChange={(val) => update('dropoff_date', val)} />
             </div>
           </div>
 
