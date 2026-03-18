@@ -176,7 +176,7 @@ export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] =
     const diff = act != null ? (act - est).toFixed(2) : '';
     const summary = buildStopsSummary(l, stops);
     return [
-      l.load_date, l.pickup_location, l.dropoff_location, summary,
+      getEffectiveDate(l), l.pickup_location, l.dropoff_location, summary,
       l.loaded_miles, l.deadhead_miles, l.rate_per_mile,
       Number(l.wait_fee).toFixed(2), Number(l.detention_fee).toFixed(2), Number(l.other_fees).toFixed(2),
       est.toFixed(2), act != null ? act.toFixed(2) : '', diff,
