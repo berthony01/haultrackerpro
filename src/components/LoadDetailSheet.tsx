@@ -99,12 +99,12 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span>Pickup: {format(parseISO(load.load_date), 'EEEE, MMM d, yyyy')}</span>
+              <span>Drop-off: {format(parseISO(getEffectiveDate(load)), 'EEEE, MMM d, yyyy')}</span>
             </div>
-            {(load as any).dropoff_date && (load as any).dropoff_date !== load.load_date && (
+            {load.dropoff_date && load.dropoff_date !== load.load_date && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>Delivery: {format(parseISO((load as any).dropoff_date), 'EEEE, MMM d, yyyy')}</span>
+                <span>Pickup: {format(parseISO(load.load_date), 'EEEE, MMM d, yyyy')}</span>
               </div>
             )}
           </div>
