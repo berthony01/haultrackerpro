@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
-import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
 import { LoadStop } from '@/hooks/useLoadStops';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,9 +61,9 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
             {/* Date + Status row */}
             <div className="flex items-center gap-2 mb-2.5">
               <span className="text-xs font-semibold text-muted-foreground">
-                {(load as any).dropoff_date && (load as any).dropoff_date !== load.load_date
-                  ? `${format(parseISO(load.load_date), 'MMM d')} → ${format(parseISO((load as any).dropoff_date), 'MMM d, yyyy')}`
-                  : format(parseISO(load.load_date), 'MMM d, yyyy')}
+                {load.dropoff_date && load.dropoff_date !== load.load_date
+                  ? `${format(parseISO(load.load_date), 'MMM d')} → ${format(parseISO(load.dropoff_date), 'MMM d, yyyy')}`
+                  : format(parseISO(getEffectiveDate(load)), 'MMM d, yyyy')}
               </span>
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
                 {load.status}
