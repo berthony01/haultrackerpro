@@ -208,7 +208,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
                   <SelectItem value="none">No link</SelectItem>
                   {loads.slice(0, 50).map(l => (
                     <SelectItem key={l.id} value={l.id}>
-                      {l.pickup_location} → {l.dropoff_location} ({format(parseISO(l.load_date), 'MMM d')})
+                      {l.pickup_location} → {l.dropoff_location} ({format(parseISO(l.dropoff_date ?? l.load_date), 'MMM d')})
                     </SelectItem>
                   ))}
                 </SelectContent>

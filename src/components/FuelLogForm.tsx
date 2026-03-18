@@ -165,7 +165,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                   <SelectItem value="none">No link</SelectItem>
                   {recentLoads.map((load) => (
                     <SelectItem key={load.id} value={load.id}>
-                      {format(new Date(load.load_date), 'MMM d')} — {load.pickup_location.split(',')[0]} → {load.dropoff_location.split(',')[0]}
+                      {format(new Date(load.dropoff_date ?? load.load_date), 'MMM d')} — {load.pickup_location.split(',')[0]} → {load.dropoff_location.split(',')[0]}
                     </SelectItem>
                   ))}
                 </SelectContent>
