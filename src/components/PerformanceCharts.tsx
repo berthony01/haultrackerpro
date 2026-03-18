@@ -111,8 +111,9 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
   const chartData = useMemo(() => {
     return buckets.map(b => {
       const bLoads = filteredLoads.filter(l => {
-        if (activeRange === 'year') return l.load_date.startsWith(b.key);
-        return l.load_date === b.key;
+        const ed = getEffectiveDate(l);
+        if (activeRange === 'year') return ed.startsWith(b.key);
+        return ed === b.key;
       });
       const bExpenses = filteredExpenses.filter(e => {
         if (activeRange === 'year') return e.expense_date.startsWith(b.key);

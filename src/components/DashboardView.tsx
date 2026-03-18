@@ -119,7 +119,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     const now = new Date();
     const ws = startOfWeek(now, { weekStartsOn });
     const we = endOfWeek(now, { weekStartsOn });
-    return loads.filter(l => isWithinInterval(parseISO(l.load_date), { start: ws, end: we })).length;
+    return loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start: ws, end: we })).length;
   }, [loads, weekStartsOn]);
   const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
