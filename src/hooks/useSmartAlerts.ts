@@ -103,7 +103,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   }
 
   // 4. RPM below 30-day average by ≥ 15%
-  const last30Loads = loads.filter(l => differenceInDays(now, parseISO(l.load_date)) <= 30);
+  const last30Loads = loads.filter(l => differenceInDays(now, parseISO(getEffectiveDate(l))) <= 30);
   const avg30Miles = last30Loads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const avg30Rev = last30Loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const avg30RPM = avg30Miles > 0 ? avg30Rev / avg30Miles : 0;
