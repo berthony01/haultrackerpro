@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { LoadStop } from '@/hooks/useLoadStops';
-import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -99,12 +99,12 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span>Pickup: {format(parseISO(load.load_date), 'EEEE, MMM d, yyyy')}</span>
+              <span>Drop-off: {format(parseISO(getEffectiveDate(load)), 'EEEE, MMM d, yyyy')}</span>
             </div>
-            {(load as any).dropoff_date && (load as any).dropoff_date !== load.load_date && (
+            {load.dropoff_date && load.dropoff_date !== load.load_date && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>Delivery: {format(parseISO((load as any).dropoff_date), 'EEEE, MMM d, yyyy')}</span>
+                <span>Pickup: {format(parseISO(load.load_date), 'EEEE, MMM d, yyyy')}</span>
               </div>
             )}
           </div>
@@ -284,7 +284,7 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete this load?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will permanently remove the load from {load.pickup_location} to {load.dropoff_location} on {format(parseISO(load.load_date), 'MMM d, yyyy')}. This action cannot be undone.
+                      This will permanently remove the load from {load.pickup_location} to {load.dropoff_location} on {format(parseISO(getEffectiveDate(load)), 'MMM d, yyyy')}. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
