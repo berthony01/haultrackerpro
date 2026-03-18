@@ -137,7 +137,7 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
 
   // 6. Missing actual pay older than 7 days
   const missingPayLoads = loads.filter(
-    l => l.actual_pay_received == null && differenceInDays(now, parseISO(l.load_date)) > 7
+    l => l.actual_pay_received == null && differenceInDays(now, parseISO(getEffectiveDate(l))) > 7
   );
   if (missingPayLoads.length > 0) {
     alerts.push({

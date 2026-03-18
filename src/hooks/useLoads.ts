@@ -20,14 +20,11 @@ export function useLoads(dateRange?: DateRange) {
     queryKey: ['loads', user?.id, dateRange?.from, dateRange?.to],
     queryFn: async () => {
       if (!user) return [];
-      let query = supabase
+      const query = supabase
         .from('loads')
         .select('*')
         .eq('user_id', user.id)
-        .order('dropoff_date', { ascending: false });
-
-      if (dateRange?.from) query = query.gte('dropoff_date', dateRange.from);
-      if (dateRange?.to) query = query.lte('dropoff_date', dateRange.to);
+        .order('load_date', { ascending: false });
 
       const { data, error } = await query;
       if (error) throw error;

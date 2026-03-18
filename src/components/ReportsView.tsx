@@ -156,7 +156,7 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
                   </div>
                   <Button variant="ghost" size="sm" className="mt-2 w-full text-xs" onClick={() => {
                     const weekLoads = loads.filter(l => {
-                      const d = new Date(l.load_date);
+                      const d = new Date(getEffectiveDate(l));
                       return d >= new Date(s.startDate) && d <= new Date(s.endDate);
                     });
                     exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`, stops, companyMeta);
