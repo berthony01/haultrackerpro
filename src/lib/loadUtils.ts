@@ -210,7 +210,7 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
     const netLoadProfit = pay - linkedExp;
     const summary = buildStopsSummary(l, stops);
     return [
-      l.load_date, l.pickup_location, l.dropoff_location, summary,
+      getEffectiveDate(l), l.pickup_location, l.dropoff_location, summary,
       est.toFixed(2), act != null ? act.toFixed(2) : '',
       linkedExp.toFixed(2), netLoadProfit.toFixed(2),
       companyMeta?.companyName ?? '', companyMeta?.companyStartDate ?? ''
