@@ -7,6 +7,11 @@ export type Load = Tables<'loads'>;
 export type LoadInsert = Omit<TablesInsert<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay' | 'gross_revenue'> & { gross_revenue?: number | null; dropoff_date?: string | null };
 export type LoadUpdate = Omit<TablesUpdate<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay'> & { dropoff_date?: string | null };
 
+/** Canonical period date: drop-off first, pickup fallback */
+function getEffectiveDate(load: Load): string {
+  return load.dropoff_date ?? load.load_date;
+}
+
 interface DateRange {
   from?: string;
   to?: string;
@@ -20,15 +25,29 @@ export function useLoads(dateRange?: DateRange) {
     queryKey: ['loads', user?.id, dateRange?.from, dateRange?.to],
     queryFn: async () => {
       if (!user) return [];
-      const query = supabase
+      const { data, error } = await supabase
         .from('loads')
         .select('*')
-        .eq('user_id', user.id)
-        .order('load_date', { ascending: false });
-
-      const { data, error } = await query;
+        .eq('user_id', user.id);
       if (error) throw error;
-      return data;
+
+      // Filter by effective date (dropoff_date ?? load_date)
+      let filtered = data ?? [];
+      if (dateRange?.from) {
+        filtered = filtered.filter(l => getEffectiveDate(l) >= dateRange.from!);
+      }
+      if (dateRange?.to) {
+        filtered = filtered.filter(l => getEffectiveDate(l) <= dateRange.to!);
+      }
+
+      // Sort by effective date descending, tie-break by created_at descending
+      filtered.sort((a, b) => {
+        const cmp = getEffectiveDate(b).localeCompare(getEffectiveDate(a));
+        if (cmp !== 0) return cmp;
+        return b.created_at.localeCompare(a.created_at);
+      });
+
+      return filtered;
     },
     enabled: !!user,
   });

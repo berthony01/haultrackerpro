@@ -1,56 +1,44 @@
 
-Goal: make load period assignment fully completion-based (drop-off date first, pickup fallback) and remove the remaining places that still behave like pickup-date-first.
 
-What I found (root causes)
-1) `src/hooks/useLoads.ts` still fetches in pickup-date order (`order('load_date')`) and does not apply effective-date filtering when `dateRange` is set.  
-   - This makes “posted/sorted” behavior look pickup-based.
-   - It also prevents Loads-page period filters from being reliably completion-date-based.
-2) Export/report row “Date” fields in `src/lib/loadUtils.ts` still output `load_date` (pickup), which makes period reports look pickup-driven even if filtering is already drop-off-based.
-3) Some load-reference dropdowns still display pickup date (`ExpenseForm`, `FuelLogForm`), which reinforces the same confusion.
+## Plan: Performance Metrics Charts Section
 
-Implementation plan (smallest safe logic correction)
-1) Update `src/hooks/useLoads.ts` (primary fix)
-   - Keep backend fetch user-scoped only.
-   - After fetch, compute `effectiveDate = dropoff_date ?? load_date`.
-   - Apply `dateRange.from/to` filtering against `effectiveDate` (string compare on `yyyy-MM-dd`).
-   - Sort returned loads by `effectiveDate` descending (tie-break by `created_at` descending).
-   - Keep existing CRUD behavior intact.
-   - Ensure insert/update path always preserves fallback safety (`dropoff_date` defaults to `load_date` when omitted).
+### Overview
 
-2) Update period-report export date fields in `src/lib/loadUtils.ts`
-   - In `exportToCSV`, `exportProfitCSV`, and `exportToPDF`, change row “Date” value from `l.load_date` to `getEffectiveDate(l)`.
-   - Keep pickup/dropoff columns unchanged for operational reference.
-   - No layout/styling changes, only date-source logic.
+Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
 
-3) Align load date display in load-link selectors (logic consistency)
-   - `src/components/ExpenseForm.tsx`: linked-load select label date should use effective date.
-   - `src/components/FuelLogForm.tsx`: linked-load select label date should use effective date.
-   - This does not change behavior, only removes pickup-date-first ambiguity in period context.
+### New File: `src/components/PerformanceCharts.tsx`
 
-4) Keep current correct areas unchanged
-   - Dashboard, charts, scorecard, weekly closeout, smart alerts, and report range filtering already use effective date logic and will remain untouched.
+A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
 
-Technical details
-- Canonical period date everywhere: `dropoff_date ?? load_date`.
-- No schema migration needed.
-- No auth/billing/navigation/theme/styling changes.
-- No change to standalone expense date logic (`expense_date` remains independent).
-- Legacy loads remain visible due pickup fallback.
+1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
 
-Verification checklist (after implementation)
-1) Create load: pickup Saturday, drop-off Monday → appears/counts in Monday’s week.
-2) Create load: pickup Jan 31, drop-off Feb 1 → counted in February.
-3) Create load: pickup Dec 31, drop-off Jan 2 → counted in new year.
-4) Legacy/empty drop-off record (if present) still included via pickup fallback.
-5) Loads page presets/custom range reflect completion date classification.
-6) Weekly closeout includes only loads completed in selected week.
-7) Weekly/monthly/report exports show effective completion date in “Date” column.
+2. **Bucket logic** — Based on selected range:
+   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
+   - This Year → monthly buckets ("Jan", "Feb", ...)
 
-Planned files to change
-- `src/hooks/useLoads.ts`
-- `src/lib/loadUtils.ts`
-- `src/components/ExpenseForm.tsx`
-- `src/components/FuelLogForm.tsx`
+3. **5 Charts** (all using Recharts, already installed):
 
-Expected result
-After these changes, all period-based load calculations, filtering, grouping, sorting-for-period views, and report/export date assignment will consistently use drop-off date with pickup-date fallback.
+   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
+
+   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
+
+   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
+
+   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
+
+   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
+
+4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
+
+5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
+
+### Modified File: `src/components/DashboardView.tsx`
+
+- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
+- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
+
+### No Other Changes
+
+- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
+- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
+

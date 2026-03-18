@@ -176,7 +176,7 @@ export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] =
     const diff = act != null ? (act - est).toFixed(2) : '';
     const summary = buildStopsSummary(l, stops);
     return [
-      l.load_date, l.pickup_location, l.dropoff_location, summary,
+      getEffectiveDate(l), l.pickup_location, l.dropoff_location, summary,
       l.loaded_miles, l.deadhead_miles, l.rate_per_mile,
       Number(l.wait_fee).toFixed(2), Number(l.detention_fee).toFixed(2), Number(l.other_fees).toFixed(2),
       est.toFixed(2), act != null ? act.toFixed(2) : '', diff,
@@ -210,7 +210,7 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
     const netLoadProfit = pay - linkedExp;
     const summary = buildStopsSummary(l, stops);
     return [
-      l.load_date, l.pickup_location, l.dropoff_location, summary,
+      getEffectiveDate(l), l.pickup_location, l.dropoff_location, summary,
       est.toFixed(2), act != null ? act.toFixed(2) : '',
       linkedExp.toFixed(2), netLoadProfit.toFixed(2),
       companyMeta?.companyName ?? '', companyMeta?.companyStartDate ?? ''
@@ -241,7 +241,7 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
     const diff = act != null ? act - est : null;
-    return [l.load_date, l.pickup_location, l.dropoff_location, String(l.loaded_miles), String(l.deadhead_miles), `$${Number(l.rate_per_mile).toFixed(2)}`, `$${Number(l.wait_fee).toFixed(2)}`, `$${Number(l.detention_fee).toFixed(2)}`, `$${Number(l.other_fees).toFixed(2)}`, `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', diff != null ? `$${diff.toFixed(2)}` : '', l.status];
+    return [getEffectiveDate(l), l.pickup_location, l.dropoff_location, String(l.loaded_miles), String(l.deadhead_miles), `$${Number(l.rate_per_mile).toFixed(2)}`, `$${Number(l.wait_fee).toFixed(2)}`, `$${Number(l.detention_fee).toFixed(2)}`, `$${Number(l.other_fees).toFixed(2)}`, `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', diff != null ? `$${diff.toFixed(2)}` : '', l.status];
   });
 
   const colWidths = [48, 58, 58, 28, 28, 30, 34, 34, 34, 45, 45, 40, 40];
