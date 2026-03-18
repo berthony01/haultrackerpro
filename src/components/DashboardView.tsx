@@ -68,7 +68,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const filteredLoads = useMemo(() => {
     if (activePreset === 'custom') {
       return loads.filter(l => {
-        const d = l.load_date;
+        const d = getEffectiveDate(l);
         if (customFrom && d < customFrom) return false;
         if (customTo && d > customTo) return false;
         return true;
@@ -76,7 +76,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     }
     const { start, end } = getPresetRange(activePreset, weekStartsOn);
     return loads.filter(l => {
-      const d = parseISO(l.load_date);
+      const d = parseISO(getEffectiveDate(l));
       return isWithinInterval(d, { start, end });
     });
   }, [loads, activePreset, customFrom, customTo, weekStartsOn]);
