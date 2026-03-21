@@ -106,7 +106,7 @@ export function OnboardingModal({ open, onComplete, onNavigateSettings }: Onboar
             className="w-full h-12 text-base font-bold gap-2 rounded-xl shadow-primary active:scale-[0.98] transition-transform"
             onClick={handleNext}
           >
-            {isLast ? 'Log Your First Load' : 'Next'}
+            {isLast ? 'Start Tracking' : 'Next'}
             <ArrowRight className="h-5 w-5" />
           </Button>
 
