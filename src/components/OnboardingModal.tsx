@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Truck, DollarSign, ClipboardCheck, ArrowRight, Settings } from 'lucide-react';
+import { Truck, DollarSign, ClipboardCheck, ArrowRight, Settings, Mic, Camera, Award, BarChart3 } from 'lucide-react';
 
 interface OnboardingModalProps {
   open: boolean;
