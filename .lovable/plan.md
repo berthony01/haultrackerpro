@@ -1,44 +1,25 @@
 
 
-## Plan: Performance Metrics Charts Section
+## Plan: Fix Admin Users Tab — Redeploy Edge Function
 
-### Overview
+### Problem
+The admin "Users" tab fails because the deployed `admin-api` edge function is an older version that doesn't include the `list-users` action handler. The network request `GET /admin-api?action=list-users&page=1&per_page=50` returns **400 "Unknown action"**.
 
-Create a new `PerformanceCharts` component placed on the Dashboard below the existing `PerformanceTrends` section. It contains 5 charts with a dedicated time range toggle (This Week / This Month / This Year) that respects the user's "Week Starts On" setting.
+The source code in `supabase/functions/admin-api/index.ts` already has the correct `list-users` handler (line 95). No code changes are needed.
 
-### New File: `src/components/PerformanceCharts.tsx`
+### Fix
+**Redeploy the `admin-api` edge function** so the deployed version matches the source code that already includes:
+- `list-users` action with pagination (50 per page)
+- Email search filtering
+- User enrichment with loads/expenses counts
 
-A single self-contained component that receives `loads` and `expenses` arrays (already fetched in `DashboardView`). Internally it:
+### Files Changed
+None — the code is already correct. Only a deployment is needed.
 
-1. **Time range toggle** — 3 buttons: "This Week", "This Month", "This Year". Uses `getPresetRange` logic already in `DashboardView` (will extract or duplicate the small helper).
-
-2. **Bucket logic** — Based on selected range:
-   - This Week / This Month → daily buckets (format: "Mon", "Tue" or "Mar 1", "Mar 2")
-   - This Year → monthly buckets ("Jan", "Feb", ...)
-
-3. **5 Charts** (all using Recharts, already installed):
-
-   **Chart 1: Net Profit Trend** — Line chart. Y = revenue - expenses per bucket. Single orange line.
-
-   **Chart 2: Revenue vs Expenses** — Line chart with 2 lines. Revenue (orange) + Expenses (red/muted). Legend below.
-
-   **Chart 3: Avg RPM Trend** — Line chart. Y = total_revenue / total_loaded_miles per bucket. Empty state note if no miles.
-
-   **Chart 4: Deadhead % Trend** — Line chart. Y = deadhead / (loaded + deadhead) * 100. Empty state if no deadhead data.
-
-   **Chart 5: Expense Breakdown by Category** — Horizontal bar chart. Top 5 categories aggregated for selected range.
-
-4. **Styling** — Uses existing `Card`/`CardContent`, `text-label`, `card-premium` classes. Chart colors use existing theme HSL values (primary orange, green for actual, muted for secondary lines). Tooltips use `formatCurrency` / `formatNumber`. Each chart is ~140px tall in a `ResponsiveContainer`.
-
-5. **Empty states** — If insufficient data for a chart, show a small muted message inside the card instead of a broken chart.
-
-### Modified File: `src/components/DashboardView.tsx`
-
-- Import and render `<PerformanceCharts loads={allLoadsQuery.loads} expenses={allExpensesQuery.expenses} />` after the existing `<PerformanceTrends />` component (line ~278).
-- Pass the unfiltered `loads` and `expenses` props (the component handles its own time range internally).
-
-### No Other Changes
-
-- No schema changes, no routing changes, no changes to existing business logic, theme, or navigation.
-- The existing `PerformanceTrends` component is kept as-is (it shows different data: last 4 weeks earnings bar chart + 30-day averages).
+### Verification
+After redeployment:
+1. Navigate to `/admin` and click the Users tab
+2. The full user list should load automatically (7 users based on overview data)
+3. Pagination controls (Previous/Next) should work
+4. Search by email/name should filter results
 
