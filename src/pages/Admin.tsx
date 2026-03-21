@@ -122,52 +122,12 @@ export default function Admin() {
   // Users
   const [userSearch, setUserSearch] = useState('');
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [planOverrideConfirm, setPlanOverrideConfirm] = useState<{ user: UserRow; newStatus: string } | null>(null);
-
-  // Admins
-  const [admins, setAdmins] = useState<AdminRow[]>([]);
-  const [addAdminOpen, setAddAdminOpen] = useState(false);
-  const [addAdminEmail, setAddAdminEmail] = useState('');
-  const [removeAdminConfirm, setRemoveAdminConfirm] = useState<AdminRow | null>(null);
-
-  // Billing
-  const [billingSearch, setBillingSearch] = useState('');
-  const [billingData, setBillingData] = useState<BillingData | null>(null);
-  const [billingUserId, setBillingUserId] = useState('');
-
-  // Feedback
-  const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
-  const [feedbackCategory, setFeedbackCategory] = useState('all');
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const initialFetchDone = useRef(false);
-
-  useEffect(() => {
-    if (!adminLoading && !isAdmin) navigate('/', { replace: true });
-  }, [adminLoading, isAdmin, navigate]);
-
-  const fetchFeedback = useCallback(async (category?: string) => {
-    setFeedbackLoading(true);
-    const params: Record<string, string> = {};
-    if (category && category !== 'all') params.category = category;
-    const data = await api.get('list-feedback', params);
-    setFeedback(Array.isArray(data) ? data : []);
-    setFeedbackLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    if (isAdmin && !initialFetchDone.current) {
-      initialFetchDone.current = true;
-      api.get('overview').then(setOverview);
-      api.get('list-admins').then(setAdmins);
-      fetchFeedback();
-    }
-  }, [isAdmin, api, fetchFeedback]);
-
-  const searchUsers = async () => {
-    const data = await api.get('search-users', { email: userSearch });
-    setUsers(Array.isArray(data) ? data : []);
-  };
 
   const handlePlanOverride = async () => {
     if (!planOverrideConfirm) return;
