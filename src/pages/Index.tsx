@@ -29,6 +29,8 @@ import { MonthlySummary } from '@/components/MonthlySummary';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AlertsView } from '@/components/AlertsView';
+import { TrialBanner, TrialExpiredBanner } from '@/components/TrialBanner';
+import { MilestoneNudges } from '@/components/MilestoneNudges';
 import { DriverScorecard } from '@/components/DriverScorecard';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,6 +66,13 @@ const Index = () => {
   // Pro gating — canonical subscription hook
   const subscription = useSubscription();
   const isPro = subscription.isPro;
+  const isTrialing = subscription.isTrialing;
+  const trialEnd = subscription.trialEnd;
+  const trialExpired = !isPro && !isTrialing && !!trialEnd && new Date(trialEnd) < new Date();
+
+  const handleUpgrade = () => {
+    setPage('settings');
+  };
 
   // Handle checkout success return
   useEffect(() => {
@@ -296,15 +305,31 @@ const Index = () => {
         ) : (
           <>
             {page === 'dashboard' && (
-              <DashboardView
-                loads={allLoadsQuery.loads}
-                expenses={allExpensesQuery.expenses}
-                fuelLogs={allFuelLogsQuery.fuelLogs}
-                isLoading={allLoadsQuery.isLoading}
-                onNavigate={handleNavigate}
-                smartAlerts={smartAlerts}
-                isPro={isPro}
-              />
+              <>
+                {isTrialing && trialEnd && (
+                  <TrialBanner trialEnd={trialEnd} onUpgrade={handleUpgrade} />
+                )}
+                {trialExpired && (
+                  <TrialExpiredBanner onUpgrade={handleUpgrade} />
+                )}
+                <MilestoneNudges
+                  loadsCount={allLoadsQuery.loads.length}
+                  expensesCount={allExpensesQuery.expenses.length}
+                  isTrialing={isTrialing}
+                  isPro={isPro}
+                  onUpgrade={handleUpgrade}
+                  onNavigate={handleNavigate}
+                />
+                <DashboardView
+                  loads={allLoadsQuery.loads}
+                  expenses={allExpensesQuery.expenses}
+                  fuelLogs={allFuelLogsQuery.fuelLogs}
+                  isLoading={allLoadsQuery.isLoading}
+                  onNavigate={handleNavigate}
+                  smartAlerts={smartAlerts}
+                  isPro={isPro}
+                />
+              </>
             )}
             {page === 'closeout' && (
               <WeeklyCloseout
