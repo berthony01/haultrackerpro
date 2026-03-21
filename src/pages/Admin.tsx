@@ -129,6 +129,65 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [planOverrideConfirm, setPlanOverrideConfirm] = useState<{ user: UserRow; newStatus: string } | null>(null);
 
+  // Admins
+  const [admins, setAdmins] = useState<AdminRow[]>([]);
+  const [addAdminOpen, setAddAdminOpen] = useState(false);
+  const [addAdminEmail, setAddAdminEmail] = useState('');
+  const [removeAdminConfirm, setRemoveAdminConfirm] = useState<AdminRow | null>(null);
+
+  // Billing
+  const [billingSearch, setBillingSearch] = useState('');
+  const [billingData, setBillingData] = useState<BillingData | null>(null);
+  const [billingUserId, setBillingUserId] = useState('');
+
+  // Feedback
+  const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
+  const [feedbackCategory, setFeedbackCategory] = useState('all');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const initialFetchDone = useRef(false);
+
+  useEffect(() => {
+    if (!adminLoading && !isAdmin) navigate('/', { replace: true });
+  }, [adminLoading, isAdmin, navigate]);
+
+  const fetchUsers = useCallback(async (page = 1, search = '') => {
+    setUsersLoading(true);
+    const params: Record<string, string> = { page: String(page), per_page: '50' };
+    if (search) params.email = search;
+    const data = await api.get('list-users', params);
+    if (data && data.users) {
+      setUsers(data.users);
+      setUsersPage(data.page);
+      setUsersTotalPages(data.total_pages);
+      setUsersTotal(data.total);
+    }
+    setUsersLoading(false);
+  }, [api]);
+
+  const fetchFeedback = useCallback(async (category?: string) => {
+    setFeedbackLoading(true);
+    const params: Record<string, string> = {};
+    if (category && category !== 'all') params.category = category;
+    const data = await api.get('list-feedback', params);
+    setFeedback(Array.isArray(data) ? data : []);
+    setFeedbackLoading(false);
+  }, [api]);
+
+  useEffect(() => {
+    if (isAdmin && !initialFetchDone.current) {
+      initialFetchDone.current = true;
+      api.get('overview').then(setOverview);
+      api.get('list-admins').then(setAdmins);
+      fetchFeedback();
+      fetchUsers(1, '');
+    }
+  }, [isAdmin, api, fetchFeedback, fetchUsers]);
+
+  const searchUsers = async () => {
+    setUsersPage(1);
+    fetchUsers(1, userSearch);
+  };
+
   const handlePlanOverride = async () => {
     if (!planOverrideConfirm) return;
     const res = await api.post('set-plan-override', {
@@ -137,7 +196,7 @@ export default function Admin() {
     });
     if (res.success) {
       toast.success(`Plan updated to ${planOverrideConfirm.newStatus}`);
-      searchUsers();
+      fetchUsers(usersPage, userSearch);
       setSelectedUser(null);
     } else {
       toast.error(res.error || 'Failed');
@@ -170,9 +229,8 @@ export default function Admin() {
   };
 
   const searchBilling = async () => {
-    // Find user_id from users search first
-    const usersData = await api.get('search-users', { email: billingSearch });
-    const arr = Array.isArray(usersData) ? usersData : [];
+    const usersData = await api.get('list-users', { email: billingSearch });
+    const arr = usersData?.users || [];
     if (arr.length === 0) {
       toast.error('User not found');
       setBillingData(null);
