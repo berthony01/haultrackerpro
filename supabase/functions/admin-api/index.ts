@@ -92,30 +92,50 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (action === "search-users") {
+    if (action === "list-users" || action === "search-users") {
       const rawEmail = url.searchParams.get("email") || "";
-      // Sanitize: limit length, strip SQL wildcards/special chars
       const email = rawEmail.slice(0, 255).replace(/[%_\\]/g, "");
-      const { data: profiles } = await adminDb
-        .from("profiles")
-        .select("user_id, display_name, subscription_status, subscription_plan, created_at")
-        .ilike("display_name", `%${email}%`)
-        .limit(50);
+      const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+      const perPage = Math.min(100, Math.max(1, parseInt(url.searchParams.get("per_page") || "50", 10)));
 
-      // Also search by auth email via profiles — we stored display_name but need email
-      // We'll use auth admin to get emails
+      // Get all auth users for email mapping
       const { data: authUsers } = await adminDb.auth.admin.listUsers({ perPage: 1000 });
       const emailMap = new Map<string, string>();
       authUsers?.users?.forEach((u) => emailMap.set(u.id, u.email || ""));
 
-      const filtered = (profiles || []).map((p) => ({
+      // Fetch profiles
+      let query = adminDb
+        .from("profiles")
+        .select("user_id, display_name, subscription_status, subscription_plan, created_at", { count: "exact" });
+
+      if (email) {
+        query = query.ilike("display_name", `%${email}%`);
+      }
+
+      query = query.order("created_at", { ascending: false });
+
+      const { data: profiles } = await query;
+
+      // Map emails and filter by search term
+      let mapped = (profiles || []).map((p) => ({
         ...p,
         email: emailMap.get(p.user_id) || p.display_name || "unknown",
-      })).filter((p) => !email || p.email.toLowerCase().includes(email.toLowerCase()) || (p.display_name || "").toLowerCase().includes(email.toLowerCase()));
+      }));
 
-      // Get counts
+      if (email) {
+        mapped = mapped.filter((p) =>
+          p.email.toLowerCase().includes(email.toLowerCase()) ||
+          (p.display_name || "").toLowerCase().includes(email.toLowerCase())
+        );
+      }
+
+      const total = mapped.length;
+      const totalPages = Math.ceil(total / perPage);
+      const paginated = mapped.slice((page - 1) * perPage, page * perPage);
+
+      // Get counts for paginated results only
       const enriched = await Promise.all(
-        filtered.map(async (p) => {
+        paginated.map(async (p) => {
           const [lc, ec] = await Promise.all([
             adminDb.from("loads").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
             adminDb.from("expenses").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
@@ -124,7 +144,7 @@ Deno.serve(async (req) => {
         })
       );
 
-      return json(enriched);
+      return json({ users: enriched, total, page, per_page: perPage, total_pages: totalPages });
     }
 
     if (action === "set-plan-override" && req.method === "POST") {

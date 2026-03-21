@@ -122,6 +122,10 @@ export default function Admin() {
   // Users
   const [userSearch, setUserSearch] = useState('');
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [planOverrideConfirm, setPlanOverrideConfirm] = useState<{ user: UserRow; newStatus: string } | null>(null);
 
@@ -146,6 +150,20 @@ export default function Admin() {
     if (!adminLoading && !isAdmin) navigate('/', { replace: true });
   }, [adminLoading, isAdmin, navigate]);
 
+  const fetchUsers = useCallback(async (page = 1, search = '') => {
+    setUsersLoading(true);
+    const params: Record<string, string> = { page: String(page), per_page: '50' };
+    if (search) params.email = search;
+    const data = await api.get('list-users', params);
+    if (data && data.users) {
+      setUsers(data.users);
+      setUsersPage(data.page);
+      setUsersTotalPages(data.total_pages);
+      setUsersTotal(data.total);
+    }
+    setUsersLoading(false);
+  }, [api]);
+
   const fetchFeedback = useCallback(async (category?: string) => {
     setFeedbackLoading(true);
     const params: Record<string, string> = {};
@@ -161,12 +179,13 @@ export default function Admin() {
       api.get('overview').then(setOverview);
       api.get('list-admins').then(setAdmins);
       fetchFeedback();
+      fetchUsers(1, '');
     }
-  }, [isAdmin, api, fetchFeedback]);
+  }, [isAdmin, api, fetchFeedback, fetchUsers]);
 
   const searchUsers = async () => {
-    const data = await api.get('search-users', { email: userSearch });
-    setUsers(Array.isArray(data) ? data : []);
+    setUsersPage(1);
+    fetchUsers(1, userSearch);
   };
 
   const handlePlanOverride = async () => {
@@ -177,7 +196,7 @@ export default function Admin() {
     });
     if (res.success) {
       toast.success(`Plan updated to ${planOverrideConfirm.newStatus}`);
-      searchUsers();
+      fetchUsers(usersPage, userSearch);
       setSelectedUser(null);
     } else {
       toast.error(res.error || 'Failed');
@@ -210,9 +229,8 @@ export default function Admin() {
   };
 
   const searchBilling = async () => {
-    // Find user_id from users search first
-    const usersData = await api.get('search-users', { email: billingSearch });
-    const arr = Array.isArray(usersData) ? usersData : [];
+    const usersData = await api.get('list-users', { email: billingSearch });
+    const arr = usersData?.users || [];
     if (arr.length === 0) {
       toast.error('User not found');
       setBillingData(null);
@@ -288,34 +306,67 @@ export default function Admin() {
                 onKeyDown={(e) => e.key === 'Enter' && searchUsers()}
               />
               <Button onClick={searchUsers}><Search className="h-4 w-4" /></Button>
+              {userSearch && (
+                <Button variant="ghost" onClick={() => { setUserSearch(''); fetchUsers(1, ''); }}>Clear</Button>
+              )}
             </div>
-            {users.length > 0 && (
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Loads</TableHead>
-                      <TableHead>Expenses</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
-                        <TableCell className="text-xs">{u.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
-                            {u.subscription_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{u.loads_count}</TableCell>
-                        <TableCell>{u.expenses_count}</TableCell>
+            <p className="text-xs text-muted-foreground">{usersTotal} users total · Page {usersPage} of {usersTotalPages}</p>
+            {usersLoading ? (
+              <p className="text-muted-foreground text-center py-8">Loading...</p>
+            ) : users.length > 0 ? (
+              <>
+                <Card>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Plan</TableHead>
+                        <TableHead>Loads</TableHead>
+                        <TableHead>Expenses</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((u) => (
+                        <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
+                          <TableCell className="text-xs">{u.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
+                              {u.subscription_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{u.loads_count}</TableCell>
+                          <TableCell>{u.expenses_count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+                {usersTotalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={usersPage <= 1}
+                      onClick={() => fetchUsers(usersPage - 1, userSearch)}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {usersPage} / {usersTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={usersPage >= usersTotalPages}
+                      onClick={() => fetchUsers(usersPage + 1, userSearch)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No users found.</p>
             )}
 
             {/* User detail dialog */}
