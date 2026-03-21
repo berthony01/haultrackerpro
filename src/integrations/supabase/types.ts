@@ -598,6 +598,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_ended_trials: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
