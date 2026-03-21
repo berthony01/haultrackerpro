@@ -31,9 +31,10 @@ const slides = [
   },
   {
     icon: ClipboardCheck,
-    title: 'Close Out Every Week',
-    description: 'Finalize your weekly summary to spot trends, catch underpayments, and keep your records clean.',
-    color: 'bg-warning/10 text-warning',
+    title: "You're Starting on Pro",
+    description: 'You have 14 days of full Pro access — voice logging, receipt scanning, driver scorecard, and all charts unlocked.',
+    color: 'bg-primary/10 text-primary',
+    isProSlide: true,
   },
 ];
 
