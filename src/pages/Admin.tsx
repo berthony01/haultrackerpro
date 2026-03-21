@@ -306,34 +306,67 @@ export default function Admin() {
                 onKeyDown={(e) => e.key === 'Enter' && searchUsers()}
               />
               <Button onClick={searchUsers}><Search className="h-4 w-4" /></Button>
+              {userSearch && (
+                <Button variant="ghost" onClick={() => { setUserSearch(''); fetchUsers(1, ''); }}>Clear</Button>
+              )}
             </div>
-            {users.length > 0 && (
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Loads</TableHead>
-                      <TableHead>Expenses</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
-                        <TableCell className="text-xs">{u.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
-                            {u.subscription_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{u.loads_count}</TableCell>
-                        <TableCell>{u.expenses_count}</TableCell>
+            <p className="text-xs text-muted-foreground">{usersTotal} users total · Page {usersPage} of {usersTotalPages}</p>
+            {usersLoading ? (
+              <p className="text-muted-foreground text-center py-8">Loading...</p>
+            ) : users.length > 0 ? (
+              <>
+                <Card>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Plan</TableHead>
+                        <TableHead>Loads</TableHead>
+                        <TableHead>Expenses</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((u) => (
+                        <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
+                          <TableCell className="text-xs">{u.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
+                              {u.subscription_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{u.loads_count}</TableCell>
+                          <TableCell>{u.expenses_count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+                {usersTotalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={usersPage <= 1}
+                      onClick={() => fetchUsers(usersPage - 1, userSearch)}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {usersPage} / {usersTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={usersPage >= usersTotalPages}
+                      onClick={() => fetchUsers(usersPage + 1, userSearch)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No users found.</p>
             )}
 
             {/* User detail dialog */}
