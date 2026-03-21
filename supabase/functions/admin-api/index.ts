@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
 
       query = query.order("created_at", { ascending: false });
 
-      const { data: profiles, count: totalCount } = await query;
+      const { data: profiles } = await query;
 
       // Map emails and filter by search term
       let mapped = (profiles || []).map((p) => ({
