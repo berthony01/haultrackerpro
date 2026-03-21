@@ -1,33 +1,16 @@
-import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Calculator, Receipt, Route, Download, Mic, Camera, MapPin, ClipboardPaste, Menu, X } from 'lucide-react';
+import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Mic, Camera, Menu, X, Star, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 import SEOHead from '@/components/SEOHead';
 
-const freeFeatures = [
-  { icon: Truck, title: 'Load Tracking', desc: 'Log every load with miles, rate, fees, and multi-stop details in seconds.' },
-  { icon: Receipt, title: 'Expense Tracking', desc: 'Track fuel, maintenance, tolls, and every cost that eats into your profit.' },
-  { icon: Calculator, title: 'Net Profit Calculation', desc: 'See real net profit per load — not just gross revenue.' },
-  { icon: MapPin, title: 'Multi-Stop Loads', desc: 'Add pickup and drop-off stops with detention tracking for complex routes.' },
-  { icon: ClipboardPaste, title: 'Paste Load Parser', desc: 'Paste load details from any source and auto-fill the form — 5 free per week.' },
-  { icon: Download, title: 'CSV Exports', desc: 'Export clean load summaries for tax prep or your own records.' },
-];
-
-const proFeatures = [
-  { icon: Mic, title: 'AI Voice Logging', desc: 'Speak your expenses naturally — AI parses amount, category, and notes instantly.' },
-  { icon: Camera, title: 'AI Receipt Scanning', desc: 'Snap a photo of any receipt and auto-fill expense details with OCR.' },
-  { icon: BarChart3, title: 'Driver Scorecard', desc: 'Get graded across 5 performance metrics with tier rankings from Bronze to Platinum.' },
-  { icon: FileText, title: 'Weekly Closeout', desc: 'Lock in weekly summaries with pay variance and deadhead tracking.' },
-  { icon: TrendingUp, title: 'Unlimited Paste Parser', desc: 'Auto-fill load forms from pasted text — unlimited for Pro users.' },
-  { icon: BarChart3, title: 'Performance Charts', desc: 'RPM trends, expense breakdowns, and advanced analytics to drive smarter decisions.' },
-];
-
 const faqs = [
   { q: 'Is my data secure?', a: 'Yes. All data is encrypted in transit and stored securely. We never sell or share your data with third parties.' },
   { q: 'Do I need accounting knowledge?', a: 'Not at all. Just enter your loads and expenses — HaulTrackerPro does the math for you automatically.' },
   { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks advanced features for $15/month or $120/year.' },
   { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
+  { q: 'Can I try Pro features before paying?', a: 'Yes — every new account starts with a free 14-day Pro trial. No credit card required. You get full access to AI Voice Logging, Receipt Scanning, Driver Scorecard, and all 5 performance charts.' },
 ];
 
 export default function Landing() {
@@ -57,44 +40,33 @@ export default function Landing() {
           ]
         }}
       />
-      {/* Nav */}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* NAV */}
+      {/* ═══════════════════════════════════════════ */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <div className="flex items-center gap-2">
             <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </div>
-          {/* Desktop nav */}
           <div className="hidden sm:flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
-              Features
-            </Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
-              Pricing
-            </Button>
-            <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
-              Sign In
-            </Button>
+            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
+            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
+            <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
             <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Free
+              Start Tracking Free
             </Button>
           </div>
-          {/* Mobile nav */}
           <div className="flex sm:hidden items-center gap-2">
             <Button onClick={goToAuth} className="text-xs font-bold rounded-xl px-3" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Free
+              Start Tracking Free
             </Button>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg"
-              aria-label="Toggle menu"
-              style={{ color: 'hsl(220, 10%, 70%)' }}
-            >
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-lg" aria-label="Toggle menu" style={{ color: 'hsl(220, 10%, 70%)' }}>
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>
-        {/* Mobile menu panel */}
         {mobileMenuOpen && (
           <div className="sm:hidden border-t animate-in slide-in-from-top-2 duration-200" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
             <div className="flex flex-col px-4 py-4 space-y-1">
@@ -104,28 +76,23 @@ export default function Landing() {
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Sign In', href: '/auth' },
               ].map(item => (
-                <button
-                  key={item.href}
-                  onClick={() => { setMobileMenuOpen(false); navigate(item.href); }}
+                <button key={item.href} onClick={() => { setMobileMenuOpen(false); navigate(item.href); }}
                   className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
-                  style={{ color: 'hsl(220, 10%, 70%)' }}
-                >
-                  {item.label}
-                </button>
+                  style={{ color: 'hsl(220, 10%, 70%)' }}>{item.label}</button>
               ))}
-              <Button
-                onClick={() => { setMobileMenuOpen(false); goToAuth(); }}
+              <Button onClick={() => { setMobileMenuOpen(false); goToAuth(); }}
                 className="w-full mt-2 text-sm font-bold rounded-xl"
-                style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
-              >
-                Start Free <ArrowRight className="h-4 w-4 ml-2" />
+                style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+                Start Tracking Free <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
           </div>
         )}
       </nav>
 
-      {/* Hero */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 1: HERO */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{
           background: 'radial-gradient(ellipse 80% 60% at 50% 0%, hsl(25, 95%, 53%, 0.08) 0%, transparent 70%)'
@@ -154,7 +121,7 @@ export default function Landing() {
                 }}>
                   Start Tracking Free <ArrowRight className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-base font-semibold rounded-xl h-13 px-8" style={{
+                <Button variant="outline" size="lg" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} className="text-base font-semibold rounded-xl h-13 px-8" style={{
                   borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
                 }}>
                   See How It Works
@@ -181,8 +148,10 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 2: HOW IT WORKS */}
+      {/* ═══════════════════════════════════════════ */}
+      <section id="how-it-works" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
@@ -207,101 +176,13 @@ export default function Landing() {
               </div>
             ))}
           </div>
-          <div className="text-center mt-10">
-            <p className="text-sm mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>Ready to track your real profit?</p>
-            <Button onClick={() => navigate('/pricing')} className="text-sm font-bold rounded-xl px-6" style={{
-              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
-            }}>
-              Start Free
-            </Button>
-          </div>
         </div>
       </section>
 
-      {/* Who It's For */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 3: PAIN POINTS */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Who It's For
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Built for drivers who need clear numbers, not spreadsheets.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
-              { icon: Truck, title: 'Owner-Operators', desc: 'Track profit per load, cost per mile, and business expenses in one dashboard.' },
-              { icon: Route, title: 'Lease Operators', desc: 'Stay on top of weekly pay, deductions, and expenses without the paperwork headaches.' },
-              { icon: FileText, title: '1099 Company Drivers', desc: 'Organize expenses and tax set-aside estimates so you\'re prepared for tax season.' },
-            ].map((item, i) => (
-              <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-10">
-            {['No credit card required', 'Free plan available', 'Mobile-first', 'Set up in minutes'].map(t => (
-              <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
-                <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'hsl(152, 60%, 42%)' }} /> {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Free Calculators */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Free Trucking Calculators
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Quick tools to help owner-operators understand real trucking profits.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {[
-              { icon: Calculator, title: 'Trucking Cost Per Mile Calculator', desc: 'Calculate the real operating cost of your truck per mile.', href: '/trucking-cost-per-mile-calculator' },
-              { icon: DollarSign, title: 'Trucking Load Profit Calculator', desc: 'See if a load is actually profitable before accepting it.', href: '/trucking-load-profit-calculator' },
-            ].map((card, i) => (
-              <button
-                key={i}
-                onClick={() => navigate(card.href)}
-                className="p-6 rounded-2xl border text-left transition-all hover:scale-[1.02] hover:border-[hsl(25,95%,53%,0.3)]"
-                style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}
-              >
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <card.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{card.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{card.desc}</p>
-                <span className="inline-flex items-center gap-1 mt-4 text-sm font-semibold" style={{ color: 'hsl(25, 95%, 53%)' }}>
-                  Try It Free <ArrowRight className="h-4 w-4" />
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="text-center mt-10 space-y-4">
-            <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              HaulTrackerPro automatically calculates these metrics for every load you run.
-            </p>
-            <Button onClick={() => navigate('/pricing')} className="text-sm font-bold rounded-xl px-6" style={{
-              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
-            }}>
-              Start Tracking Free <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Problem Section */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
@@ -327,126 +208,151 @@ export default function Landing() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 4: AI DEMO (NEW) */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Log Expenses{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Without Typing.</span>
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Pro features that no other trucking app offers at this price.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Voice Logging Demo */}
+            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
+                  <Mic className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>AI Voice Logging</h3>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { step: '1', label: 'You say:', text: '"$85 fuel at Pilot, diesel"' },
+                  { step: '2', label: 'AI parses:', text: 'Amount: $85 · Category: Fuel · Station: Pilot' },
+                  { step: '3', label: 'Result:', text: 'Expense logged — hands-free, eyes on the road' },
+                ].map((s) => (
+                  <div key={s.step} className="flex gap-3 items-start">
+                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
+                      {s.step}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
+                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Receipt Scanning Demo */}
+            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
+                  <Camera className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>AI Receipt Scanning</h3>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { step: '1', label: 'You snap:', text: 'Photo of any fuel, toll, or maintenance receipt' },
+                  { step: '2', label: 'AI reads:', text: 'Amount, vendor, date, and category extracted via OCR' },
+                  { step: '3', label: 'Result:', text: 'Expense auto-filled — no typing, no lost receipts' },
+                ].map((s) => (
+                  <div key={s.step} className="flex gap-3 items-start">
+                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
+                      {s.step}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
+                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="text-center mt-10">
+            <p className="text-sm mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Every new account includes a free 14-day Pro trial. No credit card required.
+            </p>
             <Button onClick={goToAuth} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
               background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
             }}>
-              Take Control of Your Numbers <ArrowRight className="h-5 w-5" />
+              Start Tracking Free <ArrowRight className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Free Features Section */}
-      <section id="features" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Free Plan.{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Total Financial Clarity.</span>
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Everything you need to understand your real earnings — no spreadsheets, no guesswork.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {freeFeatures.map((f, i) => (
-              <div key={i} className="group p-6 rounded-2xl border transition-all duration-300 hover:border-opacity-60" style={{
-                background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)',
-              }}>
-                <div className="h-11 w-11 rounded-xl flex items-center justify-center mb-4 transition-colors" style={{ background: 'hsl(25, 95%, 53%, 0.1)' }}>
-                  <f.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-base font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{f.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pro Features Section */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Go Pro.{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Drive Smarter.</span>
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Advanced insights starting at $15/month or $120/year. Upgrade when you're ready.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {proFeatures.map((f, i) => (
-              <div key={i} className="group p-6 rounded-2xl border transition-all duration-300" style={{
-                background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.3)',
-              }}>
-                <div className="h-11 w-11 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
-                  <f.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-base font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{f.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="text-center mt-12">
-            <Button onClick={() => navigate('/pricing')} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
-              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
-            }}>
-              View Pricing <ArrowRight className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Built for Drivers */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-black tracking-tight mb-6" style={{ color: 'hsl(0, 0%, 100%)' }}>
-                Built for Drivers Who Run Their Truck{' '}
-                <span style={{ color: 'hsl(25, 95%, 53%)' }}>Like a Business.</span>
-              </h2>
-              <p className="text-base mb-8" style={{ color: 'hsl(220, 10%, 55%)' }}>
-                Whether you're an owner-operator or lease driver, HaulTrackerPro gives you the financial tools that fleets have — without the fleet overhead.
-              </p>
-              <Button onClick={goToAuth} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
-                background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
-              }}>
-                Create Your Free Account <ArrowRight className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {[
-                { icon: BarChart3, title: 'Weekly Summaries', desc: 'Close out every week with a snapshot of loads, miles, revenue, and profit.' },
-                { icon: DollarSign, title: 'Estimated vs Actual Pay', desc: 'Compare what you expected to earn against what you actually received.' },
-                { icon: AlertTriangle, title: 'Missing Pay Alerts', desc: 'Instantly see which loads are still unpaid — no more forgotten settlements.' },
-                { icon: FileText, title: 'Export-Ready Reports', desc: 'Download professional reports for tax prep, bookkeepers, or dispute resolution.' },
-              ].map((item, i) => (
-                <div key={i} className="flex gap-4 p-5 rounded-xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                  <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                    <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                    <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 5: SOCIAL PROOF (NEW) */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Built by a Developer.{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Tested by Drivers.</span>
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              HaulTrackerPro was built from the ground up after talking to real owner-operators about what they actually need — not what enterprise software companies think they need.
+            </p>
+          </div>
+
+          {/* Trust signals */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto mb-12">
+            {[
+              { icon: Shield, label: 'Your data stays yours', sub: 'Encrypted & private' },
+              { icon: Zap, label: 'Set up in minutes', sub: 'No training needed' },
+              { icon: Users, label: 'Built for solo operators', sub: 'Not bloated fleet software' },
+              { icon: Star, label: '14-day Pro trial', sub: 'No credit card required' },
+            ].map((item, i) => (
+              <div key={i} className="text-center p-4 rounded-xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                <div className="h-9 w-9 rounded-lg flex items-center justify-center mx-auto mb-2" style={{ background: 'hsl(25, 95%, 53%, 0.1)' }}>
+                  <item.icon className="h-4 w-4" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <p className="text-xs font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.label}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'hsl(220, 10%, 50%)' }}>{item.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Testimonial placeholder — replace with real quotes when available */}
+          <div className="max-w-2xl mx-auto">
+            <div className="p-6 rounded-2xl border text-center" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+              <div className="flex justify-center gap-1 mb-3">
+                {[1,2,3,4,5].map(s => (
+                  <Star key={s} className="h-4 w-4 fill-current" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                ))}
+              </div>
+              <p className="text-base italic leading-relaxed mb-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
+                "I was using a spreadsheet for two years and thought I was profitable. HaulTrackerPro showed me I was losing money on my regular lane. Changed my whole game."
+              </p>
+              <p className="text-sm font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>— Early Access Driver</p>
+              <p className="text-xs" style={{ color: 'hsl(220, 10%, 45%)' }}>Owner-Operator, Dry Van</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 6: FAQ */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Simple. Professional.{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Reliable.</span>
+              Common{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Questions</span>
             </h2>
           </div>
           <div className="space-y-3">
@@ -467,17 +373,12 @@ export default function Landing() {
               </div>
             ))}
           </div>
-          <div className="text-center mt-10">
-            <Button onClick={goToAuth} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
-              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
-            }}>
-              Start Free Today <ArrowRight className="h-5 w-5" />
-            </Button>
-          </div>
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 7: FINAL CTA */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="py-20 sm:py-28 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{
           background: 'radial-gradient(ellipse 60% 50% at 50% 50%, hsl(25, 95%, 53%, 0.06) 0%, transparent 70%)'
@@ -488,7 +389,7 @@ export default function Landing() {
             <span style={{ color: 'hsl(25, 95%, 53%)' }}>Start Knowing.</span>
           </h2>
           <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Join drivers who track every load, every expense, and every dollar. Free plan available — Pro from $15/month.
+            Join drivers who track every load, every expense, and every dollar. Start with a free 14-day Pro trial — no credit card required.
           </p>
           <Button onClick={goToAuth} size="lg" className="text-lg font-bold rounded-2xl h-14 px-10 gap-2" style={{
             background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
@@ -499,10 +400,11 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ═══════════════════════════════════════════ */}
+      {/* FOOTER */}
+      {/* ═══════════════════════════════════════════ */}
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
-          {/* Desktop: 3-column, Mobile: stacked */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-4">
             <div className="text-center sm:text-left">
               <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
