@@ -29,6 +29,8 @@ import { MonthlySummary } from '@/components/MonthlySummary';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AlertsView } from '@/components/AlertsView';
+import { TrialBanner, TrialExpiredBanner } from '@/components/TrialBanner';
+import { MilestoneNudges } from '@/components/MilestoneNudges';
 import { DriverScorecard } from '@/components/DriverScorecard';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
