@@ -305,15 +305,31 @@ const Index = () => {
         ) : (
           <>
             {page === 'dashboard' && (
-              <DashboardView
-                loads={allLoadsQuery.loads}
-                expenses={allExpensesQuery.expenses}
-                fuelLogs={allFuelLogsQuery.fuelLogs}
-                isLoading={allLoadsQuery.isLoading}
-                onNavigate={handleNavigate}
-                smartAlerts={smartAlerts}
-                isPro={isPro}
-              />
+              <>
+                {isTrialing && trialEnd && (
+                  <TrialBanner trialEnd={trialEnd} onUpgrade={handleUpgrade} />
+                )}
+                {trialExpired && (
+                  <TrialExpiredBanner onUpgrade={handleUpgrade} />
+                )}
+                <MilestoneNudges
+                  loadsCount={allLoadsQuery.loads.length}
+                  expensesCount={allExpensesQuery.expenses.length}
+                  isTrialing={isTrialing}
+                  isPro={isPro}
+                  onUpgrade={handleUpgrade}
+                  onNavigate={handleNavigate}
+                />
+                <DashboardView
+                  loads={allLoadsQuery.loads}
+                  expenses={allExpensesQuery.expenses}
+                  fuelLogs={allFuelLogsQuery.fuelLogs}
+                  isLoading={allLoadsQuery.isLoading}
+                  onNavigate={handleNavigate}
+                  smartAlerts={smartAlerts}
+                  isPro={isPro}
+                />
+              </>
             )}
             {page === 'closeout' && (
               <WeeklyCloseout
