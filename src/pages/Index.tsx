@@ -66,6 +66,13 @@ const Index = () => {
   // Pro gating — canonical subscription hook
   const subscription = useSubscription();
   const isPro = subscription.isPro;
+  const isTrialing = subscription.isTrialing;
+  const trialEnd = subscription.trialEnd;
+  const trialExpired = !isPro && !isTrialing && !!trialEnd && new Date(trialEnd) < new Date();
+
+  const handleUpgrade = () => {
+    setPage('settings');
+  };
 
   // Handle checkout success return
   useEffect(() => {
