@@ -11,6 +11,7 @@ export interface ScorecardMetric {
   score: number;
   maxScore: number;
   detail: string;
+  recommendation: string;
 }
 
 export interface ScorecardResult {
