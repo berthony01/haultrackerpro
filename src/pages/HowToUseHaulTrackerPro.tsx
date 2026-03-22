@@ -59,7 +59,7 @@ const features = [
   { title: 'Weekly Closeout', icon: CheckCircle, description: 'Finalize each week with a snapshot of earnings, miles, and deadhead percentage. Includes a Week in Review that flags your best/worst loads, deadhead issues, and missing payments.' },
   { title: 'Driver Scorecard', icon: Award, description: 'See your overall performance score (0–100) with tier rankings, 5 metric breakdowns (RPM, deadhead, expenses, profit trend, streak), and personalized coaching recommendations for each area.' },
   { title: 'Reports & Exports', icon: FileText, description: 'Export your data as CSV, PDF summary, or full profit report. Download everything for your accountant or records.' },
-  { title: 'Tax Set-Aside Planner', icon: Calculator, description: 'Configure federal, state, and self-employment tax rates. HaulTrackerPro estimates how much to set aside each quarter.' },
+  { title: 'Tax Set-Aside Planner', icon: Calculator, description: 'Configure federal, state, and self-employment tax rates. Uses the IRS method for SE tax (92.35% adjustment) and deducts half of SE tax before income tax — more accurate than a flat percentage estimate.' },
 ];
 
 const freePlan = [
