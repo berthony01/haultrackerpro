@@ -99,6 +99,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
       gallons: isFuel && form.gallons ? parseFloat(form.gallons) : null,
       linked_load_id: form.linked_load_id || null,
       notes: form.notes.trim() || null,
+      expense_type: form.expense_type,
     });
   };
 
