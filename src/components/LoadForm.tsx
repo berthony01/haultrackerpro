@@ -345,7 +345,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="loaded_miles">Loaded Miles</Label>
-              <Input id="loaded_miles" type="number" step="0.1" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
+              <Input id="loaded_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
               <FieldError field="loaded_miles" />
             </div>
             <div>
