@@ -12,6 +12,7 @@ import { PerformanceCharts } from '@/components/PerformanceCharts';
 import { ProfitOverview } from '@/components/ProfitOverview';
 import { ProInsightCard } from '@/components/ProInsightCard';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
+import { ProTimeSavedCard } from '@/components/ProTimeSavedCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
 import { FuelAnalyticsCard } from '@/components/FuelAnalyticsCard';
