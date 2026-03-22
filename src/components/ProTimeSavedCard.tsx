@@ -77,7 +77,7 @@ export function ProTimeSavedCard({ isPro = false, isTrialing = false, weekStarts
           <span className="ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">This Week</span>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-2">
           {/* Hero stat */}
           <div className="relative text-center py-3">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent rounded-xl pointer-events-none" />
