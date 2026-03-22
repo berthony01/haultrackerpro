@@ -16,6 +16,7 @@ import { ProTimeSavedCard } from '@/components/ProTimeSavedCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
 import { FuelAnalyticsCard } from '@/components/FuelAnalyticsCard';
+import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
