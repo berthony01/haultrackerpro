@@ -31,20 +31,30 @@ export function ProfitOverview({ loads, expenses, onAddExpense }: ProfitOverview
 
   if (expenses.length === 0) {
     return (
-      <Card className="border-dashed border-2 border-muted-foreground/20">
-        <CardContent className="py-6 text-center space-y-3">
-          <Receipt className="h-8 w-8 text-muted-foreground/30 mx-auto" />
-          <p className="text-sm text-muted-foreground">Add expenses to calculate true profit.</p>
-          {onAddExpense && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 rounded-xl"
-              onClick={onAddExpense}
-            >
-              <Plus className="h-3.5 w-3.5" /> Add First Expense
-            </Button>
-          )}
+      <Card className="shadow-card overflow-hidden border-primary/10">
+        <CardContent className="p-0">
+          <div className="relative px-5 py-6 text-center space-y-4">
+            {/* Subtle gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/3 pointer-events-none" />
+            <div className="relative">
+              <div className="inline-flex items-center justify-center rounded-2xl bg-primary/10 p-4 mb-2">
+                <DollarSign className="h-8 w-8 text-primary" />
+              </div>
+              <p className="text-sm font-bold">Track Your True Profit</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto leading-relaxed">
+                Log your first expense to see net profit, cost-per-mile, and where your money goes.
+              </p>
+            </div>
+            {onAddExpense && (
+              <Button
+                size="sm"
+                className="gap-1.5 rounded-xl font-bold shadow-primary active:scale-95 transition-all"
+                onClick={onAddExpense}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add First Expense
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     );

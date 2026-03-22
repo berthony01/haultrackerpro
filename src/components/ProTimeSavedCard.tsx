@@ -68,24 +68,36 @@ export function ProTimeSavedCard({ isPro = false, isTrialing = false, weekStarts
   ].filter(i => i.count > 0);
 
   return (
-    <Card className="shadow-card border-primary/10 bg-primary/5">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Clock className="h-4 w-4 text-primary" />
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pro Saved You Time</p>
+    <Card className="shadow-card overflow-hidden border-primary/10">
+      <CardContent className="p-0">
+        {/* Header strip */}
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5 border-b border-primary/10">
+          <Clock className="h-3.5 w-3.5 text-primary" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Pro Saved You Time</span>
+          <span className="ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">This Week</span>
         </div>
-        <div className="text-center mb-3">
-          <p className="text-3xl font-black font-mono text-primary">{totalMinutes}</p>
-          <p className="text-xs text-muted-foreground">minutes saved this week</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {items.map(item => (
-            <div key={item.label} className="text-center rounded-lg bg-background/60 p-2">
-              <item.icon className="h-3.5 w-3.5 mx-auto text-muted-foreground mb-1" />
-              <p className="text-xs font-bold">{item.count}</p>
-              <p className="text-[10px] text-muted-foreground">{item.label}</p>
-            </div>
-          ))}
+
+        <div className="p-4 space-y-4">
+          {/* Hero stat */}
+          <div className="relative text-center py-3">
+            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent rounded-xl pointer-events-none" />
+            <p className="relative text-4xl font-black font-mono text-primary leading-none">{totalMinutes}</p>
+            <p className="relative text-[11px] text-muted-foreground mt-1.5 font-medium">minutes saved with Pro tools</p>
+          </div>
+
+          {/* Breakdown chips */}
+          <div className="grid grid-cols-3 gap-2">
+            {items.map(item => (
+              <div key={item.label} className="text-center rounded-xl bg-secondary/80 border border-border/50 p-2.5 hover:border-primary/20 transition-colors">
+                <div className="inline-flex items-center justify-center rounded-lg bg-primary/10 p-1.5 mb-1.5">
+                  <item.icon className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <p className="text-sm font-black font-mono">{item.count}</p>
+                <p className="text-[10px] text-muted-foreground font-medium">{item.label}</p>
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5">{Math.round(item.mins)} min</p>
+              </div>
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>
