@@ -36,6 +36,7 @@ import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
 
 const Index = () => {
   const { signOut, user } = useAuth();
@@ -79,6 +80,7 @@ const Index = () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
       toast.success('Welcome to Pro! Your subscription is now active.', { duration: 5000 });
+      trackPurchase(subscription.planKey, subscription.planKey === 'pro_yearly' ? 120 : 15);
       subscription.refetch();
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -119,6 +121,7 @@ const Index = () => {
   const handleAddLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     addLoad.mutate(data, {
       onSuccess: (result) => {
+        trackLoadLogged(allLoadsQuery.loads.length + 1);
         if (stops && stops.length > 0 && result?.id) {
           loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
         }
@@ -138,7 +141,7 @@ const Index = () => {
 
   const handleAddExpense = (data: ExpenseInsert) => {
     allExpensesQuery.addExpense.mutate(data, {
-      onSuccess: () => { toast.success('Expense saved!'); setEditingExpense(null); setPage('expenses'); },
+      onSuccess: () => { trackExpenseLogged(); toast.success('Expense saved!'); setEditingExpense(null); setPage('expenses'); },
       onError: (e) => toast.error(e.message),
     });
   };

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import SEOHead from '@/components/SEOHead';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Calculator, DollarSign, Fuel, Truck, TrendingUp, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/loadUtils';
+import { trackCalculatorUsed } from '@/lib/analytics';
 
 export default function LoadProfitCalculator() {
   const navigate = useNavigate();
@@ -39,6 +40,12 @@ export default function LoadProfitCalculator() {
   }, [miles, ratePerMile, fuelPrice, mpg, maintenancePerMile, taxRate, otherExpenses]);
 
   const hasInput = parseFloat(miles) > 0 && parseFloat(ratePerMile) > 0;
+
+  useEffect(() => {
+    if (hasInput) {
+      trackCalculatorUsed('load_profit_calculator');
+    }
+  }, [hasInput]);
 
   return (
     <div className="min-h-screen bg-background">

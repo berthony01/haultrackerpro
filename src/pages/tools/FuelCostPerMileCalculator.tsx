@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import SEOHead from '@/components/SEOHead';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Fuel, DollarSign, Truck, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/loadUtils';
+import { trackCalculatorUsed } from '@/lib/analytics';
 
 export default function FuelCostPerMileCalculator() {
   const navigate = useNavigate();
@@ -26,6 +27,12 @@ export default function FuelCostPerMileCalculator() {
   }, [fuelPrice, mpg, miles]);
 
   const hasInput = parseFloat(fuelPrice) > 0 && parseFloat(mpg) > 0;
+
+  useEffect(() => {
+    if (hasInput) {
+      trackCalculatorUsed('fuel_cost_per_mile_calculator');
+    }
+  }, [hasInput]);
 
   return (
     <div className="min-h-screen bg-background">
