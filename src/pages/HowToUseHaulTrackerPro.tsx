@@ -46,7 +46,7 @@ const steps = [
   {
     num: '04',
     title: 'See Real Profit',
-    description: 'HaulTrackerPro calculates estimated revenue, compares it against actual pay, and subtracts all expenses — giving you a clear picture of real profitability.',
+    description: 'Net Profit = Revenue − Expenses. The Tax Planner then estimates your SE, federal, and state tax using the IRS method — so you see what you actually keep after expenses and taxes.',
     icon: BarChart3,
   },
 ];
