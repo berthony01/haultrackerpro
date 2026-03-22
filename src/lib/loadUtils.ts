@@ -354,3 +354,90 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export function exportScheduleCSummary(
+  expenses: { category: string; amount: number; expense_date: string }[],
+  filename: string = 'schedule-c-summary',
+  companyMeta?: { companyName?: string }
+) {
+  const SCHEDULE_C_MAP: Record<string, { line: string; description: string }> = {
+    'Fuel': { line: '9', description: 'Car and truck expenses' },
+    'Tolls': { line: '9', description: 'Car and truck expenses' },
+    'Parking': { line: '9', description: 'Car and truck expenses' },
+    'Maintenance': { line: '21', description: 'Repairs and maintenance' },
+    'Repairs': { line: '21', description: 'Repairs and maintenance' },
+    'Tires': { line: '21', description: 'Repairs and maintenance' },
+    'Insurance': { line: '15', description: 'Insurance (other than health)' },
+    'Permits': { line: '22', description: 'Taxes and licenses' },
+    'Licensing': { line: '22', description: 'Taxes and licenses' },
+    'Truck Payment': { line: '13', description: 'Depreciation / Section 179' },
+    'Lease Payment': { line: '20a', description: 'Rent or lease' },
+    'Phone': { line: '25', description: 'Utilities' },
+    'ELD/Software': { line: '18', description: 'Office expense' },
+    'Scale/Weigh': { line: '27a', description: 'Other expenses' },
+    'Lumper': { line: '27a', description: 'Other expenses' },
+    'Meals': { line: '24b', description: 'Travel, meals (50% deductible)' },
+    'Lodging': { line: '24a', description: 'Travel' },
+    'Supplies': { line: '22', description: 'Supplies' },
+    'Other': { line: '27a', description: 'Other expenses' },
+  };
+
+  const getLine = (cat: string) => SCHEDULE_C_MAP[cat] ?? { line: '27a', description: 'Other expenses' };
+
+  const groups: Record<string, { description: string; categories: Set<string>; total: number }> = {};
+  for (const exp of expenses) {
+    const sc = getLine(exp.category);
+    if (!groups[sc.line]) groups[sc.line] = { description: sc.description, categories: new Set(), total: 0 };
+    groups[sc.line].categories.add(exp.category);
+    groups[sc.line].total += exp.amount;
+  }
+
+  const sorted = Object.entries(groups)
+    .map(([line, data]) => ({ line, ...data, categories: [...data.categories] }))
+    .sort((a, b) => parseFloat(a.line) - parseFloat(b.line));
+
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+
+  const headers = ['Schedule C Line', 'Line Description', 'Categories', 'Total Amount'];
+  const rows = sorted.map(g => [
+    `Line ${g.line}`,
+    g.description,
+    g.categories.join(', '),
+    g.total.toFixed(2),
+  ].map(v => `"${v}"`));
+
+  const metaRows = [
+    [`"Schedule C Expense Summary"`, '', '', ''],
+    [`"Generated: ${new Date().toLocaleDateString()}"`, `"${companyMeta?.companyName ?? 'HaulTrackerPro'}"`, '', ''],
+    [`"Total Expenses: $${totalExpenses.toFixed(2)}"`, `"${expenses.length} transactions"`, '', ''],
+    ['', '', '', ''],
+  ];
+
+  const detailHeaders = ['Date', 'Category', 'Schedule C Line', 'Amount'];
+  const detailRows = expenses
+    .sort((a, b) => a.category.localeCompare(b.category))
+    .map(e => [
+      e.expense_date,
+      e.category,
+      `Line ${getLine(e.category).line}`,
+      e.amount.toFixed(2),
+    ].map(v => `"${v}"`));
+
+  const csv = [
+    ...metaRows.map(r => r.join(',')),
+    headers.join(','),
+    ...rows.map(r => r.join(',')),
+    '',
+    '"DETAIL BY TRANSACTION"',
+    detailHeaders.join(','),
+    ...detailRows.map(r => r.join(',')),
+  ].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
