@@ -79,10 +79,10 @@ export function ProTimeSavedCard({ isPro = false, isTrialing = false, weekStarts
 
         <div className="p-3 space-y-2">
           {/* Hero stat */}
-          <div className="relative text-center py-3">
+          <div className="relative text-center py-1.5">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent rounded-xl pointer-events-none" />
-            <p className="relative text-4xl font-black font-mono text-primary leading-none">{totalMinutes}</p>
-            <p className="relative text-[11px] text-muted-foreground mt-1.5 font-medium">minutes saved with Pro tools</p>
+            <p className="relative text-2xl font-black font-mono text-primary leading-none">{totalMinutes}</p>
+            <p className="relative text-[11px] text-muted-foreground mt-1 font-medium">minutes saved with Pro tools</p>
           </div>
 
           {/* Breakdown chips */}
