@@ -36,6 +36,7 @@ import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
 
 const Index = () => {
   const { signOut, user } = useAuth();
