@@ -2,6 +2,7 @@ import { Load } from '@/hooks/useLoads';
 import type { Expense } from '@/hooks/useExpenses';
 import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
+import { getScheduleCLine, groupByScheduleC } from '@/lib/scheduleCMapping';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 /** Get the effective date for grouping — uses dropoff_date if available, otherwise load_date */
