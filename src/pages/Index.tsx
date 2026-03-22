@@ -80,6 +80,7 @@ const Index = () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
       toast.success('Welcome to Pro! Your subscription is now active.', { duration: 5000 });
+      trackPurchase(subscription.planKey, subscription.planKey === 'pro_yearly' ? 120 : 15);
       subscription.refetch();
       window.history.replaceState({}, '', window.location.pathname);
     }
