@@ -32,6 +32,7 @@ interface DashboardViewProps {
   onNavigate?: (page: string, options?: { filter?: string }) => void;
   smartAlerts?: { alerts: any[]; dismissAlert: { mutate: (key: string) => void } };
   isPro?: boolean;
+  isTrialing?: boolean;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
