@@ -208,6 +208,23 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
                   </SelectContent>
                 </Select>
                 <FieldError field="category" />
+                {/* Fixed/Variable Classification */}
+                {form.category && (
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">Type:</p>
+                      <Badge variant={form.expense_type === 'fixed' ? 'secondary' : 'outline'} className="text-[10px] cursor-pointer" onClick={() => setForm(prev => ({ ...prev, expense_type: 'fixed' }))}>
+                        Fixed
+                      </Badge>
+                      <Badge variant={form.expense_type === 'variable' ? 'secondary' : 'outline'} className="text-[10px] cursor-pointer" onClick={() => setForm(prev => ({ ...prev, expense_type: 'variable' }))}>
+                        Variable
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {form.expense_type === 'fixed' ? 'Monthly overhead' : 'Per-trip cost'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
