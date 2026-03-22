@@ -88,8 +88,8 @@ export function ProTimeSavedCard({ isPro = false, isTrialing = false, weekStarts
           {/* Breakdown chips */}
           <div className="grid grid-cols-3 gap-2">
             {items.map(item => (
-              <div key={item.label} className="text-center rounded-xl bg-secondary/80 border border-border/50 p-2.5 hover:border-primary/20 transition-colors">
-                <div className="inline-flex items-center justify-center rounded-lg bg-primary/10 p-1.5 mb-1.5">
+              <div key={item.label} className="text-center rounded-xl bg-muted/60 border border-border/50 p-2 hover:border-primary/20 transition-colors">
+                <div className="inline-flex items-center justify-center rounded-lg bg-primary/10 p-1.5">
                   <item.icon className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <p className="text-sm font-black font-mono">{item.count}</p>
