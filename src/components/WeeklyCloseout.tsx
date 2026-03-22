@@ -7,8 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap } from 'lucide-react';
+import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap, Sparkles } from 'lucide-react';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
+import { generateWeeklySummary } from '@/lib/generateWeeklySummary';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -221,6 +222,27 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
                         <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${ins.color === 'text-success' ? 'bg-success' : ins.color === 'text-destructive' ? 'bg-destructive' : ins.color === 'text-warning' ? 'bg-warning' : 'bg-muted-foreground'}`} />
                         <p className={`text-xs ${ins.color}`}>{ins.text}</p>
                       </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* AI Weekly Summary */}
+          {weekLoads.length > 0 && (() => {
+            const summaryLines = generateWeeklySummary({ weekLoads, allLoads: loads, weekStartsOn });
+            if (summaryLines.length === 0) return null;
+            return (
+              <Card className="shadow-card overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary">AI Weekly Summary</span>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    {summaryLines.map((line, i) => (
+                      <p key={i} className="text-xs leading-relaxed text-muted-foreground">{line}</p>
                     ))}
                   </div>
                 </CardContent>
