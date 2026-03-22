@@ -72,12 +72,13 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   if (lastWeekProfit > 0 && thisWeekLoads.length > 0) {
     const dropPct = ((lastWeekProfit - thisWeekProfit) / lastWeekProfit) * 100;
     if (dropPct >= 20) {
+      const dollarDrop = lastWeekProfit - thisWeekProfit;
       alerts.push({
       type: 'profit_drop',
       severity: 'warning',
       tier: 'advanced',
       title: 'Profit Dropped This Week',
-        message: `Profit is down ${dropPct.toFixed(0)}% compared to last week.`,
+        message: `Profit is down ${dropPct.toFixed(0)}% ($${dollarDrop.toFixed(0)}) compared to last week.`,
         ctaLabel: 'View Dashboard',
         ctaRoute: 'dashboard',
         dedupeKey: `profit_drop_${thisWeek.start.toISOString().slice(0, 10)}`,
@@ -90,12 +91,14 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   const totalDH = thisWeekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
   const totalMi = totalLoaded + totalDH;
   if (totalMi > 0 && (totalDH / totalMi) * 100 > 20) {
+    const avgRPM = totalLoaded > 0 ? thisWeekRevenue / totalLoaded : 0;
+    const dhCost = Math.round(avgRPM * totalDH * 0.3);
     alerts.push({
       type: 'high_deadhead',
       severity: 'warning',
       tier: 'basic',
       title: 'High Deadhead This Week',
-      message: `Your deadhead ratio is ${((totalDH / totalMi) * 100).toFixed(1)}%. Aim for under 20%.`,
+      message: `Your deadhead ratio is ${((totalDH / totalMi) * 100).toFixed(1)}%. That's ~$${dhCost} in estimated lost revenue. Aim for under 20%.`,
       ctaLabel: 'View Loads',
       ctaRoute: 'loads',
       dedupeKey: `high_deadhead_${thisWeek.start.toISOString().slice(0, 10)}`,
@@ -109,12 +112,13 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   const avg30RPM = avg30Miles > 0 ? avg30Rev / avg30Miles : 0;
   const thisWeekRPM = totalLoaded > 0 ? thisWeekRevenue / totalLoaded : 0;
   if (avg30RPM > 0 && thisWeekRPM > 0 && ((avg30RPM - thisWeekRPM) / avg30RPM) * 100 >= 15) {
+    const rpmLoss = Math.round((avg30RPM - thisWeekRPM) * totalLoaded);
     alerts.push({
       type: 'low_rpm',
       severity: 'warning',
       tier: 'advanced',
       title: 'Low Rate Per Mile',
-      message: `This week's RPM ($${thisWeekRPM.toFixed(2)}) is ${(((avg30RPM - thisWeekRPM) / avg30RPM) * 100).toFixed(0)}% below your 30-day average ($${avg30RPM.toFixed(2)}).`,
+      message: `This week's RPM ($${thisWeekRPM.toFixed(2)}) is ${(((avg30RPM - thisWeekRPM) / avg30RPM) * 100).toFixed(0)}% below your 30-day average ($${avg30RPM.toFixed(2)}). That's ~$${rpmLoss} less than your typical rate.`,
       ctaLabel: 'Review Loads',
       ctaRoute: 'loads',
       dedupeKey: `low_rpm_${thisWeek.start.toISOString().slice(0, 10)}`,
@@ -123,12 +127,13 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
 
   // 5. Expense ratio > 70%
   if (thisWeekRevenue > 0 && (thisWeekExpenses / thisWeekRevenue) * 100 > 70) {
+    const excessExpense = Math.round(thisWeekExpenses - (thisWeekRevenue * 0.7));
     alerts.push({
       type: 'high_expense_ratio',
       severity: 'warning',
       tier: 'advanced',
       title: 'High Expense Ratio',
-      message: `Expenses are ${((thisWeekExpenses / thisWeekRevenue) * 100).toFixed(0)}% of revenue this week. Target below 70%.`,
+      message: `Expenses are ${((thisWeekExpenses / thisWeekRevenue) * 100).toFixed(0)}% of revenue ($${thisWeekExpenses.toFixed(0)} vs $${thisWeekRevenue.toFixed(0)}). You're $${excessExpense} over the 70% target.`,
       ctaLabel: 'View Reports',
       ctaRoute: 'reports',
       dedupeKey: `high_expense_${thisWeek.start.toISOString().slice(0, 10)}`,

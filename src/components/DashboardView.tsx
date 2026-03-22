@@ -12,6 +12,7 @@ import { PerformanceCharts } from '@/components/PerformanceCharts';
 import { ProfitOverview } from '@/components/ProfitOverview';
 import { ProInsightCard } from '@/components/ProInsightCard';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
+import { ProTimeSavedCard } from '@/components/ProTimeSavedCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
 import { FuelAnalyticsCard } from '@/components/FuelAnalyticsCard';
@@ -246,6 +247,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* Profit Overview */}
           <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined} />
+
+          {/* Pro Time Saved */}
+          <ProTimeSavedCard isPro={isPro} isTrialing={isTrialing} weekStartsOn={weekStartsOn} />
 
           {/* Fuel Analytics */}
           <FuelAnalyticsCard fuelLogs={fuelLogs} loads={filteredLoads} isPro={isPro} onNavigate={onNavigate} />
