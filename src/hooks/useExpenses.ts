@@ -35,6 +35,7 @@ export interface Expense {
   gallons: number | null;
   linked_load_id: string | null;
   notes: string | null;
+  expense_type: 'fixed' | 'variable';
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +47,7 @@ export interface ExpenseInsert {
   gallons?: number | null;
   linked_load_id?: string | null;
   notes?: string | null;
+  expense_type?: 'fixed' | 'variable';
 }
 
 interface DateRange {
