@@ -72,12 +72,13 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   if (lastWeekProfit > 0 && thisWeekLoads.length > 0) {
     const dropPct = ((lastWeekProfit - thisWeekProfit) / lastWeekProfit) * 100;
     if (dropPct >= 20) {
+      const dollarDrop = lastWeekProfit - thisWeekProfit;
       alerts.push({
       type: 'profit_drop',
       severity: 'warning',
       tier: 'advanced',
       title: 'Profit Dropped This Week',
-        message: `Profit is down ${dropPct.toFixed(0)}% compared to last week.`,
+        message: `Profit is down ${dropPct.toFixed(0)}% ($${dollarDrop.toFixed(0)}) compared to last week.`,
         ctaLabel: 'View Dashboard',
         ctaRoute: 'dashboard',
         dedupeKey: `profit_drop_${thisWeek.start.toISOString().slice(0, 10)}`,
