@@ -64,6 +64,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
         gallons: initialData.gallons?.toString() ?? '',
         linked_load_id: initialData.linked_load_id ?? '',
         notes: initialData.notes ?? '',
+        expense_type: (initialData as any)?.expense_type ?? 'variable',
       });
     }
   }, [initialData]);
