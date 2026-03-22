@@ -138,7 +138,7 @@ export default function HowToUseHaulTrackerPro() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button asChild size="lg" className="rounded-xl font-bold text-base px-8">
-              <Link to="/pricing">Start Free <ArrowRight className="ml-1 h-4 w-4" /></Link>
+              <Link to="/pricing">Start Tracking Free <ArrowRight className="ml-1 h-4 w-4" /></Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-xl font-bold text-base px-8">
               <Link to="/features">View Features</Link>
