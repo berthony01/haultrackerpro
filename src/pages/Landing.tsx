@@ -225,7 +225,7 @@ export default function Landing() {
               Pro features that no other trucking app offers at this price.
             </p>
           </div>
-          <div className="grid sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {/* Voice Logging Demo */}
             <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
               <div className="flex items-center gap-3 mb-6">
