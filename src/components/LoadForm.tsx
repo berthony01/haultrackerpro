@@ -457,6 +457,56 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           </Button>
         </form>
       </CardContent>
+
+      {/* Scan Load Modal */}
+      <ScanLoadModal
+        open={showScanLoad}
+        onOpenChange={setShowScanLoad}
+        onParsed={(data: ParsedLoadData) => {
+          if (data.pickup_location) update('pickup_location', data.pickup_location);
+          if (data.dropoff_location) update('dropoff_location', data.dropoff_location);
+          if (data.loaded_miles) update('loaded_miles', data.loaded_miles);
+          if (data.deadhead_miles) update('deadhead_miles', data.deadhead_miles);
+          if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
+          if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
+          if (data.load_date) update('load_date', data.load_date);
+          if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
+            setMultiStop(true);
+            setStops(data.stops.map((s, i) => ({
+              stop_order: i + 1,
+              location: s.location,
+              stop_type: s.stop_type,
+              detention_minutes: null,
+            })));
+            setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
+          }
+        }}
+      />
+
+      {/* Scan Upgrade Modal */}
+      {showScanUpgrade && (
+        <Dialog open={showScanUpgrade} onOpenChange={setShowScanUpgrade}>
+          <DialogContent className="sm:max-w-xs">
+            <div className="text-center py-4 space-y-4">
+              <div className="inline-flex items-center justify-center rounded-2xl bg-primary/10 p-4">
+                <Camera className="h-8 w-8 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold">Scan Rate Confirmations</h3>
+                <p className="text-sm text-muted-foreground">
+                  Upload a screenshot of your rate con and auto-fill the load form with AI-powered OCR. Available on Pro.
+                </p>
+              </div>
+              <Button
+                className="w-full rounded-xl font-bold gap-1.5"
+                onClick={() => { setShowScanUpgrade(false); window.location.href = '/pricing'; }}
+              >
+                <Crown className="h-4 w-4" /> Upgrade to Pro
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }
