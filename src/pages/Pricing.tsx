@@ -56,9 +56,9 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
 
 const whyProPoints = [
   { icon: Zap, title: 'Log Expenses in Seconds', desc: 'Use voice or receipt scan — no manual typing required.' },
-  { icon: BarChart3, title: 'See What Others Miss', desc: 'Performance trends most drivers never track: RPM, deadhead %, expense breakdown.' },
+  { icon: BarChart3, title: 'See What Others Miss', desc: 'Performance trends with dollar-impact alerts, coaching advice on your scorecard, and expense breakdowns.' },
   { icon: Target, title: 'Plan Taxes with Confidence', desc: 'Full federal, state, and SE tax breakdown with quarterly payment schedule.' },
-  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout snapshots lock in your numbers with pay variance tracking.' },
+  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout with Week in Review — flags your best/worst loads, deadhead issues, and missing payments.' },
 ];
 
 export default function Pricing() {
