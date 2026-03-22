@@ -77,19 +77,19 @@ export function ProTimeSavedCard({ isPro = false, isTrialing = false, weekStarts
           <span className="ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">This Week</span>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-2">
           {/* Hero stat */}
-          <div className="relative text-center py-3">
+          <div className="relative text-center py-1.5">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent rounded-xl pointer-events-none" />
-            <p className="relative text-4xl font-black font-mono text-primary leading-none">{totalMinutes}</p>
-            <p className="relative text-[11px] text-muted-foreground mt-1.5 font-medium">minutes saved with Pro tools</p>
+            <p className="relative text-2xl font-black font-mono text-primary leading-none">{totalMinutes}</p>
+            <p className="relative text-[11px] text-muted-foreground mt-1 font-medium">minutes saved with Pro tools</p>
           </div>
 
           {/* Breakdown chips */}
           <div className="grid grid-cols-3 gap-2">
             {items.map(item => (
-              <div key={item.label} className="text-center rounded-xl bg-secondary/80 border border-border/50 p-2.5 hover:border-primary/20 transition-colors">
-                <div className="inline-flex items-center justify-center rounded-lg bg-primary/10 p-1.5 mb-1.5">
+              <div key={item.label} className="text-center rounded-xl bg-muted/60 border border-border/50 p-2 hover:border-primary/20 transition-colors">
+                <div className="inline-flex items-center justify-center rounded-lg bg-primary/10 p-1.5">
                   <item.icon className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <p className="text-sm font-black font-mono">{item.count}</p>
