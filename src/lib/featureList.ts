@@ -32,6 +32,7 @@ export const featureList: FeatureCategory[] = [
       { icon: Mic, title: 'AI Voice Expense Logging', description: 'Dictate expenses hands-free and let AI parse the amount, category, and notes automatically.', pro: true },
       { icon: Camera, title: 'AI Receipt & Screenshot Scanning', description: 'Snap a photo of a receipt or screenshot and auto-extract expense details using OCR.', pro: true },
       { icon: ClipboardPaste, title: 'Paste Load Parser (Unlimited)', description: 'Unlimited paste-to-form load parsing with no weekly cap.', pro: true },
+      { icon: Camera, title: 'Scan Rate Confirmations', description: 'Upload a screenshot of your rate con and auto-fill the load form using AI-powered OCR.', pro: true },
     ],
   },
   {

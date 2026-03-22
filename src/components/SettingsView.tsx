@@ -32,6 +32,7 @@ const proFeatures = [
   { label: 'Weekly Closeout', desc: 'Finalize weekly summaries with pay variance and deadhead tracking' },
   { label: 'Advanced Exports', desc: 'PDF exports and profit reports with expense breakdowns' },
   { label: 'Unlimited Paste Load Parser', desc: 'Unlimited auto-fill from pasted load details (free: 5/week)' },
+  { label: 'Scan Rate Confirmations', desc: 'Upload rate con screenshots to auto-fill load details with OCR' },
 ];
 
 const freePlanIncludes = [

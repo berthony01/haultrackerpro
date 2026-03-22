@@ -12,11 +12,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { DateInput } from '@/components/ui/date-input';
 import { calculateEstimatedPay } from '@/lib/types';
-import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info } from 'lucide-react';
+import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
 import { PasteLoadParser } from '@/components/PasteLoadParser';
+import { ScanLoadModal } from '@/components/ScanLoadModal';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
 
 interface LoadFormProps {
@@ -68,6 +70,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [stopErrors, setStopErrors] = useState<Record<number, string>>({});
   const [saveAsPending, setSaveAsPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showScanLoad, setShowScanLoad] = useState(false);
+  const [showScanUpgrade, setShowScanUpgrade] = useState(false);
   const [multiStopBanner, setMultiStopBanner] = useState<string | null>(null);
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
@@ -274,6 +278,34 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             />
           )}
 
+          {/* Scan Rate Con Screenshot */}
+          {!initialData && (
+            <div className="space-y-1.5">
+              <Button
+                variant="outline"
+                className="w-full h-11 gap-2 rounded-xl border-primary/30 text-primary font-bold text-sm"
+                onClick={() => {
+                  if (!isPro) {
+                    setShowScanUpgrade(true);
+                    return;
+                  }
+                  setShowScanLoad(true);
+                }}
+              >
+                <Camera className="h-4 w-4" />
+                Scan Rate Con Screenshot
+                {!isPro && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] text-warning font-bold">
+                    <Crown className="h-3 w-3" /> Pro
+                  </span>
+                )}
+              </Button>
+              <p className="text-[10px] text-muted-foreground/60 text-center leading-relaxed px-2">
+                Accuracy varies by image quality and format. Always review extracted fields before saving.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="load_date">Pickup Date</Label>
@@ -345,12 +377,12 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="loaded_miles">Loaded Miles</Label>
-              <Input id="loaded_miles" type="number" step="0.1" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
+              <Input id="loaded_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
               <FieldError field="loaded_miles" />
             </div>
             <div>
               <Label htmlFor="deadhead_miles">Deadhead Miles</Label>
-              <Input id="deadhead_miles" type="number" step="0.1" {...numericProps} placeholder="0" value={form.deadhead_miles} onChange={e => update('deadhead_miles', e.target.value)} />
+              <Input id="deadhead_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.deadhead_miles} onChange={e => update('deadhead_miles', e.target.value)} />
               <FieldError field="deadhead_miles" />
             </div>
           </div>
@@ -453,6 +485,56 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           </Button>
         </form>
       </CardContent>
+
+      {/* Scan Load Modal */}
+      <ScanLoadModal
+        open={showScanLoad}
+        onOpenChange={setShowScanLoad}
+        onParsed={(data: ParsedLoadData) => {
+          if (data.pickup_location) update('pickup_location', data.pickup_location);
+          if (data.dropoff_location) update('dropoff_location', data.dropoff_location);
+          if (data.loaded_miles) update('loaded_miles', data.loaded_miles);
+          if (data.deadhead_miles) update('deadhead_miles', data.deadhead_miles);
+          if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
+          if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
+          if (data.load_date) update('load_date', data.load_date);
+          if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
+            setMultiStop(true);
+            setStops(data.stops.map((s, i) => ({
+              stop_order: i + 1,
+              location: s.location,
+              stop_type: s.stop_type,
+              detention_minutes: null,
+            })));
+            setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
+          }
+        }}
+      />
+
+      {/* Scan Upgrade Modal */}
+      {showScanUpgrade && (
+        <Dialog open={showScanUpgrade} onOpenChange={setShowScanUpgrade}>
+          <DialogContent className="sm:max-w-xs">
+            <div className="text-center py-4 space-y-4">
+              <div className="inline-flex items-center justify-center rounded-2xl bg-primary/10 p-4">
+                <Camera className="h-8 w-8 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold">Scan Rate Confirmations</h3>
+                <p className="text-sm text-muted-foreground">
+                  Upload a screenshot of your rate con and auto-fill the load form with AI-powered OCR. Available on Pro.
+                </p>
+              </div>
+              <Button
+                className="w-full rounded-xl font-bold gap-1.5"
+                onClick={() => { setShowScanUpgrade(false); window.location.href = '/pricing'; }}
+              >
+                <Crown className="h-4 w-4" /> Upgrade to Pro
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }
