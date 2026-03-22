@@ -121,6 +121,7 @@ const Index = () => {
   const handleAddLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     addLoad.mutate(data, {
       onSuccess: (result) => {
+        trackLoadLogged(allLoadsQuery.loads.length + 1);
         if (stops && stops.length > 0 && result?.id) {
           loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
         }
