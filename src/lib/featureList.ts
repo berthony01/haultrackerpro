@@ -41,9 +41,9 @@ export const featureList: FeatureCategory[] = [
       { icon: TrendingUp, title: 'RPM Trend Analysis', description: 'Track your rate per mile over time to spot pricing trends and negotiate better rates.', pro: true },
       { icon: BarChart3, title: 'Deadhead % Tracking', description: 'Visualize your deadhead percentage trend to minimize empty miles and maximize efficiency.', pro: true },
       { icon: Receipt, title: 'Expense Breakdown by Category', description: 'See where your money goes with a detailed category-by-category expense breakdown chart.', pro: true },
-      { icon: Trophy, title: 'Driver Performance Scorecard', description: 'Overall performance score (0–100) with tier badges and 5 metric breakdowns: RPM, deadhead, expenses, profit trend, and logging streak.', pro: true },
-      { icon: CalendarDays, title: 'Weekly Closeout Snapshots', description: 'Close out each week with a snapshot of loads, miles, revenue, and profit for clean record-keeping.', pro: true },
-      { icon: AlertCircle, title: 'Smart Alerts 2.0', description: 'Advanced alerts for profit drops, RPM dips, and expense ratio warnings — beyond the basic alerts available to all users.', pro: true },
+      { icon: Trophy, title: 'Driver Performance Scorecard', description: 'Overall performance score (0–100) with tier badges, 5 metric breakdowns, and personalized coaching recommendations to improve each area.', pro: true },
+      { icon: CalendarDays, title: 'Weekly Closeout Snapshots', description: 'Close out each week with a snapshot of loads, miles, revenue, and profit — plus a Week in Review that flags your best/worst loads, deadhead issues, and missing payments.', pro: true },
+      { icon: AlertCircle, title: 'Smart Alerts 2.0', description: 'Advanced alerts with dollar impact for profit drops, RPM dips, and expense ratio warnings — so you see exactly how much each issue is costing you.', pro: true },
     ],
   },
   {
