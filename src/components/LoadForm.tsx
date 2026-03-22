@@ -12,11 +12,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { DateInput } from '@/components/ui/date-input';
 import { calculateEstimatedPay } from '@/lib/types';
-import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info } from 'lucide-react';
+import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
 import { PasteLoadParser } from '@/components/PasteLoadParser';
+import { ScanLoadModal } from '@/components/ScanLoadModal';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
 
 interface LoadFormProps {
