@@ -108,7 +108,7 @@ export default function Pricing() {
               Sign In
             </Button>
             <Button onClick={() => navigate('/auth')} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Free
+              Start Tracking Free
             </Button>
           </div>
         </div>
