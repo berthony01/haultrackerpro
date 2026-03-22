@@ -37,8 +37,17 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
     gallons: initialData?.gallons?.toString() ?? '',
     linked_load_id: initialData?.linked_load_id ?? '',
     notes: initialData?.notes ?? '',
+    expense_type: (initialData as any)?.expense_type ?? 'variable' as 'fixed' | 'variable',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Auto-classify expense type when category changes
+  useEffect(() => {
+    if (form.category && !isEdit) {
+      const autoType = classifyCategory(form.category);
+      setForm(prev => ({ ...prev, expense_type: autoType }));
+    }
+  }, [form.category, isEdit]);
 
   // Modal states
   const [showVoice, setShowVoice] = useState(false);
