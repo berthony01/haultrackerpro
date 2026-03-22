@@ -350,7 +350,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
             <div>
               <Label htmlFor="deadhead_miles">Deadhead Miles</Label>
-              <Input id="deadhead_miles" type="number" step="0.1" {...numericProps} placeholder="0" value={form.deadhead_miles} onChange={e => update('deadhead_miles', e.target.value)} />
+              <Input id="deadhead_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.deadhead_miles} onChange={e => update('deadhead_miles', e.target.value)} />
               <FieldError field="deadhead_miles" />
             </div>
           </div>
