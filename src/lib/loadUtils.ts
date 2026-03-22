@@ -2,6 +2,7 @@ import { Load } from '@/hooks/useLoads';
 import type { Expense } from '@/hooks/useExpenses';
 import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
+import { getScheduleCLine, groupByScheduleC } from '@/lib/scheduleCMapping';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 /** Get the effective date for grouping — uses dropoff_date if available, otherwise load_date */
@@ -360,42 +361,7 @@ export function exportScheduleCSummary(
   filename: string = 'schedule-c-summary',
   companyMeta?: { companyName?: string }
 ) {
-  const SCHEDULE_C_MAP: Record<string, { line: string; description: string }> = {
-    'Fuel': { line: '9', description: 'Car and truck expenses' },
-    'Tolls': { line: '9', description: 'Car and truck expenses' },
-    'Parking': { line: '9', description: 'Car and truck expenses' },
-    'Maintenance': { line: '21', description: 'Repairs and maintenance' },
-    'Repairs': { line: '21', description: 'Repairs and maintenance' },
-    'Tires': { line: '21', description: 'Repairs and maintenance' },
-    'Insurance': { line: '15', description: 'Insurance (other than health)' },
-    'Permits': { line: '22', description: 'Taxes and licenses' },
-    'Licensing': { line: '22', description: 'Taxes and licenses' },
-    'Truck Payment': { line: '13', description: 'Depreciation / Section 179' },
-    'Lease Payment': { line: '20a', description: 'Rent or lease' },
-    'Phone': { line: '25', description: 'Utilities' },
-    'ELD/Software': { line: '18', description: 'Office expense' },
-    'Scale/Weigh': { line: '27a', description: 'Other expenses' },
-    'Lumper': { line: '27a', description: 'Other expenses' },
-    'Meals': { line: '24b', description: 'Travel, meals (50% deductible)' },
-    'Lodging': { line: '24a', description: 'Travel' },
-    'Supplies': { line: '22', description: 'Supplies' },
-    'Other': { line: '27a', description: 'Other expenses' },
-  };
-
-  const getLine = (cat: string) => SCHEDULE_C_MAP[cat] ?? { line: '27a', description: 'Other expenses' };
-
-  const groups: Record<string, { description: string; categories: Set<string>; total: number }> = {};
-  for (const exp of expenses) {
-    const sc = getLine(exp.category);
-    if (!groups[sc.line]) groups[sc.line] = { description: sc.description, categories: new Set(), total: 0 };
-    groups[sc.line].categories.add(exp.category);
-    groups[sc.line].total += exp.amount;
-  }
-
-  const sorted = Object.entries(groups)
-    .map(([line, data]) => ({ line, ...data, categories: [...data.categories] }))
-    .sort((a, b) => parseFloat(a.line) - parseFloat(b.line));
-
+  const sorted = groupByScheduleC(expenses);
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
 
   const headers = ['Schedule C Line', 'Line Description', 'Categories', 'Total Amount'];
@@ -419,7 +385,7 @@ export function exportScheduleCSummary(
     .map(e => [
       e.expense_date,
       e.category,
-      `Line ${getLine(e.category).line}`,
+      `Line ${getScheduleCLine(e.category).line}`,
       e.amount.toFixed(2),
     ].map(v => `"${v}"`));
 
