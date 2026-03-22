@@ -55,9 +55,9 @@ const features = [
   { title: 'Load Logging', icon: ClipboardList, description: 'Log every load with full details — locations, miles, rate, fees, and pay. Support for multi-stop loads and paste parsing.' },
   { title: 'Expense Tracking', icon: DollarSign, description: 'Categorize expenses (fuel, tolls, food, maintenance, etc.), link them to loads, and see totals by category and date range.' },
   { title: 'Fuel Tracking', icon: Fuel, description: 'Dedicated fuel log with gallons, price, station, and odometer tracking. See fuel analytics on your dashboard.' },
-  { title: 'Smart Alerts', icon: Bell, description: 'Get notified about high deadhead percentages, missing pay entries, expense spikes, and other patterns that affect your bottom line.' },
-  { title: 'Weekly Closeout', icon: CheckCircle, description: 'Finalize each week with a snapshot of earnings, miles, and deadhead percentage to track performance over time.' },
-  { title: 'Driver Scorecard', icon: Award, description: 'See your revenue per mile, deadhead ratio, expense ratio, and overall performance grade at a glance.' },
+  { title: 'Smart Alerts', icon: Bell, description: 'Get notified about high deadhead, missing pay, expense spikes, profit drops, and RPM dips — with dollar-impact amounts so you see exactly how much each issue costs you.' },
+  { title: 'Weekly Closeout', icon: CheckCircle, description: 'Finalize each week with a snapshot of earnings, miles, and deadhead percentage. Includes a Week in Review that flags your best/worst loads, deadhead issues, and missing payments.' },
+  { title: 'Driver Scorecard', icon: Award, description: 'See your overall performance score (0–100) with tier rankings, 5 metric breakdowns (RPM, deadhead, expenses, profit trend, streak), and personalized coaching recommendations for each area.' },
   { title: 'Reports & Exports', icon: FileText, description: 'Export your data as CSV, PDF summary, or full profit report. Download everything for your accountant or records.' },
   { title: 'Tax Set-Aside Planner', icon: Calculator, description: 'Configure federal, state, and self-employment tax rates. HaulTrackerPro estimates how much to set aside each quarter.' },
 ];
