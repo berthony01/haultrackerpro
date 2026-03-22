@@ -14,6 +14,7 @@ import { VoiceExpenseModal } from '@/components/VoiceExpenseModal';
 import { ReceiptScanModal } from '@/components/ReceiptScanModal';
 import { ProUpgradeModal } from '@/components/ProUpgradeModal';
 import type { ParsedExpense } from '@/lib/parseExpenseText';
+import { categorizeExpense } from '@/lib/categorizeExpense';
 
 interface ExpenseFormProps {
   onSubmit: (data: ExpenseInsert) => void;
