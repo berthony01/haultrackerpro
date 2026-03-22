@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { classifyCategory } from '@/lib/expenseClassifier';
+import { Badge } from '@/components/ui/badge';
 import { ExpenseInsert, Expense, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { Load } from '@/hooks/useLoads';
 import { Button } from '@/components/ui/button';
@@ -35,8 +37,17 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
     gallons: initialData?.gallons?.toString() ?? '',
     linked_load_id: initialData?.linked_load_id ?? '',
     notes: initialData?.notes ?? '',
+    expense_type: (initialData as any)?.expense_type ?? 'variable' as 'fixed' | 'variable',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Auto-classify expense type when category changes
+  useEffect(() => {
+    if (form.category && !isEdit) {
+      const autoType = classifyCategory(form.category);
+      setForm(prev => ({ ...prev, expense_type: autoType }));
+    }
+  }, [form.category, isEdit]);
 
   // Modal states
   const [showVoice, setShowVoice] = useState(false);
@@ -53,6 +64,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
         gallons: initialData.gallons?.toString() ?? '',
         linked_load_id: initialData.linked_load_id ?? '',
         notes: initialData.notes ?? '',
+        expense_type: (initialData as any)?.expense_type ?? 'variable',
       });
     }
   }, [initialData]);
@@ -87,6 +99,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
       gallons: isFuel && form.gallons ? parseFloat(form.gallons) : null,
       linked_load_id: form.linked_load_id || null,
       notes: form.notes.trim() || null,
+      expense_type: form.expense_type,
     });
   };
 
@@ -195,6 +208,23 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
                   </SelectContent>
                 </Select>
                 <FieldError field="category" />
+                {/* Fixed/Variable Classification */}
+                {form.category && (
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">Type:</p>
+                      <Badge variant={form.expense_type === 'fixed' ? 'secondary' : 'outline'} className="text-[10px] cursor-pointer" onClick={() => setForm(prev => ({ ...prev, expense_type: 'fixed' }))}>
+                        Fixed
+                      </Badge>
+                      <Badge variant={form.expense_type === 'variable' ? 'secondary' : 'outline'} className="text-[10px] cursor-pointer" onClick={() => setForm(prev => ({ ...prev, expense_type: 'variable' }))}>
+                        Variable
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {form.expense_type === 'fixed' ? 'Monthly overhead' : 'Per-trip cost'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

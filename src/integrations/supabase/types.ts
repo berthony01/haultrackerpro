@@ -101,6 +101,7 @@ export type Database = {
           category: string
           created_at: string
           expense_date: string
+          expense_type: string
           gallons: number | null
           id: string
           linked_load_id: string | null
@@ -113,6 +114,7 @@ export type Database = {
           category: string
           created_at?: string
           expense_date: string
+          expense_type?: string
           gallons?: number | null
           id?: string
           linked_load_id?: string | null
@@ -125,6 +127,7 @@ export type Database = {
           category?: string
           created_at?: string
           expense_date?: string
+          expense_type?: string
           gallons?: number | null
           id?: string
           linked_load_id?: string | null

@@ -17,6 +17,7 @@ import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
 import { FuelAnalyticsCard } from '@/components/FuelAnalyticsCard';
 import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
+import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -279,6 +280,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           {/* Profit Overview */}
           <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined} />
 
+          {/* Cost Breakdown: Fixed vs Variable + Contribution Margin */}
+          <ContributionMarginCard loads={filteredLoads} expenses={filteredExpenses} />
           {/* Pro Time Saved */}
           <ProTimeSavedCard isPro={isPro} isTrialing={isTrialing} weekStartsOn={weekStartsOn} />
 
