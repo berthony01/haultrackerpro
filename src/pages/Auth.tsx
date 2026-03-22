@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead';
+import { trackSignUp, trackLogin } from '@/lib/analytics';
 
 export default function Auth() {
   const { signIn, signUp } = useAuth();
