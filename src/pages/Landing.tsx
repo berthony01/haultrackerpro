@@ -279,6 +279,33 @@ export default function Landing() {
                 ))}
               </div>
             </div>
+
+            {/* Rate Con Scanner Demo */}
+            <div className="p-6 sm:p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
+                  <Camera className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Scan Rate Con</h3>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { step: '1', label: 'You upload:', text: 'Screenshot or photo of your rate confirmation' },
+                  { step: '2', label: 'AI extracts:', text: 'Pickup, dropoff, miles, rate, revenue, date' },
+                  { step: '3', label: 'Result:', text: 'Load form auto-filled — review and save in seconds' },
+                ].map((s) => (
+                  <div key={s.step} className="flex gap-3 items-start">
+                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
+                      {s.step}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
+                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="text-center mt-10">
             <p className="text-sm mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>

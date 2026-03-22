@@ -68,7 +68,7 @@ export const featureList: FeatureCategory[] = [
     category: 'Reports & Exports',
     features: [
       { icon: FileText, title: 'CSV Export', description: 'Export your load and expense data as CSV files for spreadsheets or bookkeepers.' },
-      { icon: FileText, title: 'PDF Reports', description: 'Generate professional PDF reports for tax prep, dispute resolution, or personal records.', pro: true },
+      { icon: FileText, title: 'PDF Reports', description: 'Generate branded, professional PDF reports with summary totals and clean formatting — ready for tax prep, bookkeepers, or dispute resolution.', pro: true },
       { icon: DatabaseBackup, title: 'Full Data Export', description: 'Download your complete account data as JSON for backup or migration purposes.' },
       { icon: Filter, title: 'Date Range Filtering', description: 'Filter all reports and views by custom date ranges — weekly, monthly, quarterly, or custom.' },
     ],

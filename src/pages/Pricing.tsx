@@ -170,7 +170,7 @@ export default function Pricing() {
             <Button onClick={() => navigate('/auth')} variant="outline" className="w-full rounded-xl font-bold mb-6" style={{
               borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
             }}>
-              Start Free
+              Start Tracking Free
             </Button>
             <ul className="space-y-3">
               {freeFeatures.map(f => (
