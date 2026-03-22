@@ -10,6 +10,7 @@ import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 import { PerformanceTrends } from '@/components/PerformanceTrends';
 import { PerformanceCharts } from '@/components/PerformanceCharts';
 import { ProfitOverview } from '@/components/ProfitOverview';
+import { ProInsightCard } from '@/components/ProInsightCard';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { TaxReminderBanner } from '@/components/TaxReminderBanner';
 import { SmartAlertsCard } from '@/components/SmartAlertsCard';
