@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { classifyCategory } from '@/lib/expenseClassifier';
+import { Badge } from '@/components/ui/badge';
 import { ExpenseInsert, Expense, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { Load } from '@/hooks/useLoads';
 import { Button } from '@/components/ui/button';
