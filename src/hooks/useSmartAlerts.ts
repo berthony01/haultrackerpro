@@ -91,12 +91,14 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   const totalDH = thisWeekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
   const totalMi = totalLoaded + totalDH;
   if (totalMi > 0 && (totalDH / totalMi) * 100 > 20) {
+    const avgRPM = totalLoaded > 0 ? thisWeekRevenue / totalLoaded : 0;
+    const dhCost = Math.round(avgRPM * totalDH * 0.3);
     alerts.push({
       type: 'high_deadhead',
       severity: 'warning',
       tier: 'basic',
       title: 'High Deadhead This Week',
-      message: `Your deadhead ratio is ${((totalDH / totalMi) * 100).toFixed(1)}%. Aim for under 20%.`,
+      message: `Your deadhead ratio is ${((totalDH / totalMi) * 100).toFixed(1)}%. That's ~$${dhCost} in estimated lost revenue. Aim for under 20%.`,
       ctaLabel: 'View Loads',
       ctaRoute: 'loads',
       dedupeKey: `high_deadhead_${thisWeek.start.toISOString().slice(0, 10)}`,
