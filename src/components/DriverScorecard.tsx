@@ -120,6 +120,12 @@ export function DriverScorecard({ scorecard, onBack, isPro = false }: DriverScor
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1.5">{metric.detail}</p>
+                {metric.recommendation && (
+                  <div className="flex items-start gap-1.5 mt-2 p-2 rounded-lg bg-primary/5 border border-primary/10">
+                    <Lightbulb className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-foreground/80 leading-relaxed">{metric.recommendation}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

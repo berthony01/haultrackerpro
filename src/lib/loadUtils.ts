@@ -236,61 +236,87 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
 }
 
 export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Ld Mi', 'DH Mi', '$/Mi', 'Wait', 'Det.', 'Other', 'Est Pay', 'Act Pay', 'Diff', 'Status'];
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Ld Mi', 'DH Mi', '$/Mi', 'Est Pay', 'Act Pay', 'Status'];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
-    const diff = act != null ? act - est : null;
-    return [getEffectiveDate(l), l.pickup_location, l.dropoff_location, String(l.loaded_miles), String(l.deadhead_miles), `$${Number(l.rate_per_mile).toFixed(2)}`, `$${Number(l.wait_fee).toFixed(2)}`, `$${Number(l.detention_fee).toFixed(2)}`, `$${Number(l.other_fees).toFixed(2)}`, `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', diff != null ? `$${diff.toFixed(2)}` : '', l.status];
+    return [getEffectiveDate(l), l.pickup_location, l.dropoff_location, String(l.loaded_miles), String(l.deadhead_miles), `$${Number(l.rate_per_mile).toFixed(2)}`, `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', l.status];
   });
 
-  const colWidths = [48, 58, 58, 28, 28, 30, 34, 34, 34, 45, 45, 40, 40];
+  // Summary totals
+  const totalLoaded = loads.reduce((s, l) => s + Number(l.loaded_miles), 0);
+  const totalDH = loads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
+  const totalEst = loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const totalAct = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
+
+  const colWidths = [52, 68, 68, 35, 35, 38, 52, 52, 45];
   const pageW = 595;
   const pageH = 842;
   const marginX = 30;
-  const rowH = 16;
-  const headerH = 20;
+  const rowH = 18;
+  const headerH = 22;
+  const bodyFont = 8;
+  const headFont = 9;
 
   let y = 50;
   let page = 1;
   const pages: string[] = [];
   let currentContent = '';
 
+  const brandName = companyMeta?.companyName || 'HaulTrackerPro';
+
   const startPage = () => {
     y = 50;
-    const titleParts = [filename, `Page ${page}`];
-    if (companyMeta?.companyName) titleParts.unshift(companyMeta.companyName);
-    currentContent += `BT /F1 14 Tf ${marginX} ${pageH - 30} Td (${titleParts.join(' - ')}) Tj ET\n`;
-    if (companyMeta?.companyStartDate && page === 1) {
-      currentContent += `BT /F1 8 Tf ${marginX} ${pageH - 44} Td (Company Start: ${companyMeta.companyStartDate}) Tj ET\n`;
-      y += 10;
+    // Branded header
+    currentContent += `BT /F1 14 Tf ${marginX} ${pageH - 30} Td (${brandName} - Load Report) Tj ET\n`;
+    currentContent += `BT /F1 8 Tf ${marginX} ${pageH - 44} Td (Generated: ${format(new Date(), 'MMM d, yyyy')} | Page ${page}) Tj ET\n`;
+    y += 10;
+    if (page === 1) {
+      // Summary block
+      y += 6;
+      currentContent += `BT /F1 9 Tf ${marginX} ${pageH - y} Td (Summary: ${loads.length} loads | ${totalLoaded.toLocaleString()} loaded mi | Est: $${totalEst.toFixed(0)} | Act: $${totalAct.toFixed(0)}) Tj ET\n`;
+      y += 18;
     }
-    // Header row
+    // Header row background
+    currentContent += `0.92 0.92 0.92 rg ${marginX - 2} ${pageH - y - 4} ${colWidths.reduce((a, b) => a + b, 0) + 4} ${headerH} re f\n`;
+    currentContent += `0 0 0 rg\n`;
     let x = marginX;
     headers.forEach((h, i) => {
-      currentContent += `BT /F1 7 Tf ${x} ${pageH - y} Td (${h}) Tj ET\n`;
+      currentContent += `BT /F1 ${headFont} Tf ${x} ${pageH - y} Td (${h}) Tj ET\n`;
       x += colWidths[i];
     });
     y += headerH;
   };
 
   startPage();
+  let rowIdx = 0;
 
   rows.forEach(row => {
-    if (y > pageH - 40) {
+    if (y > pageH - 50) {
+      // Footer
+      currentContent += `BT /F1 7 Tf ${marginX} 20 Td (${brandName} - haultrackerpro.lovable.app) Tj ET\n`;
       pages.push(currentContent);
       currentContent = '';
       page++;
       startPage();
     }
+    // Alternating row shading
+    if (rowIdx % 2 === 1) {
+      currentContent += `0.96 0.96 0.96 rg ${marginX - 2} ${pageH - y - 4} ${colWidths.reduce((a, b) => a + b, 0) + 4} ${rowH} re f\n`;
+      currentContent += `0 0 0 rg\n`;
+    }
     let x = marginX;
     row.forEach((cell, i) => {
-      const clean = cell.replace(/[()\\]/g, ' ').substring(0, 20);
-      currentContent += `BT /F1 6 Tf ${x} ${pageH - y} Td (${clean}) Tj ET\n`;
+      const clean = cell.replace(/[()\\]/g, ' ').substring(0, 22);
+      currentContent += `BT /F1 ${bodyFont} Tf ${x} ${pageH - y} Td (${clean}) Tj ET\n`;
       x += colWidths[i];
     });
     y += rowH;
+    rowIdx++;
   });
+
+  // Footer on last page
+  currentContent += `BT /F1 7 Tf ${marginX} 20 Td (${brandName} - haultrackerpro.lovable.app) Tj ET\n`;
   pages.push(currentContent);
 
   // Build minimal PDF

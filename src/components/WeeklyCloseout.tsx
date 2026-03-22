@@ -190,6 +190,44 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
             </Card>
           </div>
 
+          {/* Week in Review */}
+          {weekLoads.length >= 2 && (() => {
+            const loadsWithRPM = weekLoads.map(l => ({
+              load: l,
+              rpm: Number(l.loaded_miles) > 0 ? Number(l.estimated_pay ?? 0) / Number(l.loaded_miles) : 0,
+              dhPct: (Number(l.loaded_miles) + Number(l.deadhead_miles)) > 0
+                ? (Number(l.deadhead_miles) / (Number(l.loaded_miles) + Number(l.deadhead_miles))) * 100 : 0,
+            }));
+            const best = loadsWithRPM.reduce((a, b) => b.rpm > a.rpm ? b : a);
+            const worst = loadsWithRPM.reduce((a, b) => b.rpm < a.rpm && b.rpm > 0 ? b : a);
+            const highDH = loadsWithRPM.filter(l => l.dhPct > 30);
+            const unpaid = weekLoads.filter(l => l.actual_pay_received == null && l.status !== 'cancelled');
+            const insights: { color: string; text: string }[] = [];
+            if (best.rpm > 0) insights.push({ color: 'text-success', text: `Best load: ${best.load.pickup_location} → ${best.load.dropoff_location} at $${best.rpm.toFixed(2)}/mi` });
+            if (worst.rpm > 0 && worst.load.id !== best.load.id) insights.push({ color: 'text-destructive', text: `Lowest RPM: ${worst.load.pickup_location} → ${worst.load.dropoff_location} at $${worst.rpm.toFixed(2)}/mi` });
+            if (highDH.length > 0) insights.push({ color: 'text-warning', text: `${highDH.length} load${highDH.length > 1 ? 's' : ''} had >30% deadhead` });
+            if (unpaid.length > 0) insights.push({ color: 'text-muted-foreground', text: `${unpaid.length} load${unpaid.length > 1 ? 's' : ''} still awaiting payment` });
+            if (insights.length === 0) return null;
+            return (
+              <Card className="shadow-card">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Week in Review</p>
+                  </div>
+                  <div className="space-y-2">
+                    {insights.map((ins, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${ins.color === 'text-success' ? 'bg-success' : ins.color === 'text-destructive' ? 'bg-destructive' : ins.color === 'text-warning' ? 'bg-warning' : 'bg-muted-foreground'}`} />
+                        <p className={`text-xs ${ins.color}`}>{ins.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {/* Deadhead */}
           <Card className="card-premium">
             <CardContent className="p-4 flex items-center justify-between">

@@ -127,12 +127,13 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
 
   // 5. Expense ratio > 70%
   if (thisWeekRevenue > 0 && (thisWeekExpenses / thisWeekRevenue) * 100 > 70) {
+    const excessExpense = Math.round(thisWeekExpenses - (thisWeekRevenue * 0.7));
     alerts.push({
       type: 'high_expense_ratio',
       severity: 'warning',
       tier: 'advanced',
       title: 'High Expense Ratio',
-      message: `Expenses are ${((thisWeekExpenses / thisWeekRevenue) * 100).toFixed(0)}% of revenue this week. Target below 70%.`,
+      message: `Expenses are ${((thisWeekExpenses / thisWeekRevenue) * 100).toFixed(0)}% of revenue ($${thisWeekExpenses.toFixed(0)} vs $${thisWeekRevenue.toFixed(0)}). You're $${excessExpense} over the 70% target.`,
       ctaLabel: 'View Reports',
       ctaRoute: 'reports',
       dedupeKey: `high_expense_${thisWeek.start.toISOString().slice(0, 10)}`,

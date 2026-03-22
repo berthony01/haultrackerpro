@@ -99,15 +99,36 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
 
   const totalScore = rpmScore + dhScore + expScore + profitScore + streakScore;
 
+  // Actionable recommendations based on score thresholds
+  const rpmRec = rpmScore >= 20 ? 'Great RPM — keep targeting high-paying lanes.' :
+    rpmScore >= 10 ? 'Try negotiating rates above $2.50/mi or reducing short-haul loads.' :
+    totalMiles > 0 ? 'Focus on longer hauls and avoid loads under $2/mi to boost RPM.' : 'Log loads to start tracking your rate per mile.';
+
+  const dhRec = dhScore >= 16 ? 'Excellent deadhead control — your planning is paying off.' :
+    dhScore >= 8 ? 'Look for backhauls or nearby loads to cut empty miles.' :
+    'Over 30% deadhead is costly. Use load boards to find loads closer to your drop-off.';
+
+  const expRec = expScore >= 16 ? 'Expenses are well controlled relative to revenue.' :
+    expScore >= 8 ? 'Review recurring expenses — small cuts add up weekly.' :
+    'Expenses are eating into profit. Audit fuel stops, tolls, and subscriptions.';
+
+  const profitRec = profitScore >= 14 ? 'Profit trend is strong — maintain consistency.' :
+    profitScore >= 8 ? 'Profit dipped slightly. Check if expenses spiked or revenue dropped.' :
+    'Profit is declining. Compare this week\'s loads and expenses to find the gap.';
+
+  const streakRec = streakScore >= 12 ? 'Amazing consistency! Your logging streak builds better data.' :
+    streakScore >= 6 ? 'Good streak going. Log at least 1 load every week to keep it.' :
+    'Log loads weekly to build your streak and unlock better insights.';
+
   return {
     totalScore,
     tier: getTier(totalScore),
     metrics: [
-      { label: 'RPM Performance', score: rpmScore, maxScore: 25, detail: rpmDetail },
-      { label: 'Deadhead Efficiency', score: dhScore, maxScore: 20, detail: dhDetail },
-      { label: 'Expense Control', score: expScore, maxScore: 20, detail: expDetail },
-      { label: 'Profit Trend', score: profitScore, maxScore: 20, detail: profitDetail },
-      { label: 'Logging Streak', score: streakScore, maxScore: 15, detail: streakDetail },
+      { label: 'RPM Performance', score: rpmScore, maxScore: 25, detail: rpmDetail, recommendation: rpmRec },
+      { label: 'Deadhead Efficiency', score: dhScore, maxScore: 20, detail: dhDetail, recommendation: dhRec },
+      { label: 'Expense Control', score: expScore, maxScore: 20, detail: expDetail, recommendation: expRec },
+      { label: 'Profit Trend', score: profitScore, maxScore: 20, detail: profitDetail, recommendation: profitRec },
+      { label: 'Logging Streak', score: streakScore, maxScore: 15, detail: streakDetail, recommendation: streakRec },
     ],
   };
 }
