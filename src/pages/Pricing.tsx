@@ -26,6 +26,7 @@ const freeFeatures = [
 const proFeatures = [
   'AI Voice Expense Logging',
   'AI Receipt & Screenshot Scanning',
+  'Scan Rate Con Screenshots (OCR)',
   'Paste Load Parser (Unlimited)',
   'RPM, Deadhead % & Expense Breakdown Charts',
   'Driver Performance Scorecard',
@@ -46,6 +47,7 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
   { feature: 'AI Voice Logging', free: '—', pro: '✓' },
   { feature: 'AI Receipt Scanning', free: '—', pro: '✓' },
+  { feature: 'Scan Rate Con Screenshots', free: '—', pro: '✓' },
   { feature: 'Driver Scorecard', free: '—', pro: '✓' },
   { feature: 'Weekly Closeout', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
@@ -54,9 +56,9 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
 
 const whyProPoints = [
   { icon: Zap, title: 'Log Expenses in Seconds', desc: 'Use voice or receipt scan — no manual typing required.' },
-  { icon: BarChart3, title: 'See What Others Miss', desc: 'Performance trends most drivers never track: RPM, deadhead %, expense breakdown.' },
+  { icon: BarChart3, title: 'See What Others Miss', desc: 'Performance trends with dollar-impact alerts, coaching advice on your scorecard, and expense breakdowns.' },
   { icon: Target, title: 'Plan Taxes with Confidence', desc: 'Full federal, state, and SE tax breakdown with quarterly payment schedule.' },
-  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout snapshots lock in your numbers with pay variance tracking.' },
+  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout with Week in Review — flags your best/worst loads, deadhead issues, and missing payments.' },
 ];
 
 export default function Pricing() {
@@ -106,7 +108,7 @@ export default function Pricing() {
               Sign In
             </Button>
             <Button onClick={() => navigate('/auth')} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Free
+              Start Tracking Free
             </Button>
           </div>
         </div>
@@ -168,7 +170,7 @@ export default function Pricing() {
             <Button onClick={() => navigate('/auth')} variant="outline" className="w-full rounded-xl font-bold mb-6" style={{
               borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
             }}>
-              Start Free
+              Start Tracking Free
             </Button>
             <ul className="space-y-3">
               {freeFeatures.map(f => (

@@ -18,7 +18,7 @@ export default function Features() {
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </button>
           <Button onClick={() => navigate('/auth')} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-            Start Free
+            Start Tracking Free
           </Button>
         </div>
       </nav>

@@ -34,8 +34,16 @@ const faqs = [
     answer: 'When logging a load, toggle "Multi-stop load?" to add intermediate stops between pickup and drop-off. Each stop can have a type (Pickup, Stop, Drop) and optional detention minutes. Loaded miles and deadhead miles remain totals for the whole load.',
   },
   {
+    question: 'How does the Rate Con Screenshot Scanner work?',
+    answer: 'Open the load form and tap "Scan Rate Con Screenshot" (Pro feature). Upload or snap a photo of your rate confirmation. The app uses OCR to extract text from the image, then parses pickup, dropoff, miles, rate, and revenue from the text. You always review the extracted fields before saving — accuracy depends on image quality and format.',
+  },
+  {
+    question: 'What does the Driver Scorecard measure?',
+    answer: 'The Driver Scorecard grades you across 5 metrics: Rate Per Mile performance, Deadhead Efficiency, Expense Control, Profit Trend (week over week), and Logging Streak (consecutive weeks of activity). Each metric includes a specific coaching recommendation to help you improve. Scores range from 0–100 with tier rankings from Bronze to Platinum.',
+  },
+  {
     question: 'What\'s included in the 14-day free trial?',
-    answer: 'The free trial gives you full access to every Pro feature: Weekly Closeouts, Driver Scorecard, unlimited paste parsing, advanced exports (PDF & profit reports), Smart Alerts 2.0, and tax planning tools. No restrictions — try everything before you commit.',
+    answer: 'Every new account starts with a 14-day Pro trial — no credit card required. You get full access to AI Voice Logging, AI Receipt Scanning, Rate Con Screenshot Scanner, Driver Scorecard with coaching advice, Weekly Closeout with anomaly detection, all 5 performance charts, dollar-impact Smart Alerts, branded PDF reports, and full tax breakdowns. No restrictions — try everything before you commit.',
   },
   {
     question: 'How do I upgrade to Pro?',
