@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval, format } from 'date-fns';
 import { Shield } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+
 
 interface DashboardViewProps {
   loads: Load[];
