@@ -278,6 +278,34 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             />
           )}
 
+          {/* Scan Rate Con Screenshot */}
+          {!initialData && (
+            <div className="space-y-1.5">
+              <Button
+                variant="outline"
+                className="w-full h-11 gap-2 rounded-xl border-primary/30 text-primary font-bold text-sm"
+                onClick={() => {
+                  if (!isPro) {
+                    setShowScanUpgrade(true);
+                    return;
+                  }
+                  setShowScanLoad(true);
+                }}
+              >
+                <Camera className="h-4 w-4" />
+                Scan Rate Con Screenshot
+                {!isPro && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] text-warning font-bold">
+                    <Crown className="h-3 w-3" /> Pro
+                  </span>
+                )}
+              </Button>
+              <p className="text-[10px] text-muted-foreground/60 text-center leading-relaxed px-2">
+                Accuracy varies by image quality and format. Always review extracted fields before saving.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="load_date">Pickup Date</Label>
