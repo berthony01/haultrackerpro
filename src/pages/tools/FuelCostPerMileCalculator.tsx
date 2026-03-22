@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Fuel, DollarSign, Truck, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/loadUtils';
+import { trackCalculatorUsed } from '@/lib/analytics';
 
 export default function FuelCostPerMileCalculator() {
   const navigate = useNavigate();
