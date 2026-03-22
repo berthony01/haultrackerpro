@@ -43,7 +43,7 @@ export function SmartLoadAdvisor({ loads, expenses, isPro, isTrialing = false }:
 
     if (recentLoads.length < 5) return null;
 
-    const laneMap = new Map<string, Load[]>();
+    const laneMap: globalThis.Map<string, Load[]> = new globalThis.Map();
     recentLoads.forEach(l => {
       const pickup = normalizeCityName(l.pickup_location);
       const dropoff = normalizeCityName(l.dropoff_location);
