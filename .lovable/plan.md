@@ -1,68 +1,63 @@
 
 
-## Plan: 5 Pro Feature Enhancements
+## Plan: Quick Actions, Pricing Fix, and 3 New AI Pro Features
 
-### Task 1: Actionable Recommendations in Driver Scorecard
-
-**`src/hooks/useDriverScorecard.ts`**
-- Add `recommendation: string` to `ScorecardMetric` interface (line 13)
-- After line 99 (`totalScore` calc), add recommendation strings based on score thresholds for each metric (RPM, deadhead, expense, profit, streak)
-- Update metrics array (lines 104-110) to include `recommendation` field on each entry
-
-**`src/components/DriverScorecard.tsx`**
-- Add `Lightbulb` to lucide imports (line 6)
-- After line 122 (`metric.detail` paragraph), add a bordered recommendation section with Lightbulb icon and `metric.recommendation` text
-
-### Task 2: Week in Review Anomaly Detection in Weekly Closeout
-
-**`src/components/WeeklyCloseout.tsx`**
-- Add `Zap` to lucide imports (line 10)
-- Before the `{/* Deadhead */}` section (line 193), insert a "Week in Review" card that:
-  - Calculates RPM per load, finds best/worst loads
-  - Flags loads with >30% deadhead
-  - Notes unpaid loads
-  - Renders color-coded insight rows (good/warning/info)
-
-### Task 3: Dollar Impact in Smart Alerts
-
-**`src/hooks/useSmartAlerts.ts`** — 4 alert message updates:
-- **Profit drop** (line 80): Add `$dollarDrop` amount to message
-- **High deadhead** (line 98): Add estimated cost using `avgRPM * totalDH * 0.3`
-- **Low RPM** (line 117): Add `$rpmLoss` based on `(avg30RPM - thisWeekRPM) * totalLoaded`
-- **High expense ratio** (line 131): Add `$excessExpense` above 70% target with revenue/expense totals
-
-### Task 4: Improved PDF Report
-
-**`src/lib/loadUtils.ts`**
-- Replace entire `exportToPDF` function (lines 238-330) with improved version featuring:
-  - Larger fonts (8pt body, 9pt headers instead of 6-7pt)
-  - Branded header with company name
-  - Summary totals on page 1
-  - Alternating row shading
-  - Footer with branding
-  - Fewer columns (9 vs 13) for readability
-
-### Task 5: "Pro Saved You Time" Dashboard Card
-
-**New file: `src/components/ProTimeSavedCard.tsx`**
-- Queries `expense_automation_logs` (voice + receipt counts) and `parse_usage` (paste parse counts) for current week
-- Calculates estimated time saved (2min/voice, 3min/receipt, 1.5min/paste)
-- Shows total minutes saved + breakdown grid
-- Only visible for Pro/trialing users with >0 actions this week
+### Task 1: Quick Action Row on Dashboard
 
 **`src/components/DashboardView.tsx`**
-- Import `ProTimeSavedCard`
-- Add component before `{/* Fuel Analytics */}` section, passing `isPro`, `isTrialing`, `weekStartsOn`
+- Add `Receipt, Fuel` to the lucide-react import (line 19 — `Truck` already present)
+- Insert Quick Action row between the date filter closing `</div>` (line 175) and the `{/* Loading skeletons */}` comment (line 177): three buttons for Quick Expense, Log Load, and Fuel Log
+
+### Task 2: Fix Pricing Page Bottom CTA
+
+**`src/pages/Pricing.tsx`**
+- Replace lines 287-313 (the Bottom CTA section) with a single-button CTA layout — removes the confusing dual-button pattern and uses one clear "Start Tracking Free" button
+
+### Task 3: Smart Load Advisor
+
+**New file: `src/components/SmartLoadAdvisor.tsx`**
+- Analyzes last 60 days of loads, groups by lane (pickup city to dropoff city)
+- Shows best/worst lanes by RPM, potential weekly earnings gain
+- Free users see a teaser with load/lane counts; Pro users see full analysis
+- No LLM needed — pure client-side data analysis
+
+**`src/components/DashboardView.tsx`**
+- Import `SmartLoadAdvisor`
+- Add it before the `{/* Performance Trends */}` section (before line 302)
+
+### Task 4: AI Expense Categorization
+
+**New file: `src/lib/categorizeExpense.ts`**
+- Keyword-matching engine with weighted scoring across 6 categories (Fuel, Tolls, Maintenance, Repairs, Insurance, Permits)
+- Trucking-specific keywords (Pilot, Love's, EZPass, DOT inspection, etc.)
+
+**`src/components/ExpenseForm.tsx`**
+- Import `categorizeExpense`
+- Enhance the `update` function (line 92) to auto-detect category when notes field changes, category is empty, user is Pro, and text is 3+ chars
+- Shows toast on successful detection; never overwrites user's manual selection
+
+### Task 5: AI Weekly Summary
+
+**New file: `src/lib/generateWeeklySummary.ts`**
+- Template-based natural language summary generator comparing this week vs last week
+- Covers revenue, RPM, deadhead, load count, best load, and actionable tips
+- No LLM needed — conditional sentence construction
+
+**`src/components/WeeklyCloseout.tsx`**
+- Import `generateWeeklySummary`
+- Add an "AI Weekly Summary" card after the existing Week in Review section showing the generated narrative paragraphs
+- Only visible for Pro users with loads in the current week
 
 ### Files changed
-- `src/hooks/useDriverScorecard.ts` — add recommendation field + logic
-- `src/components/DriverScorecard.tsx` — render recommendations
-- `src/components/WeeklyCloseout.tsx` — add Week in Review card
-- `src/hooks/useSmartAlerts.ts` — 4 alert message enhancements
-- `src/lib/loadUtils.ts` — replace exportToPDF function
-- `src/components/ProTimeSavedCard.tsx` (new)
-- `src/components/DashboardView.tsx` — add ProTimeSavedCard
+- `src/components/DashboardView.tsx` — Quick Actions + SmartLoadAdvisor import
+- `src/pages/Pricing.tsx` — Bottom CTA replacement
+- `src/components/SmartLoadAdvisor.tsx` (new)
+- `src/lib/categorizeExpense.ts` (new)
+- `src/components/ExpenseForm.tsx` — auto-categorization in update function
+- `src/lib/generateWeeklySummary.ts` (new)
+- `src/components/WeeklyCloseout.tsx` — AI Summary card
 
 ### What stays unchanged
-- All database tables, edge functions, RLS policies, auth, billing, navigation, styling patterns
+- All database tables, edge functions, RLS policies, auth, billing, navigation
+- All existing dashboard sections and component ordering (additions only)
 
