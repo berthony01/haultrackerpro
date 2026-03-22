@@ -47,6 +47,7 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
   { feature: 'AI Voice Logging', free: '—', pro: '✓' },
   { feature: 'AI Receipt Scanning', free: '—', pro: '✓' },
+  { feature: 'Scan Rate Con Screenshots', free: '—', pro: '✓' },
   { feature: 'Driver Scorecard', free: '—', pro: '✓' },
   { feature: 'Weekly Closeout', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
