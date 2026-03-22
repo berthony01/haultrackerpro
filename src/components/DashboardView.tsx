@@ -175,6 +175,35 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         )}
       </div>
 
+      {/* Quick Actions */}
+      {!isLoading && onNavigate && (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 h-11 gap-2 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all"
+            onClick={() => onNavigate('add_expense')}
+          >
+            <Receipt className="h-4 w-4" />
+            Quick Expense
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 h-11 gap-2 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all"
+            onClick={() => onNavigate('add')}
+          >
+            <Truck className="h-4 w-4" />
+            Log Load
+          </Button>
+          <Button
+            variant="outline"
+            className="h-11 w-11 rounded-xl border-primary/20 text-primary active:scale-95 transition-all shrink-0 p-0"
+            onClick={() => onNavigate('add_fuel')}
+          >
+            <Fuel className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Loading skeletons */}
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3">
