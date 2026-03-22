@@ -79,6 +79,9 @@ export default function Pricing() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.url) {
+        const planKey = annual ? 'pro_yearly' : 'pro_monthly';
+        const value = annual ? 120 : 15;
+        trackBeginCheckout(planKey, value);
         window.location.href = data.url;
       }
     } catch (e: any) {

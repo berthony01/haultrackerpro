@@ -23,10 +23,12 @@ export default function Auth() {
       if (mode === 'signup') {
         const { error } = await signUp(form.email, form.password, form.name);
         if (error) throw error;
+        trackSignUp('email');
         toast.success('Check your email to confirm your account!');
       } else {
         const { error } = await signIn(form.email, form.password);
         if (error) throw error;
+        trackLogin('email');
       }
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');

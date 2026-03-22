@@ -41,6 +41,12 @@ export default function LoadProfitCalculator() {
 
   const hasInput = parseFloat(miles) > 0 && parseFloat(ratePerMile) > 0;
 
+  useEffect(() => {
+    if (hasInput) {
+      trackCalculatorUsed('load_profit_calculator');
+    }
+  }, [hasInput]);
+
   return (
     <div className="min-h-screen bg-background">
       <SEOHead

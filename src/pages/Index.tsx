@@ -141,7 +141,7 @@ const Index = () => {
 
   const handleAddExpense = (data: ExpenseInsert) => {
     allExpensesQuery.addExpense.mutate(data, {
-      onSuccess: () => { toast.success('Expense saved!'); setEditingExpense(null); setPage('expenses'); },
+      onSuccess: () => { trackExpenseLogged(); toast.success('Expense saved!'); setEditingExpense(null); setPage('expenses'); },
       onError: (e) => toast.error(e.message),
     });
   };

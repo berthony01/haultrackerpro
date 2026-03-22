@@ -91,6 +91,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <PageViewTracker />
         <Routes>
           <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />

@@ -28,6 +28,12 @@ export default function FuelCostPerMileCalculator() {
 
   const hasInput = parseFloat(fuelPrice) > 0 && parseFloat(mpg) > 0;
 
+  useEffect(() => {
+    if (hasInput) {
+      trackCalculatorUsed('fuel_cost_per_mile_calculator');
+    }
+  }, [hasInput]);
+
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
