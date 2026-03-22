@@ -72,14 +72,17 @@ const freePlan = [
 ];
 
 const proPlan = [
+  'AI Voice Expense Logging',
+  'AI Receipt Scanning',
+  'Scan Rate Con Screenshots (OCR)',
+  'Driver Scorecard with coaching advice',
+  'Weekly Closeout with Week in Review',
+  'Smart Alerts 2.0 with dollar impact',
   'Fuel analytics (cost/mile, % of revenue)',
-  'Advanced profit insights',
-  'Smart Alerts 2.0',
-  'Driver Scorecard',
-  'Weekly Closeout & summaries',
-  'Advanced reports & exports',
-  'CSV load import',
+  'Full tax breakdown (SE, federal, state)',
   'PDF & profit report exports',
+  'Unlimited Paste Load Parser',
+  '"Pro Saved You Time" dashboard card',
 ];
 
 const checklist = [
