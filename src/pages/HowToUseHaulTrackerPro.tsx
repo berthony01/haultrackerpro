@@ -46,7 +46,7 @@ const steps = [
   {
     num: '04',
     title: 'See Real Profit',
-    description: 'HaulTrackerPro calculates estimated revenue, compares it against actual pay, and subtracts all expenses — giving you a clear picture of real profitability.',
+    description: 'Net Profit = Revenue − Expenses. The Tax Planner then estimates your SE, federal, and state tax using the IRS method — so you see what you actually keep after expenses and taxes.',
     icon: BarChart3,
   },
 ];
@@ -55,11 +55,11 @@ const features = [
   { title: 'Load Logging', icon: ClipboardList, description: 'Log every load with full details — locations, miles, rate, fees, and pay. Support for multi-stop loads and paste parsing.' },
   { title: 'Expense Tracking', icon: DollarSign, description: 'Categorize expenses (fuel, tolls, food, maintenance, etc.), link them to loads, and see totals by category and date range.' },
   { title: 'Fuel Tracking', icon: Fuel, description: 'Dedicated fuel log with gallons, price, station, and odometer tracking. See fuel analytics on your dashboard.' },
-  { title: 'Smart Alerts', icon: Bell, description: 'Get notified about high deadhead percentages, missing pay entries, expense spikes, and other patterns that affect your bottom line.' },
-  { title: 'Weekly Closeout', icon: CheckCircle, description: 'Finalize each week with a snapshot of earnings, miles, and deadhead percentage to track performance over time.' },
-  { title: 'Driver Scorecard', icon: Award, description: 'See your revenue per mile, deadhead ratio, expense ratio, and overall performance grade at a glance.' },
+  { title: 'Smart Alerts', icon: Bell, description: 'Get notified about high deadhead, missing pay, expense spikes, profit drops, and RPM dips — with dollar-impact amounts so you see exactly how much each issue costs you.' },
+  { title: 'Weekly Closeout', icon: CheckCircle, description: 'Finalize each week with a snapshot of earnings, miles, and deadhead percentage. Includes a Week in Review that flags your best/worst loads, deadhead issues, and missing payments.' },
+  { title: 'Driver Scorecard', icon: Award, description: 'See your overall performance score (0–100) with tier rankings, 5 metric breakdowns (RPM, deadhead, expenses, profit trend, streak), and personalized coaching recommendations for each area.' },
   { title: 'Reports & Exports', icon: FileText, description: 'Export your data as CSV, PDF summary, or full profit report. Download everything for your accountant or records.' },
-  { title: 'Tax Set-Aside Planner', icon: Calculator, description: 'Configure federal, state, and self-employment tax rates. HaulTrackerPro estimates how much to set aside each quarter.' },
+  { title: 'Tax Set-Aside Planner', icon: Calculator, description: 'Configure federal, state, and self-employment tax rates. Uses the IRS method for SE tax (92.35% adjustment) and deducts half of SE tax before income tax — more accurate than a flat percentage estimate.' },
 ];
 
 const freePlan = [
@@ -72,14 +72,17 @@ const freePlan = [
 ];
 
 const proPlan = [
+  'AI Voice Expense Logging',
+  'AI Receipt Scanning',
+  'Scan Rate Con Screenshots (OCR)',
+  'Driver Scorecard with coaching advice',
+  'Weekly Closeout with Week in Review',
+  'Smart Alerts 2.0 with dollar impact',
   'Fuel analytics (cost/mile, % of revenue)',
-  'Advanced profit insights',
-  'Smart Alerts 2.0',
-  'Driver Scorecard',
-  'Weekly Closeout & summaries',
-  'Advanced reports & exports',
-  'CSV load import',
+  'Full tax breakdown (SE, federal, state)',
   'PDF & profit report exports',
+  'Unlimited Paste Load Parser',
+  '"Pro Saved You Time" dashboard card',
 ];
 
 const checklist = [
@@ -95,7 +98,8 @@ const faqs = [
   { q: 'Is HaulTrackerPro free to start?', a: 'Yes. You can create an account and start logging loads, expenses, and fuel at no cost. Pro features are available with a 14-day free trial.' },
   { q: 'Can I track fuel and expenses?', a: 'Absolutely. HaulTrackerPro has dedicated fuel logging and categorized expense tracking built in. Both are available on the free plan.' },
   { q: 'Can I use it if I\'m a lease driver?', a: 'Yes. Lease operators can track truck payments, insurance, and all other expenses alongside load revenue to understand true profitability.' },
-  { q: 'How is profit calculated?', a: 'Profit = Actual Pay Received − All Expenses (including fuel). If actual pay hasn\'t been entered yet, estimated pay (rate × miles + fees) is used.' },
+  { q: 'How is profit calculated?', a: 'Net Profit = Gross Revenue − Total Expenses. Gross revenue uses actual pay received when available, and falls back to estimated pay (rate per mile × loaded miles + fees) for unpaid loads. Expenses include everything you\'ve logged: fuel, tolls, maintenance, insurance, repairs, permits, and other costs. Net $/Mile divides your net profit by total miles (loaded + deadhead) to show your true earning rate.' },
+  { q: 'How is the tax estimate calculated?', a: 'The Tax Set-Aside Planner uses the IRS method for self-employment tax: your tax base (gross or net income, depending on your setting) is first multiplied by 92.35%, then the SE tax rate (typically 15.3%) is applied. Half of the SE tax is then deducted from your income before calculating federal and state income tax. This is more accurate than applying a flat combined percentage. You can add a buffer percentage for safety. Pro users see a full breakdown of SE, federal, state, and buffer amounts. This is an estimate only — always verify with a tax professional.' },
   { q: 'Do I need accounting experience?', a: 'Not at all. HaulTrackerPro is designed for drivers, not accountants. Just log your loads and expenses — the app handles the math.' },
 ];
 
@@ -134,7 +138,7 @@ export default function HowToUseHaulTrackerPro() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button asChild size="lg" className="rounded-xl font-bold text-base px-8">
-              <Link to="/pricing">Start Free <ArrowRight className="ml-1 h-4 w-4" /></Link>
+              <Link to="/pricing">Start Tracking Free <ArrowRight className="ml-1 h-4 w-4" /></Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-xl font-bold text-base px-8">
               <Link to="/features">View Features</Link>

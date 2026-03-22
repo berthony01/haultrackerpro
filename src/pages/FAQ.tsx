@@ -53,6 +53,14 @@ const faqs = [
     question: 'Can I cancel my Pro subscription?',
     answer: 'Yes, anytime. Go to Settings → Billing → Manage Billing to open your billing portal. Cancel there and you\'ll keep Pro access until the end of your current billing period. You can always re-subscribe later.',
   },
+  {
+    question: 'How is net profit calculated?',
+    answer: 'Net Profit = Gross Revenue − Total Expenses. Gross revenue uses actual pay received when available, and falls back to estimated pay (rate per mile × loaded miles + fees) for unpaid loads. Expenses include everything you\'ve logged across all categories. Net $/Mile divides net profit by total miles to show your true earning rate.',
+  },
+  {
+    question: 'How does the tax estimator work?',
+    answer: 'The Tax Set-Aside Planner uses the IRS method for self-employment tax: your income is first multiplied by 92.35%, then the SE tax rate (typically 15.3%) is applied. Half of SE tax is deducted from your income before calculating federal and state income tax. Pro users see a full breakdown by tax type. You can configure your federal rate, state rate, SE rate, and add a safety buffer in Settings. This is an estimate — always verify with a tax professional.',
+  },
 ];
 
 export default function FAQ() {
