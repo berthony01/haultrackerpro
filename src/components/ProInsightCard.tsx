@@ -31,10 +31,9 @@ interface InsightData {
 export function ProInsightCard({ loads, expenses, isPro, isTrialing = false, onNavigate }: ProInsightCardProps) {
   const navigate = useNavigate();
 
-  // Don't show for Pro or trialing users, or users with < 3 loads
-  if (isPro || isTrialing || loads.length < 3) return null;
-
   const insight = useMemo((): InsightData | null => {
+    // Don't compute for Pro or trialing users, or users with < 3 loads
+    if (isPro || isTrialing || loads.length < 3) return null;
     const now = new Date();
 
     // Last 30 days data
