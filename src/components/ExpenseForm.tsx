@@ -91,7 +91,18 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
   };
 
   const update = (key: string, value: string) => {
-    setForm(prev => ({ ...prev, [key]: value }));
+    setForm(prev => {
+      const next = { ...prev, [key]: value };
+      // AI Auto-categorization: when notes change and no category selected yet, try to detect
+      if (key === 'notes' && !prev.category && isPro && value.length >= 3) {
+        const detected = categorizeExpense(value);
+        if (detected) {
+          next.category = detected;
+          toast.success(`Auto-detected: ${detected}`, { duration: 2000 });
+        }
+      }
+      return next;
+    });
     if (errors[key]) setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
   };
 

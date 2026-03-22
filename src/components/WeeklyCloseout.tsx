@@ -229,6 +229,27 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
             );
           })()}
 
+          {/* AI Weekly Summary */}
+          {weekLoads.length > 0 && (() => {
+            const summaryLines = generateWeeklySummary({ weekLoads, allLoads: loads, weekStartsOn });
+            if (summaryLines.length === 0) return null;
+            return (
+              <Card className="shadow-card overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary">AI Weekly Summary</span>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    {summaryLines.map((line, i) => (
+                      <p key={i} className="text-xs leading-relaxed text-muted-foreground">{line}</p>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {/* Deadhead */}
           <Card className="card-premium">
             <CardContent className="p-4 flex items-center justify-between">

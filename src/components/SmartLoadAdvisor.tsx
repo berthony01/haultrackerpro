@@ -30,7 +30,7 @@ function normalizeCityName(location: string): string {
   return location.trim().split(',')[0].trim().substring(0, 25);
 }
 
-export function SmartLoadAdvisor({ loads, expenses, isPro, isTrialing = false }: SmartLoadAdvisorProps) {
+export function SmartLoadAdvisor({ loads, isPro, isTrialing = false }: SmartLoadAdvisorProps) {
   const navigate = useNavigate();
   const isProAccess = isPro || isTrialing;
 

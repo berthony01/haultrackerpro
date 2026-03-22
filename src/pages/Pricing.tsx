@@ -294,21 +294,14 @@ export default function Pricing() {
             Ready to Drive Smarter?
           </h2>
           <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Start free today. Upgrade to Pro when you're ready for next-level insights.
+            Every new account starts with a free 14-day Pro trial. No credit card required. Experience everything, then decide.
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-3">
-            <Button onClick={() => navigate('/auth')} variant="outline" size="lg" className="text-base font-bold rounded-xl h-13 px-8" style={{
-              borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
-            }}>
-              Start Free Today
-            </Button>
-            <Button onClick={handleUpgrade} disabled={loading} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
-              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
-              boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.5)'
-            }}>
-              {loading ? 'Loading...' : 'Start Free Trial'} {!loading && <ArrowRight className="h-5 w-5" />}
-            </Button>
-          </div>
+          <Button onClick={() => navigate('/auth')} size="lg" className="text-base font-bold rounded-xl h-13 px-10 gap-2" style={{
+            background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
+            boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.5)'
+          }}>
+            Start Tracking Free <ArrowRight className="h-5 w-5" />
+          </Button>
         </div>
       </section>
 

@@ -329,6 +329,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
           />
 
+          {/* Smart Load Advisor */}
+          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} isTrialing={isTrialing} />
+
           {/* Performance Trends */}
           <PerformanceTrends loads={loads} />
 
