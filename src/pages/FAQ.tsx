@@ -35,7 +35,7 @@ const faqs = [
   },
   {
     question: 'What\'s included in the 14-day free trial?',
-    answer: 'The free trial gives you full access to every Pro feature: Weekly Closeouts, Driver Scorecard, unlimited paste parsing, advanced exports (PDF & profit reports), Smart Alerts 2.0, and tax planning tools. No restrictions — try everything before you commit.',
+    answer: 'Every new account starts with a 14-day Pro trial — no credit card required. You get full access to AI Voice Logging, AI Receipt Scanning, Rate Con Screenshot Scanner, Driver Scorecard with coaching advice, Weekly Closeout with anomaly detection, all 5 performance charts, dollar-impact Smart Alerts, branded PDF reports, and full tax breakdowns. No restrictions — try everything before you commit.',
   },
   {
     question: 'How do I upgrade to Pro?',
