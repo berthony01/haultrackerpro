@@ -331,6 +331,7 @@ const Index = () => {
                   onNavigate={handleNavigate}
                   smartAlerts={smartAlerts}
                   isPro={isPro}
+                  isTrialing={isTrialing}
                 />
               </>
             )}

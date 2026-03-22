@@ -286,22 +286,14 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </Button>
           )}
 
-          {/* Pro Insight Teaser — free users only */}
-          {!isPro && (
-            <Card className="shadow-card border-primary/20">
-              <CardContent className="p-4 text-center space-y-2">
-                <div className="flex items-center justify-center gap-1.5">
-                  <Crown className="h-4 w-4 text-warning" />
-                  <p className="text-sm font-bold">Pro Insight</p>
-                </div>
-                <p className="text-xs text-muted-foreground">Your Driver Performance Score is available in Pro.</p>
-                <p className="text-lg font-black font-mono text-muted-foreground/30 select-none blur-md">87 / 100</p>
-                <Button size="sm" className="rounded-xl font-bold gap-1.5" onClick={() => navigate('/pricing')}>
-                  <Crown className="h-3.5 w-3.5" /> Start Free Trial
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          {/* Personalized Pro Insight — free users only */}
+          <ProInsightCard
+            loads={loads}
+            expenses={expenses}
+            isPro={isPro}
+            isTrialing={isTrialing}
+            onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
+          />
 
           {/* Performance Trends */}
           <PerformanceTrends loads={loads} />
