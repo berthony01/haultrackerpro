@@ -112,12 +112,13 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   const avg30RPM = avg30Miles > 0 ? avg30Rev / avg30Miles : 0;
   const thisWeekRPM = totalLoaded > 0 ? thisWeekRevenue / totalLoaded : 0;
   if (avg30RPM > 0 && thisWeekRPM > 0 && ((avg30RPM - thisWeekRPM) / avg30RPM) * 100 >= 15) {
+    const rpmLoss = Math.round((avg30RPM - thisWeekRPM) * totalLoaded);
     alerts.push({
       type: 'low_rpm',
       severity: 'warning',
       tier: 'advanced',
       title: 'Low Rate Per Mile',
-      message: `This week's RPM ($${thisWeekRPM.toFixed(2)}) is ${(((avg30RPM - thisWeekRPM) / avg30RPM) * 100).toFixed(0)}% below your 30-day average ($${avg30RPM.toFixed(2)}).`,
+      message: `This week's RPM ($${thisWeekRPM.toFixed(2)}) is ${(((avg30RPM - thisWeekRPM) / avg30RPM) * 100).toFixed(0)}% below your 30-day average ($${avg30RPM.toFixed(2)}). That's ~$${rpmLoss} less than your typical rate.`,
       ctaLabel: 'Review Loads',
       ctaRoute: 'loads',
       dedupeKey: `low_rpm_${thisWeek.start.toISOString().slice(0, 10)}`,
