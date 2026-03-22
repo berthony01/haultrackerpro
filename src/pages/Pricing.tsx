@@ -26,6 +26,7 @@ const freeFeatures = [
 const proFeatures = [
   'AI Voice Expense Logging',
   'AI Receipt & Screenshot Scanning',
+  'Scan Rate Con Screenshots (OCR)',
   'Paste Load Parser (Unlimited)',
   'RPM, Deadhead % & Expense Breakdown Charts',
   'Driver Performance Scorecard',
