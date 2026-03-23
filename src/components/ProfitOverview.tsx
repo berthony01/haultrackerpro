@@ -4,7 +4,7 @@ import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, TrendingDown, Receipt, DollarSign, Info, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Receipt, Info, Plus } from 'lucide-react';
 
 interface ProfitOverviewProps {
   loads: Load[];
@@ -31,27 +31,23 @@ export function ProfitOverview({ loads, expenses, onAddExpense }: ProfitOverview
 
   if (expenses.length === 0) {
     return (
-      <Card className="shadow-card overflow-hidden border-primary/10">
-        <CardContent className="p-0">
-          <div className="relative px-5 py-6 text-center space-y-4">
-            {/* Subtle gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/3 pointer-events-none" />
-            <div className="relative">
-              <div className="inline-flex items-center justify-center rounded-2xl bg-primary/10 p-4 mb-2">
-                <DollarSign className="h-8 w-8 text-primary" />
-              </div>
-              <p className="text-sm font-bold">Track Your True Profit</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-[240px] mx-auto leading-relaxed">
-                Log your first expense to see net profit, cost-per-mile, and where your money goes.
-              </p>
+      <Card className="border border-primary/15 bg-primary/[0.03]">
+        <CardContent className="p-3.5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Receipt className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold leading-tight">Track Your True Profit</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Log expenses to see net profit and cost-per-mile</p>
             </div>
             {onAddExpense && (
               <Button
                 size="sm"
-                className="gap-1.5 rounded-xl font-bold shadow-primary active:scale-95 transition-all"
+                className="shrink-0 h-8 text-xs font-bold rounded-lg gap-1 px-3"
                 onClick={onAddExpense}
               >
-                <Plus className="h-3.5 w-3.5" /> Add First Expense
+                <Plus className="h-3 w-3" /> Add
               </Button>
             )}
           </div>
