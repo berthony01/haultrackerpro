@@ -18,6 +18,7 @@ const TIME_PER_PASTE_PARSE = 1.5;
 
 export function ProTimeSavedCard({ isPro, isTrialing = false, weekStartsOn = 0 }: ProTimeSavedCardProps) {
   const { user } = useAuth();
+  const isProUser = isPro || isTrialing;
 
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn }).toISOString();
@@ -35,7 +36,7 @@ export function ProTimeSavedCard({ isPro, isTrialing = false, weekStartsOn = 0 }
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!user && (isPro || isTrialing),
+    enabled: !!user && isProUser,
     staleTime: 60_000,
   });
 
@@ -50,7 +51,7 @@ export function ProTimeSavedCard({ isPro, isTrialing = false, weekStartsOn = 0 }
       if (error) throw error;
       return count ?? 0;
     },
-    enabled: !!user && (isPro || isTrialing),
+    enabled: !!user && isProUser,
     staleTime: 60_000,
   });
 
@@ -63,55 +64,8 @@ export function ProTimeSavedCard({ isPro, isTrialing = false, weekStartsOn = 0 }
     return { voice, receipt, paste, totalMinutes, totalActions: voice + receipt + paste };
   }, [automationQuery.data, parseQuery.data]);
 
-  if ((!isPro && !isTrialing) || !user || stats.totalActions === 0) return null;
+  if (!isProUser || !user || stats.totalActions === 0) return null;
 
-  const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn }).toISOString();
-  const weekEnd = endOfWeek(now, { weekStartsOn }).toISOString();
-
-  const automationQuery = useQuery({
-    queryKey: ['automation-week-count', user.id, weekStart],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('expense_automation_logs' as any)
-        .select('source')
-        .eq('user_id', user.id)
-        .gte('created_at', weekStart)
-        .lte('created_at', weekEnd);
-      if (error) throw error;
-      const logs = (data ?? []) as { source: string }[];
-      return {
-        voice: logs.filter(l => l.source === 'voice').length,
-        receipt: logs.filter(l => l.source === 'receipt').length,
-      };
-    },
-    staleTime: 60_000,
-  });
-
-  const parseQuery = useQuery({
-    queryKey: ['parse-week-count', user.id, weekStart],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('parse_usage')
-        .select('*', { count: 'exact', head: true })
-        .gte('used_at', weekStart);
-      if (error) throw error;
-      return count ?? 0;
-    },
-    staleTime: 60_000,
-  });
-
-  const stats = useMemo(() => {
-    const voice = automationQuery.data?.voice ?? 0;
-    const receipt = automationQuery.data?.receipt ?? 0;
-    const paste = parseQuery.data ?? 0;
-    const totalMinutes = (voice * TIME_PER_VOICE_LOG) + (receipt * TIME_PER_RECEIPT_SCAN) + (paste * TIME_PER_PASTE_PARSE);
-    return { voice, receipt, paste, totalMinutes, totalActions: voice + receipt + paste };
-  }, [automationQuery.data, parseQuery.data]);
-
-  if (stats.totalActions === 0) return null;
-
-  // Build compact stat chips
   const chips: { icon: typeof Mic; count: number; label: string }[] = [];
   if (stats.voice > 0) chips.push({ icon: Mic, count: stats.voice, label: 'voice' });
   if (stats.receipt > 0) chips.push({ icon: Camera, count: stats.receipt, label: 'scans' });
