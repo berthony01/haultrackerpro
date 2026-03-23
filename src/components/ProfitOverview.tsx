@@ -4,7 +4,7 @@ import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, TrendingDown, Receipt, DollarSign, Info, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Receipt, Info, Plus } from 'lucide-react';
 
 interface ProfitOverviewProps {
   loads: Load[];

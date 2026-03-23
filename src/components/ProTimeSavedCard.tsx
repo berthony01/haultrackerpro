@@ -19,7 +19,51 @@ const TIME_PER_PASTE_PARSE = 1.5;
 export function ProTimeSavedCard({ isPro, isTrialing = false, weekStartsOn = 0 }: ProTimeSavedCardProps) {
   const { user } = useAuth();
 
-  if ((!isPro && !isTrialing) || !user) return null;
+  const now = new Date();
+  const weekStart = startOfWeek(now, { weekStartsOn }).toISOString();
+  const weekEnd = endOfWeek(now, { weekStartsOn }).toISOString();
+
+  const automationQuery = useQuery({
+    queryKey: ['automation-week-count', user?.id, weekStart],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('expense_automation_logs')
+        .select('source')
+        .eq('user_id', user!.id)
+        .gte('created_at', weekStart)
+        .lte('created_at', weekEnd);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user && (isPro || isTrialing),
+    staleTime: 60_000,
+  });
+
+  const parseQuery = useQuery({
+    queryKey: ['parse-week-count', user?.id, weekStart],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('parse_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .gte('used_at', weekStart);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!user && (isPro || isTrialing),
+    staleTime: 60_000,
+  });
+
+  const stats = useMemo(() => {
+    const logs = automationQuery.data ?? [];
+    const voice = logs.filter(l => l.source === 'voice').length;
+    const receipt = logs.filter(l => l.source === 'receipt').length;
+    const paste = parseQuery.data ?? 0;
+    const totalMinutes = (voice * TIME_PER_VOICE_LOG) + (receipt * TIME_PER_RECEIPT_SCAN) + (paste * TIME_PER_PASTE_PARSE);
+    return { voice, receipt, paste, totalMinutes, totalActions: voice + receipt + paste };
+  }, [automationQuery.data, parseQuery.data]);
+
+  if ((!isPro && !isTrialing) || !user || stats.totalActions === 0) return null;
 
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn }).toISOString();
