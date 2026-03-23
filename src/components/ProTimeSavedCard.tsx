@@ -1,102 +1,98 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
-import { Clock, Mic, Camera, ClipboardPaste } from 'lucide-react';
+import { Zap, Mic, Camera, ClipboardPaste } from 'lucide-react';
 import { startOfWeek, endOfWeek } from 'date-fns';
 
 interface ProTimeSavedCardProps {
-  isPro?: boolean;
+  isPro: boolean;
   isTrialing?: boolean;
   weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
 }
 
-const TIME_PER_ACTION = { voice: 2, receipt: 3, paste: 1.5 };
+const TIME_PER_VOICE_LOG = 2;
+const TIME_PER_RECEIPT_SCAN = 3;
+const TIME_PER_PASTE_PARSE = 1.5;
 
-export function ProTimeSavedCard({ isPro = false, isTrialing = false, weekStartsOn = 0 }: ProTimeSavedCardProps) {
+export function ProTimeSavedCard({ isPro, isTrialing = false, weekStartsOn = 0 }: ProTimeSavedCardProps) {
   const { user } = useAuth();
-  const isProUser = isPro || isTrialing;
+
+  if ((!isPro && !isTrialing) || !user) return null;
 
   const now = new Date();
-  const ws = startOfWeek(now, { weekStartsOn }).toISOString();
-  const we = endOfWeek(now, { weekStartsOn }).toISOString();
+  const weekStart = startOfWeek(now, { weekStartsOn }).toISOString();
+  const weekEnd = endOfWeek(now, { weekStartsOn }).toISOString();
 
-  const { data } = useQuery({
-    queryKey: ['pro-time-saved', user?.id, ws],
+  const automationQuery = useQuery({
+    queryKey: ['automation-week-count', user.id, weekStart],
     queryFn: async () => {
-      if (!user) return null;
-
-      const [autoLogs, parseUsage] = await Promise.all([
-        supabase
-          .from('expense_automation_logs')
-          .select('source')
-          .eq('user_id', user.id)
-          .gte('created_at', ws)
-          .lte('created_at', we),
-        supabase
-          .from('parse_usage')
-          .select('id')
-          .eq('user_id', user.id)
-          .gte('used_at', ws)
-          .lte('used_at', we),
-      ]);
-
-      const voiceCount = (autoLogs.data ?? []).filter(l => l.source === 'voice').length;
-      const receiptCount = (autoLogs.data ?? []).filter(l => l.source === 'receipt').length;
-      const pasteCount = (parseUsage.data ?? []).length;
-
-      return { voiceCount, receiptCount, pasteCount };
+      const { data, error } = await supabase
+        .from('expense_automation_logs' as any)
+        .select('source')
+        .eq('user_id', user.id)
+        .gte('created_at', weekStart)
+        .lte('created_at', weekEnd);
+      if (error) throw error;
+      const logs = (data ?? []) as { source: string }[];
+      return {
+        voice: logs.filter(l => l.source === 'voice').length,
+        receipt: logs.filter(l => l.source === 'receipt').length,
+      };
     },
-    enabled: !!user && isProUser,
     staleTime: 60_000,
   });
 
-  if (!isProUser || !data) return null;
+  const parseQuery = useQuery({
+    queryKey: ['parse-week-count', user.id, weekStart],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('parse_usage')
+        .select('*', { count: 'exact', head: true })
+        .gte('used_at', weekStart);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    staleTime: 60_000,
+  });
 
-  const totalMinutes = Math.round(
-    data.voiceCount * TIME_PER_ACTION.voice +
-    data.receiptCount * TIME_PER_ACTION.receipt +
-    data.pasteCount * TIME_PER_ACTION.paste
-  );
+  const stats = useMemo(() => {
+    const voice = automationQuery.data?.voice ?? 0;
+    const receipt = automationQuery.data?.receipt ?? 0;
+    const paste = parseQuery.data ?? 0;
+    const totalMinutes = (voice * TIME_PER_VOICE_LOG) + (receipt * TIME_PER_RECEIPT_SCAN) + (paste * TIME_PER_PASTE_PARSE);
+    return { voice, receipt, paste, totalMinutes, totalActions: voice + receipt + paste };
+  }, [automationQuery.data, parseQuery.data]);
 
-  if (totalMinutes === 0) return null;
+  if (stats.totalActions === 0) return null;
 
-  const items = [
-    { icon: Mic, label: 'Voice', count: data.voiceCount, mins: data.voiceCount * TIME_PER_ACTION.voice },
-    { icon: Camera, label: 'Receipts', count: data.receiptCount, mins: data.receiptCount * TIME_PER_ACTION.receipt },
-    { icon: ClipboardPaste, label: 'Paste', count: data.pasteCount, mins: data.pasteCount * TIME_PER_ACTION.paste },
-  ].filter(i => i.count > 0);
+  // Build compact stat chips
+  const chips: { icon: typeof Mic; count: number; label: string }[] = [];
+  if (stats.voice > 0) chips.push({ icon: Mic, count: stats.voice, label: 'voice' });
+  if (stats.receipt > 0) chips.push({ icon: Camera, count: stats.receipt, label: 'scans' });
+  if (stats.paste > 0) chips.push({ icon: ClipboardPaste, count: stats.paste, label: 'pastes' });
 
   return (
-    <Card className="shadow-card overflow-hidden border-primary/10">
-      <CardContent className="p-0">
-        {/* Header strip */}
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5 border-b border-primary/10">
-          <Clock className="h-3.5 w-3.5 text-primary" />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Pro Saved You Time</span>
-          <span className="ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">This Week</span>
-        </div>
-
-        <div className="p-3 space-y-2">
-          {/* Hero stat */}
-          <div className="relative text-center py-1.5">
-            <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent rounded-xl pointer-events-none" />
-            <p className="relative text-2xl font-black font-mono text-primary leading-none">{totalMinutes}</p>
-            <p className="relative text-[11px] text-muted-foreground mt-1 font-medium">minutes saved with Pro tools</p>
+    <Card className="border border-success/15 bg-success/[0.03]">
+      <CardContent className="p-3.5">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+            <Zap className="h-5 w-5 text-success" />
           </div>
-
-          {/* Breakdown chips */}
-          <div className="grid grid-cols-3 gap-2">
-            {items.map(item => (
-              <div key={item.label} className="text-center rounded-xl bg-muted/60 border border-border/50 p-2 hover:border-primary/20 transition-colors">
-                <div className="inline-flex items-center justify-center rounded-lg bg-primary/10 p-1.5">
-                  <item.icon className="h-3.5 w-3.5 text-primary" />
-                </div>
-                <p className="text-sm font-black font-mono">{item.count}</p>
-                <p className="text-[10px] text-muted-foreground font-medium">{item.label}</p>
-                <p className="text-[9px] text-muted-foreground/60 mt-0.5">{Math.round(item.mins)} min</p>
-              </div>
-            ))}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-bold leading-tight">~{Math.round(stats.totalMinutes)} min saved</p>
+              <span className="text-[9px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded-full">THIS WEEK</span>
+            </div>
+            <div className="flex items-center gap-2.5 mt-1">
+              {chips.map(chip => (
+                <span key={chip.label} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <chip.icon className="h-3 w-3" />
+                  {chip.count} {chip.label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </CardContent>
