@@ -34,6 +34,20 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
+    // Handle cron-triggered trial expiry
+    let body: any = {};
+    try { body = await req.json(); } catch { /* no body is fine */ }
+    if (body?.action === "expire_trials") {
+      logStep("Running expire_ended_trials via cron");
+      const { error: expireErr } = await supabaseClient.rpc("expire_ended_trials");
+      if (expireErr) logStep("expire_ended_trials error", { message: expireErr.message });
+      else logStep("expire_ended_trials completed");
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
