@@ -65,6 +65,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_insights: {
+        Row: {
+          content: string
+          context_hash: string | null
+          created_at: string
+          generated_at: string
+          id: string
+          insight_type: string
+          user_id: string
+          week_start: string | null
+        }
+        Insert: {
+          content: string
+          context_hash?: string | null
+          created_at?: string
+          generated_at?: string
+          id?: string
+          insight_type: string
+          user_id: string
+          week_start?: string | null
+        }
+        Update: {
+          content?: string
+          context_hash?: string | null
+          created_at?: string
+          generated_at?: string
+          id?: string
+          insight_type?: string
+          user_id?: string
+          week_start?: string | null
+        }
+        Relationships: []
+      }
       expense_automation_logs: {
         Row: {
           created_at: string
