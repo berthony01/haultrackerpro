@@ -87,56 +87,58 @@ function PageViewTracker() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <PageViewTracker />
-        <Routes>
-          <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/landing" element={<Navigate to="/" replace />} />
-          <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/features" element={<Features />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/install" element={<Install />} />
-          <Route path="/truck-driver-tax-deductions" element={<TruckDriverTaxDeductions />} />
-          <Route path="/owner-operator-expense-tracker" element={<OwnerOperatorExpenseTracker />} />
-          <Route path="/trucking-profit-calculator" element={<TruckingProfitCalculator />} />
-          <Route path="/trucker-bookkeeping-guide" element={<TruckerBookkeepingGuide />} />
-          <Route path="/truck-driver-expenses" element={<TruckDriverExpenses />} />
-          <Route path="/truck-driver-per-diem" element={<TruckDriverPerDiem />} />
-          <Route path="/owner-operator-salary" element={<OwnerOperatorSalary />} />
-          <Route path="/trucking-cost-per-mile" element={<TruckingCostPerMile />} />
-          <Route path="/trucking-expenses-list" element={<TruckingExpensesList />} />
-          <Route path="/owner-operator-expenses-list" element={<OwnerOperatorExpensesList />} />
-          <Route path="/trucking-finance-guides" element={<TruckingFinanceGuides />} />
-          <Route path="/fuel-cost-per-mile-trucking" element={<FuelCostPerMileTrucking />} />
-          <Route path="/trucking-maintenance-cost-per-mile" element={<TruckingMaintenanceCostPerMile />} />
-          <Route path="/truck-driver-fuel-expenses" element={<TruckDriverFuelExpenses />} />
-          <Route path="/trucking-expense-categories" element={<TruckingExpenseCategories />} />
-          <Route path="/owner-operator-tax-write-offs" element={<OwnerOperatorTaxWriteOffs />} />
-          <Route path="/trucker-fuel-cost-calculator" element={<TruckerFuelCostCalculator />} />
-          <Route path="/trucking-mileage-expense-guide" element={<TruckingMileageExpenseGuide />} />
-          <Route path="/trucker-cost-per-mile-breakdown" element={<TruckerCostPerMileBreakdown />} />
-          <Route path="/owner-operator-operating-costs" element={<OwnerOperatorOperatingCosts />} />
-          <Route path="/truck-driver-operating-expenses" element={<TruckDriverOperatingExpenses />} />
-          <Route path="/trucking-cost-per-mile-calculator" element={<TruckingCostPerMileCalculator />} />
-          <Route path="/trucking-load-profit-calculator" element={<TruckingLoadProfitCalculator />} />
-          <Route path="/tools/load-profit-calculator" element={<ToolsLoadProfitCalculator />} />
-          <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
-          <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <PageViewTracker />
+          <Routes>
+            <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/landing" element={<Navigate to="/" replace />} />
+            <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/features" element={<Features />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/install" element={<Install />} />
+            <Route path="/truck-driver-tax-deductions" element={<TruckDriverTaxDeductions />} />
+            <Route path="/owner-operator-expense-tracker" element={<OwnerOperatorExpenseTracker />} />
+            <Route path="/trucking-profit-calculator" element={<TruckingProfitCalculator />} />
+            <Route path="/trucker-bookkeeping-guide" element={<TruckerBookkeepingGuide />} />
+            <Route path="/truck-driver-expenses" element={<TruckDriverExpenses />} />
+            <Route path="/truck-driver-per-diem" element={<TruckDriverPerDiem />} />
+            <Route path="/owner-operator-salary" element={<OwnerOperatorSalary />} />
+            <Route path="/trucking-cost-per-mile" element={<TruckingCostPerMile />} />
+            <Route path="/trucking-expenses-list" element={<TruckingExpensesList />} />
+            <Route path="/owner-operator-expenses-list" element={<OwnerOperatorExpensesList />} />
+            <Route path="/trucking-finance-guides" element={<TruckingFinanceGuides />} />
+            <Route path="/fuel-cost-per-mile-trucking" element={<FuelCostPerMileTrucking />} />
+            <Route path="/trucking-maintenance-cost-per-mile" element={<TruckingMaintenanceCostPerMile />} />
+            <Route path="/truck-driver-fuel-expenses" element={<TruckDriverFuelExpenses />} />
+            <Route path="/trucking-expense-categories" element={<TruckingExpenseCategories />} />
+            <Route path="/owner-operator-tax-write-offs" element={<OwnerOperatorTaxWriteOffs />} />
+            <Route path="/trucker-fuel-cost-calculator" element={<TruckerFuelCostCalculator />} />
+            <Route path="/trucking-mileage-expense-guide" element={<TruckingMileageExpenseGuide />} />
+            <Route path="/trucker-cost-per-mile-breakdown" element={<TruckerCostPerMileBreakdown />} />
+            <Route path="/owner-operator-operating-costs" element={<OwnerOperatorOperatingCosts />} />
+            <Route path="/truck-driver-operating-expenses" element={<TruckDriverOperatingExpenses />} />
+            <Route path="/trucking-cost-per-mile-calculator" element={<TruckingCostPerMileCalculator />} />
+            <Route path="/trucking-load-profit-calculator" element={<TruckingLoadProfitCalculator />} />
+            <Route path="/tools/load-profit-calculator" element={<ToolsLoadProfitCalculator />} />
+            <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
+            <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
