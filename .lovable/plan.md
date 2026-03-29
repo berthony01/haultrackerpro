@@ -1,17 +1,21 @@
 
 
-## Plan: Compact & Readable ProTimeSavedCard
+## Phase 1: Bug Fixes & Infrastructure ✅ COMPLETE
 
-The card is too tall and the breakdown chips use `bg-secondary/80` which renders as dark navy — hard to read. Fix both issues.
+- ✅ Trial expiry cron job (pg_cron + pg_net enabled, hourly schedule calling expire_ended_trials)
+- ✅ ErrorBoundary component wrapping entire app
+- ✅ PWA manifest.webmanifest created and linked in index.html
+- ✅ Fixed hardcoded lovable.app URLs in loadUtils.ts, create-checkout, customer-portal
 
-### Changes to `src/components/ProTimeSavedCard.tsx`
+## Next: Phase 2 — AI Integration
 
-1. **Hero stat section** — reduce padding from `py-3` to `py-1.5`, shrink font from `text-4xl` to `text-2xl`
-2. **Breakdown chips** — change `bg-secondary/80` to `bg-muted/60` so text is visible on light background; reduce padding from `p-2.5` to `p-2`; remove `mb-1.5` on icon wrapper
-3. **Overall spacing** — change `space-y-4` to `space-y-2` and `p-4` to `p-3`
+### 2.1 Database: `ai_insights` cache table
+### 2.2 Edge Function: `ai-insight` (lane_advice, weekly_report, tax_tips, parse_expense, parse_ratecon)
+### 2.3 Smart Load Advisor — AI weekly advice
+### 2.4 Natural Language Expense Entry (VoiceExpenseModal)
+### 2.5 AI Weekly Business Report (WeeklyCloseout)
+### 2.6 AI-Enhanced Rate Con Parsing (ScanLoadModal)
+### 2.7 Quarterly Tax Optimization Tips (TaxEstimateCard)
 
-Result: compact card, light readable chip backgrounds matching the platform theme.
-
-### Files changed
-- `src/components/ProTimeSavedCard.tsx`
-
+## Phase 3: Pricing Update ($19.99/mo)
+## Phase 4: Dashboard Mockup & Polish
