@@ -64,22 +64,29 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <TrendingUp className="h-4 w-4 text-primary" />
-        <h2 className="text-label">Performance Trends</h2>
+      <div className="section-header">
+        <TrendingUp className="section-header-icon" />
+        <h2 className="section-header-title">Performance Trends</h2>
       </div>
 
       <Card className="card-premium">
         <CardContent className="p-4">
-          <p className="text-label mb-3">Last 4 Weeks Earnings</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-label">Last 4 Weeks Earnings</p>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary inline-block" /> Est.</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-success inline-block" /> Actual</span>
+            </div>
+          </div>
           <div className="h-36">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weeklyData} barGap={2}>
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} width={45} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(220, 10%, 46%)' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'hsl(220, 10%, 46%)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} width={45} />
                 <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 12, border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+                  contentStyle={{ fontSize: 12, borderRadius: 12, border: '1px solid hsl(220, 13%, 87%)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', background: 'hsl(0, 0%, 100%)' }}
                   formatter={(value: number, name: string) => [formatCurrency(value), name === 'estimated' ? 'Estimated' : 'Actual']}
+                  cursor={{ fill: 'hsl(25, 95%, 53%, 0.06)' }}
                 />
                 <Bar dataKey="estimated" fill="hsl(25, 95%, 53%)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="actual" fill="hsl(152, 60%, 42%)" radius={[6, 6, 0, 0]} />

@@ -52,7 +52,7 @@ export function ContributionMarginCard({ loads, expenses }: ContributionMarginCa
   if (data.fixedExpenses === 0 && data.variableExpenses === 0) return null;
 
   return (
-    <Card className="shadow-card border-primary/10">
+    <Card className="shadow-card border-primary/10 card-premium">
       <CardContent className="p-4">
         <div className="flex items-center gap-1.5 mb-3">
           <Layers className="h-3.5 w-3.5 text-primary" />

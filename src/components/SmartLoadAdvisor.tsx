@@ -158,6 +158,7 @@ export function SmartLoadAdvisor({ loads, isPro, isTrialing = false }: SmartLoad
           <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5">
             <Map className="h-3.5 w-3.5 text-primary" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Smart Load Advisor</span>
+            <span className="ai-badge ml-1"><Sparkles className="h-2.5 w-2.5" />AI</span>
             <span className="ml-auto">
               <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">Pro</span>
             </span>
@@ -185,6 +186,7 @@ export function SmartLoadAdvisor({ loads, isPro, isTrialing = false }: SmartLoad
         <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5">
           <Map className="h-3.5 w-3.5 text-primary" />
           <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Smart Load Advisor</span>
+          <span className="ai-badge ml-1"><Sparkles className="h-2.5 w-2.5" />AI</span>
           <span className="text-[10px] text-muted-foreground ml-auto">{analysis.totalLoadsAnalyzed} loads · 60 days</span>
         </div>
         <div className="p-4 space-y-3">

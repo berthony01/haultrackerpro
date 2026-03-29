@@ -129,7 +129,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <div>
         <h1 className="text-2xl font-black font-heading">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
@@ -216,7 +216,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} size="large" />
             <StatCard
               label="Actual Earnings"
