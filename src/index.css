@@ -205,6 +205,24 @@
     );
   }
 
+  /* Section header style */
+  .section-header {
+    @apply flex items-center gap-2 mb-3;
+  }
+  .section-header-icon {
+    @apply h-4 w-4 text-primary;
+  }
+  .section-header-title {
+    @apply text-xs font-bold uppercase tracking-wider text-muted-foreground;
+  }
+
+  /* AI badge */
+  .ai-badge {
+    @apply inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--warning) / 0.15));
+    color: hsl(var(--primary));
+  }
+
   /* Green pulse for payment updates */
   @keyframes green-pulse {
     0% { box-shadow: 0 0 0 0 hsl(152 60% 42% / 0.4); }
