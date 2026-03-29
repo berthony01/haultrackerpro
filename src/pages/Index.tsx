@@ -338,6 +338,7 @@ const Index = () => {
             {page === 'closeout' && (
               <WeeklyCloseout
                 loads={allLoadsQuery.loads}
+                expenses={allExpensesQuery.expenses}
                 onNavigate={handleNavigate}
                 onBack={() => setPage('dashboard')}
                 isPro={isPro}
