@@ -3,9 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Mic, MicOff, Loader2, Keyboard, Check, Square } from 'lucide-react';
+import { Mic, MicOff, Loader2, Keyboard, Check, Square, Sparkles } from 'lucide-react';
 import { parseExpenseText, ParsedExpense } from '@/lib/parseExpenseText';
 import { useExpenseAutomation } from '@/hooks/useExpenseAutomation';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface VoiceExpenseModalProps {
@@ -22,12 +23,44 @@ const SpeechRecognitionAPI =
 // How long to wait after the last word before auto-stopping (ms)
 const SILENCE_TIMEOUT = 3000;
 
+/** Try AI parsing first, fall back to regex */
+async function parseWithAI(text: string): Promise<{ expenses: ParsedExpense[]; usedAI: boolean }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('ai-insight', {
+      body: { type: 'parse_expense', context: { text } },
+    });
+
+    if (error) throw error;
+
+    const parsed = data?.parsed;
+    if (parsed?.expenses?.length > 0) {
+      const mapped: ParsedExpense[] = parsed.expenses.map((e: any) => ({
+        amount: e.amount ?? null,
+        category: e.category ?? null,
+        notes: e.notes ?? null,
+        date: e.date ?? null,
+        confidence: 0.9,
+      }));
+      return { expenses: mapped, usedAI: true };
+    }
+  } catch (err) {
+    console.error('AI parse failed, falling back to regex:', err);
+  }
+
+  // Fallback to regex
+  const result = parseExpenseText(text);
+  return { expenses: [result], usedAI: false };
+}
+
 export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpenseModalProps) {
   const { checkLimit, logAutomation } = useExpenseAutomation();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimText, setInterimText] = useState('');
-  const [parsed, setParsed] = useState<ParsedExpense | null>(null);
+  const [parsedExpenses, setParsedExpenses] = useState<ParsedExpense[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [usedAI, setUsedAI] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [fallbackMode, setFallbackMode] = useState(!SpeechRecognitionAPI);
   const [manualText, setManualText] = useState('');
   const recognitionRef = useRef<any>(null);
@@ -48,7 +81,10 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
       setIsListening(false);
       setTranscript('');
       setInterimText('');
-      setParsed(null);
+      setParsedExpenses([]);
+      setSelectedIdx(0);
+      setUsedAI(false);
+      setIsParsing(false);
       setManualText('');
       finalTranscriptRef.current = '';
       clearSilenceTimer();
@@ -58,6 +94,29 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
     }
   }, [open, clearSilenceTimer]);
 
+  // Process text with AI then regex fallback
+  const processText = useCallback(async (text: string) => {
+    if (!text.trim()) {
+      toast.error('No speech detected. Try again or type below.');
+      setFallbackMode(true);
+      return;
+    }
+    setTranscript(text);
+    setIsParsing(true);
+    try {
+      const { expenses, usedAI: ai } = await parseWithAI(text);
+      setParsedExpenses(expenses);
+      setUsedAI(ai);
+      setSelectedIdx(0);
+    } catch {
+      const result = parseExpenseText(text);
+      setParsedExpenses([result]);
+      setUsedAI(false);
+      setSelectedIdx(0);
+    }
+    setIsParsing(false);
+  }, []);
+
   // Stop listening and process the transcript
   const stopAndProcess = useCallback(() => {
     clearSilenceTimer();
@@ -66,17 +125,8 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
     }
     setIsListening(false);
     setInterimText('');
-
-    const text = finalTranscriptRef.current.trim();
-    if (text) {
-      setTranscript(text);
-      const result = parseExpenseText(text);
-      setParsed(result);
-    } else {
-      toast.error('No speech detected. Try again or type below.');
-      setFallbackMode(true);
-    }
-  }, [clearSilenceTimer]);
+    processText(finalTranscriptRef.current.trim());
+  }, [clearSilenceTimer, processText]);
 
   const startListening = useCallback(() => {
     const { allowed } = checkLimit();
@@ -90,16 +140,15 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
     }
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = true;         // Keep listening across pauses
-    recognition.interimResults = true;     // Show live text while speaking
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
     recognition.maxAlternatives = 1;
 
-    // Reset state
     finalTranscriptRef.current = '';
     setTranscript('');
     setInterimText('');
-    setParsed(null);
+    setParsedExpenses([]);
 
     recognition.onresult = (event: any) => {
       let finalText = '';
@@ -120,10 +169,8 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
       }
       setInterimText(interim);
 
-      // Reset silence timer on every result (speech is still happening)
       clearSilenceTimer();
       silenceTimerRef.current = setTimeout(() => {
-        // No new speech for SILENCE_TIMEOUT ms — auto-stop
         stopAndProcess();
       }, SILENCE_TIMEOUT);
     };
@@ -131,7 +178,6 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
     recognition.onerror = (event: any) => {
       clearSilenceTimer();
       setIsListening(false);
-      // "no-speech" is not really an error — just means silence
       if (event.error === 'no-speech') {
         toast.error('No speech detected. Try again or type below.');
       } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
@@ -143,13 +189,10 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
     };
 
     recognition.onend = () => {
-      // If still supposed to be listening (browser auto-stopped), restart
-      // This handles the case where continuous mode times out on some browsers
       if (isListening && recognitionRef.current === recognition) {
         try {
           recognition.start();
         } catch {
-          // If restart fails, process what we have
           stopAndProcess();
         }
       }
@@ -159,7 +202,6 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
     recognition.start();
     setIsListening(true);
 
-    // Safety timeout: auto-stop after 30 seconds no matter what
     setTimeout(() => {
       if (recognitionRef.current === recognition) {
         stopAndProcess();
@@ -171,19 +213,18 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
     stopAndProcess();
   }, [stopAndProcess]);
 
-  const handleParseManual = () => {
+  const handleParseManual = async () => {
     const { allowed } = checkLimit();
     if (!allowed) {
       toast.error('Usage limit reached (200/month). Contact support.');
       return;
     }
     if (!manualText.trim()) return;
-    const result = parseExpenseText(manualText.trim());
-    setTranscript(manualText.trim());
-    setParsed(result);
+    await processText(manualText.trim());
   };
 
   const handleConfirm = () => {
+    const parsed = parsedExpenses[selectedIdx];
     if (!parsed) return;
     logAutomation.mutate({
       source: 'voice',
@@ -192,8 +233,19 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
       parse_confidence: parsed.confidence,
     });
     onAutofill(parsed);
-    onOpenChange(false);
+
+    // If there are more expenses, remove the confirmed one and stay open
+    if (parsedExpenses.length > 1) {
+      const remaining = parsedExpenses.filter((_, i) => i !== selectedIdx);
+      setParsedExpenses(remaining);
+      setSelectedIdx(0);
+      toast.success(`Expense filled! ${remaining.length} more remaining.`);
+    } else {
+      onOpenChange(false);
+    }
   };
+
+  const currentParsed = parsedExpenses[selectedIdx] ?? null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -206,13 +258,13 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
           <DialogDescription className="text-xs">
             {fallbackMode
               ? 'Type or paste your expense description below.'
-              : 'Speak naturally — e.g. "$85 fuel at Pilot today"'}
+              : 'Speak naturally — e.g. "$85 fuel at Pilot and $12 tolls today"'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Voice recording */}
-          {!fallbackMode && !parsed && (
+          {!fallbackMode && parsedExpenses.length === 0 && !isParsing && (
             <div className="flex flex-col items-center gap-3">
               {!isListening ? (
                 <>
@@ -236,7 +288,6 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
                   </button>
                   <p className="text-xs text-muted-foreground">Listening... tap to finish</p>
 
-                  {/* Live transcript preview */}
                   <div className="w-full rounded-xl bg-muted/50 p-3 min-h-[48px]">
                     <p className="text-sm">
                       {transcript && <span>{transcript}</span>}
@@ -261,19 +312,27 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
             </div>
           )}
 
+          {/* AI Parsing indicator */}
+          {isParsing && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <p className="text-xs text-muted-foreground">AI is parsing your expense...</p>
+            </div>
+          )}
+
           {/* Text fallback */}
-          {fallbackMode && !parsed && (
+          {fallbackMode && parsedExpenses.length === 0 && !isParsing && (
             <div className="space-y-2">
               <Label className="text-xs">Describe the expense</Label>
               <Textarea
-                placeholder='e.g. "$85 fuel at Pilot yesterday" or "Tolls $12.50 March 21"'
+                placeholder='e.g. "$85 fuel at Pilot yesterday and $12 tolls"'
                 rows={3}
                 value={manualText}
                 onChange={e => setManualText(e.target.value)}
               />
               <div className="flex gap-2">
-                <Button onClick={handleParseManual} className="flex-1 h-10 font-bold" disabled={!manualText.trim()}>
-                  Parse
+                <Button onClick={handleParseManual} className="flex-1 h-10 font-bold" disabled={!manualText.trim() || isParsing}>
+                  {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Parse'}
                 </Button>
                 {SpeechRecognitionAPI && (
                   <Button variant="outline" size="icon" onClick={() => setFallbackMode(false)}>
@@ -285,45 +344,76 @@ export function VoiceExpenseModal({ open, onOpenChange, onAutofill }: VoiceExpen
           )}
 
           {/* Parsed preview */}
-          {parsed && (
+          {currentParsed && !isParsing && (
             <div className="space-y-3 animate-fade-in">
               <div className="rounded-xl bg-muted p-3 space-y-1.5">
-                <p className="text-xs text-muted-foreground">You said:</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs text-muted-foreground">You said:</p>
+                  {usedAI && (
+                    <span className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                      <Sparkles className="h-2.5 w-2.5" /> AI Parsed
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm italic">"{transcript}"</p>
               </div>
+
+              {/* Multi-expense tabs */}
+              {parsedExpenses.length > 1 && (
+                <div className="flex gap-1.5">
+                  {parsedExpenses.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedIdx(i)}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-colors ${
+                        i === selectedIdx
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      Expense {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-lg bg-muted/50 p-2">
                   <span className="text-label">Amount</span>
-                  <p className="font-bold">{parsed.amount != null ? `$${parsed.amount.toFixed(2)}` : '—'}</p>
+                  <p className="font-bold">{currentParsed.amount != null ? `$${currentParsed.amount.toFixed(2)}` : '—'}</p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-2">
                   <span className="text-label">Category</span>
-                  <p className="font-bold">{parsed.category ?? '—'}</p>
+                  <p className="font-bold">{currentParsed.category ?? '—'}</p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-2">
                   <span className="text-label">Date</span>
-                  <p className="font-bold">{parsed.date ?? 'Today (default)'}</p>
+                  <p className="font-bold">{currentParsed.date ?? 'Today (default)'}</p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-2">
                   <span className="text-label">Confidence</span>
-                  <p className="font-bold">{Math.round(parsed.confidence * 100)}%</p>
+                  <p className="font-bold">{Math.round(currentParsed.confidence * 100)}%</p>
                 </div>
               </div>
+              {currentParsed.notes && (
+                <p className="text-xs text-muted-foreground">📝 {currentParsed.notes}</p>
+              )}
               <p className="text-[11px] text-muted-foreground">
                 Only empty fields in the form will be filled. Your existing entries are preserved.
               </p>
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => {
-                  setParsed(null);
+                  setParsedExpenses([]);
                   setTranscript('');
                   setInterimText('');
+                  setUsedAI(false);
                   finalTranscriptRef.current = '';
                 }}>
                   Try Again
                 </Button>
                 <Button onClick={handleConfirm} className="flex-1 font-bold">
                   <Check className="h-4 w-4 mr-2" />
-                  Fill Form
+                  {parsedExpenses.length > 1 ? `Fill #${selectedIdx + 1}` : 'Fill Form'}
                 </Button>
               </div>
             </div>

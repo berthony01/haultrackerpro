@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { getEffectiveDate, formatCurrency } from '@/lib/loadUtils';
 import { parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, Map, Lock, Crown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Map, Lock, Crown, Sparkles, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface SmartLoadAdvisorProps {
   loads: Load[];
@@ -33,6 +35,8 @@ function normalizeCityName(location: string): string {
 export function SmartLoadAdvisor({ loads, isPro, isTrialing = false }: SmartLoadAdvisorProps) {
   const navigate = useNavigate();
   const isProAccess = isPro || isTrialing;
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const analysis = useMemo(() => {
     const now = new Date();
@@ -88,8 +92,62 @@ export function SmartLoadAdvisor({ loads, isPro, isTrialing = false }: SmartLoad
     const rpmDiff = avgRPM - worstLane.avgRPM;
     const potentialWeeklyGain = rpmDiff > 0 ? rpmDiff * (worstLane.totalMiles / worstLane.count) * worstLaneWeeklyLoads : 0;
 
-    return { lanes, bestLane, worstLane, avgRPM, potentialWeeklyGain, totalLoadsAnalyzed: recentLoads.length };
+    const overallDeadheadPct = recentLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0) /
+      (recentLoads.reduce((s, l) => s + Number(l.loaded_miles) + Number(l.deadhead_miles), 0) || 1) * 100;
+
+    return { lanes, bestLane, worstLane, avgRPM, potentialWeeklyGain, totalLoadsAnalyzed: recentLoads.length, overallDeadheadPct };
   }, [loads]);
+
+  // Fetch AI advice when analysis is ready and user is Pro
+  useEffect(() => {
+    if (!analysis || !isProAccess) return;
+
+    const fetchAiAdvice = async () => {
+      setAiLoading(true);
+      try {
+        const context = {
+          totalLoads: analysis.totalLoadsAnalyzed,
+          totalLanes: analysis.lanes.length,
+          avgRPM: analysis.avgRPM.toFixed(2),
+          overallDeadheadPct: analysis.overallDeadheadPct.toFixed(1),
+          bestLane: {
+            route: analysis.bestLane.lane,
+            avgRPM: analysis.bestLane.avgRPM.toFixed(2),
+            count: analysis.bestLane.count,
+            totalRevenue: analysis.bestLane.totalRevenue.toFixed(0),
+            deadheadPct: analysis.bestLane.avgDeadheadPct.toFixed(1),
+          },
+          worstLane: {
+            route: analysis.worstLane.lane,
+            avgRPM: analysis.worstLane.avgRPM.toFixed(2),
+            count: analysis.worstLane.count,
+            totalRevenue: analysis.worstLane.totalRevenue.toFixed(0),
+            deadheadPct: analysis.worstLane.avgDeadheadPct.toFixed(1),
+          },
+          topLanes: analysis.lanes.slice(0, 5).map(l => ({
+            route: l.lane,
+            avgRPM: l.avgRPM.toFixed(2),
+            count: l.count,
+          })),
+          potentialWeeklyGain: analysis.potentialWeeklyGain.toFixed(0),
+        };
+
+        const { data, error } = await supabase.functions.invoke('ai-insight', {
+          body: { type: 'lane_advice', context },
+        });
+
+        if (error) throw error;
+        if (data?.content) setAiAdvice(data.content);
+      } catch (err) {
+        console.error('AI advice error:', err);
+        // Silently fail — the static tip is still shown
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    fetchAiAdvice();
+  }, [analysis, isProAccess]);
 
   if (!analysis) return null;
 
@@ -155,8 +213,25 @@ export function SmartLoadAdvisor({ loads, isPro, isTrialing = false }: SmartLoad
             </div>
           </div>
 
-          {/* Recommendation */}
-          {analysis.potentialWeeklyGain > 10 && (
+          {/* AI Advice */}
+          {aiLoading && (
+            <div className="rounded-xl bg-primary/5 p-3 flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+              <p className="text-xs text-muted-foreground">Generating AI advice...</p>
+            </div>
+          )}
+          {aiAdvice && !aiLoading && (
+            <div className="rounded-xl bg-primary/5 p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Sparkles className="h-3 w-3 text-primary" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary">AI Insight</span>
+              </div>
+              <p className="text-xs leading-relaxed">{aiAdvice}</p>
+            </div>
+          )}
+
+          {/* Static Recommendation (shown when no AI advice) */}
+          {!aiAdvice && !aiLoading && analysis.potentialWeeklyGain > 10 && (
             <div className="rounded-xl bg-primary/5 p-3">
               <p className="text-xs leading-relaxed">
                 <span className="font-bold">💡 Tip:</span> If you replaced your{' '}
