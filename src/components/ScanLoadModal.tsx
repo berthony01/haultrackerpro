@@ -27,19 +27,15 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
         pickup_location: parsed.pickup_location || undefined,
         dropoff_location: parsed.dropoff_location || undefined,
         load_date: parsed.load_date || undefined,
-        dropoff_date: parsed.dropoff_date || undefined,
-        loaded_miles: parsed.loaded_miles || undefined,
-        rate_per_mile: parsed.rate_per_mile || undefined,
-        gross_revenue: parsed.estimated_pay || undefined,
-        detention_fee: parsed.detention_fee || undefined,
-        other_fees: parsed.other_fees || undefined,
+        loaded_miles: parsed.loaded_miles?.toString() || undefined,
+        rate_per_mile: parsed.rate_per_mile?.toString() || undefined,
+        gross_revenue: parsed.estimated_pay?.toString() || undefined,
         notes: parsed.notes || undefined,
         multiStopDetected: parsed.stops && parsed.stops.length > 2,
         detectedStopsCount: parsed.stops?.length,
         stops: parsed.stops?.map((s: any) => ({
           location: s.location,
           stop_type: s.stop_type || 'Stop',
-          stop_order: s.stop_order,
         })),
       };
       return { data: result, usedAI: true };
@@ -53,7 +49,7 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
 
 export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalProps) {
   const [scanning, setScanning] = useState(false);
-  const [rawText, setRawText] = useState('');
+  const [_rawText, setRawText] = useState('');
   const [parsed, setParsed] = useState<ParsedLoadData | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [fieldCount, setFieldCount] = useState(0);
@@ -109,7 +105,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
 
       setParsed(result);
       setFieldCount(count);
-    } catch (err) {
+    } catch {
       toast.error('Failed to scan image. Please try a clearer photo.');
     } finally {
       setScanning(false);

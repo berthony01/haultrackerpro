@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useWeeklySnapshots } from '@/hooks/useWeeklySnapshots';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { formatCurrency, formatNumber, getCurrentWeekLoads, weekStartDayToNumber } from '@/lib/loadUtils';
+import { formatCurrency, getCurrentWeekLoads, weekStartDayToNumber } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
