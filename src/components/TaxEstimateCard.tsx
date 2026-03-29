@@ -132,6 +132,7 @@ export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: Ta
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
             Est. Tax Set-Aside
           </p>
+          {isPro && <span className="ai-badge ml-0.5"><Sparkles className="h-2.5 w-2.5" />AI</span>}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

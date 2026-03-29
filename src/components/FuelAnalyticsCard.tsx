@@ -64,7 +64,7 @@ export function FuelAnalyticsCard({ fuelLogs, loads, isPro, onNavigate }: FuelAn
 
   // Pro users see full analytics
   return (
-    <Card className="shadow-card">
+    <Card className="shadow-card card-premium">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-3">
           <div className="rounded-lg bg-warning/10 p-2">
