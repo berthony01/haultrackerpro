@@ -47,7 +47,7 @@ const faqs = [
   },
   {
     question: 'How do I upgrade to Pro?',
-    answer: 'Go to Settings → tap "Upgrade to Pro" or visit the Pricing page. You can choose monthly ($15/mo) or annual ($120/yr — save $60). Both start with a 14-day free trial. Payment is handled securely through Stripe.',
+    answer: 'Go to Settings → tap "Upgrade to Pro" or visit the Pricing page. You can choose monthly ($19.99/mo) or annual ($179.88/yr — save $60). Both start with a 14-day free trial. Payment is handled securely through Stripe.',
   },
   {
     question: 'Can I cancel my Pro subscription?',

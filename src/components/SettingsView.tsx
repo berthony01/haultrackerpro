@@ -479,7 +479,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <p className="text-xs font-bold uppercase tracking-wider text-primary">Pro Plan Features</p>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Unlock advanced insights for $15/month or $120/year.
+            Unlock AI-powered insights for $19.99/month or $179.88/year.
           </p>
         </div>
         <CardContent className="p-4 space-y-2">

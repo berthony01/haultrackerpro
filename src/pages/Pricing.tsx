@@ -26,7 +26,10 @@ const freeFeatures = [
 const proFeatures = [
   'AI Voice Expense Logging',
   'AI Receipt & Screenshot Scanning',
-  'Scan Rate Con Screenshots (OCR)',
+  'AI Rate Con Parsing (OCR)',
+  'AI Weekly Business Report',
+  'AI Lane Advice & Load Optimization',
+  'AI Tax Optimization Tips',
   'Paste Load Parser (Unlimited)',
   'RPM, Deadhead % & Expense Breakdown Charts',
   'Driver Performance Scorecard',
@@ -47,7 +50,10 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
   { feature: 'AI Voice Logging', free: '—', pro: '✓' },
   { feature: 'AI Receipt Scanning', free: '—', pro: '✓' },
-  { feature: 'Scan Rate Con Screenshots', free: '—', pro: '✓' },
+  { feature: 'AI Rate Con Parsing', free: '—', pro: '✓' },
+  { feature: 'AI Weekly Business Report', free: '—', pro: '✓' },
+  { feature: 'AI Lane Advice', free: '—', pro: '✓' },
+  { feature: 'AI Tax Tips', free: '—', pro: '✓' },
   { feature: 'Driver Scorecard', free: '—', pro: '✓' },
   { feature: 'Weekly Closeout', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
@@ -55,10 +61,10 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
 ];
 
 const whyProPoints = [
-  { icon: Zap, title: 'Log Expenses in Seconds', desc: 'Use voice or receipt scan — no manual typing required.' },
-  { icon: BarChart3, title: 'See What Others Miss', desc: 'Performance trends with dollar-impact alerts, coaching advice on your scorecard, and expense breakdowns.' },
-  { icon: Target, title: 'Plan Taxes with Confidence', desc: 'Full federal, state, and SE tax breakdown with quarterly payment schedule.' },
-  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout with Week in Review — flags your best/worst loads, deadhead issues, and missing payments.' },
+  { icon: Zap, title: 'AI-Powered Automation', desc: 'Voice logging, receipt scanning, and rate con parsing — AI does the data entry so you can drive.' },
+  { icon: BarChart3, title: 'AI Business Insights', desc: 'Weekly AI reports, lane optimization advice, and performance trends with dollar-impact alerts.' },
+  { icon: Target, title: 'AI Tax Optimization', desc: 'Full tax breakdown with quarterly schedule plus AI-generated tips to maximize deductions.' },
+  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout with AI narrative — flags your best/worst loads, deadhead issues, and missing payments.' },
 ];
 
 export default function Pricing() {
@@ -81,8 +87,8 @@ export default function Pricing() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.url) {
-        const planKey = annual ? 'pro_yearly' : 'pro_monthly';
-        const value = annual ? 120 : 15;
+      const planKey = annual ? 'pro_yearly' : 'pro_monthly';
+        const value = annual ? 179.88 : 19.99;
         trackBeginCheckout(planKey, value);
         window.location.href = data.url;
       }
@@ -151,7 +157,7 @@ export default function Pricing() {
               color: annual ? 'hsl(0, 0%, 100%)' : 'hsl(220, 10%, 55%)',
             }}
           >
-            Annual <span className="ml-1 text-xs opacity-80">Save $60</span>
+            Annual <span className="ml-1 text-xs opacity-80">Save $60/yr</span>
           </button>
         </div>
       </div>
@@ -197,12 +203,12 @@ export default function Pricing() {
             <p className="text-sm mb-6" style={{ color: 'hsl(220, 10%, 55%)' }}>Advanced insights for serious drivers</p>
             <div className="mb-6">
               <span className="text-4xl font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>
-                ${annual ? '10' : '15'}
+                ${annual ? '14.99' : '19.99'}
               </span>
               <span className="text-sm ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
               {annual && (
                 <span className="block text-xs mt-1" style={{ color: 'hsl(25, 95%, 60%)' }}>
-                  $120/year — save $60
+                  $179.88/year — save $60
                 </span>
               )}
             </div>

@@ -8,7 +8,7 @@ import SEOHead from '@/components/SEOHead';
 const faqs = [
   { q: 'Is my data secure?', a: 'Yes. All data is encrypted in transit and stored securely. We never sell or share your data with third parties.' },
   { q: 'Do I need accounting knowledge?', a: 'Not at all. Just enter your loads and expenses — HaulTrackerPro does the math for you automatically.' },
-  { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks advanced features for $15/month or $120/year.' },
+  { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks AI-powered automation and advanced features for $19.99/month or $179.88/year.' },
   { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
   { q: 'Can I try Pro features before paying?', a: 'Yes — every new account starts with a free 14-day Pro trial. No credit card required. You get full access to AI Voice Logging, Receipt Scanning, Driver Scorecard, and all 5 performance charts.' },
 ];
@@ -36,7 +36,7 @@ export default function Landing() {
           "url": "https://haultrackerpro.com",
           "offers": [
             { "@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free" },
-            { "@type": "Offer", "price": "15", "priceCurrency": "USD", "name": "Pro Monthly" }
+            { "@type": "Offer", "price": "19.99", "priceCurrency": "USD", "name": "Pro Monthly" }
           ]
         }}
       />
@@ -128,7 +128,7 @@ export default function Landing() {
                 </Button>
               </div>
               <div className="flex items-center gap-6 pt-2">
-                {['No credit card', 'Free plan available', 'Pro from $15/mo'].map(t => (
+                {['No credit card', 'Free plan available', 'Pro from $19.99/mo'].map(t => (
                   <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
                     <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'hsl(152, 60%, 42%)' }} /> {t}
                   </span>
