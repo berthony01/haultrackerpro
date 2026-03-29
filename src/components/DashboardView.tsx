@@ -216,7 +216,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} size="large" />
             <StatCard
               label="Actual Earnings"
