@@ -295,7 +295,7 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
   rows.forEach(row => {
     if (y > pageH - 50) {
       // Footer
-      currentContent += `BT /F1 7 Tf ${marginX} 20 Td (${brandName} - haultrackerpro.lovable.app) Tj ET\n`;
+      currentContent += `BT /F1 7 Tf ${marginX} 20 Td (${brandName} - haultrackerpro.com) Tj ET\n`;
       pages.push(currentContent);
       currentContent = '';
       page++;
@@ -317,7 +317,7 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
   });
 
   // Footer on last page
-  currentContent += `BT /F1 7 Tf ${marginX} 20 Td (${brandName} - haultrackerpro.lovable.app) Tj ET\n`;
+  currentContent += `BT /F1 7 Tf ${marginX} 20 Td (${brandName} - haultrackerpro.com) Tj ET\n`;
   pages.push(currentContent);
 
   // Build minimal PDF
