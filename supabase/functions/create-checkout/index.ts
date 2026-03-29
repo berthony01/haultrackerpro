@@ -103,7 +103,7 @@ serve(async (req) => {
       }
     }
 
-    const origin = req.headers.get("origin") || "https://haultrackerpro.lovable.app";
+    const origin = req.headers.get("origin") || "https://haultrackerpro.com";
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,

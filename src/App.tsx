@@ -45,6 +45,7 @@ import ToolsLoadProfitCalculator from "./pages/tools/LoadProfitCalculator";
 import ToolsFuelCostPerMile from "./pages/tools/FuelCostPerMileCalculator";
 import HowToUseHaulTrackerPro from "./pages/HowToUseHaulTrackerPro";
 import NotFound from "./pages/NotFound";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
