@@ -35,6 +35,19 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const weekLoads = useMemo(() => getCurrentWeekLoads(loads, weekStartsOn), [loads, weekStartsOn]);
 
+  const now = new Date();
+  const weekStart = startOfWeek(now, { weekStartsOn });
+  const weekEnd = endOfWeek(now, { weekStartsOn });
+
+  // Compute week expenses (must be before early return to satisfy hooks rules)
+  const weekExpenseTotal = useMemo(() => {
+    const ws = format(weekStart, 'yyyy-MM-dd');
+    const we = format(weekEnd, 'yyyy-MM-dd');
+    return expenses
+      .filter(e => e.expense_date >= ws && e.expense_date <= we)
+      .reduce((s, e) => s + Number(e.amount), 0);
+  }, [expenses, weekStart, weekEnd]);
+
   if (!isPro) {
     return (
       <div className="space-y-5 animate-fade-in">
@@ -63,11 +76,6 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
     );
   }
 
-
-  const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn });
-  const weekEnd = endOfWeek(now, { weekStartsOn });
-
   const estimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const paidLoads = weekLoads.filter(l => l.actual_pay_received != null);
   const actual = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
@@ -79,15 +87,6 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
   const deadheadMiles = weekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
   const totalMiles = loadedMiles + deadheadMiles;
   const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
-
-  // Compute week expenses
-  const weekExpenseTotal = useMemo(() => {
-    const ws = format(weekStart, 'yyyy-MM-dd');
-    const we = format(weekEnd, 'yyyy-MM-dd');
-    return expenses
-      .filter(e => e.expense_date >= ws && e.expense_date <= we)
-      .reduce((s, e) => s + Number(e.amount), 0);
-  }, [expenses, weekStart, weekEnd]);
 
   const avgRPM = loadedMiles > 0 ? estimated / loadedMiles : 0;
 
