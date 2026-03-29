@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Camera, Loader2, Check, Upload, AlertCircle } from 'lucide-react';
+import { Camera, Loader2, Check, Upload, AlertCircle, Sparkles } from 'lucide-react';
 import { parseLoadText, ParsedLoadData } from '@/lib/parseLoadText';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface ScanLoadModalProps {
@@ -11,12 +12,52 @@ interface ScanLoadModalProps {
   onParsed: (data: ParsedLoadData) => void;
 }
 
+/** Try AI parsing of OCR text, fall back to regex */
+async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; usedAI: boolean }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('ai-insight', {
+      body: { type: 'parse_ratecon', context: { text: ocrText } },
+    });
+
+    if (error) throw error;
+
+    const parsed = data?.parsed;
+    if (parsed && (parsed.pickup_location || parsed.estimated_pay)) {
+      const result: ParsedLoadData = {
+        pickup_location: parsed.pickup_location || undefined,
+        dropoff_location: parsed.dropoff_location || undefined,
+        load_date: parsed.load_date || undefined,
+        dropoff_date: parsed.dropoff_date || undefined,
+        loaded_miles: parsed.loaded_miles || undefined,
+        rate_per_mile: parsed.rate_per_mile || undefined,
+        gross_revenue: parsed.estimated_pay || undefined,
+        detention_fee: parsed.detention_fee || undefined,
+        other_fees: parsed.other_fees || undefined,
+        notes: parsed.notes || undefined,
+        multiStopDetected: parsed.stops && parsed.stops.length > 2,
+        detectedStopsCount: parsed.stops?.length,
+        stops: parsed.stops?.map((s: any) => ({
+          location: s.location,
+          stop_type: s.stop_type || 'Stop',
+          stop_order: s.stop_order,
+        })),
+      };
+      return { data: result, usedAI: true };
+    }
+  } catch (err) {
+    console.error('AI rate con parsing failed, falling back to regex:', err);
+  }
+
+  return { data: parseLoadText(ocrText), usedAI: false };
+}
+
 export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalProps) {
   const [scanning, setScanning] = useState(false);
   const [rawText, setRawText] = useState('');
   const [parsed, setParsed] = useState<ParsedLoadData | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [fieldCount, setFieldCount] = useState(0);
+  const [usedAI, setUsedAI] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -26,6 +67,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
       setParsed(null);
       setPreview(null);
       setFieldCount(0);
+      setUsedAI(false);
     }
   }, [open]);
 
@@ -34,6 +76,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
     setPreview(url);
     setScanning(true);
     setParsed(null);
+    setUsedAI(false);
 
     try {
       const { createWorker } = await import('tesseract.js');
@@ -50,7 +93,10 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
         return;
       }
 
-      const result = parseLoadText(text);
+      // Try AI first, then regex fallback
+      const { data: result, usedAI: ai } = await parseWithAI(text);
+      setUsedAI(ai);
+
       const count = Object.entries(result)
         .filter(([key, val]) => val && key !== 'multiStopDetected' && key !== 'detectedStopsCount' && key !== 'stops')
         .length;
@@ -120,7 +166,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
               <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-2.5">
                 <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  For best results, use a clear, well-lit screenshot. Accuracy depends on image quality and rate con format — always review extracted fields before saving.
+                  AI-enhanced parsing extracts more fields with higher accuracy. Always review before saving.
                 </p>
               </div>
             </div>
@@ -133,7 +179,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                 <img src={preview} alt="Rate con" className="w-24 h-24 object-cover rounded-xl border" />
               )}
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Scanning rate confirmation...</p>
+              <p className="text-sm text-muted-foreground">Scanning with AI...</p>
               <p className="text-[11px] text-muted-foreground">This may take a few seconds</p>
             </div>
           )}
@@ -143,6 +189,13 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
             <div className="space-y-3 animate-fade-in">
               {preview && (
                 <img src={preview} alt="Rate con" className="w-full max-h-32 object-contain rounded-xl border" />
+              )}
+
+              {usedAI && (
+                <div className="flex items-center gap-1.5 px-2">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary">AI-Enhanced Extraction</span>
+                </div>
               )}
 
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -206,6 +259,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                     setPreview(null);
                     setRawText('');
                     setFieldCount(0);
+                    setUsedAI(false);
                   }}
                 >
                   Retry

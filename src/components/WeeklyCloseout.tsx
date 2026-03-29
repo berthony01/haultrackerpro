@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Load } from '@/hooks/useLoads';
+import { Expense } from '@/hooks/useExpenses';
 import { useWeeklySnapshots } from '@/hooks/useWeeklySnapshots';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency, formatNumber, getCurrentWeekLoads, weekStartDayToNumber } from '@/lib/loadUtils';
@@ -7,22 +8,27 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap, Sparkles } from 'lucide-react';
+import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import { generateWeeklySummary } from '@/lib/generateWeeklySummary';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface WeeklyCloseoutProps {
   loads: Load[];
+  expenses?: Expense[];
   onNavigate: (page: string, options?: { filter?: string }) => void;
   onBack: () => void;
   isPro?: boolean;
 }
 
-export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: WeeklyCloseoutProps) {
+export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro = false }: WeeklyCloseoutProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [finalized, setFinalized] = useState(false);
+  const [aiReport, setAiReport] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiExpanded, setAiExpanded] = useState(true);
   const navigate = useNavigate();
   const { saveSnapshot } = useWeeklySnapshots();
   const { settings } = useUserSettings();
@@ -74,6 +80,64 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
   const totalMiles = loadedMiles + deadheadMiles;
   const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
 
+  // Compute week expenses
+  const weekExpenseTotal = useMemo(() => {
+    const ws = format(weekStart, 'yyyy-MM-dd');
+    const we = format(weekEnd, 'yyyy-MM-dd');
+    return expenses
+      .filter(e => e.expense_date >= ws && e.expense_date <= we)
+      .reduce((s, e) => s + Number(e.amount), 0);
+  }, [expenses, weekStart, weekEnd]);
+
+  const avgRPM = loadedMiles > 0 ? estimated / loadedMiles : 0;
+
+  // Fetch AI weekly report after finalization
+  const fetchAiReport = async () => {
+    setAiLoading(true);
+    try {
+      const context = {
+        weekRange: `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d, yyyy')}`,
+        totalLoads: weekLoads.length,
+        loadedMiles,
+        deadheadMiles,
+        deadheadPct: deadheadPct.toFixed(1),
+        estimatedRevenue: estimated.toFixed(0),
+        actualRevenue: actual.toFixed(0),
+        paidLoads: paidLoads.length,
+        unpaidLoads: unpaidLoads.length,
+        unpaidEstimated: unpaidEstimated.toFixed(0),
+        knownDifference: knownDifference.toFixed(0),
+        avgRPM: avgRPM.toFixed(2),
+        weekExpenses: weekExpenseTotal.toFixed(0),
+        bestLoad: weekLoads.length > 0
+          ? (() => {
+              const best = weekLoads.reduce((a, b) => {
+                const aRPM = Number(a.loaded_miles) > 0 ? Number(a.estimated_pay ?? 0) / Number(a.loaded_miles) : 0;
+                const bRPM = Number(b.loaded_miles) > 0 ? Number(b.estimated_pay ?? 0) / Number(b.loaded_miles) : 0;
+                return bRPM > aRPM ? b : a;
+              });
+              return `${best.pickup_location} → ${best.dropoff_location} at $${(Number(best.loaded_miles) > 0 ? Number(best.estimated_pay ?? 0) / Number(best.loaded_miles) : 0).toFixed(2)}/mi`;
+            })()
+          : null,
+      };
+
+      const { data, error } = await supabase.functions.invoke('ai-insight', {
+        body: {
+          type: 'weekly_report',
+          context,
+          weekStart: format(weekStart, 'yyyy-MM-dd'),
+        },
+      });
+
+      if (error) throw error;
+      if (data?.content) setAiReport(data.content);
+    } catch (err) {
+      console.error('AI weekly report error:', err);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleFinalize = () => {
     saveSnapshot.mutate({
       user_id: '',
@@ -92,6 +156,7 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
       onSuccess: () => {
         setFinalized(true);
         toast.success('Weekly summary finalized!');
+        fetchAiReport();
       },
       onError: (e) => toast.error(e.message),
     });
@@ -117,6 +182,34 @@ export function WeeklyCloseout({ loads, onNavigate, onBack, isPro = false }: Wee
             <p className="text-value-lg text-primary">{formatCurrency(estimated)}</p>
           </CardContent></Card>
         </div>
+
+        {/* AI Weekly Report */}
+        {aiLoading && (
+          <div className="flex items-center justify-center gap-2 py-4">
+            <Loader2 className="h-4 w-4 text-primary animate-spin" />
+            <p className="text-xs text-muted-foreground">Generating your AI Week in Review...</p>
+          </div>
+        )}
+        {aiReport && !aiLoading && (
+          <Card className="shadow-card overflow-hidden text-left max-w-md mx-auto">
+            <CardContent className="p-0">
+              <button
+                onClick={() => setAiExpanded(prev => !prev)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-primary/5 w-full text-left"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex-1">AI Week in Review</span>
+                {aiExpanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+              </button>
+              {aiExpanded && (
+                <div className="p-4">
+                  <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-line">{aiReport}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Button className="rounded-xl shadow-primary" onClick={onBack}>Back to Dashboard</Button>
       </div>
     );

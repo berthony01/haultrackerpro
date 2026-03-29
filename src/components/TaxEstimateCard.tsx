@@ -1,11 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { UserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calculator, Info } from 'lucide-react';
+import { Calculator, Info, Sparkles, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TaxEstimateCardProps {
   loads: Load[];
@@ -15,6 +16,9 @@ interface TaxEstimateCardProps {
 }
 
 export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: TaxEstimateCardProps) {
+  const [aiTip, setAiTip] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
   const result = useMemo(() => {
     if (!settings?.tax_estimator_enabled) return null;
 
@@ -39,20 +43,17 @@ export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: Ta
     if (taxBase <= 0) {
       return { 
         seTax: 0, federalTax: 0, stateTax: 0, bufferTax: 0,
-        totalTax: 0, profitAfterTax: netProfit, netProfit, 
+        totalTax: 0, profitAfterTax: netProfit, netProfit, grossRevenue, totalExpenses,
         baseLabel: settings.tax_base_type === 'gross' ? 'gross' : 'net',
         totalPercent: (federalRate + stateRate + seRate + bufferRate) * 100,
       };
     }
 
     // ── CORRECTED SE TAX CALCULATION (IRS method) ──
-    // Step 1: Multiply base by 92.35% (IRS requires this adjustment)
-    // Step 2: Apply SE rate (typically 15.3%) to the adjusted amount
     const seAdjustedBase = taxBase * 0.9235;
     const seTax = includeSE ? seAdjustedBase * seRate : 0;
 
     // ── CORRECTED INCOME TAX CALCULATION ──
-    // Half of SE tax is deductible from income before calculating income tax
     const seDeduction = seTax / 2;
     const incomeForIncomeTax = Math.max(0, taxBase - seDeduction);
 
@@ -73,10 +74,53 @@ export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: Ta
       totalTax,
       profitAfterTax,
       netProfit,
+      grossRevenue,
+      totalExpenses,
       baseLabel: settings.tax_base_type === 'gross' ? 'gross' : 'net',
       totalPercent,
     };
   }, [loads, expenses, settings]);
+
+  // Fetch AI tax tips for Pro users (quarterly)
+  useEffect(() => {
+    if (!isPro || !result || result.totalTax <= 0) return;
+
+    const fetchTaxTips = async () => {
+      setAiLoading(true);
+      try {
+        // Build expense category summary
+        const categoryTotals: Record<string, number> = {};
+        expenses.forEach(e => {
+          categoryTotals[e.category] = (categoryTotals[e.category] || 0) + Number(e.amount);
+        });
+
+        const context = {
+          grossRevenue: result.grossRevenue.toFixed(0),
+          totalExpenses: result.totalExpenses.toFixed(0),
+          netProfit: result.netProfit.toFixed(0),
+          estimatedTax: result.totalTax.toFixed(0),
+          expenseCategories: categoryTotals,
+          totalLoads: loads.length,
+          includeSE: settings?.include_se_tax ?? false,
+          federalRate: settings?.federal_tax_percent ?? 0,
+          stateRate: settings?.state_tax_percent ?? 0,
+        };
+
+        const { data, error } = await supabase.functions.invoke('ai-insight', {
+          body: { type: 'tax_tips', context },
+        });
+
+        if (error) throw error;
+        if (data?.content) setAiTip(data.content);
+      } catch (err) {
+        console.error('AI tax tips error:', err);
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    fetchTaxTips();
+  }, [isPro, result?.totalTax]);
 
   if (!result) return null;
 
@@ -144,6 +188,25 @@ export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: Ta
                 <p className="text-[11px] font-mono font-bold">{formatCurrency(result.bufferTax)}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* AI Tax Tip — Pro only */}
+        {isPro && aiLoading && (
+          <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-2">
+            <Loader2 className="h-3 w-3 text-primary animate-spin" />
+            <p className="text-[10px] text-muted-foreground">Generating tax tips...</p>
+          </div>
+        )}
+        {isPro && aiTip && !aiLoading && (
+          <div className="mt-2 pt-2 border-t border-border/50">
+            <div className="rounded-lg bg-primary/5 p-2.5">
+              <div className="flex items-center gap-1 mb-1">
+                <Sparkles className="h-2.5 w-2.5 text-primary" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-primary">AI Tax Tip</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">{aiTip}</p>
+            </div>
           </div>
         )}
 
