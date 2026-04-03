@@ -29,6 +29,8 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
   const [payFilter, setPayFilter] = useState(initialPayFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const loadIds = loads.map(l => l.id);
   const { stops } = useLoadStops(loadIds);
