@@ -55,26 +55,39 @@ interface DateRange {
   to?: string;
 }
 
-export function useExpenses(dateRange?: DateRange) {
+const PAGE_SIZE = 50;
+
+export function useExpenses(dateRange?: DateRange, page?: number) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const expensesQuery = useQuery({
-    queryKey: ['expenses', user?.id, dateRange?.from, dateRange?.to],
+    queryKey: ['expenses', user?.id, dateRange?.from, dateRange?.to, page],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user) return { expenses: [], totalCount: 0 };
+
       let query = supabase
         .from('expenses')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('user_id', user.id)
         .order('expense_date', { ascending: false });
 
       if (dateRange?.from) query = query.gte('expense_date', dateRange.from);
       if (dateRange?.to) query = query.lte('expense_date', dateRange.to);
 
-      const { data, error } = await query;
+      // Apply pagination range if page is provided
+      if (page !== undefined) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        query = query.range(from, to);
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
-      return (data ?? []) as unknown as Expense[];
+      return {
+        expenses: (data ?? []) as unknown as Expense[],
+        totalCount: count ?? (data ?? []).length,
+      };
     },
     enabled: !!user,
   });
@@ -115,10 +128,12 @@ export function useExpenses(dateRange?: DateRange) {
   });
 
   return {
-    expenses: expensesQuery.data ?? [],
+    expenses: expensesQuery.data?.expenses ?? [],
+    totalCount: expensesQuery.data?.totalCount ?? 0,
     isLoading: expensesQuery.isLoading,
     addExpense,
     updateExpense,
     deleteExpense,
+    pageSize: PAGE_SIZE,
   };
 }

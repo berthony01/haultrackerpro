@@ -17,22 +17,40 @@ interface DateRange {
   to?: string;
 }
 
-export function useLoads(dateRange?: DateRange) {
+const PAGE_SIZE = 50;
+
+export function useLoads(dateRange?: DateRange, page?: number) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const loadsQuery = useQuery({
-    queryKey: ['loads', user?.id, dateRange?.from, dateRange?.to],
+    queryKey: ['loads', user?.id, dateRange?.from, dateRange?.to, page],
     queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
+      if (!user) return { loads: [], totalCount: 0 };
+
+      let query = supabase
         .from('loads')
-        .select('*')
-        .eq('user_id', user.id);
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .order('load_date', { ascending: false });
+
+      // Server-side date filtering
+      if (dateRange?.from) query = query.gte('load_date', dateRange.from);
+      if (dateRange?.to) query = query.lte('load_date', dateRange.to);
+
+      // Apply pagination range if page is provided
+      if (page !== undefined) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        query = query.range(from, to);
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
 
-      // Filter by effective date (dropoff_date ?? load_date)
       let filtered = data ?? [];
+
+      // Additional client-side effective-date filtering for precision
       if (dateRange?.from) {
         filtered = filtered.filter(l => getEffectiveDate(l) >= dateRange.from!);
       }
@@ -47,7 +65,7 @@ export function useLoads(dateRange?: DateRange) {
         return b.created_at.localeCompare(a.created_at);
       });
 
-      return filtered;
+      return { loads: filtered, totalCount: count ?? filtered.length };
     },
     enabled: !!user,
   });
@@ -86,10 +104,12 @@ export function useLoads(dateRange?: DateRange) {
   });
 
   return {
-    loads: loadsQuery.data ?? [],
+    loads: loadsQuery.data?.loads ?? [],
+    totalCount: loadsQuery.data?.totalCount ?? 0,
     isLoading: loadsQuery.isLoading,
     addLoad,
     updateLoad,
     deleteLoad,
+    pageSize: PAGE_SIZE,
   };
 }
