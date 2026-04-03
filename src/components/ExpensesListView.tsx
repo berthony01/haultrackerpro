@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Expense, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { Load } from '@/hooks/useLoads';
 import { formatCurrency } from '@/lib/loadUtils';
