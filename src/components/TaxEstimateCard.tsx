@@ -200,15 +200,7 @@ export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: Ta
           </div>
         )}
         {isPro && aiTip && !aiLoading && (
-          <div className="mt-2 pt-2 border-t border-border/50">
-            <div className="rounded-lg bg-primary/5 p-2.5">
-              <div className="flex items-center gap-1 mb-1">
-                <Sparkles className="h-2.5 w-2.5 text-primary" />
-                <span className="text-[9px] font-bold uppercase tracking-wider text-primary">AI Tax Tip</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">{aiTip}</p>
-            </div>
-          </div>
+          <TaxTipCollapsible tip={aiTip} />
         )}
 
         <p className="text-[9px] text-muted-foreground/50 mt-2">
