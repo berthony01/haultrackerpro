@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Expense, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { Load } from '@/hooks/useLoads';
 import { formatCurrency } from '@/lib/loadUtils';
@@ -62,6 +63,8 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const loadsMap = useMemo(() => {
     const m = new Map<string, Load>();
@@ -105,6 +108,12 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
 
     return list;
   }, [expenses, activePreset, customFrom, customTo, categoryFilter, search, weekStartsOn]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedExpenses = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+  // Reset page when filters change
+  useMemo(() => { setCurrentPage(0); }, [activePreset, customFrom, customTo, categoryFilter, search]);
 
   const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount), 0);
 
@@ -247,7 +256,7 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map(expense => {
+          {paginatedExpenses.map(expense => {
             const IconComp = categoryIcons[expense.category] || Receipt;
             const linkedLoad = expense.linked_load_id ? loadsMap.get(expense.linked_load_id) : null;
 
@@ -298,6 +307,39 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
             );
           })}
         </div>
+      )}
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                className={currentPage === 0 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              const pageNum = totalPages <= 5 ? i : Math.min(Math.max(currentPage - 2, 0), totalPages - 5) + i;
+              return (
+                <PaginationItem key={pageNum}>
+                  <PaginationLink
+                    isActive={pageNum === currentPage}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className="cursor-pointer"
+                  >
+                    {pageNum + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              );
+            })}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                className={currentPage >= totalPages - 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
 
       {/* Delete Confirmation */}

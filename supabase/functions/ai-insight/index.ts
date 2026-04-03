@@ -50,12 +50,10 @@ const PARSE_EXPENSE_TOOL = {
               category: {
                 type: "string",
                 enum: [
-                  "Fuel", "Insurance", "Truck Payment", "Maintenance", "Tires",
-                  "Permits & Licenses", "Tolls", "Parking", "Scale Fees",
-                  "Food & Meals", "Lodging", "Phone & Internet", "Office & Software",
-                  "Dispatch Fee", "Factoring Fee", "Cargo Insurance", "ELD/Tracking",
-                  "Trailer Rental", "Wash & Detail", "Medical & DOT", "Legal & Professional",
-                  "Clothing & Safety", "Association Dues", "Deadhead Fuel", "Other",
+                  "Fuel", "Maintenance", "Repairs", "Tires", "Insurance",
+                  "Tolls", "Parking", "Permits", "Licensing", "Truck Payment",
+                  "Lease Payment", "Phone", "ELD/Software", "Scale/Weigh",
+                  "Lumper", "Meals", "Lodging", "Supplies", "Other",
                 ],
               },
               notes: { type: "string", description: "Brief description" },

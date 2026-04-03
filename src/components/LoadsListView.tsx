@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
@@ -28,6 +29,8 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
   const [payFilter, setPayFilter] = useState(initialPayFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const loadIds = loads.map(l => l.id);
   const { stops } = useLoadStops(loadIds);
@@ -44,6 +47,12 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
     }
     return true;
   });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedLoads = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+  // Reset page when filters change
+  useMemo(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery]);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -149,7 +158,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map(load => (
+          {paginatedLoads.map(load => (
             <LoadCard
               key={load.id}
               load={load}
@@ -161,6 +170,39 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
             />
           ))}
         </div>
+      )}
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                className={currentPage === 0 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              const pageNum = totalPages <= 5 ? i : Math.min(Math.max(currentPage - 2, 0), totalPages - 5) + i;
+              return (
+                <PaginationItem key={pageNum}>
+                  <PaginationLink
+                    isActive={pageNum === currentPage}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className="cursor-pointer"
+                  >
+                    {pageNum + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              );
+            })}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                className={currentPage >= totalPages - 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
 
       <LoadDetailSheet
