@@ -4,7 +4,35 @@ import { Expense } from '@/hooks/useExpenses';
 import { UserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calculator, Info, Sparkles, Loader2 } from 'lucide-react';
+import { Calculator, Info, Sparkles, Loader2, ChevronDown } from 'lucide-react';
+
+function TaxTipCollapsible({ tip }: { tip: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const previewLength = 180;
+  const needsTruncation = tip.length > previewLength;
+  const displayText = !expanded && needsTruncation ? tip.slice(0, previewLength).trimEnd() + '…' : tip;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/50">
+      <div className="rounded-lg bg-primary/5 p-2.5">
+        <div className="flex items-center gap-1 mb-1">
+          <Sparkles className="h-2.5 w-2.5 text-primary" />
+          <span className="text-[9px] font-bold uppercase tracking-wider text-primary">AI Tax Tip</span>
+        </div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap">{displayText}</p>
+        {needsTruncation && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="mt-1.5 flex items-center gap-0.5 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors"
+          >
+            {expanded ? 'Show less' : 'Read more'}
+            <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 
