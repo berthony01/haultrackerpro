@@ -63,6 +63,8 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const loadsMap = useMemo(() => {
     const m = new Map<string, Load>();
