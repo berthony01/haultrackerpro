@@ -48,6 +48,12 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
     return true;
   });
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedLoads = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+  // Reset page when filters change
+  useMemo(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery]);
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div>
