@@ -158,7 +158,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map(load => (
+          {paginatedLoads.map(load => (
             <LoadCard
               key={load.id}
               load={load}
@@ -171,6 +171,39 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
           ))}
         </div>
       )}
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                className={currentPage === 0 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              const pageNum = totalPages <= 5 ? i : Math.min(Math.max(currentPage - 2, 0), totalPages - 5) + i;
+              return (
+                <PaginationItem key={pageNum}>
+                  <PaginationLink
+                    isActive={pageNum === currentPage}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className="cursor-pointer"
+                  >
+                    {pageNum + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              );
+            })}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                className={currentPage >= totalPages - 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )
 
       <LoadDetailSheet
         load={selectedLoad}
