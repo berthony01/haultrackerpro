@@ -109,6 +109,12 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
     return list;
   }, [expenses, activePreset, customFrom, customTo, categoryFilter, search, weekStartsOn]);
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginatedExpenses = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+  // Reset page when filters change
+  useMemo(() => { setCurrentPage(0); }, [activePreset, customFrom, customTo, categoryFilter, search]);
+
   const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount), 0);
 
   const handleConfirmDelete = () => {
