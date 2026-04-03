@@ -1,28 +1,42 @@
 
-## Phase 1: Bug Fixes & Infrastructure ✅ COMPLETE
 
-## Phase 2: AI Integration ✅ COMPLETE
+# Fix Critical Issues: Category Mismatch + Pagination
 
-- ✅ 2.1 ai_insights DB table with RLS + indexes
-- ✅ 2.2 ai-insight edge function (5 types: lane_advice, weekly_report, tax_tips, parse_expense, parse_ratecon)
-- ✅ 2.3 SmartLoadAdvisor — AI weekly lane advice with cache
-- ✅ 2.4 VoiceExpenseModal — AI compound expense parsing with multi-expense tabs
-- ✅ 2.5 WeeklyCloseout — AI narrative report generated after finalization
-- ✅ 2.6 ScanLoadModal — AI-enhanced rate con parsing after OCR
-- ✅ 2.7 TaxEstimateCard — AI quarterly tax optimization tips (Pro only)
+Two high-priority fixes from the analysis.
 
-## Phase 3: Pricing Update ($19.99/mo) ✅ COMPLETE
+---
 
-- ✅ 3.1 New Stripe prices created ($19.99/mo, $179.88/yr)
-- ✅ 3.2 plans.ts updated with new price IDs and amounts
-- ✅ 3.3 Pricing page updated with AI features and new prices
-- ✅ 3.4 Landing, FAQ, Features, Settings pages updated
-- ✅ 3.5 Feature list updated with AI Automation category
+## 1. Expense Category Mismatch Fix
 
-## Phase 4: Dashboard Mockup & Polish ✅ COMPLETE
+**Problem**: The AI edge function uses 24 categories (e.g., "Permits & Licenses", "Food & Meals", "Dispatch Fee") that don't match the app's 19 categories (e.g., "Permits", "Meals", "Lumper"). When AI parses an expense, the category won't match what the form expects.
 
-- ✅ 4.1 Tighter dashboard spacing (space-y-5, gap-2.5)
-- ✅ 4.2 Reusable section-header and ai-badge CSS classes
-- ✅ 4.3 PerformanceTrends chart legend, themed tooltip, cursor highlight
-- ✅ 4.4 AI badges on SmartLoadAdvisor + TaxEstimateCard headers
-- ✅ 4.5 card-premium applied to ContributionMarginCard + FuelAnalyticsCard
+**Fix**: Update the AI edge function's `PARSE_EXPENSE_TOOL` enum to use the app's exact 19 categories: Fuel, Maintenance, Repairs, Tires, Insurance, Tolls, Parking, Permits, Licensing, Truck Payment, Lease Payment, Phone, ELD/Software, Scale/Weigh, Lumper, Meals, Lodging, Supplies, Other.
+
+**File**: `supabase/functions/ai-insight/index.ts` — replace the category enum (lines 52-59)
+
+---
+
+## 2. Pagination for Loads & Expenses
+
+**Problem**: Both `useLoads` and `useExpenses` fetch all records with no limit. The default 1,000-row cap silently truncates data for power users.
+
+**Fix**: Add server-side pagination with a page-size of 50. Add `.range()` calls and return total count. Update the list views to use pagination controls.
+
+### Changes:
+
+- **`src/hooks/useLoads.ts`** — Accept `page` param, add `.range(from, to)` and `.order()` server-side, return `{ loads, totalCount, page, pageSize }`
+- **`src/hooks/useExpenses.ts`** — Same pagination pattern
+- **`src/components/LoadsListView.tsx`** — Add pagination controls at bottom using existing `Pagination` UI component
+- **`src/components/ExpensesListView.tsx`** — Same pagination controls
+
+---
+
+## Files Changed
+| File | Change |
+|------|--------|
+| `supabase/functions/ai-insight/index.ts` | Fix category enum to match app's 19 categories |
+| `src/hooks/useLoads.ts` | Add server-side pagination with `.range()` |
+| `src/hooks/useExpenses.ts` | Add server-side pagination with `.range()` |
+| `src/components/LoadsListView.tsx` | Add pagination UI |
+| `src/components/ExpensesListView.tsx` | Add pagination UI |
+
