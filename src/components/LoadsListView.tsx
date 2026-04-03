@@ -203,7 +203,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
             </PaginationItem>
           </PaginationContent>
         </Pagination>
-      )
+      )}
 
       <LoadDetailSheet
         load={selectedLoad}
