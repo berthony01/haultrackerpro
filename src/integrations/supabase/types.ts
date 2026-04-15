@@ -313,12 +313,19 @@ export type Database = {
           estimated_pay: number | null
           gross_revenue: number | null
           id: string
+          invoice_submitted_date: string | null
           load_date: string
           loaded_miles: number
           notes: string | null
           other_fees: number
+          paid_date: string | null
+          payment_due_date: string | null
+          payment_notes: string | null
+          payment_status: string
           pickup_location: string
+          pod_submitted_date: string | null
           rate_per_mile: number
+          short_paid_amount: number | null
           status: string
           updated_at: string
           user_id: string
@@ -334,12 +341,19 @@ export type Database = {
           estimated_pay?: number | null
           gross_revenue?: number | null
           id?: string
+          invoice_submitted_date?: string | null
           load_date: string
           loaded_miles?: number
           notes?: string | null
           other_fees?: number
+          paid_date?: string | null
+          payment_due_date?: string | null
+          payment_notes?: string | null
+          payment_status?: string
           pickup_location: string
+          pod_submitted_date?: string | null
           rate_per_mile?: number
+          short_paid_amount?: number | null
           status?: string
           updated_at?: string
           user_id: string
@@ -355,12 +369,19 @@ export type Database = {
           estimated_pay?: number | null
           gross_revenue?: number | null
           id?: string
+          invoice_submitted_date?: string | null
           load_date?: string
           loaded_miles?: number
           notes?: string | null
           other_fees?: number
+          paid_date?: string | null
+          payment_due_date?: string | null
+          payment_notes?: string | null
+          payment_status?: string
           pickup_location?: string
+          pod_submitted_date?: string | null
           rate_per_mile?: number
+          short_paid_amount?: number | null
           status?: string
           updated_at?: string
           user_id?: string
