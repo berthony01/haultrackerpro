@@ -425,6 +425,57 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_expense_templates: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          end_date: string | null
+          expense_type: string
+          frequency: string
+          id: string
+          is_active: boolean
+          last_generated_date: string | null
+          notes: string | null
+          start_date: string
+          template_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          end_date?: string | null
+          expense_type?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_generated_date?: string | null
+          notes?: string | null
+          start_date: string
+          template_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          end_date?: string | null
+          expense_type?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_generated_date?: string | null
+          notes?: string | null
+          start_date?: string
+          template_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean
