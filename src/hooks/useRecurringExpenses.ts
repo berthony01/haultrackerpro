@@ -1,35 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
-export interface RecurringExpenseTemplate {
-  id: string;
-  user_id: string;
-  template_name: string;
-  category: string;
-  amount: number;
-  frequency: string;
-  start_date: string;
-  end_date: string | null;
-  notes: string | null;
-  is_active: boolean;
-  last_generated_date: string | null;
-  expense_type: string;
-  created_at: string;
-  updated_at: string;
-}
+export type RecurringExpenseTemplate = Tables<'recurring_expense_templates'>;
 
-export interface RecurringExpenseTemplateInsert {
-  template_name: string;
-  category: string;
-  amount: number;
-  frequency?: string;
-  start_date: string;
-  end_date?: string | null;
-  notes?: string | null;
-  is_active?: boolean;
-  expense_type?: string;
-}
+export type RecurringExpenseTemplateInsert = Omit<
+  TablesInsert<'recurring_expense_templates'>,
+  'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_generated_date'
+>;
 
 export function useRecurringExpenses() {
   const { user } = useAuth();
