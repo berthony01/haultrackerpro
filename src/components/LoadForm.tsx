@@ -166,7 +166,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       notes: form.notes.trim() || null,
       status: finalStatus,
       gross_revenue: form.gross_revenue ? parseFloat(form.gross_revenue) : null,
-    } as any, formattedStops);
+      invoice_submitted_date: form.invoice_submitted_date || null,
+      pod_submitted_date: form.pod_submitted_date || null,
+      payment_due_date: form.payment_due_date || null,
+      paid_date: form.paid_date || null,
+      short_paid_amount: form.short_paid_amount ? parseFloat(form.short_paid_amount) : null,
+      payment_status: form.payment_status,
+      payment_notes: form.payment_notes.trim() || null,
+    }, formattedStops);
   };
 
   const update = (key: string, value: string) => {
