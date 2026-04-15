@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.ai-insight]
 verify_jwt = false
+
+[functions.generate-recurring-expenses]
+verify_jwt = false

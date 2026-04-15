@@ -30,6 +30,7 @@ import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AlertsView } from '@/components/AlertsView';
 import { TrialBanner, TrialExpiredBanner } from '@/components/TrialBanner';
+import { RecurringExpensesView } from '@/components/RecurringExpensesView';
 import { MilestoneNudges } from '@/components/MilestoneNudges';
 import { DriverScorecard } from '@/components/DriverScorecard';
 import { Truck, LogOut } from 'lucide-react';
@@ -398,6 +399,13 @@ const Index = () => {
                 onDelete={handleDeleteExpense}
                 isLoading={allExpensesQuery.isLoading}
                 onBack={() => setPage('dashboard')}
+                onNavigate={handleNavigate}
+              />
+            )}
+            {page === 'recurring_expenses' && (
+              <RecurringExpensesView
+                isPro={isPro}
+                onBack={() => setPage('expenses')}
               />
             )}
             {page === 'loads' && (

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Receipt, Search, Pencil, Trash2, Fuel, Wrench, Shield, CircleDollarSign, ArrowLeft } from 'lucide-react';
+import { Receipt, Search, Pencil, Trash2, Fuel, Wrench, Shield, CircleDollarSign, ArrowLeft, RefreshCcw } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths } from 'date-fns';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber } from '@/lib/loadUtils';
@@ -20,6 +20,7 @@ interface ExpensesListViewProps {
   onDelete: (id: string) => void;
   isLoading?: boolean;
   onBack?: () => void;
+  onNavigate?: (page: string) => void;
 }
 
 type PresetKey = 'all' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
@@ -53,7 +54,7 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6)
   }
 }
 
-export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading, onBack }: ExpensesListViewProps) {
+export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading, onBack, onNavigate }: ExpensesListViewProps) {
   const { settings } = useUserSettings();
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
 
@@ -127,16 +128,28 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        {onBack && (
-          <Button variant="ghost" size="icon" className="rounded-xl" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" className="rounded-xl" onClick={onBack}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-black font-heading">Expenses</h1>
+            <p className="text-sm text-muted-foreground">Manage your expenses</p>
+          </div>
+        </div>
+        {onNavigate && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl gap-1.5 text-xs font-bold"
+            onClick={() => onNavigate('recurring_expenses')}
+          >
+            <RefreshCcw className="h-3.5 w-3.5" /> Recurring
           </Button>
         )}
-        <div>
-          <h1 className="text-2xl font-black font-heading">Expenses</h1>
-          <p className="text-sm text-muted-foreground">Manage your expenses</p>
-        </div>
       </div>
 
       {/* Total Summary */}
