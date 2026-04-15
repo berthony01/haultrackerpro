@@ -24,7 +24,7 @@ export function useRecurringExpenses() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as RecurringExpenseTemplate[];
+      return data ?? [];
     },
     enabled: !!user,
   });
@@ -34,7 +34,7 @@ export function useRecurringExpenses() {
       if (!user) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('recurring_expense_templates')
-        .insert({ ...data, user_id: user.id } as any);
+        .insert({ ...data, user_id: user.id });
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recurring_expense_templates'] }),
@@ -45,7 +45,7 @@ export function useRecurringExpenses() {
       if (!user) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('recurring_expense_templates')
-        .update(data as any)
+        .update(data as TablesUpdate<'recurring_expense_templates'>)
         .eq('id', id)
         .eq('user_id', user.id);
       if (error) throw error;
@@ -58,7 +58,7 @@ export function useRecurringExpenses() {
       if (!user) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('recurring_expense_templates')
-        .update({ is_active } as any)
+        .update({ is_active })
         .eq('id', id)
         .eq('user_id', user.id);
       if (error) throw error;
