@@ -60,7 +60,7 @@ export function ContributionMarginCard({ loads, expenses }: ContributionMarginCa
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-3 w-3 text-muted-foreground/40 cursor-help" />
+                <span className="inline-flex"><Info className="h-3 w-3 text-muted-foreground/40 cursor-help" /></span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[250px]">
                 <p className="text-xs leading-relaxed">
