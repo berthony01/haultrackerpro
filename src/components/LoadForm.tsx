@@ -464,7 +464,69 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <FieldError field="actual_pay_received" />
           </div>
 
-          {/* Notes */}
+          {/* Payment Tracking (collapsible) */}
+          <div className="rounded-lg border border-border/60 overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 text-sm font-medium hover:bg-muted transition-colors"
+              onClick={() => setShowPaymentTracking(!showPaymentTracking)}
+            >
+              <span className="flex items-center gap-1.5">
+                <Receipt className="h-3.5 w-3.5 text-primary" />
+                Payment Tracking
+              </span>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showPaymentTracking ? 'rotate-180' : ''}`} />
+            </button>
+            {showPaymentTracking && (
+              <div className="p-4 space-y-3 border-t border-border/40">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="invoice_submitted_date" className="text-xs">Invoice Submitted</Label>
+                    <DateInput id="invoice_submitted_date" value={form.invoice_submitted_date} onChange={(val) => update('invoice_submitted_date', val)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="pod_submitted_date" className="text-xs">POD Submitted</Label>
+                    <DateInput id="pod_submitted_date" value={form.pod_submitted_date} onChange={(val) => update('pod_submitted_date', val)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="payment_due_date" className="text-xs">Payment Due</Label>
+                    <DateInput id="payment_due_date" value={form.payment_due_date} onChange={(val) => update('payment_due_date', val)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="paid_date" className="text-xs">Paid Date</Label>
+                    <DateInput id="paid_date" value={form.paid_date} onChange={(val) => update('paid_date', val)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="payment_status" className="text-xs">Payment Status</Label>
+                    <Select value={form.payment_status} onValueChange={v => update('payment_status', v)}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unpaid">Unpaid</SelectItem>
+                        <SelectItem value="invoiced">Invoiced</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="short_paid">Short Paid</SelectItem>
+                        <SelectItem value="overdue">Overdue</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="short_paid_amount" className="text-xs">Short-Paid Amount</Label>
+                    <Input id="short_paid_amount" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.short_paid_amount} onChange={e => update('short_paid_amount', e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="payment_notes" className="text-xs">Payment Notes</Label>
+                  <Textarea id="payment_notes" placeholder="Invoice #, dispute details..." rows={2} value={form.payment_notes} onChange={e => update('payment_notes', e.target.value)} className="text-xs" />
+                </div>
+              </div>
+            )}
+          </div>
+
+
           <div>
             <Label htmlFor="notes" className="flex items-center gap-1">
               <FileText className="h-3 w-3" /> Notes
