@@ -1,42 +1,81 @@
 
 
-# Fix Critical Issues: Category Mismatch + Pagination
+# Full Audit: 5 Prompts Execution Status
 
-Two high-priority fixes from the analysis.
+## Prompt 1: Category Mismatch + Pagination — COMPLETE ✅
 
----
+**Category enum fix**: The AI edge function (`ai-insight/index.ts` lines 52-57) now uses the exact 19 categories matching `EXPENSE_CATEGORIES` in `useExpenses.ts`. Verified match.
 
-## 1. Expense Category Mismatch Fix
+**Pagination for Loads**: `useLoads.ts` has `PAGE_SIZE = 50`, accepts `page` param, uses `.range()` and `count: 'exact'`. `LoadsListView.tsx` has client-side pagination UI with `Pagination` component. Working.
 
-**Problem**: The AI edge function uses 24 categories (e.g., "Permits & Licenses", "Food & Meals", "Dispatch Fee") that don't match the app's 19 categories (e.g., "Permits", "Meals", "Lumper"). When AI parses an expense, the category won't match what the form expects.
-
-**Fix**: Update the AI edge function's `PARSE_EXPENSE_TOOL` enum to use the app's exact 19 categories: Fuel, Maintenance, Repairs, Tires, Insurance, Tolls, Parking, Permits, Licensing, Truck Payment, Lease Payment, Phone, ELD/Software, Scale/Weigh, Lumper, Meals, Lodging, Supplies, Other.
-
-**File**: `supabase/functions/ai-insight/index.ts` — replace the category enum (lines 52-59)
+**Pagination for Expenses**: `useExpenses.ts` has same pattern. `ExpensesListView.tsx` has pagination controls. Working.
 
 ---
 
-## 2. Pagination for Loads & Expenses
+## Prompt 2: Trial Expiration Hardening — COMPLETE ✅ (minor issue found)
 
-**Problem**: Both `useLoads` and `useExpenses` fetch all records with no limit. The default 1,000-row cap silently truncates data for power users.
+**Trial flow**: `handle_new_user` creates 14-day trial → `expire_ended_trials()` DB function updates expired trials → `check-subscription` edge function called by cron.
 
-**Fix**: Add server-side pagination with a page-size of 50. Add `.range()` calls and return total count. Update the list views to use pagination controls.
+**Issue found: Duplicate cron jobs**. There are TWO cron jobs for trial expiration:
+- `expire-ended-trials` (schedule: `0 * * * *`) — uses `extensions.http_post`
+- `expire-ended-trials-hourly` (schedule: `0 * * * *`) — uses `net.http_post`
 
-### Changes:
-
-- **`src/hooks/useLoads.ts`** — Accept `page` param, add `.range(from, to)` and `.order()` server-side, return `{ loads, totalCount, page, pageSize }`
-- **`src/hooks/useExpenses.ts`** — Same pagination pattern
-- **`src/components/LoadsListView.tsx`** — Add pagination controls at bottom using existing `Pagination` UI component
-- **`src/components/ExpensesListView.tsx`** — Same pagination controls
+Both do the same thing on the same schedule. One uses `extensions.http_post`, the other `net.http_post`. This is harmless (idempotent operation) but wasteful. **Recommend removing the duplicate.**
 
 ---
 
-## Files Changed
-| File | Change |
-|------|--------|
-| `supabase/functions/ai-insight/index.ts` | Fix category enum to match app's 19 categories |
-| `src/hooks/useLoads.ts` | Add server-side pagination with `.range()` |
-| `src/hooks/useExpenses.ts` | Add server-side pagination with `.range()` |
-| `src/components/LoadsListView.tsx` | Add pagination UI |
-| `src/components/ExpensesListView.tsx` | Add pagination UI |
+## Prompt 3: Code-Quality Cleanup — COMPLETE ✅
+
+- `useSubscription.ts`: `as any` casts removed, properly typed
+- `billing/plans.ts`: `isProStatus` uses safe `readonly string[]` widening + null guard
+- `parseExpenseText.ts`: Category validation uses safe array widening
+
+---
+
+## Prompt 4: Performance / Lazy Loading — COMPLETE ✅
+
+- `App.tsx`: 36 routes lazy-loaded via `React.lazy()`, only `Landing` and `Auth` eager
+- `Suspense` wrapper with `PageFallback` component present
+- All routes preserved
+
+---
+
+## Prompt 5: Recurring Expense Templates — COMPLETE ✅
+
+**Database**: `recurring_expense_templates` table exists with all required columns (template_name, category, amount, frequency, start_date, end_date, notes, is_active, last_generated_date, expense_type).
+
+**Edge function**: `generate-recurring-expenses` deployed and running (logs confirm "No templates to process").
+
+**Cron**: `generate-recurring-expenses` scheduled at `0 6 * * *` (daily 6am UTC). Working.
+
+**UI**: `RecurringExpensesView.tsx` with Pro gating, accessible via "Recurring" button in `ExpensesListView.tsx`.
+
+**Hook**: `useRecurringExpenses.ts` with full CRUD + toggle.
+
+---
+
+## Prompt 5b (in same session): Payment Tracking — COMPLETE ✅
+
+**Database**: All 7 columns confirmed in `loads` table: `invoice_submitted_date`, `pod_submitted_date`, `payment_due_date`, `paid_date`, `short_paid_amount` (default 0), `payment_status` (default 'unpaid'), `payment_notes`.
+
+**UI**: `LoadForm.tsx` has collapsible Payment Tracking section. `LoadDetailSheet.tsx` shows payment info + days-to-pay. `LoadCard.tsx` has payment status badges. `LoadsListView.tsx` has unpaid/overdue/paid/short_paid filters.
+
+**Types**: `LoadInsert` and `LoadUpdate` include payment fields.
+
+---
+
+## Issues Found
+
+| # | Severity | Issue | Fix |
+|---|----------|-------|-----|
+| 1 | Low | Duplicate trial expiration cron job (`expire-ended-trials` + `expire-ended-trials-hourly`) | Remove one via `cron.unschedule('expire-ended-trials')` — the `-hourly` one uses the correct `net.http_post` |
+| 2 | Low | Console warning: `TaxTipCollapsible` component cannot be given refs (Radix Tooltip tries to pass ref to function component) | Wrap `TaxTipCollapsible` with `React.forwardRef` or wrap its root element in a `<span>` |
+| 3 | Low | Console warning: Same ref issue in `ContributionMarginCard` with Tooltip | Same fix pattern |
+
+## Recommended Fix (if approved)
+
+1. Add migration to remove the duplicate cron job: `SELECT cron.unschedule('expire-ended-trials');`
+2. Fix the two `forwardRef` console warnings in `TaxEstimateCard.tsx` and `ContributionMarginCard.tsx`
+
+All 5 prompts were executed successfully with no missing functionality. The only issues are cosmetic (console warnings) and one redundant cron job.
 
