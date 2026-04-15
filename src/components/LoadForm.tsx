@@ -204,7 +204,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       actual_pay_received: '',
       notes: lastLoad.notes || '',
       status: 'pending',
-      gross_revenue: (lastLoad as any).gross_revenue?.toString() || '',
+      gross_revenue: lastLoad.gross_revenue?.toString() || '',
+      invoice_submitted_date: '',
+      pod_submitted_date: '',
+      payment_due_date: '',
+      paid_date: '',
+      short_paid_amount: '',
+      payment_status: 'unpaid',
+      payment_notes: '',
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
