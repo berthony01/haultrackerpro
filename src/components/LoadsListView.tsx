@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
@@ -65,7 +65,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
   const paginatedLoads = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   // Reset page when filters change
-  useMemo(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery]);
+  useEffect(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery]);
 
   return (
     <div className="space-y-4 animate-fade-in">

@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: Record<string, unknown>) => {
   console.log(`[STRIPE-WEBHOOK] ${step}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
@@ -23,7 +23,7 @@ function resolvePlanKey(priceId: string): string {
 
 /** Upsert the subscriptions table row */
 async function upsertSubscription(
-  supabaseClient: any,
+  supabaseClient: ReturnType<typeof createClient>,
   userId: string,
   data: {
     stripe_customer_id?: string;

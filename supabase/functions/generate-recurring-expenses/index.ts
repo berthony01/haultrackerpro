@@ -33,16 +33,6 @@ serve(async (req) => {
 
     // Find active templates that haven't generated for this month yet
     // and whose start_date <= current month and (end_date is null or >= current month)
-    const { data: templates, error: fetchErr } = await supabase
-      .from("recurring_expense_templates")
-      .select("*, subscriptions!inner(status)")
-      .eq("is_active", true)
-      .or(`last_generated_date.is.null,last_generated_date.lt.${currentMonthStart}`)
-      .lte("start_date", currentMonthStart)
-      .or(`end_date.is.null,end_date.gte.${currentMonthStart}`);
-
-    // The join above won't work with RLS service role — let's do it differently
-    // Fetch templates first, then check subscription per user
     const { data: activeTemplates, error: tplErr } = await supabase
       .from("recurring_expense_templates")
       .select("*")
