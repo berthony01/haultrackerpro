@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: Record<string, unknown>) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
@@ -35,7 +35,7 @@ serve(async (req) => {
     logStep("Function started");
 
     // Handle cron-triggered trial expiry
-    let body: any = {};
+    let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body is fine */ }
     if (body?.action === "expire_trials") {
       logStep("Running expire_ended_trials via cron");
