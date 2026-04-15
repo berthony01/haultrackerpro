@@ -39,7 +39,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
-    dropoff_date: (initialData as any)?.dropoff_date || '',
+    dropoff_date: initialData?.dropoff_date || '',
     pickup_location: initialData?.pickup_location || '',
     dropoff_location: initialData?.dropoff_location || '',
     loaded_miles: initialData?.loaded_miles?.toString() || '',
@@ -51,8 +51,18 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     actual_pay_received: initialData?.actual_pay_received?.toString() || '',
     notes: initialData?.notes || '',
     status: initialData?.status || 'completed',
-    gross_revenue: (initialData as any)?.gross_revenue?.toString() || '',
+    gross_revenue: initialData?.gross_revenue?.toString() || '',
+    invoice_submitted_date: initialData?.invoice_submitted_date || '',
+    pod_submitted_date: initialData?.pod_submitted_date || '',
+    payment_due_date: initialData?.payment_due_date || '',
+    paid_date: initialData?.paid_date || '',
+    short_paid_amount: initialData?.short_paid_amount?.toString() || '',
+    payment_status: initialData?.payment_status || 'unpaid',
+    payment_notes: initialData?.payment_notes || '',
   });
+  const [showPaymentTracking, setShowPaymentTracking] = useState(
+    !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
+  );
 
   // Sync default settings when they load asynchronously (only for new loads)
   useEffect(() => {
