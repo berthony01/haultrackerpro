@@ -20,6 +20,7 @@ interface ExpensesListViewProps {
   onDelete: (id: string) => void;
   isLoading?: boolean;
   onBack?: () => void;
+  onNavigate?: (page: string) => void;
 }
 
 type PresetKey = 'all' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
@@ -53,7 +54,7 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6)
   }
 }
 
-export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading, onBack }: ExpensesListViewProps) {
+export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading, onBack, onNavigate }: ExpensesListViewProps) {
   const { settings } = useUserSettings();
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
 
