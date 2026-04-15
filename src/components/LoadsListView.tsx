@@ -41,6 +41,19 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       if (l.status === 'cancelled') return false;
       if (l.actual_pay_received != null) return false;
     }
+    if (payFilter === 'unpaid') {
+      if (l.payment_status !== 'unpaid' && l.payment_status !== 'invoiced') return false;
+    }
+    if (payFilter === 'overdue') {
+      const isOverdue = l.payment_status === 'overdue' || (l.payment_due_date && !l.paid_date && new Date(l.payment_due_date) < new Date());
+      if (!isOverdue) return false;
+    }
+    if (payFilter === 'paid') {
+      if (l.payment_status !== 'paid') return false;
+    }
+    if (payFilter === 'short_paid') {
+      if (l.payment_status !== 'short_paid') return false;
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       if (!l.pickup_location.toLowerCase().includes(q) && !l.dropoff_location.toLowerCase().includes(q)) return false;
@@ -136,6 +149,10 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
           <SelectContent>
             <SelectItem value="all">All Pay</SelectItem>
             <SelectItem value="missing_pay">Pending Pay</SelectItem>
+            <SelectItem value="unpaid">Unpaid</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="short_paid">Short Paid</SelectItem>
           </SelectContent>
         </Select>
       </div>

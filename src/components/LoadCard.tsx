@@ -66,6 +66,16 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
                 {load.status}
               </Badge>
+              {load.payment_status && load.payment_status !== 'unpaid' && (
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold ${
+                  load.payment_status === 'paid' ? 'bg-success/15 text-success border-success/30' :
+                  load.payment_status === 'overdue' || (load.payment_due_date && !load.paid_date && new Date(load.payment_due_date) < new Date()) ? 'bg-destructive/15 text-destructive border-destructive/30' :
+                  load.payment_status === 'short_paid' ? 'bg-warning/15 text-warning border-warning/30' :
+                  'bg-primary/15 text-primary border-primary/30'
+                }`}>
+                  {load.payment_status === 'short_paid' ? 'short paid' : load.payment_status}
+                </Badge>
+              )}
               {stopsCount > 0 && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold">
                   +{stopsCount} stop{stopsCount !== 1 ? 's' : ''}

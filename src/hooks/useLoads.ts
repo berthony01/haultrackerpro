@@ -4,8 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Load = Tables<'loads'>;
-export type LoadInsert = Omit<TablesInsert<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay' | 'gross_revenue'> & { gross_revenue?: number | null; dropoff_date?: string | null };
-export type LoadUpdate = Omit<TablesUpdate<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay'> & { dropoff_date?: string | null };
+export type LoadInsert = Omit<TablesInsert<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay' | 'gross_revenue'> & { gross_revenue?: number | null; dropoff_date?: string | null; invoice_submitted_date?: string | null; pod_submitted_date?: string | null; payment_due_date?: string | null; paid_date?: string | null; short_paid_amount?: number | null; payment_status?: string; payment_notes?: string | null };
+export type LoadUpdate = Omit<TablesUpdate<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'estimated_pay'> & { dropoff_date?: string | null; invoice_submitted_date?: string | null; pod_submitted_date?: string | null; payment_due_date?: string | null; paid_date?: string | null; short_paid_amount?: number | null; payment_status?: string; payment_notes?: string | null };
 
 /** Canonical period date: drop-off first, pickup fallback */
 function getEffectiveDate(load: Load): string {

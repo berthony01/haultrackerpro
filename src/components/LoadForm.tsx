@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { DateInput } from '@/components/ui/date-input';
 import { calculateEstimatedPay } from '@/lib/types';
-import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown } from 'lucide-react';
+import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
@@ -39,7 +39,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
-    dropoff_date: (initialData as any)?.dropoff_date || '',
+    dropoff_date: initialData?.dropoff_date || '',
     pickup_location: initialData?.pickup_location || '',
     dropoff_location: initialData?.dropoff_location || '',
     loaded_miles: initialData?.loaded_miles?.toString() || '',
@@ -51,8 +51,18 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     actual_pay_received: initialData?.actual_pay_received?.toString() || '',
     notes: initialData?.notes || '',
     status: initialData?.status || 'completed',
-    gross_revenue: (initialData as any)?.gross_revenue?.toString() || '',
+    gross_revenue: initialData?.gross_revenue?.toString() || '',
+    invoice_submitted_date: initialData?.invoice_submitted_date || '',
+    pod_submitted_date: initialData?.pod_submitted_date || '',
+    payment_due_date: initialData?.payment_due_date || '',
+    paid_date: initialData?.paid_date || '',
+    short_paid_amount: initialData?.short_paid_amount?.toString() || '',
+    payment_status: initialData?.payment_status || 'unpaid',
+    payment_notes: initialData?.payment_notes || '',
   });
+  const [showPaymentTracking, setShowPaymentTracking] = useState(
+    !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
+  );
 
   // Sync default settings when they load asynchronously (only for new loads)
   useEffect(() => {
@@ -156,7 +166,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       notes: form.notes.trim() || null,
       status: finalStatus,
       gross_revenue: form.gross_revenue ? parseFloat(form.gross_revenue) : null,
-    } as any, formattedStops);
+      invoice_submitted_date: form.invoice_submitted_date || null,
+      pod_submitted_date: form.pod_submitted_date || null,
+      payment_due_date: form.payment_due_date || null,
+      paid_date: form.paid_date || null,
+      short_paid_amount: form.short_paid_amount ? parseFloat(form.short_paid_amount) : null,
+      payment_status: form.payment_status,
+      payment_notes: form.payment_notes.trim() || null,
+    }, formattedStops);
   };
 
   const update = (key: string, value: string) => {
@@ -194,7 +211,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       actual_pay_received: '',
       notes: lastLoad.notes || '',
       status: 'pending',
-      gross_revenue: (lastLoad as any).gross_revenue?.toString() || '',
+      gross_revenue: lastLoad.gross_revenue?.toString() || '',
+      invoice_submitted_date: '',
+      pod_submitted_date: '',
+      payment_due_date: '',
+      paid_date: '',
+      short_paid_amount: '',
+      payment_status: 'unpaid',
+      payment_notes: '',
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
@@ -440,7 +464,69 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <FieldError field="actual_pay_received" />
           </div>
 
-          {/* Notes */}
+          {/* Payment Tracking (collapsible) */}
+          <div className="rounded-lg border border-border/60 overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 text-sm font-medium hover:bg-muted transition-colors"
+              onClick={() => setShowPaymentTracking(!showPaymentTracking)}
+            >
+              <span className="flex items-center gap-1.5">
+                <Receipt className="h-3.5 w-3.5 text-primary" />
+                Payment Tracking
+              </span>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showPaymentTracking ? 'rotate-180' : ''}`} />
+            </button>
+            {showPaymentTracking && (
+              <div className="p-4 space-y-3 border-t border-border/40">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="invoice_submitted_date" className="text-xs">Invoice Submitted</Label>
+                    <DateInput id="invoice_submitted_date" value={form.invoice_submitted_date} onChange={(val) => update('invoice_submitted_date', val)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="pod_submitted_date" className="text-xs">POD Submitted</Label>
+                    <DateInput id="pod_submitted_date" value={form.pod_submitted_date} onChange={(val) => update('pod_submitted_date', val)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="payment_due_date" className="text-xs">Payment Due</Label>
+                    <DateInput id="payment_due_date" value={form.payment_due_date} onChange={(val) => update('payment_due_date', val)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="paid_date" className="text-xs">Paid Date</Label>
+                    <DateInput id="paid_date" value={form.paid_date} onChange={(val) => update('paid_date', val)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="payment_status" className="text-xs">Payment Status</Label>
+                    <Select value={form.payment_status} onValueChange={v => update('payment_status', v)}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unpaid">Unpaid</SelectItem>
+                        <SelectItem value="invoiced">Invoiced</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="short_paid">Short Paid</SelectItem>
+                        <SelectItem value="overdue">Overdue</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="short_paid_amount" className="text-xs">Short-Paid Amount</Label>
+                    <Input id="short_paid_amount" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.short_paid_amount} onChange={e => update('short_paid_amount', e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="payment_notes" className="text-xs">Payment Notes</Label>
+                  <Textarea id="payment_notes" placeholder="Invoice #, dispute details..." rows={2} value={form.payment_notes} onChange={e => update('payment_notes', e.target.value)} className="text-xs" />
+                </div>
+              </div>
+            )}
+          </div>
+
+
           <div>
             <Label htmlFor="notes" className="flex items-center gap-1">
               <FileText className="h-3 w-3" /> Notes

@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText, Copy, Ban, Check, Receipt, Navigation } from 'lucide-react';
+import { MapPin, Pencil, Trash2, Calendar, DollarSign, TrendingUp, TrendingDown, FileText, Copy, Ban, Check, Receipt, Navigation, Clock, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -244,6 +244,66 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
                   {formatCurrency(netLoadProfit)}
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* Payment Tracking */}
+          {(load.invoice_submitted_date || load.pod_submitted_date || load.payment_due_date || load.paid_date || (load.short_paid_amount && Number(load.short_paid_amount) > 0) || load.payment_notes || load.payment_status !== 'unpaid') && (
+            <div className="space-y-2">
+              <p className="font-medium text-foreground text-sm flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-primary" /> Payment Tracking
+              </p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Status</span>
+                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                    load.payment_status === 'paid' ? 'bg-success/15 text-success border-success/30' :
+                    load.payment_status === 'overdue' ? 'bg-destructive/15 text-destructive border-destructive/30' :
+                    load.payment_status === 'short_paid' ? 'bg-warning/15 text-warning border-warning/30' :
+                    load.payment_status === 'invoiced' ? 'bg-primary/15 text-primary border-primary/30' :
+                    ''
+                  }`}>
+                    {load.payment_status === 'short_paid' ? 'Short Paid' : load.payment_status}
+                  </Badge>
+                </div>
+                {load.invoice_submitted_date && (
+                  <div className="flex justify-between"><span>Invoice Submitted</span><span className="font-mono">{format(parseISO(load.invoice_submitted_date), 'MMM d, yyyy')}</span></div>
+                )}
+                {load.pod_submitted_date && (
+                  <div className="flex justify-between"><span>POD Submitted</span><span className="font-mono">{format(parseISO(load.pod_submitted_date), 'MMM d, yyyy')}</span></div>
+                )}
+                {load.payment_due_date && (
+                  <div className="flex justify-between">
+                    <span>Due Date</span>
+                    <span className={`font-mono ${!load.paid_date && new Date(load.payment_due_date) < new Date() ? 'text-destructive font-semibold' : ''}`}>
+                      {format(parseISO(load.payment_due_date), 'MMM d, yyyy')}
+                      {!load.paid_date && new Date(load.payment_due_date) < new Date() && ' (overdue)'}
+                    </span>
+                  </div>
+                )}
+                {load.paid_date && (
+                  <div className="flex justify-between"><span>Paid Date</span><span className="font-mono text-success">{format(parseISO(load.paid_date), 'MMM d, yyyy')}</span></div>
+                )}
+                {load.paid_date && load.invoice_submitted_date && (
+                  <div className="flex justify-between">
+                    <span>Days to Pay</span>
+                    <span className="font-mono font-semibold">
+                      {Math.ceil((new Date(load.paid_date).getTime() - new Date(load.invoice_submitted_date).getTime()) / (1000 * 60 * 60 * 24))} days
+                    </span>
+                  </div>
+                )}
+                {load.short_paid_amount != null && Number(load.short_paid_amount) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Short-Paid</span>
+                    <span className="font-mono text-destructive font-semibold">-{formatCurrency(Number(load.short_paid_amount))}</span>
+                  </div>
+                )}
+              </div>
+              {load.payment_notes && (
+                <div className="rounded-lg bg-muted/60 p-2">
+                  <p className="text-xs text-muted-foreground">{load.payment_notes}</p>
+                </div>
+              )}
             </div>
           )}
 
