@@ -183,7 +183,7 @@ export function parseExpenseText(text: string): ParsedExpense {
 
   return {
     amount: amount && amount > 0 ? amount : null,
-    category: category && EXPENSE_CATEGORIES.includes(category as any) ? category : null,
+    category: category && (EXPENSE_CATEGORIES as readonly string[]).includes(category) ? category : null,
     date,
     notes,
     confidence: Math.min(confidence, 1),

@@ -50,7 +50,7 @@ export const PRO_STATUSES = ['active', 'trialing'] as const;
 
 /** Check if a subscription status grants Pro access */
 export function isProStatus(status: string | null | undefined): boolean {
-  return PRO_STATUSES.includes(status as any);
+  return !!status && (PRO_STATUSES as readonly string[]).includes(status);
 }
 
 /** Get plan definition by Stripe price ID */

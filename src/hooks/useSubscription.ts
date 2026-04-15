@@ -51,17 +51,17 @@ export function useSubscription(): SubscriptionState {
     try {
       // Read from subscriptions table (canonical source)
       const { data: sub } = await supabase
-        .from('subscriptions' as any)
+        .from('subscriptions')
         .select('plan_key, status, cancel_at_period_end, current_period_end, trial_end')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (sub) {
-        setPlanKey((sub as any).plan_key || 'free');
-        setStatus((sub as any).status || 'free');
-        setCancelAtPeriodEnd((sub as any).cancel_at_period_end || false);
-        setCurrentPeriodEnd((sub as any).current_period_end || null);
-        setTrialEnd((sub as any).trial_end || null);
+        setPlanKey((sub.plan_key as PlanKey) || 'free');
+        setStatus(sub.status || 'free');
+        setCancelAtPeriodEnd(sub.cancel_at_period_end || false);
+        setCurrentPeriodEnd(sub.current_period_end || null);
+        setTrialEnd(sub.trial_end || null);
       }
 
       // Also trigger edge function to sync with Stripe (can only upgrade, never downgrade admin/manual overrides)
@@ -70,18 +70,18 @@ export function useSubscription(): SubscriptionState {
         if (data?.subscribed === true) {
           // Re-read subscription after edge function may have updated it
           const { data: freshSub } = await supabase
-            .from('subscriptions' as any)
+            .from('subscriptions')
             .select('plan_key, status, cancel_at_period_end, current_period_end, trial_end')
             .eq('user_id', user.id)
             .maybeSingle();
           if (freshSub) {
-            setPlanKey((freshSub as any).plan_key || 'free');
-            setStatus((freshSub as any).status || 'free');
-            setCancelAtPeriodEnd((freshSub as any).cancel_at_period_end || false);
-            setCurrentPeriodEnd((freshSub as any).current_period_end || null);
-            setTrialEnd((freshSub as any).trial_end || null);
+            setPlanKey((freshSub.plan_key as PlanKey) || 'free');
+            setStatus(freshSub.status || 'free');
+            setCancelAtPeriodEnd(freshSub.cancel_at_period_end || false);
+            setCurrentPeriodEnd(freshSub.current_period_end || null);
+            setTrialEnd(freshSub.trial_end || null);
           }
-        } else if (sub && !isProStatus((sub as any).status)) {
+        } else if (sub && !isProStatus(sub.status)) {
           // Only downgrade if DB already shows non-pro
           setPlanKey('free');
           setStatus('free');
