@@ -98,6 +98,104 @@ export type Database = {
         }
         Relationships: []
       }
+      broker_stats: {
+        Row: {
+          avg_actual_pay: number
+          avg_estimated_pay: number
+          avg_variance_amount: number
+          broker_id: string
+          created_at: string
+          days_to_invoice_avg: number | null
+          days_to_pay_avg: number | null
+          id: string
+          last_load_date: string | null
+          load_count: number
+          reliability_score: number | null
+          short_pay_count: number
+          unpaid_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_actual_pay?: number
+          avg_estimated_pay?: number
+          avg_variance_amount?: number
+          broker_id: string
+          created_at?: string
+          days_to_invoice_avg?: number | null
+          days_to_pay_avg?: number | null
+          id?: string
+          last_load_date?: string | null
+          load_count?: number
+          reliability_score?: number | null
+          short_pay_count?: number
+          unpaid_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_actual_pay?: number
+          avg_estimated_pay?: number
+          avg_variance_amount?: number
+          broker_id?: string
+          created_at?: string
+          days_to_invoice_avg?: number | null
+          days_to_pay_avg?: number | null
+          id?: string
+          last_load_date?: string | null
+          load_count?: number
+          reliability_score?: number | null
+          short_pay_count?: number
+          unpaid_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_stats_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "brokers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brokers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          mc_number: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          mc_number?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          mc_number?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       expense_automation_logs: {
         Row: {
           created_at: string
@@ -258,6 +356,63 @@ export type Database = {
           },
         ]
       }
+      lane_stats: {
+        Row: {
+          avg_days_to_pay: number | null
+          avg_deadhead_miles: number
+          avg_loaded_miles: number
+          avg_margin_pct: number
+          avg_net_profit: number
+          avg_rpm: number
+          created_at: string
+          destination_market: string | null
+          id: string
+          lane_key: string
+          last_load_date: string | null
+          load_count: number
+          origin_market: string | null
+          trend_direction: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_days_to_pay?: number | null
+          avg_deadhead_miles?: number
+          avg_loaded_miles?: number
+          avg_margin_pct?: number
+          avg_net_profit?: number
+          avg_rpm?: number
+          created_at?: string
+          destination_market?: string | null
+          id?: string
+          lane_key: string
+          last_load_date?: string | null
+          load_count?: number
+          origin_market?: string | null
+          trend_direction?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_days_to_pay?: number | null
+          avg_deadhead_miles?: number
+          avg_loaded_miles?: number
+          avg_margin_pct?: number
+          avg_net_profit?: number
+          avg_rpm?: number
+          created_at?: string
+          destination_market?: string | null
+          id?: string
+          lane_key?: string
+          last_load_date?: string | null
+          load_count?: number
+          origin_market?: string | null
+          trend_direction?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       load_stops: {
         Row: {
           created_at: string
@@ -305,6 +460,8 @@ export type Database = {
       loads: {
         Row: {
           actual_pay_received: number | null
+          broker_id: string | null
+          broker_name_raw: string | null
           created_at: string
           deadhead_miles: number
           detention_fee: number
@@ -333,6 +490,8 @@ export type Database = {
         }
         Insert: {
           actual_pay_received?: number | null
+          broker_id?: string | null
+          broker_name_raw?: string | null
           created_at?: string
           deadhead_miles?: number
           detention_fee?: number
@@ -361,6 +520,8 @@ export type Database = {
         }
         Update: {
           actual_pay_received?: number | null
+          broker_id?: string | null
+          broker_name_raw?: string | null
           created_at?: string
           deadhead_miles?: number
           detention_fee?: number
@@ -386,6 +547,50 @@ export type Database = {
           updated_at?: string
           user_id?: string
           wait_fee?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loads_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "brokers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operating_metrics: {
+        Row: {
+          created_at: string
+          id: string
+          last_recomputed_at: string | null
+          rolling_cost_per_mile: number
+          rolling_deadhead_pct: number
+          rolling_fuel_cost_per_mile: number
+          rolling_margin_pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_recomputed_at?: string | null
+          rolling_cost_per_mile?: number
+          rolling_deadhead_pct?: number
+          rolling_fuel_cost_per_mile?: number
+          rolling_margin_pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_recomputed_at?: string | null
+          rolling_cost_per_mile?: number
+          rolling_deadhead_pct?: number
+          rolling_fuel_cost_per_mile?: number
+          rolling_margin_pct?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -589,6 +794,9 @@ export type Database = {
           pay_type: string
           se_tax_percent: number | null
           state_tax_percent: number | null
+          target_deadhead_pct: number | null
+          target_margin_pct: number | null
+          target_rpm: number | null
           tax_base_type: string | null
           tax_estimator_enabled: boolean
           tax_reminder_offsets: number[] | null
@@ -613,6 +821,9 @@ export type Database = {
           pay_type?: string
           se_tax_percent?: number | null
           state_tax_percent?: number | null
+          target_deadhead_pct?: number | null
+          target_margin_pct?: number | null
+          target_rpm?: number | null
           tax_base_type?: string | null
           tax_estimator_enabled?: boolean
           tax_reminder_offsets?: number[] | null
@@ -637,6 +848,9 @@ export type Database = {
           pay_type?: string
           se_tax_percent?: number | null
           state_tax_percent?: number | null
+          target_deadhead_pct?: number | null
+          target_margin_pct?: number | null
+          target_rpm?: number | null
           tax_base_type?: string | null
           tax_estimator_enabled?: boolean
           tax_reminder_offsets?: number[] | null
