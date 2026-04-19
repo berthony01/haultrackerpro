@@ -920,9 +920,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      build_lane_key: {
+        Args: { _dropoff: string; _pickup: string }
+        Returns: string
+      }
       expire_ended_trials: { Args: never; Returns: undefined }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      recompute_broker_stats: { Args: { _user_id: string }; Returns: undefined }
+      recompute_lane_stats: { Args: { _user_id: string }; Returns: undefined }
+      recompute_operating_metrics: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
+      recompute_personal_intelligence: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
