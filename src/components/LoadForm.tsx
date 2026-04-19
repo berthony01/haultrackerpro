@@ -20,6 +20,8 @@ import { PasteLoadParser } from '@/components/PasteLoadParser';
 import { ScanLoadModal } from '@/components/ScanLoadModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
+import { useProfitCheck } from '@/hooks/useProfitCheck';
+import { ProfitCheckCard } from '@/components/ProfitCheckCard';
 
 interface LoadFormProps {
   onSubmit: (data: LoadInsert, stops?: LoadStopInput[]) => void;
@@ -103,6 +105,25 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       parseFloat(form.other_fees) || 0
     );
   }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage]);
+
+  // Phase 3: Pre-load profit check (deterministic, personal-history based)
+  const profitCheckInput = useMemo(() => {
+    if (isCancelled) return null;
+    const loaded = parseFloat(form.loaded_miles) || 0;
+    const deadhead = parseFloat(form.deadhead_miles) || 0;
+    if (loaded <= 0 || estimated <= 0) return null;
+    if (!form.pickup_location.trim() || !form.dropoff_location.trim()) return null;
+    return {
+      pickup_location: formatLocation(form.pickup_location),
+      dropoff_location: formatLocation(form.dropoff_location),
+      loaded_miles: loaded,
+      deadhead_miles: deadhead,
+      estimated_pay: estimated,
+      broker_id: initialData?.broker_id ?? null,
+    };
+  }, [form.loaded_miles, form.deadhead_miles, form.pickup_location, form.dropoff_location, estimated, isCancelled, initialData?.broker_id]);
+
+  const { result: profitCheck } = useProfitCheck(profitCheckInput);
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
