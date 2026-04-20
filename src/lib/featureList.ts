@@ -89,9 +89,9 @@ export const featureList: FeatureCategory[] = [
   {
     category: 'Account & Security',
     features: [
-      { icon: Shield, title: 'Secure Authentication', description: 'Email-based authentication with encrypted data storage — your financial data stays private.' },
-      { icon: DatabaseBackup, title: 'Data Export', description: 'Export all your data anytime — you always own your information.' },
-      { icon: Trash2, title: 'Account Deletion', description: 'Full account and data deletion available anytime from Settings — no hoops to jump through.' },
+      { icon: Shield, title: 'Secure Authentication', description: 'Email-based authentication with mandatory verification and leaked-password protection — your financial data stays private and encrypted.' },
+      { icon: DatabaseBackup, title: 'Full Data Export', description: 'Download every dataset tied to your account as JSON — loads, expenses, fuel logs, recurring expenses, weekly snapshots, AI insights, brokers, lane stats, settings, and more (15+ datasets). You always own your information.' },
+      { icon: Trash2, title: 'Complete Account Deletion', description: 'Permanently delete your account and all associated data across 18 tables in one click — loads, expenses, fuel logs, snapshots, AI insights, brokers, alerts, settings, subscription records, and your auth account. No hoops, no retention.' },
     ],
   },
 ];
