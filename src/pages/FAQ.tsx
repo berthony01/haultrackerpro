@@ -6,10 +6,6 @@ import SEOHead from '@/components/SEOHead';
 
 const faqs = [
   {
-    question: 'How is net profit calculated?',
-    answer: 'Net profit is calculated by taking your actual pay received (or estimated pay if actual isn\'t entered yet) and subtracting all expenses logged for the same period. This includes fuel, tolls, maintenance, and any other tracked expenses.',
-  },
-  {
     question: 'Why is estimated pay different from actual?',
     answer: 'Estimated pay is calculated from your rate per mile × loaded miles + fees (detention, wait, other). Actual pay is what the broker or carrier deposits into your account. Differences can occur due to deductions, adjustments, fuel surcharges, or billing corrections.',
   },
