@@ -87,7 +87,6 @@ export default function Pricing() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.url) {
-      const planKey = annual ? 'pro_yearly' : 'pro_monthly';
         const value = annual ? 179.88 : 19.99;
         trackBeginCheckout(planKey, value);
         window.location.href = data.url;
