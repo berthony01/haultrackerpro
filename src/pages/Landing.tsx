@@ -23,8 +23,8 @@ export default function Landing() {
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
-        title="HaulTrackerPro | Load, Expense & Profit Tracker for Truck Drivers"
-        description="HaulTrackerPro helps owner-operators and 1099 truck drivers track loads, log expenses, and see real net profit."
+        title="HaulTrackerPro | Know Your Real Profit Per Load"
+        description="Stop driving blind. HaulTrackerPro shows truck drivers their true profit after fuel, deadhead, and expenses — so you stop losing money on bad loads."
         path="/"
         jsonLd={{
           "@context": "https://schema.org",
