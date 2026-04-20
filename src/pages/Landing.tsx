@@ -155,17 +155,17 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              How It Works
+              HaulTrackerPro Shows You The Truth About Every Load
             </h2>
             <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Three simple steps to track your trucking business like a real business.
+              Track your loads, expenses, and miles in real time — and automatically see your true net profit. No spreadsheets. No guessing. No surprises.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {[
-              { step: '1', title: 'Log Your Loads', desc: 'Enter pickup, drop-off, miles, and pay. Multi-stop supported.' },
-              { step: '2', title: 'Track Every Expense', desc: 'Fuel, parking, tolls, maintenance, food, supplies. Keep it all organized.' },
-              { step: '3', title: 'Know Your Real Profit', desc: 'See profit per load, weekly summaries, and tax-ready exports.' },
+              { step: '1', title: 'Know Your Real Profit', desc: 'See exactly what you made after fuel, expenses, and deadhead — per load and per week.' },
+              { step: '2', title: 'Catch Bad Loads Before They Cost You', desc: 'Stop taking loads that hurt your bottom line. Spot losers before you commit.' },
+              { step: '3', title: 'Stop Missing Money', desc: 'Track payments, catch short-pays, and stay tax-ready year-round — automatically.' },
             ].map((item, i) => (
               <div key={i} className="p-6 rounded-2xl border text-center" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-black" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
