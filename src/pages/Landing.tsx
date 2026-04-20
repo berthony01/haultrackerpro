@@ -107,11 +107,11 @@ export default function Landing() {
                   <TrendingUp className="h-3.5 w-3.5" /> Built for Owner-Operators
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]" style={{ color: 'hsl(0, 0%, 100%)' }}>
-                  Know What Every Load{' '}
-                  <span style={{ color: 'hsl(25, 95%, 53%)' }}>Really Earns.</span>
+                  Stop Driving Blind.{' '}
+                  <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Track loads, expenses, and real net profit in one powerful dashboard built for owner-operators and lease drivers.
+                  Most loads look profitable. Many aren't. HaulTrackerPro shows your true profit after fuel, deadhead, and expenses — so you stop losing money on bad loads.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -119,12 +119,12 @@ export default function Landing() {
                   background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
                   boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)'
                 }}>
-                  Start Tracking Free <ArrowRight className="h-5 w-5" />
+                  Start Free — See Your Real Profit Today <ArrowRight className="h-5 w-5" />
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} className="text-base font-semibold rounded-xl h-13 px-8" style={{
                   borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
                 }}>
-                  See How It Works
+                  Watch How It Works
                 </Button>
               </div>
               <div className="flex items-center gap-6 pt-2">
