@@ -8,12 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap, Sparkles, Loader2, ChevronDown, ChevronUp, TrendingUp, TrendingDown, ShieldAlert } from 'lucide-react';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import { generateWeeklySummary } from '@/lib/generateWeeklySummary';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePersonalIntelligence } from '@/hooks/usePersonalIntelligence';
+import { buildWeeklyRecommendations } from '@/lib/profitDefenseAlerts';
 
 interface WeeklyCloseoutProps {
   loads: Load[];
