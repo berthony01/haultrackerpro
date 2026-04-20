@@ -76,16 +76,25 @@ const Index = () => {
     setPage('settings');
   };
 
-  // Handle checkout success return
+  // Handle checkout success return — refetch first, then track once subscription resolves
+  const [pendingPurchaseTrack, setPendingPurchaseTrack] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
       toast.success('Welcome to Pro! Your subscription is now active.', { duration: 5000 });
-      trackPurchase(subscription.planKey, subscription.planKey === 'pro_yearly' ? 120 : 15);
+      setPendingPurchaseTrack(true);
       subscription.refetch();
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  // Fire purchase analytics once the resolved plan is available (avoids stale closure)
+  useEffect(() => {
+    if (pendingPurchaseTrack && !subscription.isLoading && subscription.isPro) {
+      trackPurchase(subscription.planKey, subscription.planKey === 'pro_yearly' ? 179.88 : 19.99);
+      setPendingPurchaseTrack(false);
+    }
+  }, [pendingPurchaseTrack, subscription.isLoading, subscription.isPro, subscription.planKey]);
 
   // Editing stops state
   const [editingStops, setEditingStops] = useState<LoadStopInput[]>([]);

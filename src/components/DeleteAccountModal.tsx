@@ -47,7 +47,7 @@ export function DeleteAccountModal({ open, onOpenChange }: DeleteAccountModalPro
           </div>
           <DialogTitle className="text-lg font-heading">Delete Account</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-            This will permanently delete your account and all associated data including loads, expenses, snapshots, and reports. This action cannot be undone.
+            This will permanently delete your account and <span className="font-semibold text-foreground">all associated data</span>: loads &amp; stops, expenses, fuel logs, brokers, recurring expense templates, weekly snapshots, AI insights, smart alerts, feedback, parse history, settings, subscription, and your sign-in account. This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 pt-2">
