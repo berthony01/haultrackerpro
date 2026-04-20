@@ -356,11 +356,11 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Built by a Developer.{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Tested by Drivers.</span>
+              Not Another Tracking App.{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Your Profit Command Center.</span>
             </h2>
             <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              HaulTrackerPro was built from the ground up after talking to real owner-operators about what they actually need — not what enterprise software companies think they need.
+              Most tools help you find loads, log miles, or track fuel. HaulTrackerPro helps you keep your money — built from the ground up after talking to real owner-operators.
             </p>
           </div>
 
