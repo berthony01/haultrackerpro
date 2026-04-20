@@ -441,18 +441,21 @@ export default function Landing() {
         }} />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center relative">
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight mb-5" style={{ color: 'hsl(0, 0%, 100%)' }}>
-            Stop Guessing.{' '}
-            <span style={{ color: 'hsl(25, 95%, 53%)' }}>Start Knowing.</span>
+            If You Don't Know Your Profit…{' '}
+            <span style={{ color: 'hsl(25, 95%, 53%)' }}>You're Guessing Your Income.</span>
           </h2>
           <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Join drivers who track every load, every expense, and every dollar. Start with a free 14-day Pro trial — no credit card required.
+            You're already working hard. Now make sure the numbers actually make sense.
           </p>
           <Button onClick={goToAuth} size="lg" className="text-lg font-bold rounded-2xl h-14 px-10 gap-2" style={{
             background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
             boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.5)'
           }}>
-            Start Tracking Free <ArrowRight className="h-5 w-5" />
+            Start Your Free Trial <ArrowRight className="h-5 w-5" />
           </Button>
+          <p className="text-xs mt-4" style={{ color: 'hsl(220, 10%, 45%)' }}>
+            No credit card required.
+          </p>
         </div>
       </section>
 
