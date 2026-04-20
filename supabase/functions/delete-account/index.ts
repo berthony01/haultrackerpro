@@ -39,12 +39,30 @@ Deno.serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const userId = user.id;
 
-    // Delete all user data (order matters due to foreign keys)
+    // Delete all user-owned data. Order matters for FK constraints:
+    // - load_stops references loads, so load_stops first
+    // - expenses and fuel_logs reference loads (linked_load_id), so they go before loads
+    // - broker_stats references brokers, so broker_stats before brokers
+    // - loads references brokers (broker_id), so loads before brokers
+    // Derived tables (lane_stats, broker_stats, operating_metrics) are user-owned
+    // caches and are deleted here for completeness.
+    // admin_audit_log / admin_users are intentionally NOT touched — they are
+    // system/audit tables, not user content.
     await adminClient.from("load_stops").delete().eq("user_id", userId);
     await adminClient.from("expenses").delete().eq("user_id", userId);
+    await adminClient.from("fuel_logs").delete().eq("user_id", userId);
     await adminClient.from("loads").delete().eq("user_id", userId);
+    await adminClient.from("broker_stats").delete().eq("user_id", userId);
+    await adminClient.from("lane_stats").delete().eq("user_id", userId);
+    await adminClient.from("operating_metrics").delete().eq("user_id", userId);
+    await adminClient.from("brokers").delete().eq("user_id", userId);
+    await adminClient.from("recurring_expense_templates").delete().eq("user_id", userId);
     await adminClient.from("weekly_snapshots").delete().eq("user_id", userId);
     await adminClient.from("feedback_responses").delete().eq("user_id", userId);
+    await adminClient.from("parse_usage").delete().eq("user_id", userId);
+    await adminClient.from("user_alerts").delete().eq("user_id", userId);
+    await adminClient.from("expense_automation_logs").delete().eq("user_id", userId);
+    await adminClient.from("ai_insights").delete().eq("user_id", userId);
     await adminClient.from("subscriptions").delete().eq("user_id", userId);
     await adminClient.from("user_settings").delete().eq("user_id", userId);
     await adminClient.from("profiles").delete().eq("user_id", userId);

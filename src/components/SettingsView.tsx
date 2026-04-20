@@ -115,23 +115,62 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     if (!user) return;
     setExporting(true);
     try {
-      const [loads, expenses, stops, snapshots, feedback, profile] = await Promise.all([
+      // Full export: all user-owned tables. Derived tables (lane_stats,
+      // broker_stats, operating_metrics) are intentionally excluded — they are
+      // recomputed automatically from loads/expenses/fuel_logs and would be
+      // redundant in a backup. Admin/system tables are also excluded.
+      // Subscriptions exports plan/status only (no Stripe secrets are stored client-side).
+      const [
+        profile, settings, loads, stops, expenses, fuelLogs, brokers,
+        recurring, snapshots, feedback, subscription, parseUsage,
+        alerts, automationLogs, insights,
+      ] = await Promise.all([
+        supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle(),
         supabase.from('loads').select('*').eq('user_id', user.id),
-        supabase.from('expenses').select('*').eq('user_id', user.id),
         supabase.from('load_stops').select('*').eq('user_id', user.id),
+        supabase.from('expenses').select('*').eq('user_id', user.id),
+        supabase.from('fuel_logs').select('*').eq('user_id', user.id),
+        supabase.from('brokers').select('*').eq('user_id', user.id),
+        supabase.from('recurring_expense_templates').select('*').eq('user_id', user.id),
         supabase.from('weekly_snapshots').select('*').eq('user_id', user.id),
         supabase.from('feedback_responses').select('*').eq('user_id', user.id),
-        supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+        supabase.from('subscriptions').select('*').eq('user_id', user.id),
+        supabase.from('parse_usage').select('*').eq('user_id', user.id),
+        supabase.from('user_alerts').select('*').eq('user_id', user.id),
+        supabase.from('expense_automation_logs').select('*').eq('user_id', user.id),
+        supabase.from('ai_insights').select('*').eq('user_id', user.id),
       ]);
 
       const exportData = {
         exported_at: new Date().toISOString(),
-        profile: profile.data,
-        loads: loads.data ?? [],
-        expenses: expenses.data ?? [],
-        load_stops: stops.data ?? [],
-        weekly_snapshots: snapshots.data ?? [],
-        feedback_responses: feedback.data ?? [],
+        export_version: 2,
+        user_id: user.id,
+        email: user.email,
+        account: {
+          profile: profile.data ?? null,
+          user_settings: settings.data ?? null,
+          subscription: subscription.data ?? [],
+        },
+        operations: {
+          loads: loads.data ?? [],
+          load_stops: stops.data ?? [],
+          expenses: expenses.data ?? [],
+          fuel_logs: fuelLogs.data ?? [],
+          brokers: brokers.data ?? [],
+          recurring_expense_templates: recurring.data ?? [],
+        },
+        history: {
+          weekly_snapshots: snapshots.data ?? [],
+          feedback_responses: feedback.data ?? [],
+          parse_usage: parseUsage.data ?? [],
+          user_alerts: alerts.data ?? [],
+          expense_automation_logs: automationLogs.data ?? [],
+          ai_insights: insights.data ?? [],
+        },
+        _excluded_derived: {
+          note: 'lane_stats, broker_stats, and operating_metrics are excluded because they are auto-recomputed from loads/expenses/fuel_logs.',
+        },
       };
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
