@@ -34,6 +34,8 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
   const navigate = useNavigate();
   const { saveSnapshot } = useWeeklySnapshots();
   const { settings } = useUserSettings();
+  const { lanes, brokers } = usePersonalIntelligence();
+  const recommendations = useMemo(() => buildWeeklyRecommendations(lanes, brokers), [lanes, brokers]);
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const weekLoads = useMemo(() => getCurrentWeekLoads(loads, weekStartsOn), [loads, weekStartsOn]);
 
