@@ -6,6 +6,9 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, differenceInDays } from 'date-fns';
 import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
+import { usePersonalIntelligence } from '@/hooks/usePersonalIntelligence';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import { buildProfitDefenseAlerts } from '@/lib/profitDefenseAlerts';
 
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertTier = 'basic' | 'advanced';
@@ -194,7 +197,35 @@ export function useSmartAlerts(loads: Load[], expenses: Expense[], weekStartDay?
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert_dismissals'] }),
   });
 
-  const allAlerts = useMemo(() => computeAlerts(loads, expenses, wso), [loads, expenses, wso]);
+  const { lanes, brokers, operatingMetrics } = usePersonalIntelligence();
+  const { settings } = useUserSettings();
+
+  const allAlerts = useMemo(() => {
+    const base = computeAlerts(loads, expenses, wso);
+    const defense = buildProfitDefenseAlerts({
+      loads,
+      lanes,
+      brokers,
+      operatingMetrics,
+      targets: settings ? {
+        target_margin_pct: settings.target_margin_pct,
+        target_deadhead_pct: settings.target_deadhead_pct,
+        target_rpm: settings.target_rpm,
+      } : null,
+    });
+    // Merge, dedupe by dedupeKey, then sort by severity
+    const merged = [...base, ...defense];
+    const seen = new Set<string>();
+    const unique = merged.filter(a => {
+      if (seen.has(a.dedupeKey)) return false;
+      seen.add(a.dedupeKey);
+      return true;
+    });
+    const severityOrder: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 };
+    unique.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+    return unique;
+  }, [loads, expenses, wso, lanes, brokers, operatingMetrics, settings]);
+
   const dismissedKeys = new Set(dismissedQuery.data ?? []);
   const activeAlerts = allAlerts.filter(a => !dismissedKeys.has(a.dedupeKey));
 
