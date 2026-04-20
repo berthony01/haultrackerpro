@@ -142,6 +142,18 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         supabase.from('ai_insights').select('*').eq('user_id', user.id),
       ]);
 
+      // Fail loudly if any query errored — prevents a silent partial "full" export.
+      const results = {
+        profile, settings, loads, stops, expenses, fuelLogs, brokers,
+        recurring, snapshots, feedback, subscription, parseUsage,
+        alerts, automationLogs, insights,
+      };
+      const failed = Object.entries(results).filter(([, r]) => r.error);
+      if (failed.length > 0) {
+        const names = failed.map(([k]) => k).join(', ');
+        throw new Error(`Export incomplete — failed to load: ${names}`);
+      }
+
       const exportData = {
         exported_at: new Date().toISOString(),
         export_version: 2,
