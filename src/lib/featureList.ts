@@ -72,7 +72,7 @@ export const featureList: FeatureCategory[] = [
     features: [
       { icon: FileText, title: 'CSV Export', description: 'Export your load and expense data as CSV files for spreadsheets or bookkeepers.' },
       { icon: FileText, title: 'PDF Reports', description: 'Generate branded, professional PDF reports with summary totals and clean formatting — ready for tax prep, bookkeepers, or dispute resolution.', pro: true },
-      { icon: DatabaseBackup, title: 'Full Data Export', description: 'Download your complete account data as JSON for backup or migration purposes.' },
+      { icon: DatabaseBackup, title: 'Full Data Export', description: 'Download all your core account and operational data as a single JSON file for backup or migration. Includes 15 datasets; derived analytics are excluded because they regenerate from your raw data.' },
       { icon: Filter, title: 'Date Range Filtering', description: 'Filter all reports and views by custom date ranges — weekly, monthly, quarterly, or custom.' },
     ],
   },
@@ -90,7 +90,7 @@ export const featureList: FeatureCategory[] = [
     category: 'Account & Security',
     features: [
       { icon: Shield, title: 'Secure Authentication', description: 'Email-based authentication with mandatory verification and leaked-password protection — your financial data stays private and encrypted.' },
-      { icon: DatabaseBackup, title: 'Full Data Export', description: 'Download every dataset tied to your account as JSON — loads, expenses, fuel logs, recurring expenses, weekly snapshots, AI insights, brokers, lane stats, settings, and more (15+ datasets). You always own your information.' },
+      { icon: DatabaseBackup, title: 'Full Data Export', description: 'Download all of your account and operational data as a single JSON file — profile, settings, subscription plan, loads, load stops, expenses, fuel logs, brokers, recurring expense templates, weekly snapshots, feedback, parse usage, alerts, automation logs, and AI insights (15 datasets). Derived analytics (lane, broker, and operating metrics) are excluded because they regenerate automatically from your raw data. You always own your information.' },
       { icon: Trash2, title: 'Complete Account Deletion', description: 'Permanently delete your account and all associated data across 18 tables in one click — loads, expenses, fuel logs, snapshots, AI insights, brokers, alerts, settings, subscription records, and your auth account. No hoops, no retention.' },
     ],
   },
