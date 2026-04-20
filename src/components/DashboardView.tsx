@@ -19,6 +19,7 @@ import { FuelAnalyticsCard } from '@/components/FuelAnalyticsCard';
 import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
 import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { PersonalIntelligenceBlocks } from '@/components/PersonalIntelligenceBlocks';
+import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -336,6 +337,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* Smart Load Advisor */}
           <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} isTrialing={isTrialing} />
+
+          {/* Phase 6: Weekly Pulse — Mon/Tue recap of last week + top recommendations */}
+          <WeeklyPulseCard isPro={isPro} isTrialing={isTrialing} />
 
           {/* Phase 4: Personal Intelligence — best/weakest lanes, broker reliability, margin leaks */}
           <PersonalIntelligenceBlocks isPro={isPro} isTrialing={isTrialing} />
