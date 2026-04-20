@@ -22,7 +22,7 @@ function dismissKey() {
 export function WeeklyPulseCard({ isPro, isTrialing = false }: WeeklyPulseCardProps) {
   const navigate = useNavigate();
   const { loads, isLoading } = useLoads();
-  const { lanes, brokers } = usePersonalIntelligence();
+  const { lanes, brokers, operatingMetrics } = usePersonalIntelligence();
   const hasAccess = isPro || isTrialing;
 
   const [dismissed, setDismissed] = useState(false);
@@ -42,15 +42,20 @@ export function WeeklyPulseCard({ isPro, isTrialing = false }: WeeklyPulseCardPr
     });
     const revenue = inRange.reduce((s, l) => s + Number(l.actual_pay_received ?? l.estimated_pay ?? 0), 0);
     const loadedMiles = inRange.reduce((s, l) => s + Number(l.loaded_miles ?? 0), 0);
-    return { start, end, loads: inRange, revenue, loadedMiles };
-  }, [loads]);
+    const deadheadMiles = inRange.reduce((s, l) => s + Number(l.deadhead_miles ?? 0), 0);
+    const cpm = Number(operatingMetrics?.rolling_cost_per_mile ?? 0);
+    const variableCost = (loadedMiles + deadheadMiles) * cpm;
+    const net = revenue - variableCost;
+    const margin = revenue > 0 ? (net / revenue) * 100 : 0;
+    return { start, end, loads: inRange, revenue, loadedMiles, net, margin };
+  }, [loads, operatingMetrics]);
 
   const recs = useMemo(() => buildWeeklyRecommendations(lanes, brokers), [lanes, brokers]);
 
   if (isLoading || dismissed) return null;
 
-  const dayOfWeek = new Date().getDay(); // 0=Sun, 1=Mon, 2=Tue
-  const isPulseDay = dayOfWeek === 1 || dayOfWeek === 2 || dayOfWeek === 0;
+  const dayOfWeek = new Date().getDay(); // 1=Mon, 2=Tue
+  const isPulseDay = dayOfWeek === 1 || dayOfWeek === 2;
   if (!isPulseDay) return null;
 
   const hasContent =
@@ -116,16 +121,20 @@ export function WeeklyPulseCard({ isPro, isTrialing = false }: WeeklyPulseCardPr
         {lastWeek.loads.length > 0 && (
           <div className="px-4 py-3 border-b border-border/40 grid grid-cols-3 gap-2 text-center">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Loads</div>
-              <div className="text-sm font-bold">{lastWeek.loads.length}</div>
-            </div>
-            <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Revenue</div>
               <div className="text-sm font-bold">{formatCurrency(lastWeek.revenue)}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Miles</div>
-              <div className="text-sm font-bold">{Math.round(lastWeek.loadedMiles).toLocaleString()}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Net</div>
+              <div className={`text-sm font-bold ${lastWeek.net >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {formatCurrency(lastWeek.net)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Margin</div>
+              <div className={`text-sm font-bold ${lastWeek.margin >= 15 ? 'text-success' : lastWeek.margin >= 0 ? 'text-foreground' : 'text-destructive'}`}>
+                {lastWeek.margin.toFixed(1)}%
+              </div>
             </div>
           </div>
         )}
