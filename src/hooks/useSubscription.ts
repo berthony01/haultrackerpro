@@ -100,8 +100,24 @@ export function useSubscription(): SubscriptionState {
   useEffect(() => {
     if (isAdminLoading) return;
     fetchSubscription();
-    const interval = setInterval(fetchSubscription, 60000);
-    return () => clearInterval(interval);
+
+    // Refetch on tab focus / visibility change instead of polling every 60s.
+    // Throttle to at most once per 30s to avoid bursts on rapid tab switching.
+    let lastFetch = Date.now();
+    const maybeRefetch = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastFetch < 30_000) return;
+      lastFetch = now;
+      fetchSubscription();
+    };
+
+    window.addEventListener('focus', maybeRefetch);
+    document.addEventListener('visibilitychange', maybeRefetch);
+    return () => {
+      window.removeEventListener('focus', maybeRefetch);
+      document.removeEventListener('visibilitychange', maybeRefetch);
+    };
   }, [fetchSubscription, isAdminLoading]);
 
   const isPro = isAdmin || isProStatus(status);
