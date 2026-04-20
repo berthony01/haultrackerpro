@@ -22,7 +22,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // User client to get the user
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -35,39 +34,47 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Admin client to delete data and auth user
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const userId = user.id;
 
-    // Delete all user-owned data. Order matters for FK constraints:
-    // - load_stops references loads, so load_stops first
-    // - expenses and fuel_logs reference loads (linked_load_id), so they go before loads
-    // - broker_stats references brokers, so broker_stats before brokers
-    // - loads references brokers (broker_id), so loads before brokers
-    // Derived tables (lane_stats, broker_stats, operating_metrics) are user-owned
-    // caches and are deleted here for completeness.
-    // admin_audit_log / admin_users are intentionally NOT touched — they are
-    // system/audit tables, not user content.
-    await adminClient.from("load_stops").delete().eq("user_id", userId);
-    await adminClient.from("expenses").delete().eq("user_id", userId);
-    await adminClient.from("fuel_logs").delete().eq("user_id", userId);
-    await adminClient.from("loads").delete().eq("user_id", userId);
-    await adminClient.from("broker_stats").delete().eq("user_id", userId);
-    await adminClient.from("lane_stats").delete().eq("user_id", userId);
-    await adminClient.from("operating_metrics").delete().eq("user_id", userId);
-    await adminClient.from("brokers").delete().eq("user_id", userId);
-    await adminClient.from("recurring_expense_templates").delete().eq("user_id", userId);
-    await adminClient.from("weekly_snapshots").delete().eq("user_id", userId);
-    await adminClient.from("feedback_responses").delete().eq("user_id", userId);
-    await adminClient.from("parse_usage").delete().eq("user_id", userId);
-    await adminClient.from("user_alerts").delete().eq("user_id", userId);
-    await adminClient.from("expense_automation_logs").delete().eq("user_id", userId);
-    await adminClient.from("ai_insights").delete().eq("user_id", userId);
-    await adminClient.from("subscriptions").delete().eq("user_id", userId);
-    await adminClient.from("user_settings").delete().eq("user_id", userId);
-    await adminClient.from("profiles").delete().eq("user_id", userId);
+    // FK-safe deletion order. Each step is checked — if any deletion fails
+    // we abort BEFORE removing the auth user, so the account remains
+    // recoverable rather than orphaned. Derived tables (lane_stats,
+    // broker_stats, operating_metrics) are user-owned caches and are deleted
+    // for completeness. admin_audit_log / admin_users are intentionally
+    // retained as they are system/audit records, not user content.
+    const tablesInOrder = [
+      "load_stops",
+      "expenses",
+      "fuel_logs",
+      "loads",
+      "broker_stats",
+      "lane_stats",
+      "operating_metrics",
+      "brokers",
+      "recurring_expense_templates",
+      "weekly_snapshots",
+      "feedback_responses",
+      "parse_usage",
+      "user_alerts",
+      "expense_automation_logs",
+      "ai_insights",
+      "subscriptions",
+      "user_settings",
+      "profiles",
+    ];
 
-    // Delete auth user
+    for (const table of tablesInOrder) {
+      const { error } = await adminClient.from(table).delete().eq("user_id", userId);
+      if (error) {
+        return new Response(
+          JSON.stringify({ error: `Failed to delete from ${table}: ${error.message}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    // Only delete the auth user after all data deletions succeeded.
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
