@@ -8,12 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Truck, AlertTriangle, CheckCircle2, ArrowLeft, Route, MapPin, Lock, Zap, Sparkles, Loader2, ChevronDown, ChevronUp, TrendingUp, TrendingDown, ShieldAlert } from 'lucide-react';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
 import { generateWeeklySummary } from '@/lib/generateWeeklySummary';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePersonalIntelligence } from '@/hooks/usePersonalIntelligence';
+import { buildWeeklyRecommendations } from '@/lib/profitDefenseAlerts';
 
 interface WeeklyCloseoutProps {
   loads: Load[];
@@ -32,6 +34,8 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
   const navigate = useNavigate();
   const { saveSnapshot } = useWeeklySnapshots();
   const { settings } = useUserSettings();
+  const { lanes, brokers } = usePersonalIntelligence();
+  const recommendations = useMemo(() => buildWeeklyRecommendations(lanes, brokers), [lanes, brokers]);
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const weekLoads = useMemo(() => getCurrentWeekLoads(loads, weekStartsOn), [loads, weekStartsOn]);
 
@@ -378,6 +382,81 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
                       Review Pending Loads
                     </Button>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Lanes & Brokers Recommendations (grounded in personal history) */}
+          {(recommendations.lanesToRepeat.length > 0 ||
+            recommendations.lanesToAvoid.length > 0 ||
+            recommendations.brokersToWatch.length > 0) && (
+            <Card className="shadow-card overflow-hidden">
+              <CardContent className="p-0">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                    Recommendations Based on Your History
+                  </span>
+                </div>
+                <div className="p-4 space-y-4">
+                  {recommendations.lanesToRepeat.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <TrendingUp className="h-3.5 w-3.5 text-success" />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-success">Lanes to Repeat</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        {recommendations.lanesToRepeat.map(l => (
+                          <div key={l.lane_key} className="flex items-start justify-between gap-2 text-xs">
+                            <span className="text-foreground truncate flex-1">{l.lane_key}</span>
+                            <span className="text-success font-bold whitespace-nowrap">
+                              +{formatCurrency(l.avg_net_profit)} • ${l.avg_rpm.toFixed(2)}/mi
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {recommendations.lanesToAvoid.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-destructive">Lanes to Avoid</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        {recommendations.lanesToAvoid.map(l => (
+                          <div key={l.lane_key} className="flex items-start justify-between gap-2 text-xs">
+                            <span className="text-foreground truncate flex-1">{l.lane_key}</span>
+                            <span className="text-destructive font-bold whitespace-nowrap">
+                              {l.avg_net_profit >= 0 ? '+' : ''}{formatCurrency(l.avg_net_profit)} • {l.avg_margin_pct.toFixed(0)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {recommendations.brokersToWatch.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <ShieldAlert className="h-3.5 w-3.5 text-warning" />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-warning">Brokers to Watch</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        {recommendations.brokersToWatch.map(b => (
+                          <div key={b.broker_name} className="flex items-start justify-between gap-2 text-xs">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-foreground truncate">{b.broker_name}</p>
+                              <p className="text-[10px] text-muted-foreground">{b.reason}</p>
+                            </div>
+                            <span className="text-warning font-bold whitespace-nowrap">{b.metric}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
