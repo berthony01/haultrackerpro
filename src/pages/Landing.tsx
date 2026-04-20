@@ -186,18 +186,18 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Most Drivers Track Revenue.{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Smart Drivers Track Profit.</span>
+              You're Not Losing Money Because You're Working Hard…{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>You're Losing Money Because You Can't See It.</span>
             </h2>
             <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Revenue looks good on paper. But after fuel, tolls, maintenance, and deadhead miles — do you really know what you earned?
+              Every week, drivers take loads that look good on paper — but after fuel, deadhead, maintenance, and hidden costs, profit is much lower than expected. Sometimes there's no profit at all.
             </p>
           </div>
-          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
             {[
-              { icon: AlertTriangle, title: 'Hidden Losses', desc: 'Without tracking expenses per load, profitable-looking loads could be costing you money.' },
-              { icon: DollarSign, title: 'Pay Disputes', desc: "When estimated and actual pay don't match, you need records to prove what you're owed." },
-              { icon: FileText, title: 'Tax Season Chaos', desc: 'Scrambling to reconstruct expenses at tax time costs you deductions and peace of mind.' },
+              { icon: AlertTriangle, title: 'You Only See Gross Pay', desc: 'Without expenses per load, profitable-looking runs could be quietly costing you money.' },
+              { icon: DollarSign, title: 'You Miss Short-Pays', desc: "When estimated and actual pay don't match, you need records to catch what you're owed." },
+              { icon: FileText, title: 'You Guess Instead of Knowing', desc: 'Tax season chaos and lost deductions — because the numbers were never tracked.' },
             ].map((item, i) => (
               <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
@@ -207,6 +207,35 @@ export default function Landing() {
                 <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
               </div>
             ))}
+          </div>
+
+          {/* Reality Check — $2,000 → $700 */}
+          <div className="max-w-2xl mx-auto p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.25)' }}>
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-center mb-6" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              That $2,000 Load Might Only Be{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>$700.</span>
+            </h3>
+            <div className="space-y-2 max-w-sm mx-auto text-sm">
+              {[
+                { label: 'Load pays', val: '$2,000', positive: true },
+                { label: 'Fuel', val: '− $800' },
+                { label: 'Deadhead', val: '− $150' },
+                { label: 'Maintenance', val: '− $200' },
+                { label: 'Insurance', val: '− $150' },
+              ].map((row, i) => (
+                <div key={i} className="flex justify-between py-1.5 border-b" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+                  <span style={{ color: 'hsl(220, 10%, 65%)' }}>{row.label}</span>
+                  <span className="font-bold tabular-nums" style={{ color: row.positive ? 'hsl(0, 0%, 100%)' : 'hsl(220, 10%, 75%)' }}>{row.val}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-3 text-base">
+                <span className="font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Real Profit</span>
+                <span className="font-black tabular-nums" style={{ color: 'hsl(25, 95%, 53%)' }}>$700</span>
+              </div>
+            </div>
+            <p className="text-center mt-6 text-sm italic" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              If you're not tracking this… you're making decisions in the dark.
+            </p>
           </div>
         </div>
       </section>
