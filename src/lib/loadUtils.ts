@@ -219,7 +219,7 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
   const netProfit = totalRevenue - totalExpenses;
   const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
 
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Estimated Pay', 'Actual Pay', 'Linked Expenses', 'Net Load Profit', 'Company Name', 'Company Start Date'];
+  const headers = [...CSV_HEADERS_PROFIT];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
