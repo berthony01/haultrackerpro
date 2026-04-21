@@ -1,30 +1,52 @@
 
 
-## DNS Records Look Correct — Just Waiting on Propagation
+## End-to-End Analysis — Profit Intelligence Surface
 
-Your Cloudflare DNS is configured perfectly. The two `notify` NS records pointing to `ns3.lovable.cloud` and `ns4.lovable.cloud` are exactly what Lovable needs, and they're correctly set to "DNS only" mode.
+### What's solid (no action needed)
 
-### Why it still says "verifying"
+**Demo (`ProfitIntelDemo.tsx`)** — All 6 inputs, scoring math, verdict gating (75/55), warnings, and "Use My Numbers" → `sessionStorage` + `/?prefill=load` round-trip. Disclaimer present.
 
-NS delegation propagation across the global DNS network can take anywhere from **15 minutes to several hours**, occasionally up to 24 hours, depending on how aggressively resolvers cache responses. This is normal and there is nothing more to configure on your end.
+**Prefill hydration (`Index.tsx`)** — 5-min freshness window, maps `rate → gross_revenue + estimated_pay`, computes `rate_per_mile`, drops fuel/other into Notes, switches to `add` page.
 
-### What I'll do next
+**Anchor scroll (`Landing.tsx`)** — `behavior: 'auto'` + rAF polling (20 frames) eliminates flicker on direct `/#profit-intelligence` hits.
 
-Run a fresh status check on `notify.haultrackerpro.com` to see whether Lovable's verification system has detected the NS delegation yet. Three possible outcomes:
+**Pricing link** — Header button → `/#profit-intelligence` (line 120).
 
-1. **Status flips to active** — branded auth emails go live immediately, no further action needed.
-2. **Still pending but NS detected** — Lovable has seen the records and is provisioning SPF/DKIM/MX; just a bit more wait time.
-3. **Still pending with no detection** — propagation hasn't reached Lovable's resolvers yet; wait 30–60 more minutes and re-check.
+**FAQ page** — Search w/ URL deep-linking (`?q=&open=`), shareable link copy, live CSV preview with type selector, header integrity badge, accessible PDF mock (Tab/Enter/Esc/hover), AnchorValidator that auto-reruns on focus/visibility/route change.
 
-### What stays untouched
+**Single source of truth** — `loadUtils.ts` exports `CSV_HEADERS_*`; FAQ imports them; integrity badge compares against snapshot. Headers currently match — badge will show "Verified".
 
-- Cloudflare DNS records (everything is correct, do not edit)
-- Auth flow, edge functions, email templates, app code
-- Custom domain A records for `haultrackerpro.com` and `www`
+### Gaps / things worth doing
 
-### Nothing for you to do right now
+**1. Landing FAQ is plain text but the FAQ page is rich.** The Landing page's `faqs` array (lines 9–20) duplicates content as flat strings while `/faq` has the live previews. A user reading the Landing FAQ for "CSV columns" gets a wall of text instead of the live picker.
+   - Add a "See live preview →" link on each duplicated Landing FAQ that deep-links to `/faq?open=csv-columns`, `/faq?open=pdf-mock`, `/faq?open=profit-intelligence-link`, `/faq?open=use-my-numbers`.
 
-Do **not** add MX, SPF, DKIM, or DMARC records for the `notify` subdomain in Cloudflare — once the NS delegation is live, Lovable's nameservers handle all of those automatically. Adding them manually in Cloudflare would be ignored anyway (the NS delegation overrides them) but it would create confusion.
+**2. Prefill loses two demo inputs.** `deadheadMiles` is prefilled, but `brokerOnTimePct` and the warning context never reach the form. The "Use My Numbers" FAQ already documents this honestly, but we could surface a one-line toast on arrival ("Prefilled from demo — fuel/other added to Notes, broker stays manual") so the user understands what came across.
 
-After approval, I'll run the status check and report back.
+**3. AnchorValidator is fragile in dev.** It does `fetch('/')` and parses HTML for `id="profit-intelligence"`. In Vite dev, the SSR HTML never contains that id (it's React-rendered), so the fallback path fires and the message is misleading. The iframe path still works in prod. Consider:
+   - Skip the HTML-substring check and rely solely on the iframe `getElementById` result.
+   - Bumping `tries` from 30 to ~60 for slow first-paint.
+
+**4. No analytics on the new surface.** The `trackBeginCheckout`-style hooks exist (`src/lib/analytics.ts`) but the demo's "Use My Numbers" CTA, the Pricing → Profit Intelligence link, and the FAQ deep-link copies all fire silently. Add 3 GA4 events: `demo_use_my_numbers`, `pricing_profit_intel_click`, `faq_share_link_copied`.
+
+**5. Mobile viewport check.** The demo grid is `lg:grid-cols-2 gap-6` — fine on the user's 1121px preview, but on <640px the "Score / 100" big number + verdict label can wrap awkwardly when the verdict is "Proceed With Caution". Worth a quick visual-only tweak.
+
+**6. SEO.** The Landing page `jsonLd` doesn't expose the FAQ entries. Adding a `FAQPage` schema with the 10 Landing FAQs would help Google surface "How does load scoring use my own history" as a rich result.
+
+### Recommended next batch (pick any subset)
+
+```text
+A. Cross-link Landing FAQ → /faq deep-links (low effort, high UX)
+B. Toast on prefill arrival explaining what's manual    (low effort)
+C. Harden AnchorValidator (drop fetch path, raise polls) (low effort)
+D. Add 3 GA4 events on the new surface                   (low effort)
+E. Add FAQPage JSON-LD to Landing                        (medium, SEO win)
+F. Mobile polish on demo verdict header                  (low effort)
+```
+
+### Nothing broken
+
+No type errors, no missing imports, header snapshot matches code, prefill round-trip is wired end-to-end, FAQ search/deep-link/share all function. The Profit Intelligence surface is shippable as-is — the items above are enhancements, not fixes.
+
+Tell me which of A–F to proceed with (or "all") and I'll implement.
 
