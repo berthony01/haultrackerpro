@@ -88,3 +88,20 @@ export function trackProFeatureHit(featureName: string) {
     feature_name: featureName,
   });
 }
+
+// ─── PROFIT INTELLIGENCE SURFACE ─────────────────────────
+export function trackDemoUseMyNumbers(score: number, verdict: string) {
+  gtag('event', 'demo_use_my_numbers', { score, verdict });
+}
+
+export function trackPricingProfitIntelClick() {
+  gtag('event', 'pricing_profit_intel_click');
+}
+
+export function trackFaqShareLinkCopied(faqId: string) {
+  gtag('event', 'faq_share_link_copied', { faq_id: faqId });
+}
+
+export function trackLandingFaqDeepLink(target: string) {
+  gtag('event', 'landing_faq_deep_link', { target });
+}
