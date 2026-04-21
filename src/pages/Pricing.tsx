@@ -27,7 +27,7 @@ const proFeatures = [
   'Score loads before you take them (RPM, margin, deadhead, broker)',
   'See your best & worst lanes and broker reliability automatically',
   'Get warned when a lane weakens, a broker pays slow, or margin slips',
-  'Monday recap: lane to repeat, lane to avoid, broker to watch',
+  'Start-of-week recap: lane to repeat, lane to avoid, broker to watch',
   'Log expenses by voice — hands-free',
   'Snap a receipt, AI fills in the expense',
   'Snap a rate con, AI fills in the load',
@@ -63,7 +63,7 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Score a load before you take it', free: '—', pro: '✓' },
   { feature: 'Best/worst lanes & broker reliability', free: '—', pro: '✓' },
   { feature: 'Money-slip alerts (lane, broker, margin)', free: '—', pro: '✓' },
-  { feature: 'Monday recap (repeat / avoid / watch)', free: '—', pro: '✓' },
+  { feature: 'Start-of-week recap (repeat / avoid / watch)', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
   { feature: 'PDF reports', free: '—', pro: '✓' },
 ];
@@ -72,7 +72,7 @@ const whyProPoints = [
   { icon: Shield, title: 'Protect Your Money Before It Slips', desc: 'Score a load before you take it. Get warned when a lane weakens, a broker pays slow, or your margin starts drifting — based on your own history.' },
   { icon: Target, title: 'Know Where You Make & Lose Money', desc: 'See your best lanes, weakest lanes, broker reliability, and margin leaks — surfaced automatically from the loads you already log.' },
   { icon: Zap, title: 'Stop Doing The Data Entry', desc: 'Speak an expense, snap a receipt, or upload a rate con — AI fills in the rest so you can stay focused on driving.' },
-  { icon: TrendingUp, title: 'Close Your Week Like A Business', desc: 'Weekly closeout, AI summary, dollar-impact alerts, and a Monday recap of last week — so this week starts with a plan.' },
+  { icon: TrendingUp, title: 'Close Your Week Like A Business', desc: 'Weekly closeout, AI summary, dollar-impact alerts, and a start-of-week recap of last week — so this week starts with a plan.' },
 ];
 
 export default function Pricing() {

@@ -262,7 +262,7 @@ export default function Landing() {
               { icon: CheckCircle2, title: 'Score a Load Before You Take It', desc: 'Paste a load and get a quick read on whether the rate, miles, deadhead, and broker actually pencil out — based on your own history, not a generic average.' },
               { icon: BarChart3, title: 'See Your Best & Worst Lanes', desc: 'The dashboard shows which lanes pay you the most, which ones quietly lose money, which brokers pay reliably, and where your margin is leaking.' },
               { icon: AlertTriangle, title: 'Get Warned Before Money Slips', desc: 'Plain-language alerts when a lane goes weak, a broker pays slow, your margin or deadhead drifts the wrong way, or an invoice is aging unpaid.' },
-              { icon: TrendingUp, title: 'A Clear Read on Your Week', desc: 'Every Monday, see last week in one card: the lane to repeat, the lane to avoid, and the broker to watch — so this week starts with a plan.' },
+              { icon: TrendingUp, title: 'A Clear Read on Your Week', desc: 'At the start of every week, see last week in one card: the lane to repeat, the lane to avoid, and the broker to watch — so this week starts with a plan.' },
             ].map((item, i) => (
               <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>

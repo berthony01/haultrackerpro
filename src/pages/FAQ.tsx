@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     question: 'How do I delete my account?',
-    answer: 'Go to Settings → scroll to the Account section → tap "Delete Account." You\'ll need to type DELETE to confirm. This permanently removes all your data including loads, expenses, snapshots, and reports.',
+    answer: 'Go to Settings → scroll to the Account section → tap "Delete Account." You\'ll need to type DELETE to confirm. This permanently removes everything tied to your account: loads and stops, expenses, fuel logs, brokers, recurring expense templates, weekly snapshots, AI insights, smart alerts, feedback, parse history, your settings and subscription record, and your sign-in account itself. This action cannot be undone.',
   },
   {
     question: 'What is the Weekly Closeout?',
