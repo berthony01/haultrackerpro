@@ -160,6 +160,16 @@ export default function Admin() {
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
   const [feedbackCategory, setFeedbackCategory] = useState('all');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  // Emails
+  const [emails, setEmails] = useState<EmailLogRow[]>([]);
+  const [emailTemplates, setEmailTemplates] = useState<string[]>([]);
+  const [emailSummary, setEmailSummary] = useState<EmailListResponse['summary'] | null>(null);
+  const [emailStatus, setEmailStatus] = useState('all');
+  const [emailTemplate, setEmailTemplate] = useState('all');
+  const [emailsLoading, setEmailsLoading] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState<EmailLogRow | null>(null);
+
   const initialFetchDone = useRef(false);
 
   useEffect(() => {
