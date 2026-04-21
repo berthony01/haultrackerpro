@@ -39,6 +39,15 @@ export const featureList: FeatureCategory[] = [
     ],
   },
   {
+    category: 'Profit Intelligence (Pro)',
+    features: [
+      { icon: Target, title: 'Pre-Load Profit Check', description: 'Before you accept a load, see a deterministic score based on RPM, margin, deadhead, and broker history — scored against your personal lane and operating data so you know if it’s worth taking.', pro: true },
+      { icon: BarChart3, title: 'Personal Intelligence Blocks', description: 'Dashboard cards surface your best lanes, weakest lanes, broker reliability scores, and margin leaks — automatically computed from your own load history.', pro: true },
+      { icon: AlertCircle, title: 'Profit Defense Alerts', description: 'Grounded alerts for weak lanes, slow-paying brokers, margin and deadhead slips, and aging unpaid loads — plus weekly closeout lanes-to-repeat, lanes-to-avoid, and brokers-to-watch.', pro: true },
+      { icon: CalendarDays, title: 'Weekly Pulse', description: 'Every Monday and Tuesday: a dashboard recap of last week with the top lane to repeat, the lane to avoid, and the broker to watch. Dismissable per ISO week.', pro: true },
+    ],
+  },
+  {
     category: 'Advanced Insights (Pro)',
     features: [
       { icon: TrendingUp, title: 'RPM Trend Analysis', description: 'Track your rate per mile over time to spot pricing trends and negotiate better rates.', pro: true },

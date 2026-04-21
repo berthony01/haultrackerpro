@@ -241,9 +241,48 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 4: AI DEMO (NEW) */}
+      {/* SECTION 3.5: PROFIT INTELLIGENCE (Phases 3–6) */}
       {/* ═══════════════════════════════════════════ */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+              <Shield className="h-3.5 w-3.5" /> PROFIT INTELLIGENCE
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Your Personal{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Profit Command Center.</span>
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              HaulTrackerPro learns from your loads, lanes, and brokers — then defends your profit before you take a bad load.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            {[
+              { icon: CheckCircle2, title: 'Pre-Load Profit Check', desc: 'Before you accept, see a deterministic score based on RPM, margin, deadhead, and broker history — so you know if a load is worth it.' },
+              { icon: BarChart3, title: 'Personal Intelligence Blocks', desc: 'Your best lanes, weakest lanes, broker reliability, and margin leaks — surfaced automatically from your own load history.' },
+              { icon: AlertTriangle, title: 'Profit Defense Alerts', desc: 'Grounded alerts for weak lanes, slow-paying brokers, margin slips, deadhead spikes, and aging unpaid loads.' },
+              { icon: TrendingUp, title: 'Weekly Pulse', desc: 'Every Monday: last week recap with the top lane to repeat, the lane to avoid, and the broker to watch.' },
+            ].map((item, i) => (
+              <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center mt-8 text-sm" style={{ color: 'hsl(220, 10%, 50%)' }}>
+            Included with Pro — no extra setup.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 4: AI DEMO (NEW) */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
