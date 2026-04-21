@@ -158,14 +158,14 @@ export default function Landing() {
               HaulTrackerPro Shows You The Truth About Every Load
             </h2>
             <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Track your loads, expenses, and miles in real time — and automatically see your true net profit. No spreadsheets. No guessing. No surprises.
+              Track loads, expenses, and miles in real time — and let the app turn that data into clear money decisions. No spreadsheets. No guessing. No surprises.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {[
-              { step: '1', title: 'Know Your Real Profit', desc: 'See exactly what you made after fuel, expenses, and deadhead — per load and per week.' },
-              { step: '2', title: 'Catch Bad Loads Before They Cost You', desc: 'Stop taking loads that hurt your bottom line. Spot losers before you commit.' },
-              { step: '3', title: 'Stop Missing Money', desc: 'Track payments, catch short-pays, and stay tax-ready year-round — automatically.' },
+              { step: '1', title: 'Know What You Actually Made', desc: 'Real net profit per load and per week — after fuel, deadhead, and every expense — not just gross pay.' },
+              { step: '2', title: 'Know Before You Commit', desc: 'See if a load pencils out against your own lane and broker history before you say yes.' },
+              { step: '3', title: 'Know Where Money Is Slipping', desc: 'Catch weak lanes, slow-paying brokers, short-pays, and unpaid invoices before they cost you a week.' },
             ].map((item, i) => (
               <div key={i} className="p-6 rounded-2xl border text-center" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-black" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
