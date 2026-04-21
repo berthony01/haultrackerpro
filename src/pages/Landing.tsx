@@ -11,6 +11,7 @@ const faqs = [
   { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks AI-powered automation and advanced features for $19.99/month or $179.88/year.' },
   { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
   { q: 'Can I try Pro features before paying?', a: 'Yes — every new account starts with a free 14-day Pro trial. No credit card required. You get full access to AI Voice Logging, Receipt Scanning, Driver Scorecard, and all 5 performance charts.' },
+  { q: 'How does HaulTrackerPro know if a load is worth it?', a: 'Pro learns from your own loads, lanes, and brokers. Before you commit, it scores the rate, miles, deadhead, and broker against your personal history — not a generic average. It also warns you when a lane weakens, a broker pays slow, or your margin starts drifting, and gives you a Monday recap of which lanes to repeat, which to avoid, and which broker to watch.' },
 ];
 
 export default function Landing() {
