@@ -136,7 +136,8 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey]);
 
   // Fire purchase analytics once the resolved plan is available (avoids stale closure)
   useEffect(() => {

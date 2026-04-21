@@ -29,9 +29,9 @@ export default function Auth() {
         if (!TEST_ACCOUNTS.includes(form.email.toLowerCase().trim())) {
           supabase.functions.invoke('send-transactional-email', {
             body: {
-              templateName: 'welcome',
+              templateName: 'lifecycle-day0',
               recipientEmail: form.email,
-              idempotencyKey: `welcome-${form.email.toLowerCase().trim()}`,
+              idempotencyKey: `lifecycle-day0-${form.email.toLowerCase().trim()}`,
               templateData: { name: form.name },
             },
           }).catch(() => {});
