@@ -471,6 +471,159 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "send-lifecycle-test" && req.method === "POST") {
+      const TEST_ACCOUNTS = new Set([
+        "berthonyxyz@gmail.com",
+        "peejayslifestyle@gmail.com",
+        "wysdomaniac@gmail.com",
+      ]);
+      const ALLOWED_TEMPLATES = new Set(["welcome", "lifecycle-day2", "lifecycle-day7"]);
+
+      const templateName = String(body.templateName || "");
+      const mode = String(body.mode || "single"); // 'single' | 'all-inactive'
+      const includeTestAccounts = body.includeTestAccounts === true;
+      const recipientUserId = body.recipientUserId as string | undefined;
+
+      if (!ALLOWED_TEMPLATES.has(templateName)) {
+        return json({ error: "Invalid templateName" }, 400);
+      }
+
+      const RECENT_EMAIL_CHANGE_HOURS = 72;
+      const now = Date.now();
+      const recentEmailChangeCutoff = now - RECENT_EMAIL_CHANGE_HOURS * 60 * 60 * 1000;
+      const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
+      // Pull all auth users
+      type AuthUser = {
+        id: string;
+        email?: string;
+        email_confirmed_at?: string | null;
+        confirmed_at?: string | null;
+        email_change_sent_at?: string | null;
+        new_email?: string | null;
+        user_metadata: Record<string, unknown>;
+      };
+      const allUsers: AuthUser[] = [];
+      let pg = 1;
+      while (true) {
+        const { data, error } = await adminDb.auth.admin.listUsers({ page: pg, perPage: 200 });
+        if (error) return json({ error: error.message }, 500);
+        allUsers.push(...((data?.users || []) as unknown as AuthUser[]));
+        if (!data?.users || data.users.length < 200) break;
+        pg++;
+        if (pg > 25) break;
+      }
+
+      const sendOne = async (u: AuthUser): Promise<{ email: string; status: string; reason?: string }> => {
+        const email = (u.email || "").toLowerCase().trim();
+        if (!email) return { email: "(none)", status: "skipped", reason: "no email" };
+        const name = (u.user_metadata?.display_name as string | undefined) || undefined;
+        const { error } = await adminDb.functions.invoke("send-transactional-email", {
+          body: {
+            templateName,
+            recipientEmail: email,
+            idempotencyKey: `${templateName}-test-${u.id}-${yyyymmdd}`,
+            templateData: { name },
+          },
+        });
+        if (error) {
+          return { email, status: "failed", reason: error.message };
+        }
+        return { email, status: "sent" };
+      };
+
+      // ---- single send ----
+      if (mode === "single") {
+        if (!recipientUserId) return json({ error: "recipientUserId required" }, 400);
+        const u = allUsers.find((x) => x.id === recipientUserId);
+        if (!u) return json({ error: "User not found" }, 404);
+        const result = await sendOne(u);
+        await adminDb.from("admin_audit_log").insert({
+          admin_user_id: userId,
+          action: "send-lifecycle-test",
+          target_user_id: recipientUserId,
+          metadata: { templateName, mode: "single", result },
+        });
+        return json({ mode: "single", result });
+      }
+
+      // ---- bulk: all inactive ----
+      // Eligibility: verified, no recent email change, opted-in, zero loads, not test (unless toggled)
+      const eligible: AuthUser[] = [];
+      const skipped: Array<{ email: string; reason: string }> = [];
+
+      for (const u of allUsers) {
+        const email = (u.email || "").toLowerCase().trim();
+        if (!email) { skipped.push({ email: "(none)", reason: "no email" }); continue; }
+        if (!includeTestAccounts && TEST_ACCOUNTS.has(email)) {
+          skipped.push({ email, reason: "test account" }); continue;
+        }
+        const verified = !!(u.email_confirmed_at || u.confirmed_at);
+        if (!verified) { skipped.push({ email, reason: "unverified" }); continue; }
+        if (u.new_email) { skipped.push({ email, reason: "pending email change" }); continue; }
+        if (u.email_change_sent_at) {
+          const t = new Date(u.email_change_sent_at).getTime();
+          if (!Number.isNaN(t) && t > recentEmailChangeCutoff) {
+            skipped.push({ email, reason: "recent email change" }); continue;
+          }
+        }
+        eligible.push(u);
+      }
+
+      const eligibleIds = eligible.map((u) => u.id);
+      if (eligibleIds.length === 0) {
+        return json({ mode: "all-inactive", sent: 0, skipped, results: [] });
+      }
+
+      // Loads gate
+      const { data: loadsData } = await adminDb
+        .from("loads")
+        .select("user_id")
+        .in("user_id", eligibleIds);
+      const loadCount = new Map<string, number>();
+      for (const r of (loadsData ?? []) as Array<{ user_id: string }>) {
+        loadCount.set(r.user_id, (loadCount.get(r.user_id) ?? 0) + 1);
+      }
+
+      // Opt-in gate
+      const { data: settingsRows } = await adminDb
+        .from("user_settings")
+        .select("user_id, lifecycle_emails_opt_in")
+        .in("user_id", eligibleIds);
+      const optedIn = new Map<string, boolean>();
+      for (const r of (settingsRows ?? []) as Array<{ user_id: string; lifecycle_emails_opt_in: boolean | null }>) {
+        optedIn.set(r.user_id, r.lifecycle_emails_opt_in !== false);
+      }
+
+      const finalRecipients: AuthUser[] = [];
+      for (const u of eligible) {
+        const email = (u.email || "").toLowerCase().trim();
+        if ((loadCount.get(u.id) ?? 0) > 0) {
+          skipped.push({ email, reason: "has loads" }); continue;
+        }
+        if (optedIn.get(u.id) === false) {
+          skipped.push({ email, reason: "opted out" }); continue;
+        }
+        finalRecipients.push(u);
+      }
+
+      const results: Array<{ email: string; status: string; reason?: string }> = [];
+      let sent = 0;
+      for (const u of finalRecipients) {
+        const r = await sendOne(u);
+        if (r.status === "sent") sent++;
+        results.push(r);
+      }
+
+      await adminDb.from("admin_audit_log").insert({
+        admin_user_id: userId,
+        action: "send-lifecycle-test",
+        metadata: { templateName, mode: "all-inactive", sent, attempted: finalRecipients.length, skipped_count: skipped.length },
+      });
+
+      return json({ mode: "all-inactive", sent, attempted: finalRecipients.length, skipped, results });
+    }
+
     return json({ error: "Unknown action" }, 400);
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
