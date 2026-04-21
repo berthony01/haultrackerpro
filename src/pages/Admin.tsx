@@ -1009,6 +1009,7 @@ export default function Admin() {
                       <TableHead>Template</TableHead>
                       <TableHead>Recipient</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1018,6 +1019,7 @@ export default function Admin() {
                         : e.status === 'dlq' || e.status === 'failed' || e.status === 'bounced' || e.status === 'complained' ? 'destructive'
                         : e.status === 'suppressed' ? 'outline'
                         : 'secondary';
+                      const canRetry = e.status === 'pending' || e.status === 'failed' || e.status === 'dlq';
                       return (
                         <TableRow
                           key={e.id}
@@ -1031,6 +1033,19 @@ export default function Admin() {
                           <TableCell className="text-xs max-w-[180px] truncate">{e.recipient_email}</TableCell>
                           <TableCell>
                             <Badge variant={variant} className="text-xs">{e.status}</Badge>
+                          </TableCell>
+                          <TableCell onClick={(ev) => ev.stopPropagation()}>
+                            {canRetry && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 gap-1"
+                                disabled={retryingId === e.id}
+                                onClick={() => handleRetryEmail(e)}
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${retryingId === e.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
