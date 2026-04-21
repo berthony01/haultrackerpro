@@ -609,6 +609,155 @@ export default function Admin() {
               </Card>
             )}
           </TabsContent>
+
+          {/* EMAILS */}
+          <TabsContent value="emails" className="space-y-3">
+            {emailSummary && (
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: 'Total', value: emailSummary.total, tone: 'secondary' as const },
+                  { label: 'Sent', value: emailSummary.sent, tone: 'default' as const },
+                  { label: 'Failed', value: emailSummary.failed, tone: 'destructive' as const },
+                  { label: 'Suppressed', value: emailSummary.suppressed, tone: 'outline' as const },
+                ].map((s) => (
+                  <Card key={s.label} className="shadow-card">
+                    <CardContent className="p-3">
+                      <p className="text-xs text-muted-foreground">{s.label}</p>
+                      <p className="text-xl font-bold">{s.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 items-center flex-wrap">
+              <Select
+                value={emailStatus}
+                onValueChange={(val) => { setEmailStatus(val); fetchEmails(val, emailTemplate); }}
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                  <SelectItem value="pending">Pending (queued)</SelectItem>
+                  <SelectItem value="dlq">Failed (DLQ)</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="bounced">Bounced</SelectItem>
+                  <SelectItem value="complained">Complained</SelectItem>
+                  <SelectItem value="suppressed">Suppressed</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={emailTemplate}
+                onValueChange={(val) => { setEmailTemplate(val); fetchEmails(emailStatus, val); }}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Template" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All templates</SelectItem>
+                  {emailTemplates.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchEmails(emailStatus, emailTemplate)}
+                disabled={emailsLoading}
+                className="gap-1"
+              >
+                <RefreshCw className={`h-4 w-4 ${emailsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+
+              <span className="text-xs text-muted-foreground ml-auto">
+                Showing latest {emails.length} unique emails
+              </span>
+            </div>
+
+            {emailsLoading ? (
+              <p className="text-muted-foreground text-center py-8">Loading...</p>
+            ) : emails.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No email logs found.</p>
+            ) : (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Template</TableHead>
+                      <TableHead>Recipient</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {emails.map((e) => {
+                      const variant: 'default' | 'destructive' | 'secondary' | 'outline' =
+                        e.status === 'sent' ? 'default'
+                        : e.status === 'dlq' || e.status === 'failed' || e.status === 'bounced' || e.status === 'complained' ? 'destructive'
+                        : e.status === 'suppressed' ? 'outline'
+                        : 'secondary';
+                      return (
+                        <TableRow
+                          key={e.id}
+                          className="cursor-pointer"
+                          onClick={() => setSelectedEmail(e)}
+                        >
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {new Date(e.created_at).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-xs">{e.template_name}</TableCell>
+                          <TableCell className="text-xs max-w-[180px] truncate">{e.recipient_email}</TableCell>
+                          <TableCell>
+                            <Badge variant={variant} className="text-xs">{e.status}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+
+            <Dialog open={!!selectedEmail} onOpenChange={() => setSelectedEmail(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Email Detail</DialogTitle>
+                  <DialogDescription>Send log entry for this email.</DialogDescription>
+                </DialogHeader>
+                {selectedEmail && (
+                  <div className="space-y-2 text-sm">
+                    <div className="grid grid-cols-3 gap-2">
+                      <p className="text-muted-foreground">Status</p>
+                      <p className="col-span-2">{selectedEmail.status}</p>
+                      <p className="text-muted-foreground">Template</p>
+                      <p className="col-span-2 break-all">{selectedEmail.template_name}</p>
+                      <p className="text-muted-foreground">Recipient</p>
+                      <p className="col-span-2 break-all">{selectedEmail.recipient_email}</p>
+                      <p className="text-muted-foreground">Time</p>
+                      <p className="col-span-2">{new Date(selectedEmail.created_at).toLocaleString()}</p>
+                      <p className="text-muted-foreground">Message ID</p>
+                      <p className="col-span-2 break-all text-xs">{selectedEmail.message_id || '—'}</p>
+                    </div>
+                    {selectedEmail.error_message && (
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-1">Error</p>
+                        <pre className="text-xs bg-muted p-2 rounded whitespace-pre-wrap break-words">
+                          {selectedEmail.error_message}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
         </Tabs>
       </div>
     </div>
