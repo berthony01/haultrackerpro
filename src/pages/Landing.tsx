@@ -6,18 +6,30 @@ import dashboardMockup from '@/assets/dashboard-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
 
-const faqs = [
+type LandingFaq = { q: string; a: string; deepLink?: string };
+
+const faqs: LandingFaq[] = [
   { q: 'Is my data secure?', a: 'Yes. All data is encrypted in transit and stored securely. We never sell or share your data with third parties.' },
   { q: 'Do I need accounting knowledge?', a: 'Not at all. Just enter your loads and expenses — HaulTrackerPro does the math for you automatically.' },
   { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks AI-powered automation and advanced features for $19.99/month or $179.88/year.' },
   { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
   { q: 'Can I try Pro features before paying?', a: 'Yes — every new account starts with a free 14-day Pro trial. No credit card required. You get full access to AI Voice Logging, Receipt Scanning, Driver Scorecard, and all 5 performance charts.' },
   { q: 'How does load scoring use my own history — and what triggers a money-slip or broker warning?', a: 'Every load you log feeds your personal lane stats (avg RPM, margin, deadhead, days-to-pay) and broker stats (reliability, short-pay rate, days-to-pay). Pro scores new loads against your own rolling averages, not generic industry numbers. Money-slip alerts trigger when a lane\'s margin drops vs. its 60-day baseline, deadhead drifts above your target, or your rolling cost-per-mile climbs. Broker warnings trigger on slow payments (days-to-pay above your average), repeated short-pays, or unpaid invoices aging past their due date.' },
-  { q: 'Can I export weekly or monthly summaries as PDF or CSV?', a: 'Yes. From your dashboard, open the Reports view and pick a date range — week, month, quarter, or custom. CSV exports of loads and expenses are included on every plan. Pro adds branded PDF reports with summary totals, ready for tax prep, bookkeepers, or pay disputes. You can also export every dataset on your account as a single JSON backup from Settings.' },
-  { q: 'What columns are in the CSV export?', a: 'The standard Loads CSV (All Loads, Filtered Loads, Monthly Summary, and per-week exports) includes 17 columns: Date, Pickup, Dropoff, Stops Summary, Loaded Miles, Deadhead Miles, Rate/Mile, Wait Fee, Detention Fee, Other Fees, Estimated Pay, Actual Pay, Difference, Status, Notes, Company Name, and Company Start Date. The Profit Report CSV includes: Date, Pickup, Dropoff, Stops Summary, Estimated Pay, Actual Pay, Linked Expenses, Net Load Profit, Company Name, Company Start Date. The Schedule C Summary CSV groups expenses by IRS Schedule C line: Schedule C Line, Line Description, Categories, Total Amount.' },
-  { q: 'What\'s inside the weekly / monthly PDF report?', a: 'Each branded PDF includes: a header with your company name, the date range, and totals (loads, loaded miles, deadhead miles, estimated pay, actual pay, and pay variance); a per-load table with date, pickup, dropoff, loaded/deadhead miles, $/mile, estimated pay, actual pay, and status; pay variance highlights for short-paid or unpaid loads; and a brief lane and broker summary showing your top lanes by revenue and any brokers with payment issues in the period. See the FAQ page for a visual mock layout.' },
-  { q: 'How does the Pricing → Profit Intelligence link work with direct URLs and refreshes?', a: 'The "Profit Intelligence" link on the Pricing page points to /#profit-intelligence on the home page. The same URL works as a shareable direct link or after a full refresh — the home page reads the hash on mount and instantly anchors the viewport to the Profit Intelligence section using behavior:auto with a per-frame poll, so there is no top-flash, smooth-scroll jump, or flicker on first load. You land directly on the four flagship cards followed by the interactive demo.' },
+  { q: 'Can I export weekly or monthly summaries as PDF or CSV?', a: 'Yes. From your dashboard, open the Reports view and pick a date range — week, month, quarter, or custom. CSV exports of loads and expenses are included on every plan. Pro adds branded PDF reports with summary totals, ready for tax prep, bookkeepers, or pay disputes. You can also export every dataset on your account as a single JSON backup from Settings.', deepLink: '/faq?open=pdf-mock' },
+  { q: 'What columns are in the CSV export?', a: 'The standard Loads CSV (All Loads, Filtered Loads, Monthly Summary, and per-week exports) includes 17 columns: Date, Pickup, Dropoff, Stops Summary, Loaded Miles, Deadhead Miles, Rate/Mile, Wait Fee, Detention Fee, Other Fees, Estimated Pay, Actual Pay, Difference, Status, Notes, Company Name, and Company Start Date. The Profit Report CSV includes: Date, Pickup, Dropoff, Stops Summary, Estimated Pay, Actual Pay, Linked Expenses, Net Load Profit, Company Name, Company Start Date. The Schedule C Summary CSV groups expenses by IRS Schedule C line: Schedule C Line, Line Description, Categories, Total Amount.', deepLink: '/faq?open=csv-columns' },
+  { q: 'What\'s inside the weekly / monthly PDF report?', a: 'Each branded PDF includes: a header with your company name, the date range, and totals (loads, loaded miles, deadhead miles, estimated pay, actual pay, and pay variance); a per-load table with date, pickup, dropoff, loaded/deadhead miles, $/mile, estimated pay, actual pay, and status; pay variance highlights for short-paid or unpaid loads; and a brief lane and broker summary showing your top lanes by revenue and any brokers with payment issues in the period. See the FAQ page for a visual mock layout.', deepLink: '/faq?open=pdf-mock' },
+  { q: 'How does the Pricing → Profit Intelligence link work with direct URLs and refreshes?', a: 'The "Profit Intelligence" link on the Pricing page points to /#profit-intelligence on the home page. The same URL works as a shareable direct link or after a full refresh — the home page reads the hash on mount and instantly anchors the viewport to the Profit Intelligence section using behavior:auto with a per-frame poll, so there is no top-flash, smooth-scroll jump, or flicker on first load. You land directly on the four flagship cards followed by the interactive demo.', deepLink: '/faq?open=profit-intelligence-link' },
 ];
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
 
 export default function Landing() {
   const navigate = useNavigate();
