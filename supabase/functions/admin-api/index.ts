@@ -134,13 +134,27 @@ Deno.serve(async (req) => {
       const paginated = mapped.slice((page - 1) * perPage, page * perPage);
 
       // Get counts for paginated results only
+      const userIdsForPage = paginated.map((p) => p.user_id);
+      const [{ data: settingsRows }] = await Promise.all([
+        adminDb.from("user_settings").select("user_id, lifecycle_emails_opt_in").in("user_id", userIdsForPage),
+      ]);
+      const optedOut = new Set<string>();
+      for (const s of (settingsRows || []) as Array<{ user_id: string; lifecycle_emails_opt_in: boolean | null }>) {
+        if (s.lifecycle_emails_opt_in === false) optedOut.add(s.user_id);
+      }
+
       const enriched = await Promise.all(
         paginated.map(async (p) => {
           const [lc, ec] = await Promise.all([
             adminDb.from("loads").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
             adminDb.from("expenses").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
           ]);
-          return { ...p, loads_count: lc.count ?? 0, expenses_count: ec.count ?? 0 };
+          return {
+            ...p,
+            loads_count: lc.count ?? 0,
+            expenses_count: ec.count ?? 0,
+            lifecycle_opted_out: optedOut.has(p.user_id),
+          };
         })
       );
 
@@ -397,7 +411,7 @@ Deno.serve(async (req) => {
 
       // Email impact — for each lifecycle email (welcome, lifecycle-day2, lifecycle-day7),
       // % of recipients who logged a load AFTER receiving the email.
-      const TEMPLATES_FOR_IMPACT = ["welcome", "lifecycle-day2", "lifecycle-day7"] as const;
+      const TEMPLATES_FOR_IMPACT = ["lifecycle-day0", "welcome", "lifecycle-day2", "lifecycle-day7"] as const;
       const emailImpact: Record<string, { sent: number; activated_after: number; rate: number } | null> = {
         day0: null,
         day2: null,
@@ -454,7 +468,19 @@ Deno.serve(async (req) => {
         };
       };
 
-      emailImpact.day0 = computeImpact("welcome");
+      // Day 0 = lifecycle-day0 OR welcome (legacy). Combine recipients.
+      const day0FromDay0 = computeImpact("lifecycle-day0");
+      const day0FromWelcome = computeImpact("welcome");
+      const merge = (
+        a: { sent: number; activated_after: number; rate: number } | null,
+        b: { sent: number; activated_after: number; rate: number } | null,
+      ) => {
+        if (!a && !b) return null;
+        const sent = (a?.sent ?? 0) + (b?.sent ?? 0);
+        const activated_after = (a?.activated_after ?? 0) + (b?.activated_after ?? 0);
+        return { sent, activated_after, rate: sent > 0 ? Math.round((activated_after / sent) * 1000) / 10 : 0 };
+      };
+      emailImpact.day0 = merge(day0FromDay0, day0FromWelcome);
       emailImpact.day2 = computeImpact("lifecycle-day2");
       emailImpact.day7 = computeImpact("lifecycle-day7");
 
@@ -622,6 +648,66 @@ Deno.serve(async (req) => {
       });
 
       return json({ mode: "all-inactive", sent, attempted: finalRecipients.length, skipped, results });
+    }
+
+    if (action === "list-suppressed") {
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10), 500);
+      const { data, error } = await adminDb
+        .from("suppressed_emails")
+        .select("id, email, reason, created_at, metadata")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) return json({ error: error.message }, 500);
+      return json({ suppressed: data || [] });
+    }
+
+    if (action === "remove-suppression" && req.method === "POST") {
+      if (!isSuperAdmin) return json({ error: "Super admin required" }, 403);
+      const email = String(body.email || "").toLowerCase().trim();
+      if (!email) return json({ error: "email required" }, 400);
+      const { error } = await adminDb.from("suppressed_emails").delete().eq("email", email);
+      if (error) return json({ error: error.message }, 500);
+      await adminDb.from("admin_audit_log").insert({
+        admin_user_id: userId,
+        action: "remove-suppression",
+        metadata: { email },
+      });
+      return json({ success: true });
+    }
+
+    if (action === "retry-email" && req.method === "POST") {
+      const logId = String(body.log_id || "");
+      if (!logId) return json({ error: "log_id required" }, 400);
+      const { data: row, error: rowErr } = await adminDb
+        .from("email_send_log")
+        .select("id, message_id, template_name, recipient_email, status, metadata")
+        .eq("id", logId)
+        .maybeSingle();
+      if (rowErr || !row) return json({ error: "Log entry not found" }, 404);
+
+      const meta = (row.metadata || {}) as Record<string, unknown>;
+      const idemKey =
+        (meta.idempotencyKey as string | undefined) ||
+        (row.message_id ? `retry-${row.message_id}` : `retry-${row.id}-${Date.now()}`);
+      const templateData = (meta.templateData as Record<string, unknown> | undefined) || {};
+
+      const { error: invokeErr } = await adminDb.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: row.template_name,
+          recipientEmail: row.recipient_email,
+          idempotencyKey: idemKey,
+          templateData,
+        },
+      });
+
+      await adminDb.from("admin_audit_log").insert({
+        admin_user_id: userId,
+        action: "retry-email",
+        metadata: { log_id: logId, template: row.template_name, recipient: row.recipient_email, error: invokeErr?.message },
+      });
+
+      if (invokeErr) return json({ error: invokeErr.message }, 500);
+      return json({ success: true });
     }
 
     return json({ error: "Unknown action" }, 400);

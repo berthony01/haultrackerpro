@@ -32,6 +32,15 @@ interface UserRow {
   created_at: string;
   loads_count: number;
   expenses_count: number;
+  lifecycle_opted_out?: boolean;
+}
+
+interface SuppressedRow {
+  id: string;
+  email: string;
+  reason: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
 }
 
 interface AdminRow {
@@ -200,6 +209,12 @@ export default function Admin() {
   const [activation, setActivation] = useState<ActivationResponse | null>(null);
   const [activationLoading, setActivationLoading] = useState(false);
 
+  // Suppression list
+  const [suppressed, setSuppressed] = useState<SuppressedRow[]>([]);
+  const [suppressedLoading, setSuppressedLoading] = useState(false);
+  const [removeSuppressionConfirm, setRemoveSuppressionConfirm] = useState<SuppressedRow | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
   const initialFetchDone = useRef(false);
 
   useEffect(() => {
@@ -287,6 +302,37 @@ export default function Admin() {
     setActivationLoading(false);
   }, [api]);
 
+  const fetchSuppressed = useCallback(async () => {
+    setSuppressedLoading(true);
+    const data: { suppressed: SuppressedRow[] } | null = await api.get('list-suppressed');
+    setSuppressed(data?.suppressed || []);
+    setSuppressedLoading(false);
+  }, [api]);
+
+  const handleRemoveSuppression = useCallback(async () => {
+    if (!removeSuppressionConfirm) return;
+    const res = await api.post('remove-suppression', { email: removeSuppressionConfirm.email });
+    if (res?.success) {
+      toast.success(`Removed ${removeSuppressionConfirm.email} from suppression list`);
+      fetchSuppressed();
+    } else {
+      toast.error(res?.error || 'Failed to remove');
+    }
+    setRemoveSuppressionConfirm(null);
+  }, [api, removeSuppressionConfirm, fetchSuppressed]);
+
+  const handleRetryEmail = useCallback(async (row: EmailLogRow) => {
+    setRetryingId(row.id);
+    const res = await api.post('retry-email', { log_id: row.id });
+    setRetryingId(null);
+    if (res?.success) {
+      toast.success(`Re-queued ${row.template_name} → ${row.recipient_email}`);
+      fetchEmails(emailStatus, emailTemplate);
+    } else {
+      toast.error(res?.error || 'Retry failed');
+    }
+  }, [api, fetchEmails, emailStatus, emailTemplate]);
+
   useEffect(() => {
     if (isAdmin && !initialFetchDone.current) {
       initialFetchDone.current = true;
@@ -296,8 +342,9 @@ export default function Admin() {
       fetchUsers(1, '');
       fetchEmails();
       fetchActivation();
+      fetchSuppressed();
     }
-  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails, fetchActivation]);
+  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails, fetchActivation, fetchSuppressed]);
 
   const searchUsers = async () => {
     setUsersPage(1);
@@ -549,7 +596,14 @@ export default function Admin() {
                     <TableBody>
                       {users.map((u) => (
                         <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
-                          <TableCell className="text-xs">{u.email}</TableCell>
+                          <TableCell className="text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <span>{u.email}</span>
+                              {u.lifecycle_opted_out && (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
                               {u.subscription_status}
@@ -955,6 +1009,7 @@ export default function Admin() {
                       <TableHead>Template</TableHead>
                       <TableHead>Recipient</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -964,6 +1019,7 @@ export default function Admin() {
                         : e.status === 'dlq' || e.status === 'failed' || e.status === 'bounced' || e.status === 'complained' ? 'destructive'
                         : e.status === 'suppressed' ? 'outline'
                         : 'secondary';
+                      const canRetry = e.status === 'pending' || e.status === 'failed' || e.status === 'dlq';
                       return (
                         <TableRow
                           key={e.id}
@@ -977,6 +1033,19 @@ export default function Admin() {
                           <TableCell className="text-xs max-w-[180px] truncate">{e.recipient_email}</TableCell>
                           <TableCell>
                             <Badge variant={variant} className="text-xs">{e.status}</Badge>
+                          </TableCell>
+                          <TableCell onClick={(ev) => ev.stopPropagation()}>
+                            {canRetry && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 gap-1"
+                                disabled={retryingId === e.id}
+                                onClick={() => handleRetryEmail(e)}
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${retryingId === e.id ? 'animate-spin' : ''}`} />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -1018,6 +1087,68 @@ export default function Admin() {
                 )}
               </DialogContent>
             </Dialog>
+
+            {/* Suppression list */}
+            <Card className="border-destructive/30">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-destructive" />
+                  Suppression list ({suppressed.length})
+                </CardTitle>
+                <Button variant="outline" size="sm" className="gap-1" onClick={fetchSuppressed} disabled={suppressedLoading}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${suppressedLoading ? 'animate-spin' : ''}`} /> Refresh
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {suppressed.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">
+                    No suppressed emails. Bounces, complaints, and unsubscribes will appear here.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Added</TableHead>
+                        {isSuperAdmin && <TableHead className="w-[60px]"></TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {suppressed.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="text-xs break-all">{s.email}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{s.reason}</Badge></TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                          {isSuperAdmin && (
+                            <TableCell>
+                              <Button size="sm" variant="ghost" onClick={() => setRemoveSuppressionConfirm(s)}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            <AlertDialog open={!!removeSuppressionConfirm} onOpenChange={() => setRemoveSuppressionConfirm(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove from suppression list?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {removeSuppressionConfirm?.email} will receive emails again. If they previously bounced or complained, future sends may also bounce.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRemoveSuppression}>Remove</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </TabsContent>
         </Tabs>
       </div>

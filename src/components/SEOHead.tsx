@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 
 const BASE_URL = 'https://haultrackerpro.com';
@@ -12,14 +13,10 @@ interface SEOHeadProps {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
 
-export default function SEOHead({
-  title,
-  description,
-  path,
-  image = DEFAULT_IMAGE,
-  noindex = false,
-  jsonLd,
-}: SEOHeadProps) {
+const SEOHead = forwardRef<HTMLDivElement, SEOHeadProps>(function SEOHead(
+  { title, description, path, image = DEFAULT_IMAGE, noindex = false, jsonLd },
+  _ref,
+) {
   const canonicalUrl = `${BASE_URL}${path}`;
 
   return (
@@ -50,4 +47,6 @@ export default function SEOHead({
       ))}
     </Helmet>
   );
-}
+});
+
+export default SEOHead;
