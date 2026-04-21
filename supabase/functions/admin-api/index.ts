@@ -650,6 +650,66 @@ Deno.serve(async (req) => {
       return json({ mode: "all-inactive", sent, attempted: finalRecipients.length, skipped, results });
     }
 
+    if (action === "list-suppressed") {
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10), 500);
+      const { data, error } = await adminDb
+        .from("suppressed_emails")
+        .select("id, email, reason, created_at, metadata")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) return json({ error: error.message }, 500);
+      return json({ suppressed: data || [] });
+    }
+
+    if (action === "remove-suppression" && req.method === "POST") {
+      if (!isSuperAdmin) return json({ error: "Super admin required" }, 403);
+      const email = String(body.email || "").toLowerCase().trim();
+      if (!email) return json({ error: "email required" }, 400);
+      const { error } = await adminDb.from("suppressed_emails").delete().eq("email", email);
+      if (error) return json({ error: error.message }, 500);
+      await adminDb.from("admin_audit_log").insert({
+        admin_user_id: userId,
+        action: "remove-suppression",
+        metadata: { email },
+      });
+      return json({ success: true });
+    }
+
+    if (action === "retry-email" && req.method === "POST") {
+      const logId = String(body.log_id || "");
+      if (!logId) return json({ error: "log_id required" }, 400);
+      const { data: row, error: rowErr } = await adminDb
+        .from("email_send_log")
+        .select("id, message_id, template_name, recipient_email, status, metadata")
+        .eq("id", logId)
+        .maybeSingle();
+      if (rowErr || !row) return json({ error: "Log entry not found" }, 404);
+
+      const meta = (row.metadata || {}) as Record<string, unknown>;
+      const idemKey =
+        (meta.idempotencyKey as string | undefined) ||
+        (row.message_id ? `retry-${row.message_id}` : `retry-${row.id}-${Date.now()}`);
+      const templateData = (meta.templateData as Record<string, unknown> | undefined) || {};
+
+      const { error: invokeErr } = await adminDb.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: row.template_name,
+          recipientEmail: row.recipient_email,
+          idempotencyKey: idemKey,
+          templateData,
+        },
+      });
+
+      await adminDb.from("admin_audit_log").insert({
+        admin_user_id: userId,
+        action: "retry-email",
+        metadata: { log_id: logId, template: row.template_name, recipient: row.recipient_email, error: invokeErr?.message },
+      });
+
+      if (invokeErr) return json({ error: invokeErr.message }, 500);
+      return json({ success: true });
+    }
+
     return json({ error: "Unknown action" }, 400);
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
