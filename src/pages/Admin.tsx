@@ -199,6 +199,20 @@ export default function Admin() {
     setFeedbackLoading(false);
   }, [api]);
 
+  const fetchEmails = useCallback(async (status?: string, template?: string) => {
+    setEmailsLoading(true);
+    const params: Record<string, string> = { limit: '50' };
+    if (status && status !== 'all') params.status = status;
+    if (template && template !== 'all') params.template = template;
+    const data: EmailListResponse | null = await api.get('list-emails', params);
+    if (data) {
+      setEmails(data.emails || []);
+      setEmailTemplates(data.templates || []);
+      setEmailSummary(data.summary || null);
+    }
+    setEmailsLoading(false);
+  }, [api]);
+
   useEffect(() => {
     if (isAdmin && !initialFetchDone.current) {
       initialFetchDone.current = true;
@@ -206,8 +220,9 @@ export default function Admin() {
       api.get('list-admins').then(setAdmins);
       fetchFeedback();
       fetchUsers(1, '');
+      fetchEmails();
     }
-  }, [isAdmin, api, fetchFeedback, fetchUsers]);
+  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails]);
 
   const searchUsers = async () => {
     setUsersPage(1);
@@ -287,12 +302,13 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-5">
+          <TabsList className="w-full grid grid-cols-6">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
             <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
             <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
             <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
+            <TabsTrigger value="emails"><Mail className="h-4 w-4 mr-1" />Emails</TabsTrigger>
           </TabsList>
 
           {/* OVERVIEW */}
