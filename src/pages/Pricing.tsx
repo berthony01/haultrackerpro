@@ -24,6 +24,10 @@ const freeFeatures = [
 ];
 
 const proFeatures = [
+  'Pre-Load Profit Check (score loads before accepting)',
+  'Personal Intelligence Blocks (best/weakest lanes, broker reliability, margin leaks)',
+  'Profit Defense Alerts (weak lane, slow broker, margin/deadhead, aging unpaid)',
+  'Weekly Pulse (Monday recap: lane to repeat, lane to avoid, broker to watch)',
   'AI Voice Expense Logging',
   'AI Receipt & Screenshot Scanning',
   'AI Rate Con Parsing (OCR)',
@@ -56,6 +60,10 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'AI Tax Tips', free: '—', pro: '✓' },
   { feature: 'Driver Scorecard', free: '—', pro: '✓' },
   { feature: 'Weekly Closeout', free: '—', pro: '✓' },
+  { feature: 'Pre-Load Profit Check', free: '—', pro: '✓' },
+  { feature: 'Personal Intelligence Blocks', free: '—', pro: '✓' },
+  { feature: 'Profit Defense Alerts', free: '—', pro: '✓' },
+  { feature: 'Weekly Pulse recap', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
   { feature: 'PDF exports & reports', free: '—', pro: '✓' },
 ];
