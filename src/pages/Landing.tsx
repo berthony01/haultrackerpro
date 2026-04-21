@@ -26,12 +26,20 @@ export default function Landing() {
   const goToAuth = () => navigate('/auth');
 
   useEffect(() => {
-    if (window.location.hash) {
-      const id = window.location.hash.slice(1);
-      requestAnimationFrame(() => {
-        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
+    if (!window.location.hash) return;
+    const id = window.location.hash.slice(1);
+    let attempts = 0;
+    // Poll for the target element (it may render after lazy content / images settle).
+    // Use behavior: 'auto' to avoid the "jump-to-top then smooth-scroll" flicker on first load.
+    const tryScroll = () => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'auto', block: 'start' });
+        return;
+      }
+      if (attempts++ < 20) requestAnimationFrame(tryScroll);
+    };
+    requestAnimationFrame(tryScroll);
   }, []);
 
   return (
