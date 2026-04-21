@@ -1,9 +1,10 @@
 import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Mic, Camera, Menu, X, Star, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 import SEOHead from '@/components/SEOHead';
+import ProfitIntelDemo from '@/components/ProfitIntelDemo';
 
 const faqs = [
   { q: 'Is my data secure?', a: 'Yes. All data is encrypted in transit and stored securely. We never sell or share your data with third parties.' },
@@ -11,7 +12,8 @@ const faqs = [
   { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks AI-powered automation and advanced features for $19.99/month or $179.88/year.' },
   { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
   { q: 'Can I try Pro features before paying?', a: 'Yes — every new account starts with a free 14-day Pro trial. No credit card required. You get full access to AI Voice Logging, Receipt Scanning, Driver Scorecard, and all 5 performance charts.' },
-  { q: 'How does HaulTrackerPro know if a load is worth it?', a: 'Pro learns from your own loads, lanes, and brokers. Before you commit, it scores the rate, miles, deadhead, and broker against your personal history — not a generic average. It also warns you when a lane weakens, a broker pays slow, or your margin starts drifting, and gives you a Monday recap of which lanes to repeat, which to avoid, and which broker to watch.' },
+  { q: 'How does load scoring use my own history — and what triggers a money-slip or broker warning?', a: 'Every load you log feeds your personal lane stats (avg RPM, margin, deadhead, days-to-pay) and broker stats (reliability, short-pay rate, days-to-pay). Pro scores new loads against your own rolling averages, not generic industry numbers. Money-slip alerts trigger when a lane\'s margin drops vs. its 60-day baseline, deadhead drifts above your target, or your rolling cost-per-mile climbs. Broker warnings trigger on slow payments (days-to-pay above your average), repeated short-pays, or unpaid invoices aging past their due date.' },
+  { q: 'Can I export weekly or monthly summaries as PDF or CSV?', a: 'Yes. From your dashboard, open the Reports view and pick a date range — week, month, quarter, or custom. CSV exports of loads and expenses are included on every plan. Pro adds branded PDF reports with summary totals, ready for tax prep, bookkeepers, or pay disputes. You can also export every dataset on your account as a single JSON backup from Settings.' },
 ];
 
 export default function Landing() {
@@ -20,6 +22,15 @@ export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const goToAuth = () => navigate('/auth');
+
+  useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.slice(1);
+      requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, []);
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
@@ -244,7 +255,7 @@ export default function Landing() {
       {/* ═══════════════════════════════════════════ */}
       {/* SECTION 3.5: PROFIT INTELLIGENCE (Phases 3–6) */}
       {/* ═══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+      <section id="profit-intelligence" className="py-16 sm:py-24 scroll-mt-20" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-12">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
@@ -277,6 +288,20 @@ export default function Landing() {
           <p className="text-center mt-8 text-sm" style={{ color: 'hsl(220, 10%, 50%)' }}>
             Included with Pro — no extra setup.
           </p>
+
+          {/* Interactive demo */}
+          <div className="mt-14">
+            <div className="max-w-3xl mx-auto text-center mb-8">
+              <h3 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+                Try It Yourself —{' '}
+                <span style={{ color: 'hsl(25, 95%, 53%)' }}>Score a Sample Load</span>
+              </h3>
+              <p className="mt-3 text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
+                Punch in a load and see what the app would tell you. Adjust the numbers to see how rate, deadhead, and broker reliability change the verdict.
+              </p>
+            </div>
+            <ProfitIntelDemo />
+          </div>
         </div>
       </section>
 
