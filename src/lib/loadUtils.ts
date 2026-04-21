@@ -10,6 +10,23 @@ export function getEffectiveDate(load: Load): string {
   return (load as any).dropoff_date ?? load.load_date;
 }
 
+// ── Canonical CSV header rows (single source of truth) ──────────────────────
+// FAQ live previews import these so docs cannot drift from the real exports.
+export const CSV_HEADERS_LOADS = [
+  'Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Loaded Miles', 'Deadhead Miles',
+  'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay',
+  'Actual Pay', 'Difference', 'Status', 'Notes', 'Company Name', 'Company Start Date',
+] as const;
+
+export const CSV_HEADERS_PROFIT = [
+  'Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Estimated Pay', 'Actual Pay',
+  'Linked Expenses', 'Net Load Profit', 'Company Name', 'Company Start Date',
+] as const;
+
+export const CSV_HEADERS_SCHEDULE_C = [
+  'Schedule C Line', 'Line Description', 'Categories', 'Total Amount',
+] as const;
+
 /** Convert user setting string ('sunday', 'monday', etc.) to date-fns weekStartsOn number (0=Sun, 1=Mon, ...) */
 export function weekStartDayToNumber(day?: string | null): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   const map: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6> = {
@@ -170,7 +187,7 @@ export function buildStopsSummary(load: Load, stops: LoadStop[]): string {
 }
 
 export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay', 'Actual Pay', 'Difference', 'Status', 'Notes', 'Company Name', 'Company Start Date'];
+  const headers = [...CSV_HEADERS_LOADS];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
@@ -202,7 +219,7 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
   const netProfit = totalRevenue - totalExpenses;
   const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
 
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Estimated Pay', 'Actual Pay', 'Linked Expenses', 'Net Load Profit', 'Company Name', 'Company Start Date'];
+  const headers = [...CSV_HEADERS_PROFIT];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
@@ -364,7 +381,7 @@ export function exportScheduleCSummary(
   const sorted = groupByScheduleC(expenses);
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
 
-  const headers = ['Schedule C Line', 'Line Description', 'Categories', 'Total Amount'];
+  const headers = [...CSV_HEADERS_SCHEDULE_C];
   const rows = sorted.map(g => [
     `Line ${g.line}`,
     g.description,
