@@ -791,6 +791,88 @@ export default function Admin() {
 
           {/* EMAILS */}
           <TabsContent value="emails" className="space-y-3">
+            {/* TEST EMAIL PANEL */}
+            <Card className="border-primary/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-primary" />
+                  Send Test Lifecycle Email
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Select value={testTemplate} onValueChange={(v) => setTestTemplate(v as typeof testTemplate)}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="welcome">welcome (Day 0)</SelectItem>
+                      <SelectItem value="lifecycle-day2">lifecycle-day2</SelectItem>
+                      <SelectItem value="lifecycle-day7">lifecycle-day7</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={testRecipientId || 'none'} onValueChange={(v) => setTestRecipientId(v === 'none' ? '' : v)}>
+                    <SelectTrigger className="w-[280px]">
+                      <SelectValue placeholder="Pick recipient" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— pick recipient —</SelectItem>
+                      {users
+                        .filter((u) => testIncludeTest || !TEST_ACCOUNTS.includes(u.email.toLowerCase()))
+                        .map((u) => (
+                          <SelectItem key={u.user_id} value={u.user_id}>
+                            {u.email} · {u.loads_count} loads
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button size="sm" onClick={sendTestEmailSingle} disabled={testSending || !testRecipientId}>
+                    Send to one
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setBulkConfirmOpen(true)}
+                    disabled={testSending}
+                  >
+                    Send to all inactive users
+                  </Button>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={testIncludeTest}
+                    onChange={(e) => setTestIncludeTest(e.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  Include test accounts
+                </label>
+
+                <p className="text-xs text-muted-foreground">
+                  Single send: ignores all eligibility — fires immediately. Bulk: same gates as the daily cron (verified, opted-in, 0 loads) minus the day window. Idempotency key includes today's date so you can re-run tomorrow.
+                </p>
+              </CardContent>
+            </Card>
+
+            <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Send "{testTemplate}" to all eligible inactive users?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Sends to every verified user with 0 loads who hasn't opted out{testIncludeTest ? '' : ', excluding the 3 test accounts'}. Recipients see this as a real email.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={sendTestEmailBulk}>Send bulk</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             {emailSummary && (
               <div className="grid grid-cols-4 gap-2">
                 {[
