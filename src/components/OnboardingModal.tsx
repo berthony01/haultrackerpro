@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Truck, DollarSign, ClipboardCheck, ArrowRight, Settings, Mic, Camera, Award, BarChart3 } from 'lucide-react';
+import { Truck, DollarSign, ClipboardCheck, ArrowRight, Settings, Mic, Camera, Award, BarChart3, Shield, Target, AlertTriangle, TrendingUp } from 'lucide-react';
 
 interface OnboardingModalProps {
   open: boolean;
@@ -28,6 +28,13 @@ const slides = [
     title: 'Know Your Real Profit',
     description: 'Track expenses like fuel, tolls, and maintenance. See your true net profit and cost per mile.',
     color: 'bg-success/10 text-success',
+  },
+  {
+    icon: Shield,
+    title: 'Built To Protect Your Money',
+    description: 'As you log loads, the app learns your lanes and brokers — then helps you make smarter decisions before money slips.',
+    color: 'bg-primary/10 text-primary',
+    isProfitIntelSlide: true,
   },
   {
     icon: ClipboardCheck,
@@ -62,6 +69,23 @@ export function OnboardingModal({ open, onComplete, onNavigateSettings }: Onboar
             <h2 className="text-xl font-black font-heading">{slide.title}</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">{slide.description}</p>
           </div>
+
+          {/* Profit Intelligence features grid */}
+          {(slide as any).isProfitIntelSlide && (
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {[
+                { icon: Target, label: 'Score loads first' },
+                { icon: BarChart3, label: 'Best/worst lanes' },
+                { icon: AlertTriangle, label: 'Money-slip alerts' },
+                { icon: TrendingUp, label: 'Weekly recap' },
+              ].map(f => (
+                <div key={f.label} className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
+                  <f.icon className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">{f.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Pro features grid on trial slide */}
           {(slide as any).isProSlide && (
