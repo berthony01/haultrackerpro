@@ -27,6 +27,15 @@ export const featureList: FeatureCategory[] = [
     ],
   },
   {
+    category: 'Profit Intelligence — Built To Protect Your Money (Pro)',
+    features: [
+      { icon: Target, title: 'Score A Load Before You Take It', description: 'Paste a load and get a quick read on whether the rate, miles, deadhead, and broker actually pencil out — scored against your own lane and operating history, not a generic average. Available right inside the load form before you commit.', pro: true },
+      { icon: BarChart3, title: 'See Your Best & Worst Lanes', description: 'Dashboard cards show which lanes pay you the most, which ones quietly lose money, which brokers pay reliably, and where your margin is leaking — automatically computed from your own load history. No setup.', pro: true },
+      { icon: AlertCircle, title: 'Get Warned Before Money Slips', description: 'Plain-language alerts when a lane goes weak, a broker pays slow, your margin or deadhead drifts the wrong way, or an invoice is aging unpaid — plus a weekly closeout summary of lanes to repeat, lanes to avoid, and brokers to watch.', pro: true },
+      { icon: CalendarDays, title: 'A Clear Read On Your Week', description: 'Every Monday and Tuesday, a single dashboard card recaps last week: the top lane to repeat, the lane to avoid, and the broker to watch — so this week starts with a plan instead of a guess. Dismissable per ISO week.', pro: true },
+    ],
+  },
+  {
     category: 'AI Automation (Pro)',
     features: [
       { icon: Mic, title: 'AI Voice Expense Logging', description: 'Dictate expenses hands-free and let AI parse the amount, category, and notes automatically.', pro: true },
@@ -36,15 +45,6 @@ export const featureList: FeatureCategory[] = [
       { icon: Sparkles, title: 'AI Weekly Business Report', description: 'AI-generated narrative summary of your week — highlights best/worst loads, deadhead issues, and actionable recommendations.', pro: true },
       { icon: Target, title: 'AI Lane Advice', description: 'AI analyzes your load history and recommends your most profitable lanes with optimization tips.', pro: true },
       { icon: Calculator, title: 'AI Tax Optimization Tips', description: 'AI-generated quarterly tax tips based on your expense patterns to help maximize deductions.', pro: true },
-    ],
-  },
-  {
-    category: 'Profit Intelligence (Pro)',
-    features: [
-      { icon: Target, title: 'Pre-Load Profit Check', description: 'Before you accept a load, see a deterministic score based on RPM, margin, deadhead, and broker history — scored against your personal lane and operating data so you know if it’s worth taking.', pro: true },
-      { icon: BarChart3, title: 'Personal Intelligence Blocks', description: 'Dashboard cards surface your best lanes, weakest lanes, broker reliability scores, and margin leaks — automatically computed from your own load history.', pro: true },
-      { icon: AlertCircle, title: 'Profit Defense Alerts', description: 'Grounded alerts for weak lanes, slow-paying brokers, margin and deadhead slips, and aging unpaid loads — plus weekly closeout lanes-to-repeat, lanes-to-avoid, and brokers-to-watch.', pro: true },
-      { icon: CalendarDays, title: 'Weekly Pulse', description: 'Every Monday and Tuesday: a dashboard recap of last week with the top lane to repeat, the lane to avoid, and the broker to watch. Dismissable per ISO week.', pro: true },
     ],
   },
   {
