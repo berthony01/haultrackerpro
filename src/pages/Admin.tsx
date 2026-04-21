@@ -332,8 +332,9 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-6">
+          <TabsList className="w-full grid grid-cols-7">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
+            <TabsTrigger value="activation"><TrendingUp className="h-4 w-4 mr-1" />Activation</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
             <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
             <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
