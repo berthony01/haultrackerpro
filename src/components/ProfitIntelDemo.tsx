@@ -173,6 +173,35 @@ export default function ProfitIntelDemo() {
           )}
         </div>
       </div>
+
+      {/* CTA + Disclaimer (full width) */}
+      <div className="lg:col-span-2 flex flex-col items-center gap-3 mt-2">
+        <button
+          onClick={() => {
+            try {
+              sessionStorage.setItem('htp_demo_prefill', JSON.stringify({
+                rate, loadedMiles, deadheadMiles, fuelCost, otherCost, brokerOnTimePct, ts: Date.now(),
+              }));
+            } catch {}
+            navigate('/?prefill=load');
+          }}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all hover:translate-y-[-1px]"
+          style={{
+            background: 'hsl(25, 95%, 53%)',
+            color: 'hsl(0, 0%, 100%)',
+            boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)',
+          }}
+        >
+          Use My Numbers in HaulTrackerPro <ArrowRight className="h-4 w-4" />
+        </button>
+        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed max-w-2xl text-center justify-center" style={{ color: 'hsl(220, 10%, 50%)' }}>
+          <Info className="h-3 w-3 mt-0.5 shrink-0" />
+          <span>
+            <strong style={{ color: 'hsl(220, 10%, 65%)' }}>Marketing preview only.</strong>{' '}
+            Real scoring inside HaulTrackerPro uses your in-app load history, lane stats, and broker reliability data — not the generic targets used here.
+          </span>
+        </p>
+      </div>
     </div>
   );
 }
