@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { TrendingUp, AlertTriangle, CheckCircle2, Target } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, CheckCircle2, Target, ArrowRight, Info } from 'lucide-react';
 
 /**
  * Lightweight, marketing-only Profit Intelligence preview.
@@ -7,6 +8,7 @@ import { TrendingUp, AlertTriangle, CheckCircle2, Target } from 'lucide-react';
  * without touching real lane_stats / broker_stats. For Landing page only.
  */
 export default function ProfitIntelDemo() {
+  const navigate = useNavigate();
   const [rate, setRate] = useState(2000);
   const [loadedMiles, setLoadedMiles] = useState(800);
   const [deadheadMiles, setDeadheadMiles] = useState(120);
