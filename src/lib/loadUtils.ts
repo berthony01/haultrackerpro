@@ -381,7 +381,7 @@ export function exportScheduleCSummary(
   const sorted = groupByScheduleC(expenses);
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
 
-  const headers = ['Schedule C Line', 'Line Description', 'Categories', 'Total Amount'];
+  const headers = [...CSV_HEADERS_SCHEDULE_C];
   const rows = sorted.map(g => [
     `Line ${g.line}`,
     g.description,
