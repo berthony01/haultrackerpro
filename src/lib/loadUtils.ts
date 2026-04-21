@@ -187,7 +187,7 @@ export function buildStopsSummary(load: Load, stops: LoadStop[]): string {
 }
 
 export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Loaded Miles', 'Deadhead Miles', 'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay', 'Actual Pay', 'Difference', 'Status', 'Notes', 'Company Name', 'Company Start Date'];
+  const headers = [...CSV_HEADERS_LOADS];
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
