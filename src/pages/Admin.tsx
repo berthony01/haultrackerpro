@@ -188,6 +188,14 @@ export default function Admin() {
   const [emailsLoading, setEmailsLoading] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<EmailLogRow | null>(null);
 
+  // Test email panel
+  const TEST_ACCOUNTS = ['berthonyxyz@gmail.com', 'peejayslifestyle@gmail.com', 'wysdomaniac@gmail.com'];
+  const [testTemplate, setTestTemplate] = useState<'welcome' | 'lifecycle-day2' | 'lifecycle-day7'>('welcome');
+  const [testRecipientId, setTestRecipientId] = useState<string>('');
+  const [testIncludeTest, setTestIncludeTest] = useState(false);
+  const [testSending, setTestSending] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+
   // Activation
   const [activation, setActivation] = useState<ActivationResponse | null>(null);
   const [activationLoading, setActivationLoading] = useState(false);
