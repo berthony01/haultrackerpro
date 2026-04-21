@@ -23,7 +23,7 @@ export const featureList: FeatureCategory[] = [
       { icon: DollarSign, title: 'Estimated vs Actual Pay', description: 'Compare what you expected to earn against what you actually received to catch pay discrepancies.' },
       { icon: Calculator, title: 'Net Profit Calculation', description: 'See real net profit per load after all expenses — not just gross revenue.' },
       { icon: Route, title: 'Deadhead Awareness', description: 'Track deadhead miles and percentage to understand how empty miles impact your earnings.' },
-      { icon: Sparkles, title: 'Multi-Stop Auto-Detection', description: 'Paste load details with numbered stops (1#:, 2#:) and the system auto-detects multi-stop loads, toggles multi-stop mode, and pre-fills stop locations.' },
+      { icon: Sparkles, title: 'Smart Multi-Stop Paste Detection', description: 'When you paste load details with numbered stops (1#:, 2#:), the system auto-detects them, toggles multi-stop mode, and pre-fills each stop location for you.' },
     ],
   },
   {
