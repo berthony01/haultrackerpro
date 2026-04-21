@@ -243,6 +243,43 @@ export default function Admin() {
     setEmailsLoading(false);
   }, [api]);
 
+  const sendTestEmailSingle = useCallback(async () => {
+    if (!testRecipientId) {
+      toast.error('Pick a recipient first');
+      return;
+    }
+    setTestSending(true);
+    const res = await api.post('send-lifecycle-test', {
+      templateName: testTemplate,
+      mode: 'single',
+      recipientUserId: testRecipientId,
+    });
+    setTestSending(false);
+    if (res?.result?.status === 'sent') {
+      toast.success(`Sent ${testTemplate} to ${res.result.email}`);
+      fetchEmails(emailStatus, emailTemplate);
+    } else {
+      toast.error(res?.result?.reason || res?.error || 'Send failed');
+    }
+  }, [api, testRecipientId, testTemplate, fetchEmails, emailStatus, emailTemplate]);
+
+  const sendTestEmailBulk = useCallback(async () => {
+    setBulkConfirmOpen(false);
+    setTestSending(true);
+    const res = await api.post('send-lifecycle-test', {
+      templateName: testTemplate,
+      mode: 'all-inactive',
+      includeTestAccounts: testIncludeTest,
+    });
+    setTestSending(false);
+    if (res?.sent !== undefined) {
+      toast.success(`Sent ${res.sent} of ${res.attempted} (${res.skipped?.length || 0} skipped)`);
+      fetchEmails(emailStatus, emailTemplate);
+    } else {
+      toast.error(res?.error || 'Bulk send failed');
+    }
+  }, [api, testTemplate, testIncludeTest, fetchEmails, emailStatus, emailTemplate]);
+
   const fetchActivation = useCallback(async () => {
     setActivationLoading(true);
     const data: ActivationResponse | null = await api.get('activation');
