@@ -24,6 +24,18 @@ export default function Auth() {
         const { error } = await signUp(form.email, form.password, form.name);
         if (error) throw error;
         trackSignUp('email');
+        // Fire-and-forget welcome email (Day 0)
+        const TEST_ACCOUNTS = ['berthonyxyz@gmail.com', 'peejayslifestyle@gmail.com', 'wysdomaniac@gmail.com'];
+        if (!TEST_ACCOUNTS.includes(form.email.toLowerCase().trim())) {
+          supabase.functions.invoke('send-transactional-email', {
+            body: {
+              templateName: 'welcome',
+              recipientEmail: form.email,
+              idempotencyKey: `welcome-${form.email.toLowerCase().trim()}`,
+              templateData: { name: form.name },
+            },
+          }).catch(() => {});
+        }
         toast.success('Check your email to confirm your account!');
       } else {
         const { error } = await signIn(form.email, form.password);
