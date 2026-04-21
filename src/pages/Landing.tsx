@@ -247,22 +247,22 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-12">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              <Shield className="h-3.5 w-3.5" /> PROFIT INTELLIGENCE
+              <Shield className="h-3.5 w-3.5" /> BUILT TO PROTECT YOUR MONEY
             </div>
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Your Personal{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Profit Command Center.</span>
+              The App Tells You{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>If a Load Is Worth It.</span>
             </h2>
             <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              HaulTrackerPro learns from your loads, lanes, and brokers — then defends your profit before you take a bad load.
+              HaulTrackerPro learns from your own loads, lanes, and brokers — then warns you before you take a bad load, lose margin, or chase money that isn't coming.
             </p>
           </div>
           <div className="grid sm:grid-cols-2 gap-6 max-w-5xl mx-auto">
             {[
-              { icon: CheckCircle2, title: 'Pre-Load Profit Check', desc: 'Before you accept, see a deterministic score based on RPM, margin, deadhead, and broker history — so you know if a load is worth it.' },
-              { icon: BarChart3, title: 'Personal Intelligence Blocks', desc: 'Your best lanes, weakest lanes, broker reliability, and margin leaks — surfaced automatically from your own load history.' },
-              { icon: AlertTriangle, title: 'Profit Defense Alerts', desc: 'Grounded alerts for weak lanes, slow-paying brokers, margin slips, deadhead spikes, and aging unpaid loads.' },
-              { icon: TrendingUp, title: 'Weekly Pulse', desc: 'Every Monday: last week recap with the top lane to repeat, the lane to avoid, and the broker to watch.' },
+              { icon: CheckCircle2, title: 'Score a Load Before You Take It', desc: 'Paste a load and get a quick read on whether the rate, miles, deadhead, and broker actually pencil out — based on your own history, not a generic average.' },
+              { icon: BarChart3, title: 'See Your Best & Worst Lanes', desc: 'The dashboard shows which lanes pay you the most, which ones quietly lose money, which brokers pay reliably, and where your margin is leaking.' },
+              { icon: AlertTriangle, title: 'Get Warned Before Money Slips', desc: 'Plain-language alerts when a lane goes weak, a broker pays slow, your margin or deadhead drifts the wrong way, or an invoice is aging unpaid.' },
+              { icon: TrendingUp, title: 'A Clear Read on Your Week', desc: 'Every Monday, see last week in one card: the lane to repeat, the lane to avoid, and the broker to watch — so this week starts with a plan.' },
             ].map((item, i) => (
               <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
