@@ -124,6 +124,25 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Failed to process unsubscribe' }, 500)
   }
 
+  // Best-effort: also flip lifecycle_emails_opt_in off for the matching auth user
+  try {
+    const { data: usersList } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+    const target = usersList?.users?.find(
+      (u) => (u.email || '').toLowerCase() === tokenRecord.email.toLowerCase(),
+    )
+    if (target?.id) {
+      await supabase
+        .from('user_settings')
+        .upsert(
+          { user_id: target.id, lifecycle_emails_opt_in: false },
+          { onConflict: 'user_id' },
+        )
+    }
+  } catch (e) {
+    // Non-fatal — suppression list already prevents future sends
+    console.error('Failed to flip lifecycle_emails_opt_in', e)
+  }
+
   console.log('Email unsubscribed', { email: tokenRecord.email })
 
   return jsonResponse({ success: true })
