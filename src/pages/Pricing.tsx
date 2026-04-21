@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PLANS } from '@/lib/billing/plans';
-import { trackBeginCheckout } from '@/lib/analytics';
+import { trackBeginCheckout, trackPricingProfitIntelClick } from '@/lib/analytics';
 
 const freeFeatures = [
   'Unlimited load logging',
