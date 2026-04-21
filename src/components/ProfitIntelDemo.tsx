@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Target, ArrowRight, Info } from 'lucide-react';
+import { trackDemoUseMyNumbers } from '@/lib/analytics';
 
 /**
  * Lightweight, marketing-only Profit Intelligence preview.
@@ -115,18 +116,18 @@ export default function ProfitIntelDemo() {
         borderColor: `${verdictColor.replace(')', ', 0.4)')}`,
         boxShadow: `0 0 30px -10px ${verdictColor.replace(')', ', 0.25)')}`
       }}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <VerdictIcon className="h-4 w-4" style={{ color: verdictColor }} />
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: verdictColor }}>
+        <div className="flex items-start sm:items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <VerdictIcon className="h-4 w-4 shrink-0" style={{ color: verdictColor }} />
+            <span className="text-xs font-bold uppercase tracking-wider leading-tight" style={{ color: verdictColor }}>
               {result.verdictLabel}
             </span>
           </div>
-          <div className="text-right">
-            <div className="text-3xl font-black tabular-nums" style={{ color: verdictColor }}>
+          <div className="text-right shrink-0">
+            <div className="text-3xl font-black tabular-nums leading-none" style={{ color: verdictColor }}>
               {result.overall}
             </div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(220, 10%, 50%)' }}>
+            <div className="text-[10px] font-semibold uppercase tracking-wider mt-1" style={{ color: 'hsl(220, 10%, 50%)' }}>
               Score / 100
             </div>
           </div>
@@ -183,6 +184,7 @@ export default function ProfitIntelDemo() {
                 rate, loadedMiles, deadheadMiles, fuelCost, otherCost, brokerOnTimePct, ts: Date.now(),
               }));
             } catch {}
+            trackDemoUseMyNumbers(result.overall, result.verdict);
             navigate('/?prefill=load');
           }}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all hover:translate-y-[-1px]"

@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PLANS } from '@/lib/billing/plans';
-import { trackBeginCheckout } from '@/lib/analytics';
+import { trackBeginCheckout, trackPricingProfitIntelClick } from '@/lib/analytics';
 
 const freeFeatures = [
   'Unlimited load logging',
@@ -117,7 +117,7 @@ export default function Pricing() {
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </button>
           <div className="flex items-center gap-1 sm:gap-3">
-            <Button variant="ghost" onClick={() => navigate('/#profit-intelligence')} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(25, 95%, 60%)' }}>
+            <Button variant="ghost" onClick={() => { trackPricingProfitIntelClick(); navigate('/#profit-intelligence'); }} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(25, 95%, 60%)' }}>
               Profit Intelligence
             </Button>
             <Button variant="ghost" onClick={() => navigate('/auth')} className="text-sm hidden sm:inline-flex" style={{ color: 'hsl(220, 10%, 70%)' }}>

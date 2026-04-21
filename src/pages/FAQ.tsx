@@ -9,6 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import SEOHead from '@/components/SEOHead';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent } from 'react';
 import { CSV_HEADERS_LOADS, CSV_HEADERS_PROFIT, CSV_HEADERS_SCHEDULE_C } from '@/lib/loadUtils';
+import { trackFaqShareLinkCopied } from '@/lib/analytics';
 
 type Faq = { id: string; question: string; answer: ReactNode; keywords?: string };
 
@@ -266,21 +267,18 @@ const AnchorValidator = () => {
 
   const run = useCallback(async () => {
     setStatus('running');
-    setDetail('Fetching / and inspecting #profit-intelligence…');
+    setDetail('Loading /#profit-intelligence in a hidden frame…');
     try {
-      const res = await fetch('/', { cache: 'no-store' });
-      const html = await res.text();
-      const hasAnchor = html.includes('id="profit-intelligence"') || html.includes("id='profit-intelligence'");
-
       const iframe = document.createElement('iframe');
       iframe.src = '/#profit-intelligence';
       iframe.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:600px;height:800px;border:0;';
       document.body.appendChild(iframe);
 
       const result = await new Promise<{ ok: boolean; msg: string }>((resolve) => {
-        const timeout = setTimeout(() => resolve({ ok: hasAnchor, msg: hasAnchor
-          ? 'Anchor present in HTML; live scroll check timed out (likely SPA hydration).'
-          : 'Anchor not found in HTML and live check timed out.' }), 4000);
+        const timeout = setTimeout(
+          () => resolve({ ok: false, msg: 'Timed out waiting for #profit-intelligence to render in the frame.' }),
+          8000,
+        );
         iframe.addEventListener('load', () => {
           let tries = 0;
           const poll = () => {
@@ -290,11 +288,16 @@ const AnchorValidator = () => {
               if (el) {
                 clearTimeout(timeout);
                 const rect = el.getBoundingClientRect();
-                resolve({ ok: true, msg: `Found #profit-intelligence (${Math.round(rect.width)}×${Math.round(rect.height)}px). Scroll target resolves on direct URL & refresh.` });
+                resolve({
+                  ok: true,
+                  msg: `Found #profit-intelligence (${Math.round(rect.width)}×${Math.round(rect.height)}px). Scroll target resolves on direct URL & refresh.`,
+                });
                 return;
               }
-            } catch {/* same-origin only */}
-            if (tries < 30) requestAnimationFrame(poll);
+            } catch {
+              /* same-origin only */
+            }
+            if (tries < 60) requestAnimationFrame(poll);
             else { clearTimeout(timeout); resolve({ ok: false, msg: 'Iframe loaded but #profit-intelligence never appeared in the DOM.' }); }
           };
           requestAnimationFrame(poll);
@@ -651,6 +654,7 @@ export default function FAQ() {
               <button
                 onClick={() => {
                   navigator.clipboard?.writeText(shareableLink);
+                  if (bestMatchId) trackFaqShareLinkCopied(bestMatchId);
                 }}
                 className="text-primary font-semibold hover:underline"
                 title="Copy a shareable URL that opens this answer"
