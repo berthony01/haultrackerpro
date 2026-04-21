@@ -311,6 +311,10 @@ export default function Landing() {
               </p>
             </div>
             <ProfitIntelDemo />
+            <p className="max-w-3xl mx-auto text-center text-xs mt-5 leading-relaxed" style={{ color: 'hsl(220, 10%, 50%)' }}>
+              <span className="font-semibold" style={{ color: 'hsl(220, 10%, 70%)' }}>"Use My Numbers" prefills:</span>{' '}
+              Load pays → Gross Revenue &amp; Estimated Pay · Loaded miles → Loaded Miles · Deadhead miles → Deadhead Miles · Load pays ÷ Loaded miles → Rate/Mile · Fuel &amp; Other costs → Notes (log as separate expenses). Pickup, dropoff, dates, and broker stay empty for you to fill in.
+            </p>
           </div>
         </div>
       </section>
