@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Target, ArrowRight, Info } from 'lucide-react';
+import { trackDemoUseMyNumbers } from '@/lib/analytics';
 
 /**
  * Lightweight, marketing-only Profit Intelligence preview.
