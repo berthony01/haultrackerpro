@@ -53,7 +53,7 @@ export default function OwnerOperatorExpenseTracker() {
             Owner operators juggle dozens of expenses every week — fuel, parking, tolls, meals, supplies, and more.
             Keeping track of every receipt while driving thousands of miles is nearly impossible with pen and paper.
             Spreadsheets get messy fast, and without a system, expenses slip through the cracks. That means lost
-            deductions and higher taxes at the end of the year.
+            deductions at tax time — and worse, you can't see which loads, lanes, or weeks are actually losing you money.
           </p>
         </section>
 

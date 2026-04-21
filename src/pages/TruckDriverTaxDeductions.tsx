@@ -51,7 +51,7 @@ export default function TruckDriverTaxDeductions() {
           </div>
           <h2 className="text-3xl font-black font-heading">Truck Driver Tax Deductions Explained</h2>
           <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Understand the deductions truck drivers can legally claim to reduce taxes.
+            Every missed deduction is real money out of your pocket. Learn what truck drivers can legally claim — and how tracking them as you go protects your profit, not just your tax return.
           </p>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             Track Your Deductions <ArrowRight className="h-4 w-4" />

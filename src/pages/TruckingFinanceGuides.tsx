@@ -86,7 +86,7 @@ export default function TruckingFinanceGuides() {
           </div>
           <h2 className="text-3xl font-black font-heading">Trucking Finance Guides</h2>
           <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Practical guides to help owner-operators and truck drivers understand expenses, taxes, and real profit.
+            Plain-language guides on the numbers that decide whether a load is worth taking — cost per mile, expenses, taxes, and real profit per haul.
           </p>
         </section>
 

@@ -51,7 +51,7 @@ export default function TruckingCostPerMile() {
           </div>
           <h2 className="text-3xl font-black font-heading">Trucking Cost Per Mile Explained</h2>
           <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Understand the real operating cost of running a truck.
+            Your cost per mile is the line that decides if a load makes money or loses it. Learn how to calculate it — and how to use it to walk away from bad loads before you commit.
           </p>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             Track Trucking Costs <ArrowRight className="h-4 w-4" />

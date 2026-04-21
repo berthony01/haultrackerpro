@@ -131,10 +131,10 @@ export default function HowToUseHaulTrackerPro() {
             How to Use <span className="text-primary">HaulTrackerPro</span>
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground mb-4 max-w-2xl mx-auto">
-            A step-by-step guide to tracking loads, expenses, fuel, and real profit with HaulTrackerPro.
+            A step-by-step guide to logging loads, tracking expenses, and seeing the real profit on every haul — so you can spot bad loads before they cost you.
           </p>
           <p className="text-sm text-muted-foreground mb-8 max-w-xl mx-auto">
-            HaulTrackerPro helps owner-operators, lease drivers, and 1099 company drivers run their truck like a business — not a guessing game. Log loads, track every dollar out, and see your real take-home profit.
+            HaulTrackerPro helps owner-operators, lease drivers, and 1099 company drivers run their truck like a business — not a guessing game. Log loads, see your true take-home profit, and get warned when a lane, broker, or week starts losing you money.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button asChild size="lg" className="rounded-xl font-bold text-base px-8">
