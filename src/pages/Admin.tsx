@@ -1087,6 +1087,68 @@ export default function Admin() {
                 )}
               </DialogContent>
             </Dialog>
+
+            {/* Suppression list */}
+            <Card className="border-destructive/30">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-destructive" />
+                  Suppression list ({suppressed.length})
+                </CardTitle>
+                <Button variant="outline" size="sm" className="gap-1" onClick={fetchSuppressed} disabled={suppressedLoading}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${suppressedLoading ? 'animate-spin' : ''}`} /> Refresh
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {suppressed.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">
+                    No suppressed emails. Bounces, complaints, and unsubscribes will appear here.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Added</TableHead>
+                        {isSuperAdmin && <TableHead className="w-[60px]"></TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {suppressed.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="text-xs break-all">{s.email}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{s.reason}</Badge></TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                          {isSuperAdmin && (
+                            <TableCell>
+                              <Button size="sm" variant="ghost" onClick={() => setRemoveSuppressionConfirm(s)}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            <AlertDialog open={!!removeSuppressionConfirm} onOpenChange={() => setRemoveSuppressionConfirm(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove from suppression list?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {removeSuppressionConfirm?.email} will receive emails again. If they previously bounced or complained, future sends may also bounce.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRemoveSuppression}>Remove</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </TabsContent>
         </Tabs>
       </div>
