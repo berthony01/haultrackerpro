@@ -596,7 +596,14 @@ export default function Admin() {
                     <TableBody>
                       {users.map((u) => (
                         <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
-                          <TableCell className="text-xs">{u.email}</TableCell>
+                          <TableCell className="text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <span>{u.email}</span>
+                              {u.lifecycle_opted_out && (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
                               {u.subscription_status}
