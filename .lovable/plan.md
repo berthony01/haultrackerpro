@@ -1,63 +1,49 @@
 
 
-## Recommendation: Activation > Email Reminders
+## Test the lifecycle email sequence on real users
 
-You have an **activation problem**, not a reminder problem. 12 signups, 1 active user means people are dropping off **inside the app**, not forgetting to come back. Sending "log your first load!" emails to users who already saw 5 onboarding modals and didn't act will mostly land in spam or get ignored. We need to fix the in-app dropoff first, then layer email on top.
+You want to manually trigger the Day 0 / Day 2 / Day 7 emails to your existing inactive signups so you can confirm deliverability, copy, and the unsubscribe flow before the daily cron does it automatically.
 
-Here's the recommended order, biggest impact first.
+### What I'll build
 
-### Phase 1 — Diagnose the dropoff (no code, ~10 min)
+**1. Admin "Send Test Email" panel** (Admin → Emails tab)
 
-Before building anything, I'll query `auth.users` joined with `loads`, `expenses`, `fuel_logs`, and `user_settings` (via a migration to grant access or via a Supabase admin query) to answer:
+A new card at the top of the Emails tab with:
+- **Recipient picker** — dropdown of all users (excludes the 3 test accounts by default, but with a "show test accounts" toggle so you can send to yourself first)
+- **Template picker** — `welcome`, `lifecycle-day2`, `lifecycle-day7`
+- **Send button** — fires one email immediately
+- **"Send to all inactive users" button** (separate, with confirm dialog) — runs the same eligibility logic as the cron (verified, opted-in, 0 loads, not a test account) but ignores the day-2/day-7 age windows so you can send right now
 
-- How many users completed the **5-step onboarding modal** vs skipped?
-- How many set a **default rate per mile** in Settings?
-- How many opened the **Add Load** form but didn't submit?
+Results land in the existing email log table below so you can watch status flip from `pending` → `sent`.
 
-This tells us *where* in the funnel they're dropping. Without this, any reminder email is a guess.
+**2. New admin-api action: `send-lifecycle-test`**
 
-### Phase 2 — Reduce in-app friction (high impact)
+Backend handler that:
+- Verifies caller is admin (existing pattern)
+- Accepts `{ templateName, recipientUserId }` for single send, or `{ templateName, mode: 'all-inactive' }` for bulk
+- For bulk mode: reuses the exact eligibility logic from `send-lifecycle-emails` (verified email, no recent email change, opted-in, zero loads, not in TEST_ACCOUNTS) — but skips the age window check
+- Invokes `send-transactional-email` with idempotency key `<template>-test-<userId>-<yyyymmdd>` so you can re-send on a different day if needed
+- Returns per-user result (sent / skipped + reason)
 
-Three concrete changes likely to move activation from 8% to 25%+:
+**3. Safety rails**
 
-1. **Shorten onboarding from 5 slides to 2.** Slides 2 (set rate), 4 (Profit Intel), and 5 (Pro trial) are great content but they delay the user from the one thing that matters: logging a load. Move them to a "Tips" panel inside the dashboard.
-2. **Add a sample/demo load** auto-created on signup so the dashboard isn't empty. Empty state = "I don't know what this app does" = bounce.
-3. **Pre-fill the first Add Load form** with a realistic example (Atlanta → Miami, 650 mi, $2.50/mi) and a "Log your real first load" CTA. Friction goes from "blank form" to "edit and save."
+- Test accounts (`berthonyxyz@`, `peejayslifestyle@`, `wysdomaniac@`) excluded from bulk mode unless you flip the toggle
+- Idempotency key includes today's date → prevents accidental double-sends within the same day
+- Bulk send shows a confirm dialog with the exact recipient count before firing
+- All sends logged to `email_send_log` and visible in the existing table
 
-### Phase 3 — Lifecycle emails (the actual reminder system)
+### Recommended test flow (after I ship this)
 
-Once the in-app flow is tighter, layer in 3 transactional emails using the infrastructure already deployed:
+1. Send `welcome` to your own account → confirm it arrives, looks right, unsubscribe link works
+2. Send `lifecycle-day2` to one real inactive user → check inbox + log status
+3. If good, use "Send to all inactive users" with `lifecycle-day2` to hit the remaining ~10 users
+4. Wait a day, repeat with `lifecycle-day7`
 
-| When                          | Email                               | Purpose                          |
-|-------------------------------|-------------------------------------|----------------------------------|
-| Day 0 (immediately on signup) | Welcome + "Log your first load" CTA | Already built (`welcome` template) — just wire to `auth.users` insert trigger |
-| Day 2 (if 0 loads)            | "Need help getting started?" + 30-sec demo video link | Re-engage before they forget the app exists |
-| Day 7 (if 0 loads, trial mid-point) | "Your Pro trial ends in 7 days" + what they'll lose | Trial urgency drives action |
+### Files
 
-These are **legitimate transactional emails** (triggered by their signup + inactivity, expected, one-to-one). Each has a clear unsubscribe via the existing handler.
+- `supabase/functions/admin-api/index.ts` — add `send-lifecycle-test` action
+- `src/pages/Admin.tsx` — add the test panel to the Emails tab
+- Redeploy `admin-api`
 
-### Phase 4 — Admin visibility
-
-Add an **Activation funnel** card to the Admin dashboard:
-- Signed up → Completed onboarding → Set default rate → Logged 1st load → Logged 5th load
-- Per-user "last active" + "days since signup with 0 loads" column
-- One-click "Send re-engagement email" button per user
-
-This lets you see the funnel at a glance instead of scrolling the user table.
-
-### What I'd build first
-
-If you give the go-ahead, I'll do **Phase 1 + Phase 2** in one pass (diagnostic query + onboarding shortened + sample load + pre-filled form). That's the highest-leverage work. Then we add Phase 3 emails once we see the funnel data. Phase 4 is a nice-to-have after.
-
-### What I would NOT do
-
-- **Build a daily/weekly "you haven't logged anything" email blast.** That's borderline marketing, hurts deliverability, and won't convert users who already silently churned. Targeted day-2/day-7 transactional emails to specific users are fine; bulk inactivity blasts are not.
-- **Send reminders to your 3 test accounts.** I'll exclude `berthonyxyz@gmail.com`, `peejayslifestyle@gmail.com`, `wysdomaniac@gmail.com` from any lifecycle email logic.
-
-### Reply with one of:
-
-- **"Do Phase 1+2"** — diagnose the funnel and ship the activation fixes
-- **"Just emails (Phase 3)"** — skip the in-app work, wire the 3 lifecycle emails now
-- **"Do all of it"** — Phase 1 → 4 in sequence
-- Or push back / change the plan
+No new tables, no migrations, no changes to the daily cron.
 
