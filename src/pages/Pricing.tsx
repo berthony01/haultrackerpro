@@ -24,23 +24,23 @@ const freeFeatures = [
 ];
 
 const proFeatures = [
-  'Pre-Load Profit Check (score loads before accepting)',
-  'Personal Intelligence Blocks (best/weakest lanes, broker reliability, margin leaks)',
-  'Profit Defense Alerts (weak lane, slow broker, margin/deadhead, aging unpaid)',
-  'Weekly Pulse (Monday recap: lane to repeat, lane to avoid, broker to watch)',
-  'AI Voice Expense Logging',
-  'AI Receipt & Screenshot Scanning',
-  'AI Rate Con Parsing (OCR)',
-  'AI Weekly Business Report',
-  'AI Lane Advice & Load Optimization',
-  'AI Tax Optimization Tips',
-  'Paste Load Parser (Unlimited)',
-  'RPM, Deadhead % & Expense Breakdown Charts',
-  'Driver Performance Scorecard',
-  'Weekly Closeout Snapshots',
-  'Full Tax Breakdown & Quarterly Schedule',
-  'Advanced Smart Alerts (profit drops, RPM dips)',
-  'PDF Exports & Profit Reports',
+  'Score loads before you take them (RPM, margin, deadhead, broker)',
+  'See your best & worst lanes and broker reliability automatically',
+  'Get warned when a lane weakens, a broker pays slow, or margin slips',
+  'Monday recap: lane to repeat, lane to avoid, broker to watch',
+  'Log expenses by voice — hands-free',
+  'Snap a receipt, AI fills in the expense',
+  'Snap a rate con, AI fills in the load',
+  'AI weekly business report on what made and lost money',
+  'AI lane advice based on your own load history',
+  'AI tax tips to keep more of what you earn',
+  'Unlimited Paste Load Parser',
+  'RPM, deadhead %, and expense breakdown charts',
+  'Driver performance scorecard',
+  'Weekly closeout snapshots',
+  'Full tax breakdown with quarterly schedule',
+  'Advanced alerts with dollar impact (profit drops, RPM dips)',
+  'PDF profit reports for taxes, bookkeepers, or disputes',
 ];
 
 const comparisonRows: { feature: string; free: string; pro: string }[] = [
@@ -52,27 +52,27 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Performance charts', free: '2 charts', pro: 'All 5 charts' },
   { feature: 'Tax planning', free: 'Total estimate only', pro: 'Full breakdown + quarterly' },
   { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
-  { feature: 'AI Voice Logging', free: '—', pro: '✓' },
-  { feature: 'AI Receipt Scanning', free: '—', pro: '✓' },
-  { feature: 'AI Rate Con Parsing', free: '—', pro: '✓' },
-  { feature: 'AI Weekly Business Report', free: '—', pro: '✓' },
-  { feature: 'AI Lane Advice', free: '—', pro: '✓' },
-  { feature: 'AI Tax Tips', free: '—', pro: '✓' },
-  { feature: 'Driver Scorecard', free: '—', pro: '✓' },
-  { feature: 'Weekly Closeout', free: '—', pro: '✓' },
-  { feature: 'Pre-Load Profit Check', free: '—', pro: '✓' },
-  { feature: 'Personal Intelligence Blocks', free: '—', pro: '✓' },
-  { feature: 'Profit Defense Alerts', free: '—', pro: '✓' },
-  { feature: 'Weekly Pulse recap', free: '—', pro: '✓' },
+  { feature: 'Voice expense logging', free: '—', pro: '✓' },
+  { feature: 'Receipt scanning (AI)', free: '—', pro: '✓' },
+  { feature: 'Rate con scanning (AI)', free: '—', pro: '✓' },
+  { feature: 'AI weekly business report', free: '—', pro: '✓' },
+  { feature: 'AI lane advice', free: '—', pro: '✓' },
+  { feature: 'AI tax tips', free: '—', pro: '✓' },
+  { feature: 'Driver scorecard', free: '—', pro: '✓' },
+  { feature: 'Weekly closeout', free: '—', pro: '✓' },
+  { feature: 'Score a load before you take it', free: '—', pro: '✓' },
+  { feature: 'Best/worst lanes & broker reliability', free: '—', pro: '✓' },
+  { feature: 'Money-slip alerts (lane, broker, margin)', free: '—', pro: '✓' },
+  { feature: 'Monday recap (repeat / avoid / watch)', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
-  { feature: 'PDF exports & reports', free: '—', pro: '✓' },
+  { feature: 'PDF reports', free: '—', pro: '✓' },
 ];
 
 const whyProPoints = [
-  { icon: Zap, title: 'AI-Powered Automation', desc: 'Voice logging, receipt scanning, and rate con parsing — AI does the data entry so you can drive.' },
-  { icon: BarChart3, title: 'AI Business Insights', desc: 'Weekly AI reports, lane optimization advice, and performance trends with dollar-impact alerts.' },
-  { icon: Target, title: 'AI Tax Optimization', desc: 'Full tax breakdown with quarterly schedule plus AI-generated tips to maximize deductions.' },
-  { icon: TrendingUp, title: 'Close Your Week Like a Business', desc: 'Weekly Closeout with AI narrative — flags your best/worst loads, deadhead issues, and missing payments.' },
+  { icon: Shield, title: 'Protect Your Money Before It Slips', desc: 'Score a load before you take it. Get warned when a lane weakens, a broker pays slow, or your margin starts drifting — based on your own history.' },
+  { icon: Target, title: 'Know Where You Make & Lose Money', desc: 'See your best lanes, weakest lanes, broker reliability, and margin leaks — surfaced automatically from the loads you already log.' },
+  { icon: Zap, title: 'Stop Doing The Data Entry', desc: 'Speak an expense, snap a receipt, or upload a rate con — AI fills in the rest so you can stay focused on driving.' },
+  { icon: TrendingUp, title: 'Close Your Week Like A Business', desc: 'Weekly closeout, AI summary, dollar-impact alerts, and a Monday recap of last week — so this week starts with a plan.' },
 ];
 
 export default function Pricing() {
@@ -138,7 +138,7 @@ export default function Pricing() {
             <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            HaulTrackerPro helps owner-operators track profit, automate bookkeeping, and plan taxes with confidence.
+            See the real profit on every load, get warned before money slips, and know which lanes and brokers are actually worth your time.
           </p>
         </div>
       </section>
