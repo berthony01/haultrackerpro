@@ -369,6 +369,109 @@ export default function Admin() {
             )}
           </TabsContent>
 
+          {/* ACTIVATION */}
+          <TabsContent value="activation" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Cohorts exclude internal test accounts. "Activated" = user logged at least one load.
+              </p>
+              <Button variant="outline" size="sm" className="gap-1" onClick={fetchActivation} disabled={activationLoading}>
+                <RefreshCw className={`h-4 w-4 ${activationLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+
+            {activationLoading && !activation ? (
+              <p className="text-muted-foreground text-center py-8">Loading...</p>
+            ) : activation ? (
+              <>
+                {/* Headline */}
+                <Card className="shadow-card">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold mb-1">
+                      Overall Activation
+                    </p>
+                    <p className="text-3xl font-bold">{activation.overall.rate}%</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {activation.overall.activated} of {activation.overall.signups} signups logged a first load
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Email impact */}
+                <Card className="shadow-card">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Lifecycle Email Impact</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {[
+                      { key: 'day0' as const, label: 'Day 0 — Welcome' },
+                      { key: 'day2' as const, label: 'Day 2 — "Need a hand?"' },
+                      { key: 'day7' as const, label: 'Day 7 — Trial midpoint' },
+                    ].map(({ key, label }) => {
+                      const m = activation.emailImpact[key];
+                      return (
+                        <div key={key} className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold">{label}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {m ? `${m.activated_after} of ${m.sent} recipients activated` : 'No sends yet'}
+                            </p>
+                          </div>
+                          <Badge variant={m && m.rate >= 25 ? 'default' : 'secondary'} className="text-xs whitespace-nowrap">
+                            {m ? `${m.rate}%` : '—'}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                    <p className="text-[10px] text-muted-foreground/70 pt-1">
+                      Rate = % of email recipients who logged their first load any time after the email was sent.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Cohort table */}
+                <Card>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cohort (ISO week)</TableHead>
+                        <TableHead className="text-right">Signups</TableHead>
+                        <TableHead className="text-right">Activated</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                        <TableHead className="text-right">Avg hrs to 1st load</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activation.cohorts.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
+                            No cohorts yet.
+                          </TableCell>
+                        </TableRow>
+                      ) : activation.cohorts.map((c) => (
+                        <TableRow key={c.cohort}>
+                          <TableCell className="text-xs whitespace-nowrap">{c.cohort}</TableCell>
+                          <TableCell className="text-right text-xs">{c.signups}</TableCell>
+                          <TableCell className="text-right text-xs">{c.activated}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={c.activation_rate >= 25 ? 'default' : 'secondary'} className="text-xs">
+                              {c.activation_rate}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-xs">
+                            {c.avg_hours_to_first_load != null ? `${c.avg_hours_to_first_load}h` : '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">No data.</p>
+            )}
+          </TabsContent>
+
           {/* USERS */}
           <TabsContent value="users" className="space-y-3">
             <div className="flex gap-2">
