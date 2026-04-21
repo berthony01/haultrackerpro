@@ -61,19 +61,22 @@ export default function Landing() {
         title="HaulTrackerPro | Know Your Real Profit Per Load"
         description="Stop driving blind. HaulTrackerPro shows truck drivers their true profit after fuel, deadhead, and expenses — so you stop losing money on bad loads."
         path="/"
-        jsonLd={{
-          "@context": "https://schema.org",
-          "@type": "SoftwareApplication",
-          "name": "HaulTrackerPro",
-          "applicationCategory": "FinanceApplication",
-          "operatingSystem": "Web",
-          "description": "Track loads, expenses, and real net profit for owner-operators and lease drivers.",
-          "url": "https://haultrackerpro.com",
-          "offers": [
-            { "@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free" },
-            { "@type": "Offer", "price": "19.99", "priceCurrency": "USD", "name": "Pro Monthly" }
-          ]
-        }}
+        jsonLd={[
+          {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "HaulTrackerPro",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Web",
+            "description": "Track loads, expenses, and real net profit for owner-operators and lease drivers.",
+            "url": "https://haultrackerpro.com",
+            "offers": [
+              { "@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free" },
+              { "@type": "Offer", "price": "19.99", "priceCurrency": "USD", "name": "Pro Monthly" }
+            ]
+          },
+          faqJsonLd,
+        ]}
       />
 
       {/* ═══════════════════════════════════════════ */}
