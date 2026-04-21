@@ -253,6 +253,58 @@ Deno.serve(async (req) => {
       return json(enriched);
     }
 
+    if (action === "list-emails") {
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 200);
+      const statusFilter = url.searchParams.get("status"); // sent | failed | dlq | suppressed | pending | bounced | complained | null
+      const templateFilter = url.searchParams.get("template"); // template_name | null
+
+      // Pull a wider window so deduplication still yields `limit` unique emails
+      const fetchSize = Math.max(limit * 4, 200);
+      let query = adminDb
+        .from("email_send_log")
+        .select("id, message_id, template_name, recipient_email, status, error_message, created_at")
+        .order("created_at", { ascending: false })
+        .limit(fetchSize);
+
+      if (templateFilter) query = query.eq("template_name", templateFilter);
+
+      const { data: rows, error: emailsErr } = await query;
+      if (emailsErr) return json({ error: emailsErr.message }, 500);
+
+      // Deduplicate by message_id, keeping the latest (rows already sorted desc)
+      const seen = new Set<string>();
+      const deduped: typeof rows = [] as never;
+      for (const r of rows || []) {
+        const key = r.message_id || `__noid_${r.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(r);
+      }
+
+      let filtered = deduped;
+      if (statusFilter) filtered = filtered.filter((r) => r.status === statusFilter);
+
+      // Distinct templates for filter dropdown
+      const { data: templateRows } = await adminDb
+        .from("email_send_log")
+        .select("template_name")
+        .order("template_name", { ascending: true });
+      const templates = Array.from(
+        new Set((templateRows || []).map((t) => t.template_name).filter(Boolean))
+      );
+
+      // Summary counts (over the deduped window, before status filter)
+      const summary = { total: deduped.length, sent: 0, failed: 0, suppressed: 0, pending: 0 };
+      for (const r of deduped) {
+        if (r.status === "sent") summary.sent++;
+        else if (r.status === "dlq" || r.status === "failed" || r.status === "bounced" || r.status === "complained") summary.failed++;
+        else if (r.status === "suppressed") summary.suppressed++;
+        else if (r.status === "pending") summary.pending++;
+      }
+
+      return json({ emails: filtered.slice(0, limit), templates, summary });
+    }
+
     return json({ error: "Unknown action" }, 400);
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
