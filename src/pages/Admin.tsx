@@ -235,6 +235,13 @@ export default function Admin() {
     setEmailsLoading(false);
   }, [api]);
 
+  const fetchActivation = useCallback(async () => {
+    setActivationLoading(true);
+    const data: ActivationResponse | null = await api.get('activation');
+    if (data) setActivation(data);
+    setActivationLoading(false);
+  }, [api]);
+
   useEffect(() => {
     if (isAdmin && !initialFetchDone.current) {
       initialFetchDone.current = true;
@@ -243,8 +250,9 @@ export default function Admin() {
       fetchFeedback();
       fetchUsers(1, '');
       fetchEmails();
+      fetchActivation();
     }
-  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails]);
+  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails, fetchActivation]);
 
   const searchUsers = async () => {
     setUsersPage(1);
