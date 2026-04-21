@@ -900,6 +900,7 @@ export type Database = {
           federal_tax_percent: number | null
           id: string
           include_se_tax: boolean | null
+          lifecycle_emails_opt_in: boolean
           onboarding_completed: boolean
           pay_percentage: number | null
           pay_type: string
@@ -927,6 +928,7 @@ export type Database = {
           federal_tax_percent?: number | null
           id?: string
           include_se_tax?: boolean | null
+          lifecycle_emails_opt_in?: boolean
           onboarding_completed?: boolean
           pay_percentage?: number | null
           pay_type?: string
@@ -954,6 +956,7 @@ export type Database = {
           federal_tax_percent?: number | null
           id?: string
           include_se_tax?: boolean | null
+          lifecycle_emails_opt_in?: boolean
           onboarding_completed?: boolean
           pay_percentage?: number | null
           pay_type?: string
