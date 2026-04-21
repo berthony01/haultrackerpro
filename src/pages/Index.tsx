@@ -126,7 +126,10 @@ const Index = () => {
               short_paid_amount: null,
             } as unknown as Load);
             setPage('add');
-            toast.success('Demo numbers loaded — review and save your load.');
+            toast.success('Demo numbers loaded — review and save your load.', {
+              description: 'Loaded miles, deadhead, rate, and gross pay are filled. Fuel and other expenses were added to Notes. Pickup, dropoff, broker, and dates are still manual.',
+              duration: 8000,
+            });
           }
           sessionStorage.removeItem('htp_demo_prefill');
         }

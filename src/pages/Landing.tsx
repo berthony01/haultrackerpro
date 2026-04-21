@@ -1,10 +1,11 @@
-import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Mic, Camera, Menu, X, Star, Users, Zap } from 'lucide-react';
+import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Mic, Camera, Menu, X, Star, Users, Zap, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
+import { trackLandingFaqDeepLink } from '@/lib/analytics';
 
 type LandingFaq = { q: string; a: string; deepLink?: string };
 
@@ -517,8 +518,20 @@ export default function Landing() {
                   <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-200 ${openFaq === i ? 'rotate-180' : ''}`} style={{ color: 'hsl(220, 10%, 50%)' }} />
                 </button>
                 {openFaq === i && (
-                  <div className="px-5 pb-5 -mt-1">
+                  <div className="px-5 pb-5 -mt-1 space-y-3">
                     <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{faq.a}</p>
+                    {faq.deepLink && (
+                      <button
+                        onClick={() => {
+                          trackLandingFaqDeepLink(faq.deepLink!);
+                          navigate(faq.deepLink!);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold rounded-lg px-3 py-1.5 transition-colors hover:bg-white/5"
+                        style={{ color: 'hsl(25, 95%, 60%)', border: '1px solid hsl(25, 95%, 53%, 0.3)' }}
+                      >
+                        See live preview <ExternalLink className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
