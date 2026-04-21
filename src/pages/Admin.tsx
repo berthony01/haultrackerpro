@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface OverviewData {
@@ -58,6 +58,22 @@ interface FeedbackRow {
   category: string | null;
   loads_count: number;
   created_at: string;
+}
+
+interface EmailLogRow {
+  id: string;
+  message_id: string | null;
+  template_name: string;
+  recipient_email: string;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+}
+
+interface EmailListResponse {
+  emails: EmailLogRow[];
+  templates: string[];
+  summary: { total: number; sent: number; failed: number; suppressed: number; pending: number };
 }
 
 function useAdminApi() {
