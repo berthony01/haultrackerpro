@@ -67,6 +67,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [payType, setPayType] = useState('cpm');
   const [payPercentage, setPayPercentage] = useState('');
   const [companyStartDate, setCompanyStartDate] = useState<Date | undefined>(undefined);
+  const [lifecycleEmailsOptIn, setLifecycleEmailsOptIn] = useState(true);
+  const [savingEmailPref, setSavingEmailPref] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -86,6 +88,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setPayType(settings.pay_type ?? 'cpm');
     setPayPercentage(settings.pay_percentage?.toString() ?? '');
     setCompanyStartDate(settings.company_start_date ? parseISO(settings.company_start_date) : undefined);
+    setLifecycleEmailsOptIn((settings as any).lifecycle_emails_opt_in ?? true);
     setInitialized(true);
   }
 
