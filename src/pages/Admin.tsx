@@ -76,6 +76,24 @@ interface EmailListResponse {
   summary: { total: number; sent: number; failed: number; suppressed: number; pending: number };
 }
 
+interface ActivationCohort {
+  cohort: string;
+  signups: number;
+  activated: number;
+  activation_rate: number;
+  avg_hours_to_first_load: number | null;
+}
+
+interface ActivationResponse {
+  overall: { signups: number; activated: number; rate: number };
+  cohorts: ActivationCohort[];
+  emailImpact: {
+    day0: { sent: number; activated_after: number; rate: number } | null;
+    day2: { sent: number; activated_after: number; rate: number } | null;
+    day7: { sent: number; activated_after: number; rate: number } | null;
+  };
+}
+
 function useAdminApi() {
   const invoke = useCallback(async (action: string, params?: Record<string, string>, method = 'GET', body?: unknown) => {
     const queryParams = new URLSearchParams({ action, ...params });
@@ -169,6 +187,10 @@ export default function Admin() {
   const [emailTemplate, setEmailTemplate] = useState('all');
   const [emailsLoading, setEmailsLoading] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<EmailLogRow | null>(null);
+
+  // Activation
+  const [activation, setActivation] = useState<ActivationResponse | null>(null);
+  const [activationLoading, setActivationLoading] = useState(false);
 
   const initialFetchDone = useRef(false);
 
