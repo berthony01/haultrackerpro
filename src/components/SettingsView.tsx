@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle, BookOpen } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle, BookOpen, BellOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -66,6 +67,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [payType, setPayType] = useState('cpm');
   const [payPercentage, setPayPercentage] = useState('');
   const [companyStartDate, setCompanyStartDate] = useState<Date | undefined>(undefined);
+  const [lifecycleEmailsOptIn, setLifecycleEmailsOptIn] = useState(true);
+  const [savingEmailPref, setSavingEmailPref] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -85,6 +88,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setPayType(settings.pay_type ?? 'cpm');
     setPayPercentage(settings.pay_percentage?.toString() ?? '');
     setCompanyStartDate(settings.company_start_date ? parseISO(settings.company_start_date) : undefined);
+    setLifecycleEmailsOptIn((settings as any).lifecycle_emails_opt_in ?? true);
     setInitialized(true);
   }
 
@@ -461,6 +465,52 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* CSV Import */}
       <CSVImport isPro={isPro ?? false} />
+
+      {/* Email Preferences */}
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5" /> Email Preferences
+          </p>
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
+                <p className="text-sm font-semibold">Lifecycle reminder emails</p>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                Occasional helper emails (Day 2 / Day 7) if you haven't logged a load yet. Account-critical emails like password resets and receipts are always sent.
+              </p>
+            </div>
+            <Switch
+              checked={lifecycleEmailsOptIn}
+              disabled={savingEmailPref || isLoading}
+              onCheckedChange={(checked) => {
+                const next = checked;
+                setLifecycleEmailsOptIn(next);
+                setSavingEmailPref(true);
+                updateSettings.mutate(
+                  { lifecycle_emails_opt_in: next } as any,
+                  {
+                    onSuccess: () => {
+                      toast.success(next ? 'Lifecycle emails turned on' : 'Lifecycle emails turned off');
+                      setSavingEmailPref(false);
+                    },
+                    onError: (e) => {
+                      setLifecycleEmailsOptIn(!next);
+                      toast.error(e.message || 'Failed to update preference');
+                      setSavingEmailPref(false);
+                    },
+                  },
+                );
+              }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground/60">
+            You can change this anytime. Unsubscribe links in our emails will also flip this off.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Data Management */}
       <Card className="shadow-card">
