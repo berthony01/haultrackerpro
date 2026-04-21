@@ -134,13 +134,27 @@ Deno.serve(async (req) => {
       const paginated = mapped.slice((page - 1) * perPage, page * perPage);
 
       // Get counts for paginated results only
+      const userIdsForPage = paginated.map((p) => p.user_id);
+      const [{ data: settingsRows }] = await Promise.all([
+        adminDb.from("user_settings").select("user_id, lifecycle_emails_opt_in").in("user_id", userIdsForPage),
+      ]);
+      const optedOut = new Set<string>();
+      for (const s of (settingsRows || []) as Array<{ user_id: string; lifecycle_emails_opt_in: boolean | null }>) {
+        if (s.lifecycle_emails_opt_in === false) optedOut.add(s.user_id);
+      }
+
       const enriched = await Promise.all(
         paginated.map(async (p) => {
           const [lc, ec] = await Promise.all([
             adminDb.from("loads").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
             adminDb.from("expenses").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
           ]);
-          return { ...p, loads_count: lc.count ?? 0, expenses_count: ec.count ?? 0 };
+          return {
+            ...p,
+            loads_count: lc.count ?? 0,
+            expenses_count: ec.count ?? 0,
+            lifecycle_opted_out: optedOut.has(p.user_id),
+          };
         })
       );
 
@@ -397,7 +411,7 @@ Deno.serve(async (req) => {
 
       // Email impact — for each lifecycle email (welcome, lifecycle-day2, lifecycle-day7),
       // % of recipients who logged a load AFTER receiving the email.
-      const TEMPLATES_FOR_IMPACT = ["welcome", "lifecycle-day2", "lifecycle-day7"] as const;
+      const TEMPLATES_FOR_IMPACT = ["lifecycle-day0", "welcome", "lifecycle-day2", "lifecycle-day7"] as const;
       const emailImpact: Record<string, { sent: number; activated_after: number; rate: number } | null> = {
         day0: null,
         day2: null,
@@ -454,7 +468,19 @@ Deno.serve(async (req) => {
         };
       };
 
-      emailImpact.day0 = computeImpact("welcome");
+      // Day 0 = lifecycle-day0 OR welcome (legacy). Combine recipients.
+      const day0FromDay0 = computeImpact("lifecycle-day0");
+      const day0FromWelcome = computeImpact("welcome");
+      const merge = (
+        a: { sent: number; activated_after: number; rate: number } | null,
+        b: { sent: number; activated_after: number; rate: number } | null,
+      ) => {
+        if (!a && !b) return null;
+        const sent = (a?.sent ?? 0) + (b?.sent ?? 0);
+        const activated_after = (a?.activated_after ?? 0) + (b?.activated_after ?? 0);
+        return { sent, activated_after, rate: sent > 0 ? Math.round((activated_after / sent) * 1000) / 10 : 0 };
+      };
+      emailImpact.day0 = merge(day0FromDay0, day0FromWelcome);
       emailImpact.day2 = computeImpact("lifecycle-day2");
       emailImpact.day7 = computeImpact("lifecycle-day7");
 
