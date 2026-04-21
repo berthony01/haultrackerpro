@@ -51,7 +51,7 @@ export default function TruckingProfitCalculator() {
           </div>
           <h2 className="text-3xl font-black font-heading">Trucking Profit Calculator for Owner Operators</h2>
           <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Estimate your real profit after fuel, parking, tolls, maintenance, and taxes.
+            Gross pay isn't profit. See what you actually keep after fuel, parking, tolls, maintenance, and taxes — load by load and week by week.
           </p>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             Start Tracking Profit <ArrowRight className="h-4 w-4" />

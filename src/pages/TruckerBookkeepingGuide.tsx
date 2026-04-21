@@ -50,7 +50,7 @@ export default function TruckerBookkeepingGuide() {
           </div>
           <h2 className="text-3xl font-black font-heading">Trucker Bookkeeping Guide</h2>
           <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Learn how to manage trucking finances the simple way.
+            Bookkeeping isn't paperwork — it's how you see which loads, lanes, and brokers are actually making you money. Here's the simple way to keep your records straight without slowing down.
           </p>
           <Button size="lg" className="rounded-xl gap-2" onClick={() => navigate('/pricing')}>
             Start Tracking Finances <ArrowRight className="h-4 w-4" />
