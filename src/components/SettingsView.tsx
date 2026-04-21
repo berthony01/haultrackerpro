@@ -466,6 +466,52 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       {/* CSV Import */}
       <CSVImport isPro={isPro ?? false} />
 
+      {/* Email Preferences */}
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5" /> Email Preferences
+          </p>
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 p-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
+                <p className="text-sm font-semibold">Lifecycle reminder emails</p>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                Occasional helper emails (Day 2 / Day 7) if you haven't logged a load yet. Account-critical emails like password resets and receipts are always sent.
+              </p>
+            </div>
+            <Switch
+              checked={lifecycleEmailsOptIn}
+              disabled={savingEmailPref || isLoading}
+              onCheckedChange={(checked) => {
+                const next = checked;
+                setLifecycleEmailsOptIn(next);
+                setSavingEmailPref(true);
+                updateSettings.mutate(
+                  { lifecycle_emails_opt_in: next } as any,
+                  {
+                    onSuccess: () => {
+                      toast.success(next ? 'Lifecycle emails turned on' : 'Lifecycle emails turned off');
+                      setSavingEmailPref(false);
+                    },
+                    onError: (e) => {
+                      setLifecycleEmailsOptIn(!next);
+                      toast.error(e.message || 'Failed to update preference');
+                      setSavingEmailPref(false);
+                    },
+                  },
+                );
+              }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground/60">
+            You can change this anytime. Unsubscribe links in our emails will also flip this off.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Data Management */}
       <Card className="shadow-card">
         <CardContent className="p-4 space-y-3">
