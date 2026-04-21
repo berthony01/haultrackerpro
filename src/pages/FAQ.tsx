@@ -14,6 +14,14 @@ const faqs = [
     answer: 'Go to Reports from the bottom navigation. You can export your data as CSV, PDF summary, or a full profit report. You can also export all your data as JSON from Settings → Export All My Data.',
   },
   {
+    question: 'What columns are in the CSV export?',
+    answer: 'The standard Loads CSV (All Loads, Filtered Loads, Monthly Summary, and per-week exports) includes 17 columns: Date, Pickup, Dropoff, Stops Summary, Loaded Miles, Deadhead Miles, Rate/Mile, Wait Fee, Detention Fee, Other Fees, Estimated Pay, Actual Pay, Difference, Status, Notes, Company Name, Company Start Date. The Profit Report CSV includes: Date, Pickup, Dropoff, Stops Summary, Estimated Pay, Actual Pay, Linked Expenses, Net Load Profit, Company Name, Company Start Date. The Schedule C Summary CSV groups expenses by IRS Schedule C line: Schedule C Line, Line Description, Categories, Total Amount.',
+  },
+  {
+    question: 'What\'s inside the weekly / monthly PDF report?',
+    answer: 'Each branded PDF includes: a header with your company name, the date range, and totals (loads, loaded miles, deadhead miles, estimated pay, actual pay, and pay variance); a per-load table with date, pickup, dropoff, loaded/deadhead miles, $/mile, estimated pay, actual pay, and status; pay variance highlights for short-paid or unpaid loads; and a brief lane and broker summary showing your top lanes by revenue and any brokers with payment issues in the period. Generated on demand from Reports → Export PDF.',
+  },
+  {
     question: 'Can I edit past loads?',
     answer: 'Yes! Go to My Loads, tap on any load to see its details, then use the edit button to modify any field. You can update pay received, miles, locations, and all other details at any time.',
   },
