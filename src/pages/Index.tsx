@@ -86,6 +86,53 @@ const Index = () => {
       subscription.refetch();
       window.history.replaceState({}, '', window.location.pathname);
     }
+    // Prefill from Landing Profit Intelligence demo
+    if (params.get('prefill') === 'load') {
+      try {
+        const raw = sessionStorage.getItem('htp_demo_prefill');
+        if (raw) {
+          const d = JSON.parse(raw) as { rate: number; loadedMiles: number; deadheadMiles: number; fuelCost: number; otherCost: number; ts: number };
+          // Only honor recent prefills (5 min window)
+          if (d && Date.now() - (d.ts || 0) < 5 * 60 * 1000) {
+            const rpm = d.loadedMiles > 0 ? Number((d.rate / d.loadedMiles).toFixed(2)) : 0;
+            setEditingLoad({
+              id: '',
+              user_id: user?.id ?? '',
+              load_date: new Date().toISOString().split('T')[0],
+              dropoff_date: null,
+              pickup_location: '',
+              dropoff_location: '',
+              loaded_miles: d.loadedMiles,
+              deadhead_miles: d.deadheadMiles,
+              rate_per_mile: rpm,
+              wait_fee: 0,
+              detention_fee: 0,
+              other_fees: 0,
+              actual_pay_received: null,
+              gross_revenue: d.rate,
+              estimated_pay: d.rate,
+              status: 'completed',
+              notes: `Prefilled from Profit Intelligence demo — fuel ~$${d.fuelCost}, other ~$${d.otherCost}.`,
+              broker_id: null,
+              broker_name_raw: null,
+              created_at: '',
+              updated_at: '',
+              invoice_submitted_date: null,
+              pod_submitted_date: null,
+              payment_due_date: null,
+              paid_date: null,
+              payment_status: 'unpaid',
+              payment_notes: null,
+              short_paid_amount: null,
+            } as unknown as Load);
+            setPage('add');
+            toast.success('Demo numbers loaded — review and save your load.');
+          }
+          sessionStorage.removeItem('htp_demo_prefill');
+        }
+      } catch {}
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
   // Fire purchase analytics once the resolved plan is available (avoids stale closure)
