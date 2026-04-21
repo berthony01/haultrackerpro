@@ -31,22 +31,33 @@ interface LoadFormProps {
   loading?: boolean;
   recentLoads?: Load[];
   isPro?: boolean;
+  /** Pre-fill the form with a sample load for first-time users with zero loads logged. */
+  firstTimeUser?: boolean;
 }
 
-export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [], isPro = false }: LoadFormProps) {
+const SAMPLE_LOAD = {
+  pickup_location: 'Atlanta, GA',
+  dropoff_location: 'Miami, FL',
+  loaded_miles: '650',
+  deadhead_miles: '50',
+  rate_per_mile: '2.50',
+};
+
+export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [], isPro = false, firstTimeUser = false }: LoadFormProps) {
   const { settings } = useUserSettings();
   const lastLoad = recentLoads[0] ?? null;
 
   const isPercentagePay = settings?.pay_type === 'percentage';
+  const useSample = firstTimeUser && !initialData;
 
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
     dropoff_date: initialData?.dropoff_date || '',
-    pickup_location: initialData?.pickup_location || '',
-    dropoff_location: initialData?.dropoff_location || '',
-    loaded_miles: initialData?.loaded_miles?.toString() || '',
-    deadhead_miles: initialData?.deadhead_miles?.toString() || '',
-    rate_per_mile: initialData?.rate_per_mile?.toString() || (settings?.default_rate_per_mile?.toString() ?? ''),
+    pickup_location: initialData?.pickup_location || (useSample ? SAMPLE_LOAD.pickup_location : ''),
+    dropoff_location: initialData?.dropoff_location || (useSample ? SAMPLE_LOAD.dropoff_location : ''),
+    loaded_miles: initialData?.loaded_miles?.toString() || (useSample ? SAMPLE_LOAD.loaded_miles : ''),
+    deadhead_miles: initialData?.deadhead_miles?.toString() || (useSample ? SAMPLE_LOAD.deadhead_miles : ''),
+    rate_per_mile: initialData?.rate_per_mile?.toString() || (settings?.default_rate_per_mile?.toString() ?? (useSample ? SAMPLE_LOAD.rate_per_mile : '')),
     wait_fee: initialData?.wait_fee?.toString() || '0',
     detention_fee: initialData?.detention_fee?.toString() || '0',
     other_fees: initialData?.other_fees?.toString() || (settings?.default_other_fees?.toString() ?? '0'),
@@ -275,6 +286,16 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* First-time user banner */}
+          {firstTimeUser && !initialData && (
+            <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-3 flex items-start gap-2">
+              <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div className="text-xs text-foreground leading-relaxed">
+                <span className="font-bold">We pre-filled an example load</span> (Atlanta → Miami). Edit any field to match your real run, or save it as-is to see the dashboard come alive. You can delete it anytime.
+              </div>
+            </div>
+          )}
+
           {/* Quick Default Chips */}
           {!initialData && (
             <SmartChips
