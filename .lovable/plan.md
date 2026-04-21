@@ -1,49 +1,54 @@
 
 
-## Test the lifecycle email sequence on real users
+## Full cleanup — Phases A through D
 
-You want to manually trigger the Day 0 / Day 2 / Day 7 emails to your existing inactive signups so you can confirm deliverability, copy, and the unsubscribe flow before the daily cron does it automatically.
+I'll execute all four phases in sequence. Here's exactly what ships.
 
-### What I'll build
+### Phase A — Quick wins (restore tab + fix unsubscribe + ref warnings)
 
-**1. Admin "Send Test Email" panel** (Admin → Emails tab)
+1. **Hard reload guidance** — after deploy, you Cmd+Shift+R `/admin`. The Emails tab is already in the source; the warning about it being missing is a stale Vite chunk. No code change needed for the tab itself.
+2. **Fix `PageFallback` ref warning** in `src/App.tsx` — wrap with `React.forwardRef` so React Router can pass refs without warning.
+3. **Fix `SEOHead` and `Badge` ref warnings** in `src/pages/Admin.tsx` and `src/components/SEOHead.tsx` — forwardRef on `SEOHead`; `Badge` already uses forwardRef but is being passed a ref through a non-forwarding wrapper — fix the wrapper.
+4. **Add `verify_jwt = false`** for `handle-email-unsubscribe` and `handle-email-suppression` in `supabase/config.toml`. Redeploy both functions so unsubscribe links work without a session.
 
-A new card at the top of the Emails tab with:
-- **Recipient picker** — dropdown of all users (excludes the 3 test accounts by default, but with a "show test accounts" toggle so you can send to yourself first)
-- **Template picker** — `welcome`, `lifecycle-day2`, `lifecycle-day7`
-- **Send button** — fires one email immediately
-- **"Send to all inactive users" button** (separate, with confirm dialog) — runs the same eligibility logic as the cron (verified, opted-in, 0 loads, not a test account) but ignores the day-2/day-7 age windows so you can send right now
+### Phase B — Email pipeline correctness
 
-Results land in the existing email log table below so you can watch status flip from `pending` → `sent`.
+1. **Drain the 7 pending emails** — query `email_send_log` for stuck rows, inspect `process-email-queue` logs to identify the cause (likely the cron secret refresh after recent function deploys), and either re-enqueue via `pgmq.send` or mark them `failed` with a reason so the dashboard reflects reality. If the cron job is broken, re-run setup to refresh the vault secret.
+2. **Create `lifecycle-day0` template** in `supabase/functions/_shared/transactional-email-templates/lifecycle-day0.tsx` and register in `registry.ts`. Wire `Auth.tsx` signup to send `lifecycle-day0` (replacing the generic `welcome` for activation tracking) so the Day 0 column in the activation dashboard populates. Keep `welcome` template available for manual sends.
+3. **Fix `Index.tsx` useEffect deps** at line ~139 — add `subscription` and `user?.id` to dep array so subscription state stays fresh on user change.
 
-**2. New admin-api action: `send-lifecycle-test`**
+### Phase C — Admin visibility upgrades
 
-Backend handler that:
-- Verifies caller is admin (existing pattern)
-- Accepts `{ templateName, recipientUserId }` for single send, or `{ templateName, mode: 'all-inactive' }` for bulk
-- For bulk mode: reuses the exact eligibility logic from `send-lifecycle-emails` (verified email, no recent email change, opted-in, zero loads, not in TEST_ACCOUNTS) — but skips the age window check
-- Invokes `send-transactional-email` with idempotency key `<template>-test-<userId>-<yyyymmdd>` so you can re-send on a different day if needed
-- Returns per-user result (sent / skipped + reason)
+1. **Suppression list panel** in Admin → Emails tab. Reads `suppressed_emails` (email, reason, suppressed_at). Includes a "Remove from suppression" button that deletes the row (admin-only, audited).
+2. **Retry button on each email log row** — for `pending`/`failed`/`dlq` rows, button re-invokes `send-transactional-email` with the same idempotency key. Calls a new `admin-api` action `retry-email` that reads the original metadata from `email_send_log`.
+3. **Lifecycle opt-out badge in Users tab** — shows a small "opted out" tag next to users where `user_settings.lifecycle_emails_opt_in = false` so you know who won't receive lifecycle emails.
 
-**3. Safety rails**
+### Phase D — Code hygiene
 
-- Test accounts (`berthonyxyz@`, `peejayslifestyle@`, `wysdomaniac@`) excluded from bulk mode unless you flip the toggle
-- Idempotency key includes today's date → prevents accidental double-sends within the same day
-- Bulk send shows a confirm dialog with the exact recipient count before firing
-- All sends logged to `email_send_log` and visible in the existing table
+1. **Knock out the 76 ESLint errors** in batches — typed `any` → proper interfaces (mostly in `admin-api`, `Admin.tsx`, hooks), and drop useless regex escapes in `parseLoadText.ts` / `parseExpenseText.ts`. Pure cleanup, no behavior change. Skip ESLint warnings that require risky refactors (e.g. exhaustive-deps inside the AI hooks where the omission is intentional and commented).
 
-### Recommended test flow (after I ship this)
+### Files touched
 
-1. Send `welcome` to your own account → confirm it arrives, looks right, unsubscribe link works
-2. Send `lifecycle-day2` to one real inactive user → check inbox + log status
-3. If good, use "Send to all inactive users" with `lifecycle-day2` to hit the remaining ~10 users
-4. Wait a day, repeat with `lifecycle-day7`
+**Frontend**
+- `src/App.tsx` — forwardRef wrap
+- `src/components/SEOHead.tsx` — forwardRef
+- `src/pages/Admin.tsx` — suppression panel, retry buttons, opt-out badge, fix Badge wrapper
+- `src/pages/Index.tsx` — useEffect dep fix
+- `src/pages/Auth.tsx` — switch signup email to `lifecycle-day0`
+- ~10 small files for ESLint cleanup
 
-### Files
+**Backend**
+- `supabase/config.toml` — `verify_jwt = false` for unsubscribe + suppression
+- `supabase/functions/_shared/transactional-email-templates/lifecycle-day0.tsx` (new)
+- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register day0
+- `supabase/functions/admin-api/index.ts` — `retry-email`, `remove-suppression` actions; update activation analytics to read `lifecycle-day0`
+- `supabase/functions/send-lifecycle-emails/index.ts` — minor: include day0 metric tracking
 
-- `supabase/functions/admin-api/index.ts` — add `send-lifecycle-test` action
-- `src/pages/Admin.tsx` — add the test panel to the Emails tab
-- Redeploy `admin-api`
+**Functions redeployed**: `admin-api`, `handle-email-unsubscribe`, `handle-email-suppression`, `send-lifecycle-emails`
 
-No new tables, no migrations, no changes to the daily cron.
+**No new tables, no migrations.** All data layer changes are runtime (drain pending queue) or use existing tables.
+
+### Order of execution
+
+A → B → C → D, with a verification step between each. After Phase A I'll confirm the unsubscribe link works and the console is clean. After B I'll confirm `email_send_log` has zero rows stuck in `pending`. After C I'll confirm the new admin controls render. D is pure cleanup so no functional verification needed.
 
