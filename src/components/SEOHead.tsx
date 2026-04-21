@@ -9,7 +9,7 @@ interface SEOHeadProps {
   path: string;
   image?: string;
   noindex?: boolean;
-  jsonLd?: Record<string, unknown>;
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 export default function SEOHead({
@@ -43,11 +43,11 @@ export default function SEOHead({
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={image} />
 
-      {jsonLd && (
-        <script type="application/ld+json">
-          {JSON.stringify(jsonLd)}
+      {jsonLd && (Array.isArray(jsonLd) ? jsonLd : [jsonLd]).map((obj, i) => (
+        <script key={i} type="application/ld+json">
+          {JSON.stringify(obj)}
         </script>
-      )}
+      ))}
     </Helmet>
   );
 }
