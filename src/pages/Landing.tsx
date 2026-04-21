@@ -1,7 +1,7 @@
 import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Mic, Camera, Menu, X, Star, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
