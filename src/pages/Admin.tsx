@@ -32,6 +32,15 @@ interface UserRow {
   created_at: string;
   loads_count: number;
   expenses_count: number;
+  lifecycle_opted_out?: boolean;
+}
+
+interface SuppressedRow {
+  id: string;
+  email: string;
+  reason: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
 }
 
 interface AdminRow {
@@ -200,6 +209,12 @@ export default function Admin() {
   const [activation, setActivation] = useState<ActivationResponse | null>(null);
   const [activationLoading, setActivationLoading] = useState(false);
 
+  // Suppression list
+  const [suppressed, setSuppressed] = useState<SuppressedRow[]>([]);
+  const [suppressedLoading, setSuppressedLoading] = useState(false);
+  const [removeSuppressionConfirm, setRemoveSuppressionConfirm] = useState<SuppressedRow | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
   const initialFetchDone = useRef(false);
 
   useEffect(() => {
@@ -287,6 +302,37 @@ export default function Admin() {
     setActivationLoading(false);
   }, [api]);
 
+  const fetchSuppressed = useCallback(async () => {
+    setSuppressedLoading(true);
+    const data: { suppressed: SuppressedRow[] } | null = await api.get('list-suppressed');
+    setSuppressed(data?.suppressed || []);
+    setSuppressedLoading(false);
+  }, [api]);
+
+  const handleRemoveSuppression = useCallback(async () => {
+    if (!removeSuppressionConfirm) return;
+    const res = await api.post('remove-suppression', { email: removeSuppressionConfirm.email });
+    if (res?.success) {
+      toast.success(`Removed ${removeSuppressionConfirm.email} from suppression list`);
+      fetchSuppressed();
+    } else {
+      toast.error(res?.error || 'Failed to remove');
+    }
+    setRemoveSuppressionConfirm(null);
+  }, [api, removeSuppressionConfirm, fetchSuppressed]);
+
+  const handleRetryEmail = useCallback(async (row: EmailLogRow) => {
+    setRetryingId(row.id);
+    const res = await api.post('retry-email', { log_id: row.id });
+    setRetryingId(null);
+    if (res?.success) {
+      toast.success(`Re-queued ${row.template_name} → ${row.recipient_email}`);
+      fetchEmails(emailStatus, emailTemplate);
+    } else {
+      toast.error(res?.error || 'Retry failed');
+    }
+  }, [api, fetchEmails, emailStatus, emailTemplate]);
+
   useEffect(() => {
     if (isAdmin && !initialFetchDone.current) {
       initialFetchDone.current = true;
@@ -296,8 +342,9 @@ export default function Admin() {
       fetchUsers(1, '');
       fetchEmails();
       fetchActivation();
+      fetchSuppressed();
     }
-  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails, fetchActivation]);
+  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails, fetchActivation, fetchSuppressed]);
 
   const searchUsers = async () => {
     setUsersPage(1);
