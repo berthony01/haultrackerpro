@@ -32,11 +32,20 @@ serve(async (req) => {
     const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
     // Find active templates that haven't generated for this month yet
-    // and whose start_date <= current month and (end_date is null or >= current month)
+    // and whose start_date <= current month and (end_date is null or >= current month).
+    //
+    // PAUSED TEMPLATES ARE INTENTIONALLY SKIPPED HERE.
+    // Users pause templates during home time / downtime so the system stops creating
+    // new fixed expenses they aren't actually incurring. We do NOT backfill skipped
+    // months when a template is later resumed — `last_generated_date` is left untouched
+    // during the pause, and on resume we simply pick up from the current month forward.
+    // We filter on both `is_active=true` and `status='active'` (kept in sync via DB
+    // trigger `sync_recurring_template_status`) for defense in depth.
     const { data: activeTemplates, error: tplErr } = await supabase
       .from("recurring_expense_templates")
       .select("*")
       .eq("is_active", true)
+      .eq("status", "active")
       .or(`last_generated_date.is.null,last_generated_date.lt.${currentMonthStart}`)
       .lte("start_date", currentMonthStart)
       .or(`end_date.is.null,end_date.gte.${currentMonthStart}`);

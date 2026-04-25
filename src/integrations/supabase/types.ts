@@ -750,7 +750,11 @@ export type Database = {
           is_active: boolean
           last_generated_date: string | null
           notes: string | null
+          pause_reason: string | null
+          paused_at: string | null
+          resumed_at: string | null
           start_date: string
+          status: string
           template_name: string
           updated_at: string
           user_id: string
@@ -766,7 +770,11 @@ export type Database = {
           is_active?: boolean
           last_generated_date?: string | null
           notes?: string | null
+          pause_reason?: string | null
+          paused_at?: string | null
+          resumed_at?: string | null
           start_date: string
+          status?: string
           template_name: string
           updated_at?: string
           user_id: string
@@ -782,7 +790,11 @@ export type Database = {
           is_active?: boolean
           last_generated_date?: string | null
           notes?: string | null
+          pause_reason?: string | null
+          paused_at?: string | null
+          resumed_at?: string | null
           start_date?: string
+          status?: string
           template_name?: string
           updated_at?: string
           user_id?: string
@@ -898,6 +910,9 @@ export type Database = {
           default_other_fees: number | null
           default_rate_per_mile: number | null
           federal_tax_percent: number | null
+          home_time_ended_at: string | null
+          home_time_mode: boolean
+          home_time_started_at: string | null
           id: string
           include_se_tax: boolean | null
           lifecycle_emails_opt_in: boolean
@@ -926,6 +941,9 @@ export type Database = {
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           federal_tax_percent?: number | null
+          home_time_ended_at?: string | null
+          home_time_mode?: boolean
+          home_time_started_at?: string | null
           id?: string
           include_se_tax?: boolean | null
           lifecycle_emails_opt_in?: boolean
@@ -954,6 +972,9 @@ export type Database = {
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           federal_tax_percent?: number | null
+          home_time_ended_at?: string | null
+          home_time_mode?: boolean
+          home_time_started_at?: string | null
           id?: string
           include_se_tax?: boolean | null
           lifecycle_emails_opt_in?: boolean
