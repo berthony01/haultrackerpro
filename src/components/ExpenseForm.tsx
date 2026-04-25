@@ -374,6 +374,13 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
               </div>
             )}
 
+            <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
+              {loading ? 'Saving...' : isEdit ? 'Update Expense' : 'Save Expense'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
       {/* AI Modals */}
       <VoiceExpenseModal open={showVoice} onOpenChange={setShowVoice} onAutofill={handleAutofill} />
       <ReceiptScanModal open={showReceipt} onOpenChange={setShowReceipt} onAutofill={handleAutofill} />
