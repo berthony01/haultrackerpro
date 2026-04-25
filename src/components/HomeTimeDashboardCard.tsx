@@ -146,7 +146,7 @@ export function HomeTimeDashboardCard({ isPro, isTrialing = false, onNavigate }:
         </AlertDialogContent>
       </AlertDialog>
 
-      <ProUpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} />
+      <ProUpgradeModal open={showUpgrade} onOpenChange={setShowUpgrade} featureName="Home Time Mode" />
     </>
   );
 }
