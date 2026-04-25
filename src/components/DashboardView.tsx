@@ -21,6 +21,7 @@ import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { PersonalIntelligenceBlocks } from '@/components/PersonalIntelligenceBlocks';
 import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
+import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -206,6 +207,11 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             Fuel
           </Button>
         </div>
+      )}
+
+      {/* Home Time Mode + Recurring shortcut */}
+      {!isLoading && (
+        <HomeTimeDashboardCard isPro={isPro} isTrialing={isTrialing} onNavigate={onNavigate} />
       )}
 
       {/* Loading skeletons */}
