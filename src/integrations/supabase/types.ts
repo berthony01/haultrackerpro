@@ -912,6 +912,7 @@ export type Database = {
           federal_tax_percent: number | null
           home_time_ended_at: string | null
           home_time_mode: boolean
+          home_time_paused_template_ids: string[]
           home_time_started_at: string | null
           id: string
           include_se_tax: boolean | null
@@ -943,6 +944,7 @@ export type Database = {
           federal_tax_percent?: number | null
           home_time_ended_at?: string | null
           home_time_mode?: boolean
+          home_time_paused_template_ids?: string[]
           home_time_started_at?: string | null
           id?: string
           include_se_tax?: boolean | null
@@ -974,6 +976,7 @@ export type Database = {
           federal_tax_percent?: number | null
           home_time_ended_at?: string | null
           home_time_mode?: boolean
+          home_time_paused_template_ids?: string[]
           home_time_started_at?: string | null
           id?: string
           include_se_tax?: boolean | null
