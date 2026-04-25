@@ -43,6 +43,12 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // "Make this recurring" sub-form (create only, Pro only)
+  const [makeRecurring, setMakeRecurring] = useState(false);
+  const [recurringName, setRecurringName] = useState('');
+  const [recurringEndDate, setRecurringEndDate] = useState('');
+  const { addTemplate } = useRecurringExpenses();
+
   // Auto-classify expense type when category changes
   useEffect(() => {
     if (form.category && !isEdit) {
