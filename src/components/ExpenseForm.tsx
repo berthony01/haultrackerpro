@@ -301,12 +301,78 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
               <Textarea id="expense_notes" placeholder="Optional notes..." rows={2} value={form.notes} onChange={e => update('notes', e.target.value)} />
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
-              {loading ? 'Saving...' : isEdit ? 'Update Expense' : 'Save Expense'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            {/* Make this recurring — create-only, Pro-gated */}
+            {!isEdit && (
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-2">
+                <div className="flex items-start gap-3">
+                  <RefreshCcw className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="make_recurring" className="text-sm font-bold cursor-pointer flex items-center gap-1.5">
+                        Save as recurring monthly expense
+                        {!isPro && (
+                          <Badge variant="outline" className="text-[9px] gap-0.5 px-1.5 py-0 h-4">
+                            <Lock className="h-2.5 w-2.5" /> Pro
+                          </Badge>
+                        )}
+                      </Label>
+                      <Switch
+                        id="make_recurring"
+                        checked={makeRecurring}
+                        onCheckedChange={(checked) => {
+                          if (!isPro) {
+                            setUpgradeFeature('Recurring Expenses');
+                            setShowUpgrade(true);
+                            return;
+                          }
+                          setMakeRecurring(checked);
+                          if (checked && !recurringName && form.category) {
+                            const amt = form.amount ? ` — $${form.amount}` : '';
+                            setRecurringName(`${form.category}${amt}`);
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Auto-create this expense on the 1st of every month. You can pause it anytime.
+                    </p>
+                  </div>
+                </div>
+
+                {makeRecurring && isPro && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/40 animate-fade-in">
+                    <div>
+                      <Label htmlFor="recurring_name" className="text-xs">Template name</Label>
+                      <Input
+                        id="recurring_name"
+                        value={recurringName}
+                        onChange={(e) => {
+                          setRecurringName(e.target.value);
+                          if (errors.recurringName) setErrors((p) => { const n = { ...p }; delete n.recurringName; return n; });
+                        }}
+                        placeholder="e.g. Truck Insurance"
+                        className="h-9 text-sm"
+                      />
+                      <FieldError field="recurringName" />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurring_end" className="text-xs">End date (optional)</Label>
+                      <Input
+                        id="recurring_end"
+                        type="date"
+                        value={recurringEndDate}
+                        onChange={(e) => {
+                          setRecurringEndDate(e.target.value);
+                          if (errors.recurringEndDate) setErrors((p) => { const n = { ...p }; delete n.recurringEndDate; return n; });
+                        }}
+                        className="h-9 text-sm"
+                      />
+                      <FieldError field="recurringEndDate" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
       {/* AI Modals */}
       <VoiceExpenseModal open={showVoice} onOpenChange={setShowVoice} onAutofill={handleAutofill} />
