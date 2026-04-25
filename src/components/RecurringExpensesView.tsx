@@ -121,13 +121,16 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
   };
 
   const handleStartHomeTime = () => {
-    // Pause all active templates, then mark home time mode on user_settings
+    // Pause all currently-active templates with a home-time-specific reason,
+    // then record their IDs on user_settings so "Back on the Road" only resumes
+    // those (templates the user manually paused before home time stay paused).
     pauseAllTemplates.mutate('Home time mode', {
-      onSuccess: () => {
+      onSuccess: (pausedIds) => {
         updateSettings.mutate(
           {
             home_time_mode: true,
             home_time_started_at: new Date().toISOString(),
+            home_time_paused_template_ids: pausedIds ?? [],
           },
           {
             onSuccess: () => {
@@ -143,15 +146,16 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
   };
 
   const handleEndHomeTime = () => {
-    // Resume all paused templates that were paused for home time, then mark mode off.
-    // We resume all paused templates (best-effort distinction) since this is the most
-    // common expectation when a user comes back on the road.
-    resumeAllTemplates.mutate(undefined, {
+    // Resume ONLY the templates that Home Time Mode itself paused.
+    // Manually-paused templates remain paused.
+    const idsToResume = (settings?.home_time_paused_template_ids as string[] | null) ?? [];
+    resumeAllTemplates.mutate(idsToResume, {
       onSuccess: () => {
         updateSettings.mutate(
           {
             home_time_mode: false,
             home_time_ended_at: new Date().toISOString(),
+            home_time_paused_template_ids: [],
           },
           {
             onSuccess: () => {

@@ -6,10 +6,11 @@ import { Load } from '@/hooks/useLoads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Receipt, X, AlertCircle, Mic, Camera } from 'lucide-react';
+import { Receipt, X, AlertCircle, Mic, Camera, RefreshCcw, Lock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { VoiceExpenseModal } from '@/components/VoiceExpenseModal';
@@ -17,6 +18,7 @@ import { ReceiptScanModal } from '@/components/ReceiptScanModal';
 import { ProUpgradeModal } from '@/components/ProUpgradeModal';
 import type { ParsedExpense } from '@/lib/parseExpenseText';
 import { categorizeExpense } from '@/lib/categorizeExpense';
+import { useRecurringExpenses } from '@/hooks/useRecurringExpenses';
 
 interface ExpenseFormProps {
   onSubmit: (data: ExpenseInsert) => void;
@@ -40,6 +42,12 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
     expense_type: (initialData as any)?.expense_type ?? 'variable' as 'fixed' | 'variable',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // "Make this recurring" sub-form (create only, Pro only)
+  const [makeRecurring, setMakeRecurring] = useState(false);
+  const [recurringName, setRecurringName] = useState('');
+  const [recurringEndDate, setRecurringEndDate] = useState('');
+  const { addTemplate } = useRecurringExpenses();
 
   // Auto-classify expense type when category changes
   useEffect(() => {
@@ -81,6 +89,12 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
       const g = parseFloat(form.gallons);
       if (isNaN(g) || g < 0) errs.gallons = 'Gallons cannot be negative';
     }
+    if (makeRecurring) {
+      if (!recurringName.trim()) errs.recurringName = 'Template name is required';
+      if (recurringEndDate && recurringEndDate < form.expense_date) {
+        errs.recurringEndDate = 'End date must be after start date';
+      }
+    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       toast.error('Please fix the errors before submitting');
@@ -101,6 +115,31 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
       notes: form.notes.trim() || null,
       expense_type: form.expense_type,
     });
+
+    // If user opted in, also create a recurring template (Pro-gated, create-only).
+    // We set last_generated_date = expense_date so the cron does NOT double-generate
+    // for the current month — the manual expense above already covers it.
+    if (!isEdit && makeRecurring && isPro) {
+      addTemplate.mutate(
+        {
+          template_name: recurringName.trim(),
+          category: form.category,
+          amount: parseFloat(form.amount),
+          frequency: 'monthly',
+          start_date: form.expense_date,
+          end_date: recurringEndDate || null,
+          notes: form.notes.trim() || null,
+          expense_type: form.expense_type,
+          is_active: true,
+          last_generated_date: form.expense_date,
+        } as any,
+        {
+          onSuccess: () => toast.success('Recurring template created'),
+          onError: () =>
+            toast.error('Expense saved, but recurring setup failed — try again from Recurring Expenses.'),
+        }
+      );
+    }
   };
 
   const update = (key: string, value: string) => {
@@ -261,6 +300,79 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
               <Label htmlFor="expense_notes">Notes (optional)</Label>
               <Textarea id="expense_notes" placeholder="Optional notes..." rows={2} value={form.notes} onChange={e => update('notes', e.target.value)} />
             </div>
+
+            {/* Make this recurring — create-only, Pro-gated */}
+            {!isEdit && (
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-2">
+                <div className="flex items-start gap-3">
+                  <RefreshCcw className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="make_recurring" className="text-sm font-bold cursor-pointer flex items-center gap-1.5">
+                        Save as recurring monthly expense
+                        {!isPro && (
+                          <Badge variant="outline" className="text-[9px] gap-0.5 px-1.5 py-0 h-4">
+                            <Lock className="h-2.5 w-2.5" /> Pro
+                          </Badge>
+                        )}
+                      </Label>
+                      <Switch
+                        id="make_recurring"
+                        checked={makeRecurring}
+                        onCheckedChange={(checked) => {
+                          if (!isPro) {
+                            setUpgradeFeature('Recurring Expenses');
+                            setShowUpgrade(true);
+                            return;
+                          }
+                          setMakeRecurring(checked);
+                          if (checked && !recurringName && form.category) {
+                            const amt = form.amount ? ` — $${form.amount}` : '';
+                            setRecurringName(`${form.category}${amt}`);
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Auto-create this expense on the 1st of every month. You can pause it anytime.
+                    </p>
+                  </div>
+                </div>
+
+                {makeRecurring && isPro && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/40 animate-fade-in">
+                    <div>
+                      <Label htmlFor="recurring_name" className="text-xs">Template name</Label>
+                      <Input
+                        id="recurring_name"
+                        value={recurringName}
+                        onChange={(e) => {
+                          setRecurringName(e.target.value);
+                          if (errors.recurringName) setErrors((p) => { const n = { ...p }; delete n.recurringName; return n; });
+                        }}
+                        placeholder="e.g. Truck Insurance"
+                        className="h-9 text-sm"
+                      />
+                      <FieldError field="recurringName" />
+                    </div>
+                    <div>
+                      <Label htmlFor="recurring_end" className="text-xs">End date (optional)</Label>
+                      <Input
+                        id="recurring_end"
+                        type="date"
+                        value={recurringEndDate}
+                        onChange={(e) => {
+                          setRecurringEndDate(e.target.value);
+                          if (errors.recurringEndDate) setErrors((p) => { const n = { ...p }; delete n.recurringEndDate; return n; });
+                        }}
+                        className="h-9 text-sm"
+                      />
+                      <FieldError field="recurringEndDate" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
               {loading ? 'Saving...' : isEdit ? 'Update Expense' : 'Save Expense'}

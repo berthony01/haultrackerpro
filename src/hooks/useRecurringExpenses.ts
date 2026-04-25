@@ -100,37 +100,50 @@ export function useRecurringExpenses() {
   });
 
   // Bulk: pause all currently-active templates for the user.
+  // Returns the IDs of templates that were actually paused (so callers like
+  // Home Time Mode can record them and resume only those later).
   const pauseAllTemplates = useMutation({
-    mutationFn: async (reason?: string) => {
+    mutationFn: async (reason?: string): Promise<string[]> => {
       if (!user) throw new Error('Not authenticated');
       const update = {
         status: 'paused',
         paused_at: new Date().toISOString(),
-        pause_reason: reason ?? 'Home time / paused all',
+        pause_reason: reason ?? 'Paused all (bulk action)',
       } as TablesUpdate<'recurring_expense_templates'>;
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('recurring_expense_templates')
         .update(update)
         .eq('user_id', user.id)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .select('id');
       if (error) throw error;
+      return (data ?? []).map((r) => r.id);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recurring_expense_templates'] }),
   });
 
   // Bulk: resume all currently-paused templates for the user.
+  // If `ids` is provided, only resume templates whose IDs are in that list
+  // (used by Home Time Mode "Back on the Road" so manually-paused templates stay paused).
   const resumeAllTemplates = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (ids?: string[]) => {
       if (!user) throw new Error('Not authenticated');
       const update = {
         status: 'active',
         resumed_at: new Date().toISOString(),
       } as TablesUpdate<'recurring_expense_templates'>;
-      const { error } = await supabase
+      let query = supabase
         .from('recurring_expense_templates')
         .update(update)
         .eq('user_id', user.id)
         .eq('status', 'paused');
+      if (ids && ids.length > 0) {
+        query = query.in('id', ids);
+      } else if (ids && ids.length === 0) {
+        // Empty list explicitly means "resume nothing" — short-circuit
+        return;
+      }
+      const { error } = await query;
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recurring_expense_templates'] }),
