@@ -89,6 +89,12 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
       const g = parseFloat(form.gallons);
       if (isNaN(g) || g < 0) errs.gallons = 'Gallons cannot be negative';
     }
+    if (makeRecurring) {
+      if (!recurringName.trim()) errs.recurringName = 'Template name is required';
+      if (recurringEndDate && recurringEndDate < form.expense_date) {
+        errs.recurringEndDate = 'End date must be after start date';
+      }
+    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       toast.error('Please fix the errors before submitting');
@@ -109,6 +115,31 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
       notes: form.notes.trim() || null,
       expense_type: form.expense_type,
     });
+
+    // If user opted in, also create a recurring template (Pro-gated, create-only).
+    // We set last_generated_date = expense_date so the cron does NOT double-generate
+    // for the current month — the manual expense above already covers it.
+    if (!isEdit && makeRecurring && isPro) {
+      addTemplate.mutate(
+        {
+          template_name: recurringName.trim(),
+          category: form.category,
+          amount: parseFloat(form.amount),
+          frequency: 'monthly',
+          start_date: form.expense_date,
+          end_date: recurringEndDate || null,
+          notes: form.notes.trim() || null,
+          expense_type: form.expense_type,
+          is_active: true,
+          last_generated_date: form.expense_date,
+        } as any,
+        {
+          onSuccess: () => toast.success('Recurring template created'),
+          onError: () =>
+            toast.error('Expense saved, but recurring setup failed — try again from Recurring Expenses.'),
+        }
+      );
+    }
   };
 
   const update = (key: string, value: string) => {
