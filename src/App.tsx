@@ -26,6 +26,8 @@ const Install = lazy(() => import("./pages/Install"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const HowToUseHaulTrackerPro = lazy(() => import("./pages/HowToUseHaulTrackerPro"));
 const Parking = lazy(() => import("./pages/Parking"));
+const StarterKit = lazy(() => import("./pages/StarterKit"));
+const StarterKitThanks = lazy(() => import("./pages/StarterKitThanks"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -149,6 +151,8 @@ const App = () => (
               <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
               <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
               <Route path="/parking" element={<ProtectedRoute><Parking /></ProtectedRoute>} />
+              <Route path="/starter-kit" element={<StarterKit />} />
+              <Route path="/starter-kit/thanks" element={<StarterKitThanks />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

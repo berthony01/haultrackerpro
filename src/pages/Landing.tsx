@@ -591,6 +591,7 @@ export default function Landing() {
               <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
               <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:block max-w-xs mx-auto sm:max-w-none sm:mx-0">
                 {[
+                  { label: 'Free Starter Kit', href: '/starter-kit' },
                   { label: 'Finance Guides', href: '/trucking-finance-guides' },
                   { label: 'How to Use', href: '/how-to-use-haultrackerpro' },
                   { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
