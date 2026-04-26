@@ -23,6 +23,37 @@ import { ParsedLoadData } from '@/lib/parseLoadText';
 import { useProfitCheck } from '@/hooks/useProfitCheck';
 import { ProfitCheckCard } from '@/components/ProfitCheckCard';
 
+/**
+ * Deadhead pay status persisted inside the load `notes` field as a structured tag
+ * (no DB migration). Format: `[dh_pay:unpaid]` or `[dh_pay:same]` or `[dh_pay:custom:0.85]`.
+ */
+type DhPayStatus = 'unpaid' | 'same' | 'custom';
+const DH_TAG_RE = /\s*\[dh_pay:(unpaid|same|custom)(?::([\d.]+))?\]\s*/i;
+
+function readDhFromNotes(notes: string | null | undefined): { status: DhPayStatus; rate: string; cleanNotes: string } {
+  if (!notes) return { status: 'unpaid', rate: '', cleanNotes: '' };
+  const m = notes.match(DH_TAG_RE);
+  if (!m) return { status: 'unpaid', rate: '', cleanNotes: notes };
+  return {
+    status: m[1].toLowerCase() as DhPayStatus,
+    rate: m[2] ?? '',
+    cleanNotes: notes.replace(DH_TAG_RE, ' ').trim(),
+  };
+}
+
+function writeDhToNotes(cleanNotes: string, status: DhPayStatus, rate: string): string | null {
+  const tag =
+    status === 'custom' && rate ? `[dh_pay:custom:${rate}]`
+    : status === 'same' ? `[dh_pay:same]`
+    : status === 'unpaid' ? `[dh_pay:unpaid]`
+    : '';
+  const base = (cleanNotes || '').trim();
+  if (!tag) return base || null;
+  // Default 'unpaid' with no notes → keep notes null to avoid noise.
+  if (status === 'unpaid' && !base) return null;
+  return `${base}${base ? ' ' : ''}${tag}`.trim();
+}
+
 interface LoadFormProps {
   onSubmit: (data: LoadInsert, stops?: LoadStopInput[]) => void;
   onCancel?: () => void;
@@ -50,6 +81,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const isPercentagePay = settings?.pay_type === 'percentage';
   const useSample = firstTimeUser && !initialData;
 
+  // Parse DH-pay tag out of existing notes (edit mode); defaults for new loads.
+  const initialDh = useMemo(() => readDhFromNotes(initialData?.notes ?? null), [initialData?.notes]);
+
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
     dropoff_date: initialData?.dropoff_date || '',
@@ -62,7 +96,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     detention_fee: initialData?.detention_fee?.toString() || '0',
     other_fees: initialData?.other_fees?.toString() || (settings?.default_other_fees?.toString() ?? '0'),
     actual_pay_received: initialData?.actual_pay_received?.toString() || '',
-    notes: initialData?.notes || '',
+    notes: initialDh.cleanNotes,
     status: initialData?.status || 'completed',
     gross_revenue: initialData?.gross_revenue?.toString() || '',
     invoice_submitted_date: initialData?.invoice_submitted_date || '',
@@ -72,10 +106,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     short_paid_amount: initialData?.short_paid_amount?.toString() || '',
     payment_status: initialData?.payment_status || 'unpaid',
     payment_notes: initialData?.payment_notes || '',
+    dh_pay_status: initialDh.status as DhPayStatus,
+    dh_pay_rate: initialDh.rate,
   });
   const [showPaymentTracking, setShowPaymentTracking] = useState(
     !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
   );
+
+  // Last parser detection summary (Phase 6) — shown briefly above the form fields after a paste.
+  const [parserDetected, setParserDetected] = useState<{
+    loaded_miles?: string;
+    deadhead_miles?: string;
+    trip_id?: string;
+  } | null>(null);
 
   // Sync default settings when they load asynchronously (only for new loads)
   useEffect(() => {
@@ -99,6 +142,21 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
+  // Deadhead revenue layer (Phase 5).
+  // Skipped for percentage pay (gross already includes everything).
+  const deadheadRevenue = useMemo(() => {
+    if (isCancelled || isPercentagePay) return 0;
+    const dhMiles = parseFloat(form.deadhead_miles) || 0;
+    if (dhMiles <= 0) return 0;
+    if (form.dh_pay_status === 'same') {
+      return dhMiles * (parseFloat(form.rate_per_mile) || 0);
+    }
+    if (form.dh_pay_status === 'custom') {
+      return dhMiles * (parseFloat(form.dh_pay_rate) || 0);
+    }
+    return 0; // unpaid
+  }, [form.deadhead_miles, form.rate_per_mile, form.dh_pay_status, form.dh_pay_rate, isCancelled, isPercentagePay]);
+
   const estimated = useMemo(() => {
     if (isCancelled) return 0;
     // Percentage-based pay calculation
@@ -107,15 +165,15 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       const pct = Number(settings.pay_percentage) / 100;
       return grossRev * pct + (parseFloat(form.wait_fee) || 0) + (parseFloat(form.detention_fee) || 0) + (parseFloat(form.other_fees) || 0);
     }
-    // CPM-based pay calculation (default)
+    // CPM-based pay calculation (default) + paid deadhead layer
     return calculateEstimatedPay(
       parseFloat(form.loaded_miles) || 0,
       parseFloat(form.rate_per_mile) || 0,
       parseFloat(form.wait_fee) || 0,
       parseFloat(form.detention_fee) || 0,
       parseFloat(form.other_fees) || 0
-    );
-  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage]);
+    ) + deadheadRevenue;
+  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage, deadheadRevenue]);
 
   // Phase 3: Pre-load profit check (deterministic, personal-history based)
   const profitCheckInput = useMemo(() => {
@@ -195,7 +253,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       detention_fee: parseFloat(form.detention_fee) || 0,
       other_fees: parseFloat(form.other_fees) || 0,
       actual_pay_received: form.actual_pay_received ? parseFloat(form.actual_pay_received) : null,
-      notes: form.notes.trim() || null,
+      notes: writeDhToNotes(form.notes.trim(), form.dh_pay_status, form.dh_pay_rate),
       status: finalStatus,
       gross_revenue: form.gross_revenue ? parseFloat(form.gross_revenue) : null,
       invoice_submitted_date: form.invoice_submitted_date || null,
@@ -229,6 +287,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const handleCopyLastLoad = () => {
     if (!lastLoad) return;
+    const lastDh = readDhFromNotes(lastLoad.notes ?? null);
     setForm({
       load_date: new Date().toISOString().split('T')[0],
       dropoff_date: '',
@@ -241,7 +300,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       detention_fee: lastLoad.detention_fee.toString(),
       other_fees: lastLoad.other_fees.toString(),
       actual_pay_received: '',
-      notes: lastLoad.notes || '',
+      notes: lastDh.cleanNotes,
       status: 'pending',
       gross_revenue: lastLoad.gross_revenue?.toString() || '',
       invoice_submitted_date: '',
@@ -251,6 +310,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       short_paid_amount: '',
       payment_status: 'unpaid',
       payment_notes: '',
+      dh_pay_status: lastDh.status,
+      dh_pay_rate: lastDh.rate,
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
@@ -329,6 +390,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
                 if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
                 if (data.load_date) update('load_date', data.load_date);
+                // Phase 6: surface a confirmation summary so the user can verify
+                // detected miles + DH + trip ID before saving. DH defaults to "Unpaid".
+                setParserDetected({
+                  loaded_miles: data.loaded_miles,
+                  deadhead_miles: data.deadhead_miles,
+                  trip_id: data.trip_id,
+                });
+                if (data.trip_id) {
+                  // Append trip ID into notes (only once) so it persists with the load.
+                  setForm(prev => prev.notes.includes(data.trip_id!)
+                    ? prev
+                    : { ...prev, notes: prev.notes ? `${prev.notes}\nTrip ID: ${data.trip_id}` : `Trip ID: ${data.trip_id}` });
+                }
                 // Multi-stop auto-detection
                 if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
                   setMultiStop(true);
@@ -344,7 +418,28 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             />
           )}
 
-          {/* Scan Rate Con Screenshot */}
+          {/* Phase 6: Parser detection summary */}
+          {parserDetected && (parserDetected.loaded_miles || parserDetected.deadhead_miles || parserDetected.trip_id) && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-1.5 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold flex items-center gap-1.5">
+                  <Info className="h-3.5 w-3.5 text-primary" /> Detected
+                </p>
+                <button type="button" onClick={() => setParserDetected(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <ul className="text-[11px] text-foreground/90 space-y-0.5">
+                {parserDetected.trip_id && <li>• Trip ID: <span className="font-mono">{parserDetected.trip_id}</span></li>}
+                {parserDetected.loaded_miles && <li>• Loaded/Trip Miles: <span className="font-bold">{parserDetected.loaded_miles}</span></li>}
+                {parserDetected.deadhead_miles && <li>• Deadhead Miles: <span className="font-bold">{parserDetected.deadhead_miles}</span></li>}
+                {parserDetected.deadhead_miles && (
+                  <li>• Deadhead Pay: <span className="font-bold">{form.dh_pay_status === 'unpaid' ? 'Unpaid by default' : form.dh_pay_status === 'same' ? 'Same as loaded rate' : 'Custom rate'}</span></li>
+                )}
+              </ul>
+            </div>
+          )}
+
           {!initialData && (
             <div className="space-y-1.5">
               <Button
@@ -452,6 +547,37 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               <FieldError field="deadhead_miles" />
             </div>
           </div>
+
+          {/* Deadhead Pay Status (Phase 4) — only shown when DH miles > 0 and CPM pay */}
+          {!isPercentagePay && (parseFloat(form.deadhead_miles) || 0) > 0 && (
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
+              <Label htmlFor="dh_pay_status" className="text-xs font-bold flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Deadhead Pay
+              </Label>
+              <Select value={form.dh_pay_status} onValueChange={v => update('dh_pay_status', v)}>
+                <SelectTrigger id="dh_pay_status" className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unpaid">Unpaid deadhead</SelectItem>
+                  <SelectItem value="same">Paid at same rate as loaded miles</SelectItem>
+                  <SelectItem value="custom">Paid at different rate</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.dh_pay_status === 'custom' && (
+                <div>
+                  <Label htmlFor="dh_pay_rate" className="text-xs">Deadhead Rate ($/mi)</Label>
+                  <Input id="dh_pay_rate" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.dh_pay_rate} onChange={e => update('dh_pay_rate', e.target.value)} />
+                </div>
+              )}
+              {deadheadRevenue > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Adds <span className="font-bold text-success">{formatCurrency(deadheadRevenue)}</span> to estimated pay.
+                </p>
+              )}
+              <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
+                Some companies pay deadhead miles and some do not. Choose how this load pays so your profit numbers stay accurate.
+              </p>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="rate_per_mile" className="flex items-center gap-1">

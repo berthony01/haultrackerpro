@@ -1,6 +1,14 @@
 /**
  * Regex-based parser for extracting load details from pasted text (Telegram, SMS, broker messages).
  * No AI. User always reviews before saving.
+ *
+ * Mileage detection strategy (in order):
+ *   1. Normalize input (fold bold-unicode letters → ASCII, strip emojis/symbols around labels).
+ *   2. Detect DEADHEAD miles first — using strong DH/Empty/Bobtail/Unpaid keywords —
+ *      so the loaded-miles regex cannot accidentally consume them.
+ *   3. Detect LOADED / TRIP miles using a wide list of label variants
+ *      (Trip, Trip Miles, Loaded Miles, Linehaul, Route, Distance, etc.).
+ *   4. Use "Total Miles" only as a last-resort fallback.
  */
 
 export interface ParsedStopData {
@@ -17,6 +25,7 @@ export interface ParsedLoadData {
   gross_revenue?: string;
   load_date?: string;
   notes?: string;
+  trip_id?: string;
   multiStopDetected?: boolean;
   detectedStopsCount?: number;
   stops?: ParsedStopData[];
@@ -25,6 +34,37 @@ export interface ParsedLoadData {
 /** Strip $ and commas from a number string */
 function cleanNum(s: string): string {
   return s.replace(/[$,]/g, '').trim();
+}
+
+/**
+ * Fold "mathematical bold / sans / mono" Unicode letter ranges back to plain ASCII.
+ * Examples: 𝗧𝗿𝗶𝗽 → Trip, 𝐋𝐨𝐚𝐝𝐞𝐝 → Loaded.
+ * Covers the common ranges Telegram / dispatch bots use.
+ */
+function normalizeUnicodeLetters(input: string): string {
+  let out = '';
+  for (const ch of input) {
+    const cp = ch.codePointAt(0)!;
+    // Mathematical Bold (A–Z 1D400–1D419, a–z 1D41A–1D433)
+    if (cp >= 0x1d400 && cp <= 0x1d419) out += String.fromCharCode(0x41 + (cp - 0x1d400));
+    else if (cp >= 0x1d41a && cp <= 0x1d433) out += String.fromCharCode(0x61 + (cp - 0x1d41a));
+    // Mathematical Italic, Bold-Italic, Script, Bold Script, Fraktur, Double-Struck,
+    // Bold Fraktur, Sans-Serif, Sans-Serif Bold, Sans-Serif Italic,
+    // Sans-Serif Bold Italic, Monospace — all 26-letter blocks at 1D434..1D6A3
+    else if (cp >= 0x1d434 && cp <= 0x1d6a3) {
+      const offset = (cp - 0x1d434) % 52;
+      out += offset < 26
+        ? String.fromCharCode(0x41 + offset)
+        : String.fromCharCode(0x61 + offset - 26);
+    }
+    // Mathematical Bold Digits 1D7CE–1D7D7 → 0–9
+    else if (cp >= 0x1d7ce && cp <= 0x1d7ff) {
+      out += String.fromCharCode(0x30 + ((cp - 0x1d7ce) % 10));
+    } else {
+      out += ch;
+    }
+  }
+  return out;
 }
 
 /** Try to parse a date string into YYYY-MM-DD */
@@ -60,10 +100,80 @@ function tryParseDate(raw: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Extract loaded / trip miles from the (already unicode-normalized) text.
+ * Tries label variants in priority order; falls back to "Total Miles".
+ */
+function extractLoadedMiles(t: string): string | undefined {
+  // High-priority labelled patterns. Group 1 = numeric value.
+  // Order matters — most specific first.
+  const labelledPatterns: RegExp[] = [
+    // "Total Trip Miles: 257.10"
+    /total\s*trip\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+    // "Trip Miles: 257.10" / "Miles Trip: 257.10"
+    /(?:trip\s*miles?|miles?\s*trip)\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+    // "Loaded Miles: 300" / "Loaded Mi: 300" / "Loaded Distance: 300" / "Loaded: 300mi"
+    /loaded\s*(?:miles?|mi|distance)?\s*[:=]\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
+    // "Linehaul Miles: 257"
+    /linehaul\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+    // "Route Miles: 222" / "Route miles 222 mi"
+    /route\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+    // "Distance: 257 mi"
+    /distance\s*[:=]\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
+    // "Trip: 257.10mi" / "Trip: 257.10 mi" / "Trip: 257.10 miles"
+    // Requires "mi" suffix after the number to avoid matching "Trip ID: T-123".
+    /\btrip\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*mi(?:les?)?\b/i,
+  ];
+
+  for (const re of labelledPatterns) {
+    const m = t.match(re);
+    if (m) return cleanNum(m[1]);
+  }
+
+  // Fallback only: "Total Miles: 500" (no better mileage value found)
+  const totalM = t.match(/total\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i);
+  if (totalM) return cleanNum(totalM[1]);
+
+  return undefined;
+}
+
+/**
+ * Extract deadhead miles. Run BEFORE loaded miles so DH numbers can't be
+ * misread as trip miles.
+ */
+function extractDeadheadMiles(t: string): string | undefined {
+  const patterns: RegExp[] = [
+    // "Deadhead Miles: 25" / "Deadhead 25 miles" / "Deadhead: 25 mi"
+    /dead\s*head\s*(?:miles?)?\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
+    // "DH 25 miles" / "DH: 25 miles" / "DH 25mi" / "DH: 25"
+    /\bdh\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
+    // "Empty Miles: 25"
+    /empty\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+    // "Bobtail Miles: 25"
+    /bobtail\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+    // "Unpaid Miles: 25"
+    /unpaid\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+    // Trailing form: "25 DH" / "25 deadhead"
+    /([\d,]+(?:\.\d+)?)\s*(?:dh|dead\s*head)\b/i,
+  ];
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (m) return cleanNum(m[1]);
+  }
+  return undefined;
+}
+
 export function parseLoadText(text: string): ParsedLoadData {
   const result: ParsedLoadData = {};
-  const t = text.trim();
-  if (!t) return result;
+  if (!text || !text.trim()) return result;
+
+  // STEP 1: Normalize bold/styled unicode letters → ASCII so all label
+  // regexes can match regardless of formatting characters used by dispatch bots.
+  const t = normalizeUnicodeLetters(text).trim();
+
+  // --- Trip ID (e.g. "Trip ID: T-1123J49SR") ---
+  const tripIdMatch = t.match(/trip\s*id\s*[:=]?\s*([A-Z0-9][A-Z0-9\-]{2,})/i);
+  if (tripIdMatch) result.trip_id = tripIdMatch[1].trim();
 
   // --- Locations ---
   // "from X to Y" pattern
@@ -83,7 +193,7 @@ export function parseLoadText(text: string): ParsedLoadData {
     if (m) result.dropoff_location = m[1].split(/\n/)[0].replace(/,\s*$/, '').trim();
   }
 
-  // "City, ST → City, ST" or "City, ST - City, ST"  (arrow or dash separating two city/state pairs)
+  // "City, ST → City, ST" or "City, ST - City, ST"
   if (!result.pickup_location) {
     m = t.match(/([A-Za-z\s]+,\s*[A-Z]{2})\s*(?:→|->|–|—|to)\s*([A-Za-z\s]+,\s*[A-Z]{2})/i);
     if (m) {
@@ -92,23 +202,22 @@ export function parseLoadText(text: string): ParsedLoadData {
     }
   }
 
-  // --- Miles ---
-  // "loaded miles: 920" or "920 mi" or "920 miles" or "miles: 920"
-  m = t.match(/(?:loaded\s*(?:miles)?|total\s*miles|miles)\s*[:=]?\s*([\d,.]+)/i);
-  if (m) result.loaded_miles = cleanNum(m[1]);
-  if (!result.loaded_miles) {
-    m = t.match(/([\d,.]+)\s*(?:loaded\s+)?mi(?:les?)?\b/i);
-    if (m) result.loaded_miles = cleanNum(m[1]);
-  }
+  // --- Deadhead first (so loaded-miles regex can't consume DH numbers) ---
+  const dh = extractDeadheadMiles(t);
+  if (dh) result.deadhead_miles = dh;
 
-  // --- Deadhead ---
-  // "DH: 45", "45 DH", "deadhead 45", "deadhead: 45 mi"
-  m = t.match(/(?:dh|dead\s*head)\s*[:=]?\s*([\d,.]+)\s*(?:mi(?:les?)?)?\b/i);
-  if (m) {
-    result.deadhead_miles = cleanNum(m[1]);
-  } else {
-    m = t.match(/([\d,.]+)\s*(?:dh|dead\s*head)\b/i);
-    if (m) result.deadhead_miles = cleanNum(m[1]);
+  // --- Loaded / Trip miles ---
+  const loaded = extractLoadedMiles(t);
+  if (loaded) result.loaded_miles = loaded;
+
+  // Legacy fallback: bare "920 mi" / "920 miles" — only if still nothing
+  // and we're confident we won't grab the deadhead number again.
+  if (!result.loaded_miles) {
+    const bare = t.match(/(?<![\w-])([\d,]+(?:\.\d+)?)\s*mi(?:les?)?\b/i);
+    if (bare) {
+      const candidate = cleanNum(bare[1]);
+      if (candidate !== result.deadhead_miles) result.loaded_miles = candidate;
+    }
   }
 
   // --- Rate per mile ---
@@ -121,14 +230,12 @@ export function parseLoadText(text: string): ParsedLoadData {
   }
 
   // --- Gross Revenue ---
-  // "$3,500 load", "gross $3500", "revenue: $3500", "total: $3500", "$3500 gross"
   m = t.match(/(?:gross|revenue|total\s*(?:pay|revenue|load)?)\s*[:=]?\s*\$?([\d,.]+)/i);
   if (m) result.gross_revenue = cleanNum(m[1]);
   if (!result.gross_revenue) {
     m = t.match(/\$?([\d,.]+)\s*(?:gross|load\s*(?:pay|revenue)?)\b/i);
     if (m) result.gross_revenue = cleanNum(m[1]);
   }
-  // Standalone dollar amount (large, likely gross) — only if no rate found and amount > 100
   if (!result.gross_revenue && !result.rate_per_mile) {
     m = t.match(/\$([\d,]+(?:\.\d{1,2})?)/);
     if (m) {
@@ -147,15 +254,12 @@ export function parseLoadText(text: string): ParsedLoadData {
     result.multiStopDetected = true;
     result.detectedStopsCount = stopMarkers.length;
 
-    // Split into stop blocks
     const blocks = t.split(/(?=\b\d+#:\s*)/).filter(b => /^\d+#:/.test(b.trim()));
     const parsedStops: ParsedStopData[] = [];
 
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
-      // Try city, ST ZIP pattern
       let cityMatch = block.match(/([A-Za-z .'-]+,\s*[A-Z]{2})\s*\d{5}/);
-      // Fallback: city, ST without zip
       if (!cityMatch) cityMatch = block.match(/([A-Za-z .'-]+,\s*[A-Z]{2})\b/);
       const location = cityMatch ? cityMatch[1].trim() : block.replace(/^\d+#:\s*/, '').split('\n')[0].trim();
 
@@ -168,7 +272,6 @@ export function parseLoadText(text: string): ParsedLoadData {
 
     if (parsedStops.length >= 2) {
       result.stops = parsedStops;
-      // Set pickup/dropoff for compatibility
       result.pickup_location = parsedStops[0].location;
       result.dropoff_location = parsedStops[parsedStops.length - 1].location;
     }
