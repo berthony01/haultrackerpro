@@ -130,7 +130,8 @@ describe('parseLoadText — unit attachment variants (user requirement)', () => 
   }
 
   it('handles bold-unicode digits e.g. 𝟐𝟓𝟕.𝟏𝟎mi', () => {
-    const bold = '\u{1D7D0}\u{1D7D3}\u{1D7D5}.\u{1D7D1}\u{1D7CE}mi';
+    // Math Bold Digits: 0=1D7CE … 9=1D7D7. So 257.10 = 1D7D0 1D7D3 1D7D5 . 1D7CF 1D7CE
+    const bold = '\u{1D7D0}\u{1D7D3}\u{1D7D5}.\u{1D7CF}\u{1D7CE}mi';
     const r = parseLoadText(`Trip: ${bold}`);
     expect(r.loaded_miles).toBe('257.10');
   });
