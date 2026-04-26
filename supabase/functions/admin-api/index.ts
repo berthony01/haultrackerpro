@@ -315,24 +315,41 @@ Deno.serve(async (req) => {
 
       // Get counts for paginated results only
       const userIdsForPage = paginated.map((p) => p.user_id);
-      const [{ data: settingsRows }] = await Promise.all([
+      const [{ data: settingsRows }, { data: subsRows }, { data: pointsRows }] = await Promise.all([
         adminDb.from("user_settings").select("user_id, lifecycle_emails_opt_in").in("user_id", userIdsForPage),
+        adminDb.from("subscriptions").select("user_id, status, plan_key, trial_end").in("user_id", userIdsForPage),
+        adminDb.from("driver_points").select("user_id, total_points").in("user_id", userIdsForPage),
       ]);
       const optedOut = new Set<string>();
       for (const s of (settingsRows || []) as Array<{ user_id: string; lifecycle_emails_opt_in: boolean | null }>) {
         if (s.lifecycle_emails_opt_in === false) optedOut.add(s.user_id);
       }
+      const subMap = new Map<string, { status: string; plan_key: string; trial_end: string | null }>();
+      for (const s of (subsRows || []) as Array<{ user_id: string; status: string; plan_key: string; trial_end: string | null }>) {
+        subMap.set(s.user_id, { status: s.status, plan_key: s.plan_key, trial_end: s.trial_end });
+      }
+      const pointsMap = new Map<string, number>();
+      for (const p of (pointsRows || []) as Array<{ user_id: string; total_points: number }>) {
+        pointsMap.set(p.user_id, p.total_points);
+      }
 
       const enriched = await Promise.all(
         paginated.map(async (p) => {
-          const [lc, ec] = await Promise.all([
+          const [lc, ec, fc] = await Promise.all([
             adminDb.from("loads").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
             adminDb.from("expenses").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
+            adminDb.from("fuel_logs").select("id", { count: "exact", head: true }).eq("user_id", p.user_id),
           ]);
+          const sub = subMap.get(p.user_id);
           return {
             ...p,
             loads_count: lc.count ?? 0,
             expenses_count: ec.count ?? 0,
+            fuel_logs_count: fc.count ?? 0,
+            driver_points_total: pointsMap.get(p.user_id) ?? 0,
+            sub_status: sub?.status ?? "free",
+            sub_plan_key: sub?.plan_key ?? "free",
+            trial_end: sub?.trial_end ?? null,
             lifecycle_opted_out: optedOut.has(p.user_id),
           };
         })
