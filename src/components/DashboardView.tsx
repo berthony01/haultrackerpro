@@ -238,6 +238,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       ) : (
         <>
+          {/* === ZONE 5 · BUSINESS METRICS === */}
           {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-2.5">
             <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} size="large" />
@@ -305,8 +306,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* Cost Breakdown: Fixed vs Variable + Contribution Margin */}
           <ContributionMarginCard loads={filteredLoads} expenses={filteredExpenses} />
-          {/* Pro Time Saved */}
-          <ProTimeSavedCard isPro={isPro} isTrialing={isTrialing} weekStartsOn={weekStartsOn} />
 
           {/* Fuel Analytics */}
           <FuelAnalyticsCard fuelLogs={fuelLogs} loads={filteredLoads} isPro={isPro} onNavigate={onNavigate} />
@@ -336,16 +335,15 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </Button>
           )}
 
-          {/* Driver Scorecard CTA */}
-          {onNavigate && (
-            <Button
-              variant="outline"
-              className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
-              onClick={() => onNavigate('scorecard')}
-            >
-              <Trophy className="h-5 w-5" /> View Driver Scorecard
-            </Button>
-          )}
+          {/* === ZONE 6 · INSIGHTS (AI + trends) === */}
+          {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
+          <WeeklyPulseCard isPro={isPro} isTrialing={isTrialing} />
+
+          {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
+          <PersonalIntelligenceBlocks isPro={isPro} isTrialing={isTrialing} />
+
+          {/* Smart Load Advisor — promoted */}
+          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} isTrialing={isTrialing} />
 
           {/* Personalized Pro Insight — free users only */}
           <ProInsightCard
@@ -356,14 +354,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
           />
 
-          {/* Smart Load Advisor */}
-          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} isTrialing={isTrialing} />
-
-          {/* Phase 6: Weekly Pulse — Mon/Tue recap of last week + top recommendations */}
-          <WeeklyPulseCard isPro={isPro} isTrialing={isTrialing} />
-
-          {/* Phase 4: Personal Intelligence — best/weakest lanes, broker reliability, margin leaks */}
-          <PersonalIntelligenceBlocks isPro={isPro} isTrialing={isTrialing} />
+          {/* Pro Time Saved */}
+          <ProTimeSavedCard isPro={isPro} isTrialing={isTrialing} weekStartsOn={weekStartsOn} />
 
           {/* Performance Trends */}
           <PerformanceTrends loads={loads} />
