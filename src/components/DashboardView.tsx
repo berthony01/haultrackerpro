@@ -144,7 +144,15 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
       {/* Driver Intelligence — gamified score card */}
       {!isLoading && <DriverIntelligenceCard isPro={isPro} isTrialing={isTrialing} />}
-      {!isLoading && <DriverLeaderboardCard limit={5} />}
+      {!isLoading && (
+        <DriverLeaderboardCard
+          limit={5}
+          onCustomize={onNavigate ? () => {
+            try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
+            onNavigate('settings');
+          } : undefined}
+        />
+      )}
 
       {/* Quarterly Tax Reminder Banner */}
       {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
