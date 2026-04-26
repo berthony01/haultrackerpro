@@ -44,7 +44,7 @@ export default function StarterKit() {
 
   useEffect(() => {
     trackLeadMagnetView('starter-kit');
-    trackStarterKitViewed('starter-kit');
+    trackOncePerSession('starter_kit_page_viewed', () => trackStarterKitViewed('starter-kit'));
     if (user?.email) setEmail(user.email);
   }, [user?.email]);
 
