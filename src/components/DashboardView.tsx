@@ -20,7 +20,7 @@ import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
 import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { PersonalIntelligenceBlocks } from '@/components/PersonalIntelligenceBlocks';
 import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel, ParkingCircle } from 'lucide-react';
 import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { DriverIntelligenceCard } from '@/components/DriverIntelligenceCard';
 import { useTierUpDetector } from '@/hooks/useTierUpDetector';
@@ -145,10 +145,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       {/* === ZONE 1 · ACTION ZONE === */}
       {/* Quick Actions — primary "log something" entry point */}
       {!isLoading && onNavigate && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <Button
             variant="outline"
-            className="h-11 gap-1.5 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all"
+            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
             onClick={() => onNavigate('add_expense')}
           >
             <Receipt className="h-4 w-4 shrink-0" />
@@ -156,7 +156,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           </Button>
           <Button
             variant="outline"
-            className="h-11 gap-1.5 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all"
+            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
             onClick={() => onNavigate('add')}
           >
             <Truck className="h-4 w-4 shrink-0" />
@@ -164,11 +164,19 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           </Button>
           <Button
             variant="outline"
-            className="h-11 gap-1.5 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all"
+            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
             onClick={() => onNavigate('add_fuel')}
           >
             <Fuel className="h-4 w-4 shrink-0" />
             Fuel
+          </Button>
+          <Button
+            variant="outline"
+            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
+            onClick={() => onNavigate('parking')}
+          >
+            <ParkingCircle className="h-4 w-4 shrink-0" />
+            Parking
           </Button>
         </div>
       )}
