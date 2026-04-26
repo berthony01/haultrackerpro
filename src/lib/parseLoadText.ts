@@ -340,8 +340,12 @@ export function parseLoadText(text: string): ParsedLoadData {
 
     if (parsedStops.length >= 2) {
       result.stops = parsedStops;
+      result.detectedStopsCount = parsedStops.length;
       result.pickup_location = parsedStops[0].location;
       result.dropoff_location = parsedStops[parsedStops.length - 1].location;
+    } else {
+      // Filtered down to <2 real stops — not actually multi-stop.
+      result.multiStopDetected = false;
     }
   }
 
