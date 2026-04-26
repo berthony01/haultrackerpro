@@ -64,10 +64,19 @@ export function PublicProfileSection() {
       (emoji ?? null) !== (profile?.handle_emoji ?? null) ||
       isPublic !== !!profile?.handle_public);
 
+  const normalizedHandle = handle.trim().toLowerCase();
+  const handleUnchanged = normalizedHandle === (profile?.driver_handle ?? '');
+
   const canSave =
     dirty &&
     !updateMut.isPending &&
-    (handle.trim() === '' ? !isPublic : availability === 'ok');
+    (
+      normalizedHandle === ''
+        ? !isPublic
+        : handleUnchanged
+          ? true
+          : availability === 'ok'
+    );
 
   const handleSave = () => {
     const normalized = handle.trim().toLowerCase();
