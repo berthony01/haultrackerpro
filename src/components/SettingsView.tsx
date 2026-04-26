@@ -68,6 +68,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [payType, setPayType] = useState('cpm');
   const [payPercentage, setPayPercentage] = useState('');
   const [companyStartDate, setCompanyStartDate] = useState<Date | undefined>(undefined);
+  const [defaultDhPayStatus, setDefaultDhPayStatus] = useState<'unpaid' | 'same' | 'custom'>('unpaid');
+  const [defaultDhPayRate, setDefaultDhPayRate] = useState('');
   const [lifecycleEmailsOptIn, setLifecycleEmailsOptIn] = useState(true);
   const [savingEmailPref, setSavingEmailPref] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -111,6 +113,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setPayType(settings.pay_type ?? 'cpm');
     setPayPercentage(settings.pay_percentage?.toString() ?? '');
     setCompanyStartDate(settings.company_start_date ? parseISO(settings.company_start_date) : undefined);
+    setDefaultDhPayStatus(((settings as any).default_dh_pay_status ?? 'unpaid') as 'unpaid' | 'same' | 'custom');
+    setDefaultDhPayRate((settings as any).default_dh_pay_rate?.toString() ?? '');
     setLifecycleEmailsOptIn((settings as any).lifecycle_emails_opt_in ?? true);
     setInitialized(true);
   }
@@ -132,6 +136,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       pay_type: payType,
       pay_percentage: payType === 'percentage' && payPercentage ? Number(payPercentage) : null,
       company_start_date: companyStartDate ? format(companyStartDate, 'yyyy-MM-dd') : null,
+      default_dh_pay_status: defaultDhPayStatus,
+      default_dh_pay_rate: defaultDhPayStatus === 'custom' && defaultDhPayRate ? Number(defaultDhPayRate) : null,
     }, {
       onSuccess: () => toast.success('Settings saved!'),
       onError: (e) => toast.error(e.message),
@@ -370,6 +376,36 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 <Input type="number" step="0.01" placeholder="0.00" value={otherFees} onChange={e => setOtherFees(e.target.value)} className="h-10 pl-8 text-sm rounded-xl" />
               </div>
             </div>
+          </div>
+
+          {/* Deadhead Pay default — applied to new loads automatically */}
+          <div className="space-y-2 rounded-xl border border-border/60 p-3 bg-muted/30">
+            <Label className="text-xs font-semibold">Do you get paid for Deadhead miles?</Label>
+            <Select value={defaultDhPayStatus} onValueChange={(v) => setDefaultDhPayStatus(v as 'unpaid' | 'same' | 'custom')}>
+              <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unpaid">No — deadhead is unpaid</SelectItem>
+                <SelectItem value="same">Yes — same rate as loaded miles</SelectItem>
+                <SelectItem value="custom">Yes — custom rate per mile</SelectItem>
+              </SelectContent>
+            </Select>
+            {defaultDhPayStatus === 'custom' && (
+              <div className="relative">
+                <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 0.85"
+                  value={defaultDhPayRate}
+                  onChange={e => setDefaultDhPayRate(e.target.value)}
+                  className="h-10 pl-8 text-sm rounded-xl"
+                />
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              New loads will use this as the default. You can still override it per load.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -107,3 +107,73 @@ describe('parseLoadText — mileage detection', () => {
     expect(r.loaded_miles).toBe('1257.10');
   });
 });
+
+describe('parseLoadText — unit attachment variants (user requirement)', () => {
+  // User requirement: "as long as the numbers has mi, miles in front of it, it should
+  // register it, whether it's written 257.10mi, 257.10 mi, 257.10mile, 257.10 mile,
+  // 257.10miles, or 257.10 miles."
+  const VARIANTS = [
+    '257.10mi',    '257.10 mi',
+    '257.10mile',  '257.10 mile',
+    '257.10miles', '257.10 miles',
+  ];
+  for (const v of VARIANTS) {
+    it(`extracts loaded miles from "${v}"`, () => {
+      const r = parseLoadText(`Trip: ${v}`);
+      expect(r.loaded_miles).toBe('257.10');
+    });
+    it(`co-extracts dh+loaded with "DH 25 miles" and "${v}"`, () => {
+      const r = parseLoadText(`DH 25 miles\nTrip: ${v}`);
+      expect(r.deadhead_miles).toBe('25');
+      expect(r.loaded_miles).toBe('257.10');
+    });
+  }
+
+  it('handles bold-unicode digits e.g. 𝟐𝟓𝟕.𝟏𝟎mi', () => {
+    // Math Bold Digits: 0=1D7CE … 9=1D7D7. So 257.10 = 1D7D0 1D7D3 1D7D5 . 1D7CF 1D7CE
+    const bold = '\u{1D7D0}\u{1D7D3}\u{1D7D5}.\u{1D7CF}\u{1D7CE}mi';
+    const r = parseLoadText(`Trip: ${bold}`);
+    expect(r.loaded_miles).toBe('257.10');
+  });
+
+  it('handles non-breaking space between number and unit', () => {
+    const r = parseLoadText('Trip: 257.10\u00A0mi');
+    expect(r.loaded_miles).toBe('257.10');
+  });
+});
+
+describe('parseLoadText — defensive guards', () => {
+  it('does not double-assign a single mileage value to both loaded and deadhead', () => {
+    // Single token, no DH context → loaded only, dh undefined
+    const r = parseLoadText('25 miles');
+    expect(r.loaded_miles).toBe('25');
+    expect(r.deadhead_miles).toBeUndefined();
+  });
+
+  it('skips Telegram pinned-message preview snippets in multi-stop detection', () => {
+    // The first 1#: line is a truncated preview (ends with "...") and should be
+    // dropped, leaving the real 3 stops.
+    const sample = `📍1#: 111DF4KFK Loaded - P...
+📍1#: 111DF4KFK
+Loaded - Preloaded
+Sun, Apr 26, 12:00 AM EDT ORH5
+515 Douglas St
+Uxbridge, MA 01569
+—————————————
+📍2#: 111DF4KFK
+Loaded - Preloaded
+Sun, Apr 26, 05:14 AM EDT WNY4
+1159 County Route 24
+Granville, NY 12832-9438
+—————————————
+📍3#: 115PBBXB5
+Empty - Drop
+Sun, Apr 26, 07:47 AM EDT ALB1
+1835 Us Route 9
+Castleton, NY 12033`;
+    const r = parseLoadText(sample);
+    expect(r.detectedStopsCount).toBe(3);
+    expect(r.pickup_location).toBe('Uxbridge, MA');
+    expect(r.dropoff_location).toBe('Castleton, NY');
+  });
+});

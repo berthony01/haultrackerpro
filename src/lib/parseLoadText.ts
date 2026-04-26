@@ -271,6 +271,12 @@ export function parseLoadText(text: string): ParsedLoadData {
     }
   }
 
+  // Defensive guard: a single number can't be both loaded AND deadhead.
+  // If they ended up equal AND there's only one mileage token in the source, drop deadhead.
+  if (dh && loaded && dh === loaded && mileageMatches.length <= 1) {
+    dh = undefined;
+  }
+
   if (dh) result.deadhead_miles = dh;
   if (loaded) result.loaded_miles = loaded;
 
@@ -306,9 +312,20 @@ export function parseLoadText(text: string): ParsedLoadData {
   const stopMarkers = t.match(/\b\d+#:\s*/g);
   if (stopMarkers && stopMarkers.length >= 2) {
     result.multiStopDetected = true;
-    result.detectedStopsCount = stopMarkers.length;
-
-    const blocks = t.split(/(?=\b\d+#:\s*)/).filter(b => /^\d+#:/.test(b.trim()));
+    // detectedStopsCount is set from the filtered blocks below (after pinned-preview filter)
+    const blocks = t.split(/(?=\b\d+#:\s*)/)
+      .filter(b => /^\d+#:/.test(b.trim()))
+      // Drop Telegram pinned-message-preview snippets. The preview is a
+      // single-line truncated copy ending in "..." or "…" — e.g.
+      // "1#: 111DF4KFK Loaded - P..." — which would otherwise be parsed as a stop.
+      .filter(b => {
+        const body = b.replace(/^\d+#:\s*/, '');
+        const firstLine = body.split('\n')[0].trim();
+        // Block must have multi-line body OR contain a city,ST pattern.
+        // Single-line truncated previews fail both checks.
+        if (/(\.{3}|…)/.test(firstLine) && !/[A-Za-z]+,\s*[A-Z]{2}/.test(body)) return false;
+        return true;
+      });
     const parsedStops: ParsedStopData[] = [];
 
     for (let i = 0; i < blocks.length; i++) {
@@ -326,8 +343,12 @@ export function parseLoadText(text: string): ParsedLoadData {
 
     if (parsedStops.length >= 2) {
       result.stops = parsedStops;
+      result.detectedStopsCount = parsedStops.length;
       result.pickup_location = parsedStops[0].location;
       result.dropoff_location = parsedStops[parsedStops.length - 1].location;
+    } else {
+      // Filtered down to <2 real stops — not actually multi-stop.
+      result.multiStopDetected = false;
     }
   }
 
