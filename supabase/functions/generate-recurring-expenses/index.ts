@@ -74,7 +74,7 @@ serve(async (req) => {
 
     const proUsers = new Set(
       (subs || [])
-        .filter((s) => s.status === "active" || s.status === "trialing")
+        .filter((s) => s.status === "active")
         .map((s) => s.user_id)
     );
 
@@ -88,7 +88,7 @@ serve(async (req) => {
     let generated = 0;
 
     for (const template of activeTemplates) {
-      // Only generate for Pro/trialing/admin users
+      // Only generate for Pro/admin users
       if (!proUsers.has(template.user_id)) {
         logStep("Skipping non-Pro user", { userId: template.user_id });
         continue;

@@ -36,14 +36,14 @@ serve(async (req) => {
       });
     }
 
-    // Check subscription status from profiles
-    const { data: profile } = await supabaseClient
-      .from("profiles")
-      .select("subscription_status")
+    // Check Pro access from canonical subscriptions table (no trials)
+    const { data: sub } = await supabaseClient
+      .from("subscriptions")
+      .select("status")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const isPro = profile?.subscription_status === "pro" || profile?.subscription_status === "trial";
+    const isPro = sub?.status === "active";
 
     if (!isPro) {
       return new Response(JSON.stringify({ 
