@@ -113,6 +113,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setPayType(settings.pay_type ?? 'cpm');
     setPayPercentage(settings.pay_percentage?.toString() ?? '');
     setCompanyStartDate(settings.company_start_date ? parseISO(settings.company_start_date) : undefined);
+    setDefaultDhPayStatus(((settings as any).default_dh_pay_status ?? 'unpaid') as 'unpaid' | 'same' | 'custom');
+    setDefaultDhPayRate((settings as any).default_dh_pay_rate?.toString() ?? '');
     setLifecycleEmailsOptIn((settings as any).lifecycle_emails_opt_in ?? true);
     setInitialized(true);
   }
