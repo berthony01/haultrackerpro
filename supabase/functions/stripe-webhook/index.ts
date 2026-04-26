@@ -23,12 +23,12 @@ function resolvePlanKey(priceId: string): string {
 
 /** Upsert the subscriptions table row */
 async function upsertSubscription(
-  supabaseClient: ReturnType<typeof createClient>,
+  supabaseClient: any,
   userId: string,
   data: {
-    stripe_customer_id?: string;
-    stripe_subscription_id?: string;
-    stripe_price_id?: string;
+    stripe_customer_id?: string | null;
+    stripe_subscription_id?: string | null;
+    stripe_price_id?: string | null;
     plan_key: string;
     status: string;
     cancel_at_period_end?: boolean;
