@@ -1,169 +1,107 @@
-# Parking Intelligence + Driver Intelligence — MVP Plan
 
-## Scope locked
+# Phase A + Phase B Fix Plan — Parking & Driver Intelligence MVP
 
-✅ **Building now (MVP):** Phases 1, 2 (list-only), 3, 6
-⏸ **Deferred:** Map (Phase 2 viz), smart prompts (4), score extension into existing scorecard (5), leaderboard (7), full streak UI (8), load integration (9), advanced Pro gating (10)
-
-This ships fast, validates the core loop (find parking → tap report → earn points → see score), and creates a clean foundation for the deferred phases.
+Scope: production-safety fixes only. No new features, no UI redesign, no pricing/route changes, no untouched edge functions.
 
 ---
 
-## Phase 1 — Database (single migration)
+## PHASE A — Critical Fixes
 
-**New tables (all RLS-enabled, scoped by `user_id` where applicable):**
+### A1. Fix Pro gating on `DriverIntelligenceCard`
+**File:** `src/components/DriverIntelligenceCard.tsx`
+- Add `ProUpgradeModal` import + local `showUpgrade` state.
+- Change Parking button `onClick`: if `!hasAccess` → open `ProUpgradeModal` (featureName: "Driver Intelligence rewards"). If `hasAccess` → navigate to `/parking` as today.
+- Lock icon stays. No visual redesign.
+- `/parking` itself remains reachable from bottom nav / direct URL for free users (view-only).
 
-1. **`parking_locations`** — community-owned parking pins
-   - `id, name, address, latitude, longitude, type` (enum: truck_stop/rest_area/warehouse/street/private)
-   - `is_paid, overnight_allowed, truck_friendly` (booleans, default false)
-   - `total_spots` (nullable int), `created_by` (uuid → auth user, nullable for seeds), `created_at`
-   - **RLS:** anyone authenticated can SELECT (it's a shared network); INSERT requires `auth.uid() = created_by`; UPDATE/DELETE only by creator (or admin via `is_admin`)
+### A2. Fix `AddParkingModal` Pro gating
+**Files:** `src/components/parking/ParkingFinder.tsx`, `src/components/parking/AddParkingModal.tsx`
+- In `ParkingFinder`, change both "Add a parking spot" buttons (the empty-state one and the bottom one): if `!hasAccess` → `setShowUpgrade(true)` instead of `setShowAdd(true)`. Add a small `Lock` icon next to the button label for free users (no layout change).
+- Defense-in-depth in `AddParkingModal.handleSubmit`: if not Pro/trialing, show toast + return early. (Pass `hasAccess` prop from `ParkingFinder`, or read from `useSubscription` directly inside the modal — simpler: read inside modal so signature unchanged.)
+- RLS already blocks insert of `created_by != auth.uid()`; this is purely a tier gate, enforced both client-side and (after migration) backstopped by application logic. No new RLS needed for this since we don't have a server-side "is_pro" check available in RLS without coupling to `subscriptions`. Document this limitation in the audit report; the realistic risk surface is low (a bypass user would only be inserting locations to a community table they can already read).
 
-2. **`parking_reports`** — status updates
-   - `id, parking_id, user_id, status` (available/limited/full), `safety_rating` (1–5, nullable), `notes` (nullable), `created_at`
-   - **RLS:** SELECT all authenticated; INSERT own; no UPDATE/DELETE
-   - **Index** on `(parking_id, created_at DESC)` for "recent reports" queries
-   - **Anti-spam:** enforced in app layer (1 report/location/user/hour) — DB stays simple
-
-3. **`parking_verifications`** — lightweight thumbs-up/down on a recent report
-   - `id, parking_id, user_id, verified_status` (available/full), `created_at`
-   - Same RLS pattern as reports
-
-4. **`parking_favorites`** — saved spots (Pro feature in deferred phase)
-   - `id, user_id, parking_id, created_at`
-   - **RLS:** full CRUD by owner only; UNIQUE `(user_id, parking_id)`
-
-5. **`driver_points`** — gamification ledger summary (one row per user)
-   - `user_id` (PK), `total_points, weekly_points, parking_points, load_points`
-   - `streak_days, last_activity_date`, `updated_at`
-   - **RLS:** SELECT/UPDATE own only; row auto-created by trigger on first points award
-
-**Seed data:** ~80 well-known truck stop locations across major US interstates (Pilot, Loves, TA, Petro flagship sites — hand-curated coordinates from public data). Lightweight enough to ship in the migration without bloat. Marked with `created_by = NULL` so they're recognizable as seeds.
-
-**Helper function:** `award_points(_user_id, _category, _amount)` (SECURITY DEFINER) — upserts into `driver_points`, increments correct buckets, updates streak based on `last_activity_date` vs today, resets `weekly_points` if it's a new ISO week. Single source of truth for all point grants.
+### A3. DB-level anti-spam for `parking_reports`
+**Migration (new):**
+- Add generated column `report_hour_bucket timestamptz GENERATED ALWAYS AS (date_trunc('hour', created_at)) STORED`.
+- Pre-clean: `DELETE` duplicate rows keeping the earliest per `(parking_id, user_id, report_hour_bucket)` using `ctid`-based dedupe, only if duplicates exist.
+- Add `CREATE UNIQUE INDEX IF NOT EXISTS parking_reports_one_per_hour ON public.parking_reports (parking_id, user_id, report_hour_bucket);`
+- In `useParkingReports`, catch unique-violation Postgres code `23505` and surface "You already reported this lot in the last hour" instead of raw error. Keep the existing client-side pre-check as a UX optimization.
 
 ---
 
-## Phase 2 — Parking Finder (`/parking`, list-only)
+## PHASE B — High-Value Fixes
 
-**New route:** `/parking` added to `App.tsx` (existing route style, lazy-loaded), nav entry as a small chip on the dashboard (NOT in bottom nav — keeps the 2+FAB+2 layout intact per project memory).
+### B4. `Badge` forwardRef
+**File:** `src/components/ui/badge.tsx`
+- Convert `Badge` to `React.forwardRef<HTMLDivElement, BadgeProps>`. Set `displayName = "Badge"`. Preserve all variants/classnames/exports.
 
-**New components:**
-- `src/pages/Parking.tsx` — page shell with SEOHead + auth guard
-- `src/components/parking/ParkingFinder.tsx` — search + filters + list
-- `src/components/parking/ParkingCard.tsx` — card per location
-- `src/components/parking/ParkingDetailSheet.tsx` — Radix Sheet (matches `LoadDetailSheet` pattern)
-- `src/components/parking/AddParkingModal.tsx` — Dialog to add a new location
-- `src/hooks/useParkingLocations.ts` — TanStack Query: list + search + nearby
-- `src/hooks/useParkingReports.ts` — list reports for a location, submit report
-- `src/hooks/useGeolocation.ts` — on-demand `navigator.geolocation.getCurrentPosition` wrapper
+### B5. Enable realtime for `driver_points` & `parking_reports`
+**Migration (new):** Idempotent block:
+```sql
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.driver_points;
+  EXCEPTION WHEN duplicate_object THEN NULL; END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.parking_reports;
+  EXCEPTION WHEN duplicate_object THEN NULL; END;
+END $$;
+ALTER TABLE public.driver_points REPLICA IDENTITY FULL;
+ALTER TABLE public.parking_reports REPLICA IDENTITY FULL;
+```
+- Verify `useDriverPoints` cleanup already calls `supabase.removeChannel(channel)` on unmount — confirmed in current code; no change needed.
 
-**UI:**
-- **Top bar:** search input (city/zip/free-text → matches name/address ILIKE), "Use my location" button (one-tap, prompts permission only when tapped)
-- **Filter row:** Free/Paid pills, Overnight, Truck Friendly, Confidence (High/Med/Low — derived from most recent report age + count, no DB column needed)
-- **List:** ParkingCard rows with name, distance (only if user shared location), confidence badge (green/amber/red matching app theme), "Last verified Xm ago"
-- **Empty state:** "No parking found nearby. [+ Add a location]" — opens AddParkingModal
-- **Detail sheet** (tap a card): full details, last 5 reports, average safety rating, three big tap-friendly buttons: **Available / Limited / Full** + "Add Report" (opens form with optional notes/safety rating)
+### B6. Wire load points
+**File:** `src/pages/Index.tsx` (only place `addLoad.mutate` is called)
+- In the `addLoad.mutate(data, { onSuccess: ... })` callback, after the existing onSuccess work, fire-and-forget:
+  ```ts
+  supabase.rpc('award_points', { _user_id: user.id, _category: 'load', _amount: 5 })
+    .then(({ error }) => { if (error) console.warn('award_points(load) failed', error); });
+  ```
+  (Only on create path — `updateLoad` is untouched, so edits never award points.)
+- Wrap in `try/catch` no-op; never block load save. No success toast change (avoid misleading copy).
+- Gate to Pro/trialing only (matches DriverIntelligenceCard messaging) — skip RPC if `!isPro && !isTrialing`.
 
-**Confidence logic (client-side, deterministic):**
-- High = ≥1 report in last 2h AND ≥2 reports in last 24h
-- Medium = ≥1 report in last 24h
-- Low = no reports in last 24h (or never reported)
+### B7. Idempotent seed safety for `parking_locations`
+**Migration (new):**
+- Add unique index: `CREATE UNIQUE INDEX IF NOT EXISTS parking_locations_dedupe ON public.parking_locations (lower(trim(name)), round(latitude::numeric, 5), round(longitude::numeric, 5));`
+- Pre-clean duplicates only if any exist (keep earliest by `created_at`, using `ctid`).
+- Future seed inserts must use `ON CONFLICT DO NOTHING`. (No new seed in this migration; constraint just protects future runs.)
+- Does not delete user-added rows that are unique.
 
-**Distance:** Haversine formula in JS when user grants location; otherwise hide distance and show "Enable location for distance".
-
----
-
-## Phase 3 — 1-Tap Reports + Points
-
-**Report submission flow (in `useParkingReports.ts`):**
-1. Check anti-spam: query last report by this user for this location in the last hour. If found → toast "You already reported this lot recently" and abort.
-2. Insert into `parking_reports`.
-3. Call `award_points(user, 'parking', 5)` via supabase RPC.
-4. Read back `driver_points` row, compute streak delta.
-5. Toast: `+5 points earned 🔥 Parking streak: ${streak_days}` using sonner (matches project pattern).
-6. Invalidate parking list + detail queries so confidence updates live.
-
-**Verifications** (separate from reports — a verification is a thumbs-up on someone else's report): tap "Still available" or "Now full" inside the detail sheet → award 3 points, same anti-spam window. Lighter weight than a full report.
-
----
-
-## Phase 6 — Dashboard Card (Driver Intelligence)
-
-**New component:** `src/components/DriverIntelligenceCard.tsx`
-**Placement:** top of `DashboardView.tsx`, just under date filter / above Quick Actions row. Pro-gated with the existing locked-preview pattern (free users see blurred preview + "Unlock with Pro").
-
-**Card content (from `driver_points`):**
-- Big number: total score
-- Tier label (mock for v1): Bronze 0–49 / Silver 50–149 / Gold 150–399 / Platinum 400+
-- Weekly delta: `+${weekly_points} this week`
-- Mock percentile: deterministic hash of user_id mapped to "Ahead of N% of drivers" (60–95% range — feels real, no leaderboard data needed yet). Marked with subtle "estimate" hint in the tooltip so it's honest.
-- Streak: `🔥 ${streak_days} day streak` if > 0
-- Tip line that rotates based on what's lowest: "Report parking to level up faster" / "Log a load to earn +5"
-- Single CTA: "View parking" → `/parking`
-
-**Reads:** new hook `src/hooks/useDriverPoints.ts` (TanStack Query), realtime subscribe to user's own `driver_points` row so toasts and the card stay in sync.
-
-**Existing scorecard:** unchanged. Phase 5 (extending the scorecard) is deferred — the new card lives alongside, not on top of, the existing one.
+### B8. Polish
+- `src/components/parking/ParkingCard.tsx`: remove unused `Heart` import.
+- `src/components/parking/AddParkingModal.tsx` validation in `handleSubmit`:
+  - `const trimmed = name.trim();`
+  - Reject if `trimmed.length < 3` → toast "Name must be at least 3 characters"
+  - Reject if `trimmed.length > 64` → toast "Name must be 64 characters or less"
+  - Reject if `/^\s*$/.test(name)` (already covered by length)
+  - Use `trimmed` in the insert.
 
 ---
 
-## Pro gating in MVP
-
-Per your "use existing $19.99 Pro" rule and the locked-preview pattern:
-- **Parking search/list/view reports:** free for all authenticated users
-- **Submitting reports / earning points / Driver Intelligence card:** Pro-gated (free users see the card teaser + upgrade nudge; can browse `/parking` but tapping a report button opens the existing `ProUpgradeModal`)
-- Favorites, smart prompts, load integration, advanced filters → deferred phases
-
-This keeps the conversion funnel intact (free users get a preview of the network value, Pro unlocks participation).
-
----
-
-## Files touched
-
-**New:**
-- `supabase/migrations/<ts>_parking_intelligence.sql` (5 tables + RLS + `award_points` fn + seed)
-- `src/pages/Parking.tsx`
-- `src/components/parking/ParkingFinder.tsx`
-- `src/components/parking/ParkingCard.tsx`
-- `src/components/parking/ParkingDetailSheet.tsx`
-- `src/components/parking/AddParkingModal.tsx`
+## Files to be modified
 - `src/components/DriverIntelligenceCard.tsx`
-- `src/hooks/useParkingLocations.ts`
+- `src/components/parking/ParkingFinder.tsx`
+- `src/components/parking/AddParkingModal.tsx`
+- `src/components/parking/ParkingCard.tsx`
+- `src/components/ui/badge.tsx`
 - `src/hooks/useParkingReports.ts`
-- `src/hooks/useDriverPoints.ts`
-- `src/hooks/useGeolocation.ts`
+- `src/pages/Index.tsx` (single small `onSuccess` addition for `addLoad`)
 
-**Edited (surgical, no redesign):**
-- `src/App.tsx` — add `/parking` route
-- `src/components/DashboardView.tsx` — mount `DriverIntelligenceCard` at top + small "Find Parking" chip near Quick Actions
-- `src/integrations/supabase/types.ts` — auto-regenerated after migration
+## Migrations to be added (one combined SQL migration is fine)
+1. `parking_reports` hour-bucket generated column + dedupe + unique index.
+2. `parking_locations` dedupe unique index (+ safe pre-clean).
+3. `supabase_realtime` publication add for `driver_points` and `parking_reports` + `REPLICA IDENTITY FULL`.
 
-**Untouched:** bottom nav, existing scorecard, load forms, expense flow, recurring expenses, profit intel, weekly closeout, all dashboards beyond the one card insertion. No route renames, no UI redesigns.
+## Out of scope (deferred per instruction)
+- Leaflet map, leaderboard, Driver Scorecard merge, smart prompts, Parking Outlook on loads, favorites UI, pricing changes, edge function changes.
 
----
-
-## Verification after build
-
-1. Migration applies cleanly; seeds visible in `/parking` list
-2. `/parking` loads on mobile (390×844) and desktop without overflow
-3. Anti-spam blocks 2nd report within 1 hour with friendly toast
-4. Tapping Available awards 5 points, toast shows correct streak number
-5. Driver Intelligence card on dashboard reflects new total within ~1s (realtime)
-6. Free user sees Pro upgrade modal on report tap
-7. Existing dashboard, loads page, expenses, recurring expenses, scorecard, settings all render unchanged
-8. No TypeScript errors, no console errors on `/dashboard` or `/parking`
-
----
-
-## Deferred for follow-ups (clearly out of scope right now)
-
-- Leaflet map view on `/parking` (Phase 2 viz)
-- Smart "you just parked?" prompts (Phase 4) — needs geolocation strategy refinement
-- Merging Parking Intelligence into the existing Driver Scorecard (Phase 5)
-- Leaderboard route (Phase 7)
-- Streak detail UI / parking_streak_days separation (Phase 8)
-- Load → parking outlook on load detail sheet (Phase 9)
-- Favorites + advanced Pro filters (Phase 10)
-
-I'll log each as a clean follow-up after MVP ships and you've validated the loop with real taps.
+## Post-implementation verification (will be reported)
+- TS check passes; no new console warnings; `Badge` ref warning gone.
+- Free user: Parking button on dashboard → upgrade modal; Add Parking button → upgrade modal; report buttons → upgrade modal (already in place).
+- Pro/trial user: routes to `/parking`, can add spots, can submit reports, earns points.
+- Load create → +5 load points (Pro/trial only); load edit → no points.
+- DB unique index blocks 2nd report within same hour even if client check is bypassed.
+- Existing load/expense/recurring/scorecard/pricing flows untouched.
