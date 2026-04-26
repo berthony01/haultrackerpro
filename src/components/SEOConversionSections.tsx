@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, ArrowRight, Sparkles, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import dashboardMockup from '@/assets/dashboard-mockup.png';
 
 export function ProblemSolutionSection() {
   return (
@@ -60,9 +61,9 @@ export function ProductProofSection() {
       </div>
       <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
         <img
-          src="/placeholder.svg"
+          src={dashboardMockup}
           alt="HaulTrackerPro dashboard showing loads, expenses, and profit overview"
-          className="w-full h-48 sm:h-64 object-cover bg-muted"
+          className="w-full h-auto object-contain bg-card"
           loading="lazy"
         />
         <div className="p-5">
