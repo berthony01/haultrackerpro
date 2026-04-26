@@ -68,7 +68,7 @@ const Index = () => {
   const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
   const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
 
-  // Pro gating — canonical subscription hook (Free vs Pro only; no trials)
+  // Pro gating — canonical subscription hook (Free vs Pro plans only)
   const subscription = useSubscription();
   const isPro = subscription.isPro;
 
