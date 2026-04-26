@@ -138,7 +138,7 @@ export default function TruckingFinanceGuides() {
               <ParkingCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <div>
                 <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Real-Time Parking Finder (Pro)</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Find safe truck parking with live availability reports from drivers. Included with Pro + 14-day free trial.</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Find safe truck parking with live availability reports from drivers. Included with Pro.</div>
               </div>
             </Link>
             <Link

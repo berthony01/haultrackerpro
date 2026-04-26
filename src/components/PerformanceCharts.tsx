@@ -294,7 +294,7 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
               <li>• Expense breakdown insights</li>
             </ul>
             <Button size="sm" className="rounded-xl font-bold gap-1.5" onClick={() => navigate('/pricing')}>
-              <Crown className="h-3.5 w-3.5" /> Start Free Trial
+              <Crown className="h-3.5 w-3.5" /> Upgrade to Pro
             </Button>
           </div>
         )}

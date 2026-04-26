@@ -62,7 +62,7 @@ export function QuarterlyReminderSettings({ settings, onSave, isPending, isPro =
             <p className="text-sm font-semibold">Quarterly tax reminders are available in Pro.</p>
             <p className="text-xs text-muted-foreground">Get notified before IRS quarterly deadlines with recommended set-aside amounts.</p>
             <Button size="sm" className="rounded-xl font-bold gap-1.5 mt-1" onClick={() => navigate('/pricing')}>
-              <Crown className="h-3.5 w-3.5" /> Start Free Trial
+              <Crown className="h-3.5 w-3.5" /> Upgrade to Pro
             </Button>
           </div>
         </CardContent>
