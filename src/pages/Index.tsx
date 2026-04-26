@@ -61,6 +61,20 @@ const Index = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const { ready: releaseReady, hasSeenLatest, markSeen } = useReleaseNotesSeen();
+
+  // Auto-open the What's New modal once per user (after onboarding modal isn't blocking)
+  useEffect(() => {
+    if (releaseReady && !hasSeenLatest && !showOnboardingModal) {
+      setShowWhatsNew(true);
+    }
+  }, [releaseReady, hasSeenLatest, showOnboardingModal]);
+
+  const handleCloseWhatsNew = () => {
+    markSeen();
+    setShowWhatsNew(false);
+  };
 
   const allLoadsQuery = useLoads();
   const allExpensesQuery = useExpenses();
