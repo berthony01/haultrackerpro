@@ -228,23 +228,51 @@ export function parseLoadText(text: string): ParsedLoadData {
     }
   }
 
-  // --- Deadhead first (so loaded-miles regex can't consume DH numbers) ---
-  const dh = extractDeadheadMiles(t);
-  if (dh) result.deadhead_miles = dh;
+  // --- Mileage: pattern-first scan + context classification ---
+  // Find every "<number> mi|mile|miles" token. Penalty $-amounts have no mi unit so they're skipped.
+  const mileageMatches = findAllMileage(t);
 
-  // --- Loaded / Trip miles ---
-  const loaded = extractLoadedMiles(t);
-  if (loaded) result.loaded_miles = loaded;
+  let dh = pickDeadhead(mileageMatches);
+  let loaded = pickLoaded(mileageMatches, dh);
 
-  // Legacy fallback: bare "920 mi" / "920 miles" — only if still nothing
-  // and we're confident we won't grab the deadhead number again.
-  if (!result.loaded_miles) {
-    const bare = t.match(/(?<![\w-])([\d,]+(?:\.\d+)?)\s*mi(?:les?)?\b/i);
-    if (bare) {
-      const candidate = cleanNum(bare[1]);
-      if (candidate !== result.deadhead_miles) result.loaded_miles = candidate;
+  // --- Labelled fallback (covers "Loaded Miles: 300" / "Trip Miles: 415.5" /
+  // "Empty Miles: 25" / "Linehaul Miles: 257.10" — number has no trailing "mi") ---
+  if (!dh) {
+    const dhLabelled =
+      t.match(/(?:dead\s*head|empty|bobtail|unpaid|reposition|non[\s-]?revenue)\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
+      t.match(/\bdh\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
+      t.match(/([\d,]+(?:\.\d+)?)\s*(?:dh|dead\s*head)\b/i);
+    if (dhLabelled) dh = cleanNum(dhLabelled[1]);
+  }
+  if (!loaded) {
+    const labelledLoaded: RegExp[] = [
+      /total\s*trip\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /(?:trip\s*miles?|miles?\s*trip)\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /loaded\s*(?:miles?|mi|distance)?\s*[:=]\s*([\d,]+(?:\.\d+)?)/i,
+      /linehaul\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /route\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /distance\s*[:=]\s*([\d,]+(?:\.\d+)?)/i,
+      /\btrip\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*mi(?:les?)?\b/i,
+    ];
+    for (const re of labelledLoaded) {
+      const lm = t.match(re);
+      if (lm) {
+        const v = cleanNum(lm[1]);
+        if (v !== dh) { loaded = v; break; }
+      }
+    }
+    // Last-resort "Total Miles: 500"
+    if (!loaded) {
+      const totalM = t.match(/total\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i);
+      if (totalM) {
+        const v = cleanNum(totalM[1]);
+        if (v !== dh) loaded = v;
+      }
     }
   }
+
+  if (dh) result.deadhead_miles = dh;
+  if (loaded) result.loaded_miles = loaded;
 
   // --- Rate per mile ---
   // "$2.45/mi", "$2.45 CPM", "$2.45 per mile", "2.45 rpm", "rate: $2.45"
