@@ -59,7 +59,7 @@ export default function StarterKit() {
     try {
       await submitLeadMagnet(parsed.data, { convertedUserId: user?.id ?? null });
       trackLeadMagnetSubmit();
-      trackStarterKitFormSubmitted();
+      trackOncePerSession('starter_kit_form_submitted', () => trackStarterKitFormSubmitted());
       toast.success('Your kit is ready! Redirecting…');
       navigate(`/starter-kit/thanks?email=${encodeURIComponent(parsed.data.email)}`);
     } catch (err) {
