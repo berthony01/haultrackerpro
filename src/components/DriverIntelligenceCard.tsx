@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Flame, TrendingUp, MapPin, Lock } from 'lucide-react';
-import { useDriverPoints, tierFor, mockPercentile } from '@/hooks/useDriverPoints';
+import { useDriverPoints, tierFor, mockPercentile, nextTierProgress } from '@/hooks/useDriverPoints';
 import { useMyLeaderboardRank } from '@/hooks/useDriverLeaderboard';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +29,7 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
   const best = points?.best_weekly_points ?? 0;
   const bestDate = points?.best_weekly_period_start ?? null;
   const tier = tierFor(total);
+  const nextTier = nextTierProgress(total);
   const percentile = mockPercentile(user?.id, total);
 
   // Rank chase line — competitive pull on every dashboard visit.
@@ -89,6 +90,11 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
                   </span>
                 )}
               </div>
+              {nextTier && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {nextTier.next} at {nextTier.threshold} pts — {nextTier.toGo} to go
+                </p>
+              )}
               <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1 text-success">
                   <TrendingUp className="h-3 w-3" />+{weekly} this week
@@ -97,12 +103,18 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
                 {me && <span>Your rank: <span className="font-bold text-foreground">#{me.rank}</span></span>}
                 {top && <span>Top: <span className="font-bold text-foreground">{top.weekly_points}p</span></span>}
               </div>
-              {best > 0 && (
-                <p className={`text-[11px] mt-1 ${isNewBest ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
-                  {isNewBest
-                    ? `🔥 New personal best: ${weekly} pts this week`
-                    : `Personal best: ${best} pts${bestDate ? ` (week of ${bestDate})` : ''}`}
-                </p>
+              {points && (
+                best > 0 ? (
+                  <p className={`text-[11px] mt-1 ${isNewBest ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+                    {isNewBest
+                      ? `🔥 New personal best: ${weekly} pts this week`
+                      : `Personal best: ${best} pts${bestDate ? ` (week of ${bestDate})` : ''}`}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    No personal best yet — log a load or verify parking to start.
+                  </p>
+                )
               )}
               {chaseLine && (
                 <p className="text-[11px] text-foreground/80 mt-1 font-medium">{chaseLine}</p>

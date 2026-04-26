@@ -61,6 +61,14 @@ export function tierFor(total: number): { name: string; color: string } {
   return { name: 'Bronze', color: 'text-orange-400' };
 }
 
+/** Returns the next tier name and points needed to reach it, or null if already at top tier. */
+export function nextTierProgress(total: number): { next: string; threshold: number; toGo: number } | null {
+  if (total < 50) return { next: 'Silver', threshold: 50, toGo: 50 - total };
+  if (total < 150) return { next: 'Gold', threshold: 150, toGo: 150 - total };
+  if (total < 400) return { next: 'Platinum', threshold: 400, toGo: 400 - total };
+  return null;
+}
+
 // Deterministic mock percentile from user id — keeps the dashboard honest-feeling
 // without a real leaderboard query.
 export function mockPercentile(userId: string | undefined, total: number): number {

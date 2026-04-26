@@ -12,12 +12,15 @@ interface DriverLeaderboardCardProps {
   title?: string;
   /** Hide the explanatory footer. */
   hideHelp?: boolean;
+  /** Optional handler for the "Customize handle" link. When provided, link is shown. */
+  onCustomize?: () => void;
 }
 
 export function DriverLeaderboardCard({
   limit = 5,
   title = 'Top Drivers This Week',
   hideHelp,
+  onCustomize,
 }: DriverLeaderboardCardProps) {
   const { user } = useAuth();
   // Fetch a wider list so we can find current user's rank if outside top N.
@@ -73,6 +76,15 @@ export function DriverLeaderboardCard({
           <p className="text-[11px] text-muted-foreground mt-3">
             Earn points by logging loads, reporting parking, and verifying parking status.
           </p>
+        )}
+        {onCustomize && (
+          <button
+            type="button"
+            onClick={onCustomize}
+            className="mt-2 text-[11px] text-primary hover:underline focus:outline-none focus:underline"
+          >
+            Customize your leaderboard handle →
+          </button>
         )}
       </CardContent>
     </Card>

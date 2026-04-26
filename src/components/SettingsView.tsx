@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -75,6 +75,19 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const publicProfileRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll to Public Profile when arriving via "Customize handle" link
+  useEffect(() => {
+    let flag: string | null = null;
+    try { flag = sessionStorage.getItem('settings.focusSection'); } catch {}
+    if (flag !== 'public-profile') return;
+    try { sessionStorage.removeItem('settings.focusSection'); } catch {}
+    const id = window.requestAnimationFrame(() => {
+      publicProfileRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
   const subscription = useSubscription();
   const isPro = subscription.isPro;
@@ -270,7 +283,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       </Card>
 
       {/* Public Profile (leaderboard handle) */}
-      <PublicProfileSection />
+      <div ref={publicProfileRef}>
+        <PublicProfileSection />
+      </div>
 
       {/* Billing */}
       <Card className="shadow-card">
