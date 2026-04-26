@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
-import { trackLandingFaqDeepLink } from '@/lib/analytics';
+import { trackLandingFaqDeepLink, trackStarterKitCTAClicked } from '@/lib/analytics';
 
 type LandingFaq = { q: string; a: string; deepLink?: string };
 
@@ -559,8 +559,15 @@ export default function Landing() {
                 CDL study, test day checklist, and owner-operator paperwork — six free PDFs, no credit card.
               </p>
             </div>
-            <Button onClick={() => navigate('/starter-kit')} variant="outline" className="rounded-xl font-bold gap-2 w-full sm:w-auto"
-              style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
+            <Button
+              onClick={() => {
+                trackStarterKitCTAClicked('landing');
+                navigate('/starter-kit');
+              }}
+              variant="outline"
+              className="rounded-xl font-bold gap-2 w-full sm:w-auto"
+              style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
+            >
               Get the Free Kit <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
@@ -668,7 +675,15 @@ export default function Landing() {
                   { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
                   { label: 'Bookkeeping', href: '/trucker-bookkeeping-guide' },
                 ].map(link => (
-                  <a key={link.href} href={link.href} className="block text-xs font-medium hover:underline text-center sm:text-left py-1.5 sm:py-0 sm:mb-1.5 rounded-md" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => {
+                      if (link.href === '/starter-kit') trackStarterKitCTAClicked('footer');
+                    }}
+                    className="block text-xs font-medium hover:underline text-center sm:text-left py-1.5 sm:py-0 sm:mb-1.5 rounded-md"
+                    style={{ color: 'hsl(220, 10%, 45%)' }}
+                  >
                     {link.label}
                   </a>
                 ))}

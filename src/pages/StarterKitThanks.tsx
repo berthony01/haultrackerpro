@@ -9,6 +9,8 @@ import {
   trackLeadMagnetView,
   trackLeadMagnetDownload,
   trackLeadMagnetSignupClick,
+  trackStarterKitDownloadClicked,
+  trackStarterKitSignupClicked,
 } from '@/lib/analytics';
 
 const ORANGE = 'hsl(25, 95%, 53%)';
@@ -30,11 +32,13 @@ export default function StarterKitThanks() {
 
   const handleDownload = () => {
     trackLeadMagnetDownload();
+    trackStarterKitDownloadClicked('thanks');
     window.open(STARTER_KIT_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
   };
 
   const handleSignup = () => {
     trackLeadMagnetSignupClick();
+    trackStarterKitSignupClicked();
     navigate(user ? '/dashboard' : '/auth');
   };
 

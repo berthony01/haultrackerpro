@@ -106,7 +106,7 @@ export function trackLandingFaqDeepLink(target: string) {
   gtag('event', 'landing_faq_deep_link', { target });
 }
 
-// ─── LEAD MAGNET FUNNEL ─────────────────────────────────
+// ─── LEAD MAGNET FUNNEL (legacy — kept for backward-compat with existing GA reports) ─────
 export function trackLeadMagnetView(source: string) {
   gtag('event', 'lead_magnet_view', { source });
 }
@@ -121,4 +121,25 @@ export function trackLeadMagnetDownload() {
 
 export function trackLeadMagnetSignupClick() {
   gtag('event', 'lead_magnet_signup_click');
+}
+
+// ─── STARTER KIT FUNNEL (standardized event names) ──────────────────────────
+export function trackStarterKitViewed(source?: string) {
+  gtag('event', 'starter_kit_page_viewed', { source });
+}
+
+export function trackStarterKitCTAClicked(source: 'landing' | 'pricing' | 'footer' | string) {
+  gtag('event', 'starter_kit_cta_clicked', { source });
+}
+
+export function trackStarterKitFormSubmitted() {
+  gtag('event', 'starter_kit_form_submitted');
+}
+
+export function trackStarterKitDownloadClicked(source?: 'starter_kit' | 'thanks') {
+  gtag('event', 'starter_kit_download_clicked', { source });
+}
+
+export function trackStarterKitSignupClicked() {
+  gtag('event', 'starter_kit_signup_clicked');
 }

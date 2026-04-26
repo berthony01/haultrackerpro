@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PLANS } from '@/lib/billing/plans';
-import { trackBeginCheckout, trackPricingProfitIntelClick } from '@/lib/analytics';
+import { trackBeginCheckout, trackPricingProfitIntelClick, trackStarterKitCTAClicked } from '@/lib/analytics';
 
 const freeFeatures = [
   'Unlimited load logging',
@@ -307,7 +307,10 @@ export default function Pricing() {
       <section className="py-8" style={{ background: 'hsl(220, 20%, 8%)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <button
-            onClick={() => navigate('/starter-kit')}
+            onClick={() => {
+              trackStarterKitCTAClicked('pricing');
+              navigate('/starter-kit');
+            }}
             className="w-full text-center text-sm py-3 px-4 rounded-lg border hover:bg-white/5 transition"
             style={{ borderColor: 'hsl(220, 16%, 16%)', color: 'hsl(220, 10%, 70%)' }}
           >
