@@ -65,6 +65,7 @@ export function useSubmitParkingReport() {
     onSuccess: ({ pointsRow }) => {
       qc.invalidateQueries({ queryKey: ['parking-reports'] });
       qc.invalidateQueries({ queryKey: ['driver-points'] });
+      qc.invalidateQueries({ queryKey: ['driver-leaderboard'] });
       const streak = (pointsRow as { streak_days?: number } | null)?.streak_days ?? 0;
       toast.success('+5 points earned', {
         description: streak > 0 ? `🔥 ${streak} day streak` : 'Thanks for helping drivers',
