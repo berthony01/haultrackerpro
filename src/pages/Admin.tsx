@@ -883,31 +883,36 @@ export default function Admin() {
                   <DialogTitle>User Detail</DialogTitle>
                   <DialogDescription>View and manage user details</DialogDescription>
                 </DialogHeader>
-                {selectedUser && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <p className="text-muted-foreground">Email</p><p>{selectedUser.email}</p>
-                      <p className="text-muted-foreground">Plan</p><p>{selectedUser.subscription_status}</p>
-                      <p className="text-muted-foreground">Joined</p><p>{new Date(selectedUser.created_at).toLocaleDateString()}</p>
-                      <p className="text-muted-foreground">Loads</p><p>{selectedUser.loads_count}</p>
-                      <p className="text-muted-foreground">Expenses</p><p>{selectedUser.expenses_count}</p>
-                    </div>
-                    {isSuperAdmin && (
-                      <div className="flex gap-2 pt-2">
-                        <Button
-                          size="sm"
-                          variant={selectedUser.subscription_status === 'pro' ? 'destructive' : 'default'}
-                          onClick={() => setPlanOverrideConfirm({
-                            user: selectedUser,
-                            newStatus: selectedUser.subscription_status === 'pro' ? 'free' : 'pro',
-                          })}
-                        >
-                          Set {selectedUser.subscription_status === 'pro' ? 'Free' : 'Pro'}
-                        </Button>
+                {selectedUser && (() => {
+                  const rawStatus = selectedUser.sub_status ?? selectedUser.subscription_status;
+                  const displayStatus = rawStatus === 'trialing' || rawStatus === 'active' ? 'pro' : rawStatus;
+                  const isPro = displayStatus === 'pro';
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <p className="text-muted-foreground">Email</p><p>{selectedUser.email}</p>
+                        <p className="text-muted-foreground">Plan</p><p>{displayStatus}</p>
+                        <p className="text-muted-foreground">Joined</p><p>{new Date(selectedUser.created_at).toLocaleDateString()}</p>
+                        <p className="text-muted-foreground">Loads</p><p>{selectedUser.loads_count}</p>
+                        <p className="text-muted-foreground">Expenses</p><p>{selectedUser.expenses_count}</p>
                       </div>
-                    )}
-                  </div>
-                )}
+                      {isSuperAdmin && (
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            variant={isPro ? 'destructive' : 'default'}
+                            onClick={() => setPlanOverrideConfirm({
+                              user: selectedUser,
+                              newStatus: isPro ? 'free' : 'pro',
+                            })}
+                          >
+                            Set {isPro ? 'Free' : 'Pro'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </DialogContent>
             </Dialog>
 
