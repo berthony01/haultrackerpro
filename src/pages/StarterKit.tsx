@@ -8,7 +8,14 @@ import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
 import { leadMagnetSchema, submitLeadMagnet, STARTER_KIT_DOWNLOAD_URL } from '@/lib/leadMagnet';
-import { trackLeadMagnetView, trackLeadMagnetSubmit, trackLeadMagnetDownload } from '@/lib/analytics';
+import {
+  trackLeadMagnetView,
+  trackLeadMagnetSubmit,
+  trackLeadMagnetDownload,
+  trackStarterKitViewed,
+  trackStarterKitFormSubmitted,
+  trackStarterKitDownloadClicked,
+} from '@/lib/analytics';
 
 const ORANGE = 'hsl(25, 95%, 53%)';
 const ORANGE_SOFT = 'hsl(25, 95%, 60%)';
@@ -36,6 +43,7 @@ export default function StarterKit() {
 
   useEffect(() => {
     trackLeadMagnetView('starter-kit');
+    trackStarterKitViewed('starter-kit');
     if (user?.email) setEmail(user.email);
   }, [user?.email]);
 
@@ -50,6 +58,7 @@ export default function StarterKit() {
     try {
       await submitLeadMagnet(parsed.data, { convertedUserId: user?.id ?? null });
       trackLeadMagnetSubmit();
+      trackStarterKitFormSubmitted();
       toast.success('Your kit is ready! Redirecting…');
       navigate(`/starter-kit/thanks?email=${encodeURIComponent(parsed.data.email)}`);
     } catch (err) {
@@ -62,6 +71,7 @@ export default function StarterKit() {
 
   const directDownload = () => {
     trackLeadMagnetDownload();
+    trackStarterKitDownloadClicked('starter_kit');
     window.open(STARTER_KIT_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
   };
 
