@@ -196,6 +196,42 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_points: {
+        Row: {
+          last_activity_date: string | null
+          load_points: number
+          parking_points: number
+          streak_days: number
+          total_points: number
+          updated_at: string
+          user_id: string
+          weekly_period_start: string | null
+          weekly_points: number
+        }
+        Insert: {
+          last_activity_date?: string | null
+          load_points?: number
+          parking_points?: number
+          streak_days?: number
+          total_points?: number
+          updated_at?: string
+          user_id: string
+          weekly_period_start?: string | null
+          weekly_points?: number
+        }
+        Update: {
+          last_activity_date?: string | null
+          load_points?: number
+          parking_points?: number
+          streak_days?: number
+          total_points?: number
+          updated_at?: string
+          user_id?: string
+          weekly_period_start?: string | null
+          weekly_points?: number
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -681,6 +717,150 @@ export type Database = {
         }
         Relationships: []
       }
+      parking_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          parking_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parking_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parking_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_favorites_parking_id_fkey"
+            columns: ["parking_id"]
+            isOneToOne: false
+            referencedRelation: "parking_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parking_locations: {
+        Row: {
+          address: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_paid: boolean
+          latitude: number
+          longitude: number
+          name: string
+          overnight_allowed: boolean
+          total_spots: number | null
+          truck_friendly: boolean
+          type: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_paid?: boolean
+          latitude: number
+          longitude: number
+          name: string
+          overnight_allowed?: boolean
+          total_spots?: number | null
+          truck_friendly?: boolean
+          type?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_paid?: boolean
+          latitude?: number
+          longitude?: number
+          name?: string
+          overnight_allowed?: boolean
+          total_spots?: number | null
+          truck_friendly?: boolean
+          type?: string
+        }
+        Relationships: []
+      }
+      parking_reports: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          parking_id: string
+          safety_rating: number | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parking_id: string
+          safety_rating?: number | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parking_id?: string
+          safety_rating?: number | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_reports_parking_id_fkey"
+            columns: ["parking_id"]
+            isOneToOne: false
+            referencedRelation: "parking_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parking_verifications: {
+        Row: {
+          created_at: string
+          id: string
+          parking_id: string
+          user_id: string
+          verified_status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parking_id: string
+          user_id: string
+          verified_status: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parking_id?: string
+          user_id?: string
+          verified_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_verifications_parking_id_fkey"
+            columns: ["parking_id"]
+            isOneToOne: false
+            referencedRelation: "parking_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parse_usage: {
         Row: {
           id: string
@@ -1058,6 +1238,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      award_points: {
+        Args: { _amount: number; _category: string; _user_id: string }
+        Returns: {
+          last_activity_date: string | null
+          load_points: number
+          parking_points: number
+          streak_days: number
+          total_points: number
+          updated_at: string
+          user_id: string
+          weekly_period_start: string | null
+          weekly_points: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_points"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       build_lane_key: {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
