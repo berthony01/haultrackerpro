@@ -407,6 +407,12 @@ const Index = () => {
           <>
             {page === 'dashboard' && (
               <>
+                {releaseReady && !hasSeenLatest && (
+                  <WhatsNewCard
+                    onOpen={() => setShowWhatsNew(true)}
+                    onDismiss={() => markSeen()}
+                  />
+                )}
                 {!subscription.isLoading && (
                   <MilestoneNudges
                     loadsCount={allLoadsQuery.loads.length}
@@ -567,6 +573,7 @@ const Index = () => {
         onComplete={handleOnboardingComplete}
         onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
       />
+      <WhatsNewModal open={showWhatsNew} onClose={handleCloseWhatsNew} />
     </div>
   );
 };
