@@ -34,6 +34,9 @@ import { AlertsView } from '@/components/AlertsView';
 
 import { RecurringExpensesView } from '@/components/RecurringExpensesView';
 import { MilestoneNudges } from '@/components/MilestoneNudges';
+import { WhatsNewCard } from '@/components/WhatsNewCard';
+import { WhatsNewModal } from '@/components/WhatsNewModal';
+import { useReleaseNotesSeen } from '@/hooks/useReleaseNotesSeen';
 import { DriverScorecard } from '@/components/DriverScorecard';
 import { Truck, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
