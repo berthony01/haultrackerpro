@@ -67,4 +67,43 @@ describe('parseLoadText — mileage detection', () => {
     expect(parseLoadText('Bobtail Miles: 25').deadhead_miles).toBe('25');
     expect(parseLoadText('Unpaid Miles: 25').deadhead_miles).toBe('25');
   });
+
+  it('Context: penalty $ amounts are NOT captured as miles', () => {
+    const r = parseLoadText('DH 25 miles 🚛 Trip: 257.10mi ❌Late PU: $1000 ❌Late DEL: $700');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBe('257.10');
+  });
+
+  it('Context: "Empty miles 18 Route miles 190"', () => {
+    const r = parseLoadText('Empty miles: 18 Route miles: 190');
+    expect(r.deadhead_miles).toBe('18');
+    expect(r.loaded_miles).toBe('190');
+  });
+
+  it('Context: "Deadhead: 40 mi Loaded Miles: 260 mi"', () => {
+    const r = parseLoadText('Deadhead: 40 mi Loaded Miles: 260 mi');
+    expect(r.deadhead_miles).toBe('40');
+    expect(r.loaded_miles).toBe('260');
+  });
+
+  it('Context: "Linehaul 415.5 mi" (no colon)', () => {
+    const r = parseLoadText('Linehaul 415.5 mi');
+    expect(r.loaded_miles).toBe('415.5');
+  });
+
+  it('Context: "Distance: 222 miles"', () => {
+    const r = parseLoadText('Distance: 222 miles');
+    expect(r.loaded_miles).toBe('222');
+  });
+
+  it('Context: only one mileage value, not deadhead → loaded', () => {
+    const r = parseLoadText('Some random text 257.10mi here');
+    expect(r.loaded_miles).toBe('257.10');
+    expect(r.deadhead_miles).toBeUndefined();
+  });
+
+  it('Context: comma-thousands "1,257.10 miles"', () => {
+    const r = parseLoadText('Trip: 1,257.10 miles');
+    expect(r.loaded_miles).toBe('1257.10');
+  });
 });

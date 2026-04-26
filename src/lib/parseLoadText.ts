@@ -2,13 +2,18 @@
  * Regex-based parser for extracting load details from pasted text (Telegram, SMS, broker messages).
  * No AI. User always reviews before saving.
  *
- * Mileage detection strategy (in order):
- *   1. Normalize input (fold bold-unicode letters → ASCII, strip emojis/symbols around labels).
- *   2. Detect DEADHEAD miles first — using strong DH/Empty/Bobtail/Unpaid keywords —
- *      so the loaded-miles regex cannot accidentally consume them.
- *   3. Detect LOADED / TRIP miles using a wide list of label variants
- *      (Trip, Trip Miles, Loaded Miles, Linehaul, Route, Distance, etc.).
- *   4. Use "Total Miles" only as a last-resort fallback.
+ * Mileage detection strategy (pattern-first + context classification):
+ *   1. Normalize input (fold bold-unicode letters → ASCII).
+ *   2. Find ALL `<number> mi|mile|miles` occurrences (the unit is required, so $-amounts can't match).
+ *   3. For each occurrence, look at a context window (~30 chars before, ~10 after) and classify:
+ *        - deadhead keyword nearby → deadhead miles
+ *        - loaded/trip/linehaul/route/distance/total keyword nearby → loaded miles
+ *        - otherwise → unclassified candidate
+ *   4. Pick deadhead = first deadhead-classified value.
+ *   5. Pick loaded by priority of context strength
+ *      (loaded > trip > linehaul > route > distance > total > largest non-deadhead candidate).
+ *   6. If exactly 2 values and one is deadhead, the other is loaded.
+ *   7. If only 1 value and it's not deadhead, it's loaded.
  */
 
 export interface ParsedStopData {
@@ -101,66 +106,87 @@ function tryParseDate(raw: string): string | undefined {
 }
 
 /**
- * Extract loaded / trip miles from the (already unicode-normalized) text.
- * Tries label variants in priority order; falls back to "Total Miles".
+ * Pattern-first mileage extraction.
+ *
+ * Finds every `<number> mi|mile|miles` in the text (unit required — penalty $ amounts
+ * like "$1000" are ignored automatically). For each, inspects ~30 chars before and
+ * ~10 chars after to classify by context.
  */
-function extractLoadedMiles(t: string): string | undefined {
-  // High-priority labelled patterns. Group 1 = numeric value.
-  // Order matters — most specific first.
-  const labelledPatterns: RegExp[] = [
-    // "Total Trip Miles: 257.10"
-    /total\s*trip\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
-    // "Trip Miles: 257.10" / "Miles Trip: 257.10"
-    /(?:trip\s*miles?|miles?\s*trip)\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
-    // "Loaded Miles: 300" / "Loaded Mi: 300" / "Loaded Distance: 300" / "Loaded: 300mi"
-    /loaded\s*(?:miles?|mi|distance)?\s*[:=]\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
-    // "Linehaul Miles: 257"
-    /linehaul\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
-    // "Route Miles: 222" / "Route miles 222 mi"
-    /route\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
-    // "Distance: 257 mi"
-    /distance\s*[:=]\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
-    // "Trip: 257.10mi" / "Trip: 257.10 mi" / "Trip: 257.10 miles"
-    // Requires "mi" suffix after the number to avoid matching "Trip ID: T-123".
-    /\btrip\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*mi(?:les?)?\b/i,
-  ];
+type LoadedKind = 'loaded' | 'trip' | 'linehaul' | 'route' | 'distance' | 'total' | 'unknown';
 
-  for (const re of labelledPatterns) {
-    const m = t.match(re);
-    if (m) return cleanNum(m[1]);
-  }
-
-  // Fallback only: "Total Miles: 500" (no better mileage value found)
-  const totalM = t.match(/total\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i);
-  if (totalM) return cleanNum(totalM[1]);
-
-  return undefined;
+interface MileageMatch {
+  value: string;       // cleaned numeric string, e.g. "257.10"
+  numeric: number;     // parsed float for comparisons
+  isDeadhead: boolean;
+  loadedKind: LoadedKind;
+  index: number;       // start position in text
 }
 
-/**
- * Extract deadhead miles. Run BEFORE loaded miles so DH numbers can't be
- * misread as trip miles.
- */
-function extractDeadheadMiles(t: string): string | undefined {
-  const patterns: RegExp[] = [
-    // "Deadhead Miles: 25" / "Deadhead 25 miles" / "Deadhead: 25 mi"
-    /dead\s*head\s*(?:miles?)?\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
-    // "DH 25 miles" / "DH: 25 miles" / "DH 25mi" / "DH: 25"
-    /\bdh\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i,
-    // "Empty Miles: 25"
-    /empty\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
-    // "Bobtail Miles: 25"
-    /bobtail\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
-    // "Unpaid Miles: 25"
-    /unpaid\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
-    // Trailing form: "25 DH" / "25 deadhead"
-    /([\d,]+(?:\.\d+)?)\s*(?:dh|dead\s*head)\b/i,
-  ];
-  for (const re of patterns) {
-    const m = t.match(re);
-    if (m) return cleanNum(m[1]);
+// Number-with-unit. Unit (mi/mile/miles) is REQUIRED — prevents matching "$1000".
+// `(?<![\w-])` so we don't grab the "10" out of "ORH5" / "ALB1" etc.
+const MILEAGE_TOKEN_RE = /(?<![\w-])([\d]{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(mi|mile|miles)\b/gi;
+
+const DEADHEAD_CTX_RE = /\b(dh|dead\s*head|empty|bobtail|reposition|non[\s-]?revenue|unpaid)\b/i;
+
+// Loaded-context keyword matchers, ranked. First match wins for that token.
+const LOADED_CTX_RANKED: { kind: Exclude<LoadedKind, 'unknown'>; re: RegExp }[] = [
+  { kind: 'loaded',   re: /\bloaded\b/i },
+  { kind: 'trip',     re: /\btrip\b/i },
+  { kind: 'linehaul', re: /\blinehaul\b/i },
+  { kind: 'route',    re: /\broute\b/i },
+  { kind: 'distance', re: /\bdistance\b/i },
+  { kind: 'total',    re: /\btotal\b/i },
+];
+
+const LOADED_PRIORITY: Record<LoadedKind, number> = {
+  loaded: 6, trip: 5, linehaul: 4, route: 3, distance: 2, total: 1, unknown: 0,
+};
+
+function findAllMileage(t: string): MileageMatch[] {
+  const out: MileageMatch[] = [];
+  MILEAGE_TOKEN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = MILEAGE_TOKEN_RE.exec(t)) !== null) {
+    const raw = m[1];
+    const value = cleanNum(raw);
+    const numeric = parseFloat(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) continue;
+
+    const start = m.index;
+    const before = t.slice(Math.max(0, start - 30), start);
+    const after = t.slice(start + m[0].length, start + m[0].length + 10);
+    const ctx = `${before} ${after}`;
+
+    const isDeadhead = DEADHEAD_CTX_RE.test(before) || /^\s*(dh|deadhead|empty)/i.test(after);
+
+    let loadedKind: LoadedKind = 'unknown';
+    if (!isDeadhead) {
+      for (const { kind, re } of LOADED_CTX_RANKED) {
+        if (re.test(ctx)) { loadedKind = kind; break; }
+      }
+    }
+
+    out.push({ value, numeric, isDeadhead, loadedKind, index: start });
   }
-  return undefined;
+  return out;
+}
+
+function pickDeadhead(matches: MileageMatch[]): string | undefined {
+  const dh = matches.find(m => m.isDeadhead);
+  return dh?.value;
+}
+
+function pickLoaded(matches: MileageMatch[], deadheadValue?: string): string | undefined {
+  const nonDh = matches.filter(m => !m.isDeadhead && m.value !== deadheadValue);
+  if (nonDh.length === 0) return undefined;
+
+  // Strongest context wins; break ties by larger numeric value (likely the trip total).
+  const sorted = [...nonDh].sort((a, b) => {
+    const pri = LOADED_PRIORITY[b.loadedKind] - LOADED_PRIORITY[a.loadedKind];
+    if (pri !== 0) return pri;
+    return b.numeric - a.numeric;
+  });
+  return sorted[0].value;
 }
 
 export function parseLoadText(text: string): ParsedLoadData {
@@ -202,23 +228,51 @@ export function parseLoadText(text: string): ParsedLoadData {
     }
   }
 
-  // --- Deadhead first (so loaded-miles regex can't consume DH numbers) ---
-  const dh = extractDeadheadMiles(t);
-  if (dh) result.deadhead_miles = dh;
+  // --- Mileage: pattern-first scan + context classification ---
+  // Find every "<number> mi|mile|miles" token. Penalty $-amounts have no mi unit so they're skipped.
+  const mileageMatches = findAllMileage(t);
 
-  // --- Loaded / Trip miles ---
-  const loaded = extractLoadedMiles(t);
-  if (loaded) result.loaded_miles = loaded;
+  let dh = pickDeadhead(mileageMatches);
+  let loaded = pickLoaded(mileageMatches, dh);
 
-  // Legacy fallback: bare "920 mi" / "920 miles" — only if still nothing
-  // and we're confident we won't grab the deadhead number again.
-  if (!result.loaded_miles) {
-    const bare = t.match(/(?<![\w-])([\d,]+(?:\.\d+)?)\s*mi(?:les?)?\b/i);
-    if (bare) {
-      const candidate = cleanNum(bare[1]);
-      if (candidate !== result.deadhead_miles) result.loaded_miles = candidate;
+  // --- Labelled fallback (covers "Loaded Miles: 300" / "Trip Miles: 415.5" /
+  // "Empty Miles: 25" / "Linehaul Miles: 257.10" — number has no trailing "mi") ---
+  if (!dh) {
+    const dhLabelled =
+      t.match(/(?:dead\s*head|empty|bobtail|unpaid|reposition|non[\s-]?revenue)\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
+      t.match(/\bdh\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
+      t.match(/([\d,]+(?:\.\d+)?)\s*(?:dh|dead\s*head)\b/i);
+    if (dhLabelled) dh = cleanNum(dhLabelled[1]);
+  }
+  if (!loaded) {
+    const labelledLoaded: RegExp[] = [
+      /total\s*trip\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /(?:trip\s*miles?|miles?\s*trip)\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /loaded\s*(?:miles?|mi|distance)?\s*[:=]\s*([\d,]+(?:\.\d+)?)/i,
+      /linehaul\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /route\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i,
+      /distance\s*[:=]\s*([\d,]+(?:\.\d+)?)/i,
+      /\btrip\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*mi(?:les?)?\b/i,
+    ];
+    for (const re of labelledLoaded) {
+      const lm = t.match(re);
+      if (lm) {
+        const v = cleanNum(lm[1]);
+        if (v !== dh) { loaded = v; break; }
+      }
+    }
+    // Last-resort "Total Miles: 500"
+    if (!loaded) {
+      const totalM = t.match(/total\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i);
+      if (totalM) {
+        const v = cleanNum(totalM[1]);
+        if (v !== dh) loaded = v;
+      }
     }
   }
+
+  if (dh) result.deadhead_miles = dh;
+  if (loaded) result.loaded_miles = loaded;
 
   // --- Rate per mile ---
   // "$2.45/mi", "$2.45 CPM", "$2.45 per mile", "2.45 rpm", "rate: $2.45"
