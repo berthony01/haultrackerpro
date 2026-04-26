@@ -18,9 +18,10 @@ import { toast } from 'sonner';
 
 interface OverviewData {
   total_users: number;
-  subs_trialing: number;
-  subs_active: number;
   subs_free: number;
+  subs_active_pro: number;
+  subs_canceled: number;
+  pro_conversion_rate: number;
   total_loads: number;
   loads_7d: number;
   total_expenses: number;
@@ -52,7 +53,6 @@ interface UserRow {
   driver_points_total?: number;
   sub_status?: string;
   sub_plan_key?: string;
-  trial_end?: string | null;
   lifecycle_opted_out?: boolean;
 }
 
@@ -569,12 +569,13 @@ export default function Admin() {
               <>
                 <div>
                   <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Users & Subscriptions</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {[
                       { label: 'Total Users', value: overview.total_users, icon: Users },
-                      { label: 'Trialing', value: overview.subs_trialing, icon: Sparkles },
-                      { label: 'Paid (Active)', value: overview.subs_active, icon: Crown },
-                      { label: 'Free / Canceled', value: overview.subs_free, icon: Users },
+                      { label: 'Free Users', value: overview.subs_free, icon: Users },
+                      { label: 'Active Pro', value: overview.subs_active_pro, icon: Crown },
+                      { label: 'Canceled / Expired', value: overview.subs_canceled, icon: Users },
+                      { label: 'Pro Conversion', value: `${overview.pro_conversion_rate}%`, icon: TrendingUp },
                     ].map((s) => (
                       <Card key={s.label} className="shadow-card">
                         <CardContent className="p-4">
@@ -818,10 +819,10 @@ export default function Admin() {
                     </TableHeader>
                     <TableBody>
                       {users.map((u) => {
-                        const status = u.sub_status ?? u.subscription_status;
-                        const isTrialing = status === 'trialing';
-                        const isPaid = status === 'active' || status === 'pro';
-                        const trialDaysLeft = u.trial_end ? Math.max(0, Math.ceil((new Date(u.trial_end).getTime() - Date.now()) / 86400000)) : 0;
+                        const rawStatus = u.sub_status ?? u.subscription_status;
+                        // Trialing users have full Pro access — display them as "pro" (no countdown).
+                        const displayStatus = rawStatus === 'trialing' || rawStatus === 'active' ? 'pro' : rawStatus;
+                        const isPaid = displayStatus === 'pro';
                         return (
                           <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
                             <TableCell className="text-xs">
@@ -833,14 +834,9 @@ export default function Admin() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Badge variant={isPaid ? 'default' : isTrialing ? 'secondary' : 'outline'} className="text-xs">
-                                  {status}
-                                </Badge>
-                                {isTrialing && u.trial_end && (
-                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{trialDaysLeft}d</Badge>
-                                )}
-                              </div>
+                              <Badge variant={isPaid ? 'default' : 'outline'} className="text-xs">
+                                {displayStatus}
+                              </Badge>
                             </TableCell>
                             <TableCell className="text-right text-xs">{u.loads_count}</TableCell>
                             <TableCell className="text-right text-xs">{u.expenses_count}</TableCell>
