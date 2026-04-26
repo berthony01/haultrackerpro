@@ -1165,6 +1165,8 @@ export type Database = {
           company_start_date: string | null
           created_at: string
           currency: string
+          default_dh_pay_rate: number | null
+          default_dh_pay_status: string
           default_other_fees: number | null
           default_rate_per_mile: number | null
           federal_tax_percent: number | null
@@ -1197,6 +1199,8 @@ export type Database = {
           company_start_date?: string | null
           created_at?: string
           currency?: string
+          default_dh_pay_rate?: number | null
+          default_dh_pay_status?: string
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           federal_tax_percent?: number | null
@@ -1229,6 +1233,8 @@ export type Database = {
           company_start_date?: string | null
           created_at?: string
           currency?: string
+          default_dh_pay_rate?: number | null
+          default_dh_pay_status?: string
           default_other_fees?: number | null
           default_rate_per_mile?: number | null
           federal_tax_percent?: number | null
