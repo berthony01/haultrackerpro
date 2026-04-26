@@ -272,6 +272,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const handleCopyLastLoad = () => {
     if (!lastLoad) return;
+    const lastDh = readDhFromNotes(lastLoad.notes ?? null);
     setForm({
       load_date: new Date().toISOString().split('T')[0],
       dropoff_date: '',
@@ -284,7 +285,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       detention_fee: lastLoad.detention_fee.toString(),
       other_fees: lastLoad.other_fees.toString(),
       actual_pay_received: '',
-      notes: lastLoad.notes || '',
+      notes: lastDh.cleanNotes,
       status: 'pending',
       gross_revenue: lastLoad.gross_revenue?.toString() || '',
       invoice_submitted_date: '',
@@ -294,6 +295,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       short_paid_amount: '',
       payment_status: 'unpaid',
       payment_notes: '',
+      dh_pay_status: lastDh.status,
+      dh_pay_rate: lastDh.rate,
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
