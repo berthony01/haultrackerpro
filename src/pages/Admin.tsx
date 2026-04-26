@@ -290,6 +290,21 @@ export default function Admin() {
   const [removeSuppressionConfirm, setRemoveSuppressionConfirm] = useState<SuppressedRow | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
+  // Parking
+  const [parkingOverview, setParkingOverview] = useState<ParkingOverviewData | null>(null);
+  const [parkingReports, setParkingReports] = useState<ParkingReportRow[]>([]);
+  const [parkingLoading, setParkingLoading] = useState(false);
+
+  // Drivers / leaderboard
+  const [driverOverview, setDriverOverview] = useState<DriverOverviewData | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [driversLoading, setDriversLoading] = useState(false);
+
+  // Lead magnet / starter kit
+  const [leadOverview, setLeadOverview] = useState<LeadOverviewData | null>(null);
+  const [leadSignups, setLeadSignups] = useState<LeadSignupRow[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+
   const initialFetchDone = useRef(false);
 
   useEffect(() => {
