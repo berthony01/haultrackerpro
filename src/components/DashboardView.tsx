@@ -23,6 +23,7 @@ import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
 import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { DriverIntelligenceCard } from '@/components/DriverIntelligenceCard';
+import { DriverLeaderboardCard } from '@/components/DriverLeaderboardCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,6 +142,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
       {/* Driver Intelligence — gamified score card */}
       {!isLoading && <DriverIntelligenceCard isPro={isPro} isTrialing={isTrialing} />}
+      {!isLoading && <DriverLeaderboardCard limit={5} />}
 
       {/* Quarterly Tax Reminder Banner */}
       {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
