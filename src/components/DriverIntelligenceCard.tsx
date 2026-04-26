@@ -29,6 +29,7 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
   const best = points?.best_weekly_points ?? 0;
   const bestDate = points?.best_weekly_period_start ?? null;
   const tier = tierFor(total);
+  const nextTier = nextTierProgress(total);
   const percentile = mockPercentile(user?.id, total);
 
   // Rank chase line — competitive pull on every dashboard visit.
