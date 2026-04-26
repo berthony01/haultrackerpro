@@ -541,6 +541,33 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 6.5: FREE STARTER KIT (lead magnet) */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <div className="p-6 sm:p-8 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6"
+            style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+            <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+              <FileText className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-base sm:text-lg font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>
+                New to trucking? Get the Free Trucker Starter Kit.
+              </h3>
+              <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
+                CDL study, test day checklist, and owner-operator paperwork — six free PDFs, no credit card.
+              </p>
+            </div>
+            <Button onClick={() => navigate('/starter-kit')} variant="outline" className="rounded-xl font-bold gap-2 w-full sm:w-auto"
+              style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
+              Get the Free Kit <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
       {/* SECTION 7: FINAL CTA */}
       {/* ═══════════════════════════════════════════ */}
       <section className="py-20 sm:py-28 relative overflow-hidden">
