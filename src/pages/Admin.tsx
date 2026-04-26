@@ -13,15 +13,31 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp, ParkingCircle, Trophy, Gift, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface OverviewData {
   total_users: number;
-  pro_users: number;
+  subs_trialing: number;
+  subs_active: number;
+  subs_free: number;
   total_loads: number;
   loads_7d: number;
   total_expenses: number;
+  expenses_7d: number;
+  total_fuel_logs: number;
+  fuel_logs_7d: number;
+  recurring_templates_active: number;
+  parking_locations_total: number;
+  parking_reports_7d: number;
+  parking_verifications_7d: number;
+  driver_points_active_users: number;
+  lead_magnet_signups_total: number;
+  lead_magnet_signups_7d: number;
+  lead_magnet_signups_30d: number;
+  parse_usage_7d: number;
+  expense_automation_7d: number;
+  ai_insights_7d: number;
 }
 
 interface UserRow {
@@ -32,7 +48,66 @@ interface UserRow {
   created_at: string;
   loads_count: number;
   expenses_count: number;
+  fuel_logs_count?: number;
+  driver_points_total?: number;
+  sub_status?: string;
+  sub_plan_key?: string;
+  trial_end?: string | null;
   lifecycle_opted_out?: boolean;
+}
+
+interface ParkingOverviewData {
+  total_locations: number;
+  reports_7d: number;
+  verifications_7d: number;
+  top_locations: Array<{ id: string; name: string; address: string | null; type: string; report_count: number }>;
+}
+interface ParkingReportRow {
+  id: string;
+  parking_id: string;
+  user_id: string;
+  status: string;
+  safety_rating: number | null;
+  notes: string | null;
+  created_at: string;
+  location_name: string;
+  reporter_handle: string;
+}
+interface DriverOverviewData {
+  active_drivers_week: number;
+  total_points_awarded: number;
+  top_streak: number;
+  total_drivers: number;
+  tiers: { Bronze: number; Silver: number; Gold: number; Platinum: number };
+}
+interface LeaderboardRow {
+  user_id: string;
+  weekly_points: number;
+  total_points: number;
+  parking_points: number;
+  load_points: number;
+  streak_days: number;
+  tier: string;
+  rank: number;
+  masked_display_name: string;
+}
+interface LeadOverviewData {
+  total: number;
+  last_7d: number;
+  last_30d: number;
+  converted: number;
+  conversion_rate: number;
+}
+interface LeadSignupRow {
+  id: string;
+  email: string;
+  first_name: string | null;
+  source_page: string | null;
+  utm_source: string | null;
+  utm_campaign: string | null;
+  created_at: string;
+  downloaded_at: string | null;
+  converted_user_id: string | null;
 }
 
 interface SuppressedRow {
