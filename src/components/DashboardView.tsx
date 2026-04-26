@@ -20,7 +20,7 @@ import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
 import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { PersonalIntelligenceBlocks } from '@/components/PersonalIntelligenceBlocks';
 import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel } from 'lucide-react';
 import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { DriverIntelligenceCard } from '@/components/DriverIntelligenceCard';
 import { useTierUpDetector } from '@/hooks/useTierUpDetector';
@@ -142,60 +142,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
 
-      {/* Driver Intelligence — gamified score card */}
-      {!isLoading && <DriverIntelligenceCard isPro={isPro} isTrialing={isTrialing} />}
-      {!isLoading && (
-        <DriverLeaderboardCard
-          limit={5}
-          onCustomize={onNavigate ? () => {
-            try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
-            onNavigate('settings');
-          } : undefined}
-        />
-      )}
-
-      {/* Quarterly Tax Reminder Banner */}
-      {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
-
-      {/* Weekly Focus Card — always visible at top */}
-      {!isLoading && <WeeklyFocusCard loads={loads} />}
-
-      {/* Smart Alerts Card */}
-      {!isLoading && smartAlerts && (
-        <SmartAlertsCard
-          alerts={smartAlerts.alerts}
-          onDismiss={(key) => smartAlerts.dismissAlert.mutate(key)}
-          onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
-          onViewAll={onNavigate ? () => onNavigate('alerts') : undefined}
-          isPro={isPro}
-        />
-      )}
-
-      {/* Date Range Filter */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {presets.map(p => (
-            <Button
-              key={p.key}
-              variant={activePreset === p.key ? 'default' : 'outline'}
-              size="sm"
-              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
-              onClick={() => setActivePreset(p.key)}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
-        {showCustom && (
-          <div className="flex gap-2 items-center animate-fade-in">
-            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
-          </div>
-        )}
-      </div>
-
-      {/* Quick Actions */}
+      {/* === ZONE 1 · ACTION ZONE === */}
+      {/* Quick Actions — primary "log something" entry point */}
       {!isLoading && onNavigate && (
         <div className="grid grid-cols-3 gap-2">
           <Button
@@ -225,10 +173,61 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       )}
 
-      {/* Home Time Mode + Recurring shortcut */}
+      {/* Driver Intelligence — gamified score card with next-tier hint */}
+      {!isLoading && <DriverIntelligenceCard isPro={isPro} isTrialing={isTrialing} />}
+
+      {/* === ZONE 2 · COMPETITION ZONE === */}
+      {!isLoading && (
+        <DriverLeaderboardCard
+          limit={5}
+          onCustomize={onNavigate ? () => {
+            try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
+            onNavigate('settings');
+          } : undefined}
+        />
+      )}
+
+      {/* === ZONE 3 · ALERTS (urgent only) === */}
+      {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
+      {!isLoading && smartAlerts && (
+        <SmartAlertsCard
+          alerts={smartAlerts.alerts}
+          onDismiss={(key) => smartAlerts.dismissAlert.mutate(key)}
+          onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
+          onViewAll={onNavigate ? () => onNavigate('alerts') : undefined}
+          isPro={isPro}
+        />
+      )}
+      {!isLoading && <WeeklyFocusCard loads={loads} />}
+
+      {/* === ZONE 4 · QUICK SHORTCUTS / SUPPORT === */}
       {!isLoading && (
         <HomeTimeDashboardCard isPro={isPro} isTrialing={isTrialing} onNavigate={onNavigate} />
       )}
+
+      {/* Date Range Filter */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map(p => (
+            <Button
+              key={p.key}
+              variant={activePreset === p.key ? 'default' : 'outline'}
+              size="sm"
+              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
+              onClick={() => setActivePreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        {showCustom && (
+          <div className="flex gap-2 items-center animate-fade-in">
+            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
+          </div>
+        )}
+      </div>
 
       {/* Loading skeletons */}
       {isLoading ? (
@@ -239,6 +238,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       ) : (
         <>
+          {/* === ZONE 5 · BUSINESS METRICS === */}
           {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-2.5">
             <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} size="large" />
@@ -306,8 +306,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* Cost Breakdown: Fixed vs Variable + Contribution Margin */}
           <ContributionMarginCard loads={filteredLoads} expenses={filteredExpenses} />
-          {/* Pro Time Saved */}
-          <ProTimeSavedCard isPro={isPro} isTrialing={isTrialing} weekStartsOn={weekStartsOn} />
 
           {/* Fuel Analytics */}
           <FuelAnalyticsCard fuelLogs={fuelLogs} loads={filteredLoads} isPro={isPro} onNavigate={onNavigate} />
@@ -337,16 +335,15 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </Button>
           )}
 
-          {/* Driver Scorecard CTA */}
-          {onNavigate && (
-            <Button
-              variant="outline"
-              className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
-              onClick={() => onNavigate('scorecard')}
-            >
-              <Trophy className="h-5 w-5" /> View Driver Scorecard
-            </Button>
-          )}
+          {/* === ZONE 6 · INSIGHTS (AI + trends) === */}
+          {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
+          <WeeklyPulseCard isPro={isPro} isTrialing={isTrialing} />
+
+          {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
+          <PersonalIntelligenceBlocks isPro={isPro} isTrialing={isTrialing} />
+
+          {/* Smart Load Advisor — promoted */}
+          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} isTrialing={isTrialing} />
 
           {/* Personalized Pro Insight — free users only */}
           <ProInsightCard
@@ -357,14 +354,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
           />
 
-          {/* Smart Load Advisor */}
-          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} isTrialing={isTrialing} />
-
-          {/* Phase 6: Weekly Pulse — Mon/Tue recap of last week + top recommendations */}
-          <WeeklyPulseCard isPro={isPro} isTrialing={isTrialing} />
-
-          {/* Phase 4: Personal Intelligence — best/weakest lanes, broker reliability, margin leaks */}
-          <PersonalIntelligenceBlocks isPro={isPro} isTrialing={isTrialing} />
+          {/* Pro Time Saved */}
+          <ProTimeSavedCard isPro={isPro} isTrialing={isTrialing} weekStartsOn={weekStartsOn} />
 
           {/* Performance Trends */}
           <PerformanceTrends loads={loads} />
