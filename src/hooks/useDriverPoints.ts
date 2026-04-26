@@ -12,6 +12,8 @@ export interface DriverPoints {
   streak_days: number;
   last_activity_date: string | null;
   weekly_period_start: string | null;
+  best_weekly_points: number;
+  best_weekly_period_start: string | null;
   updated_at: string;
 }
 
