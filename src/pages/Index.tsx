@@ -41,6 +41,7 @@ import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analyt
 
 const Index = () => {
   const { signOut, user } = useAuth();
+  const queryClient = (await import('@tanstack/react-query')).useQueryClient();
   const { isAdmin } = useAdmin();
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
