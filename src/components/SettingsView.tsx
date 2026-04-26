@@ -569,6 +569,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/how-to-use-haultrackerpro')}>
             <BookOpen className="h-4 w-4 text-primary" /> User Guide
           </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/updates')}>
+            <Sparkles className="h-4 w-4 text-primary" /> What's New
+          </Button>
           <AdminDashboardLink />
           <div className="flex items-center gap-2 pt-1">
             <Mail className="h-3.5 w-3.5 text-muted-foreground/50" />
