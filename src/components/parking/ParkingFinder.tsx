@@ -14,6 +14,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { useParkingLocations, useRecentParkingReports, computeConfidence, ParkingLocation } from '@/hooks/useParkingLocations';
+import { useRecentParkingVerifications } from '@/hooks/useParkingVerifications';
 import { useGeolocation, distanceMiles } from '@/hooks/useGeolocation';
 import { ParkingCard } from './ParkingCard';
 import { ParkingDetailSheet } from './ParkingDetailSheet';
@@ -43,6 +44,7 @@ function buildPageList(current: number, total: number): (number | 'ellipsis')[] 
 export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
   const { data: locations = [], isLoading } = useParkingLocations();
   const { data: recentReports = [] } = useRecentParkingReports();
+  const { data: recentVerifications = [] } = useRecentParkingVerifications();
   const geo = useGeolocation();
 
   const [search, setSearch] = useState('');
@@ -76,7 +78,7 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
       if (overnightOnly && !loc.overnight_allowed) return false;
       if (truckOnly && !loc.truck_friendly) return false;
       if (confFilter !== 'any') {
-        const { level } = computeConfidence(recentReports, loc.id);
+        const { level } = computeConfidence(recentReports, recentVerifications, loc.id);
         if (level !== confFilter) return false;
       }
       return true;
@@ -88,7 +90,7 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
       );
     }
     return list;
-  }, [locations, search, paidFilter, overnightOnly, truckOnly, confFilter, recentReports, geo.coords]);
+  }, [locations, search, paidFilter, overnightOnly, truckOnly, confFilter, recentReports, recentVerifications, geo.coords]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
@@ -266,6 +268,7 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
               key={loc.id}
               location={loc}
               reports={recentReports}
+              verifications={recentVerifications}
               userCoords={geo.coords}
               onSelect={setSelected}
             />

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, Trophy, TrendingUp, Route, DollarSign, Flame, Target, Lock, Lightbulb } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { DriverLeaderboardCard } from '@/components/DriverLeaderboardCard';
 
 interface DriverScorecardProps {
   scorecard: ScorecardResult;
@@ -151,6 +152,9 @@ export function DriverScorecard({ scorecard, onBack, isPro = false }: DriverScor
           </div>
         </CardContent>
       </Card>
+
+      {/* Weekly Leaderboard */}
+      <DriverLeaderboardCard limit={10} title="Weekly Leaderboard" />
     </div>
   );
 }

@@ -80,20 +80,82 @@ export function useParkingReportsForLocation(parkingId: string | null) {
 
 export type Confidence = 'high' | 'medium' | 'low';
 
-export function computeConfidence(reports: ParkingReportRow[], parkingId: string): {
+interface SignalLike {
+  parking_id: string;
+  created_at: string;
+  status?: 'available' | 'limited' | 'full';
+  verified_status?: 'available' | 'limited' | 'full';
+}
+
+export function computeConfidence(
+  reports: ParkingReportRow[],
+  verificationsOrParkingId: { parking_id: string; created_at: string; verified_status: 'available' | 'limited' | 'full' }[] | string,
+  parkingIdMaybe?: string,
+): {
   level: Confidence;
   lastReportAt: string | null;
+  lastSignalAt: string | null;
+  lastSignalKind: 'report' | 'verification' | null;
+  lastSignalStatus: 'available' | 'limited' | 'full' | null;
   recentCount: number;
 } {
+  // Back-compat: old signature was computeConfidence(reports, parkingId).
+  let verifications: { parking_id: string; created_at: string; verified_status: 'available' | 'limited' | 'full' }[] = [];
+  let parkingId: string;
+  if (typeof verificationsOrParkingId === 'string') {
+    parkingId = verificationsOrParkingId;
+  } else {
+    verifications = verificationsOrParkingId;
+    parkingId = parkingIdMaybe ?? '';
+  }
+
   const now = Date.now();
-  const forLoc = reports.filter((r) => r.parking_id === parkingId);
-  const last2h = forLoc.filter((r) => now - new Date(r.created_at).getTime() < 2 * 3600 * 1000);
-  const last24h = forLoc;
-  const lastReportAt = forLoc[0]?.created_at ?? null;
+
+  const reportSignals: SignalLike[] = reports
+    .filter((r) => r.parking_id === parkingId)
+    .map((r) => ({ parking_id: r.parking_id, created_at: r.created_at, status: r.status }));
+  const verifSignals: SignalLike[] = verifications
+    .filter((v) => v.parking_id === parkingId)
+    .map((v) => ({ parking_id: v.parking_id, created_at: v.created_at, verified_status: v.verified_status }));
+
+  const all = [...reportSignals, ...verifSignals].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  const last2h = all.filter((s) => now - new Date(s.created_at).getTime() < 2 * 3600 * 1000);
+  const last24h = all;
+  const lastReportAt = reportSignals[0]?.created_at ?? null;
+  const lastSignal = all[0] ?? null;
+  const lastSignalAt = lastSignal?.created_at ?? null;
+  const lastSignalKind: 'report' | 'verification' | null = lastSignal
+    ? lastSignal.verified_status
+      ? 'verification'
+      : 'report'
+    : null;
+  const lastSignalStatus = lastSignal
+    ? (lastSignal.verified_status ?? lastSignal.status ?? null)
+    : null;
+
+  // Fresh "full" signals shouldn't boost availability — drop them from the freshness count.
+  const freshPositive = last2h.filter((s) => {
+    const st = s.verified_status ?? s.status;
+    return st === 'available' || st === 'limited';
+  });
+  const recentPositive = last24h.filter((s) => {
+    const st = s.verified_status ?? s.status;
+    return st === 'available' || st === 'limited';
+  });
 
   let level: Confidence = 'low';
-  if (last2h.length >= 1 && last24h.length >= 2) level = 'high';
-  else if (last24h.length >= 1) level = 'medium';
+  if (freshPositive.length >= 1 && recentPositive.length >= 2) level = 'high';
+  else if (recentPositive.length >= 1) level = 'medium';
 
-  return { level, lastReportAt, recentCount: last24h.length };
+  return {
+    level,
+    lastReportAt,
+    lastSignalAt,
+    lastSignalKind,
+    lastSignalStatus,
+    recentCount: last24h.length,
+  };
 }

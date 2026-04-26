@@ -1,13 +1,15 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Shield, ChevronRight, DollarSign } from 'lucide-react';
+import { MapPin, Shield, ChevronRight, DollarSign, BadgeCheck } from 'lucide-react';
 import { ParkingLocation, computeConfidence, ParkingReportRow, Confidence } from '@/hooks/useParkingLocations';
+import { ParkingVerificationRow } from '@/hooks/useParkingVerifications';
 import { Coords, distanceMiles } from '@/hooks/useGeolocation';
 import { formatDistanceToNowStrict } from 'date-fns';
 
 interface ParkingCardProps {
   location: ParkingLocation;
   reports: ParkingReportRow[];
+  verifications?: ParkingVerificationRow[];
   userCoords: Coords | null;
   onSelect: (loc: ParkingLocation) => void;
 }
@@ -32,9 +34,26 @@ function confidenceLabel(level: Confidence): string {
   return level === 'high' ? 'High' : level === 'medium' ? 'Medium' : 'Low';
 }
 
-export function ParkingCard({ location, reports, userCoords, onSelect }: ParkingCardProps) {
-  const { level, lastReportAt } = computeConfidence(reports, location.id);
+const STATUS_TITLE: Record<string, string> = {
+  available: 'Available',
+  limited: 'Limited',
+  full: 'Full',
+};
+
+export function ParkingCard({ location, reports, verifications = [], userCoords, onSelect }: ParkingCardProps) {
+  const { level, lastSignalAt, lastSignalKind, lastSignalStatus } = computeConfidence(
+    reports,
+    verifications,
+    location.id,
+  );
   const distance = userCoords ? distanceMiles(userCoords, location) : null;
+
+  const verifiedLabel =
+    lastSignalAt && lastSignalKind === 'verification' && lastSignalStatus
+      ? `Verified ${STATUS_TITLE[lastSignalStatus]} · ${formatDistanceToNowStrict(new Date(lastSignalAt))} ago`
+      : lastSignalAt
+        ? `Last reported ${formatDistanceToNowStrict(new Date(lastSignalAt))} ago`
+        : 'No recent reports';
 
   return (
     <Card
@@ -81,10 +100,9 @@ export function ParkingCard({ location, reports, userCoords, onSelect }: Parking
                 <Badge variant="outline" className="text-[10px] h-5 px-1.5">{location.total_spots} spots</Badge>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-2">
-              {lastReportAt
-                ? `Last verified ${formatDistanceToNowStrict(new Date(lastReportAt))} ago`
-                : 'No recent reports'}
+            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1">
+              {lastSignalKind === 'verification' && <BadgeCheck className="h-3 w-3 text-primary" />}
+              {verifiedLabel}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">

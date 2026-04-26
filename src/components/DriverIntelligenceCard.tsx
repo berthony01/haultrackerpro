@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Flame, TrendingUp, MapPin, Lock } from 'lucide-react';
 import { useDriverPoints, tierFor, mockPercentile } from '@/hooks/useDriverPoints';
+import { useMyLeaderboardRank } from '@/hooks/useDriverLeaderboard';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { ProUpgradeModal } from '@/components/ProUpgradeModal';
@@ -16,6 +17,7 @@ interface DriverIntelligenceCardProps {
 export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverIntelligenceCardProps) {
   const { user } = useAuth();
   const { data: points } = useDriverPoints();
+  const { me, top } = useMyLeaderboardRank(50);
   const navigate = useNavigate();
   const hasAccess = isPro || isTrialing;
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -30,7 +32,7 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
   const tip = parking < 5
     ? 'Report parking to level up faster'
     : weekly < 20
-    ? 'Log a load this week to keep your streak'
+    ? 'Earn +3 by verifying parking near you'
     : 'Keep helping the network — you\'re on a roll';
 
   const handleParkingClick = () => {
@@ -70,6 +72,8 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
                   <TrendingUp className="h-3 w-3" />+{weekly} this week
                 </span>
                 <span>Ahead of {percentile}% of drivers</span>
+                {me && <span>Your rank: <span className="font-bold text-foreground">#{me.rank}</span></span>}
+                {top && <span>Top: <span className="font-bold text-foreground">{top.weekly_points}p</span></span>}
               </div>
               <p className="text-[11px] text-muted-foreground mt-2 italic">{tip}</p>
             </div>
