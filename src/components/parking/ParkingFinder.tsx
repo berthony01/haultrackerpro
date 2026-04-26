@@ -171,6 +171,15 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
           {geo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
           <span className="hidden sm:inline ml-1.5">Near me</span>
         </Button>
+        <Button
+          onClick={handleAddClick}
+          className="shrink-0 h-10"
+          aria-label={hasAccess ? 'Add a parking spot' : 'Add a parking spot (Pro)'}
+        >
+          {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+          <span className="hidden sm:inline ml-1.5">Add spot</span>
+          {!hasAccess && <span className="hidden sm:inline ml-1 text-[10px] opacity-80">Pro</span>}
+        </Button>
       </div>
       {geo.error && <p className="text-xs text-destructive">{geo.error}</p>}
 
