@@ -106,8 +106,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     short_paid_amount: initialData?.short_paid_amount?.toString() || '',
     payment_status: initialData?.payment_status || 'unpaid',
     payment_notes: initialData?.payment_notes || '',
-    dh_pay_status: initialDh.status as DhPayStatus,
-    dh_pay_rate: initialDh.rate,
+    dh_pay_status: (initialData ? initialDh.status : ((settings as any)?.default_dh_pay_status as DhPayStatus | undefined) ?? initialDh.status) as DhPayStatus,
+    dh_pay_rate: initialData ? initialDh.rate : ((settings as any)?.default_dh_pay_rate?.toString() ?? initialDh.rate),
   });
   const [showPaymentTracking, setShowPaymentTracking] = useState(
     !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
