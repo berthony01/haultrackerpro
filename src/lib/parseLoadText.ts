@@ -315,12 +315,15 @@ export function parseLoadText(text: string): ParsedLoadData {
     // detectedStopsCount is set from the filtered blocks below (after pinned-preview filter)
     const blocks = t.split(/(?=\b\d+#:\s*)/)
       .filter(b => /^\d+#:/.test(b.trim()))
-      // Drop Telegram pinned-preview snippets: short, truncated with "..." or "…",
-      // or that lack any city/state pattern. These otherwise pollute pickup_location.
+      // Drop Telegram pinned-message-preview snippets. The preview is a
+      // single-line truncated copy ending in "..." or "…" — e.g.
+      // "1#: 111DF4KFK Loaded - P..." — which would otherwise be parsed as a stop.
       .filter(b => {
-        const body = b.replace(/^\d+#:\s*/, '').trim();
-        if (body.length < 25) return false;
-        if (/(\.{3}|…)\s*$/.test(body)) return false;
+        const body = b.replace(/^\d+#:\s*/, '');
+        const firstLine = body.split('\n')[0].trim();
+        // Block must have multi-line body OR contain a city,ST pattern.
+        // Single-line truncated previews fail both checks.
+        if (/(\.{3}|…)/.test(firstLine) && !/[A-Za-z]+,\s*[A-Z]{2}/.test(body)) return false;
         return true;
       });
     const parsedStops: ParsedStopData[] = [];
