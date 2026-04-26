@@ -1,99 +1,44 @@
-## Audit Findings
+# Audit Findings — Admin User Detail "free" vs "pro" mismatch
 
-**Trial-facing admin logic still present (must remove from UI):**
+## Root cause (confirmed in DB + code)
 
-1. `supabase/functions/admin-api/index.ts`
-   - `overview` action returns `subs_trialing` (line 100, 116)
-   - `list-users` returns `trial_end` (lines 320, 327–329, 352)
-   - Does **not** return a `subs_canceled` count or `conversion_rate`
+The Users **table** and the User Detail **modal** read from two different sources:
 
-2. `src/pages/Admin.tsx`
-   - Type `OverviewData` declares `subs_trialing` (line 21) and user `trial_end` (line 55)
-   - Overview "Users & Subscriptions" tile shows **"Trialing"** KPI (line 575)
-   - Users table shows trial-days-left badge `{trialDaysLeft}d` (lines 822–824, 840–842) and `isTrialing` styling
+| Surface | Field used | Source |
+|---|---|---|
+| Users table (`Plan` column) | `u.sub_status ?? u.subscription_status`, then maps `trialing`/`active` → `pro` | Canonical `subscriptions` table (correct) |
+| User Detail modal (`Plan`, `Set Pro/Free` button) | `selectedUser.subscription_status` only | Legacy `profiles.subscription_status` (stale) |
 
-**Canonical subscription statuses currently in DB:** `free` (9), `trialing` (2), `active` (1). No `canceled`/`past_due` rows yet, but schema supports them.
+DB confirms both flagged users:
+- `andersontruckingra8@gmail.com` → `subscriptions.status = trialing`, `plan_key = pro_monthly`, `trial_end = 2026-05-04` — but `profiles.subscription_status = 'free'`.
+- `againstalloddstransportllc@gmail.com` → `subscriptions.status = trialing`, `plan_key = pro_monthly`, `trial_end = 2026-04-30` — but `profiles.subscription_status = 'free'`.
 
-**What stays untouched (intentionally):**
-- `handle_new_user` DB trigger that grants 14-day trialing on signup → core auto-trial system (mem://business/auto-trial-system). The audit instructions explicitly say *"Do not drop database columns or old migrations"*.
-- `subscriptions.trial_end` column and `expire_ended_trials()` function.
-- All other admin tabs (Activation, Admins, Billing, Feedback, Emails, Parking, Drivers, Starter Kit) — already audited as correct.
-- All driver-facing UI, Stripe, RLS, edge function security.
+So the **table is correct** (these users are on an active Pro trial via the auto-trial system) and the **modal is wrong** (reading the legacy profile column that was never updated by the trial trigger).
 
----
+Total Pro right now per canonical table: **1 active + 2 trialing = 3 Pro users**, 9 free. No data is broken — only the modal display is.
 
-## Changes
+## Fix (surgical, modal-only)
 
-### 1. `supabase/functions/admin-api/index.ts`
+**File:** `src/pages/Admin.tsx` (User Detail dialog, lines ~886–910)
 
-**`overview` action — replace subscription queries:**
-- Remove the `subsTrialing` query.
-- Keep `subsActive` (status='active').
-- Replace `subsFree` query (currently `in ('free','canceled')`) with two separate queries:
-  - `subsFreeOnly` → `status='free'` OR null
-  - `subsCanceled` → `status in ('canceled','past_due','unpaid','incomplete_expired')`
-- Treat **trialing users as Pro** for the active count (they have full Pro access). Compute `subs_active_pro = subsActive.count + trialingCount` where `trialingCount` is fetched separately but **not exposed as its own KPI**. Simpler: add trialing into active in the API response.
-- Add `pro_conversion_rate` = `subs_active_pro / total_users` (rounded to 1 decimal).
-- Response shape becomes:
-  - `total_users`
-  - `subs_free`
-  - `subs_active_pro` (active + trialing combined)
-  - `subs_canceled`
-  - `pro_conversion_rate`
-  - (drop `subs_trialing` from response)
+1. Compute the same normalized status the table uses:
+   ```ts
+   const rawStatus = selectedUser.sub_status ?? selectedUser.subscription_status;
+   const displayStatus = (rawStatus === 'trialing' || rawStatus === 'active') ? 'pro' : rawStatus;
+   ```
+2. Render `{displayStatus}` in the Plan row instead of `selectedUser.subscription_status`.
+3. Use `displayStatus === 'pro'` for the Set Pro/Free button's variant, label, and the new-status payload sent to `planOverrideConfirm`.
+4. No edge-function changes required — `list-users` already returns `sub_status`/`sub_plan_key` from the canonical `subscriptions` table.
 
-**`list-users` action:**
-- Stop selecting `trial_end` from subscriptions.
-- Stop returning `trial_end` on each user row.
-- Keep `sub_status` (canonical from `subscriptions` table) — but normalize: if status is `trialing`, return `'pro (trial)'` so admins see they're on Pro without the day-countdown. *(Alternative: just return raw status `'trialing'` and let UI render it as a neutral Pro badge with no countdown.)* → Going with **return raw status, UI renders trialing as Pro-styled badge with no countdown.**
+## Out of scope (per no-trial-admin-UI strategy already in place)
 
-### 2. `src/pages/Admin.tsx`
+- Do NOT show `trial_end` or a countdown in the modal.
+- Do NOT drop `profiles.subscription_status` (legacy field, separate cleanup).
+- Do NOT change the Set Pro/Free flow itself or Stripe logic — only what the modal reads.
 
-**Type `OverviewData` (line ~17–32):**
-- Remove `subs_trialing`.
-- Add `subs_active_pro: number`, `subs_canceled: number`, `pro_conversion_rate: number`.
-- Remove `subs_active`, `subs_free` reshape: keep `subs_free` and `subs_active_pro` and `subs_canceled`.
+## Verification after fix
 
-**Type `UserRow` (~line 50–60):**
-- Remove `trial_end?: string | null`.
-
-**Overview "Users & Subscriptions" grid (line 572–589):**
-- Replace 4 tiles with 5:
-  - Total Users
-  - Free Users
-  - Active Pro (active + trialing combined)
-  - Canceled / Expired
-  - Pro Conversion Rate (`{pro_conversion_rate}%`)
-- Use a `grid-cols-2 md:grid-cols-3` so 5 tiles wrap cleanly on mobile (715px and 375px).
-- Drop the `Sparkles` icon usage here (still imported for Lead Magnet section line 669, so import stays).
-
-**Users table rows (lines 820–851):**
-- Remove `trialDaysLeft` calc and the `{trialDaysLeft}d` badge.
-- Keep status badge logic, but treat `trialing` like `active` (variant `'default'`) since trialing users have Pro access. Rendered text: show `pro` for both trialing and active to remove trial-facing language; show raw status for canceled/free.
-- One simple mapping in render:
-  ```
-  const displayStatus = (status === 'trialing' || status === 'active') ? 'pro' : status;
-  const isPaid = displayStatus === 'pro';
-  ```
-
-### 3. Files NOT modified
-- `supabase/functions/handle-*`, `stripe-webhook`, `check-subscription`, `create-checkout`, `customer-portal`
-- Any migration file
-- `src/hooks/useSubscription.ts` (still surfaces trialing for the user-facing trial banner — that's intentional and outside admin scope)
-- All other tabs / components
-
----
-
-## Verification
-
-1. `tsc --noEmit` clean.
-2. Deploy `admin-api` and curl `?action=overview` to confirm the new payload shape; confirm `subs_active_pro` ≈ 3 (1 active + 2 trialing) on current DB.
-3. Curl `?action=list-users` to confirm rows have no `trial_end`.
-4. Visually verify Admin → Overview shows 5 tiles, no "Trialing" tile, no trial-days badge in Users table.
-5. Responsive QA at 375px and 715px — confirm 5-tile grid wraps cleanly.
-
-## Out of scope (explicit non-goals)
-- Removing `subscriptions.trial_end` column.
-- Changing the `handle_new_user` trigger that creates trialing rows.
-- Touching the user-facing TrialBanner.
-- Any change to non-admin code.
+- Click `andersontruckingra8@gmail.com` → modal shows Plan: **pro**, button shows **Set Free**.
+- Click a true free user (e.g. `theurpi@gmail.com`) → modal shows Plan: **free**, button shows **Set Pro**.
+- Table and modal now agree; Overview KPIs (`Active Pro = 3`) remain correct.
+- TypeScript check passes.
