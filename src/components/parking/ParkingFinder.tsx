@@ -1,8 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Search, Plus, Loader2, Lock } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { MapPin, Search, Plus, Loader2, Lock, X, Sparkles } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { useParkingLocations, useRecentParkingReports, computeConfidence, ParkingLocation } from '@/hooks/useParkingLocations';
 import { useGeolocation, distanceMiles } from '@/hooks/useGeolocation';
 import { ParkingCard } from './ParkingCard';
@@ -16,6 +26,20 @@ interface ParkingFinderProps {
 
 type ConfidenceFilter = 'any' | 'high' | 'medium' | 'low';
 
+const PAGE_SIZE = 24;
+
+function buildPageList(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | 'ellipsis')[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push('ellipsis');
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total - 1) pages.push('ellipsis');
+  pages.push(total);
+  return pages;
+}
+
 export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
   const { data: locations = [], isLoading } = useParkingLocations();
   const { data: recentReports = [] } = useRecentParkingReports();
@@ -26,6 +50,7 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
   const [overnightOnly, setOvernightOnly] = useState(false);
   const [truckOnly, setTruckOnly] = useState(false);
   const [confFilter, setConfFilter] = useState<ConfidenceFilter>('any');
+  const [page, setPage] = useState(1);
 
   const [selected, setSelected] = useState<ParkingLocation | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -65,6 +90,52 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
     return list;
   }, [locations, search, paidFilter, overnightOnly, truckOnly, confFilter, recentReports, geo.coords]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  // Reset to page 1 whenever filters or sort context change.
+  useEffect(() => {
+    setPage(1);
+  }, [search, paidFilter, overnightOnly, truckOnly, confFilter, geo.coords]);
+
+  // Clamp page if it ever exceeds totalPages.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const filtersActive =
+    !!search.trim() ||
+    paidFilter !== 'any' ||
+    overnightOnly ||
+    truckOnly ||
+    confFilter !== 'any';
+
+  const resetFilters = () => {
+    setSearch('');
+    setPaidFilter('any');
+    setOvernightOnly(false);
+    setTruckOnly(false);
+    setConfFilter('any');
+  };
+
+  const SegBtn = ({
+    active, onClick, children,
+  }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 h-8 text-xs font-medium rounded-md transition-colors ${
+        active ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  const rangeStart = filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, filtered.length);
+  const pageList = buildPageList(page, totalPages);
+
   return (
     <div className="space-y-4">
       {/* Search + location */}
@@ -75,79 +146,122 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search city, zip, or name"
-            className="pl-9"
+            className="pl-9 pr-9 h-10"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-muted text-muted-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <Button
           variant="outline"
           onClick={geo.request}
           disabled={geo.isPending}
-          className="shrink-0"
+          className="shrink-0 h-10"
           aria-label="Use my location"
         >
           {geo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-          <span className="hidden sm:inline ml-1">Near me</span>
+          <span className="hidden sm:inline ml-1.5">Near me</span>
         </Button>
       </div>
       {geo.error && <p className="text-xs text-destructive">{geo.error}</p>}
 
-      {/* Filter chips */}
-      <div className="flex flex-wrap gap-1.5">
-        {(['any', 'free', 'paid'] as const).map((v) => (
+      {/* Filter segments */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex items-center gap-1 p-1 bg-muted/50 rounded-lg border border-border/50">
+          <SegBtn active={paidFilter === 'any'} onClick={() => setPaidFilter('any')}>All</SegBtn>
+          <SegBtn active={paidFilter === 'free'} onClick={() => setPaidFilter('free')}>Free</SegBtn>
+          <SegBtn active={paidFilter === 'paid'} onClick={() => setPaidFilter('paid')}>Paid</SegBtn>
+        </div>
+
+        <div className="inline-flex items-center gap-1.5">
           <Button
-            key={v}
             size="sm"
-            variant={paidFilter === v ? 'default' : 'outline'}
-            className="h-7 text-xs rounded-full"
-            onClick={() => setPaidFilter(v)}
+            variant={overnightOnly ? 'default' : 'outline'}
+            className="h-8 text-xs rounded-full px-3"
+            onClick={() => setOvernightOnly((v) => !v)}
           >
-            {v === 'any' ? 'All' : v === 'free' ? 'Free' : 'Paid'}
+            Overnight
           </Button>
-        ))}
-        <Button
-          size="sm"
-          variant={overnightOnly ? 'default' : 'outline'}
-          className="h-7 text-xs rounded-full"
-          onClick={() => setOvernightOnly((v) => !v)}
-        >
-          Overnight
-        </Button>
-        <Button
-          size="sm"
-          variant={truckOnly ? 'default' : 'outline'}
-          className="h-7 text-xs rounded-full"
-          onClick={() => setTruckOnly((v) => !v)}
-        >
-          Truck-friendly
-        </Button>
-        {(['any', 'high', 'medium', 'low'] as const).map((v) => (
           <Button
-            key={v}
             size="sm"
-            variant={confFilter === v ? 'default' : 'outline'}
-            className="h-7 text-xs rounded-full"
-            onClick={() => setConfFilter(v)}
+            variant={truckOnly ? 'default' : 'outline'}
+            className="h-8 text-xs rounded-full px-3"
+            onClick={() => setTruckOnly((v) => !v)}
           >
-            {v === 'any' ? 'Any confidence' : v[0].toUpperCase() + v.slice(1)}
+            Truck-friendly
           </Button>
-        ))}
+        </div>
+
+        <div className="inline-flex items-center gap-1 p-1 bg-muted/50 rounded-lg border border-border/50">
+          <span className="text-[10px] uppercase font-semibold text-muted-foreground px-2">Confidence</span>
+          <SegBtn active={confFilter === 'any'} onClick={() => setConfFilter('any')}>Any</SegBtn>
+          <SegBtn active={confFilter === 'high'} onClick={() => setConfFilter('high')}>High</SegBtn>
+          <SegBtn active={confFilter === 'medium'} onClick={() => setConfFilter('medium')}>Med</SegBtn>
+          <SegBtn active={confFilter === 'low'} onClick={() => setConfFilter('low')}>Low</SegBtn>
+        </div>
+
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+          >
+            Reset
+          </button>
+        )}
       </div>
+
+      {/* Result meta */}
+      {!isLoading && filtered.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            Showing <span className="font-semibold text-foreground">{rangeStart}–{rangeEnd}</span> of{' '}
+            <span className="font-semibold text-foreground">{filtered.length}</span> spots
+          </span>
+          <span className="hidden sm:inline">{PAGE_SIZE} per page</span>
+        </div>
+      )}
 
       {/* List */}
       {isLoading ? (
-        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Loading parking…</CardContent></Card>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4 space-y-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <Card>
-          <CardContent className="p-6 text-center space-y-3">
+          <CardContent className="p-8 text-center space-y-3">
             <p className="text-sm text-muted-foreground">No parking matches your filters.</p>
-            <Button onClick={handleAddClick} size="sm">
-              {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Add a location
-            </Button>
+            <div className="flex items-center justify-center gap-2">
+              {filtersActive && (
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  Clear filters
+                </Button>
+              )}
+              <Button onClick={handleAddClick} size="sm">
+                {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                <span className="ml-1">Add a location</span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.slice(0, 100).map((loc) => (
+          {pageItems.map((loc) => (
             <ParkingCard
               key={loc.id}
               location={loc}
@@ -156,18 +270,93 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
               onSelect={setSelected}
             />
           ))}
-          {filtered.length > 100 && (
-            <p className="text-xs text-center text-muted-foreground">
-              Showing first 100 of {filtered.length}. Refine your search to see more.
-            </p>
-          )}
         </div>
       )}
 
-      <Button variant="outline" className="w-full" onClick={handleAddClick}>
-        {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Add a parking spot
-        {!hasAccess && <span className="ml-1 text-xs text-muted-foreground">(Pro)</span>}
-      </Button>
+      {/* Pagination */}
+      {!isLoading && totalPages > 1 && (
+        <>
+          {/* Mobile compact */}
+          <div className="flex sm:hidden items-center justify-between pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Prev
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Page <span className="font-semibold text-foreground">{page}</span> of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </Button>
+          </div>
+
+          {/* Desktop full */}
+          <Pagination className="hidden sm:flex pt-2">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }}
+                  className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
+                />
+              </PaginationItem>
+              {pageList.map((p, idx) =>
+                p === 'ellipsis' ? (
+                  <PaginationItem key={`e-${idx}`}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                ) : (
+                  <PaginationItem key={p}>
+                    <PaginationLink
+                      href="#"
+                      isActive={p === page}
+                      onClick={(e) => { e.preventDefault(); setPage(p); }}
+                    >
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                ),
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(totalPages, p + 1)); }}
+                  className={page >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </>
+      )}
+
+      {/* Bottom CTA */}
+      <Card className="border-dashed bg-muted/20">
+        <CardContent className="p-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Spotted parking we don't have?
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Add it to help the network — earn points for every contribution.
+            </p>
+          </div>
+          <Button onClick={handleAddClick} className="shrink-0" size="sm">
+            {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+            <span className="ml-1">Add spot</span>
+            {!hasAccess && <span className="ml-1 text-[10px] opacity-80">Pro</span>}
+          </Button>
+        </CardContent>
+      </Card>
 
       <ParkingDetailSheet
         location={selected}
