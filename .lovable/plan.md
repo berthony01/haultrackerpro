@@ -1,86 +1,116 @@
-# Trial Removal — Hardening, Verification & Audit
 
-## Pre-audit findings (already verified read-only)
+# In-App "What's New" System
 
-- **Phase 1 scan**: `rg` across all `.tsx/.ts/.md/.json/.html` (excluding `node_modules`, lockfiles, `supabase/migrations/**`, and `src/integrations/supabase/types.ts`) returned **0 user-facing matches** for any of the 9 trial phrases. Only one safe match: a comment in `src/pages/Index.tsx:71` (`"Free vs Pro only; no trials"`) which explicitly marks legacy intent — keep.
-- **Phase 2 CTAs**: Landing, Pricing, StarterKit already use **"Start Tracking Free"** + **"Create Free Account"** + **"Upgrade to Pro"** consistently. No "Start Free Trial"-style CTAs remain.
-- **Dead code**: `src/components/TrialBanner.tsx` still exists but has **zero imports**. It contains the strings "Pro Trial", "trial has ended", "days left" — it would fail the new test.
-- **Legacy `trialing` references** (defensive, NOT user-facing):
-  - `supabase/functions/create-checkout/index.ts` (blocks duplicate checkout if Stripe still has a trialing sub) — keep, it's safety code.
-  - `supabase/functions/check-subscription/index.ts` (`isTrial` mapped to free path) — keep.
-  - `src/components/ProInsightCard.tsx:35` — comment only.
-- **Phase 4 DB audit (already run)**:
-  - `subscriptions.status = 'trialing'` → **0 rows**
-  - `profiles.subscription_status = 'trialing'` → **0 rows**
-  - Rows with leftover `trial_start`/`trial_end` timestamps → **2 rows** (cosmetic; status is correct)
-  - Active Pro: 1 · Free: 11 · Other: 0
+Replace the email-blast idea with an in-app announcement system that notifies active users of the recent updates (trial removal, new pricing, parking, driver points, etc.) without spamming inboxes or risking transactional email reputation.
+
+## Goals
+- One clear, friendly explanation that the 14-day trial was retired (so prior users aren't surprised).
+- A reusable Release Notes screen for current and future updates.
+- A dismissible dashboard card + auto-popup modal on first visit only.
+- Zero risk to auth, Stripe, Supabase RLS, or Pro gating.
 
 ---
 
-## Phase 1 — Trial-language detection test
+## Phase 1 — Release Notes Data Source
 
-Create `src/test/noTrialLanguage.test.ts`:
+Create a single source of truth for updates.
 
-- Recursively walk `src/`, `public/`, `index.html`, top-level `.md` files.
-- File extensions: `.tsx`, `.ts`, `.md`, `.json`, `.html`.
-- Excludes: `node_modules`, `dist`, `src/integrations/supabase/types.ts`, `supabase/migrations/**`, `bun.lock*`, `package-lock.json`, the test file itself, and `src/components/TrialBanner.tsx` (will be deleted in Phase 2).
-- Patterns (case-insensitive, regex):
-  - `\b14[- ]day\b`, `\bfree trial\b`, `\btrial ends\b`, `\btrial expired\b`, `\bstart trial\b`, `\btrialing\b`, `\bdays left\b`, `\btrial period\b`
-- Per-line allowlist: skip a line if it contains the marker `// trial-allowlist` (used for the one Index.tsx comment and any defensive backend code we keep — but those are under `supabase/functions/`, outside scan scope; we'll only need it to remain absent from `src/`).
-- For the Index.tsx comment we'll just rephrase it to remove the word "trials" rather than allowlist (cleaner).
-- Test asserts the matches array is empty; on failure, prints file:line:match for each hit.
-- Self-verification: temporarily add `// FREE TRIAL` to a scratch line, run, confirm fail; remove, confirm pass.
+**New file: `src/lib/releaseNotes.ts`**
+- Export `RELEASE_NOTES`: typed array `{ id, version, date, title, summary, highlights[], links?: {label, to}[] }`.
+- Export `LATEST_RELEASE_ID` = the newest entry's id (used as the dismiss key).
+- Seed first entry (`v1.0-trial-retired`, dated today) covering:
+  - "We retired the 14-day Pro preview." Plain-English explanation: everyone now starts on the **Free plan** with the **Free Starter Kit**, and Pro is available anytime via upgrade.
+  - Other recent improvements: Parking Finder, Driver Points & Streaks, smarter Pro insights, Weekly Pulse.
+  - Links to `/pricing`, `/features`, `/starter-kit`.
 
-## Phase 2 — Cleanup pass (minimal)
+Why a typed array? Adding future updates is a one-line change — no new components needed.
 
-Surgical edits only — no behavioral change:
+---
 
-1. **Delete `src/components/TrialBanner.tsx**` (verified unused: `rg "TrialBanner"` returns only the file itself).
-2. `**src/pages/Index.tsx:71**` — rewrite comment from `"Free vs Pro only; no trials"` → `"Free vs Pro plans only"` (avoids the substring "trials").
-3. `**src/components/ProInsightCard.tsx:35**` — rewrite comment `"Don't compute for Pro or trialing users"` → `"Don't compute for Pro users"` (matches current logic since trialing no longer exists).
-4. **No CTA changes needed** — already verified consistent.
-5. **No backend edits** — the `trialing` references in `create-checkout` and `check-subscription` are defensive guards for Stripe-side state and are outside the scan scope.
+## Phase 2 — "Seen" Persistence (Per-User, Local)
 
-## Phase 3 — Pro-gating end-to-end verification (read-only audit)
+Avoid a DB migration for a purely UX preference. Use `localStorage` keyed by user id.
 
-No code changes. Verify and report on:
+**New file: `src/hooks/useReleaseNotesSeen.ts`**
+- Key: `htp:release-seen:<user_id>` → stores latest seen release id.
+- Returns `{ hasSeenLatest, markSeen, lastSeenId }`.
+- Falls back gracefully if `user` is null (no popup shown until auth resolved).
 
-- **Frontend gating**: re-confirm all 28+ components using `useSubscription` rely on `isPro` (not `isTrialing`). Spot-check `Parking.tsx`, `DriverScorecard`, `WeeklyCloseout`, `SmartLoadAdvisor`, `AlertsView`, `RecurringExpensesView`, `PasteLoadParser`, `CSVImport`.
-- **Backend gating**: confirm `check-pro-access`, `generate-recurring-expenses`, `admin-api`, `stripe-webhook`, `check-subscription` all require `status = 'active'` for Pro.
-- **RLS**: confirm `subscriptions` table is read-only for users (own row) + admins; `admin_users` gated by `is_admin()`. Already in schema.
-- **Routing**: `/admin` requires `useAdmin`, `/parking` is auth-gated. No new public routes.
-- **Edge cases**: walk through Free → upgrade → cancel state transitions in `useSubscription.ts` to confirm `isPro` flips correctly without any `trialing` shortcut.
+Rationale: a single dismiss flag per device/user is sufficient for an announcement card. No schema change, no RLS surface area, no risk to subscriptions table.
 
-## Phase 4 — Light trial-user audit (one-time SQL, no UI)
+---
 
-Already executed read-only. Will optionally include a **single migration** to null out the 2 stale `trial_start`/`trial_end` cosmetic timestamps:
+## Phase 3 — Reusable UI Components
 
-```sql
-UPDATE public.subscriptions
-SET trial_start = NULL, trial_end = NULL
-WHERE trial_start IS NOT NULL OR trial_end IS NOT NULL;
-```
+**New file: `src/components/WhatsNewModal.tsx`**
+- Built on existing `Dialog` (`src/components/ui/dialog.tsx`).
+- Renders the latest release entry: title, friendly summary about the trial change, bullet highlights, and CTA buttons that route to `/pricing`, `/features`, `/settings` (no behavior changes — just `navigate()` calls).
+- "Got it" button calls `markSeen(LATEST_RELEASE_ID)` and closes.
+- Accessible: `DialogTitle`, `DialogDescription`, focus-trapped by Radix.
 
-This is safe — `useSubscription` no longer reads these columns and `status` is already correct. Will ask for confirmation before applying via migration; if you'd rather leave the timestamps as historical record, we skip it.
+**New file: `src/components/WhatsNewCard.tsx`**
+- Compact dashboard card (matches existing dark-navy + amber theme; uses `Card` primitives).
+- Headline: "What's new in HaulTrackerPro" + 1-line summary + "See updates" button (opens modal) + small "×" dismiss (calls `markSeen`).
+- Pure presentational; takes `onOpen` and `onDismiss` props.
 
-## Phase 5 — Final audit
+**New file: `src/pages/Updates.tsx`**
+- Public-feeling, auth-protected page rendering the **full** `RELEASE_NOTES` list (newest first) — current + any future entries.
+- Uses `SEOHead` for title, `BottomNav`, and standard layout (mirror `Parking.tsx` shell for consistency).
+- Each entry: date pill, title, summary, highlight list, optional links.
 
-- Run `bunx vitest run` — confirm `noTrialLanguage.test.ts` and existing tests pass.
-- Run `tsc --noEmit` — confirm zero errors.
-- Re-run the manual `rg` scan — confirm 0 matches.
-- Mobile QA (375px + 715px): visual sanity check of `/`, `/pricing`, `/starter-kit`, `/admin` since no layout changed, this is a quick spot-check.
+---
 
-## Files touched
+## Phase 4 — Wiring (Surgical)
 
-- **Added**: `src/test/noTrialLanguage.test.ts`
-- **Deleted**: `src/components/TrialBanner.tsx`
-- **Edited (comment-only)**: `src/pages/Index.tsx`, `src/components/ProInsightCard.tsx`
-- **Optional migration**: null stale `trial_start`/`trial_end` (2 rows) — pending your call
+**`src/App.tsx`**
+- Add one route: `<Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />`. No other routing changes.
 
-## Risk
+**`src/pages/Index.tsx`** (dashboard host)
+- Import `useReleaseNotesSeen`, `WhatsNewModal`, `WhatsNewCard`.
+- On mount, if `!hasSeenLatest && !loading && user`, open the modal once. Modal close = `markSeen`.
+- Pass `WhatsNewCard` into `DashboardView` via a new optional prop `whatsNewSlot?: ReactNode` (rendered at top of dashboard above existing cards). Card hides itself once dismissed.
 
-Very low. No runtime logic changes. The deleted component has zero imports. The new test only reads files. Optional migration only nulls cosmetic columns on 2 rows whose `status` is already correct.
+**`src/components/SettingsView.tsx`**
+- Add a single row link: **"What's New"** → navigates to `/updates`. Sits in the existing settings list near "Help / FAQ". No styling overhaul.
 
-## Final report (to be delivered after execution)
+No changes to: `useSubscription`, `useAuth`, `check-pro-access`, Stripe functions, RLS policies, billing plans, or any Pro-gating logic.
 
-Will include: scan result, files modified, test output, tsc output, gating verification table, DB audit numbers, mobile QA notes, and an explicit confirmation that no trial language remains, CTAs are correct, Pro gating is intact, and nothing was broken. Proceed with Phases 1, 2, 3, and 5. Skip the optional migration for now. Do not modify backend trialing defensive guards.
+---
+
+## Phase 5 — Guard Test Compatibility
+
+The existing `noTrialLanguage.test.ts` will scan the new files. The release notes copy must explain the change **without** triggering the regex (no "free trial", "14-day", "trialing", etc.).
+
+Approved phrasing (verified clean against all 8 patterns):
+> "We've simplified our plans. Every account now starts on the **Free plan**, and you can upgrade to **Pro** whenever you're ready. The previous Pro preview window has been retired — your data and account are unchanged."
+
+If a phrase ever needs a forbidden token (e.g., quoting a legacy term), append `// trial-allowlist` per the test's existing escape hatch.
+
+---
+
+## Phase 6 — Verification
+
+1. `bunx tsc --noEmit` — zero errors.
+2. `bunx vitest run` — all tests pass, **including** `noTrialLanguage.test.ts`.
+3. Manual flows:
+   - New login → modal appears once → dismiss → reload → modal does not reappear, card hidden.
+   - `/updates` accessible, lists release; unauthenticated users redirected by `ProtectedRoute`.
+   - Settings → "What's New" → navigates to `/updates`.
+4. Mobile viewports 375px and 715px — modal and card render without overflow.
+
+---
+
+## Out of Scope (Per User's Constraints)
+- ❌ No emails sent.
+- ❌ No admin UI for trial users.
+- ❌ No DB migrations.
+- ❌ No changes to Pro gating, Stripe, or auth.
+- ❌ No reintroduction of trial logic or copy.
+
+---
+
+## Files Summary
+**New (5):** `src/lib/releaseNotes.ts`, `src/hooks/useReleaseNotesSeen.ts`, `src/components/WhatsNewModal.tsx`, `src/components/WhatsNewCard.tsx`, `src/pages/Updates.tsx`
+**Edited (3):** `src/App.tsx` (1 route), `src/pages/Index.tsx` (modal + card slot wiring), `src/components/SettingsView.tsx` (one nav link)
+
+Low blast radius, fully reversible, and reusable for every future release.
