@@ -1,4 +1,3 @@
-import { forwardRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Crown } from 'lucide-react';
@@ -10,10 +9,7 @@ interface ProUpgradeModalProps {
   featureName: string;
 }
 
-export const ProUpgradeModal = forwardRef<HTMLDivElement, ProUpgradeModalProps>(function ProUpgradeModal(
-  { open, onOpenChange, featureName },
-  _ref,
-) {
+export function ProUpgradeModal({ open, onOpenChange, featureName }: ProUpgradeModalProps) {
   const navigate = useNavigate();
 
   return (
@@ -42,4 +38,4 @@ export const ProUpgradeModal = forwardRef<HTMLDivElement, ProUpgradeModalProps>(
       </DialogContent>
     </Dialog>
   );
-});
+}
