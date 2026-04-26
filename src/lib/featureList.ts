@@ -1,4 +1,4 @@
-import { Truck, Receipt, Calculator, Route, ClipboardPaste, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2, AlertCircle, Trophy, Mic, Camera } from 'lucide-react';
+import { Truck, Receipt, Calculator, Route, ClipboardPaste, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2, AlertCircle, Trophy, Mic, Camera, ParkingCircle, Users } from 'lucide-react';
 
 export interface Feature {
   icon: typeof Truck;
@@ -45,6 +45,16 @@ export const featureList: FeatureCategory[] = [
       { icon: Sparkles, title: 'AI Weekly Business Report', description: 'AI-generated narrative summary of your week — highlights best/worst loads, deadhead issues, and actionable recommendations.', pro: true },
       { icon: Target, title: 'AI Lane Advice', description: 'AI analyzes your load history and recommends your most profitable lanes with optimization tips.', pro: true },
       { icon: Calculator, title: 'AI Tax Optimization Tips', description: 'AI-generated quarterly tax tips based on your expense patterns to help maximize deductions.', pro: true },
+      { icon: Route, title: 'Deadhead Pay Parsing', description: 'Paste loads that include deadhead pay and the parser separates it from line-haul revenue automatically — no manual splitting.', pro: true },
+    ],
+  },
+  {
+    category: 'Driver Community & Parking (Pro)',
+    features: [
+      { icon: ParkingCircle, title: 'Real-Time Parking Finder', description: 'Find safe truck parking with live availability reports from other drivers. See verified open spots, limited spots, full lots, and safety ratings near you — updated by the community in real time.', pro: true },
+      { icon: AlertCircle, title: 'Report & Verify Spots', description: 'Tap any lot to report status (available / limited / full) and rate safety 1–5. One report per lot per hour keeps the data fresh and trustworthy.', pro: true },
+      { icon: Trophy, title: 'Driver Points & Leaderboard', description: 'Earn 5 points for every verified parking report, build daily streaks, and climb the driver leaderboard. Help fellow truckers and get recognized for it.', pro: true },
+      { icon: Download, title: 'Parking Log Export (CSV + PDF)', description: 'Export your logged parking stops weekly or monthly to submit with load paperwork or share with your dispatcher.', pro: true },
     ],
   },
   {
