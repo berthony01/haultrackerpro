@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import SEOHead from '@/components/SEOHead';
 import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
@@ -41,7 +42,7 @@ import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analyt
 
 const Index = () => {
   const { signOut, user } = useAuth();
-  const queryClient = (await import('@tanstack/react-query')).useQueryClient();
+  const queryClient = useQueryClient();
   const { isAdmin } = useAdmin();
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
