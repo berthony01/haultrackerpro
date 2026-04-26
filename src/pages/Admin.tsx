@@ -933,6 +933,206 @@ export default function Admin() {
           </TabsContent>
 
           {/* ADMINS */}
+          {/* PARKING */}
+          <TabsContent value="parking" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Community parking system — read-only view.</p>
+              <Button variant="outline" size="sm" className="gap-1" onClick={fetchParking} disabled={parkingLoading}>
+                <RefreshCw className={`h-4 w-4 ${parkingLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+            {parkingOverview && (
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Total Locations', value: parkingOverview.total_locations },
+                  { label: 'Reports (7d)', value: parkingOverview.reports_7d },
+                  { label: 'Verifications (7d)', value: parkingOverview.verifications_7d },
+                  { label: 'Top Reports/Loc', value: parkingOverview.top_locations[0]?.report_count ?? 0 },
+                ].map((s) => (
+                  <Card key={s.label} className="shadow-card">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <ParkingCircle className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                      </div>
+                      <p className="text-2xl font-bold">{s.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            {parkingOverview && parkingOverview.top_locations.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Top 10 Most-Reported Locations</CardTitle></CardHeader>
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Reports</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {parkingOverview.top_locations.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-xs">{l.name}<div className="text-[10px] text-muted-foreground">{l.address ?? ''}</div></TableCell>
+                        <TableCell><Badge variant="secondary" className="text-xs">{l.type}</Badge></TableCell>
+                        <TableCell className="text-right text-xs font-semibold">{l.report_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Recent Reports ({parkingReports.length})</CardTitle></CardHeader>
+              {parkingReports.length === 0 ? (
+                <CardContent><p className="text-xs text-muted-foreground py-2">No reports yet.</p></CardContent>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Time</TableHead><TableHead>Location</TableHead><TableHead>Reporter</TableHead><TableHead>Status</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {parkingReports.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">{r.location_name}</TableCell>
+                        <TableCell className="text-xs">{r.reporter_handle}</TableCell>
+                        <TableCell><Badge variant={r.status === 'available' ? 'default' : r.status === 'full' ? 'destructive' : 'secondary'} className="text-xs">{r.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* DRIVERS */}
+          <TabsContent value="drivers" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Driver points & weekly leaderboard.</p>
+              <Button variant="outline" size="sm" className="gap-1" onClick={fetchDrivers} disabled={driversLoading}>
+                <RefreshCw className={`h-4 w-4 ${driversLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+            {driverOverview && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Active This Week', value: driverOverview.active_drivers_week },
+                    { label: 'Total Points Awarded', value: driverOverview.total_points_awarded },
+                    { label: 'Top Streak (days)', value: driverOverview.top_streak },
+                    { label: 'Total Drivers', value: driverOverview.total_drivers },
+                  ].map((s) => (
+                    <Card key={s.label} className="shadow-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Trophy className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">{s.label}</p>
+                        </div>
+                        <p className="text-2xl font-bold">{s.value}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">Tier Distribution</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-4 gap-2">
+                    {(['Bronze', 'Silver', 'Gold', 'Platinum'] as const).map((t) => (
+                      <div key={t} className="rounded-lg bg-muted/40 px-3 py-2 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase">{t}</p>
+                        <p className="text-lg font-bold">{driverOverview.tiers[t]}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Weekly Leaderboard ({leaderboard.length})</CardTitle></CardHeader>
+              {leaderboard.length === 0 ? (
+                <CardContent><p className="text-xs text-muted-foreground py-2">No leaderboard activity yet.</p></CardContent>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead className="w-12">#</TableHead><TableHead>Handle</TableHead>
+                    <TableHead className="text-right">Week</TableHead><TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Streak</TableHead><TableHead>Tier</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {leaderboard.map((r) => (
+                      <TableRow key={r.user_id}>
+                        <TableCell className="text-xs">{r.rank}</TableCell>
+                        <TableCell className="text-xs">{r.masked_display_name}</TableCell>
+                        <TableCell className="text-right text-xs font-semibold">{r.weekly_points}</TableCell>
+                        <TableCell className="text-right text-xs">{r.total_points}</TableCell>
+                        <TableCell className="text-right text-xs">{r.streak_days}</TableCell>
+                        <TableCell><Badge variant="secondary" className="text-xs">{r.tier}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* STARTER KIT / LEAD MAGNET */}
+          <TabsContent value="leads" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Free Trucker Starter Kit signups.</p>
+              <Button variant="outline" size="sm" className="gap-1" onClick={fetchLeads} disabled={leadsLoading}>
+                <RefreshCw className={`h-4 w-4 ${leadsLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+            {leadOverview && (
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Total Signups', value: leadOverview.total },
+                  { label: 'Last 7d', value: leadOverview.last_7d },
+                  { label: 'Last 30d', value: leadOverview.last_30d },
+                  { label: 'Converted to Account', value: `${leadOverview.converted} (${leadOverview.conversion_rate}%)` },
+                ].map((s) => (
+                  <Card key={s.label} className="shadow-card">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Gift className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                      </div>
+                      <p className="text-2xl font-bold">{s.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Recent Signups ({leadSignups.length})</CardTitle></CardHeader>
+              {leadSignups.length === 0 ? (
+                <CardContent><p className="text-xs text-muted-foreground py-2">No signups yet.</p></CardContent>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Date</TableHead><TableHead>Email</TableHead>
+                    <TableHead>Source</TableHead><TableHead>Account?</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {leadSignups.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs break-all">{l.email}{l.first_name ? ` (${l.first_name})` : ''}</TableCell>
+                        <TableCell className="text-xs">
+                          {l.utm_source || l.source_page || '—'}
+                          {l.utm_campaign && <div className="text-[10px] text-muted-foreground">{l.utm_campaign}</div>}
+                        </TableCell>
+                        <TableCell>
+                          {l.converted_user_id
+                            ? <Badge variant="default" className="text-xs">✓</Badge>
+                            : <Badge variant="outline" className="text-xs">—</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </TabsContent>
+
           <TabsContent value="admins" className="space-y-3">
             <Card>
               <Table>
