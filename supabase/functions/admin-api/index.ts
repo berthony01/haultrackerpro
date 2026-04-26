@@ -76,20 +76,200 @@ Deno.serve(async (req) => {
     // ---- ACTIONS ----
 
     if (action === "overview") {
-      const [users, proUsers, loads, loads7d, expenses] = await Promise.all([
+      const sevenDaysAgoDate = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+      const sevenDaysAgoIso = new Date(Date.now() - 7 * 86400000).toISOString();
+      const thirtyDaysAgoIso = new Date(Date.now() - 30 * 86400000).toISOString();
+      const nowIso = new Date().toISOString();
+      const [
+        users, loads, loads7d, expenses, expenses7d,
+        fuel, fuel7d, recurringActive,
+        subsTrialing, subsActive, subsFree,
+        parkingLocs, parkingReports7d, parkingVerifs7d,
+        driverPointsActive,
+        leadsTotal, leads7d, leads30d,
+        parseUsage7d, autoLogs7d, aiInsights7d,
+      ] = await Promise.all([
         adminDb.from("profiles").select("id", { count: "exact", head: true }),
-        adminDb.from("profiles").select("id", { count: "exact", head: true }).eq("subscription_status", "pro"),
         adminDb.from("loads").select("id", { count: "exact", head: true }),
-        adminDb.from("loads").select("id", { count: "exact", head: true }).gte("load_date", new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0]),
+        adminDb.from("loads").select("id", { count: "exact", head: true }).gte("load_date", sevenDaysAgoDate),
         adminDb.from("expenses").select("id", { count: "exact", head: true }),
+        adminDb.from("expenses").select("id", { count: "exact", head: true }).gte("expense_date", sevenDaysAgoDate),
+        adminDb.from("fuel_logs").select("id", { count: "exact", head: true }),
+        adminDb.from("fuel_logs").select("id", { count: "exact", head: true }).gte("date", sevenDaysAgoDate),
+        adminDb.from("recurring_expense_templates").select("id", { count: "exact", head: true }).eq("is_active", true),
+        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "trialing").gt("trial_end", nowIso),
+        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active"),
+        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).in("status", ["free", "canceled"]),
+        adminDb.from("parking_locations").select("id", { count: "exact", head: true }),
+        adminDb.from("parking_reports").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("parking_verifications").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("driver_points").select("user_id", { count: "exact", head: true }).gt("weekly_points", 0),
+        adminDb.from("lead_magnet_signups").select("id", { count: "exact", head: true }),
+        adminDb.from("lead_magnet_signups").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("lead_magnet_signups").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgoIso),
+        adminDb.from("parse_usage").select("id", { count: "exact", head: true }).gte("used_at", sevenDaysAgoIso),
+        adminDb.from("expense_automation_logs").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("ai_insights").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
       ]);
       return json({
         total_users: users.count ?? 0,
-        pro_users: proUsers.count ?? 0,
+        subs_trialing: subsTrialing.count ?? 0,
+        subs_active: subsActive.count ?? 0,
+        subs_free: subsFree.count ?? 0,
         total_loads: loads.count ?? 0,
         loads_7d: loads7d.count ?? 0,
         total_expenses: expenses.count ?? 0,
+        expenses_7d: expenses7d.count ?? 0,
+        total_fuel_logs: fuel.count ?? 0,
+        fuel_logs_7d: fuel7d.count ?? 0,
+        recurring_templates_active: recurringActive.count ?? 0,
+        parking_locations_total: parkingLocs.count ?? 0,
+        parking_reports_7d: parkingReports7d.count ?? 0,
+        parking_verifications_7d: parkingVerifs7d.count ?? 0,
+        driver_points_active_users: driverPointsActive.count ?? 0,
+        lead_magnet_signups_total: leadsTotal.count ?? 0,
+        lead_magnet_signups_7d: leads7d.count ?? 0,
+        lead_magnet_signups_30d: leads30d.count ?? 0,
+        parse_usage_7d: parseUsage7d.count ?? 0,
+        expense_automation_7d: autoLogs7d.count ?? 0,
+        ai_insights_7d: aiInsights7d.count ?? 0,
       });
+    }
+
+    if (action === "parking-overview") {
+      const sevenDaysAgoIso = new Date(Date.now() - 7 * 86400000).toISOString();
+      const [locs, reports7d, verifs7d, allReports] = await Promise.all([
+        adminDb.from("parking_locations").select("id", { count: "exact", head: true }),
+        adminDb.from("parking_reports").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("parking_verifications").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("parking_reports").select("parking_id").limit(5000),
+      ]);
+      const counts = new Map<string, number>();
+      for (const r of (allReports.data ?? []) as Array<{ parking_id: string }>) {
+        counts.set(r.parking_id, (counts.get(r.parking_id) ?? 0) + 1);
+      }
+      const topIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+      let topLocations: Array<{ id: string; name: string; address: string | null; type: string; report_count: number }> = [];
+      if (topIds.length > 0) {
+        const { data: locRows } = await adminDb
+          .from("parking_locations")
+          .select("id, name, address, type")
+          .in("id", topIds.map(([id]) => id));
+        const locMap = new Map((locRows ?? []).map((l) => [l.id, l]));
+        topLocations = topIds.map(([id, count]) => {
+          const l = locMap.get(id);
+          return {
+            id,
+            name: l?.name ?? "(unknown)",
+            address: l?.address ?? null,
+            type: l?.type ?? "—",
+            report_count: count,
+          };
+        });
+      }
+      return json({
+        total_locations: locs.count ?? 0,
+        reports_7d: reports7d.count ?? 0,
+        verifications_7d: verifs7d.count ?? 0,
+        top_locations: topLocations,
+      });
+    }
+
+    if (action === "list-parking-reports") {
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 200);
+      const { data: reports } = await adminDb
+        .from("parking_reports")
+        .select("id, parking_id, user_id, status, safety_rating, notes, created_at")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      const parkingIds = [...new Set((reports ?? []).map((r) => r.parking_id))];
+      const userIds = [...new Set((reports ?? []).map((r) => r.user_id))];
+      const [{ data: locs }, { data: profs }] = await Promise.all([
+        parkingIds.length > 0
+          ? adminDb.from("parking_locations").select("id, name").in("id", parkingIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+        userIds.length > 0
+          ? adminDb.from("profiles").select("user_id, driver_handle, handle_emoji, handle_public").in("user_id", userIds)
+          : Promise.resolve({ data: [] as Array<{ user_id: string; driver_handle: string | null; handle_emoji: string | null; handle_public: boolean }> }),
+      ]);
+      const locMap = new Map((locs ?? []).map((l) => [l.id, l.name]));
+      const profMap = new Map((profs ?? []).map((p) => [p.user_id, p]));
+      const enriched = (reports ?? []).map((r) => {
+        const p = profMap.get(r.user_id);
+        const handle = p?.handle_public && p?.driver_handle
+          ? `${p.driver_handle}${p.handle_emoji ? " " + p.handle_emoji : ""}`
+          : `Driver #${(Math.abs([...r.user_id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) % 10000).toString().padStart(4, "0")}`;
+        return {
+          ...r,
+          location_name: locMap.get(r.parking_id) ?? "(unknown)",
+          reporter_handle: handle,
+        };
+      });
+      return json({ reports: enriched });
+    }
+
+    if (action === "driver-points-overview") {
+      const { data: rows } = await adminDb
+        .from("driver_points")
+        .select("user_id, total_points, weekly_points, streak_days");
+      const all = (rows ?? []) as Array<{ user_id: string; total_points: number; weekly_points: number; streak_days: number }>;
+      const tiers = { Bronze: 0, Silver: 0, Gold: 0, Platinum: 0 };
+      let totalAwarded = 0;
+      let activeWeek = 0;
+      let topStreak = 0;
+      for (const r of all) {
+        totalAwarded += r.total_points;
+        if (r.weekly_points > 0) activeWeek++;
+        if (r.streak_days > topStreak) topStreak = r.streak_days;
+        if (r.total_points >= 400) tiers.Platinum++;
+        else if (r.total_points >= 150) tiers.Gold++;
+        else if (r.total_points >= 50) tiers.Silver++;
+        else tiers.Bronze++;
+      }
+      return json({
+        active_drivers_week: activeWeek,
+        total_points_awarded: totalAwarded,
+        top_streak: topStreak,
+        tiers,
+        total_drivers: all.length,
+      });
+    }
+
+    if (action === "driver-leaderboard") {
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "25", 10), 100);
+      const { data, error } = await adminDb.rpc("get_weekly_driver_leaderboard", { _limit: limit });
+      if (error) return json({ error: error.message }, 500);
+      return json({ rows: data ?? [] });
+    }
+
+    if (action === "lead-magnet-overview") {
+      const sevenDaysAgoIso = new Date(Date.now() - 7 * 86400000).toISOString();
+      const thirtyDaysAgoIso = new Date(Date.now() - 30 * 86400000).toISOString();
+      const [total, last7, last30, converted] = await Promise.all([
+        adminDb.from("lead_magnet_signups").select("id", { count: "exact", head: true }),
+        adminDb.from("lead_magnet_signups").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("lead_magnet_signups").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgoIso),
+        adminDb.from("lead_magnet_signups").select("id", { count: "exact", head: true }).not("converted_user_id", "is", null),
+      ]);
+      const t = total.count ?? 0;
+      const c = converted.count ?? 0;
+      return json({
+        total: t,
+        last_7d: last7.count ?? 0,
+        last_30d: last30.count ?? 0,
+        converted: c,
+        conversion_rate: t > 0 ? Math.round((c / t) * 1000) / 10 : 0,
+      });
+    }
+
+    if (action === "list-lead-magnet-signups") {
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10), 500);
+      const { data } = await adminDb
+        .from("lead_magnet_signups")
+        .select("id, email, first_name, source_page, utm_source, utm_campaign, created_at, downloaded_at, converted_user_id")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return json({ signups: data ?? [] });
     }
 
     if (action === "list-users" || action === "search-users") {
