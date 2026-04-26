@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Crown, Loader2 } from 'lucide-react';
+import { Trophy, Crown, Loader2, Settings2 } from 'lucide-react';
 import { useDriverLeaderboard, useMyLeaderboardRank, pointsSource } from '@/hooks/useDriverLeaderboard';
 import { useAuth } from '@/hooks/useAuth';
 import { tierFor } from '@/hooks/useDriverPoints';
@@ -31,7 +31,7 @@ export function DriverLeaderboardCard({
   return (
     <Card className="shadow-card">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Trophy className="h-4 w-4 text-yellow-400" />
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -40,6 +40,18 @@ export function DriverLeaderboardCard({
           </div>
           <span className="text-[10px] text-muted-foreground">Updated weekly</span>
         </div>
+
+        {onCustomize && (
+          <button
+            type="button"
+            onClick={onCustomize}
+            className="mb-3 inline-flex items-center gap-1.5 min-h-[36px] px-2 -mx-2 rounded-md text-xs font-semibold text-primary underline underline-offset-4 decoration-primary/40 hover:decoration-primary hover:bg-primary/5 active:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+            aria-label="Customize your leaderboard handle"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            Customize your leaderboard handle →
+          </button>
+        )}
 
         {isLoading ? (
           <div className="py-6 flex items-center justify-center text-muted-foreground">
@@ -76,15 +88,6 @@ export function DriverLeaderboardCard({
           <p className="text-[11px] text-muted-foreground mt-3">
             Earn points by logging loads, reporting parking, and verifying parking status.
           </p>
-        )}
-        {onCustomize && (
-          <button
-            type="button"
-            onClick={onCustomize}
-            className="mt-2 text-[11px] text-primary hover:underline focus:outline-none focus:underline"
-          >
-            Customize your leaderboard handle →
-          </button>
         )}
       </CardContent>
     </Card>
