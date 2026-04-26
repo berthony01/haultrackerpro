@@ -1,107 +1,93 @@
+# /parking Page Polish & Pagination Plan
 
-# Phase A + Phase B Fix Plan — Parking & Driver Intelligence MVP
+## What's wrong today (verified in code + console)
 
-Scope: production-safety fixes only. No new features, no UI redesign, no pricing/route changes, no untouched edge functions.
+1. **Looks flat / generic** — `Parking.tsx` is just a small heading + filter row + stacked card list. No hero, no stats, no visual hierarchy. With 30 seeded truck stops all showing identical "Low confidence" + "No recent reports", the page is one long monotone scroll.
+2. **Long scroll, no pagination** — `ParkingFinder.tsx` slices `.slice(0, 100)` with no paging. User asked for ~20–50 per page.
+3. **Button issues**:
+   - The 9 filter chips wrap into 2–3 ragged rows on desktop and look like loose pills.
+   - "Near me" button has inconsistent icon-only/text-with-icon behavior.
+   - Bottom "Add a parking spot" button is plain and the inline `<Lock />` + `<span>` kerning is off.
+   - Ghost back button uses `-ml-2` and looks unfinished next to the heading.
+4. **React `forwardRef` warning still in console** (verified in console logs lines 3–46). Source: `ParkingFinder` renders `<AddParkingModal />` and `<ProUpgradeModal />` as siblings, and one of their internal trees (likely a `<Button>` wrapping a `lucide-react` icon as the only child, or a `Switch`/Dialog child) is being passed a ref by Radix. The fix: ensure `AddParkingModal` and `ProUpgradeModal` are not the components being warned about — wrap their root in `forwardRef` if needed, OR (more likely the real cause) wrap any plain function-component icon children inside Radix `Dialog`/`Sheet` triggers properly. I'll inspect Switch + Select usages in `AddParkingModal` and convert any custom plain components.
+5. **Pre-existing**: `ParkingDetailSheet`, `ParkingFinder`, `AddParkingModal` all use `Badge`, `Button`, etc. — those are fine since we already converted Badge to `forwardRef`. Will verify no other custom function components are receiving refs.
 
----
+## Scope (surgical, no redesign of routes or business logic)
 
-## PHASE A — Critical Fixes
+### A. Visual polish — `src/pages/Parking.tsx`
+- Add a compact **hero header** styled to match the existing dashboard cards (dark navy, amber accent):
+  - Icon + "Parking Finder" title + tagline
+  - Three small stat tiles in a row (mobile: scrolls horizontally, desktop: 3 cols):
+    - **Locations** (total count from `useParkingLocations`)
+    - **Reports today** (count from `useRecentParkingReports`)
+    - **Your points** (from `useDriverPoints`, Pro/trial only — show "—" otherwise)
+- Remove the loose ghost back button; replace with a tighter pill-style back chip.
+- Subtle gradient or `bg-card/40` band behind the header to add depth (consistent with `DashboardView`).
 
-### A1. Fix Pro gating on `DriverIntelligenceCard`
-**File:** `src/components/DriverIntelligenceCard.tsx`
-- Add `ProUpgradeModal` import + local `showUpgrade` state.
-- Change Parking button `onClick`: if `!hasAccess` → open `ProUpgradeModal` (featureName: "Driver Intelligence rewards"). If `hasAccess` → navigate to `/parking` as today.
-- Lock icon stays. No visual redesign.
-- `/parking` itself remains reachable from bottom nav / direct URL for free users (view-only).
+### B. Filter row polish — `src/components/parking/ParkingFinder.tsx`
+- Group chips into **labeled segments** so they don't look like a random pile:
+  - Segment 1: `Cost` → All / Free / Paid (segmented control style)
+  - Segment 2: Toggles → Overnight, Truck-friendly
+  - Segment 3: `Confidence` → Any / High / Medium / Low (segmented)
+- Add a single "Reset filters" link when any filter is active.
+- Search input gets a slightly taller (`h-10`) treatment + leading icon + clear (×) button when text is present.
+- "Near me" button: always show icon + label on `sm:` and up; icon-only on mobile (current behavior — keep but tidy).
 
-### A2. Fix `AddParkingModal` Pro gating
-**Files:** `src/components/parking/ParkingFinder.tsx`, `src/components/parking/AddParkingModal.tsx`
-- In `ParkingFinder`, change both "Add a parking spot" buttons (the empty-state one and the bottom one): if `!hasAccess` → `setShowUpgrade(true)` instead of `setShowAdd(true)`. Add a small `Lock` icon next to the button label for free users (no layout change).
-- Defense-in-depth in `AddParkingModal.handleSubmit`: if not Pro/trialing, show toast + return early. (Pass `hasAccess` prop from `ParkingFinder`, or read from `useSubscription` directly inside the modal — simpler: read inside modal so signature unchanged.)
-- RLS already blocks insert of `created_by != auth.uid()`; this is purely a tier gate, enforced both client-side and (after migration) backstopped by application logic. No new RLS needed for this since we don't have a server-side "is_pro" check available in RLS without coupling to `subscriptions`. Document this limitation in the audit report; the realistic risk surface is low (a bypass user would only be inserting locations to a community table they can already read).
+### C. Pagination — `src/components/parking/ParkingFinder.tsx`
+- Add `pageSize = 24` and `page` state.
+- Reset `page` to 1 whenever search/filters/`geo.coords` change (use `useEffect`, per project React patterns memory).
+- Render `filtered.slice((page-1)*pageSize, page*pageSize)`.
+- Footer pager using existing `src/components/ui/pagination.tsx`:
+  - Prev / 1 … current ± 1 … last / Next, with ellipses
+  - Mobile: simplified "Page X of Y" + Prev/Next only (sm:hidden)
+- Result count line: "Showing 1–24 of 137 spots".
 
-### A3. DB-level anti-spam for `parking_reports`
-**Migration (new):**
-- Add generated column `report_hour_bucket timestamptz GENERATED ALWAYS AS (date_trunc('hour', created_at)) STORED`.
-- Pre-clean: `DELETE` duplicate rows keeping the earliest per `(parking_id, user_id, report_hour_bucket)` using `ctid`-based dedupe, only if duplicates exist.
-- Add `CREATE UNIQUE INDEX IF NOT EXISTS parking_reports_one_per_hour ON public.parking_reports (parking_id, user_id, report_hour_bucket);`
-- In `useParkingReports`, catch unique-violation Postgres code `23505` and surface "You already reported this lot in the last hour" instead of raw error. Keep the existing client-side pre-check as a UX optimization.
+### D. Card polish — `src/components/parking/ParkingCard.tsx`
+- Bump padding to `p-4`, add subtle left border whose color matches confidence (`border-l-2 border-l-success/40` etc.) so the long list has visual rhythm even when most cards say "Low".
+- Tighten the meta row spacing; promote distance to a small badge on the right side instead of inline.
+- Show a discreet "📍 Verified just now" pulse-dot only when `level === 'high'`.
+- No layout/route changes.
 
----
+### E. Bottom CTA — `src/components/parking/ParkingFinder.tsx`
+- Replace plain full-width outline button with a **two-tone CTA card**: short copy on the left ("Spotted parking we don't have yet?"), button on the right.
+- Free users see a `Lock` icon + "(Pro)" tag and clicking opens `ProUpgradeModal` (already wired).
 
-## PHASE B — High-Value Fixes
+### F. React `forwardRef` warning fix
+- Inspect `AddParkingModal` for any custom plain function components receiving refs. Most likely culprits:
+  - The `<Button onClick={useMyLocation}>` is fine (Button is forwardRef).
+  - `Switch` and `Select` items are Radix → already forwardRef.
+  - Suspect: `ProUpgradeModal` itself may be rendered inside a Radix portal that wants a ref when it's an immediate child. Wrap `ProUpgradeModal` and `AddParkingModal` exports in `React.forwardRef<HTMLDivElement, Props>((props, _ref) => ...)` so Radix's invisible ref-passing stops warning.
+- After fix, verify console is clean on `/parking`.
 
-### B4. `Badge` forwardRef
-**File:** `src/components/ui/badge.tsx`
-- Convert `Badge` to `React.forwardRef<HTMLDivElement, BadgeProps>`. Set `displayName = "Badge"`. Preserve all variants/classnames/exports.
+### G. Empty/loading states
+- Loading: replace the single "Loading parking…" line with 4 skeleton cards (using existing `Skeleton`).
+- Empty (filters return 0): keep current message but add a **"Clear filters"** action in addition to "Add a location".
 
-### B5. Enable realtime for `driver_points` & `parking_reports`
-**Migration (new):** Idempotent block:
-```sql
-DO $$
-BEGIN
-  BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.driver_points;
-  EXCEPTION WHEN duplicate_object THEN NULL; END;
-  BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.parking_reports;
-  EXCEPTION WHEN duplicate_object THEN NULL; END;
-END $$;
-ALTER TABLE public.driver_points REPLICA IDENTITY FULL;
-ALTER TABLE public.parking_reports REPLICA IDENTITY FULL;
-```
-- Verify `useDriverPoints` cleanup already calls `supabase.removeChannel(channel)` on unmount — confirmed in current code; no change needed.
+## Files to touch
+- `src/pages/Parking.tsx` — hero + stats header, tighter back nav
+- `src/components/parking/ParkingFinder.tsx` — pagination, segmented filters, polished CTA, skeleton loading, page-reset effect
+- `src/components/parking/ParkingCard.tsx` — visual rhythm (left-border by confidence, distance badge, padding)
+- `src/components/parking/AddParkingModal.tsx` — wrap export in `forwardRef` to silence warning
+- `src/components/ProUpgradeModal.tsx` — wrap export in `forwardRef` to silence warning (one-line change, no behavior change)
+- (Reuse existing) `src/components/ui/pagination.tsx`, `src/components/ui/skeleton.tsx`, `src/hooks/useDriverPoints.ts`, `src/hooks/useParkingLocations.ts`
 
-### B6. Wire load points
-**File:** `src/pages/Index.tsx` (only place `addLoad.mutate` is called)
-- In the `addLoad.mutate(data, { onSuccess: ... })` callback, after the existing onSuccess work, fire-and-forget:
-  ```ts
-  supabase.rpc('award_points', { _user_id: user.id, _category: 'load', _amount: 5 })
-    .then(({ error }) => { if (error) console.warn('award_points(load) failed', error); });
-  ```
-  (Only on create path — `updateLoad` is untouched, so edits never award points.)
-- Wrap in `try/catch` no-op; never block load save. No success toast change (avoid misleading copy).
-- Gate to Pro/trialing only (matches DriverIntelligenceCard messaging) — skip RPC if `!isPro && !isTrialing`.
+## Explicitly NOT in scope
+- ❌ Leaflet map view (deferred Phase C)
+- ❌ Leaderboard
+- ❌ Smart prompts / auto-detect parking
+- ❌ Load Parking Outlook
+- ❌ Favorites UI
+- ❌ Pricing/tier changes
+- ❌ Renaming `/parking` route
+- ❌ Touching dashboard, loads, expenses, scorecard, recurring expenses
+- ❌ Edge functions
 
-### B7. Idempotent seed safety for `parking_locations`
-**Migration (new):**
-- Add unique index: `CREATE UNIQUE INDEX IF NOT EXISTS parking_locations_dedupe ON public.parking_locations (lower(trim(name)), round(latitude::numeric, 5), round(longitude::numeric, 5));`
-- Pre-clean duplicates only if any exist (keep earliest by `created_at`, using `ctid`).
-- Future seed inserts must use `ON CONFLICT DO NOTHING`. (No new seed in this migration; constraint just protects future runs.)
-- Does not delete user-added rows that are unique.
-
-### B8. Polish
-- `src/components/parking/ParkingCard.tsx`: remove unused `Heart` import.
-- `src/components/parking/AddParkingModal.tsx` validation in `handleSubmit`:
-  - `const trimmed = name.trim();`
-  - Reject if `trimmed.length < 3` → toast "Name must be at least 3 characters"
-  - Reject if `trimmed.length > 64` → toast "Name must be 64 characters or less"
-  - Reject if `/^\s*$/.test(name)` (already covered by length)
-  - Use `trimmed` in the insert.
-
----
-
-## Files to be modified
-- `src/components/DriverIntelligenceCard.tsx`
-- `src/components/parking/ParkingFinder.tsx`
-- `src/components/parking/AddParkingModal.tsx`
-- `src/components/parking/ParkingCard.tsx`
-- `src/components/ui/badge.tsx`
-- `src/hooks/useParkingReports.ts`
-- `src/pages/Index.tsx` (single small `onSuccess` addition for `addLoad`)
-
-## Migrations to be added (one combined SQL migration is fine)
-1. `parking_reports` hour-bucket generated column + dedupe + unique index.
-2. `parking_locations` dedupe unique index (+ safe pre-clean).
-3. `supabase_realtime` publication add for `driver_points` and `parking_reports` + `REPLICA IDENTITY FULL`.
-
-## Out of scope (deferred per instruction)
-- Leaflet map, leaderboard, Driver Scorecard merge, smart prompts, Parking Outlook on loads, favorites UI, pricing changes, edge function changes.
-
-## Post-implementation verification (will be reported)
-- TS check passes; no new console warnings; `Badge` ref warning gone.
-- Free user: Parking button on dashboard → upgrade modal; Add Parking button → upgrade modal; report buttons → upgrade modal (already in place).
-- Pro/trial user: routes to `/parking`, can add spots, can submit reports, earns points.
-- Load create → +5 load points (Pro/trial only); load edit → no points.
-- DB unique index blocks 2nd report within same hour even if client check is bypassed.
-- Existing load/expense/recurring/scorecard/pricing flows untouched.
+## Verification after implementation
+1. `/parking` renders without console warnings (free + Pro).
+2. Hero shows correct counts for locations, today's reports, your points.
+3. Pagination: 24/page, controls work, filters reset to page 1.
+4. Filters still produce identical results to today's logic.
+5. Confidence badge color matches new left-border color.
+6. Bottom CTA: free user → ProUpgradeModal; Pro/trial → AddParkingModal.
+7. Mobile (375px) layout: hero stats wrap cleanly, filters stack, pagination collapses to "Page X of Y + Prev/Next".
+8. No regressions to dashboard, loads, expenses, scorecard.
