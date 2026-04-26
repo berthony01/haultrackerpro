@@ -1,93 +1,132 @@
-# /parking Page Polish & Pagination Plan
+# Phase C — Parking Verifications + Driver Leaderboard
 
-## What's wrong today (verified in code + console)
+## 0. Critical fix first (blocking the page right now)
 
-1. **Looks flat / generic** — `Parking.tsx` is just a small heading + filter row + stacked card list. No hero, no stats, no visual hierarchy. With 30 seeded truck stops all showing identical "Low confidence" + "No recent reports", the page is one long monotone scroll.
-2. **Long scroll, no pagination** — `ParkingFinder.tsx` slices `.slice(0, 100)` with no paging. User asked for ~20–50 per page.
-3. **Button issues**:
-   - The 9 filter chips wrap into 2–3 ragged rows on desktop and look like loose pills.
-   - "Near me" button has inconsistent icon-only/text-with-icon behavior.
-   - Bottom "Add a parking spot" button is plain and the inline `<Lock />` + `<span>` kerning is off.
-   - Ghost back button uses `-ml-2` and looks unfinished next to the heading.
-4. **React `forwardRef` warning still in console** (verified in console logs lines 3–46). Source: `ParkingFinder` renders `<AddParkingModal />` and `<ProUpgradeModal />` as siblings, and one of their internal trees (likely a `<Button>` wrapping a `lucide-react` icon as the only child, or a `Switch`/Dialog child) is being passed a ref by Radix. The fix: ensure `AddParkingModal` and `ProUpgradeModal` are not the components being warned about — wrap their root in `forwardRef` if needed, OR (more likely the real cause) wrap any plain function-component icon children inside Radix `Dialog`/`Sheet` triggers properly. I'll inspect Switch + Select usages in `AddParkingModal` and convert any custom plain components.
-5. **Pre-existing**: `ParkingDetailSheet`, `ParkingFinder`, `AddParkingModal` all use `Badge`, `Button`, etc. — those are fine since we already converted Badge to `forwardRef`. Will verify no other custom function components are receiving refs.
+Runtime error on `/parking`: **`Uncaught TypeError: Component is not a function`**.
 
-## Scope (surgical, no redesign of routes or business logic)
+Root cause: in Phase B we wrapped `ProUpgradeModal` and `AddParkingModal` in `React.forwardRef` even though nothing forwards a ref to them. They are rendered directly as page children, not as Radix triggers, and the `forwardRef` exotic object is what's blowing up the renderer in this environment.
 
-### A. Visual polish — `src/pages/Parking.tsx`
-- Add a compact **hero header** styled to match the existing dashboard cards (dark navy, amber accent):
-  - Icon + "Parking Finder" title + tagline
-  - Three small stat tiles in a row (mobile: scrolls horizontally, desktop: 3 cols):
-    - **Locations** (total count from `useParkingLocations`)
-    - **Reports today** (count from `useRecentParkingReports`)
-    - **Your points** (from `useDriverPoints`, Pro/trial only — show "—" otherwise)
-- Remove the loose ghost back button; replace with a tighter pill-style back chip.
-- Subtle gradient or `bg-card/40` band behind the header to add depth (consistent with `DashboardView`).
+**Fix:** revert both back to plain function components (keep all the rest of the Phase B work — gating, validation, etc.). Net change is just removing the `forwardRef` wrapper and the unused `_ref` arg.
 
-### B. Filter row polish — `src/components/parking/ParkingFinder.tsx`
-- Group chips into **labeled segments** so they don't look like a random pile:
-  - Segment 1: `Cost` → All / Free / Paid (segmented control style)
-  - Segment 2: Toggles → Overnight, Truck-friendly
-  - Segment 3: `Confidence` → Any / High / Medium / Low (segmented)
-- Add a single "Reset filters" link when any filter is active.
-- Search input gets a slightly taller (`h-10`) treatment + leading icon + clear (×) button when text is present.
-- "Near me" button: always show icon + label on `sm:` and up; icon-only on mobile (current behavior — keep but tidy).
+Files: `src/components/ProUpgradeModal.tsx`, `src/components/parking/AddParkingModal.tsx`.
 
-### C. Pagination — `src/components/parking/ParkingFinder.tsx`
-- Add `pageSize = 24` and `page` state.
-- Reset `page` to 1 whenever search/filters/`geo.coords` change (use `useEffect`, per project React patterns memory).
-- Render `filtered.slice((page-1)*pageSize, page*pageSize)`.
-- Footer pager using existing `src/components/ui/pagination.tsx`:
-  - Prev / 1 … current ± 1 … last / Next, with ellipses
-  - Mobile: simplified "Page X of Y" + Prev/Next only (sm:hidden)
-- Result count line: "Showing 1–24 of 137 spots".
+This must ship in the same change as Phase C so the leaderboard work isn't blocked behind a broken page.
 
-### D. Card polish — `src/components/parking/ParkingCard.tsx`
-- Bump padding to `p-4`, add subtle left border whose color matches confidence (`border-l-2 border-l-success/40` etc.) so the long list has visual rhythm even when most cards say "Low".
-- Tighten the meta row spacing; promote distance to a small badge on the right side instead of inline.
-- Show a discreet "📍 Verified just now" pulse-dot only when `level === 'high'`.
-- No layout/route changes.
+---
 
-### E. Bottom CTA — `src/components/parking/ParkingFinder.tsx`
-- Replace plain full-width outline button with a **two-tone CTA card**: short copy on the left ("Spotted parking we don't have yet?"), button on the right.
-- Free users see a `Lock` icon + "(Pro)" tag and clicking opens `ProUpgradeModal` (already wired).
+## Phase C1 — Parking verification system
 
-### F. React `forwardRef` warning fix
-- Inspect `AddParkingModal` for any custom plain function components receiving refs. Most likely culprits:
-  - The `<Button onClick={useMyLocation}>` is fine (Button is forwardRef).
-  - `Switch` and `Select` items are Radix → already forwardRef.
-  - Suspect: `ProUpgradeModal` itself may be rendered inside a Radix portal that wants a ref when it's an immediate child. Wrap `ProUpgradeModal` and `AddParkingModal` exports in `React.forwardRef<HTMLDivElement, Props>((props, _ref) => ...)` so Radix's invisible ref-passing stops warning.
-- After fix, verify console is clean on `/parking`.
+### Database migration (new)
+1. Add `verification_hour_bucket timestamptz NOT NULL DEFAULT now()` to `parking_verifications` (default avoids breaking existing rows).
+2. Trigger `set_parking_verification_hour_bucket` (BEFORE INSERT) → `NEW.verification_hour_bucket = date_trunc('hour', COALESCE(NEW.created_at, now()))` (mirrors the existing `set_parking_report_hour_bucket`).
+3. Backfill existing rows: `UPDATE parking_verifications SET verification_hour_bucket = date_trunc('hour', created_at)`.
+4. Unique index `parking_verifications_one_per_hour` on `(parking_id, user_id, verification_hour_bucket)`.
+5. Add `parking_verifications` to `supabase_realtime` publication (idempotent guard).
 
-### G. Empty/loading states
-- Loading: replace the single "Loading parking…" line with 4 skeleton cards (using existing `Skeleton`).
-- Empty (filters return 0): keep current message but add a **"Clear filters"** action in addition to "Add a location".
+No RLS changes — existing policies (`Anyone authenticated can view verifications`, `Users can submit own verifications`) are correct.
 
-## Files to touch
-- `src/pages/Parking.tsx` — hero + stats header, tighter back nav
-- `src/components/parking/ParkingFinder.tsx` — pagination, segmented filters, polished CTA, skeleton loading, page-reset effect
-- `src/components/parking/ParkingCard.tsx` — visual rhythm (left-border by confidence, distance badge, padding)
-- `src/components/parking/AddParkingModal.tsx` — wrap export in `forwardRef` to silence warning
-- `src/components/ProUpgradeModal.tsx` — wrap export in `forwardRef` to silence warning (one-line change, no behavior change)
-- (Reuse existing) `src/components/ui/pagination.tsx`, `src/components/ui/skeleton.tsx`, `src/hooks/useDriverPoints.ts`, `src/hooks/useParkingLocations.ts`
+### New hook: `src/hooks/useParkingVerifications.ts`
+- `useRecentParkingVerifications()` — last 24h across all locations (mirror of `useRecentParkingReports`), used for confidence + card meta.
+- `useParkingVerificationsForLocation(parkingId)` — last 20 for a location, used inside the detail sheet.
+- `useSubmitParkingVerification()` — inserts into `parking_verifications` with `verified_status` ∈ `available|limited|full`, then calls `award_points(_user_id, 'parking', 3)`. Handles `23505` with friendly toast: *"You already verified this location recently."* Success toast: *"+3 points earned · Parking verified"*. Invalidates: `parking-verifications`, `parking-reports`, `driver-points`, `driver-leaderboard`.
 
-## Explicitly NOT in scope
-- ❌ Leaflet map view (deferred Phase C)
-- ❌ Leaderboard
-- ❌ Smart prompts / auto-detect parking
-- ❌ Load Parking Outlook
-- ❌ Favorites UI
-- ❌ Pricing/tier changes
-- ❌ Renaming `/parking` route
-- ❌ Touching dashboard, loads, expenses, scorecard, recurring expenses
-- ❌ Edge functions
+### `ParkingDetailSheet` updates
+- New section under "Recent reports": **"Verify this spot"** with three buttons (`Still Available` / `Still Limited` / `Still Full`), styled exactly like the existing 1-tap report row but smaller (h-12 instead of h-14) so it reads as a secondary action.
+- Free users: lock icons → click opens `ProUpgradeModal` (use the same `onUpgrade` callback already plumbed in).
+- Pro/trial: submits verification, awards +3.
+- Show "Latest verification: <Status> · 12 min ago" line above the buttons when there's a recent verification for this location.
 
-## Verification after implementation
-1. `/parking` renders without console warnings (free + Pro).
-2. Hero shows correct counts for locations, today's reports, your points.
-3. Pagination: 24/page, controls work, filters reset to page 1.
-4. Filters still produce identical results to today's logic.
-5. Confidence badge color matches new left-border color.
-6. Bottom CTA: free user → ProUpgradeModal; Pro/trial → AddParkingModal.
-7. Mobile (375px) layout: hero stats wrap cleanly, filters stack, pagination collapses to "Page X of Y + Prev/Next".
-8. No regressions to dashboard, loads, expenses, scorecard.
+### Confidence logic update (`computeConfidence` in `useParkingLocations.ts`)
+Extend signature to accept verifications:
+```
+computeConfidence(reports, verifications, parkingId)
+```
+- Treat verification entries as fresh signals just like reports (status maps directly).
+- Fresh window stays at 2h for `high`, 24h for `medium`, otherwise `low`.
+- "Available" / "Limited" fresh signals → boost confidence; "Full" fresh signals don't boost availability confidence (same simple bucket logic — no AI prediction).
+- `lastReportAt` becomes `lastSignalAt` (max of report and verification timestamps).
+
+Update all callers (`ParkingCard`, `ParkingFinder`).
+
+### `ParkingCard` metadata
+- Show "Last verified <X> ago" using the new combined `lastSignalAt`.
+- If the latest signal is a verification, prefix it with the status word (e.g., "Verified Available · 12 min ago").
+
+---
+
+## Phase C2 — Leaderboard
+
+### New SQL function: `get_weekly_driver_leaderboard(_limit int default 10)`
+- `SECURITY DEFINER`, `STABLE`, `SET search_path = public`.
+- Returns: `user_id uuid, weekly_points int, total_points int, parking_points int, load_points int, streak_days int, tier text, rank int, masked_display_name text`.
+- `tier` computed in SQL: ≥400 Platinum, ≥150 Gold, ≥50 Silver, else Bronze.
+- `masked_display_name`: `COALESCE(NULLIF(trim(p.display_name), ''), 'Driver #' || substr(d.user_id::text, length(d.user_id::text) - 3))`. Never returns email.
+- Ordering: `weekly_points DESC, total_points DESC, last_activity_date ASC NULLS LAST` — handles ties exactly per the spec.
+- Filter: only rows where `weekly_points > 0` OR `user_id = auth.uid()` (so a brand-new user can still see themselves).
+- Grant `EXECUTE ... TO authenticated` only.
+- Privacy: only joins `profiles.display_name` (already client-visible to that user under existing RLS). No emails, no other profile fields.
+
+### New hooks: `src/hooks/useDriverLeaderboard.ts`
+- `useDriverLeaderboard(limit = 10)` → `supabase.rpc('get_weekly_driver_leaderboard', { _limit: limit })`. 60s `staleTime`.
+- `useMyLeaderboardRank()` — convenience selector that returns the current user's row (or null) + the top score.
+
+### New component: `src/components/DriverLeaderboardCard.tsx`
+Placement on dashboard: **directly below** `DriverIntelligenceCard`, in the same Quick Insights area in `DashboardView.tsx`. Reuses existing `Card`/`Badge`/`Trophy` styling — no redesign.
+
+Contents:
+- Title row: "Top Drivers This Week" + small "Updated weekly" hint.
+- Top 5 rows: rank, masked name, tier badge (color from existing `tierFor`), weekly points, source label (`parking_points > load_points * 1.5` → "Parking", `load_points > parking_points * 1.5` → "Loads", else "Balanced").
+- Current user highlighted with `bg-primary/10` row background if in top 5.
+- If current user not in top 5: bottom row "Your rank · #X · Yp" using `useMyLeaderboardRank`.
+- Empty states per spec.
+
+### Driver Scorecard "Weekly Leaderboard" section
+Scorecard is rendered inside `src/components/DriverScorecard.tsx` (route is `page === 'scorecard'` inside `Index.tsx`, not a separate URL route). Add a new bottom section reusing `DriverLeaderboardCard` configured with `limit={10}`, plus the explanatory copy from the spec. No layout/structural changes to the scorecard itself.
+
+---
+
+## Phase C3 — DriverIntelligenceCard enhancement
+
+Inside the existing card (don't change its frame), append a tiny stats row when leaderboard data is available:
+- "Your weekly rank: #X" (hidden if rank unknown)
+- "Top driver: Yp" (hidden if no leaderboard data)
+- Tip line gains a "+3 verify parking" alternative when user already has parking points but no recent verifications.
+
+If queries return empty, hide gracefully — no broken layout.
+
+---
+
+## Phase C4 — Feedback loop wiring
+
+Already covered by hook invalidations:
+- `useSubmitParkingVerification` invalidates `driver-points` + `driver-leaderboard` + parking queries.
+- `useSubmitParkingReport` (existing) — add `driver-leaderboard` to its invalidation set.
+- Load creation in `src/pages/Index.tsx` already calls `award_points('load', 5)`. Add a `qc.invalidateQueries({ queryKey: ['driver-leaderboard'] })` next to the existing `driver-points` invalidation. No duplicate awards: stays inside the `addLoad` success branch only (no edits trigger it).
+
+---
+
+## Phase C5 — Verification checklist (post-implementation)
+
+I will verify and report:
+1. `/parking` no longer throws `Component is not a function`.
+2. Free user: leaderboard visible, parking visible, verify buttons show lock + open `ProUpgradeModal`, no points awarded.
+3. Pro/trial: verify submits, +3 toast fires, second verify within the hour shows the friendly duplicate message, confidence/last-verified updates.
+4. Leaderboard ordering ties resolved correctly (weekly → total → oldest activity).
+5. Masked names never leak emails (RPC inspection).
+6. Load creation still awards +5 once; leaderboard refreshes.
+7. Regression: dashboard, parking reports, add parking gating, scorecard tab, bottom nav, pricing, Stripe — all untouched.
+8. `tsc --noEmit` clean.
+
+---
+
+## Out of scope (explicit)
+
+Not building: Leaflet map, "you just parked" prompts, load Parking Outlook, full scorecard redesign, pricing/Stripe edits, edge function edits, favorites UI.
+
+## Files touched
+
+**Modified:** `src/components/ProUpgradeModal.tsx`, `src/components/parking/AddParkingModal.tsx`, `src/components/parking/ParkingDetailSheet.tsx`, `src/components/parking/ParkingCard.tsx`, `src/components/parking/ParkingFinder.tsx`, `src/hooks/useParkingLocations.ts` (extend `computeConfidence`), `src/hooks/useParkingReports.ts` (add leaderboard invalidation), `src/components/DriverIntelligenceCard.tsx`, `src/components/DashboardView.tsx` (mount leaderboard card), `src/components/DriverScorecard.tsx` (mount leaderboard section), `src/pages/Index.tsx` (leaderboard invalidation on load create).
+
+**New:** `src/hooks/useParkingVerifications.ts`, `src/hooks/useDriverLeaderboard.ts`, `src/components/DriverLeaderboardCard.tsx`, one SQL migration (verification anti-spam + realtime + leaderboard RPC).
+
+**Untouched:** routes, `App.tsx`, `BottomNav.tsx`, pricing, Stripe code, edge functions, `subscriptions` table, `parking_locations` schema.

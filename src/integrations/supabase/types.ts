@@ -838,6 +838,7 @@ export type Database = {
           id: string
           parking_id: string
           user_id: string
+          verification_hour_bucket: string
           verified_status: string
         }
         Insert: {
@@ -845,6 +846,7 @@ export type Database = {
           id?: string
           parking_id: string
           user_id: string
+          verification_hour_bucket?: string
           verified_status: string
         }
         Update: {
@@ -852,6 +854,7 @@ export type Database = {
           id?: string
           parking_id?: string
           user_id?: string
+          verification_hour_bucket?: string
           verified_status?: string
         }
         Relationships: [
@@ -1274,6 +1277,20 @@ export type Database = {
         Returns: number
       }
       expire_ended_trials: { Args: never; Returns: undefined }
+      get_weekly_driver_leaderboard: {
+        Args: { _limit?: number }
+        Returns: {
+          load_points: number
+          masked_display_name: string
+          parking_points: number
+          rank: number
+          streak_days: number
+          tier: string
+          total_points: number
+          user_id: string
+          weekly_points: number
+        }[]
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       move_to_dlq: {
