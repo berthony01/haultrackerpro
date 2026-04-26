@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Shield, ChevronRight, Heart } from 'lucide-react';
+import { MapPin, Shield, ChevronRight } from 'lucide-react';
 import { ParkingLocation, computeConfidence, ParkingReportRow, Confidence } from '@/hooks/useParkingLocations';
 import { Coords, distanceMiles } from '@/hooks/useGeolocation';
 import { formatDistanceToNowStrict } from 'date-fns';
