@@ -13,15 +13,31 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp, ParkingCircle, Trophy, Gift, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface OverviewData {
   total_users: number;
-  pro_users: number;
+  subs_trialing: number;
+  subs_active: number;
+  subs_free: number;
   total_loads: number;
   loads_7d: number;
   total_expenses: number;
+  expenses_7d: number;
+  total_fuel_logs: number;
+  fuel_logs_7d: number;
+  recurring_templates_active: number;
+  parking_locations_total: number;
+  parking_reports_7d: number;
+  parking_verifications_7d: number;
+  driver_points_active_users: number;
+  lead_magnet_signups_total: number;
+  lead_magnet_signups_7d: number;
+  lead_magnet_signups_30d: number;
+  parse_usage_7d: number;
+  expense_automation_7d: number;
+  ai_insights_7d: number;
 }
 
 interface UserRow {
@@ -32,7 +48,66 @@ interface UserRow {
   created_at: string;
   loads_count: number;
   expenses_count: number;
+  fuel_logs_count?: number;
+  driver_points_total?: number;
+  sub_status?: string;
+  sub_plan_key?: string;
+  trial_end?: string | null;
   lifecycle_opted_out?: boolean;
+}
+
+interface ParkingOverviewData {
+  total_locations: number;
+  reports_7d: number;
+  verifications_7d: number;
+  top_locations: Array<{ id: string; name: string; address: string | null; type: string; report_count: number }>;
+}
+interface ParkingReportRow {
+  id: string;
+  parking_id: string;
+  user_id: string;
+  status: string;
+  safety_rating: number | null;
+  notes: string | null;
+  created_at: string;
+  location_name: string;
+  reporter_handle: string;
+}
+interface DriverOverviewData {
+  active_drivers_week: number;
+  total_points_awarded: number;
+  top_streak: number;
+  total_drivers: number;
+  tiers: { Bronze: number; Silver: number; Gold: number; Platinum: number };
+}
+interface LeaderboardRow {
+  user_id: string;
+  weekly_points: number;
+  total_points: number;
+  parking_points: number;
+  load_points: number;
+  streak_days: number;
+  tier: string;
+  rank: number;
+  masked_display_name: string;
+}
+interface LeadOverviewData {
+  total: number;
+  last_7d: number;
+  last_30d: number;
+  converted: number;
+  conversion_rate: number;
+}
+interface LeadSignupRow {
+  id: string;
+  email: string;
+  first_name: string | null;
+  source_page: string | null;
+  utm_source: string | null;
+  utm_campaign: string | null;
+  created_at: string;
+  downloaded_at: string | null;
+  converted_user_id: string | null;
 }
 
 interface SuppressedRow {
@@ -215,6 +290,21 @@ export default function Admin() {
   const [removeSuppressionConfirm, setRemoveSuppressionConfirm] = useState<SuppressedRow | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
+  // Parking
+  const [parkingOverview, setParkingOverview] = useState<ParkingOverviewData | null>(null);
+  const [parkingReports, setParkingReports] = useState<ParkingReportRow[]>([]);
+  const [parkingLoading, setParkingLoading] = useState(false);
+
+  // Drivers / leaderboard
+  const [driverOverview, setDriverOverview] = useState<DriverOverviewData | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [driversLoading, setDriversLoading] = useState(false);
+
+  // Lead magnet / starter kit
+  const [leadOverview, setLeadOverview] = useState<LeadOverviewData | null>(null);
+  const [leadSignups, setLeadSignups] = useState<LeadSignupRow[]>([]);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+
   const initialFetchDone = useRef(false);
 
   useEffect(() => {
@@ -309,6 +399,39 @@ export default function Admin() {
     setSuppressedLoading(false);
   }, [api]);
 
+  const fetchParking = useCallback(async () => {
+    setParkingLoading(true);
+    const [overviewData, reportsData] = await Promise.all([
+      api.get('parking-overview'),
+      api.get('list-parking-reports', { limit: '50' }),
+    ]);
+    if (overviewData) setParkingOverview(overviewData);
+    if (reportsData?.reports) setParkingReports(reportsData.reports);
+    setParkingLoading(false);
+  }, [api]);
+
+  const fetchDrivers = useCallback(async () => {
+    setDriversLoading(true);
+    const [overviewData, lbData] = await Promise.all([
+      api.get('driver-points-overview'),
+      api.get('driver-leaderboard', { limit: '25' }),
+    ]);
+    if (overviewData) setDriverOverview(overviewData);
+    if (lbData?.rows) setLeaderboard(lbData.rows);
+    setDriversLoading(false);
+  }, [api]);
+
+  const fetchLeads = useCallback(async () => {
+    setLeadsLoading(true);
+    const [overviewData, signupsData] = await Promise.all([
+      api.get('lead-magnet-overview'),
+      api.get('list-lead-magnet-signups', { limit: '100' }),
+    ]);
+    if (overviewData) setLeadOverview(overviewData);
+    if (signupsData?.signups) setLeadSignups(signupsData.signups);
+    setLeadsLoading(false);
+  }, [api]);
+
   const handleRemoveSuppression = useCallback(async () => {
     if (!removeSuppressionConfirm) return;
     const res = await api.post('remove-suppression', { email: removeSuppressionConfirm.email });
@@ -343,8 +466,11 @@ export default function Admin() {
       fetchEmails();
       fetchActivation();
       fetchSuppressed();
+      fetchParking();
+      fetchDrivers();
+      fetchLeads();
     }
-  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails, fetchActivation, fetchSuppressed]);
+  }, [isAdmin, api, fetchFeedback, fetchUsers, fetchEmails, fetchActivation, fetchSuppressed, fetchParking, fetchDrivers, fetchLeads]);
 
   const searchUsers = async () => {
     setUsersPage(1);
@@ -424,10 +550,13 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-7">
+          <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
             <TabsTrigger value="activation"><TrendingUp className="h-4 w-4 mr-1" />Activation</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
+            <TabsTrigger value="parking"><ParkingCircle className="h-4 w-4 mr-1" />Parking</TabsTrigger>
+            <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
+            <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
             <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
             <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
             <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
@@ -435,27 +564,119 @@ export default function Admin() {
           </TabsList>
 
           {/* OVERVIEW */}
-          <TabsContent value="overview" className="space-y-3">
+          <TabsContent value="overview" className="space-y-4">
             {overview ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Total Users', value: overview.total_users, icon: Users },
-                  { label: 'Pro Users', value: overview.pro_users, icon: Crown },
-                  { label: 'Total Loads', value: overview.total_loads, icon: BarChart3 },
-                  { label: 'Loads (7d)', value: overview.loads_7d, icon: BarChart3 },
-                  { label: 'Total Expenses', value: overview.total_expenses, icon: CreditCard },
-                ].map((s) => (
-                  <Card key={s.label} className="shadow-card">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <s.icon className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">{s.label}</p>
-                      </div>
-                      <p className="text-2xl font-bold">{s.value}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <>
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Users & Subscriptions</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: 'Total Users', value: overview.total_users, icon: Users },
+                      { label: 'Trialing', value: overview.subs_trialing, icon: Sparkles },
+                      { label: 'Paid (Active)', value: overview.subs_active, icon: Crown },
+                      { label: 'Free / Canceled', value: overview.subs_free, icon: Users },
+                    ].map((s) => (
+                      <Card key={s.label} className="shadow-card">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <s.icon className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">{s.label}</p>
+                          </div>
+                          <p className="text-2xl font-bold">{s.value}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Activity (Last 7 Days)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: 'Loads (7d)', value: overview.loads_7d, sub: `${overview.total_loads} total`, icon: BarChart3 },
+                      { label: 'Expenses (7d)', value: overview.expenses_7d, sub: `${overview.total_expenses} total`, icon: CreditCard },
+                      { label: 'Fuel Logs (7d)', value: overview.fuel_logs_7d, sub: `${overview.total_fuel_logs} total`, icon: BarChart3 },
+                      { label: 'Active Recurring', value: overview.recurring_templates_active, sub: 'templates', icon: RefreshCw },
+                    ].map((s) => (
+                      <Card key={s.label} className="shadow-card">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <s.icon className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">{s.label}</p>
+                          </div>
+                          <p className="text-2xl font-bold">{s.value}</p>
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{s.sub}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Community / Parking</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: 'Parking Locations', value: overview.parking_locations_total, icon: ParkingCircle },
+                      { label: 'Reports (7d)', value: overview.parking_reports_7d, icon: ParkingCircle },
+                      { label: 'Verifications (7d)', value: overview.parking_verifications_7d, icon: Shield },
+                      { label: 'Active Drivers (week)', value: overview.driver_points_active_users, icon: Trophy },
+                    ].map((s) => (
+                      <Card key={s.label} className="shadow-card">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <s.icon className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">{s.label}</p>
+                          </div>
+                          <p className="text-2xl font-bold">{s.value}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Lead Magnet</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: 'Total Signups', value: overview.lead_magnet_signups_total },
+                      { label: 'Last 7d', value: overview.lead_magnet_signups_7d },
+                      { label: 'Last 30d', value: overview.lead_magnet_signups_30d },
+                    ].map((s) => (
+                      <Card key={s.label} className="shadow-card">
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Gift className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">{s.label}</p>
+                          </div>
+                          <p className="text-2xl font-bold">{s.value}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">AI / Automation (7d)</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: 'Parse usage', value: overview.parse_usage_7d, sub: 'Paste · Voice · Scan' },
+                      { label: 'Auto-categorized', value: overview.expense_automation_7d, sub: 'expenses' },
+                      { label: 'AI insights', value: overview.ai_insights_7d, sub: 'generated' },
+                    ].map((s) => (
+                      <Card key={s.label} className="shadow-card">
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Sparkles className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">{s.label}</p>
+                          </div>
+                          <p className="text-2xl font-bold">{s.value}</p>
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{s.sub}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </>
             ) : (
               <p className="text-muted-foreground text-center py-8">Loading...</p>
             )}
@@ -589,30 +810,45 @@ export default function Admin() {
                       <TableRow>
                         <TableHead>Email</TableHead>
                         <TableHead>Plan</TableHead>
-                        <TableHead>Loads</TableHead>
-                        <TableHead>Expenses</TableHead>
+                        <TableHead className="text-right">Loads</TableHead>
+                        <TableHead className="text-right">Exp</TableHead>
+                        <TableHead className="text-right">Fuel</TableHead>
+                        <TableHead className="text-right">Pts</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((u) => (
-                        <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
-                          <TableCell className="text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <span>{u.email}</span>
-                              {u.lifecycle_opted_out && (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
-                              {u.subscription_status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{u.loads_count}</TableCell>
-                          <TableCell>{u.expenses_count}</TableCell>
-                        </TableRow>
-                      ))}
+                      {users.map((u) => {
+                        const status = u.sub_status ?? u.subscription_status;
+                        const isTrialing = status === 'trialing';
+                        const isPaid = status === 'active' || status === 'pro';
+                        const trialDaysLeft = u.trial_end ? Math.max(0, Math.ceil((new Date(u.trial_end).getTime() - Date.now()) / 86400000)) : 0;
+                        return (
+                          <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
+                            <TableCell className="text-xs">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{u.email}</span>
+                                {u.lifecycle_opted_out && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Badge variant={isPaid ? 'default' : isTrialing ? 'secondary' : 'outline'} className="text-xs">
+                                  {status}
+                                </Badge>
+                                {isTrialing && u.trial_end && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{trialDaysLeft}d</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right text-xs">{u.loads_count}</TableCell>
+                            <TableCell className="text-right text-xs">{u.expenses_count}</TableCell>
+                            <TableCell className="text-right text-xs">{u.fuel_logs_count ?? 0}</TableCell>
+                            <TableCell className="text-right text-xs">{u.driver_points_total ?? 0}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </Card>
@@ -697,6 +933,206 @@ export default function Admin() {
           </TabsContent>
 
           {/* ADMINS */}
+          {/* PARKING */}
+          <TabsContent value="parking" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Community parking system — read-only view.</p>
+              <Button variant="outline" size="sm" className="gap-1" onClick={fetchParking} disabled={parkingLoading}>
+                <RefreshCw className={`h-4 w-4 ${parkingLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+            {parkingOverview && (
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Total Locations', value: parkingOverview.total_locations },
+                  { label: 'Reports (7d)', value: parkingOverview.reports_7d },
+                  { label: 'Verifications (7d)', value: parkingOverview.verifications_7d },
+                  { label: 'Top Reports/Loc', value: parkingOverview.top_locations[0]?.report_count ?? 0 },
+                ].map((s) => (
+                  <Card key={s.label} className="shadow-card">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <ParkingCircle className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                      </div>
+                      <p className="text-2xl font-bold">{s.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            {parkingOverview && parkingOverview.top_locations.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Top 10 Most-Reported Locations</CardTitle></CardHeader>
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Name</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Reports</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {parkingOverview.top_locations.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-xs">{l.name}<div className="text-[10px] text-muted-foreground">{l.address ?? ''}</div></TableCell>
+                        <TableCell><Badge variant="secondary" className="text-xs">{l.type}</Badge></TableCell>
+                        <TableCell className="text-right text-xs font-semibold">{l.report_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Recent Reports ({parkingReports.length})</CardTitle></CardHeader>
+              {parkingReports.length === 0 ? (
+                <CardContent><p className="text-xs text-muted-foreground py-2">No reports yet.</p></CardContent>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Time</TableHead><TableHead>Location</TableHead><TableHead>Reporter</TableHead><TableHead>Status</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {parkingReports.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">{r.location_name}</TableCell>
+                        <TableCell className="text-xs">{r.reporter_handle}</TableCell>
+                        <TableCell><Badge variant={r.status === 'available' ? 'default' : r.status === 'full' ? 'destructive' : 'secondary'} className="text-xs">{r.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* DRIVERS */}
+          <TabsContent value="drivers" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Driver points & weekly leaderboard.</p>
+              <Button variant="outline" size="sm" className="gap-1" onClick={fetchDrivers} disabled={driversLoading}>
+                <RefreshCw className={`h-4 w-4 ${driversLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+            {driverOverview && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Active This Week', value: driverOverview.active_drivers_week },
+                    { label: 'Total Points Awarded', value: driverOverview.total_points_awarded },
+                    { label: 'Top Streak (days)', value: driverOverview.top_streak },
+                    { label: 'Total Drivers', value: driverOverview.total_drivers },
+                  ].map((s) => (
+                    <Card key={s.label} className="shadow-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Trophy className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">{s.label}</p>
+                        </div>
+                        <p className="text-2xl font-bold">{s.value}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">Tier Distribution</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-4 gap-2">
+                    {(['Bronze', 'Silver', 'Gold', 'Platinum'] as const).map((t) => (
+                      <div key={t} className="rounded-lg bg-muted/40 px-3 py-2 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase">{t}</p>
+                        <p className="text-lg font-bold">{driverOverview.tiers[t]}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Weekly Leaderboard ({leaderboard.length})</CardTitle></CardHeader>
+              {leaderboard.length === 0 ? (
+                <CardContent><p className="text-xs text-muted-foreground py-2">No leaderboard activity yet.</p></CardContent>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead className="w-12">#</TableHead><TableHead>Handle</TableHead>
+                    <TableHead className="text-right">Week</TableHead><TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Streak</TableHead><TableHead>Tier</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {leaderboard.map((r) => (
+                      <TableRow key={r.user_id}>
+                        <TableCell className="text-xs">{r.rank}</TableCell>
+                        <TableCell className="text-xs">{r.masked_display_name}</TableCell>
+                        <TableCell className="text-right text-xs font-semibold">{r.weekly_points}</TableCell>
+                        <TableCell className="text-right text-xs">{r.total_points}</TableCell>
+                        <TableCell className="text-right text-xs">{r.streak_days}</TableCell>
+                        <TableCell><Badge variant="secondary" className="text-xs">{r.tier}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* STARTER KIT / LEAD MAGNET */}
+          <TabsContent value="leads" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Free Trucker Starter Kit signups.</p>
+              <Button variant="outline" size="sm" className="gap-1" onClick={fetchLeads} disabled={leadsLoading}>
+                <RefreshCw className={`h-4 w-4 ${leadsLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+            {leadOverview && (
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Total Signups', value: leadOverview.total },
+                  { label: 'Last 7d', value: leadOverview.last_7d },
+                  { label: 'Last 30d', value: leadOverview.last_30d },
+                  { label: 'Converted to Account', value: `${leadOverview.converted} (${leadOverview.conversion_rate}%)` },
+                ].map((s) => (
+                  <Card key={s.label} className="shadow-card">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Gift className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                      </div>
+                      <p className="text-2xl font-bold">{s.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Recent Signups ({leadSignups.length})</CardTitle></CardHeader>
+              {leadSignups.length === 0 ? (
+                <CardContent><p className="text-xs text-muted-foreground py-2">No signups yet.</p></CardContent>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Date</TableHead><TableHead>Email</TableHead>
+                    <TableHead>Source</TableHead><TableHead>Account?</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {leadSignups.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(l.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs break-all">{l.email}{l.first_name ? ` (${l.first_name})` : ''}</TableCell>
+                        <TableCell className="text-xs">
+                          {l.utm_source || l.source_page || '—'}
+                          {l.utm_campaign && <div className="text-[10px] text-muted-foreground">{l.utm_campaign}</div>}
+                        </TableCell>
+                        <TableCell>
+                          {l.converted_user_id
+                            ? <Badge variant="default" className="text-xs">✓</Badge>
+                            : <Badge variant="outline" className="text-xs">—</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </TabsContent>
+
           <TabsContent value="admins" className="space-y-3">
             <Card>
               <Table>
