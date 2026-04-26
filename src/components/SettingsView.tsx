@@ -20,6 +20,7 @@ import { SendFeedbackModal } from '@/components/SendFeedbackModal';
 import { TaxPlannerSettings } from '@/components/TaxPlannerSettings';
 import { QuarterlyReminderSettings } from '@/components/QuarterlyReminderSettings';
 import { CSVImport } from '@/components/CSVImport';
+import { PublicProfileSection } from '@/components/PublicProfileSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
 
@@ -267,6 +268,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Public Profile (leaderboard handle) */}
+      <PublicProfileSection />
 
       {/* Billing */}
       <Card className="shadow-card">

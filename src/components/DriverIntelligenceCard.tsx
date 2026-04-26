@@ -17,7 +17,7 @@ interface DriverIntelligenceCardProps {
 export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverIntelligenceCardProps) {
   const { user } = useAuth();
   const { data: points } = useDriverPoints();
-  const { me, top } = useMyLeaderboardRank(50);
+  const { me, top, rows } = useMyLeaderboardRank(50);
   const navigate = useNavigate();
   const hasAccess = isPro || isTrialing;
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -26,8 +26,30 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
   const weekly = points?.weekly_points ?? 0;
   const streak = points?.streak_days ?? 0;
   const parking = points?.parking_points ?? 0;
+  const best = points?.best_weekly_points ?? 0;
+  const bestDate = points?.best_weekly_period_start ?? null;
   const tier = tierFor(total);
   const percentile = mockPercentile(user?.id, total);
+
+  // Rank chase line — competitive pull on every dashboard visit.
+  let chaseLine: string | null = null;
+  if (rows.length >= 2 && me) {
+    if (me.rank === 1) {
+      const second = rows.find((r) => r.rank === 2);
+      const gap = second ? me.weekly_points - second.weekly_points : 0;
+      chaseLine = `👑 You're #1 this week. ${gap} pts ahead of #2.`;
+    } else {
+      const above = rows.find((r) => r.rank === me.rank - 1);
+      if (above) {
+        const gap = above.weekly_points - me.weekly_points;
+        chaseLine = `You're ${gap} pts behind #${above.rank} (${above.masked_display_name}). Keep pushing.`;
+      }
+    }
+  } else if (!me && rows.length > 0) {
+    chaseLine = 'Log a load or verify parking to get on the board.';
+  }
+
+  const isNewBest = weekly > 0 && weekly >= best;
 
   const tip = parking < 5
     ? 'Report parking to level up faster'
@@ -75,6 +97,16 @@ export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverInte
                 {me && <span>Your rank: <span className="font-bold text-foreground">#{me.rank}</span></span>}
                 {top && <span>Top: <span className="font-bold text-foreground">{top.weekly_points}p</span></span>}
               </div>
+              {best > 0 && (
+                <p className={`text-[11px] mt-1 ${isNewBest ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+                  {isNewBest
+                    ? `🔥 New personal best: ${weekly} pts this week`
+                    : `Personal best: ${best} pts${bestDate ? ` (week of ${bestDate})` : ''}`}
+                </p>
+              )}
+              {chaseLine && (
+                <p className="text-[11px] text-foreground/80 mt-1 font-medium">{chaseLine}</p>
+              )}
               <p className="text-[11px] text-muted-foreground mt-2 italic">{tip}</p>
             </div>
             <Button
