@@ -302,6 +302,19 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* Lead magnet CTA */}
+      <section className="py-8" style={{ background: 'hsl(220, 20%, 8%)' }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <button
+            onClick={() => navigate('/starter-kit')}
+            className="w-full text-center text-sm py-3 px-4 rounded-lg border hover:bg-white/5 transition"
+            style={{ borderColor: 'hsl(220, 16%, 16%)', color: 'hsl(220, 10%, 70%)' }}
+          >
+            Not ready to sign up? <span style={{ color: 'hsl(25, 95%, 60%)' }} className="font-semibold">Grab the Free Trucker Starter Kit →</span>
+          </button>
+        </div>
+      </section>
+
       {/* Bottom CTA */}
       <section className="py-20 sm:py-28 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{
