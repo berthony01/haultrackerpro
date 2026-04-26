@@ -15,6 +15,7 @@ import {
   trackStarterKitViewed,
   trackStarterKitFormSubmitted,
   trackStarterKitDownloadClicked,
+  trackOncePerSession,
 } from '@/lib/analytics';
 
 const ORANGE = 'hsl(25, 95%, 53%)';
