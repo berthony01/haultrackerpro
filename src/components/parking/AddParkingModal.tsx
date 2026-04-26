@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { toast } from 'sonner';
 
 interface AddParkingModalProps {
@@ -32,6 +33,8 @@ type LocType = 'truck_stop' | 'rest_area' | 'warehouse' | 'street' | 'private';
 
 export function AddParkingModal({ open, onOpenChange }: AddParkingModalProps) {
   const { user } = useAuth();
+  const { isPro, isTrialing } = useSubscription();
+  const hasAccess = isPro || isTrialing;
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState('');
@@ -50,8 +53,17 @@ export function AddParkingModal({ open, onOpenChange }: AddParkingModalProps) {
 
   const handleSubmit = async () => {
     if (!user) return;
-    if (!name.trim()) {
-      toast.error('Name is required');
+    if (!hasAccess) {
+      toast.error('Adding parking spots is a Pro feature');
+      return;
+    }
+    const trimmedName = name.trim();
+    if (trimmedName.length < 3) {
+      toast.error('Name must be at least 3 characters');
+      return;
+    }
+    if (trimmedName.length > 64) {
+      toast.error('Name must be 64 characters or less');
       return;
     }
     const lat = parseFloat(latitude);
@@ -67,7 +79,7 @@ export function AddParkingModal({ open, onOpenChange }: AddParkingModalProps) {
 
     setSubmitting(true);
     const { error } = await supabase.from('parking_locations').insert({
-      name: name.trim(),
+      name: trimmedName,
       address: address.trim() || null,
       latitude: lat,
       longitude: lng,
@@ -80,7 +92,12 @@ export function AddParkingModal({ open, onOpenChange }: AddParkingModalProps) {
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message);
+      // 23505 = unique_violation from parking_locations_dedupe
+      if ((error as { code?: string }).code === '23505') {
+        toast.error('A parking spot with that name and location already exists');
+      } else {
+        toast.error(error.message);
+      }
       return;
     }
     toast.success('Parking spot added — thanks for helping the network');
