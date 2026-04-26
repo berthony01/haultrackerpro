@@ -1,132 +1,301 @@
-# Phase C — Parking Verifications + Driver Leaderboard
+# Tier 1 — Make the Leaderboard Personal
 
-## 0. Critical fix first (blocking the page right now)
+**Goal:** Add identity, rivalry, and recognition to the existing leaderboard system without redesigning the dashboard, scorecard, or pricing. Four small, additive features.
 
-Runtime error on `/parking`: **`Uncaught TypeError: Component is not a function`**.
+**Guardrails (non-negotiable):**
 
-Root cause: in Phase B we wrapped `ProUpgradeModal` and `AddParkingModal` in `React.forwardRef` even though nothing forwards a ref to them. They are rendered directly as page children, not as Radix triggers, and the `forwardRef` exotic object is what's blowing up the renderer in this environment.
-
-**Fix:** revert both back to plain function components (keep all the rest of the Phase B work — gating, validation, etc.). Net change is just removing the `forwardRef` wrapper and the unused `_ref` arg.
-
-Files: `src/components/ProUpgradeModal.tsx`, `src/components/parking/AddParkingModal.tsx`.
-
-This must ship in the same change as Phase C so the leaderboard work isn't blocked behind a broken page.
+- ❌ No public chat, comments, DMs, friends, or following
+- ❌ No pricing, Stripe, or edge function changes
+- ❌ No dashboard / scorecard / bottom nav redesign
+- ❌ No Leaflet map, no smart parking prompts (still deferred)
+- ✅ Privacy-safe by default (handle is opt-in)
+- ✅ All changes are additive — existing leaderboard, points, verification flows untouched
 
 ---
 
-## Phase C1 — Parking verification system
+## Feature 1 — Optional Driver Handle
 
-### Database migration (new)
-1. Add `verification_hour_bucket timestamptz NOT NULL DEFAULT now()` to `parking_verifications` (default avoids breaking existing rows).
-2. Trigger `set_parking_verification_hour_bucket` (BEFORE INSERT) → `NEW.verification_hour_bucket = date_trunc('hour', COALESCE(NEW.created_at, now()))` (mirrors the existing `set_parking_report_hour_bucket`).
-3. Backfill existing rows: `UPDATE parking_verifications SET verification_hour_bucket = date_trunc('hour', created_at)`.
-4. Unique index `parking_verifications_one_per_hour` on `(parking_id, user_id, verification_hour_bucket)`.
-5. Add `parking_verifications` to `supabase_realtime` publication (idempotent guard).
+Let users opt in to a public handle that replaces their masked "Driver #1234" on the leaderboard. Default stays masked.
 
-No RLS changes — existing policies (`Anyone authenticated can view verifications`, `Users can submit own verifications`) are correct.
+**Database:**
 
-### New hook: `src/hooks/useParkingVerifications.ts`
-- `useRecentParkingVerifications()` — last 24h across all locations (mirror of `useRecentParkingReports`), used for confidence + card meta.
-- `useParkingVerificationsForLocation(parkingId)` — last 20 for a location, used inside the detail sheet.
-- `useSubmitParkingVerification()` — inserts into `parking_verifications` with `verified_status` ∈ `available|limited|full`, then calls `award_points(_user_id, 'parking', 3)`. Handles `23505` with friendly toast: *"You already verified this location recently."* Success toast: *"+3 points earned · Parking verified"*. Invalidates: `parking-verifications`, `parking-reports`, `driver-points`, `driver-leaderboard`.
+- New migration: add to `profiles`
+  - `driver_handle text` (nullable, unique when set, lowercased, 3–20 chars, alphanumeric + underscore)
+  - `handle_emoji text` (nullable, single emoji, default null) — e.g. 🚛 🛻 🐺
+  - `handle_public boolean not null default false`
+- Add a `BEFORE INSERT/UPDATE` trigger validating handle format + reserved-word denylist (admin, support, lovable, system, null, etc.)
+- Add a partial unique index: `lower(driver_handle) where handle_public = true`
 
-### `ParkingDetailSheet` updates
-- New section under "Recent reports": **"Verify this spot"** with three buttons (`Still Available` / `Still Limited` / `Still Full`), styled exactly like the existing 1-tap report row but smaller (h-12 instead of h-14) so it reads as a secondary action.
-- Free users: lock icons → click opens `ProUpgradeModal` (use the same `onUpgrade` callback already plumbed in).
-- Pro/trial: submits verification, awards +3.
-- Show "Latest verification: <Status> · 12 min ago" line above the buttons when there's a recent verification for this location.
+**RPC update:**
 
-### Confidence logic update (`computeConfidence` in `useParkingLocations.ts`)
-Extend signature to accept verifications:
+- Modify `get_weekly_driver_leaderboard` to return display name as:
+  - `driver_handle` + ``  + `handle_emoji` if `handle_public = true` AND handle is set
+  - Otherwise fall back to current `Driver #XXXX` masked name
+- Field stays named `masked_display_name` so frontend doesn't need refactor
+
+**UI — `SettingsView.tsx`:**
+
+- New "Public profile" section above existing settings
+  - Input: handle (with live availability check via debounced query)
+  - Optional emoji picker (small curated list: 🚛 🛻 🚚 🐺 🦅 ⚡ 🔥 👑 — 12 max, tap to select)
+  - Toggle: "Show on leaderboard" (default off)
+  - Helper text: "When off, you appear as Driver #XXXX. Anyone can see your handle on the weekly leaderboard."
+- Validation feedback inline (taken / invalid format / too short)
+
+**UI — leaderboard rows:**
+
+- No structural change. Handles render naturally because RPC returns them in `masked_display_name`.
+
+---
+
+## Feature 2 — Rank Chase Line
+
+A single sentence that creates competitive pull on every dashboard visit.
+
+**Logic (client-side, derived from existing leaderboard query):**
+
+- If user is rank 1: `"👑 You're #1 this week. {gap} pts ahead of #2."`
+- If user has someone above them: `"You're {gap} pts behind #{rank-1} ({name}). Keep pushing."`
+- If user not on board: `"Log a load or verify parking to get on the board."`
+- If only one user (just them): hide the line
+
+**Where it appears:**
+
+- Add a one-line subtitle inside the existing `DriverIntelligenceCard` (under the current "Your weekly rank" line)
+- No new card, no new layout — just one extra `<p>` element
+
+**Files:** `src/components/DriverIntelligenceCard.tsx`
+
+---
+
+## Feature 3 — Tier-Up Celebration Moment
+
+Make crossing into Silver / Gold / Platinum *feel* like something.
+
+**Detection logic:**
+
+- New hook `useTierUpDetector` (client-side)
+  - Reads current `total_points` from `useDriverPoints`
+  - Compares against last-known tier stored in `localStorage` key `htp:lastTier:{user_id}`
+  - If new tier > last tier → fire celebration, then update localStorage
+  - On first run for a user, just record current tier without firing
+
+**Celebration:**
+
+- Use existing `sonner` toast with custom JSX content:
+  - Confetti burst (lightweight — install `canvas-confetti` ~5kb gzip, or build a tiny CSS-only confetti)
+  - Title: `"You're now {tier}! 🎉"`
+  - Subtitle: `"Top {percent}% of drivers this week"` (percent computed from leaderboard position vs total entrants in RPC; if unavailable, fall back to tier copy)
+  - Duration: 6 seconds, dismissable
+
+**Where it triggers:**
+
+- Mount `useTierUpDetector` once in `DashboardView.tsx` (top-level, runs whenever points data changes)
+- Fires only once per tier-up (localStorage prevents repeats)
+
+**Privacy / safety:**
+
+- No DB writes — purely client-side detection
+- Reset cleanly on logout (localStorage key includes `user_id`)
+
+**Files:**
+
+- New: `src/hooks/useTierUpDetector.ts`
+- Edit: `src/components/DashboardView.tsx` (add hook call)
+- Optional: `src/components/TierUpToast.tsx` (custom toast content)
+
+---
+
+## Feature 4 — Personal Best Tracking
+
+Self-competition works even when social competition doesn't. Show users their own record alongside current week.
+
+**Database:**
+
+- New migration: add to `driver_points`
+  - `best_weekly_points integer not null default 0`
+  - `best_weekly_period_start date` (when the record was set)
+- Update the existing weekly-rollover function/trigger that resets `weekly_points`:
+  - Before reset, if `weekly_points > best_weekly_points`, update `best_weekly_points` + `best_weekly_period_start`
+- Backfill: one-time UPDATE setting `best_weekly_points = greatest(weekly_points, 0)` for existing rows
+
+**UI — `DriverIntelligenceCard.tsx`:**
+
+- Add a small line under weekly points:
+  - `"Personal best: {best_weekly_points} pts ({date})"`
+  - If current week ≥ personal best: highlight in primary color with `"🔥 New personal best!"`
+- Compact, single line, no new card
+
+**Files:**
+
+- Migration only — no new components
+- Edit: `src/components/DriverIntelligenceCard.tsx` (one extra row)
+- Edit: `src/hooks/useDriverPoints.ts` (expose new fields)
+
+---
+
+## Migration Summary (single SQL file)
+
+```sql
+-- Profiles: opt-in handle
+alter table public.profiles
+  add column if not exists driver_handle text,
+  add column if not exists handle_emoji text,
+  add column if not exists handle_public boolean not null default false;
+
+create unique index if not exists profiles_handle_public_unique
+  on public.profiles (lower(driver_handle))
+  where handle_public = true and driver_handle is not null;
+
+-- Validation trigger (format, length, denylist)
+-- ... CREATE FUNCTION + TRIGGER ...
+
+-- Driver points: personal best
+alter table public.driver_points
+  add column if not exists best_weekly_points integer not null default 0,
+  add column if not exists best_weekly_period_start date;
+
+update public.driver_points
+  set best_weekly_points = greatest(weekly_points, 0)
+  where best_weekly_points = 0;
+
+-- Update weekly reset function to capture personal best before zeroing weekly_points
+-- ... CREATE OR REPLACE FUNCTION ...
+
+-- Update RPC get_weekly_driver_leaderboard to use handle when public
+-- ... CREATE OR REPLACE FUNCTION ...
 ```
-computeConfidence(reports, verifications, parkingId)
-```
-- Treat verification entries as fresh signals just like reports (status maps directly).
-- Fresh window stays at 2h for `high`, 24h for `medium`, otherwise `low`.
-- "Available" / "Limited" fresh signals → boost confidence; "Full" fresh signals don't boost availability confidence (same simple bucket logic — no AI prediction).
-- `lastReportAt` becomes `lastSignalAt` (max of report and verification timestamps).
-
-Update all callers (`ParkingCard`, `ParkingFinder`).
-
-### `ParkingCard` metadata
-- Show "Last verified <X> ago" using the new combined `lastSignalAt`.
-- If the latest signal is a verification, prefix it with the status word (e.g., "Verified Available · 12 min ago").
 
 ---
 
-## Phase C2 — Leaderboard
+## File Change Summary
 
-### New SQL function: `get_weekly_driver_leaderboard(_limit int default 10)`
-- `SECURITY DEFINER`, `STABLE`, `SET search_path = public`.
-- Returns: `user_id uuid, weekly_points int, total_points int, parking_points int, load_points int, streak_days int, tier text, rank int, masked_display_name text`.
-- `tier` computed in SQL: ≥400 Platinum, ≥150 Gold, ≥50 Silver, else Bronze.
-- `masked_display_name`: `COALESCE(NULLIF(trim(p.display_name), ''), 'Driver #' || substr(d.user_id::text, length(d.user_id::text) - 3))`. Never returns email.
-- Ordering: `weekly_points DESC, total_points DESC, last_activity_date ASC NULLS LAST` — handles ties exactly per the spec.
-- Filter: only rows where `weekly_points > 0` OR `user_id = auth.uid()` (so a brand-new user can still see themselves).
-- Grant `EXECUTE ... TO authenticated` only.
-- Privacy: only joins `profiles.display_name` (already client-visible to that user under existing RLS). No emails, no other profile fields.
+**New files (3):**
 
-### New hooks: `src/hooks/useDriverLeaderboard.ts`
-- `useDriverLeaderboard(limit = 10)` → `supabase.rpc('get_weekly_driver_leaderboard', { _limit: limit })`. 60s `staleTime`.
-- `useMyLeaderboardRank()` — convenience selector that returns the current user's row (or null) + the top score.
+- `src/hooks/useTierUpDetector.ts`
+- `src/components/TierUpToast.tsx` (optional — could inline in hook)
+- One Supabase migration
 
-### New component: `src/components/DriverLeaderboardCard.tsx`
-Placement on dashboard: **directly below** `DriverIntelligenceCard`, in the same Quick Insights area in `DashboardView.tsx`. Reuses existing `Card`/`Badge`/`Trophy` styling — no redesign.
+**Edited files (4):**
 
-Contents:
-- Title row: "Top Drivers This Week" + small "Updated weekly" hint.
-- Top 5 rows: rank, masked name, tier badge (color from existing `tierFor`), weekly points, source label (`parking_points > load_points * 1.5` → "Parking", `load_points > parking_points * 1.5` → "Loads", else "Balanced").
-- Current user highlighted with `bg-primary/10` row background if in top 5.
-- If current user not in top 5: bottom row "Your rank · #X · Yp" using `useMyLeaderboardRank`.
-- Empty states per spec.
+- `src/components/SettingsView.tsx` — public profile section
+- `src/components/DriverIntelligenceCard.tsx` — chase line + personal best line
+- `src/components/DashboardView.tsx` — mount tier-up detector
+- `src/hooks/useDriverPoints.ts` — expose `best_weekly_points`, `best_weekly_period_start`
 
-### Driver Scorecard "Weekly Leaderboard" section
-Scorecard is rendered inside `src/components/DriverScorecard.tsx` (route is `page === 'scorecard'` inside `Index.tsx`, not a separate URL route). Add a new bottom section reusing `DriverLeaderboardCard` configured with `limit={10}`, plus the explanatory copy from the spec. No layout/structural changes to the scorecard itself.
+**Untouched (do-not-modify list):**
+
+- `BottomNav.tsx`, `Pricing.tsx`, all Stripe/edge functions
+- `DriverScorecard.tsx` layout (the bottom leaderboard section auto-benefits from RPC change)
+- `DriverLeaderboardCard.tsx` rows (auto-benefit from RPC change)
+- All parking files, expense files, load files
+- Existing `award_points` RPC and points-earning flows
 
 ---
 
-## Phase C3 — DriverIntelligenceCard enhancement
+## Testing Checklist (post-implementation)
 
-Inside the existing card (don't change its frame), append a tiny stats row when leaderboard data is available:
-- "Your weekly rank: #X" (hidden if rank unknown)
-- "Top driver: Yp" (hidden if no leaderboard data)
-- Tip line gains a "+3 verify parking" alternative when user already has parking points but no recent verifications.
+**Handle:**
 
-If queries return empty, hide gracefully — no broken layout.
+- Free + Pro users can set/clear handle
+- Handle defaults to private (Driver #XXXX still shows)
+- Duplicate handle (case-insensitive) is rejected
+- Reserved words rejected (admin, support, etc.)
+- Toggling public → private hides handle on leaderboard immediately
+- Emoji renders correctly on iOS, Android, desktop
+
+**Chase line:**
+
+- User at #1 sees "👑 You're #1" with gap to #2
+- User at #5 sees gap to #4 with name
+- User not on board sees prompt copy
+- Single-user case: line hidden
+
+**Tier-up:**
+
+- Crossing Bronze→Silver fires once, not twice
+- Logout/login as different user does not fire stale celebration
+- No fire on first-ever load (just records baseline)
+- Toast dismissable, not blocking
+
+**Personal best:**
+
+- New user: shows 0 / no record gracefully
+- Beating record mid-week: "🔥 New personal best" appears
+- After weekly reset, best persists
+- Backfill correctly set existing users' bests
+
+**Regression:**
+
+- Existing leaderboard top 5 / top 10 still renders
+- Free users still blocked from verification
+- Load creation still awards +5 once
+- Parking report / verify still award correct points
+- No new console warnings
+- TypeScript clean
 
 ---
 
-## Phase C4 — Feedback loop wiring
+## What this unlocks (and what it deliberately doesn't)
 
-Already covered by hook invalidations:
-- `useSubmitParkingVerification` invalidates `driver-points` + `driver-leaderboard` + parking queries.
-- `useSubmitParkingReport` (existing) — add `driver-leaderboard` to its invalidation set.
-- Load creation in `src/pages/Index.tsx` already calls `award_points('load', 5)`. Add a `qc.invalidateQueries({ queryKey: ['driver-leaderboard'] })` next to the existing `driver-points` invalidation. No duplicate awards: stays inside the `addLoad` success branch only (no edits trigger it).
+**Unlocks:**
 
----
+- Drivers can build identity ("RoadDog_TX 🚛")
+- Every dashboard visit has a competitive pull (chase line)
+- Tier progression has a memorable moment (celebration)
+- Long-tail engagement via self-competition (personal best)
 
-## Phase C5 — Verification checklist (post-implementation)
+**Deliberately deferred to Tier 2 (next phase, not now):**
 
-I will verify and report:
-1. `/parking` no longer throws `Component is not a function`.
-2. Free user: leaderboard visible, parking visible, verify buttons show lock + open `ProUpgradeModal`, no points awarded.
-3. Pro/trial: verify submits, +3 toast fires, second verify within the hour shows the friendly duplicate message, confidence/last-verified updates.
-4. Leaderboard ordering ties resolved correctly (weekly → total → oldest activity).
-5. Masked names never leak emails (RPC inspection).
-6. Load creation still awards +5 once; leaderboard refreshes.
-7. Regression: dashboard, parking reports, add parking gating, scorecard tab, bottom nav, pricing, Stripe — all untouched.
-8. `tsc --noEmit` clean.
+- Regional/state leaderboards
+- Weekly winner crown badge persistence
+- Reactions (🔥 🤝) between drivers
+- Streak visibility on others
+- Crews / fleet groups
+- Achievement badges
 
----
+If Tier 1 measurably moves engagement (return visits, points-earning actions per user), we ship Tier 2. If not, we revisit assumptions before adding more.  I approve the Tier 1 leaderboard personalization plan with these required adjustments:
 
-## Out of scope (explicit)
+1. Public leaderboard handles:
 
-Not building: Leaflet map, "you just parked" prompts, load Parking Outlook, full scorecard redesign, pricing/Stripe edits, edge function edits, favorites UI.
+- All authenticated users may set a driver_handle privately.
 
-## Files touched
+- Only Pro/trial users may turn handle_public on.
 
-**Modified:** `src/components/ProUpgradeModal.tsx`, `src/components/parking/AddParkingModal.tsx`, `src/components/parking/ParkingDetailSheet.tsx`, `src/components/parking/ParkingCard.tsx`, `src/components/parking/ParkingFinder.tsx`, `src/hooks/useParkingLocations.ts` (extend `computeConfidence`), `src/hooks/useParkingReports.ts` (add leaderboard invalidation), `src/components/DriverIntelligenceCard.tsx`, `src/components/DashboardView.tsx` (mount leaderboard card), `src/components/DriverScorecard.tsx` (mount leaderboard section), `src/pages/Index.tsx` (leaderboard invalidation on load create).
+- Free users who try to enable public handle should see ProUpgradeModal.
 
-**New:** `src/hooks/useParkingVerifications.ts`, `src/hooks/useDriverLeaderboard.ts`, `src/components/DriverLeaderboardCard.tsx`, one SQL migration (verification anti-spam + realtime + leaderboard RPC).
+- Free users still appear as Driver #XXXX on the leaderboard.
 
-**Untouched:** routes, `App.tsx`, `BottomNav.tsx`, pricing, Stripe code, edge functions, `subscriptions` table, `parking_locations` schema.
+2. Personal best tracking:
+
+- Prefer updating best_weekly_points inside award_points() whenever weekly_points exceeds best_weekly_points.
+
+- Do not rely only on weekly reset.
+
+- Preserve weekly reset behavior.
+
+3. Tier-up celebration:
+
+- Use CSS-only or existing UI animation first.
+
+- Do not add a new package unless absolutely necessary.
+
+- Toast must fire only once per tier-up per user.
+
+4. Handle safety:
+
+- Strict format: 3–20 characters, lowercase stored, letters/numbers/underscore only.
+
+- No spaces, emails, phone numbers, slurs, impersonation terms, admin/support/system/lovable/haultracker/haultrackerpro.
+
+- Add admin/owner ability later to clear handles if needed, but do not build full moderation UI now.
+
+5. Scope control:
+
+- Do not build Tier 2 features yet.
+
+- Do not change pricing, Stripe, parking reports, verification, load points, bottom nav, or dashboard layout.
+
+- Keep all changes additive and minimal.
+
+Now create the final implementation plan, then wait for approval before building.
