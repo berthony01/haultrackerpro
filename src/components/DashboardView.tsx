@@ -23,6 +23,7 @@ import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
 import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
 import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { DriverIntelligenceCard } from '@/components/DriverIntelligenceCard';
+import { useTierUpDetector } from '@/hooks/useTierUpDetector';
 import { DriverLeaderboardCard } from '@/components/DriverLeaderboardCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,6 +69,7 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
 
 export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, isTrialing = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
+  useTierUpDetector();
   
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
