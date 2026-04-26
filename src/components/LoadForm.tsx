@@ -418,7 +418,28 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             />
           )}
 
-          {/* Scan Rate Con Screenshot */}
+          {/* Phase 6: Parser detection summary */}
+          {parserDetected && (parserDetected.loaded_miles || parserDetected.deadhead_miles || parserDetected.trip_id) && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-1.5 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold flex items-center gap-1.5">
+                  <Info className="h-3.5 w-3.5 text-primary" /> Detected
+                </p>
+                <button type="button" onClick={() => setParserDetected(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <ul className="text-[11px] text-foreground/90 space-y-0.5">
+                {parserDetected.trip_id && <li>• Trip ID: <span className="font-mono">{parserDetected.trip_id}</span></li>}
+                {parserDetected.loaded_miles && <li>• Loaded/Trip Miles: <span className="font-bold">{parserDetected.loaded_miles}</span></li>}
+                {parserDetected.deadhead_miles && <li>• Deadhead Miles: <span className="font-bold">{parserDetected.deadhead_miles}</span></li>}
+                {parserDetected.deadhead_miles && (
+                  <li>• Deadhead Pay: <span className="font-bold">{form.dh_pay_status === 'unpaid' ? 'Unpaid by default' : form.dh_pay_status === 'same' ? 'Same as loaded rate' : 'Custom rate'}</span></li>
+                )}
+              </ul>
+            </div>
+          )}
+
           {!initialData && (
             <div className="space-y-1.5">
               <Button
