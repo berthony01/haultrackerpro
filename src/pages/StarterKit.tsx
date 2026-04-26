@@ -275,7 +275,7 @@ export default function StarterKit() {
           </div>
           <div className="p-6 rounded-2xl border" style={{ background: CARD_BG, borderColor: CARD_BORDER }}>
             <h3 className="text-white font-bold text-lg">Start Tracking — Free</h3>
-            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>14-day Pro trial included. No credit card required.</p>
+            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Free to start. No credit card required.</p>
             <Button
               onClick={() => navigate('/auth')}
               className="mt-4 w-full h-11 font-bold rounded-xl gap-2"
