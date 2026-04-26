@@ -20,7 +20,7 @@ import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
 import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { PersonalIntelligenceBlocks } from '@/components/PersonalIntelligenceBlocks';
 import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, Trophy, FileText, Receipt, Fuel } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel } from 'lucide-react';
 import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { DriverIntelligenceCard } from '@/components/DriverIntelligenceCard';
 import { useTierUpDetector } from '@/hooks/useTierUpDetector';
