@@ -1,9 +1,16 @@
 User-agent: *
 Allow: /
+
+# Private / authenticated areas
 Disallow: /dashboard
 Disallow: /auth
 Disallow: /admin
 Disallow: /reset-password
 Disallow: /install
+Disallow: /parking
+Disallow: /updates
+
+# Post-submit / thank-you pages
+Disallow: /starter-kit/thanks
 
 Sitemap: https://haultrackerpro.com/sitemap.xml
