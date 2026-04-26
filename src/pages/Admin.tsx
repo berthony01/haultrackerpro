@@ -820,8 +820,7 @@ export default function Admin() {
                     <TableBody>
                       {users.map((u) => {
                         const rawStatus = u.sub_status ?? u.subscription_status;
-                        // Trialing users have full Pro access — display them as "pro" (no countdown).
-                        const displayStatus = rawStatus === 'trialing' || rawStatus === 'active' ? 'pro' : rawStatus;
+                        const displayStatus = rawStatus === 'active' ? 'pro' : rawStatus;
                         const isPaid = displayStatus === 'pro';
                         return (
                           <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
@@ -885,7 +884,7 @@ export default function Admin() {
                 </DialogHeader>
                 {selectedUser && (() => {
                   const rawStatus = selectedUser.sub_status ?? selectedUser.subscription_status;
-                  const displayStatus = rawStatus === 'trialing' || rawStatus === 'active' ? 'pro' : rawStatus;
+                  const displayStatus = rawStatus === 'active' ? 'pro' : rawStatus;
                   const isPro = displayStatus === 'pro';
                   return (
                     <div className="space-y-3">

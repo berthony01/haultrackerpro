@@ -34,15 +34,12 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Handle cron-triggered trial expiry
+    // Legacy: trial-expiry cron handler — no-op now that trials are removed.
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body is fine */ }
     if (body?.action === "expire_trials") {
-      logStep("Running expire_ended_trials via cron");
-      const { error: expireErr } = await supabaseClient.rpc("expire_ended_trials");
-      if (expireErr) logStep("expire_ended_trials error", { message: expireErr.message });
-      else logStep("expire_ended_trials completed");
-      return new Response(JSON.stringify({ ok: true }), {
+      logStep("expire_trials called but trials are removed — no-op");
+      return new Response(JSON.stringify({ ok: true, deprecated: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -85,7 +82,7 @@ serve(async (req) => {
     if (customers.data.length === 0) {
       logStep("No Stripe customer found");
       // Check for manual override
-      if (existingSub?.status === "active" || existingSub?.status === "trialing") {
+      if (existingSub?.status === "active") {
         logStep("Manual override found in subscriptions table, preserving");
         return new Response(JSON.stringify({ subscribed: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -121,13 +118,7 @@ serve(async (req) => {
       limit: 1,
     });
 
-    const trialingSubscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "trialing",
-      limit: 1,
-    });
-
-    const subscription = activeSubscriptions.data[0] || trialingSubscriptions.data[0];
+    const subscription = activeSubscriptions.data[0];
     const hasActiveSub = !!subscription;
     let subscriptionEnd = null;
     let productId = null;
@@ -170,9 +161,9 @@ serve(async (req) => {
         subscription_expires_at: subscriptionEnd,
       }).eq("user_id", user.id);
     } else {
-      logStep("No active or trialing subscription");
+      logStep("No active subscription");
       // Check for manual override before resetting
-      if (existingSub?.status === "active" || existingSub?.status === "trialing") {
+      if (existingSub?.status === "active") {
         logStep("Manual override found, preserving status");
         return new Response(JSON.stringify({ subscribed: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

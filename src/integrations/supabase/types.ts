@@ -1350,7 +1350,6 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
-      expire_ended_trials: { Args: never; Returns: undefined }
       get_weekly_driver_leaderboard: {
         Args: { _limit?: number }
         Returns: {

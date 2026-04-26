@@ -259,7 +259,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               </span>
             ) : (
               <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isPro ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'}`}>
-                {subscription.isTrialing ? <><Crown className="h-3 w-3" /> Pro Trial</> : isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
+                {isPro ? <><Crown className="h-3 w-3" /> Pro Plan</> : 'Free Plan'}
               </span>
             )}
           </div>
@@ -279,13 +279,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           )}
           {isPro && !subscription.isLoading && (
             <div className="pt-2 space-y-1">
-              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
-                {subscription.isTrialing ? 'Pro Trial Active' : 'Pro Plan Active'}
-              </p>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Pro Plan Active</p>
               <p className="text-xs text-muted-foreground">All features unlocked including advanced alerts, scorecard, exports, and unlimited parsing.</p>
-              {subscription.isTrialing && subscription.trialEnd && (
-                <p className="text-xs text-warning/80">Trial ends: {format(parseISO(subscription.trialEnd), 'PPP')}</p>
-              )}
             </div>
           )}
         </CardContent>
@@ -315,7 +310,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                   </p>
                 </div>
               )}
-              {!subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && !subscription.isTrialing && (
+              {!subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
                 <p className="text-[10px] text-muted-foreground">
                   Renews: {format(parseISO(subscription.currentPeriodEnd), 'PPP')}
                 </p>

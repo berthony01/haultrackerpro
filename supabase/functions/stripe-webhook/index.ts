@@ -173,7 +173,7 @@ serve(async (req) => {
 
         const priceId = subscription.items.data[0]?.price?.id || "";
         const planKey = resolvePlanKey(priceId);
-        const isActive = subscription.status === "active" || subscription.status === "trialing";
+        const isActive = subscription.status === "active";
         const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
         const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
         const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;

@@ -31,7 +31,7 @@ import { MonthlySummary } from '@/components/MonthlySummary';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AlertsView } from '@/components/AlertsView';
-import { TrialBanner, TrialExpiredBanner } from '@/components/TrialBanner';
+
 import { RecurringExpensesView } from '@/components/RecurringExpensesView';
 import { MilestoneNudges } from '@/components/MilestoneNudges';
 import { DriverScorecard } from '@/components/DriverScorecard';
@@ -68,12 +68,9 @@ const Index = () => {
   const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
   const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
 
-  // Pro gating — canonical subscription hook
+  // Pro gating — canonical subscription hook (Free vs Pro only; no trials)
   const subscription = useSubscription();
   const isPro = subscription.isPro;
-  const isTrialing = subscription.isTrialing;
-  const trialEnd = subscription.trialEnd;
-  const trialExpired = !isPro && !isTrialing && !!trialEnd && new Date(trialEnd) < new Date();
 
   const handleUpgrade = () => {
     setPage('settings');
@@ -189,8 +186,8 @@ const Index = () => {
         if (stops && stops.length > 0 && result?.id) {
           loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
         }
-        // Award +5 load points (Pro/trial only). Fire-and-forget; never block the save.
-        if (user && (isPro || isTrialing)) {
+        // Award +5 load points (Pro only). Fire-and-forget; never block the save.
+        if (user && isPro) {
           try {
             supabase
               .rpc('award_points', { _user_id: user.id, _category: 'load', _amount: 5 })
@@ -394,22 +391,13 @@ const Index = () => {
             {page === 'dashboard' && (
               <>
                 {!subscription.isLoading && (
-                  <>
-                    {isTrialing && trialEnd && (
-                      <TrialBanner trialEnd={trialEnd} onUpgrade={handleUpgrade} />
-                    )}
-                    {trialExpired && (
-                      <TrialExpiredBanner onUpgrade={handleUpgrade} />
-                    )}
-                    <MilestoneNudges
-                      loadsCount={allLoadsQuery.loads.length}
-                      expensesCount={allExpensesQuery.expenses.length}
-                      isTrialing={isTrialing}
-                      isPro={isPro}
-                      onUpgrade={handleUpgrade}
-                      onNavigate={handleNavigate}
-                    />
-                  </>
+                  <MilestoneNudges
+                    loadsCount={allLoadsQuery.loads.length}
+                    expensesCount={allExpensesQuery.expenses.length}
+                    isPro={isPro}
+                    onUpgrade={handleUpgrade}
+                    onNavigate={handleNavigate}
+                  />
                 )}
                 <DashboardView
                   loads={allLoadsQuery.loads}
@@ -419,7 +407,6 @@ const Index = () => {
                   onNavigate={handleNavigate}
                   smartAlerts={smartAlerts}
                   isPro={isPro}
-                  isTrialing={isTrialing}
                 />
               </>
             )}

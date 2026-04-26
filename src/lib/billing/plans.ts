@@ -33,7 +33,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     priceId: 'price_1TGMZ7I2TXbeuHi41ceyf1zP',
     monthlyPrice: 19.99,
     interval: 'month',
-    trialDays: 14,
+    trialDays: 0,
   },
   pro_yearly: {
     key: 'pro_yearly',
@@ -41,12 +41,12 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     priceId: 'price_1TGMZ8I2TXbeuHi4VmSGUcRK',
     monthlyPrice: 14.99,
     interval: 'year',
-    trialDays: 14,
+    trialDays: 0,
   },
 };
 
-/** Subscription statuses that grant Pro access */
-export const PRO_STATUSES = ['active', 'trialing'] as const;
+/** Subscription statuses that grant Pro access (no trials) */
+export const PRO_STATUSES = ['active'] as const;
 
 /** Check if a subscription status grants Pro access */
 export function isProStatus(status: string | null | undefined): boolean {

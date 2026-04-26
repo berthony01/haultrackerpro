@@ -1,44 +1,89 @@
-# Audit Findings — Admin User Detail "free" vs "pro" mismatch
+## Assessment
+I understand exactly what you mean.
 
-## Root cause (confirmed in DB + code)
+Right now the two users showing as Pro are not a display bug anymore — they are genuinely marked in the backend as `trialing`, and the admin table intentionally treats `trialing` as Pro access.
 
-The Users **table** and the User Detail **modal** read from two different sources:
+Current subscription state found:
+- 9 users on `free`
+- 2 users on `trialing`
+- 1 user on `active` Pro
 
-| Surface | Field used | Source |
-|---|---|---|
-| Users table (`Plan` column) | `u.sub_status ?? u.subscription_status`, then maps `trialing`/`active` → `pro` | Canonical `subscriptions` table (correct) |
-| User Detail modal (`Plan`, `Set Pro/Free` button) | `selectedUser.subscription_status` only | Legacy `profiles.subscription_status` (stale) |
+Those 2 users are appearing as Pro because the old 14-day trial system is still live across the platform.
 
-DB confirms both flagged users:
-- `andersontruckingra8@gmail.com` → `subscriptions.status = trialing`, `plan_key = pro_monthly`, `trial_end = 2026-05-04` — but `profiles.subscription_status = 'free'`.
-- `againstalloddstransportllc@gmail.com` → `subscriptions.status = trialing`, `plan_key = pro_monthly`, `trial_end = 2026-04-30` — but `profiles.subscription_status = 'free'`.
+I think your direction is correct if the product strategy is now:
+- Free Trucker Starter Kit
+- Free Plan
+- Pro Upgrade
 
-So the **table is correct** (these users are on an active Pro trial via the auto-trial system) and the **modal is wrong** (reading the legacy profile column that was never updated by the trial trigger).
+In that model, the 14-day trial should be removed completely so there is no mixed messaging, no confusing admin counts, and no hidden trial-based access.
 
-Total Pro right now per canonical table: **1 active + 2 trialing = 3 Pro users**, 9 free. No data is broken — only the modal display is.
+## Plan
+### Phase 1 — Convert current trial users safely
+- Update all existing `trialing` subscriptions to `free` in the canonical subscription table.
+- Clear trial-related timestamps for those users so they no longer look like legacy trial accounts.
+- Preserve real paid Pro users and admin/manual Pro overrides.
+- Do not drop legacy columns in this pass.
 
-## Fix (surgical, modal-only)
+### Phase 2 — Stop creating future trial users
+- Remove the automatic signup behavior that creates a Pro trial for new users.
+- Change new-account creation so users land on the Free plan by default.
+- Remove any scheduled or expiry logic that only exists for trials.
 
-**File:** `src/pages/Admin.tsx` (User Detail dialog, lines ~886–910)
+### Phase 3 — Remove trial access logic from the app
+- Update subscription helpers so only actual paid/admin Pro access counts as Pro.
+- Remove `trialing` from Pro access checks.
+- Remove trial countdown state and trial-specific UI handling from dashboard/settings flows.
+- Ensure feature gating becomes strictly Free vs Pro.
 
-1. Compute the same normalized status the table uses:
-   ```ts
-   const rawStatus = selectedUser.sub_status ?? selectedUser.subscription_status;
-   const displayStatus = (rawStatus === 'trialing' || rawStatus === 'active') ? 'pro' : rawStatus;
-   ```
-2. Render `{displayStatus}` in the Plan row instead of `selectedUser.subscription_status`.
-3. Use `displayStatus === 'pro'` for the Set Pro/Free button's variant, label, and the new-status payload sent to `planOverrideConfirm`.
-4. No edge-function changes required — `list-users` already returns `sub_status`/`sub_plan_key` from the canonical `subscriptions` table.
+### Phase 4 — Remove trial language from admin, billing, and public pages
+- Remove remaining “14-day trial”, “free trial”, and “Pro trial” language from pricing, landing, FAQ, guides, settings, and any upgrade prompts.
+- Update admin metrics so Pro counts only reflect real paid/manual Pro users.
+- Update billing/admin displays that still rely on legacy subscription fields so they stay consistent with the canonical subscription table.
 
-## Out of scope (per no-trial-admin-UI strategy already in place)
+### Phase 5 — Audit related backend functions
+- Remove trial-period creation in checkout.
+- Update billing sync/webhook logic so trial statuses are no longer treated as a product path.
+- Update recurring-expense and Pro-access backend checks so they no longer grant access based on `trialing`.
+- Keep compatibility for historical fields where needed, but stop using them for live logic.
 
-- Do NOT show `trial_end` or a countdown in the modal.
-- Do NOT drop `profiles.subscription_status` (legacy field, separate cleanup).
-- Do NOT change the Set Pro/Free flow itself or Stripe logic — only what the modal reads.
+### Phase 6 — Verification
+- Verify the former trial users now show as Free everywhere.
+- Verify only true paid/admin Pro users appear as Pro in admin.
+- Verify Free users do not receive unintended Pro access.
+- Verify pricing, landing, FAQ, and settings no longer mention a 14-day trial.
+- Run strict build/type checks after the cleanup.
 
-## Verification after fix
+## Technical details
+Likely implementation targets:
+- Database migration for subscription normalization and signup default behavior
+- `src/hooks/useSubscription.ts`
+- `src/components/TrialBanner.tsx`
+- `src/components/SettingsView.tsx`
+- `src/pages/Index.tsx`
+- `src/pages/Pricing.tsx`
+- `src/pages/Landing.tsx`
+- `src/pages/FAQ.tsx`
+- `src/pages/HowToUseHaulTrackerPro.tsx`
+- `src/pages/TruckingFinanceGuides.tsx`
+- `src/pages/Parking.tsx`
+- `supabase/functions/admin-api/index.ts`
+- `supabase/functions/check-subscription/index.ts`
+- `supabase/functions/create-checkout/index.ts`
+- `supabase/functions/stripe-webhook/index.ts`
+- `supabase/functions/check-pro-access/index.ts`
+- `supabase/functions/generate-recurring-expenses/index.ts`
 
-- Click `andersontruckingra8@gmail.com` → modal shows Plan: **pro**, button shows **Set Free**.
-- Click a true free user (e.g. `theurpi@gmail.com`) → modal shows Plan: **free**, button shows **Set Pro**.
-- Table and modal now agree; Overview KPIs (`Active Pro = 3`) remain correct.
-- TypeScript check passes.
+Key rule after cleanup:
+```text
+Free = default account state
+Pro = paid subscription or explicit admin/manual override
+Trialing = no longer used for product positioning or access control
+```
+
+## Expected outcome
+After this cleanup:
+- the 2 current trial users will become Free
+- new users will start on Free, not trialing
+- admin counts will stop inflating Pro totals
+- public messaging will align with your actual offer
+- the platform will match the new Free + Starter Kit + Pro strategy cleanly

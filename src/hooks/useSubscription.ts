@@ -7,11 +7,13 @@ import { isProStatus, PlanKey } from '@/lib/billing/plans';
 export interface SubscriptionState {
   isLoading: boolean;
   isPro: boolean;
+  /** @deprecated Trials removed. Always false. Kept for backward compatibility. */
   isTrialing: boolean;
   planKey: PlanKey;
   status: string;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: string | null;
+  /** @deprecated Trials removed. Always null. Kept for backward compatibility. */
   trialEnd: string | null;
   refetch: () => void;
 }
@@ -24,7 +26,6 @@ export function useSubscription(): SubscriptionState {
   const [status, setStatus] = useState('free');
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
-  const [trialEnd, setTrialEnd] = useState<string | null>(null);
 
   const fetchSubscription = useCallback(async () => {
     if (!user) {
@@ -32,7 +33,6 @@ export function useSubscription(): SubscriptionState {
       setStatus('free');
       setCancelAtPeriodEnd(false);
       setCurrentPeriodEnd(null);
-      setTrialEnd(null);
       setIsLoading(false);
       return;
     }
@@ -43,7 +43,6 @@ export function useSubscription(): SubscriptionState {
       setStatus('active');
       setCancelAtPeriodEnd(false);
       setCurrentPeriodEnd(null);
-      setTrialEnd(null);
       setIsLoading(false);
       return;
     }
@@ -52,7 +51,7 @@ export function useSubscription(): SubscriptionState {
       // Read from subscriptions table (canonical source)
       const { data: sub } = await supabase
         .from('subscriptions')
-        .select('plan_key, status, cancel_at_period_end, current_period_end, trial_end')
+        .select('plan_key, status, cancel_at_period_end, current_period_end')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -61,17 +60,15 @@ export function useSubscription(): SubscriptionState {
         setStatus(sub.status || 'free');
         setCancelAtPeriodEnd(sub.cancel_at_period_end || false);
         setCurrentPeriodEnd(sub.current_period_end || null);
-        setTrialEnd(sub.trial_end || null);
       }
 
-      // Also trigger edge function to sync with Stripe (can only upgrade, never downgrade admin/manual overrides)
+      // Sync with Stripe (can only upgrade, never downgrade admin/manual overrides)
       try {
         const { data } = await supabase.functions.invoke('check-subscription');
         if (data?.subscribed === true) {
-          // Re-read subscription after edge function may have updated it
           const { data: freshSub } = await supabase
             .from('subscriptions')
-            .select('plan_key, status, cancel_at_period_end, current_period_end, trial_end')
+            .select('plan_key, status, cancel_at_period_end, current_period_end')
             .eq('user_id', user.id)
             .maybeSingle();
           if (freshSub) {
@@ -79,14 +76,11 @@ export function useSubscription(): SubscriptionState {
             setStatus(freshSub.status || 'free');
             setCancelAtPeriodEnd(freshSub.cancel_at_period_end || false);
             setCurrentPeriodEnd(freshSub.current_period_end || null);
-            setTrialEnd(freshSub.trial_end || null);
           }
         } else if (sub && !isProStatus(sub.status)) {
-          // Only downgrade if DB already shows non-pro
           setPlanKey('free');
           setStatus('free');
         }
-        // If sub shows pro but edge says no → keep DB value (manual override)
       } catch {
         // Keep DB-based state on error
       }
@@ -101,8 +95,6 @@ export function useSubscription(): SubscriptionState {
     if (isAdminLoading) return;
     fetchSubscription();
 
-    // Refetch on tab focus / visibility change instead of polling every 60s.
-    // Throttle to at most once per 30s to avoid bursts on rapid tab switching.
     let lastFetch = Date.now();
     const maybeRefetch = () => {
       if (document.visibilityState !== 'visible') return;
@@ -121,17 +113,16 @@ export function useSubscription(): SubscriptionState {
   }, [fetchSubscription, isAdminLoading]);
 
   const isPro = isAdmin || isProStatus(status);
-  const isTrialing = status === 'trialing';
 
   return {
     isLoading,
     isPro,
-    isTrialing,
+    isTrialing: false,
     planKey,
     status,
     cancelAtPeriodEnd,
     currentPeriodEnd,
-    trialEnd,
+    trialEnd: null,
     refetch: fetchSubscription,
   };
 }
