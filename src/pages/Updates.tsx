@@ -96,7 +96,7 @@ export default function Updates() {
         ))}
       </div>
 
-      <BottomNav currentPage="dashboard" onNavigate={(p) => navigate(p === 'dashboard' ? '/dashboard' : `/dashboard?page=${p}`)} />
+      <BottomNav active="dashboard" onNavigate={() => navigate('/dashboard')} />
     </div>
   );
 }
