@@ -797,6 +797,7 @@ export type Database = {
           id: string
           notes: string | null
           parking_id: string
+          report_hour_bucket: string
           safety_rating: number | null
           status: string
           user_id: string
@@ -806,6 +807,7 @@ export type Database = {
           id?: string
           notes?: string | null
           parking_id: string
+          report_hour_bucket: string
           safety_rating?: number | null
           status: string
           user_id: string
@@ -815,6 +817,7 @@ export type Database = {
           id?: string
           notes?: string | null
           parking_id?: string
+          report_hour_bucket?: string
           safety_rating?: number | null
           status?: string
           user_id?: string

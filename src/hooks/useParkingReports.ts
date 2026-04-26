@@ -40,8 +40,14 @@ export function useSubmitParkingReport() {
         status,
         safety_rating: safetyRating ?? null,
         notes: notes ?? null,
-      });
-      if (insertErr) throw insertErr;
+      } as never);
+      if (insertErr) {
+        // 23505 = unique_violation from parking_reports_one_per_hour index
+        if ((insertErr as { code?: string }).code === '23505') {
+          throw new Error('You already reported this lot in the last hour');
+        }
+        throw insertErr;
+      }
 
       // Award points (5 for a report).
       const { data: pointsRow, error: pointsErr } = await supabase.rpc('award_points', {

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Search, Plus, Loader2 } from 'lucide-react';
+import { MapPin, Search, Plus, Loader2, Lock } from 'lucide-react';
 import { useParkingLocations, useRecentParkingReports, computeConfidence, ParkingLocation } from '@/hooks/useParkingLocations';
 import { useGeolocation, distanceMiles } from '@/hooks/useGeolocation';
 import { ParkingCard } from './ParkingCard';
@@ -30,6 +30,14 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
   const [selected, setSelected] = useState<ParkingLocation | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+
+  const handleAddClick = () => {
+    if (!hasAccess) {
+      setShowUpgrade(true);
+      return;
+    }
+    setShowAdd(true);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -132,8 +140,8 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
         <Card>
           <CardContent className="p-6 text-center space-y-3">
             <p className="text-sm text-muted-foreground">No parking matches your filters.</p>
-            <Button onClick={() => setShowAdd(true)} size="sm">
-              <Plus className="h-4 w-4" /> Add a location
+            <Button onClick={handleAddClick} size="sm">
+              {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Add a location
             </Button>
           </CardContent>
         </Card>
@@ -156,8 +164,9 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
         </div>
       )}
 
-      <Button variant="outline" className="w-full" onClick={() => setShowAdd(true)}>
-        <Plus className="h-4 w-4" /> Add a parking spot
+      <Button variant="outline" className="w-full" onClick={handleAddClick}>
+        {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />} Add a parking spot
+        {!hasAccess && <span className="ml-1 text-xs text-muted-foreground">(Pro)</span>}
       </Button>
 
       <ParkingDetailSheet
