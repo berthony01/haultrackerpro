@@ -12,6 +12,7 @@ import { Receipt, Search, Pencil, Trash2, Fuel, Wrench, Shield, CircleDollarSign
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths } from 'date-fns';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber } from '@/lib/loadUtils';
+import { ParkingExportButton } from '@/components/ParkingExportButton';
 
 interface ExpensesListViewProps {
   expenses: Expense[];
@@ -140,16 +141,19 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
             <p className="text-sm text-muted-foreground">Manage your expenses</p>
           </div>
         </div>
-        {onNavigate && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl gap-1.5 text-xs font-bold"
-            onClick={() => onNavigate('recurring_expenses')}
-          >
-            <RefreshCcw className="h-3.5 w-3.5" /> Recurring
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ParkingExportButton expenses={expenses} loads={loads} />
+          {onNavigate && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl gap-1.5 text-xs font-bold"
+              onClick={() => onNavigate('recurring_expenses')}
+            >
+              <RefreshCcw className="h-3.5 w-3.5" /> Recurring
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Total Summary */}
