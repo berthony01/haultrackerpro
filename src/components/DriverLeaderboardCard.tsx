@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trophy, Crown, Loader2 } from 'lucide-react';
+import { Trophy, Crown, Loader2, Settings2 } from 'lucide-react';
 import { useDriverLeaderboard, useMyLeaderboardRank, pointsSource } from '@/hooks/useDriverLeaderboard';
 import { useAuth } from '@/hooks/useAuth';
 import { tierFor } from '@/hooks/useDriverPoints';
