@@ -25,6 +25,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Install = lazy(() => import("./pages/Install"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const HowToUseHaulTrackerPro = lazy(() => import("./pages/HowToUseHaulTrackerPro"));
+const Parking = lazy(() => import("./pages/Parking"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -147,6 +148,7 @@ const App = () => (
               <Route path="/tools/load-profit-calculator" element={<ToolsLoadProfitCalculator />} />
               <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
               <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
+              <Route path="/parking" element={<ProtectedRoute><Parking /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
