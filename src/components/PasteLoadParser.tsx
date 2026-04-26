@@ -70,6 +70,9 @@ export function PasteLoadParser({ onParsed, isPro = false }: PasteLoadParserProp
     onParsed(parsed);
     const extra = parsed.multiStopDetected ? ` (${parsed.detectedStopsCount} stops detected)` : '';
     toast.success(`Filled ${fieldCount} field${fieldCount > 1 ? 's' : ''}${extra} — please review`);
+    if (parsed.deadhead_miles && !parsed.loaded_miles) {
+      toast.warning('Loaded/Trip miles not detected — please enter them manually.', { duration: 6000 });
+    }
     setStopsDetectedCount(parsed.multiStopDetected ? (parsed.detectedStopsCount ?? null) : null);
     setText('');
     setOpen(false);
