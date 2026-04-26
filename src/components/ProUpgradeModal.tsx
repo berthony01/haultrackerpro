@@ -42,4 +42,4 @@ export const ProUpgradeModal = forwardRef<HTMLDivElement, ProUpgradeModalProps>(
       </DialogContent>
     </Dialog>
   );
-}
+});

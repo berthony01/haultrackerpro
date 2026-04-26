@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { forwardRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -31,7 +31,10 @@ interface AddParkingModalProps {
 
 type LocType = 'truck_stop' | 'rest_area' | 'warehouse' | 'street' | 'private';
 
-export function AddParkingModal({ open, onOpenChange }: AddParkingModalProps) {
+export const AddParkingModal = forwardRef<HTMLDivElement, AddParkingModalProps>(function AddParkingModal(
+  { open, onOpenChange },
+  _ref,
+) {
   const { user } = useAuth();
   const { isPro, isTrialing } = useSubscription();
   const hasAccess = isPro || isTrialing;
@@ -184,4 +187,4 @@ export function AddParkingModal({ open, onOpenChange }: AddParkingModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+});
