@@ -609,6 +609,8 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 7: FINAL CTA */}
+      {/* ═══════════════════════════════════════════ */}
       <section className="py-20 sm:py-28 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{
           background: 'radial-gradient(ellipse 60% 50% at 50% 50%, hsl(25, 95%, 53%, 0.06) 0%, transparent 70%)'
