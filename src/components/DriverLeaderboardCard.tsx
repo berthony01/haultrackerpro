@@ -77,6 +77,15 @@ export function DriverLeaderboardCard({
             Earn points by logging loads, reporting parking, and verifying parking status.
           </p>
         )}
+        {onCustomize && (
+          <button
+            type="button"
+            onClick={onCustomize}
+            className="mt-2 text-[11px] text-primary hover:underline focus:outline-none focus:underline"
+          >
+            Customize your leaderboard handle →
+          </button>
+        )}
       </CardContent>
     </Card>
   );
