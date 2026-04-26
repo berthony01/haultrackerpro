@@ -2,13 +2,18 @@
  * Regex-based parser for extracting load details from pasted text (Telegram, SMS, broker messages).
  * No AI. User always reviews before saving.
  *
- * Mileage detection strategy (in order):
- *   1. Normalize input (fold bold-unicode letters → ASCII, strip emojis/symbols around labels).
- *   2. Detect DEADHEAD miles first — using strong DH/Empty/Bobtail/Unpaid keywords —
- *      so the loaded-miles regex cannot accidentally consume them.
- *   3. Detect LOADED / TRIP miles using a wide list of label variants
- *      (Trip, Trip Miles, Loaded Miles, Linehaul, Route, Distance, etc.).
- *   4. Use "Total Miles" only as a last-resort fallback.
+ * Mileage detection strategy (pattern-first + context classification):
+ *   1. Normalize input (fold bold-unicode letters → ASCII).
+ *   2. Find ALL `<number> mi|mile|miles` occurrences (the unit is required, so $-amounts can't match).
+ *   3. For each occurrence, look at a context window (~30 chars before, ~10 after) and classify:
+ *        - deadhead keyword nearby → deadhead miles
+ *        - loaded/trip/linehaul/route/distance/total keyword nearby → loaded miles
+ *        - otherwise → unclassified candidate
+ *   4. Pick deadhead = first deadhead-classified value.
+ *   5. Pick loaded by priority of context strength
+ *      (loaded > trip > linehaul > route > distance > total > largest non-deadhead candidate).
+ *   6. If exactly 2 values and one is deadhead, the other is loaded.
+ *   7. If only 1 value and it's not deadhead, it's loaded.
  */
 
 export interface ParsedStopData {
