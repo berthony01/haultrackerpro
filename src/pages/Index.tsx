@@ -186,6 +186,18 @@ const Index = () => {
         if (stops && stops.length > 0 && result?.id) {
           loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
         }
+        // Award +5 load points (Pro/trial only). Fire-and-forget; never block the save.
+        if (user && (isPro || isTrialing)) {
+          try {
+            supabase
+              .rpc('award_points', { _user_id: user.id, _category: 'load', _amount: 5 })
+              .then(({ error }) => {
+                if (error) console.warn('award_points(load) failed', error);
+              });
+          } catch (e) {
+            console.warn('award_points(load) threw', e);
+          }
+        }
         if (allExpensesQuery.expenses.length === 0) {
           toast.success('Load logged!', {
             description: 'Now log your first expense to see real net profit.',
