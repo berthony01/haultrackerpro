@@ -123,6 +123,26 @@ export function trackLeadMagnetSignupClick() {
   gtag('event', 'lead_magnet_signup_click');
 }
 
+// ─── SESSION-SCOPED GUARD ───────────────────────────────────────────────────
+// Ensures a tracking callback fires at most once per browser session for a
+// given event key. Uses sessionStorage and fails silently if unavailable
+// (private mode, disabled storage, SSR, etc.) — never throws.
+export function trackOncePerSession(eventKey: string, callback: () => void) {
+  const storageKey = `htp_event_${eventKey}`;
+  try {
+    if (typeof window === 'undefined' || !window.sessionStorage) {
+      callback();
+      return;
+    }
+    if (window.sessionStorage.getItem(storageKey) === 'true') return;
+    window.sessionStorage.setItem(storageKey, 'true');
+    callback();
+  } catch {
+    // Storage failed — fire once anyway so we don't lose the event entirely.
+    try { callback(); } catch { /* noop */ }
+  }
+}
+
 // ─── STARTER KIT FUNNEL (standardized event names) ──────────────────────────
 export function trackStarterKitViewed(source?: string) {
   gtag('event', 'starter_kit_page_viewed', { source });

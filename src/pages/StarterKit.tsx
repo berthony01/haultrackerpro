@@ -15,6 +15,7 @@ import {
   trackStarterKitViewed,
   trackStarterKitFormSubmitted,
   trackStarterKitDownloadClicked,
+  trackOncePerSession,
 } from '@/lib/analytics';
 
 const ORANGE = 'hsl(25, 95%, 53%)';
@@ -43,7 +44,7 @@ export default function StarterKit() {
 
   useEffect(() => {
     trackLeadMagnetView('starter-kit');
-    trackStarterKitViewed('starter-kit');
+    trackOncePerSession('starter_kit_page_viewed', () => trackStarterKitViewed('starter-kit'));
     if (user?.email) setEmail(user.email);
   }, [user?.email]);
 
@@ -58,7 +59,7 @@ export default function StarterKit() {
     try {
       await submitLeadMagnet(parsed.data, { convertedUserId: user?.id ?? null });
       trackLeadMagnetSubmit();
-      trackStarterKitFormSubmitted();
+      trackOncePerSession('starter_kit_form_submitted', () => trackStarterKitFormSubmitted());
       toast.success('Your kit is ready! Redirecting…');
       navigate(`/starter-kit/thanks?email=${encodeURIComponent(parsed.data.email)}`);
     } catch (err) {
