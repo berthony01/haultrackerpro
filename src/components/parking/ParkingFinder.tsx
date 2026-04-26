@@ -23,6 +23,7 @@ import { ProUpgradeModal } from '@/components/ProUpgradeModal';
 
 interface ParkingFinderProps {
   hasAccess: boolean;
+  subscriptionLoading?: boolean;
 }
 
 type ConfidenceFilter = 'any' | 'high' | 'medium' | 'low';
@@ -41,7 +42,7 @@ function buildPageList(current: number, total: number): (number | 'ellipsis')[] 
   return pages;
 }
 
-export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
+export function ParkingFinder({ hasAccess, subscriptionLoading = false }: ParkingFinderProps) {
   const { data: locations = [], isLoading } = useParkingLocations();
   const { data: recentReports = [] } = useRecentParkingReports();
   const { data: recentVerifications = [] } = useRecentParkingVerifications();
@@ -174,11 +175,20 @@ export function ParkingFinder({ hasAccess }: ParkingFinderProps) {
         <Button
           onClick={handleAddClick}
           className="shrink-0 h-10"
-          aria-label={hasAccess ? 'Add a parking spot' : 'Add a parking spot (Pro)'}
+          disabled={subscriptionLoading}
+          aria-label={subscriptionLoading ? 'Add a parking spot' : hasAccess ? 'Add a parking spot' : 'Add a parking spot (Pro)'}
         >
-          {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+          {subscriptionLoading ? (
+            <Plus className="h-4 w-4 opacity-60" />
+          ) : hasAccess ? (
+            <Plus className="h-4 w-4" />
+          ) : (
+            <Lock className="h-4 w-4" />
+          )}
           <span className="hidden sm:inline ml-1.5">Add spot</span>
-          {!hasAccess && <span className="hidden sm:inline ml-1 text-[10px] opacity-80">Pro</span>}
+          {!subscriptionLoading && !hasAccess && (
+            <span className="hidden sm:inline ml-1 text-[10px] opacity-80">Pro</span>
+          )}
         </Button>
       </div>
       {geo.error && <p className="text-xs text-destructive">{geo.error}</p>}
