@@ -390,6 +390,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
                 if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
                 if (data.load_date) update('load_date', data.load_date);
+                // Phase 6: surface a confirmation summary so the user can verify
+                // detected miles + DH + trip ID before saving. DH defaults to "Unpaid".
+                setParserDetected({
+                  loaded_miles: data.loaded_miles,
+                  deadhead_miles: data.deadhead_miles,
+                  trip_id: data.trip_id,
+                });
+                if (data.trip_id) {
+                  // Append trip ID into notes (only once) so it persists with the load.
+                  setForm(prev => prev.notes.includes(data.trip_id!)
+                    ? prev
+                    : { ...prev, notes: prev.notes ? `${prev.notes}\nTrip ID: ${data.trip_id}` : `Trip ID: ${data.trip_id}` });
+                }
                 // Multi-stop auto-detection
                 if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
                   setMultiStop(true);
