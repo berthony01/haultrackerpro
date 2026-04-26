@@ -198,6 +198,8 @@ export type Database = {
       }
       driver_points: {
         Row: {
+          best_weekly_period_start: string | null
+          best_weekly_points: number
           last_activity_date: string | null
           load_points: number
           parking_points: number
@@ -209,6 +211,8 @@ export type Database = {
           weekly_points: number
         }
         Insert: {
+          best_weekly_period_start?: string | null
+          best_weekly_points?: number
           last_activity_date?: string | null
           load_points?: number
           parking_points?: number
@@ -220,6 +224,8 @@ export type Database = {
           weekly_points?: number
         }
         Update: {
+          best_weekly_period_start?: string | null
+          best_weekly_points?: number
           last_activity_date?: string | null
           load_points?: number
           parking_points?: number
@@ -889,6 +895,9 @@ export type Database = {
         Row: {
           created_at: string
           display_name: string | null
+          driver_handle: string | null
+          handle_emoji: string | null
+          handle_public: boolean
           id: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -901,6 +910,9 @@ export type Database = {
         Insert: {
           created_at?: string
           display_name?: string | null
+          driver_handle?: string | null
+          handle_emoji?: string | null
+          handle_public?: boolean
           id?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -913,6 +925,9 @@ export type Database = {
         Update: {
           created_at?: string
           display_name?: string | null
+          driver_handle?: string | null
+          handle_emoji?: string | null
+          handle_public?: boolean
           id?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -1247,6 +1262,8 @@ export type Database = {
       award_points: {
         Args: { _amount: number; _category: string; _user_id: string }
         Returns: {
+          best_weekly_period_start: string | null
+          best_weekly_points: number
           last_activity_date: string | null
           load_points: number
           parking_points: number
