@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 interface MilestoneNudgesProps {
   loadsCount: number;
   expensesCount: number;
-  isTrialing: boolean;
+  isTrialing?: boolean;
   isPro: boolean;
   onUpgrade: () => void;
   onNavigate: (page: string) => void;
@@ -78,7 +78,7 @@ const nudges: Nudge[] = [
   },
 ];
 
-export function MilestoneNudges({ loadsCount, expensesCount, isTrialing, isPro, onUpgrade, onNavigate }: MilestoneNudgesProps) {
+export function MilestoneNudges({ loadsCount, expensesCount, isPro, onUpgrade, onNavigate }: MilestoneNudgesProps) {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('htp_dismissed_nudges');
@@ -86,8 +86,8 @@ export function MilestoneNudges({ loadsCount, expensesCount, isTrialing, isPro, 
     } catch { return new Set(); }
   });
 
-  // Don't show nudges during active trial or for Pro users
-  if (isTrialing || isPro) return null;
+  // Don't show nudges for Pro users
+  if (isPro) return null;
 
   const activeNudges = nudges.filter(
     n => n.condition(loadsCount, expensesCount) && !dismissedIds.has(n.id)
