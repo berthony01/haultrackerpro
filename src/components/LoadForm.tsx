@@ -527,6 +527,37 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           </div>
 
+          {/* Deadhead Pay Status (Phase 4) — only shown when DH miles > 0 and CPM pay */}
+          {!isPercentagePay && (parseFloat(form.deadhead_miles) || 0) > 0 && (
+            <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
+              <Label htmlFor="dh_pay_status" className="text-xs font-bold flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Deadhead Pay
+              </Label>
+              <Select value={form.dh_pay_status} onValueChange={v => update('dh_pay_status', v)}>
+                <SelectTrigger id="dh_pay_status" className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unpaid">Unpaid deadhead</SelectItem>
+                  <SelectItem value="same">Paid at same rate as loaded miles</SelectItem>
+                  <SelectItem value="custom">Paid at different rate</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.dh_pay_status === 'custom' && (
+                <div>
+                  <Label htmlFor="dh_pay_rate" className="text-xs">Deadhead Rate ($/mi)</Label>
+                  <Input id="dh_pay_rate" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.dh_pay_rate} onChange={e => update('dh_pay_rate', e.target.value)} />
+                </div>
+              )}
+              {deadheadRevenue > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Adds <span className="font-bold text-success">{formatCurrency(deadheadRevenue)}</span> to estimated pay.
+                </p>
+              )}
+              <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
+                Some companies pay deadhead miles and some do not. Choose how this load pays so your profit numbers stay accurate.
+              </p>
+            </div>
+          )}
+
           <div>
             <Label htmlFor="rate_per_mile" className="flex items-center gap-1">
               <DollarSign className="h-3 w-3 text-primary" /> Rate Per Mile
