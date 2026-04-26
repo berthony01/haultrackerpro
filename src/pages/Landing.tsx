@@ -434,7 +434,7 @@ export default function Landing() {
           </div>
           <div className="text-center mt-10">
             <p className="text-sm mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Every new account includes a free 14-day Pro trial. No credit card required.
+              Free forever to start. Upgrade to Pro any time. No credit card required.
             </p>
             <Button onClick={goToAuth} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
               background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
@@ -466,7 +466,7 @@ export default function Landing() {
               { icon: Shield, label: 'Your data stays yours', sub: 'Encrypted & private' },
               { icon: Zap, label: 'Set up in minutes', sub: 'No training needed' },
               { icon: Users, label: 'Built for solo operators', sub: 'Not bloated fleet software' },
-              { icon: Star, label: '14-day Pro trial', sub: 'No credit card required' },
+              { icon: Star, label: 'Free to start', sub: 'No credit card required' },
             ].map((item, i) => (
               <div key={i} className="text-center p-4 rounded-xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center mx-auto mb-2" style={{ background: 'hsl(25, 95%, 53%, 0.1)' }}>
@@ -627,7 +627,7 @@ export default function Landing() {
             background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
             boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.5)'
           }}>
-            Start Your Free Trial <ArrowRight className="h-5 w-5" />
+            Start Tracking Free <ArrowRight className="h-5 w-5" />
           </Button>
           <p className="text-xs mt-4" style={{ color: 'hsl(220, 10%, 45%)' }}>
             No credit card required.

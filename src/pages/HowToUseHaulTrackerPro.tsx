@@ -98,7 +98,7 @@ const checklist = [
 ];
 
 const faqs = [
-  { q: 'Is HaulTrackerPro free to start?', a: 'Yes. You can create an account and start logging loads, expenses, and fuel at no cost. Pro features are available with a 14-day free trial.' },
+  { q: 'Is HaulTrackerPro free to start?', a: 'Yes. You can create an account and start logging loads, expenses, and fuel at no cost. Upgrade to Pro any time to unlock advanced analytics, AI tools, and exports.' },
   { q: 'Can I track fuel and expenses?', a: 'Absolutely. HaulTrackerPro has dedicated fuel logging and categorized expense tracking built in. Both are available on the free plan.' },
   { q: 'Can I use it if I\'m a lease driver?', a: 'Yes. Lease operators can track truck payments, insurance, and all other expenses alongside load revenue to understand true profitability.' },
   { q: 'How is profit calculated?', a: 'Net Profit = Gross Revenue − Total Expenses. Gross revenue uses actual pay received when available, and falls back to estimated pay (rate per mile × loaded miles + fees) for unpaid loads. Expenses include everything you\'ve logged: fuel, tolls, maintenance, insurance, repairs, permits, and other costs. Net $/Mile divides your net profit by total miles (loaded + deadhead) to show your true earning rate.' },
@@ -236,7 +236,7 @@ export default function HowToUseHaulTrackerPro() {
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold font-heading">Pro</h3>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">14-day trial</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">Free to start</span>
                 </div>
                 <ul className="space-y-2">
                   {proPlan.map((p) => (
