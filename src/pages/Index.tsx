@@ -193,6 +193,8 @@ const Index = () => {
               .rpc('award_points', { _user_id: user.id, _category: 'load', _amount: 5 })
               .then(({ error }) => {
                 if (error) console.warn('award_points(load) failed', error);
+                queryClient.invalidateQueries({ queryKey: ['driver-points'] });
+                queryClient.invalidateQueries({ queryKey: ['driver-leaderboard'] });
               });
           } catch (e) {
             console.warn('award_points(load) threw', e);
