@@ -12,12 +12,15 @@ interface DriverLeaderboardCardProps {
   title?: string;
   /** Hide the explanatory footer. */
   hideHelp?: boolean;
+  /** Optional handler for the "Customize handle" link. When provided, link is shown. */
+  onCustomize?: () => void;
 }
 
 export function DriverLeaderboardCard({
   limit = 5,
   title = 'Top Drivers This Week',
   hideHelp,
+  onCustomize,
 }: DriverLeaderboardCardProps) {
   const { user } = useAuth();
   // Fetch a wider list so we can find current user's rank if outside top N.
