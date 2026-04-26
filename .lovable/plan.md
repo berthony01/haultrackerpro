@@ -1,148 +1,128 @@
-## Phase F1 — Bug Fixes Only (No New Features)
+# Phase F2 — Discoverability Polish (Plan Only)
 
-Two surgical fixes. No new features, no UI redesign, no scope creep.
-
----
-
-### Fix #1 — Save button bug in `PublicProfileSection.tsx`
-
-**Problem:** When a user changes only the emoji or the "Show on leaderboard" toggle (without touching the handle), the Save button stays disabled. Root cause: `canSave` requires `availability === 'ok'`, but for an unchanged handle the availability state can sit at `'idle'` or never re-validate.
-
-**File:** `src/components/PublicProfileSection.tsx`
-
-**Change — `canSave` logic (around line 75):**
-
-Replace:
-```ts
-const canSave =
-  dirty &&
-  !updateMut.isPending &&
-  (handle.trim() === '' ? !isPublic : availability === 'ok');
-```
-
-With:
-```ts
-const normalizedHandle = handle.trim().toLowerCase();
-const handleUnchanged = normalizedHandle === (profile?.driver_handle ?? '');
-
-const canSave =
-  dirty &&
-  !updateMut.isPending &&
-  (
-    // Case A: handle empty -> only allowed if not trying to be public
-    normalizedHandle === ''
-      ? !isPublic
-      // Case B: handle unchanged -> no availability check needed
-      : handleUnchanged
-        ? true
-        // Case C: handle changed -> must be available
-        : availability === 'ok'
-  );
-```
-
-**Also tighten the availability effect** so an unchanged handle deterministically resolves to `'ok'` (it already does, but we'll keep that branch explicit — no change needed there).
-
-**Acceptance:**
-- Toggling emoji only → Save enables.
-- Toggling `handle_public` only → Save enables.
-- Changing handle to a taken one → Save stays disabled.
-- Clearing handle while `isPublic=true` → Save stays disabled (correct, since trigger forces public off without a handle anyway).
+Surgical visibility improvements for Tier 1 leaderboard personalization. No dashboard, scorecard, leaderboard, pricing, parking, Stripe, or navigation redesign. No new routes.
 
 ---
 
-### Fix #2 — Replace UUID-based masked driver ID
+## 1. Fix ref warning in DriverScorecard / DriverLeaderboardCard
 
-**Problem:** `get_weekly_driver_leaderboard` currently exposes the last 4 chars of the user's UUID:
-```sql
-'Driver #' || substr(d.user_id::text, length(d.user_id::text) - 3)
-```
-This leaks a stable identifier fragment that's globally unique and reversible against any other place a UUID appears.
+### Investigation
+- Neither card is wrapped in a `Tooltip`/`asChild` at its consumer site (`DashboardView.tsx:147`, `Index.tsx:526`).
+- Internally, both use `Badge` (a plain `div`) and small inner function components (`RankBadge`, `LeaderRow`) — no refs forwarded directly.
+- Most likely cause: a parent animation/Tooltip wrapper higher in the tree (e.g., a future wrapper) **or** Radix `Badge` being passed `asChild` indirectly. Need to confirm at runtime which component the React warning names.
 
-**Fix:** Replace with a deterministic, non-reversible 4-digit hash bucket.
+### Recommended smallest safe fix
+- **Step 1 (diagnostic):** Read the exact warning text from console at runtime to identify which component is missing `forwardRef`.
+- **Step 2 (fix):** Apply the minimum fix:
+  - If warning names `LeaderRow` / `RankBadge` / `DriverScorecard` / `DriverLeaderboardCard` directly → wrap that exported function in `React.forwardRef<HTMLDivElement, Props>` and spread `ref` onto the root element.
+  - If warning is caused by a `Tooltip` ancestor passing a ref through `asChild` → wrap the offending child in a plain `<span>` or `<div>` at the consumer site only.
+- No visual or behavioral change.
 
-**Migration (new file):** `supabase/migrations/<timestamp>_fix_masked_driver_id.sql`
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_weekly_driver_leaderboard(_limit integer DEFAULT 10)
-RETURNS TABLE(
-  user_id uuid,
-  weekly_points integer,
-  total_points integer,
-  parking_points integer,
-  load_points integer,
-  streak_days integer,
-  tier text,
-  rank integer,
-  masked_display_name text
-)
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  WITH ranked AS (
-    SELECT
-      d.user_id,
-      d.weekly_points,
-      d.total_points,
-      d.parking_points,
-      d.load_points,
-      d.streak_days,
-      d.last_activity_date,
-      CASE
-        WHEN d.total_points >= 400 THEN 'Platinum'
-        WHEN d.total_points >= 150 THEN 'Gold'
-        WHEN d.total_points >= 50 THEN 'Silver'
-        ELSE 'Bronze'
-      END AS tier,
-      ROW_NUMBER() OVER (
-        ORDER BY d.weekly_points DESC,
-                 d.total_points DESC,
-                 d.last_activity_date ASC NULLS LAST
-      )::int AS rank,
-      CASE
-        WHEN p.handle_public = true AND p.driver_handle IS NOT NULL THEN
-          p.driver_handle ||
-          CASE WHEN p.handle_emoji IS NOT NULL THEN ' ' || p.handle_emoji ELSE '' END
-        ELSE
-          'Driver #' || lpad((abs(hashtext(d.user_id::text)) % 10000)::text, 4, '0')
-      END AS masked_display_name
-    FROM public.driver_points d
-    LEFT JOIN public.profiles p ON p.user_id = d.user_id
-  )
-  SELECT user_id, weekly_points, total_points, parking_points, load_points,
-         streak_days, tier, rank, masked_display_name
-  FROM ranked
-  WHERE weekly_points > 0 OR user_id = auth.uid()
-  ORDER BY rank
-  LIMIT GREATEST(1, LEAST(_limit, 100));
-$$;
-
-GRANT EXECUTE ON FUNCTION public.get_weekly_driver_leaderboard(integer) TO authenticated;
-```
-
-**Properties:**
-- Deterministic: same user → same `Driver #XXXX` every time.
-- Non-reversible: `hashtext` is a one-way hash; the 4-digit bucket discards entropy.
-- No UUID fragment is exposed.
-- ~0.01% collision probability across small leaderboards — acceptable since handles are the personalization path for users who care about identity.
+### Files likely changed
+- `src/components/DriverScorecard.tsx` (forwardRef on default export, if needed)
+- `src/components/DriverLeaderboardCard.tsx` (forwardRef on `DriverLeaderboardCard` and/or `LeaderRow`, if needed)
 
 ---
 
-### Verification (post-fix)
+## 2. "Customize handle" discoverability link
 
-1. **Save button:** open Settings → Public Profile, change only the emoji, confirm Save enables and persists.
-2. **Save button:** toggle "Show on leaderboard" with unchanged handle, confirm Save enables.
-3. **Masked ID:** query the RPC and confirm output matches `^Driver #\d{4}$` for users without public handles, and is stable across calls.
-4. **Public handle path:** confirm users with `handle_public=true` still render `handle 🚛` (unchanged behavior).
-5. **TypeScript:** no signature changes → no type regen needed; build should pass clean.
-6. **Leaderboard UI:** `DriverLeaderboardCard` and `DriverIntelligenceCard` chase line render unchanged (they consume `masked_display_name` as opaque text).
+### Behavior
+- Append a single-line subtle link **below** `DriverLeaderboardCard`'s help footer (inside the same card, so it doesn't add layout height elsewhere).
+- Copy: `Customize your leaderboard handle →`
+- Style: `text-[11px] text-primary hover:underline`, button styled as link (no new button variant).
+- On click: `navigate('/settings', { state: { focusSection: 'public-profile' } })`.
+- In `SettingsView.tsx`, read `location.state.focusSection` in a `useEffect`; if `'public-profile'`, call `scrollIntoView({ behavior: 'smooth', block: 'start' })` on a ref attached to `PublicProfileSection`'s wrapper. Best-effort — silently no-op if ref not yet mounted.
+- No new route. No nav change.
 
-### Files touched
-- `src/components/PublicProfileSection.tsx` (≈8-line logic change)
-- `supabase/migrations/<new>.sql` (RPC replacement only)
+### Files likely changed
+- `src/components/DriverLeaderboardCard.tsx` (add link, accept optional `onCustomize` prop OR import `useNavigate` directly — prefer direct `useNavigate` to keep API stable)
+- `src/components/SettingsView.tsx` (read `location.state`, attach ref, scroll on mount)
+- `src/components/PublicProfileSection.tsx` (forward a `ref` prop OR wrap consumer side with a `<div ref={...}>` — prefer the wrapper at the consumer to avoid touching this file)
 
-### Out of scope (explicitly NOT doing)
-- Reserved-word list expansion (Bug #4 from audit)
-- Free vs Pro gating of public handles
-- Any UI redesign
-- Any change to confetti, tier-up, personal-best logic
+---
+
+## 3. Next-tier hint in DriverIntelligenceCard
+
+### Behavior
+- Compute next tier from existing `tierFor` thresholds in `useDriverPoints.ts`:
+  - Bronze (<50) → `Silver at 50 pts — N to go`
+  - Silver (50–149) → `Gold at 150 pts — N to go`
+  - Gold (150–399) → `Platinum at 400 pts — N to go`
+  - Platinum (≥400) → render nothing (graceful hide)
+- Place as a single `text-[11px] text-muted-foreground` line directly under the existing tier badge row (above the weekly stats row), so it reads naturally with the tier label.
+- Pure derived value from `total_points`. No new data, no new query.
+
+### Files likely changed
+- `src/components/DriverIntelligenceCard.tsx`
+- (Optional) `src/hooks/useDriverPoints.ts` — export a small `nextTierProgress(total)` helper to keep card clean. Non-breaking.
+
+---
+
+## 4. First-time personal best teaser
+
+### Behavior
+- In `DriverIntelligenceCard.tsx`, current code only renders the personal best line when `best > 0`.
+- Add an `else` branch: when `best === 0`, render:
+  `No personal best yet — log a load or verify parking to start.`
+  with the same `text-[11px] text-muted-foreground` styling, in the same slot.
+- Once `best > 0`, the existing personal-best / new-best display takes over unchanged.
+- Hidden entirely if data is still loading (use existing `points` undefined check) to avoid flash.
+
+### Files likely changed
+- `src/components/DriverIntelligenceCard.tsx`
+
+---
+
+## Risks
+
+| Risk | Likelihood | Mitigation |
+|---|---|---|
+| Scroll-to-section runs before `PublicProfileSection` mounts | Med | Use `requestAnimationFrame` + ref guard; no-op if missing |
+| `forwardRef` change breaks existing imports | Low | Keep named export; only wrap function, signature unchanged |
+| Next-tier text crowds card on small screens | Low | Single short line, `text-[11px]`, matches existing tip line density |
+| Empty-best teaser duplicates onboarding messaging | Low | Copy is distinct + only shown in Driver Intelligence card |
+| Settings `location.state` persists on back-nav and re-scrolls | Low | Clear `location.state` after first effect run via `navigate(pathname, { replace: true })` |
+
+---
+
+## Testing checklist
+
+**Ref warning**
+- [ ] Open `/dashboard` with console open — no "Function components cannot be given refs" warning.
+- [ ] Open `/scorecard` — same check.
+- [ ] Visual diff: cards render identically.
+
+**Customize handle link**
+- [ ] Link visible under leaderboard footer text.
+- [ ] Click navigates to `/settings`.
+- [ ] Public Profile section scrolls into view smoothly.
+- [ ] Direct `/settings` navigation (no state) does NOT auto-scroll.
+- [ ] Back button from settings returns to dashboard cleanly.
+
+**Next-tier hint**
+- [ ] Bronze user (0–49 pts) sees `Silver at 50 pts — N to go`.
+- [ ] Silver user (50–149) sees Gold target.
+- [ ] Gold user (150–399) sees Platinum target.
+- [ ] Platinum user (≥400) sees no line (no empty space).
+- [ ] Math correct at boundary (e.g., 49 pts → 1 to go; 50 pts → Gold target shown).
+
+**Personal best teaser**
+- [ ] New account (best = 0) sees teaser line.
+- [ ] After first weekly rollover with points, teaser disappears and personal-best line shows.
+- [ ] Loading state shows neither (no flash).
+
+**Regression**
+- [ ] DriverIntelligenceCard rank chase line still works.
+- [ ] DriverLeaderboardCard rows render identically.
+- [ ] Settings view all other sections unchanged.
+- [ ] No TypeScript errors.
+- [ ] No console warnings.
+
+---
+
+## Out of scope (explicitly NOT touched)
+- Dashboard layout, Scorecard layout, Leaderboard layout
+- Pricing, Stripe, Parking, Navigation, BottomNav
+- New routes
+- Tier thresholds or point award logic
+- RPC / migrations
