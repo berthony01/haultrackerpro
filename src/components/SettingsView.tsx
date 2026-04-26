@@ -283,7 +283,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       </Card>
 
       {/* Public Profile (leaderboard handle) */}
-      <PublicProfileSection />
+      <div ref={publicProfileRef}>
+        <PublicProfileSection />
+      </div>
 
       {/* Billing */}
       <Card className="shadow-card">
