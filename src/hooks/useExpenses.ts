@@ -66,27 +66,49 @@ export function useExpenses(dateRange?: DateRange, page?: number) {
     queryFn: async () => {
       if (!user) return { expenses: [], totalCount: 0 };
 
-      let query = supabase
-        .from('expenses')
-        .select('*', { count: 'exact' })
-        .eq('user_id', user.id)
-        .order('expense_date', { ascending: false });
+      const buildQuery = () => {
+        let q = supabase
+          .from('expenses')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .order('expense_date', { ascending: false });
+        if (dateRange?.from) q = q.gte('expense_date', dateRange.from);
+        if (dateRange?.to) q = q.lte('expense_date', dateRange.to);
+        return q;
+      };
 
-      if (dateRange?.from) query = query.gte('expense_date', dateRange.from);
-      if (dateRange?.to) query = query.lte('expense_date', dateRange.to);
-
-      // Apply pagination range if page is provided
+      // Paged mode: return just the requested page
       if (page !== undefined) {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
-        query = query.range(from, to);
+        const { data, error, count } = await buildQuery().range(from, to);
+        if (error) throw error;
+        return {
+          expenses: (data ?? []) as unknown as Expense[],
+          totalCount: count ?? (data ?? []).length,
+        };
       }
 
-      const { data, error, count } = await query;
-      if (error) throw error;
+      // Unpaged mode: fetch ALL rows in batches to bypass Supabase's
+      // default 1000-row response cap. This keeps dashboard totals,
+      // exports, and analytics accurate beyond 1k expenses.
+      const FETCH_SIZE = 1000;
+      const all: Expense[] = [];
+      let offset = 0;
+      let totalCount = 0;
+      // Safety cap: 100k rows (100 pages) to avoid runaway loops
+      for (let i = 0; i < 100; i++) {
+        const { data, error, count } = await buildQuery().range(offset, offset + FETCH_SIZE - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as unknown as Expense[];
+        all.push(...batch);
+        if (typeof count === 'number') totalCount = count;
+        if (batch.length < FETCH_SIZE) break;
+        offset += FETCH_SIZE;
+      }
       return {
-        expenses: (data ?? []) as unknown as Expense[],
-        totalCount: count ?? (data ?? []).length,
+        expenses: all,
+        totalCount: totalCount || all.length,
       };
     },
     enabled: !!user,
