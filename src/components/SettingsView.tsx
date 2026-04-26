@@ -77,16 +77,25 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [portalLoading, setPortalLoading] = useState(false);
   const publicProfileRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to Public Profile when arriving via "Customize handle" link
+  // Auto-scroll + focus Public Profile when arriving via "Customize handle" link
   useEffect(() => {
     let flag: string | null = null;
     try { flag = sessionStorage.getItem('settings.focusSection'); } catch {}
     if (flag !== 'public-profile') return;
     try { sessionStorage.removeItem('settings.focusSection'); } catch {}
-    const id = window.requestAnimationFrame(() => {
-      publicProfileRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const raf = window.requestAnimationFrame(() => {
+      const el = publicProfileRef.current;
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Brief highlight + focus for clear affordance
+      el.classList.add('ring-2', 'ring-primary', 'rounded-xl', 'transition-shadow');
+      try { el.focus({ preventScroll: true }); } catch {}
+      window.setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-primary');
+      }, 1600);
+      toast.success('Customization options opened');
     });
-    return () => window.cancelAnimationFrame(id);
+    return () => window.cancelAnimationFrame(raf);
   }, []);
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
   const subscription = useSubscription();
