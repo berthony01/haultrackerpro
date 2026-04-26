@@ -810,30 +810,45 @@ export default function Admin() {
                       <TableRow>
                         <TableHead>Email</TableHead>
                         <TableHead>Plan</TableHead>
-                        <TableHead>Loads</TableHead>
-                        <TableHead>Expenses</TableHead>
+                        <TableHead className="text-right">Loads</TableHead>
+                        <TableHead className="text-right">Exp</TableHead>
+                        <TableHead className="text-right">Fuel</TableHead>
+                        <TableHead className="text-right">Pts</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((u) => (
-                        <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
-                          <TableCell className="text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <span>{u.email}</span>
-                              {u.lifecycle_opted_out && (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={u.subscription_status === 'pro' ? 'default' : 'secondary'}>
-                              {u.subscription_status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{u.loads_count}</TableCell>
-                          <TableCell>{u.expenses_count}</TableCell>
-                        </TableRow>
-                      ))}
+                      {users.map((u) => {
+                        const status = u.sub_status ?? u.subscription_status;
+                        const isTrialing = status === 'trialing';
+                        const isPaid = status === 'active' || status === 'pro';
+                        const trialDaysLeft = u.trial_end ? Math.max(0, Math.ceil((new Date(u.trial_end).getTime() - Date.now()) / 86400000)) : 0;
+                        return (
+                          <TableRow key={u.user_id} className="cursor-pointer" onClick={() => setSelectedUser(u)}>
+                            <TableCell className="text-xs">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{u.email}</span>
+                                {u.lifecycle_opted_out && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Badge variant={isPaid ? 'default' : isTrialing ? 'secondary' : 'outline'} className="text-xs">
+                                  {status}
+                                </Badge>
+                                {isTrialing && u.trial_end && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{trialDaysLeft}d</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right text-xs">{u.loads_count}</TableCell>
+                            <TableCell className="text-right text-xs">{u.expenses_count}</TableCell>
+                            <TableCell className="text-right text-xs">{u.fuel_logs_count ?? 0}</TableCell>
+                            <TableCell className="text-right text-xs">{u.driver_points_total ?? 0}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </Card>
