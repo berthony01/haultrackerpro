@@ -228,17 +228,12 @@ export default function Pricing() {
                 </span>
               )}
             </div>
-            <Button onClick={handleUpgrade} disabled={loading} className="w-full rounded-xl font-bold mb-2 gap-2" style={{
+            <Button onClick={handleUpgrade} disabled={loading} className="w-full rounded-xl font-bold mb-6 gap-2" style={{
               background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
               boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)'
             }}>
-              {loading ? 'Loading...' : 'Start Free Trial'} {!loading && <ArrowRight className="h-4 w-4" />}
+              {loading ? 'Loading...' : 'Upgrade to Pro'} {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
-            <p className="text-center text-xs font-semibold mb-6 px-3 py-1.5 rounded-full mx-auto w-fit" style={{
-              background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)'
-            }}>
-              ✨ 14-day free trial included
-            </p>
             <p className="text-xs mb-4 font-semibold" style={{ color: 'hsl(25, 95%, 60%)' }}>
               Everything in Free, plus:
             </p>
@@ -331,7 +326,7 @@ export default function Pricing() {
             Ready to Drive Smarter?
           </h2>
           <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Every new account starts with a free 14-day Pro trial. No credit card required. Experience everything, then decide.
+            Start free with unlimited load and expense tracking. Upgrade to Pro any time to unlock AI automation and advanced insights.
           </p>
           <Button onClick={() => navigate('/auth')} size="lg" className="text-base font-bold rounded-xl h-13 px-10 gap-2" style={{
             background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
