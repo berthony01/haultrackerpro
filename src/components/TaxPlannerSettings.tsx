@@ -180,7 +180,7 @@ export function TaxPlannerSettings({ settings, onSave, isPending, isPro = false 
                 <p className="text-sm font-semibold">Unlock full tax planning & quarterly breakdown with Pro.</p>
                 <p className="text-xs text-muted-foreground">SE tax, buffer, calculation base, and quarterly reminders.</p>
                 <Button size="sm" className="rounded-xl font-bold gap-1.5 mt-1" onClick={() => navigate('/pricing')}>
-                  <Crown className="h-3.5 w-3.5" /> Start Free Trial
+                  <Crown className="h-3.5 w-3.5" /> Upgrade to Pro
                 </Button>
               </div>
             )}
