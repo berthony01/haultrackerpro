@@ -105,3 +105,20 @@ export function trackFaqShareLinkCopied(faqId: string) {
 export function trackLandingFaqDeepLink(target: string) {
   gtag('event', 'landing_faq_deep_link', { target });
 }
+
+// ─── LEAD MAGNET FUNNEL ─────────────────────────────────
+export function trackLeadMagnetView(source: string) {
+  gtag('event', 'lead_magnet_view', { source });
+}
+
+export function trackLeadMagnetSubmit() {
+  gtag('event', 'lead_magnet_submit');
+}
+
+export function trackLeadMagnetDownload() {
+  gtag('event', 'lead_magnet_download');
+}
+
+export function trackLeadMagnetSignupClick() {
+  gtag('event', 'lead_magnet_signup_click');
+}
