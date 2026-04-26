@@ -37,7 +37,8 @@ export default function StarterKitThanks() {
       <SEOHead
         title="Your Free Trucker Starter Kit Is Ready | HaulTrackerPro"
         description="Download the Free Trucker Starter Kit — CDL study, checklists, and trucking guidance from HaulTrackerPro."
-        canonicalUrl="https://www.haultrackerpro.com/starter-kit/thanks"
+        path="/starter-kit/thanks"
+        noindex
       />
 
       <header className="border-b border-white/10">

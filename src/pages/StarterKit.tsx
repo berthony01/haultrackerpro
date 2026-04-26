@@ -63,7 +63,7 @@ export default function StarterKit() {
       <SEOHead
         title="Free Trucker Starter Kit — CDL Study, Checklists & Guides | HaulTrackerPro"
         description="Download the Free Trucker Starter Kit — CDL study companion, test day checklist, owner-operator paperwork list, and the first 30 days success guide. Built for new and aspiring truck drivers."
-        canonicalUrl="https://www.haultrackerpro.com/starter-kit"
+        path="/starter-kit"
       />
 
       {/* Top bar */}
