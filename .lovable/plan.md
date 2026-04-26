@@ -1,186 +1,68 @@
-# Dashboard UX Audit & Restructuring Plan
 
-## 1. Current Dashboard Inventory (in render order)
+## My take on the current /parking layout
 
-| # | Section | Component | Classification |
-|---|---|---|---|
-| 1 | Header ("Dashboard / Your hauling overview") | inline | Passive info |
-| 2 | Driver Intelligence (score + tier + best) | `DriverIntelligenceCard` | **Primary action driver** (gamified) |
-| 3 | Top Drivers leaderboard | `DriverLeaderboardCard` | **Primary action driver** (competition) |
-| 4 | Quarterly Tax Reminder | `TaxReminderBanner` | Alert |
-| 5 | Weekly Focus | `WeeklyFocusCard` | Secondary support |
-| 6 | Smart Alerts | `SmartAlertsCard` | Alert |
-| 7 | Date range presets | inline | Filter control |
-| 8 | Quick Actions (Expense / Load / Fuel) | inline grid | **Primary action driver** |
-| 9 | Home Time Mode | `HomeTimeDashboardCard` | Secondary |
-| 10 | Stat grid (Earnings/Loads/Miles/Deadhead/Pending) | `StatCard` x N | Business metric |
-| 11 | Profit Overview | `ProfitOverview` | Business metric |
-| 12 | Contribution Margin | `ContributionMarginCard` | Business metric |
-| 13 | Pro Time Saved | `ProTimeSavedCard` | Passive (Pro value) |
-| 14 | Fuel Analytics | `FuelAnalyticsCard` | Business metric |
-| 15 | Tax Estimate | `TaxEstimateCard` | Business metric |
-| 16 | Finalize Weekly Summary CTA | inline button | Action |
-| 17 | View Reports CTA | inline button | Action |
-| 18 | View Driver Scorecard CTA | inline button | Action (duplicates #2 intent) |
-| 19 | Pro Insight | `ProInsightCard` | Insight |
-| 20 | Smart Load Advisor | `SmartLoadAdvisor` | Insight |
-| 21 | Weekly Pulse | `WeeklyPulseCard` | Insight |
-| 22 | Personal Intelligence Blocks | `PersonalIntelligenceBlocks` | Insight |
-| 23 | Performance Trends | `PerformanceTrends` | Insight (chart) |
-| 24 | Performance Charts | `PerformanceCharts` | Insight (chart) |
-| 25 | Last updated + disclaimer + empty state | inline | Passive |
+You're right — the page has two real issues:
 
-## 2. Problems Identified
+1. **"Add spot" is buried.** It only lives in two places: an empty-state card (only visible if filters return zero) and a dashed "Spotted parking we don't have?" card at the very **bottom** of the list, after pagination. With 30 seeded locations and 24 per page, a user has to scroll past the entire list and the pager before they ever see it. That's the wrong place for a primary contribution action — especially since contributing is how drivers earn points (Competition Zone behavior).
+2. **The Parking feature has zero presence on the Dashboard.** Nothing in `DashboardView.tsx` references parking — not in Quick Actions, not in alerts, not in insights. A driver who hasn't memorized the bottom nav has no in-context reason to discover it. Given parking ties directly into driver points/leaderboard, that's a missed reinforcement loop.
 
-**Duplicate / overlapping purpose**
-- #2 Intelligence card and #18 "View Driver Scorecard" CTA push the same feature in two distant places.
-- #4 Tax Reminder and #15 Tax Estimate are split apart by ~10 sections.
-- #5 Weekly Focus, #16 Finalize Weekly Summary, and #21 Weekly Pulse all serve weekly-cadence intent but are scattered.
-
-**Buried high-value features**
-- Smart Load Advisor (#20), Personal Intelligence (#22), Weekly Pulse (#21) sit deep below charts — most users never scroll there.
-- Quick Actions (#8) sit *below* alerts/banners, making the primary "log something" action delayed.
-
-**Competing for attention at top**
-- Intelligence card + Leaderboard + Tax Banner + Weekly Focus + Smart Alerts all fire before the user can act. Five attention-grabbers stack before Quick Actions.
-
-**Friction**
-- New driver: sees a leaderboard with no rank, no clear "do this first" cue.
-- Active driver: must scroll past 3 banners to reach Quick Actions.
-- Pro user: their advanced insights (Personal Intelligence, Pulse, Advisor) are at the bottom — least-prominent placement for highest-value features.
-
-**Gamification not driving behavior**
-- Intelligence + Leaderboard render before Quick Actions, but there's no visual bridge between "you're 23 pts from Silver" and "log a load to earn points."
-
-## 3. Proposed Layout — 6 Zones
-
-```
-┌─ Header
-│
-├─ ZONE 1 · ACTION ZONE
-│   • Quick Actions (Expense / Load / Fuel)            ← moved up
-│   • Driver Intelligence (with next-tier hint)         ← already action-oriented
-│
-├─ ZONE 2 · COMPETITION ZONE
-│   • Driver Leaderboard (with Customize link)
-│
-├─ ZONE 3 · ALERTS (urgent only)
-│   • Tax Reminder Banner
-│   • Smart Alerts Card
-│   • Weekly Focus Card
-│
-├─ ZONE 4 · QUICK SHORTCUTS / SUPPORT
-│   • Home Time Mode
-│   • Date Range Filter
-│
-├─ ZONE 5 · BUSINESS METRICS
-│   • Stat grid (Earnings, Loads, Miles, Deadhead, Pending)
-│   • Profit Overview
-│   • Contribution Margin
-│   • Fuel Analytics
-│   • Tax Estimate
-│   • Finalize Weekly Summary CTA
-│   • View Reports CTA
-│
-├─ ZONE 6 · INSIGHTS (AI + trends)
-│   • Weekly Pulse                          ← promoted from bottom
-│   • Personal Intelligence Blocks          ← promoted
-│   • Smart Load Advisor                    ← promoted
-│   • Pro Insight
-│   • Pro Time Saved
-│   • Performance Trends
-│   • Performance Charts
-│
-└─ Footer (last updated, disclaimer, empty state)
-```
-
-**Removed redundancy:** "View Driver Scorecard" standalone CTA is removed — its function is already served by `DriverIntelligenceCard` (which links to `/scorecard` on tap). Net feature loss: zero.
-
-## 4. Current vs Proposed (visual)
-
-| Position | Current | Proposed |
-|---|---|---|
-| 1 | Intelligence | **Quick Actions** |
-| 2 | Leaderboard | Intelligence |
-| 3 | Tax Banner | Leaderboard |
-| 4 | Weekly Focus | Tax Banner |
-| 5 | Smart Alerts | Smart Alerts |
-| 6 | Date Filter | Weekly Focus |
-| 7 | **Quick Actions** | Home Time |
-| 8 | Home Time | Date Filter |
-| ... | Stats → Insights at bottom | Stats → **Insights promoted above charts** |
-
-## 5. Component Movement Plan (DashboardView.tsx only)
-
-All changes are JSX reordering inside the existing `return` block. No prop changes, no new components, no styling changes.
-
-| Move | From line | To zone | Notes |
-|---|---|---|---|
-| Quick Actions block (lines ~199–226) | mid | Top of Zone 1 | Wrap above `DriverIntelligenceCard` |
-| `TaxReminderBanner` (158) | top | Zone 3 | Group with Smart Alerts |
-| `WeeklyFocusCard` (161) | top | Zone 3 | After Smart Alerts |
-| `HomeTimeDashboardCard` (230) | mid | Zone 4 | Above date filter |
-| Date Range Filter (175–196) | mid | Zone 4 | Below Home Time |
-| `WeeklyPulseCard` (364) | bottom | Zone 6 top | Promote |
-| `PersonalIntelligenceBlocks` (367) | bottom | Zone 6 | Promote |
-| `SmartLoadAdvisor` (361) | bottom | Zone 6 | Promote |
-| "View Driver Scorecard" button (340–349) | mid | **Remove** | Redundant with Intelligence card |
-
-Add lightweight `{/* === ZONE N · NAME === */}` JSX comments to mark zones for future maintainers.
-
-## 6. Minimal Code Changes
-
-- **Single file edit:** `src/components/DashboardView.tsx`
-- **Type of change:** JSX block reordering inside existing `return`
-- **Lines touched:** ~50 lines moved, 10 lines deleted (scorecard CTA), 6 comment lines added
-- **No new files, no new props, no new imports** (one icon import — `Trophy` — can be removed if scorecard CTA is deleted)
-- **No CSS changes**
-- **No hook changes**
-- **No memory updates required** (navigation structure unchanged)
-
-## 7. Risks
-
-| Risk | Likelihood | Mitigation |
-|---|---|---|
-| Users miss Tax Banner now lower in Zone 3 | Low | Banner self-dismisses with date logic; still above the fold on most viewports after Quick Actions + Intelligence + Leaderboard |
-| Removing "View Driver Scorecard" CTA breaks discoverability | Low | Intelligence card already navigates to `/scorecard` on tap; bottom-nav unchanged |
-| Date filter moving down delays metric customization | Low | Default `this_week` covers >80% of intent; users who change ranges will scroll once |
-| Visual regression from JSX reorder | Very low | No styling, no Tailwind class changes |
-| Mobile scroll order tested wrong | Low | Mobile-first preserved — same single-column flow |
-
-## 8. Phased Rollout
-
-**Phase D1 — Action Zone & Alert grouping** (single PR)
-- Move Quick Actions to top
-- Group Tax Banner + Smart Alerts + Weekly Focus into Zone 3
-- Move Home Time + Date Filter into Zone 4
-- Verify: top of dashboard now shows Quick Actions → Intelligence → Leaderboard
-
-**Phase D2 — Insight promotion**
-- Move Weekly Pulse, Personal Intelligence, Smart Load Advisor above Performance Trends
-- Keep charts at bottom (passive)
-
-**Phase D3 — Cleanup**
-- Remove redundant "View Driver Scorecard" button
-- Add zone comment markers
-- Remove unused `Trophy` import if applicable
-
-Each phase is independently shippable and reversible.
-
-## 9. Testing Checklist (post-implementation)
-
-- [ ] Dashboard renders with no console errors
-- [ ] Quick Actions visible without scrolling on 375×812 viewport
-- [ ] Intelligence card still navigates to `/scorecard`
-- [ ] Leaderboard "Customize handle" link still works
-- [ ] Tax Banner still appears when due
-- [ ] Smart Alerts dismiss still functions
-- [ ] Date filter still scopes stat grid + Profit Overview + Contribution Margin
-- [ ] Empty state still renders when `filteredLoads.length === 0`
-- [ ] TypeScript clean
-- [ ] Free / Pro / trial / new-user variants all render
-- [ ] Bottom nav unchanged
+Layout strengths worth keeping: the hero header with the 3 stat tiles (Locations / Reports today / Your points) is clean and on-brand, the segmented filters work well, and the per-card confidence badge is informative. So the fix is **promotion + discoverability**, not a redesign.
 
 ---
 
-**Awaiting approval to proceed with Phase D1.**
+## Proposed changes (Phase P1 — discoverability only)
+
+### 1. Promote "Add spot" to the top of the Parking page
+**File:** `src/components/parking/ParkingFinder.tsx`
+
+- Add a compact primary "Add spot" button in the **search row** (right of the "Near me" button), so it's visible above the fold on every viewport.
+  - Mobile: icon-only (`Plus` / `Lock` for free users) to keep the row tight.
+  - Desktop (`sm:`): icon + "Add spot" label + small "Pro" pill if `!hasAccess`.
+  - Reuses the existing `handleAddClick` handler — no new logic, no new modals.
+- **Keep** the bottom dashed CTA card as-is. It's a nice secondary nudge with copy ("Spotted parking we don't have?") and points context, and removing it would lose that motivation. Two entry points is fine when one is primary placement and the other is contextual.
+- Empty-state CTA stays unchanged.
+
+### 2. Add Parking entry on the Dashboard
+**File:** `src/components/DashboardView.tsx`
+
+Smallest, highest-signal addition: extend the existing **Quick Actions** row from a 3-column grid (Expense / Load / Fuel) to a **4-column grid** (Expense / Load / Fuel / **Parking**).
+
+- New button uses the existing `ParkingCircle` lucide icon (already imported in `Parking.tsx`), label "Parking", routes via `onNavigate('parking')`.
+- Same styling as the other three (`h-11`, `rounded-xl`, `border-primary/20`, `text-primary`) so it visually belongs to the Action Zone.
+- Verify `App.tsx` / `Index.tsx` `onNavigate` already routes `'parking'` → `/parking`. If not, add the case (one-line switch entry).
+- This keeps the Action Zone consistent with the dashboard restructuring we just shipped, and surfaces parking exactly where a driver decides "what do I do next."
+
+### 3. (Optional, only if approved) Lightweight Parking nudge in alerts zone
+Skip for now unless you want it. Would add a tiny "Verify parking near you to earn points" line inside `SmartAlertsCard` when `geo.coords` is available and the user has 0 reports today — but that touches alerts logic and is better as a follow-up phase.
+
+---
+
+## Files likely changed
+- `src/components/parking/ParkingFinder.tsx` — add Add-spot button to search row
+- `src/components/DashboardView.tsx` — Quick Actions grid → 4 cols + new Parking button
+- `src/pages/Index.tsx` (or wherever `onNavigate` is handled) — confirm/add `'parking'` route case
+
+## Exact behavior after change
+- On `/parking`: top search row shows `[Search input] [Near me] [Add spot]`. Tapping "Add spot" opens `AddParkingModal` for Pro/trial, or `ProUpgradeModal` for free users (unchanged handler).
+- On `/dashboard`: Quick Actions row shows 4 equal-width buttons. Tapping "Parking" navigates to `/parking`.
+- Bottom dashed CTA card on `/parking` remains for reinforcement.
+- No data, RLS, hooks, or Pro-gating logic changes.
+
+## Risks
+- **Mobile width on 4-col grid:** at ~360px viewport, four `h-11` buttons with icon + 4–7 char labels is tight but workable (each ~80px). Will keep `text-xs`, `gap-1.5`, and `shrink-0` on icons; labels stay short ("Parking" fits). If too cramped in QA, fallback is a 2×2 grid — but I'll only switch if visually broken.
+- **`onNavigate('parking')` wiring:** if the parent doesn't already handle this case, the button is a no-op. Need to verify in `Index.tsx` during implementation.
+- **Add-spot in search row visual balance:** three buttons next to a search input can feel busy. Mitigated by icon-only on mobile.
+- No risk to leaderboard, scorecard, parking points, Stripe, or navigation — all untouched.
+
+## Testing checklist
+- [ ] `/parking`: "Add spot" visible without scrolling on 360px, 768px, 1121px viewports
+- [ ] Free user → tapping "Add spot" (top OR bottom) opens `ProUpgradeModal` with "Pro" pill visible
+- [ ] Pro/trial user → tapping "Add spot" opens `AddParkingModal`
+- [ ] Bottom dashed CTA still renders and still works
+- [ ] Empty-state (apply unmatched filter) still shows its inline Add button
+- [ ] `/dashboard`: Quick Actions row shows 4 buttons, no wrap, on mobile + desktop
+- [ ] Tapping "Parking" on dashboard navigates to `/parking`
+- [ ] No regressions to Expense / Load / Fuel buttons
+- [ ] `tsc --noEmit` clean
+
+Awaiting approval before implementing.

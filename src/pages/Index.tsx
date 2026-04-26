@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import SEOHead from '@/components/SEOHead';
@@ -315,9 +316,15 @@ const Index = () => {
     setPage('add');
   };
 
+  const navigate = useNavigate();
+
   const handleNavigate = (p: string, options?: { filter?: string }) => {
     if (p === 'add') {
       setShowAddModal(true);
+      return;
+    }
+    if (p === 'parking') {
+      navigate('/parking');
       return;
     }
     setEditingLoad(null);
