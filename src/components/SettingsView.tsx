@@ -378,6 +378,36 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             </div>
           </div>
 
+          {/* Deadhead Pay default — applied to new loads automatically */}
+          <div className="space-y-2 rounded-xl border border-border/60 p-3 bg-muted/30">
+            <Label className="text-xs font-semibold">Do you get paid for Deadhead miles?</Label>
+            <Select value={defaultDhPayStatus} onValueChange={(v) => setDefaultDhPayStatus(v as 'unpaid' | 'same' | 'custom')}>
+              <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unpaid">No — deadhead is unpaid</SelectItem>
+                <SelectItem value="same">Yes — same rate as loaded miles</SelectItem>
+                <SelectItem value="custom">Yes — custom rate per mile</SelectItem>
+              </SelectContent>
+            </Select>
+            {defaultDhPayStatus === 'custom' && (
+              <div className="relative">
+                <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 0.85"
+                  value={defaultDhPayRate}
+                  onChange={e => setDefaultDhPayRate(e.target.value)}
+                  className="h-10 pl-8 text-sm rounded-xl"
+                />
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              New loads will use this as the default. You can still override it per load.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Week Starts On</Label>
