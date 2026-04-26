@@ -26,6 +26,7 @@ export default function Privacy() {
           <h3 className="text-base font-bold">1. Information We Collect</h3>
           <ul className="list-disc list-inside text-muted-foreground space-y-1">
             <li>Email address (for account creation and authentication)</li>
+            <li>Email address and optional first name submitted via free resource downloads (e.g., the Free Trucker Starter Kit) — used only to deliver the requested resource and occasional related updates. You can unsubscribe at any time.</li>
             <li>Load data (pickup/dropoff locations, miles, rates, fees)</li>
             <li>Expense data (categories, amounts, dates)</li>
             <li>Usage data (app interactions for product improvement)</li>
