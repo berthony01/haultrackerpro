@@ -271,6 +271,12 @@ export function parseLoadText(text: string): ParsedLoadData {
     }
   }
 
+  // Defensive guard: a single number can't be both loaded AND deadhead.
+  // If they ended up equal AND there's only one mileage token in the source, drop deadhead.
+  if (dh && loaded && dh === loaded && mileageMatches.length <= 1) {
+    dh = undefined;
+  }
+
   if (dh) result.deadhead_miles = dh;
   if (loaded) result.loaded_miles = loaded;
 
