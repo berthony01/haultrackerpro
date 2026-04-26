@@ -399,6 +399,39 @@ export default function Admin() {
     setSuppressedLoading(false);
   }, [api]);
 
+  const fetchParking = useCallback(async () => {
+    setParkingLoading(true);
+    const [overviewData, reportsData] = await Promise.all([
+      api.get('parking-overview'),
+      api.get('list-parking-reports', { limit: '50' }),
+    ]);
+    if (overviewData) setParkingOverview(overviewData);
+    if (reportsData?.reports) setParkingReports(reportsData.reports);
+    setParkingLoading(false);
+  }, [api]);
+
+  const fetchDrivers = useCallback(async () => {
+    setDriversLoading(true);
+    const [overviewData, lbData] = await Promise.all([
+      api.get('driver-points-overview'),
+      api.get('driver-leaderboard', { limit: '25' }),
+    ]);
+    if (overviewData) setDriverOverview(overviewData);
+    if (lbData?.rows) setLeaderboard(lbData.rows);
+    setDriversLoading(false);
+  }, [api]);
+
+  const fetchLeads = useCallback(async () => {
+    setLeadsLoading(true);
+    const [overviewData, signupsData] = await Promise.all([
+      api.get('lead-magnet-overview'),
+      api.get('list-lead-magnet-signups', { limit: '100' }),
+    ]);
+    if (overviewData) setLeadOverview(overviewData);
+    if (signupsData?.signups) setLeadSignups(signupsData.signups);
+    setLeadsLoading(false);
+  }, [api]);
+
   const handleRemoveSuppression = useCallback(async () => {
     if (!removeSuppressionConfirm) return;
     const res = await api.post('remove-suppression', { email: removeSuppressionConfirm.email });
