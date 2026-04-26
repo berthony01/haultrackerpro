@@ -68,6 +68,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [payType, setPayType] = useState('cpm');
   const [payPercentage, setPayPercentage] = useState('');
   const [companyStartDate, setCompanyStartDate] = useState<Date | undefined>(undefined);
+  const [defaultDhPayStatus, setDefaultDhPayStatus] = useState<'unpaid' | 'same' | 'custom'>('unpaid');
+  const [defaultDhPayRate, setDefaultDhPayRate] = useState('');
   const [lifecycleEmailsOptIn, setLifecycleEmailsOptIn] = useState(true);
   const [savingEmailPref, setSavingEmailPref] = useState(false);
   const [initialized, setInitialized] = useState(false);
