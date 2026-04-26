@@ -142,6 +142,21 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
+  // Deadhead revenue layer (Phase 5).
+  // Skipped for percentage pay (gross already includes everything).
+  const deadheadRevenue = useMemo(() => {
+    if (isCancelled || isPercentagePay) return 0;
+    const dhMiles = parseFloat(form.deadhead_miles) || 0;
+    if (dhMiles <= 0) return 0;
+    if (form.dh_pay_status === 'same') {
+      return dhMiles * (parseFloat(form.rate_per_mile) || 0);
+    }
+    if (form.dh_pay_status === 'custom') {
+      return dhMiles * (parseFloat(form.dh_pay_rate) || 0);
+    }
+    return 0; // unpaid
+  }, [form.deadhead_miles, form.rate_per_mile, form.dh_pay_status, form.dh_pay_rate, isCancelled, isPercentagePay]);
+
   const estimated = useMemo(() => {
     if (isCancelled) return 0;
     // Percentage-based pay calculation
@@ -150,15 +165,15 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       const pct = Number(settings.pay_percentage) / 100;
       return grossRev * pct + (parseFloat(form.wait_fee) || 0) + (parseFloat(form.detention_fee) || 0) + (parseFloat(form.other_fees) || 0);
     }
-    // CPM-based pay calculation (default)
+    // CPM-based pay calculation (default) + paid deadhead layer
     return calculateEstimatedPay(
       parseFloat(form.loaded_miles) || 0,
       parseFloat(form.rate_per_mile) || 0,
       parseFloat(form.wait_fee) || 0,
       parseFloat(form.detention_fee) || 0,
       parseFloat(form.other_fees) || 0
-    );
-  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage]);
+    ) + deadheadRevenue;
+  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage, deadheadRevenue]);
 
   // Phase 3: Pre-load profit check (deterministic, personal-history based)
   const profitCheckInput = useMemo(() => {
