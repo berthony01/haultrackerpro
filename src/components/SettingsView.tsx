@@ -292,7 +292,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       </Card>
 
       {/* Public Profile (leaderboard handle) */}
-      <div ref={publicProfileRef}>
+      <div ref={publicProfileRef} tabIndex={-1} className="outline-none scroll-mt-20">
         <PublicProfileSection />
       </div>
 
