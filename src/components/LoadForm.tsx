@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { DateInput } from '@/components/ui/date-input';
 import { calculateEstimatedPay } from '@/lib/types';
-import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown } from 'lucide-react';
+import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
@@ -22,6 +22,37 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
 import { useProfitCheck } from '@/hooks/useProfitCheck';
 import { ProfitCheckCard } from '@/components/ProfitCheckCard';
+
+/**
+ * Deadhead pay status persisted inside the load `notes` field as a structured tag
+ * (no DB migration). Format: `[dh_pay:unpaid]` or `[dh_pay:same]` or `[dh_pay:custom:0.85]`.
+ */
+type DhPayStatus = 'unpaid' | 'same' | 'custom';
+const DH_TAG_RE = /\s*\[dh_pay:(unpaid|same|custom)(?::([\d.]+))?\]\s*/i;
+
+function readDhFromNotes(notes: string | null | undefined): { status: DhPayStatus; rate: string; cleanNotes: string } {
+  if (!notes) return { status: 'unpaid', rate: '', cleanNotes: '' };
+  const m = notes.match(DH_TAG_RE);
+  if (!m) return { status: 'unpaid', rate: '', cleanNotes: notes };
+  return {
+    status: m[1].toLowerCase() as DhPayStatus,
+    rate: m[2] ?? '',
+    cleanNotes: notes.replace(DH_TAG_RE, ' ').trim(),
+  };
+}
+
+function writeDhToNotes(cleanNotes: string, status: DhPayStatus, rate: string): string | null {
+  const tag =
+    status === 'custom' && rate ? `[dh_pay:custom:${rate}]`
+    : status === 'same' ? `[dh_pay:same]`
+    : status === 'unpaid' ? `[dh_pay:unpaid]`
+    : '';
+  const base = (cleanNotes || '').trim();
+  if (!tag) return base || null;
+  // Default 'unpaid' with no notes → keep notes null to avoid noise.
+  if (status === 'unpaid' && !base) return null;
+  return `${base}${base ? ' ' : ''}${tag}`.trim();
+}
 
 interface LoadFormProps {
   onSubmit: (data: LoadInsert, stops?: LoadStopInput[]) => void;
