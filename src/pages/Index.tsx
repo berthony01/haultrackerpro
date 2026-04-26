@@ -393,20 +393,24 @@ const Index = () => {
           <>
             {page === 'dashboard' && (
               <>
-                {isTrialing && trialEnd && (
-                  <TrialBanner trialEnd={trialEnd} onUpgrade={handleUpgrade} />
+                {!subscription.isLoading && (
+                  <>
+                    {isTrialing && trialEnd && (
+                      <TrialBanner trialEnd={trialEnd} onUpgrade={handleUpgrade} />
+                    )}
+                    {trialExpired && (
+                      <TrialExpiredBanner onUpgrade={handleUpgrade} />
+                    )}
+                    <MilestoneNudges
+                      loadsCount={allLoadsQuery.loads.length}
+                      expensesCount={allExpensesQuery.expenses.length}
+                      isTrialing={isTrialing}
+                      isPro={isPro}
+                      onUpgrade={handleUpgrade}
+                      onNavigate={handleNavigate}
+                    />
+                  </>
                 )}
-                {trialExpired && (
-                  <TrialExpiredBanner onUpgrade={handleUpgrade} />
-                )}
-                <MilestoneNudges
-                  loadsCount={allLoadsQuery.loads.length}
-                  expensesCount={allExpensesQuery.expenses.length}
-                  isTrialing={isTrialing}
-                  isPro={isPro}
-                  onUpgrade={handleUpgrade}
-                  onNavigate={handleNavigate}
-                />
                 <DashboardView
                   loads={allLoadsQuery.loads}
                   expenses={allExpensesQuery.expenses}
