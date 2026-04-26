@@ -1,5 +1,5 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, Receipt, TrendingUp, DollarSign, Truck, Sparkles, Gauge, MapPin, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Receipt, TrendingUp, DollarSign, Truck, Sparkles, Gauge, MapPin, CheckCircle2, ParkingCircle, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 
@@ -123,6 +123,36 @@ export default function TruckingFinanceGuides() {
             </section>
           );
         })}
+
+        {/* Driver Tools — Parking + Starter Kit */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <ParkingCircle className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-black font-heading">Driver Tools & Free Resources</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Link
+              to="/pricing"
+              className="flex items-start gap-3 p-4 rounded-xl border border-border bg-card shadow-sm hover:border-primary/40 transition-colors group"
+            >
+              <ParkingCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Real-Time Parking Finder (Pro)</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Find safe truck parking with live availability reports from drivers. Included with Pro + 14-day free trial.</div>
+              </div>
+            </Link>
+            <Link
+              to="/starter-kit"
+              className="flex items-start gap-3 p-4 rounded-xl border border-border bg-card shadow-sm hover:border-primary/40 transition-colors group"
+            >
+              <Trophy className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <div>
+                <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Free Trucker Starter Kit</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Six free PDFs — CDL study, test-day checklist, owner-operator paperwork, and more. No credit card.</div>
+              </div>
+            </Link>
+          </div>
+        </section>
 
         {/* CTA */}
         <section className="text-center py-8 space-y-4 rounded-xl border border-primary/20 bg-primary/5 p-6">
