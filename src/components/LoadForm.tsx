@@ -253,7 +253,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       detention_fee: parseFloat(form.detention_fee) || 0,
       other_fees: parseFloat(form.other_fees) || 0,
       actual_pay_received: form.actual_pay_received ? parseFloat(form.actual_pay_received) : null,
-      notes: form.notes.trim() || null,
+      notes: writeDhToNotes(form.notes.trim(), form.dh_pay_status, form.dh_pay_rate),
       status: finalStatus,
       gross_revenue: form.gross_revenue ? parseFloat(form.gross_revenue) : null,
       invoice_submitted_date: form.invoice_submitted_date || null,
