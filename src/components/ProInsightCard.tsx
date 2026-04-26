@@ -32,7 +32,7 @@ export function ProInsightCard({ loads, expenses, isPro, isTrialing = false, onN
   const navigate = useNavigate();
 
   const insight = useMemo((): InsightData | null => {
-    // Don't compute for Pro or trialing users, or users with < 3 loads
+    // Don't compute for Pro users, or users with < 3 loads
     if (isPro || isTrialing || loads.length < 3) return null;
     const now = new Date();
 
