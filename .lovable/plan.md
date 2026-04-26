@@ -1,68 +1,119 @@
+## Strict Platform Audit + Parking Export Plan
 
-## My take on the current /parking layout
-
-You're right — the page has two real issues:
-
-1. **"Add spot" is buried.** It only lives in two places: an empty-state card (only visible if filters return zero) and a dashed "Spotted parking we don't have?" card at the very **bottom** of the list, after pagination. With 30 seeded locations and 24 per page, a user has to scroll past the entire list and the pager before they ever see it. That's the wrong place for a primary contribution action — especially since contributing is how drivers earn points (Competition Zone behavior).
-2. **The Parking feature has zero presence on the Dashboard.** Nothing in `DashboardView.tsx` references parking — not in Quick Actions, not in alerts, not in insights. A driver who hasn't memorized the bottom nav has no in-context reason to discover it. Given parking ties directly into driver points/leaderboard, that's a missed reinforcement loop.
-
-Layout strengths worth keeping: the hero header with the 3 stat tiles (Locations / Reports today / Your points) is clean and on-brand, the segmented filters work well, and the per-card confidence badge is informative. So the fix is **promotion + discoverability**, not a redesign.
+I investigated the two bugs you described, ran a tight audit on the highest-risk areas, and scoped the new parking export feature. Below: confirmed findings, then the implementation plan.
 
 ---
 
-## Proposed changes (Phase P1 — discoverability only)
+## 🔍 Audit findings (confirmed, not guesses)
 
-### 1. Promote "Add spot" to the top of the Parking page
-**File:** `src/components/parking/ParkingFinder.tsx`
+### 🐞 BUG 1 — "Add spot" button flicker on /parking
+**Root cause:** In `ParkingFinder.tsx` (lines 174–182), the button's icon (`Plus` vs `Lock`), label suffix ("Pro"), and `aria-label` all switch based on `hasAccess`. `hasAccess` comes from `useSubscription()` inside `AddParkingModal`, but `ParkingFinder` receives it as a prop from `Parking.tsx`. While `useSubscription` is resolving, `isPro`/`isTrialing` momentarily read as `false`, so the button briefly renders **Lock + "Pro"**, then snaps to **Plus + "Add spot"** when the query resolves. That's the "flicker / shift" you see.
 
-- Add a compact primary "Add spot" button in the **search row** (right of the "Near me" button), so it's visible above the fold on every viewport.
-  - Mobile: icon-only (`Plus` / `Lock` for free users) to keep the row tight.
-  - Desktop (`sm:`): icon + "Add spot" label + small "Pro" pill if `!hasAccess`.
-  - Reuses the existing `handleAddClick` handler — no new logic, no new modals.
-- **Keep** the bottom dashed CTA card as-is. It's a nice secondary nudge with copy ("Spotted parking we don't have?") and points context, and removing it would lose that motivation. Two entry points is fine when one is primary placement and the other is contextual.
-- Empty-state CTA stays unchanged.
+**Fix:** Render a neutral placeholder (just the icon, no text) while `subscription.isLoading`, then swap to the real state — same pattern already used elsewhere (per `mem://ui/design-patterns-ux`).
 
-### 2. Add Parking entry on the Dashboard
-**File:** `src/components/DashboardView.tsx`
+### 🐞 BUG 2 — Brief flash at top of dashboard on return
+**Root cause:** In `src/pages/Index.tsx` (lines 396–409), three components render *before* `subscription.isLoading` resolves:
+- `<TrialBanner>` (gated on `isTrialing && trialEnd`)
+- `<TrialExpiredBanner>` (gated on `trialExpired` — which is `true` momentarily when defaults are `isPro=false, isTrialing=false`)
+- `<MilestoneNudges>` (renders upgrade nudges immediately)
 
-Smallest, highest-signal addition: extend the existing **Quick Actions** row from a 3-column grid (Expense / Load / Fuel) to a **4-column grid** (Expense / Load / Fuel / **Parking**).
+On a return navigation, `useSubscription` re-validates → defaults flicker visible for ~1 frame → real values arrive → banner disappears. This is the "something flashes for a split second" you saw.
 
-- New button uses the existing `ParkingCircle` lucide icon (already imported in `Parking.tsx`), label "Parking", routes via `onNavigate('parking')`.
-- Same styling as the other three (`h-11`, `rounded-xl`, `border-primary/20`, `text-primary`) so it visually belongs to the Action Zone.
-- Verify `App.tsx` / `Index.tsx` `onNavigate` already routes `'parking'` → `/parking`. If not, add the case (one-line switch entry).
-- This keeps the Action Zone consistent with the dashboard restructuring we just shipped, and surfaces parking exactly where a driver decides "what do I do next."
+**Fix:** Guard the entire trial-banner + nudge block with `!subscription.isLoading`.
 
-### 3. (Optional, only if approved) Lightweight Parking nudge in alerts zone
-Skip for now unless you want it. Would add a tiny "Verify parking near you to earn points" line inside `SmartAlertsCard` when `geo.coords` is available and the user has 0 reports today — but that touches alerts logic and is better as a follow-up phase.
+### 🐞 BUG 3 — React ref warning in AddParkingModal (console)
+**Confirmed in console logs:** `Warning: Function components cannot be given refs. ... Check the render method of AddParkingModal.`
+
+**Root cause:** The `SegBtn` style isn't the issue; the warning trace points at `DialogFooter > Button` where one of the `Button`s inside `AddParkingModal` is being given a ref by Radix's focus trap. The `Button` from shadcn already uses `forwardRef`, so the actual culprit is the `<Switch>` inline label or the `Use my current location` Button being wrapped weirdly — but the most likely cause is React StrictMode double-invoking + Radix trying to autofocus the first focusable child. Need to verify by inspecting whether any custom inline component (e.g. the helper "Use my location" button or the `SegBtn`-like wrappers) is missing `forwardRef`. Will inspect & patch in implementation.
+
+### 🔎 Wider audit — issues worth flagging
+
+| Severity | Area | Finding |
+|---|---|---|
+| 🟡 Med | `Index.tsx:325` | `Finalize Weekly Summary` button has dead-code condition `(showCloseoutButton || true)` — always renders. Either remove the override or remove the variable. |
+| 🟡 Med | `useExpenses.ts` | Default page size 50, but dashboard pulls **all** expenses with `useExpenses()` (no pagination). With heavy users this fetches up to 1000 (Supabase cap) silently — already noted in `mem://architecture/data-strategy`, but no UI warning when capped. |
+| 🟡 Med | `DashboardView.tsx:325` | `(showCloseoutButton || true)` — same dead override visible here too. |
+| 🟢 Low | `ParkingFinder.tsx:166` | `geo.request` button has no error toast, only inline `geo.error` text — easy to miss. |
+| 🟢 Low | `AddParkingModal.tsx` | No address autocomplete; lat/lng manual entry is error-prone. Out of scope for this pass but worth noting. |
+| 🟢 Low | `DashboardView` | Quick Actions grid is now `grid-cols-4` on a 320px viewport — the icon+label may wrap awkwardly on the smallest phones. Will spot-check. |
+| 🟢 Low | Console | `react-helmet-async` deprecation noise in dev builds (cosmetic, no action). |
+
+I did **not** find: missing RLS policies, broken routes, type errors, or any data-loss bugs.
 
 ---
 
-## Files likely changed
-- `src/components/parking/ParkingFinder.tsx` — add Add-spot button to search row
-- `src/components/DashboardView.tsx` — Quick Actions grid → 4 cols + new Parking button
-- `src/pages/Index.tsx` (or wherever `onNavigate` is handled) — confirm/add `'parking'` route case
+## 🎯 Feature: Parking expense export (CSV + PDF)
 
-## Exact behavior after change
-- On `/parking`: top search row shows `[Search input] [Near me] [Add spot]`. Tapping "Add spot" opens `AddParkingModal` for Pro/trial, or `ProUpgradeModal` for free users (unchanged handler).
-- On `/dashboard`: Quick Actions row shows 4 equal-width buttons. Tapping "Parking" navigates to `/parking`.
-- Bottom dashed CTA card on `/parking` remains for reinforcement.
-- No data, RLS, hooks, or Pro-gating logic changes.
+### Concept
+On the **Expenses** page, add an **"Export Parking"** action that lets you pick **This Week / Last Week / This Month / Last Month / Custom range**, then exports just `category = 'Parking'` expenses as **CSV** or **PDF** receipt-style summary, suitable to attach to load paperwork.
 
-## Risks
-- **Mobile width on 4-col grid:** at ~360px viewport, four `h-11` buttons with icon + 4–7 char labels is tight but workable (each ~80px). Will keep `text-xs`, `gap-1.5`, and `shrink-0` on icons; labels stay short ("Parking" fits). If too cramped in QA, fallback is a 2×2 grid — but I'll only switch if visually broken.
-- **`onNavigate('parking')` wiring:** if the parent doesn't already handle this case, the button is a no-op. Need to verify in `Index.tsx` during implementation.
-- **Add-spot in search row visual balance:** three buttons next to a search input can feel busy. Mitigated by icon-only on mobile.
-- No risk to leaderboard, scorecard, parking points, Stripe, or navigation — all untouched.
+### Why scope it to Expenses page (not Parking page)
+Parking expenses live in the `expenses` table with `category = 'Parking'` (already in `EXPENSE_CATEGORIES`). The `parking_locations` table is the *crowdsourced finder*, not personal spend. Tying export to the expenses table = single source of truth, no schema changes needed.
 
-## Testing checklist
-- [ ] `/parking`: "Add spot" visible without scrolling on 360px, 768px, 1121px viewports
-- [ ] Free user → tapping "Add spot" (top OR bottom) opens `ProUpgradeModal` with "Pro" pill visible
-- [ ] Pro/trial user → tapping "Add spot" opens `AddParkingModal`
-- [ ] Bottom dashed CTA still renders and still works
-- [ ] Empty-state (apply unmatched filter) still shows its inline Add button
-- [ ] `/dashboard`: Quick Actions row shows 4 buttons, no wrap, on mobile + desktop
-- [ ] Tapping "Parking" on dashboard navigates to `/parking`
-- [ ] No regressions to Expense / Load / Fuel buttons
-- [ ] `tsc --noEmit` clean
+### CSV columns
+`Date, Category, Amount, Linked Load (Pickup → Dropoff), Notes`
 
-Awaiting approval before implementing.
+### PDF layout
+- HaulTrackerPro header (driver name from settings, date range)
+- Table of parking expenses (same columns)
+- Totals row (count + sum)
+- Footer: "Submitted with load paperwork — generated by HaulTrackerPro"
+
+Uses `jspdf` + `jspdf-autotable` (already common pattern; will add as deps if not present).
+
+### Optional polish
+A small "Export Parking" button in the dashboard parking quick-action area is **not** included — keeping the Quick Actions grid clean. Export lives on the Expenses page where receipts already live.
+
+---
+
+## 📐 Implementation plan (phased)
+
+### Phase 1 — Bug fixes (small, surgical)
+1. **`ParkingFinder.tsx`**: Accept `subscriptionLoading` from parent (or read `useSubscription` directly). While loading, render Add button with just `<Plus />` icon, no Pro pill, no label swap.
+2. **`Index.tsx`**: Wrap the `TrialBanner` / `TrialExpiredBanner` / `MilestoneNudges` block with `{!subscription.isLoading && (...)}` to eliminate dashboard top flash.
+3. **`AddParkingModal.tsx`**: Inspect & resolve the ref warning. Likely fix: ensure no inline arrow-component definitions inside JSX, and confirm all custom buttons use shadcn `<Button>` (which forwards refs). If issue persists, wrap the modal body in a `forwardRef`-friendly fragment.
+4. **`DashboardView.tsx` + `Index.tsx`**: Remove the dead `|| true` override on `showCloseoutButton`.
+
+### Phase 2 — Parking expense export
+1. Create `src/lib/parkingExport.ts` with two pure functions:
+   - `exportParkingCSV(expenses, loads, range)` → triggers download
+   - `exportParkingPDF(expenses, loads, range, driverName)` → triggers download
+2. Add `<ParkingExportButton />` (new file `src/components/ParkingExportButton.tsx`):
+   - Dropdown with: range presets, format (CSV/PDF), Export action.
+   - Filters `expenses` by `category === 'Parking'` and date range.
+3. Mount it in `ExpensesListView.tsx` next to the existing list header.
+4. Install deps if missing: `jspdf`, `jspdf-autotable`.
+5. Add a small "📤 Export parking" hint in the empty-state of parking expenses (when none exist yet) so users know the feature exists.
+
+### Phase 3 — Verification
+- TypeScript build clean (`tsc --noEmit`).
+- Test: log a parking expense → open Expenses → Export → CSV downloads with correct rows → PDF downloads readable.
+- Test: dashboard return → no banner flash.
+- Test: parking page → button renders cleanly without flicker.
+- Test: console clean of the ref warning.
+
+---
+
+## ⚠️ Risk analysis
+| Risk | Mitigation |
+|---|---|
+| Loading-state guards hide legitimate UI longer than needed | Use `isLoading` only, not extra timers. Spec already shows ~50–200ms typical. |
+| jspdf bundle size (+~200KB) | Lazy-import inside the export handler so it doesn't ship in the main bundle. |
+| Dead-code removal breaks closeout flow | Verify `showCloseoutButton` is unused after removal; if in doubt, keep the variable but render conditionally without `|| true`. |
+| Ref warning has multiple possible sources | If the surface fix doesn't clear it, escalate to forwardRef wrapper — won't block other fixes. |
+
+---
+
+## 📦 Files touched
+- `src/components/parking/ParkingFinder.tsx` (bug fix)
+- `src/components/parking/AddParkingModal.tsx` (ref warning)
+- `src/pages/Index.tsx` (dashboard flash + dead code)
+- `src/components/DashboardView.tsx` (dead code)
+- `src/components/ExpensesListView.tsx` (mount export button)
+- `src/components/ParkingExportButton.tsx` (new)
+- `src/lib/parkingExport.ts` (new)
+- `package.json` (jspdf, jspdf-autotable if missing)
+
+**Nothing removed. No DB changes. No route changes. No design-system changes.**
+
+Approve and I'll execute Phase 1 → 2 → 3 in order.
