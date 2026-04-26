@@ -79,11 +79,10 @@ Deno.serve(async (req) => {
       const sevenDaysAgoDate = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
       const sevenDaysAgoIso = new Date(Date.now() - 7 * 86400000).toISOString();
       const thirtyDaysAgoIso = new Date(Date.now() - 30 * 86400000).toISOString();
-      const nowIso = new Date().toISOString();
       const [
         users, loads, loads7d, expenses, expenses7d,
         fuel, fuel7d, recurringActive,
-        subsTrialing, subsActive, subsFree,
+        subsActive, subsTrialing, subsFree, subsCanceled,
         parkingLocs, parkingReports7d, parkingVerifs7d,
         driverPointsActive,
         leadsTotal, leads7d, leads30d,
@@ -97,9 +96,11 @@ Deno.serve(async (req) => {
         adminDb.from("fuel_logs").select("id", { count: "exact", head: true }),
         adminDb.from("fuel_logs").select("id", { count: "exact", head: true }).gte("date", sevenDaysAgoDate),
         adminDb.from("recurring_expense_templates").select("id", { count: "exact", head: true }).eq("is_active", true),
-        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "trialing").gt("trial_end", nowIso),
         adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active"),
-        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).in("status", ["free", "canceled"]),
+        // Trialing users have full Pro access — folded into active_pro, not exposed as its own KPI.
+        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "trialing"),
+        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "free"),
+        adminDb.from("subscriptions").select("id", { count: "exact", head: true }).in("status", ["canceled", "past_due", "unpaid", "incomplete_expired"]),
         adminDb.from("parking_locations").select("id", { count: "exact", head: true }),
         adminDb.from("parking_reports").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
         adminDb.from("parking_verifications").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
@@ -111,11 +112,15 @@ Deno.serve(async (req) => {
         adminDb.from("expense_automation_logs").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
         adminDb.from("ai_insights").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
       ]);
+      const totalUsers = users.count ?? 0;
+      const activePro = (subsActive.count ?? 0) + (subsTrialing.count ?? 0);
+      const conversionRate = totalUsers > 0 ? Math.round((activePro / totalUsers) * 1000) / 10 : 0;
       return json({
-        total_users: users.count ?? 0,
-        subs_trialing: subsTrialing.count ?? 0,
-        subs_active: subsActive.count ?? 0,
+        total_users: totalUsers,
         subs_free: subsFree.count ?? 0,
+        subs_active_pro: activePro,
+        subs_canceled: subsCanceled.count ?? 0,
+        pro_conversion_rate: conversionRate,
         total_loads: loads.count ?? 0,
         loads_7d: loads7d.count ?? 0,
         total_expenses: expenses.count ?? 0,
@@ -317,16 +322,16 @@ Deno.serve(async (req) => {
       const userIdsForPage = paginated.map((p) => p.user_id);
       const [{ data: settingsRows }, { data: subsRows }, { data: pointsRows }] = await Promise.all([
         adminDb.from("user_settings").select("user_id, lifecycle_emails_opt_in").in("user_id", userIdsForPage),
-        adminDb.from("subscriptions").select("user_id, status, plan_key, trial_end").in("user_id", userIdsForPage),
+        adminDb.from("subscriptions").select("user_id, status, plan_key").in("user_id", userIdsForPage),
         adminDb.from("driver_points").select("user_id, total_points").in("user_id", userIdsForPage),
       ]);
       const optedOut = new Set<string>();
       for (const s of (settingsRows || []) as Array<{ user_id: string; lifecycle_emails_opt_in: boolean | null }>) {
         if (s.lifecycle_emails_opt_in === false) optedOut.add(s.user_id);
       }
-      const subMap = new Map<string, { status: string; plan_key: string; trial_end: string | null }>();
-      for (const s of (subsRows || []) as Array<{ user_id: string; status: string; plan_key: string; trial_end: string | null }>) {
-        subMap.set(s.user_id, { status: s.status, plan_key: s.plan_key, trial_end: s.trial_end });
+      const subMap = new Map<string, { status: string; plan_key: string }>();
+      for (const s of (subsRows || []) as Array<{ user_id: string; status: string; plan_key: string }>) {
+        subMap.set(s.user_id, { status: s.status, plan_key: s.plan_key });
       }
       const pointsMap = new Map<string, number>();
       for (const p of (pointsRows || []) as Array<{ user_id: string; total_points: number }>) {
@@ -349,7 +354,6 @@ Deno.serve(async (req) => {
             driver_points_total: pointsMap.get(p.user_id) ?? 0,
             sub_status: sub?.status ?? "free",
             sub_plan_key: sub?.plan_key ?? "free",
-            trial_end: sub?.trial_end ?? null,
             lifecycle_opted_out: optedOut.has(p.user_id),
           };
         })

@@ -1,185 +1,99 @@
-## Goal
+## Audit Findings
 
-Reflect everything we've shipped recently inside `/admin` so you can monitor adoption and health from one place. **Surgical additions only** — no existing tab, action, layout, RLS, or auth flow changes.
+**Trial-facing admin logic still present (must remove from UI):**
 
----
+1. `supabase/functions/admin-api/index.ts`
+   - `overview` action returns `subs_trialing` (line 100, 116)
+   - `list-users` returns `trial_end` (lines 320, 327–329, 352)
+   - Does **not** return a `subs_canceled` count or `conversion_rate`
 
-## Phase 1 — Fix and expand Overview KPIs (`admin-api: overview` + `Admin.tsx`)
+2. `src/pages/Admin.tsx`
+   - Type `OverviewData` declares `subs_trialing` (line 21) and user `trial_end` (line 55)
+   - Overview "Users & Subscriptions" tile shows **"Trialing"** KPI (line 575)
+   - Users table shows trial-days-left badge `{trialDaysLeft}d` (lines 822–824, 840–842) and `isTrialing` styling
 
-Replace the 5-card grid with a richer, accurate set. Switch subscription counts to the canonical `subscriptions` table.
+**Canonical subscription statuses currently in DB:** `free` (9), `trialing` (2), `active` (1). No `canceled`/`past_due` rows yet, but schema supports them.
 
-**New `overview` payload** (single edge function action, parallel `Promise.all`):
-
-- `total_users` (unchanged)
-- `subs_trialing` — `subscriptions where status='trialing' and trial_end > now()`
-- `subs_active` — `subscriptions where status='active'`
-- `subs_free` — `subscriptions where status in ('free','canceled')` (or null status)
-- `total_loads`, `loads_7d` (unchanged)
-- `total_expenses`, `expenses_7d` (new)
-- `total_fuel_logs`, `fuel_logs_7d` (new)
-- `recurring_templates_active` — `recurring_expense_templates where is_active=true`
-- `parking_locations_total`, `parking_reports_7d`, `parking_verifications_7d` (new)
-- `driver_points_active_users` — `count(*) from driver_points where weekly_points > 0`
-- `lead_magnet_signups_total`, `lead_magnet_signups_7d` (new)
-
-UI: keep current 2-col card style; group into 4 collapsible sections — **Users & Subscriptions**, **Activity (7d)**, **Community / Parking**, **Lead Magnet**.
+**What stays untouched (intentionally):**
+- `handle_new_user` DB trigger that grants 14-day trialing on signup → core auto-trial system (mem://business/auto-trial-system). The audit instructions explicitly say *"Do not drop database columns or old migrations"*.
+- `subscriptions.trial_end` column and `expire_ended_trials()` function.
+- All other admin tabs (Activation, Admins, Billing, Feedback, Emails, Parking, Drivers, Starter Kit) — already audited as correct.
+- All driver-facing UI, Stripe, RLS, edge function security.
 
 ---
 
-## Phase 2 — New "Parking" tab
+## Changes
 
-A read-only operator view of the community parking system.
+### 1. `supabase/functions/admin-api/index.ts`
 
-**New edge actions:**
+**`overview` action — replace subscription queries:**
+- Remove the `subsTrialing` query.
+- Keep `subsActive` (status='active').
+- Replace `subsFree` query (currently `in ('free','canceled')`) with two separate queries:
+  - `subsFreeOnly` → `status='free'` OR null
+  - `subsCanceled` → `status in ('canceled','past_due','unpaid','incomplete_expired')`
+- Treat **trialing users as Pro** for the active count (they have full Pro access). Compute `subs_active_pro = subsActive.count + trialingCount` where `trialingCount` is fetched separately but **not exposed as its own KPI**. Simpler: add trialing into active in the API response.
+- Add `pro_conversion_rate` = `subs_active_pro / total_users` (rounded to 1 decimal).
+- Response shape becomes:
+  - `total_users`
+  - `subs_free`
+  - `subs_active_pro` (active + trialing combined)
+  - `subs_canceled`
+  - `pro_conversion_rate`
+  - (drop `subs_trialing` from response)
 
-- `parking-overview` → totals, last 7d reports, last 7d verifications, top 10 most-reported locations (join `parking_locations` ↔ count of `parking_reports`)
-- `list-parking-reports?limit=50` → recent reports with location name, reporter masked handle, status, created_at
-- `list-parking-locations?search=&page=` → paginated locations (name, city, state, type, total_reports, last_verified_at)
+**`list-users` action:**
+- Stop selecting `trial_end` from subscriptions.
+- Stop returning `trial_end` on each user row.
+- Keep `sub_status` (canonical from `subscriptions` table) — but normalize: if status is `trialing`, return `'pro (trial)'` so admins see they're on Pro without the day-countdown. *(Alternative: just return raw status `'trialing'` and let UI render it as a neutral Pro badge with no countdown.)* → Going with **return raw status, UI renders trialing as Pro-styled badge with no countdown.**
 
-**UI:**
+### 2. `src/pages/Admin.tsx`
 
-- Top: 4 KPI tiles (Locations, Reports 7d, Verifications 7d, Avg reports/location)
-- Table: Top 10 hottest locations (sortable by report count)
-- Table: Recent 50 reports (with status badge: available / limited / full)
+**Type `OverviewData` (line ~17–32):**
+- Remove `subs_trialing`.
+- Add `subs_active_pro: number`, `subs_canceled: number`, `pro_conversion_rate: number`.
+- Remove `subs_active`, `subs_free` reshape: keep `subs_free` and `subs_active_pro` and `subs_canceled`.
 
-No mutations from admin in v1 (read-only) to keep scope tight and avoid touching driver-facing RLS.
+**Type `UserRow` (~line 50–60):**
+- Remove `trial_end?: string | null`.
 
----
+**Overview "Users & Subscriptions" grid (line 572–589):**
+- Replace 4 tiles with 5:
+  - Total Users
+  - Free Users
+  - Active Pro (active + trialing combined)
+  - Canceled / Expired
+  - Pro Conversion Rate (`{pro_conversion_rate}%`)
+- Use a `grid-cols-2 md:grid-cols-3` so 5 tiles wrap cleanly on mobile (715px and 375px).
+- Drop the `Sparkles` icon usage here (still imported for Lead Magnet section line 669, so import stays).
 
-## Phase 3 — New "Drivers" (points/leaderboard) tab
+**Users table rows (lines 820–851):**
+- Remove `trialDaysLeft` calc and the `{trialDaysLeft}d` badge.
+- Keep status badge logic, but treat `trialing` like `active` (variant `'default'`) since trialing users have Pro access. Rendered text: show `pro` for both trialing and active to remove trial-facing language; show raw status for canceled/free.
+- One simple mapping in render:
+  ```
+  const displayStatus = (status === 'trialing' || status === 'active') ? 'pro' : status;
+  const isPaid = displayStatus === 'pro';
+  ```
 
-Reuses the existing `get_weekly_driver_leaderboard` RPC.
-
-**New edge actions:**
-
-- `driver-points-overview` → total active drivers, total points awarded, distribution by tier (Bronze/Silver/Gold/Platinum), top streak
-- `driver-leaderboard?limit=25` → calls the existing RPC server-side and returns rows
-
-**UI:**
-
-- 4 KPI tiles (Active drivers this week, Total points all-time, Top streak, Platinum count)
-- Leaderboard table (rank, masked handle, weekly points, total points, parking points, load points, streak, tier)
-
----
-
-## Phase 4 — New "Starter Kit" tab (Lead Magnet)
-
-**New edge actions:**
-
-- `lead-magnet-overview` → total signups, signups 7d / 30d, conversions to verified user (match `lead_magnet_signups.email` → `auth.users.email_confirmed_at`)
-- `list-lead-magnet-signups?page=&search=` → paginated rows
-
-**UI:**
-
-- 4 KPI tiles (Total signups, 7d, 30d, Converted-to-account %)
-- Table: email, source/utm if present, created_at, "→ has account" badge
-
----
-
-## Phase 5 — Augment "Users" table
-
-Add 3 columns to `list-users` response **without breaking the existing layout** (append columns):
-
-- `subscription_status` from `subscriptions` table (trialing / active / free) — canonical, replacing the legacy `profiles.subscription_status` column shown today
-- `trial_end` (only when trialing) — render as "Xd left" badge
-- `fuel_logs_count`
-- `driver_points_total`
-
-Show the trial countdown badge in the existing user row. No row-action changes.
-
----
-
-## Phase 6 — New "AI / Automation" mini-panel inside Overview
-
-Small section (not a full tab) showing 3 counters from data we already collect:
-
-- `parse_usage` count for last 7d (Paste Load + Scan + Voice combined, grouped by `feature`)
-- `expense_automation_logs` count for last 7d
-- `ai_insights` count for last 7d
-
-This validates the "Pro Saved You Time" claim with real numbers.
+### 3. Files NOT modified
+- `supabase/functions/handle-*`, `stripe-webhook`, `check-subscription`, `create-checkout`, `customer-portal`
+- Any migration file
+- `src/hooks/useSubscription.ts` (still surfaces trialing for the user-facing trial banner — that's intentional and outside admin scope)
+- All other tabs / components
 
 ---
 
-## Phase 7 — Wiring + safety
+## Verification
 
-- All new actions follow the **same pattern** as existing ones: admin gate via `admin_users` row, GET-only for reads, no super_admin requirement for read endpoints.
-- Tabs grid expands from `grid-cols-7` → `grid-cols-10`. On mobile (current Admin already uses `max-w-4xl`), the TabsList wraps cleanly with `flex-wrap` fallback (small CSS tweak).
-- No changes to: auth, Stripe, Supabase migrations, RLS, `useAdmin`, `useAuth`, `Index.tsx`, public pages, or any driver-facing component.
-- TypeScript types for the new payloads added inline at the top of `Admin.tsx` matching the existing pattern.
+1. `tsc --noEmit` clean.
+2. Deploy `admin-api` and curl `?action=overview` to confirm the new payload shape; confirm `subs_active_pro` ≈ 3 (1 active + 2 trialing) on current DB.
+3. Curl `?action=list-users` to confirm rows have no `trial_end`.
+4. Visually verify Admin → Overview shows 5 tiles, no "Trialing" tile, no trial-days badge in Users table.
+5. Responsive QA at 375px and 715px — confirm 5-tile grid wraps cleanly.
 
----
-
-## Files to modify
-
-- `supabase/functions/admin-api/index.ts` — add 8 new actions + extend `overview`
-- `src/pages/Admin.tsx` — add 3 tabs (Parking, Drivers, Starter Kit), expand Overview KPIs + AI mini-panel, append columns to Users table
-
-## Files NOT touched
-
-- Any auth, billing, Stripe, RLS, or driver-facing file
-- `src/integrations/supabase/types.ts` (auto-generated)
-
-## Verification after build
-
-1. `tsc --noEmit` clean
-2. Each new tab loads without errors for an admin account
-3. Existing Overview / Activation / Users / Admins / Billing / Feedback / Emails behave identically
-4. Mobile (375px) and current 715px viewport — tabs wrap, tables scroll horizontally as today
-
-## What is intentionally NOT included
-
-- No write actions on parking, points, or lead magnet rows (read-only v1)
-- No CSV export from admin (can be a follow-up)
-- No realtime subscriptions (polling on tab open, like existing tabs) Proceed with the admin dashboard update plan, but revise it before implementation:
-  Remove all 14-day trial and trial-related admin logic.
-  Do NOT add:
-  - subs_trialing
-  - trial_end
-  - X days left badge
-  - trial countdown
-  - trial status cards
-  - trial-based user table columns
-  Replace with clean Free / Pro / Canceled subscription visibility:
-  Overview KPIs should include:
-  - total users
-  - free users
-  - active Pro users
-  - canceled/expired users
-  - Pro conversion rate
-  - total loads
-  - loads last 7 days
-  - total expenses
-  - expenses last 7 days
-  - total fuel logs
-  - fuel logs last 7 days
-  - active recurring expense templates
-  - parking locations total
-  - parking reports last 7 days
-  - parking verifications last 7 days
-  - active driver points users
-  - lead magnet signups total
-  - lead magnet signups last 7 days
-  In the Users table, append:
-  - subscription_status from the canonical subscriptions table
-  - fuel_logs_count
-  - driver_points_total
-  - lead_magnet_source if easily available
-  Do not show trial_end or trial countdown.
-  Add the new admin tabs exactly as planned:
-  - Parking tab
-  - Drivers / Leaderboard tab
-  - Starter Kit tab
-  Keep all three read-only for v1.
-  Add the AI / Automation mini-panel inside Overview if the data tables already exist and can be queried safely.
-  Do not modify auth, Stripe, RLS, Supabase migrations unrelated to this, dashboard, public pages, or driver-facing components.
-  Implement in phases:
-  1. audit existing Admin.tsx and admin-api
-  2. update overview payload
-  3. add Parking tab
-  4. add Drivers tab
-  5. add Starter Kit tab
-  6. append Users table columns
-  7. add AI/Automation mini-panel
-  8. run TypeScript/build/mobile QA
-  After implementation, provide a final report with files changed, edge actions added, tabs added, metrics added, and QA results.
+## Out of scope (explicit non-goals)
+- Removing `subscriptions.trial_end` column.
+- Changing the `handle_new_user` trigger that creates trialing rows.
+- Touching the user-facing TrialBanner.
+- Any change to non-admin code.
