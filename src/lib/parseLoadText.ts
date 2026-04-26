@@ -314,7 +314,16 @@ export function parseLoadText(text: string): ParsedLoadData {
     result.multiStopDetected = true;
     result.detectedStopsCount = stopMarkers.length;
 
-    const blocks = t.split(/(?=\b\d+#:\s*)/).filter(b => /^\d+#:/.test(b.trim()));
+    const blocks = t.split(/(?=\b\d+#:\s*)/)
+      .filter(b => /^\d+#:/.test(b.trim()))
+      // Drop Telegram pinned-preview snippets: short, truncated with "..." or "…",
+      // or that lack any city/state pattern. These otherwise pollute pickup_location.
+      .filter(b => {
+        const body = b.replace(/^\d+#:\s*/, '').trim();
+        if (body.length < 25) return false;
+        if (/(\.{3}|…)\s*$/.test(body)) return false;
+        return true;
+      });
     const parsedStops: ParsedStopData[] = [];
 
     for (let i = 0; i < blocks.length; i++) {
