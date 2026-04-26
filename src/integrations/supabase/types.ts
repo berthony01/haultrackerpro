@@ -542,6 +542,63 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_magnet_signups: {
+        Row: {
+          bundle_name: string
+          bundle_version: string
+          converted_user_id: string | null
+          created_at: string
+          download_sent_at: string | null
+          downloaded_at: string | null
+          email: string
+          first_name: string | null
+          id: string
+          source_page: string | null
+          updated_at: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          bundle_name?: string
+          bundle_version?: string
+          converted_user_id?: string | null
+          created_at?: string
+          download_sent_at?: string | null
+          downloaded_at?: string | null
+          email: string
+          first_name?: string | null
+          id?: string
+          source_page?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          bundle_name?: string
+          bundle_version?: string
+          converted_user_id?: string | null
+          created_at?: string
+          download_sent_at?: string | null
+          downloaded_at?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          source_page?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: []
+      }
       load_stops: {
         Row: {
           created_at: string
