@@ -50,7 +50,7 @@ export default function Privacy() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">4. Data Sharing</h3>
-          <p className="text-muted-foreground">We do NOT sell your data. We do not share your personal information with third parties except infrastructure providers necessary to operate the service (cloud hosting, database services).</p>
+          <p className="text-muted-foreground">We do NOT sell your data. We do not share your personal information with third parties except infrastructure providers necessary to operate the service (cloud hosting, database services). Emails collected through free resource downloads (lead magnets) follow these same rules — they are never sold or shared.</p>
         </section>
 
         <section className="space-y-2">
