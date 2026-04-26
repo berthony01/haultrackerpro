@@ -81,6 +81,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const isPercentagePay = settings?.pay_type === 'percentage';
   const useSample = firstTimeUser && !initialData;
 
+  // Parse DH-pay tag out of existing notes (edit mode); defaults for new loads.
+  const initialDh = useMemo(() => readDhFromNotes(initialData?.notes ?? null), [initialData?.notes]);
+
   const [form, setForm] = useState({
     load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
     dropoff_date: initialData?.dropoff_date || '',
@@ -93,7 +96,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     detention_fee: initialData?.detention_fee?.toString() || '0',
     other_fees: initialData?.other_fees?.toString() || (settings?.default_other_fees?.toString() ?? '0'),
     actual_pay_received: initialData?.actual_pay_received?.toString() || '',
-    notes: initialData?.notes || '',
+    notes: initialDh.cleanNotes,
     status: initialData?.status || 'completed',
     gross_revenue: initialData?.gross_revenue?.toString() || '',
     invoice_submitted_date: initialData?.invoice_submitted_date || '',
@@ -103,10 +106,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     short_paid_amount: initialData?.short_paid_amount?.toString() || '',
     payment_status: initialData?.payment_status || 'unpaid',
     payment_notes: initialData?.payment_notes || '',
+    dh_pay_status: initialDh.status as DhPayStatus,
+    dh_pay_rate: initialDh.rate,
   });
   const [showPaymentTracking, setShowPaymentTracking] = useState(
     !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
   );
+
+  // Last parser detection summary (Phase 6) — shown briefly above the form fields after a paste.
+  const [parserDetected, setParserDetected] = useState<{
+    loaded_miles?: string;
+    deadhead_miles?: string;
+    trip_id?: string;
+  } | null>(null);
 
   // Sync default settings when they load asynchronously (only for new loads)
   useEffect(() => {
