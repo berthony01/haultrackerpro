@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Truck, DollarSign, Fuel, BarChart3, ClipboardList, Bell, Award, FileText, Calculator, CheckCircle, ArrowRight, BookOpen } from 'lucide-react';
+import { Truck, DollarSign, Fuel, BarChart3, ClipboardList, Bell, Award, FileText, Calculator, CheckCircle, ArrowRight, BookOpen, ParkingCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -60,6 +60,7 @@ const features = [
   { title: 'Driver Scorecard', icon: Award, description: 'See your overall performance score (0–100) with tier rankings, 5 metric breakdowns (RPM, deadhead, expenses, profit trend, streak), and personalized coaching recommendations for each area.' },
   { title: 'Reports & Exports', icon: FileText, description: 'Export your data as CSV, PDF summary, or full profit report. Download everything for your accountant or records.' },
   { title: 'Tax Set-Aside Planner', icon: Calculator, description: 'Configure federal, state, and self-employment tax rates. Uses the IRS method for SE tax (92.35% adjustment) and deducts half of SE tax before income tax — more accurate than a flat percentage estimate.' },
+  { title: 'Real-Time Parking Finder', icon: ParkingCircle, description: 'Pro feature: see live truck parking availability reported by drivers, with safety ratings and one-tap reporting. Earn points and climb the community leaderboard while helping fellow truckers.' },
 ];
 
 const freePlan = [
@@ -83,6 +84,8 @@ const proPlan = [
   'PDF & profit report exports',
   'Unlimited Paste Load Parser',
   '"Pro Saved You Time" dashboard card',
+  'Real-time Parking Finder with driver-verified availability',
+  'Driver points, streaks & community leaderboard',
 ];
 
 const checklist = [

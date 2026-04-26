@@ -41,6 +41,9 @@ const proFeatures = [
   'Full tax breakdown with quarterly schedule',
   'Advanced alerts with dollar impact (profit drops, RPM dips)',
   'PDF profit reports for taxes, bookkeepers, or disputes',
+  'Real-time Parking Finder with driver-verified availability',
+  'Driver points, streaks & community leaderboard',
+  'Parking log export (CSV + PDF) for paperwork',
 ];
 
 const comparisonRows: { feature: string; free: string; pro: string }[] = [
@@ -64,6 +67,9 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Best/worst lanes & broker reliability', free: '—', pro: '✓' },
   { feature: 'Money-slip alerts (lane, broker, margin)', free: '—', pro: '✓' },
   { feature: 'Start-of-week recap (repeat / avoid / watch)', free: '—', pro: '✓' },
+  { feature: 'Real-time Parking Finder', free: '—', pro: '✓' },
+  { feature: 'Driver points & leaderboard', free: '—', pro: '✓' },
+  { feature: 'Parking log export (CSV + PDF)', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
   { feature: 'PDF reports', free: '—', pro: '✓' },
 ];
