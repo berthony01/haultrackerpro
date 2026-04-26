@@ -312,8 +312,7 @@ export function parseLoadText(text: string): ParsedLoadData {
   const stopMarkers = t.match(/\b\d+#:\s*/g);
   if (stopMarkers && stopMarkers.length >= 2) {
     result.multiStopDetected = true;
-    result.detectedStopsCount = stopMarkers.length;
-
+    // detectedStopsCount is set from the filtered blocks below (after pinned-preview filter)
     const blocks = t.split(/(?=\b\d+#:\s*)/)
       .filter(b => /^\d+#:/.test(b.trim()))
       // Drop Telegram pinned-preview snippets: short, truncated with "..." or "…",
