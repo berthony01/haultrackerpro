@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Flame, TrendingUp, MapPin, Lock } from 'lucide-react';
-import { useDriverPoints, tierFor, mockPercentile } from '@/hooks/useDriverPoints';
+import { useDriverPoints, tierFor, mockPercentile, nextTierProgress } from '@/hooks/useDriverPoints';
 import { useMyLeaderboardRank } from '@/hooks/useDriverLeaderboard';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
