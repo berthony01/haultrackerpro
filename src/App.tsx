@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { forwardRef, lazy, Suspense, useEffect } from 'react';
 import { trackPageView } from '@/lib/analytics';
-import { useAuth } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -110,8 +110,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <PageViewTracker />
-          <Suspense fallback={<PageFallback />}>
+          <AuthProvider>
+            <PageViewTracker />
+            <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -158,6 +159,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

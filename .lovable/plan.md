@@ -1,50 +1,58 @@
-# Fix: "What's New" modal reappears on every page load
+## Plan
 
-## Root cause
+### What I found
+- The repeating modal is most likely caused by `src/hooks/useReleaseNotesSeen.ts` assuming the user already has a `profiles` row and only doing an `update()` when dismissing. If that row is missing, the write is effectively a no-op, and the hook also swallows the failure. In storage-hostile environments, the local cache is not reliable enough on its own, so the modal comes back on reload.
+- App startup is heavier than it should be because `useAuth()` is instantiated all over the app. Right now it creates a fresh auth subscription and runs `getSession()` every time the hook is called. I found 41 call sites.
+- The dashboard path also starts several eager data flows at once: `useLoads()` twice, `useExpenses()`, `useFuelLogs()`, `useLoadStops()`, `useAdmin()`, `useSubscription()` and downstream intelligence hooks. That is a lot of work during first paint.
 
-The dismissal is tracked **only in `localStorage`** (`src/hooks/useReleaseNotesSeen.ts`, key `htp:release-seen:<userId>`). This breaks in several real-world scenarios:
+### Phase 1 — Stabilize auth bootstrap
+- Convert auth state to a shared provider/context so the app restores auth once and all consumers read the same `user/session/loading` state.
+- Keep the existing `useAuth()` API shape so auth pages, protected routes, admin checks, and billing code do not have to be rewritten.
+- Update `src/App.tsx` to mount the auth provider above routes.
 
-- The Lovable preview runs in a cross-site iframe — many browsers (Safari ITP, Brave, Firefox strict, Chrome with third-party storage partitioning) clear or partition `localStorage` between sessions, so the dismissal is lost on reload.
-- Different origins (preview URL vs `haultrackerpro.lovable.app` vs custom domain) each have their own `localStorage`, so dismissing on one does not silence it on another.
-- Private/Incognito tabs and "Clear on close" settings wipe it.
-- Switching devices/browsers re-shows the modal.
+### Phase 2 — Fix “What’s New” so it is truly once per user
+- Refactor `src/hooks/useReleaseNotesSeen.ts` to consume the shared auth state.
+- Stop clearing the seen state during transient auth bootstrap.
+- Change the dismiss write from update-only to an upsert-safe flow so users without an existing profile row still persist `last_seen_release_id`.
+- Keep the fast local cache, but make backend persistence the durable source of truth.
+- Keep `src/pages/Index.tsx` modal behavior intact except for preventing repeat popups.
 
-Result: the modal pops up on (almost) every load, exactly as the user describes.
+### Phase 3 — Reduce dashboard startup load safely
+- Remove unconditional `useLoadStops()` boot-time fetching from `src/pages/Index.tsx`; only fetch stops when the user is editing/viewing load details that actually need them.
+- Collapse duplicate auth/admin/subscription work where possible so the dashboard does not re-check the same state through separate hook trees.
+- Tighten `src/hooks/useSubscription.ts` so it does not always do the extra backend subscription sync on every initial load when local database state is already sufficient.
+- Review page-level hook activation in `src/pages/Index.tsx` so expensive data only loads when the current tab/page needs it.
 
-## Fix
+### Phase 4 — Audit and verification
+- Build and run tests after the refactor.
+- Smoke-audit these flows: dashboard load, modal dismiss/reload, sign in/out, Pro gating, parking page, pricing upgrade return, admin route.
+- Confirm no regressions to load parsing, scan rate-con flow, billing, lead magnet funnel, or release-notes content.
 
-Move the "last seen release" marker to the user's profile in the database, with `localStorage` kept only as a fast cache to avoid a flash on first paint.
+## Files likely to change
+- `src/App.tsx`
+- `src/hooks/useAuth.ts`
+- `src/hooks/useReleaseNotesSeen.ts`
+- `src/hooks/useSubscription.ts`
+- `src/pages/Index.tsx`
+- `src/hooks/useLoadStops.ts`
+- Possibly one small new auth provider/context file
 
-### What changes
+## Technical details
+```text
+Current boot path
+ProtectedRoute -> useAuth()
+Index -> useAuth()
+useReleaseNotesSeen -> useAuth()
+useAdmin -> useAuth()
+useSubscription -> useAuth() + useAdmin()
+multiple dashboard hooks -> useAuth()
 
-1. **Database**
-   - Add a nullable `last_seen_release_id text` column to `profiles` (already user-owned with RLS).
-   - No backfill needed — `null` simply means "hasn't seen the latest release yet", which matches today's behavior for everyone.
+Target boot path
+AuthProvider restores session once
+all hooks read shared auth state
+release-notes hook waits for stable auth
+markSeen persists with upsert-safe profile write
+Index only mounts heavyweight queries when needed
+```
 
-2. **`src/hooks/useReleaseNotesSeen.ts`**
-   - On mount (when `user.id` is ready):
-     - Hydrate `lastSeenId` from `localStorage` first (instant, prevents flash).
-     - Then fetch `profiles.last_seen_release_id` and reconcile (DB wins).
-   - `markSeen(releaseId)`:
-     - Write `localStorage` immediately (optimistic, snappy UX).
-     - `update profiles set last_seen_release_id = releaseId where id = user.id`.
-     - On error, keep the localStorage value so the user still doesn't get spammed in the same session.
-   - Keep the existing return shape (`ready`, `hasSeenLatest`, `lastSeenId`, `markSeen`) so `src/pages/Index.tsx` does not need changes.
-
-3. **No UI changes.** `WhatsNewModal`, `WhatsNewCard`, and the auto-open effect in `Index.tsx` stay as-is.
-
-### Why this works
-
-- DB persistence survives reloads, new devices, cleared browser storage, and origin changes.
-- `localStorage` cache prevents a one-frame flash of the modal while the profile query resolves.
-- Existing RLS on `profiles` already restricts each user to their own row — no new policies needed.
-
-## Out of scope
-
-- No changes to release notes content, the dashboard "What's New" card, or the modal layout.
-- No retroactive dismissal for users who have already seen it via localStorage — they will see it at most one more time, then it's silenced permanently via the DB.
-
-## Files touched
-
-- `supabase` migration: add `profiles.last_seen_release_id text`.
-- `src/hooks/useReleaseNotesSeen.ts`: read/write through Supabase with localStorage cache.
+This keeps the existing auth, billing, dashboard, Pro gating, and route structure in place while fixing the two issues you called out first.
