@@ -54,7 +54,8 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
   const [preview, setPreview] = useState<string | null>(null);
   const [fieldCount, setFieldCount] = useState(0);
   const [usedAI, setUsedAI] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) {
