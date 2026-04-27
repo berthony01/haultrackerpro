@@ -171,7 +171,7 @@ function findAllMileage(t: string): MileageMatch[] {
     const after = t.slice(start + m[0].length, start + m[0].length + 10);
     const ctx = `${before} ${after}`;
 
-    const isDeadhead = DEADHEAD_CTX_RE.test(before) || /^\s*(dh|deadhead|empty)/i.test(after);
+    const isDeadhead = DEADHEAD_CTX_RE.test(before);
 
     let loadedKind: LoadedKind = 'unknown';
     if (!isDeadhead) {
