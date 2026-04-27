@@ -270,10 +270,18 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                 {fieldCount} field{fieldCount > 1 ? 's' : ''} extracted. Only empty fields in the form will be filled. Always review before saving.
               </p>
 
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  size="sm"
+                  onClick={() => galleryRef.current?.click()}
+                >
+                  <ImageIcon className="h-4 w-4 mr-1.5" />
+                  Replace
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setParsed(null);
                     setPreview(null);
@@ -282,13 +290,13 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                     setUsedAI(false);
                   }}
                 >
-                  Retry
-                </Button>
-                <Button onClick={handleConfirm} className="flex-1 font-bold">
-                  <Check className="h-4 w-4 mr-2" />
-                  Fill Form
+                  Cancel
                 </Button>
               </div>
+              <Button onClick={handleConfirm} className="w-full font-bold">
+                <Check className="h-4 w-4 mr-2" />
+                Fill Form with {fieldCount} Field{fieldCount > 1 ? 's' : ''}
+              </Button>
             </div>
           )}
         </div>
