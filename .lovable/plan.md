@@ -1,48 +1,57 @@
+## What I found
+
+- The mileage parser lives in `src/lib/parseLoadText.ts`.
+- The form wiring in `src/components/LoadForm.tsx` already maps `loaded_miles` and `deadhead_miles` into separate fields, so the visible `25 / 25` result is most likely coming from the parser missing the Trip value in the real paste, not from the form swapping fields.
+- The screenshot scan flow in `src/components/ScanLoadModal.tsx` still starts OCR immediately after file selection. That means the current UX is not a true “choose file -> preview -> confirm extraction” flow yet.
+- The camera flow is also still tied to `capture="environment"`, so mobile behavior can still feel forced or inconsistent depending on which input gets triggered.
+
 ## Plan
 
-1. Fix the screenshot upload flow in `ScanLoadModal.tsx`
-- Remove the forced camera behavior from the hidden file input so mobile users get the normal image picker with access to Photos/Gallery as well as Camera.
-- Keep the same modal, OCR flow, AI fallback, and user behavior after a file is selected.
-- Mirror the safe pattern already used elsewhere in the app, but without forcing capture mode.
+1. Harden Telegram load-mile parsing in `src/lib/parseLoadText.ts`
+   - Add a first-pass, line-level matcher for loaded-mile labels before the generic mileage classifier runs.
+   - Explicitly support `Trip`, `Trip Miles`, `Trip Mileage`, `Trip Distance`, `Total Trip`, and `Loaded Trip`, including emoji-prefixed variants.
+   - Keep `Trip ID` excluded by requiring a numeric mileage value after the label.
+   - Preserve deadhead precedence separately so `DH 25 miles` never overwrites loaded miles.
 
-2. Harden pasted mileage parsing in `parseLoadText.ts`
-- Expand text normalization before regex parsing to handle Telegram-specific paste artifacts such as invisible separators, non-standard spaces, and styled characters.
-- Tighten mileage classification so deadhead-labeled values cannot win as loaded miles when trip/loaded/route/total mileage is also present.
-- Add an explicit precedence rule for messages like the user’s sample:
-  - `DH 25 miles`
-  - `Trip: 257.10mi`
-  - possible total mileage mentions such as `267 mile`
-- Preserve current deadhead support and keep deadhead separate from loaded miles.
+2. Keep the existing parser as a fallback, not a rewrite
+   - Use the new explicit Trip/Loaded line matcher as the highest-priority source.
+   - Fall back to the current generic token/context logic for all the formats that already work today.
+   - Add source tracking internally so development logs can show whether loaded miles came from `trip-line`, `loaded-line`, or generic context.
 
-3. Strengthen the form autofill application in `LoadForm.tsx`
-- Keep the atomic form update approach already in place.
-- Add one more defensive guard so parser results from paste and screenshot flows are applied consistently, including when one mileage field is missing.
-- Ensure the UI summary reflects exactly what was detected so the user can catch issues before saving.
+3. Strengthen regression coverage in `src/test/parseLoadText.test.ts`
+   - Add exact tests for the user’s Telegram sample and the failing `Trip: 257.10mi` pattern.
+   - Add guard tests for `Trip ID`, `DH 25 miles`, `Trip Distance`, and same-message mixed cases.
+   - Add a regression asserting the final parsed result is:
+     - `loaded_miles = 257.10`
+     - `deadhead_miles = 25`
 
-4. Add regression coverage in `src/test/parseLoadText.test.ts`
-- Add tests based on the exact Telegram sample from the screenshots.
-- Add tests for total-mile wording variants and Telegram formatting edge cases.
-- Add tests that prove deadhead and loaded miles never collapse into the same value when both are present.
+4. Fix the screenshot scan UX in `src/components/ScanLoadModal.tsx`
+   - Change the flow to: select image -> preview image -> user taps `Extract Info` -> OCR/parsing starts.
+   - Keep separate `Choose from Gallery` and `Take Photo` actions.
+   - Ensure the gallery action opens the normal picker and the camera action is the only one that can request capture.
+   - Keep the privacy behavior: image stays local to the device/browser session and only extracted text is parsed.
+   - Add clearer loading, success, and failure states around the actual extraction step.
 
-5. Verify without changing product behavior
-- Re-run the parser-focused test cases.
-- Confirm the fix is limited to parsing and upload entry behavior only.
-- Do not change routes, analytics, providers, backend behavior, or the existing deadhead-pay business logic.
-
-## Expected outcome
-- Pasting the Telegram load should populate loaded miles from the trip mileage instead of repeating deadhead.
-- Deadhead miles should remain separate and continue to support the existing pay-status logic.
-- Tapping “Scan Rate Con Screenshot” on mobile should open a normal image chooser that allows selecting screenshots from the photo library.
+5. Verify end-to-end in the load form
+   - Paste the exact Telegram message into `Paste Load Info` and verify the form shows `Loaded Miles = 257.10` and `Deadhead Miles = 25`.
+   - Test the uploaded screenshot flow to confirm: gallery selection works, preview appears before extraction, replace works, and extraction feedback is visible.
+   - Do not change navigation, tabs, load layout, payment tracking, or other working form behavior.
 
 ## Technical details
 
 Files to update:
-- `src/components/ScanLoadModal.tsx`
 - `src/lib/parseLoadText.ts`
-- `src/components/LoadForm.tsx`
 - `src/test/parseLoadText.test.ts`
+- `src/components/ScanLoadModal.tsx`
+- `src/components/LoadForm.tsx` only if a tiny UI integration tweak is needed for the new scan flow
 
-Key implementation notes:
-- The current photo-upload bug is caused by `capture="environment"` on the hidden file input in `ScanLoadModal.tsx`.
-- The current parser already supports `257.10mi` in tests, so the remaining fix should focus on real pasted Telegram normalization and stricter candidate selection rather than replacing the whole parser.
-- No backend changes are needed for this fix.
+Planned loaded-mile regex family:
+```ts
+/(?:🚛|🚚)?\s*(?:loaded\s*)?(?:total\s*)?(?:trip|trip\s*miles|trip\s*mileage|trip\s*distance)\s*:?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:mi|mile|miles)\b/i
+```
+
+Acceptance criteria:
+- `Trip: 257.10mi` fills Loaded Miles
+- `DH 25 miles` still fills Deadhead Miles
+- `Trip ID : T-1123J49SR` does not get mistaken for mileage
+- Scan modal supports gallery upload, pre-parse preview, replace, loading state, and success/error feedback
