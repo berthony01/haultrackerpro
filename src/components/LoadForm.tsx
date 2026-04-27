@@ -388,13 +388,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <PasteLoadParser
               isPro={isPro}
               onParsed={(data: ParsedLoadData) => {
-                if (data.pickup_location) update('pickup_location', data.pickup_location);
-                if (data.dropoff_location) update('dropoff_location', data.dropoff_location);
-                if (data.loaded_miles) update('loaded_miles', data.loaded_miles);
-                if (data.deadhead_miles) update('deadhead_miles', data.deadhead_miles);
-                if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
-                if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
-                if (data.load_date) update('load_date', data.load_date);
+                // Atomic apply: always reset mileage fields on a new paste so a
+                // stale "loaded_miles" from a previous paste can't leak into the
+                // new load if this paste only contains deadhead (and vice versa).
+                setForm(prev => ({
+                  ...prev,
+                  pickup_location: data.pickup_location ?? prev.pickup_location,
+                  dropoff_location: data.dropoff_location ?? prev.dropoff_location,
+                  loaded_miles: data.loaded_miles ?? '',
+                  deadhead_miles: data.deadhead_miles ?? '',
+                  rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
+                  gross_revenue: data.gross_revenue ?? prev.gross_revenue,
+                  load_date: data.load_date ?? prev.load_date,
+                }));
                 // Phase 6: surface a confirmation summary so the user can verify
                 // detected miles + DH + trip ID before saving. DH defaults to "Unpaid".
                 setParserDetected({
@@ -753,13 +759,17 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
         open={showScanLoad}
         onOpenChange={setShowScanLoad}
         onParsed={(data: ParsedLoadData) => {
-          if (data.pickup_location) update('pickup_location', data.pickup_location);
-          if (data.dropoff_location) update('dropoff_location', data.dropoff_location);
-          if (data.loaded_miles) update('loaded_miles', data.loaded_miles);
-          if (data.deadhead_miles) update('deadhead_miles', data.deadhead_miles);
-          if (data.rate_per_mile) update('rate_per_mile', data.rate_per_mile);
-          if (data.gross_revenue) update('gross_revenue', data.gross_revenue);
-          if (data.load_date) update('load_date', data.load_date);
+          // Atomic apply (same reasoning as PasteLoadParser handler above).
+          setForm(prev => ({
+            ...prev,
+            pickup_location: data.pickup_location ?? prev.pickup_location,
+            dropoff_location: data.dropoff_location ?? prev.dropoff_location,
+            loaded_miles: data.loaded_miles ?? '',
+            deadhead_miles: data.deadhead_miles ?? '',
+            rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
+            gross_revenue: data.gross_revenue ?? prev.gross_revenue,
+            load_date: data.load_date ?? prev.load_date,
+          }));
           if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
             setMultiStop(true);
             setStops(data.stops.map((s, i) => ({
