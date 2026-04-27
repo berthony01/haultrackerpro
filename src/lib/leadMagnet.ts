@@ -1,8 +1,16 @@
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 
-export const STARTER_KIT_DOWNLOAD_URL =
+const FALLBACK_STARTER_KIT_URL =
   'https://pngptztxwbtozwxrtbwo.supabase.co/storage/v1/object/public/lead-magnets/HaulTrackerPro_Trucker_Starter_Kit_Free.zip';
+
+/**
+ * Public download URL for the free Trucker Starter Kit.
+ * Override at build time with VITE_STARTER_KIT_DOWNLOAD_URL.
+ */
+export const STARTER_KIT_DOWNLOAD_URL =
+  (import.meta.env?.VITE_STARTER_KIT_DOWNLOAD_URL as string | undefined) ||
+  FALLBACK_STARTER_KIT_URL;
 
 export const leadMagnetSchema = z.object({
   email: z
