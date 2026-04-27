@@ -12,7 +12,7 @@ interface Props { name?: string }
 const Day0Email = ({ name }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Welcome to {SITE_NAME} — your 14-day Pro trial is active</Preview>
+    <Preview>Welcome to {SITE_NAME} — your account is ready</Preview>
     <Body style={main}>
       <Container style={container}>
         <Heading style={h1}>
