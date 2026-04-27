@@ -35,13 +35,6 @@ export function trackLogin(method: string = 'email') {
   });
 }
 
-export function trackBeginTrial() {
-  gtag('event', 'begin_trial', {
-    currency: 'USD',
-    value: 0,
-  });
-}
-
 export function trackBeginCheckout(planKey: string, value: number) {
   gtag('event', 'begin_checkout', {
     currency: 'USD',
