@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Camera, Loader2, Check, Upload, AlertCircle, Sparkles } from 'lucide-react';
+import { Camera, Loader2, Check, Image as ImageIcon, AlertCircle, Sparkles, RefreshCw, ShieldCheck } from 'lucide-react';
 import { parseLoadText, ParsedLoadData } from '@/lib/parseLoadText';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
