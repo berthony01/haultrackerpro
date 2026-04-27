@@ -23,9 +23,9 @@ const Day0Email = ({ name }: Props) => (
           expenses, and fuel so you know exactly what each mile actually pays.
         </Text>
         <Text style={text}>
-          Your account includes a <strong>14-day Pro trial</strong> with full
-          access to Smart Alerts, Profit Check, lane intelligence, and the
-          Weekly Closeout summary.
+          Your account is on the <strong>Free plan</strong>. Start tracking
+          right away — and upgrade to Pro when you want Smart Alerts, Profit
+          Check, lane intelligence, and the Weekly Closeout summary.
         </Text>
         <Section style={buttonContainer}>
           <Button style={button} href={`${APP_URL}/dashboard`}>
