@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
         adminDb.from("fuel_logs").select("id", { count: "exact", head: true }).gte("date", sevenDaysAgoDate),
         adminDb.from("recurring_expense_templates").select("id", { count: "exact", head: true }).eq("is_active", true),
         adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "active"),
-        // Trials removed — keep query stub returning 0 to avoid reshaping the destructure.
+        // Legacy slot — returns 0 to avoid reshaping the destructure.
         adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "__never__"),
         adminDb.from("subscriptions").select("id", { count: "exact", head: true }).eq("status", "free"),
         adminDb.from("subscriptions").select("id", { count: "exact", head: true }).in("status", ["canceled", "past_due", "unpaid", "incomplete_expired"]),
