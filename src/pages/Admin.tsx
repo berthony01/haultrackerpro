@@ -720,7 +720,7 @@ export default function Admin() {
                     {[
                       { key: 'day0' as const, label: 'Day 0 — Welcome' },
                       { key: 'day2' as const, label: 'Day 2 — "Need a hand?"' },
-                      { key: 'day7' as const, label: 'Day 7 — Trial midpoint' },
+                      { key: 'day7' as const, label: 'Day 7 — Habit nudge' },
                     ].map(({ key, label }) => {
                       const m = activation.emailImpact[key];
                       return (
