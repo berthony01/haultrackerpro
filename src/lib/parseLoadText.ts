@@ -254,6 +254,44 @@ export function parseLoadText(text: string): ParsedLoadData {
   let dh = pickDeadhead(mileageMatches);
   let loaded = pickLoaded(mileageMatches, dh);
 
+  // ---- HIGH-PRIORITY explicit Trip / Loaded line matchers (Telegram dispatch bots) ----
+  // These run BEFORE labelled fallback so a clear `Trip: 257.10mi` always wins, even
+  // if a noisy generic token elsewhere (e.g. another `25 mi`) might otherwise outrank it.
+  // Keyword must NOT be "Trip ID" (we exclude that explicitly).
+  const TRIP_LOADED_LINE_RE =
+    /(?:^|[\s\W])(?:loaded\s+)?(?:total\s+)?(trip\s*(?:miles?|mileage|distance)?|loaded\s*(?:miles?|mi|distance)?|linehaul(?:\s*miles?)?|route\s*miles?|distance)\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi|mile|miles)?\b/i;
+  // Find ALL matches and pick the strongest one whose keyword isn't "trip id".
+  const TRIP_LOADED_GLOBAL_RE = new RegExp(TRIP_LOADED_LINE_RE.source, 'gi');
+  let bestExplicit: { value: string; priority: number } | null = null;
+  let gm: RegExpExecArray | null;
+  TRIP_LOADED_GLOBAL_RE.lastIndex = 0;
+  while ((gm = TRIP_LOADED_GLOBAL_RE.exec(t)) !== null) {
+    const keyword = gm[1].toLowerCase().replace(/\s+/g, ' ').trim();
+    const numStr = cleanNum(gm[2]);
+    const numeric = parseFloat(numStr);
+    if (!Number.isFinite(numeric) || numeric <= 0) continue;
+    // Exclude "trip id" — verify the chars immediately before/after the keyword
+    // aren't forming "trip id". The captured keyword starts with "trip" — check
+    // the next 3 chars in the source for " id".
+    const after = t.slice(gm.index + gm[0].indexOf(gm[1]) + gm[1].length, gm.index + gm[0].indexOf(gm[1]) + gm[1].length + 4).toLowerCase();
+    if (keyword.startsWith('trip') && /^\s*id\b/.test(after)) continue;
+    // Also skip if the matched value equals the deadhead value we already locked in.
+    if (dh && numStr === dh) continue;
+    // Priority: loaded > trip > linehaul > route > distance
+    let priority = 1;
+    if (keyword.startsWith('loaded')) priority = 6;
+    else if (keyword.startsWith('trip')) priority = 5;
+    else if (keyword.startsWith('linehaul')) priority = 4;
+    else if (keyword.startsWith('route')) priority = 3;
+    else if (keyword.startsWith('distance')) priority = 2;
+    if (!bestExplicit || priority > bestExplicit.priority) {
+      bestExplicit = { value: numStr, priority };
+    }
+  }
+  if (bestExplicit) {
+    loaded = bestExplicit.value;
+  }
+
   // --- Labelled fallback (covers "Loaded Miles: 300" / "Trip Miles: 415.5" /
   // "Empty Miles: 25" / "Linehaul Miles: 257.10" — number has no trailing "mi") ---
   if (!dh) {
