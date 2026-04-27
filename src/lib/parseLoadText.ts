@@ -167,8 +167,13 @@ function findAllMileage(t: string): MileageMatch[] {
     if (!Number.isFinite(numeric) || numeric <= 0) continue;
 
     const start = m.index;
-    const before = t.slice(Math.max(0, start - 30), start);
-    const after = t.slice(start + m[0].length, start + m[0].length + 10);
+    // Restrict context to the current line so labels from neighboring lines
+    // (e.g. "Trip:" on the next line) cannot be borrowed by this token.
+    const lineStart = t.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    const lineEndIdx = t.indexOf('\n', start);
+    const lineEnd = lineEndIdx === -1 ? t.length : lineEndIdx;
+    const before = t.slice(Math.max(lineStart, start - 30), start);
+    const after = t.slice(start + m[0].length, Math.min(lineEnd, start + m[0].length + 10));
     const ctx = `${before} ${after}`;
 
     const isDeadhead = DEADHEAD_CTX_RE.test(before);
