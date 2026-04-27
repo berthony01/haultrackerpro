@@ -281,3 +281,43 @@ describe('parseLoadText — strict spec (Trip vs Trip ID, A–E)', () => {
     expect(r.deadhead_miles).toBe('25');
   });
 });
+
+describe('parseLoadText — explicit Trip line (user-reported regression)', () => {
+  it('exact user paste: Telegram dispatch with DH 25 + Trip 257.10mi', () => {
+    const sample = `🗺Trip ID : T-1123J49SR
+
+📍1#: 111DF4KFK
+Loaded - Preloaded
+Sun, Apr 26, 12:00 AM EDT ORH5
+515 Douglas St
+Uxbridge, MA 01569
+—————————————
+📍2#: 111DF4KFK
+Loaded - Preloaded
+Sun, Apr 26, 05:14 AM EDT WNY4
+1159 County Route 24
+Granville, NY 12832-9438
+—————————————
+📍3#: 115PBBXB5
+Empty - Drop
+Sun, Apr 26, 07:47 AM EDT ALB1
+1835 Us Route 9
+Castleton, NY 12033
+—————————————
+
+DH 25 miles
+
+🚛Trip: 257.10mi
+🕒Duration: 0d 7h`;
+    const r = parseLoadText(sample);
+    expect(r.loaded_miles).toBe('257.10');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.trip_id).toBe('T-1123J49SR');
+  });
+
+  it('Trip wins even when noisy DH-equal value appears first', () => {
+    const r = parseLoadText('25 miles\nDH 25 miles\nTrip: 257.10mi');
+    expect(r.loaded_miles).toBe('257.10');
+    expect(r.deadhead_miles).toBe('25');
+  });
+});
