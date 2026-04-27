@@ -306,6 +306,19 @@ export function parseLoadText(text: string): ParsedLoadData {
   if (dh) result.deadhead_miles = dh;
   if (loaded) result.loaded_miles = loaded;
 
+  // Dev-only debug trace (stripped in production builds by Vite).
+  if (import.meta.env?.DEV) {
+    const loadedSrc = mileageMatches.find(mm => mm.value === loaded);
+    const dhSrc = mileageMatches.find(mm => mm.value === dh && mm.isDeadhead);
+    // eslint-disable-next-line no-console
+    console.log('[Load Parser]', {
+      detectedLoadedMiles: loaded,
+      detectedDeadheadMiles: dh,
+      matchedLoadedMilesSource: loadedSrc?.loadedKind ?? 'labelled-fallback',
+      matchedDeadheadMilesSource: dhSrc ? 'context' : (dh ? 'labelled-fallback' : null),
+    });
+  }
+
   // --- Rate per mile ---
   // "$2.45/mi", "$2.45 CPM", "$2.45 per mile", "2.45 rpm", "rate: $2.45"
   m = t.match(/\$?([\d,.]+)\s*(?:\/\s*mi(?:le)?|cpm|rpm|per\s+mile)\b/i);
