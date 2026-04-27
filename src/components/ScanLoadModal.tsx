@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Camera, Loader2, Check, Image as ImageIcon, AlertCircle, Sparkles, ShieldCheck } from 'lucide-react';
+import { Camera, Loader2, Check, Image as ImageIcon, AlertCircle, Sparkles, ShieldCheck, Wand2 } from 'lucide-react';
 import { parseLoadText, ParsedLoadData } from '@/lib/parseLoadText';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -49,9 +49,9 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
 
 export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalProps) {
   const [scanning, setScanning] = useState(false);
-  const [_rawText, setRawText] = useState('');
   const [parsed, setParsed] = useState<ParsedLoadData | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [fieldCount, setFieldCount] = useState(0);
   const [usedAI, setUsedAI] = useState(false);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -60,17 +60,28 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
   useEffect(() => {
     if (!open) {
       setScanning(false);
-      setRawText('');
       setParsed(null);
       setPreview(null);
+      setPendingFile(null);
       setFieldCount(0);
       setUsedAI(false);
     }
   }, [open]);
 
-  const handleFile = async (file: File) => {
+  /** Step 1: user picks file → just preview, no OCR yet */
+  const handleSelectFile = (file: File) => {
+    if (preview) URL.revokeObjectURL(preview);
     const url = URL.createObjectURL(file);
     setPreview(url);
+    setPendingFile(file);
+    setParsed(null);
+    setUsedAI(false);
+    setFieldCount(0);
+  };
+
+  /** Step 2: user confirms → run OCR + parse */
+  const handleExtract = async () => {
+    if (!pendingFile) return;
     setScanning(true);
     setParsed(null);
     setUsedAI(false);
@@ -78,11 +89,10 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
     try {
       const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('eng');
-      const { data } = await worker.recognize(file);
+      const { data } = await worker.recognize(pendingFile);
       await worker.terminate();
 
       const text = data.text;
-      setRawText(text);
 
       if (!text || text.trim().length < 10) {
         toast.error('Could not read text from this image. Try a clearer photo.');
@@ -90,7 +100,6 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
         return;
       }
 
-      // Try AI first, then regex fallback
       const { data: result, usedAI: ai } = await parseWithAI(text);
       setUsedAI(ai);
 
@@ -122,6 +131,15 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
     toast.success(`Filled ${fieldCount} field${fieldCount > 1 ? 's' : ''}${extra} — please review`);
   };
 
+  const resetAll = () => {
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
+    setPendingFile(null);
+    setParsed(null);
+    setFieldCount(0);
+    setUsedAI(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
@@ -143,7 +161,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
             className="hidden"
             onChange={e => {
               const f = e.target.files?.[0];
-              if (f) handleFile(f);
+              if (f) handleSelectFile(f);
               e.target.value = '';
             }}
           />
@@ -155,13 +173,13 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
             className="hidden"
             onChange={e => {
               const f = e.target.files?.[0];
-              if (f) handleFile(f);
+              if (f) handleSelectFile(f);
               e.target.value = '';
             }}
           />
 
-          {/* Upload buttons */}
-          {!parsed && !scanning && (
+          {/* STATE 1: nothing selected — pick source */}
+          {!preview && !scanning && !parsed && (
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <Button
@@ -192,7 +210,29 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
             </div>
           )}
 
-          {/* Scanning state */}
+          {/* STATE 2: file selected, awaiting extraction */}
+          {preview && !scanning && !parsed && (
+            <div className="space-y-3 animate-fade-in">
+              <img src={preview} alt="Selected rate con" className="w-full max-h-56 object-contain rounded-xl border bg-muted" />
+              <p className="text-[11px] text-muted-foreground text-center">
+                Confirm this is the correct screenshot, then extract.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" onClick={() => galleryRef.current?.click()}>
+                  <ImageIcon className="h-4 w-4 mr-1.5" /> Replace
+                </Button>
+                <Button variant="ghost" size="sm" onClick={resetAll}>
+                  Cancel
+                </Button>
+              </div>
+              <Button onClick={handleExtract} className="w-full font-bold">
+                <Wand2 className="h-4 w-4 mr-2" />
+                Extract Info
+              </Button>
+            </div>
+          )}
+
+          {/* STATE 3: scanning */}
           {scanning && (
             <div className="flex flex-col items-center gap-3 py-6">
               {preview && (
@@ -200,12 +240,12 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
               )}
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <p className="text-sm font-bold text-foreground">Extracting load details…</p>
-              <p className="text-[11px] text-muted-foreground">Reading text and parsing with AI</p>
+              <p className="text-[11px] text-muted-foreground">Reading text and parsing</p>
             </div>
           )}
 
-          {/* Parsed results */}
-          {parsed && (
+          {/* STATE 4: parsed results */}
+          {parsed && !scanning && (
             <div className="space-y-3 animate-fade-in">
               {preview && (
                 <img src={preview} alt="Rate con" className="w-full max-h-32 object-contain rounded-xl border" />
@@ -271,25 +311,11 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
               </p>
 
               <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => galleryRef.current?.click()}
-                >
+                <Button variant="outline" size="sm" onClick={() => galleryRef.current?.click()}>
                   <ImageIcon className="h-4 w-4 mr-1.5" />
                   Replace
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setParsed(null);
-                    setPreview(null);
-                    setRawText('');
-                    setFieldCount(0);
-                    setUsedAI(false);
-                  }}
-                >
+                <Button variant="ghost" size="sm" onClick={resetAll}>
                   Cancel
                 </Button>
               </div>
