@@ -34,8 +34,8 @@ async function upsertSubscription(
     cancel_at_period_end?: boolean;
     current_period_start?: string | null;
     current_period_end?: string | null;
-    trial_start?: string | null;
-    trial_end?: string | null;
+    trial_start?: string | null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+    trial_end?: string | null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
   }
 ) {
   const { error } = await supabaseClient
@@ -103,8 +103,8 @@ serve(async (req) => {
           const planKey = session.metadata?.plan_key || resolvePlanKey(priceId);
           const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
           const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
-          const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;
-          const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
+          const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+          const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
 
           // Upsert subscriptions table (canonical)
           await upsertSubscription(supabaseClient, userId, {
@@ -116,8 +116,8 @@ serve(async (req) => {
             cancel_at_period_end: subscription.cancel_at_period_end,
             current_period_start: subscriptionStart,
             current_period_end: subscriptionEnd,
-            trial_start: trialStart,
-            trial_end: trialEnd,
+            trial_start: trialStart,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+            trial_end: trialEnd,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
           });
 
           // Also update profiles for backward compat
@@ -176,8 +176,8 @@ serve(async (req) => {
         const isActive = subscription.status === "active";
         const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
         const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
-        const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;
-        const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
+        const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+        const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
 
         // Check for admin/manual override before downgrading
         const { data: currentSub } = await supabaseClient
@@ -196,8 +196,8 @@ serve(async (req) => {
             cancel_at_period_end: subscription.cancel_at_period_end,
             current_period_start: subscriptionStart,
             current_period_end: subscriptionEnd,
-            trial_start: trialStart,
-            trial_end: trialEnd,
+            trial_start: trialStart,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+            trial_end: trialEnd,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
           });
 
           // Backward compat profiles update
@@ -227,8 +227,8 @@ serve(async (req) => {
             cancel_at_period_end: subscription.cancel_at_period_end,
             current_period_start: subscriptionStart,
             current_period_end: subscriptionEnd,
-            trial_start: trialStart,
-            trial_end: trialEnd,
+            trial_start: trialStart,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+            trial_end: trialEnd,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
           });
 
           // Only downgrade profiles if this subscription matches
@@ -251,8 +251,8 @@ serve(async (req) => {
             cancel_at_period_end: subscription.cancel_at_period_end,
             current_period_start: subscriptionStart,
             current_period_end: subscriptionEnd,
-            trial_start: trialStart,
-            trial_end: trialEnd,
+            trial_start: trialStart,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+            trial_end: trialEnd,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
           });
         }
         break;
@@ -289,8 +289,8 @@ serve(async (req) => {
             stripe_price_id: null,
             current_period_start: null,
             current_period_end: null,
-            trial_start: null,
-            trial_end: null,
+            trial_start: null,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+            trial_end: null,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
           });
 
           await supabaseClient.from("profiles").update({

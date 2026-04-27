@@ -12,7 +12,7 @@ interface Props { name?: string }
 const Day0Email = ({ name }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Welcome to {SITE_NAME} — your 14-day Pro trial is active</Preview>
+    <Preview>Welcome to {SITE_NAME} — your account is ready</Preview>
     <Body style={main}>
       <Container style={container}>
         <Heading style={h1}>
@@ -23,9 +23,9 @@ const Day0Email = ({ name }: Props) => (
           expenses, and fuel so you know exactly what each mile actually pays.
         </Text>
         <Text style={text}>
-          Your account includes a <strong>14-day Pro trial</strong> with full
-          access to Smart Alerts, Profit Check, lane intelligence, and the
-          Weekly Closeout summary.
+          Your account is on the <strong>Free plan</strong>. Start tracking
+          right away — and upgrade to Pro when you want Smart Alerts, Profit
+          Check, lane intelligence, and the Weekly Closeout summary.
         </Text>
         <Section style={buttonContainer}>
           <Button style={button} href={`${APP_URL}/dashboard`}>
@@ -49,7 +49,7 @@ const Day0Email = ({ name }: Props) => (
 
 export const template = {
   component: Day0Email,
-  subject: `Welcome to ${SITE_NAME} — your 14-day Pro trial is active`,
+  subject: `Welcome to ${SITE_NAME} — your account is ready`,
   displayName: 'Lifecycle — Day 0 (welcome)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry

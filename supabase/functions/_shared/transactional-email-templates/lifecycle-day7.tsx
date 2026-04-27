@@ -12,13 +12,14 @@ interface Props { name?: string }
 const Day7Email = ({ name }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Your Pro trial ends in 7 days</Preview>
+    <Preview>Keep building your tracking habit</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>{name ? `${name}, your Pro trial is half over` : 'Your Pro trial is half over'}</Heading>
+        <Heading style={h1}>{name ? `${name}, keep building your tracking habit` : 'Keep building your tracking habit'}</Heading>
         <Text style={text}>
-          You've got <strong>7 days left</strong> on your 14-day Pro trial — and your
-          account is still empty. Here's what Pro unlocks the moment you log a load:
+          You've had your {SITE_NAME} account for about a week. Drivers who log
+          even a few loads each week get a much clearer picture of what each mile
+          actually pays. Here's what unlocks once you upgrade to Pro:
         </Text>
         <Text style={text}>
           • <strong>Profit Check</strong> on every load before you book it<br />
@@ -27,7 +28,7 @@ const Day7Email = ({ name }: Props) => (
           • <strong>Lane intelligence</strong> — best/weakest routes from your own history
         </Text>
         <Section style={buttonContainer}>
-          <Button style={button} href={`${APP_URL}/dashboard`}>Log a load and use Pro</Button>
+          <Button style={button} href={`${APP_URL}/dashboard`}>Log a load</Button>
         </Section>
         <Hr style={hr} />
         <Text style={footer}>The {SITE_NAME} Team</Text>
@@ -38,8 +39,8 @@ const Day7Email = ({ name }: Props) => (
 
 export const template = {
   component: Day7Email,
-  subject: 'Your Pro trial ends in 7 days',
-  displayName: 'Lifecycle — Day 7 (trial midpoint)',
+  subject: 'Keep building your tracking habit',
+  displayName: 'Lifecycle — Day 7 (habit nudge)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry
 

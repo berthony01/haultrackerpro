@@ -13,7 +13,6 @@ interface ProInsightCardProps {
   loads: Load[];
   expenses: Expense[];
   isPro: boolean;
-  isTrialing?: boolean;
   onNavigate?: (page: string) => void;
 }
 
@@ -28,12 +27,12 @@ interface InsightData {
   ctaPage: string;
 }
 
-export function ProInsightCard({ loads, expenses, isPro, isTrialing = false, onNavigate }: ProInsightCardProps) {
+export function ProInsightCard({ loads, expenses, isPro, onNavigate }: ProInsightCardProps) {
   const navigate = useNavigate();
 
   const insight = useMemo((): InsightData | null => {
     // Don't compute for Pro users, or users with < 3 loads
-    if (isPro || isTrialing || loads.length < 3) return null;
+    if (isPro || loads.length < 3) return null;
     const now = new Date();
 
     // Last 30 days data

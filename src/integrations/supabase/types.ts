@@ -551,6 +551,7 @@ export type Database = {
           download_sent_at: string | null
           downloaded_at: string | null
           email: string
+          email_lower: string | null
           first_name: string | null
           id: string
           source_page: string | null
@@ -569,6 +570,7 @@ export type Database = {
           download_sent_at?: string | null
           downloaded_at?: string | null
           email: string
+          email_lower?: string | null
           first_name?: string | null
           id?: string
           source_page?: string | null
@@ -587,6 +589,7 @@ export type Database = {
           download_sent_at?: string | null
           downloaded_at?: string | null
           email?: string
+          email_lower?: string | null
           first_name?: string | null
           id?: string
           source_page?: string | null
@@ -1401,6 +1404,22 @@ export type Database = {
       recompute_personal_intelligence: {
         Args: { _user_id: string }
         Returns: undefined
+      }
+      submit_lead_magnet_signup: {
+        Args: {
+          _bundle_name?: string
+          _bundle_version?: string
+          _converted_user_id?: string
+          _email: string
+          _first_name?: string
+          _source_page?: string
+          _utm_campaign?: string
+          _utm_content?: string
+          _utm_medium?: string
+          _utm_source?: string
+          _utm_term?: string
+        }
+        Returns: string
       }
     }
     Enums: {

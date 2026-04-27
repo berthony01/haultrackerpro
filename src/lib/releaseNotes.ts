@@ -19,7 +19,7 @@ export interface ReleaseNote {
  * dashboard "What's New" card and the auto-popup modal.
  *
  * Keep copy clean of legacy plan-preview wording — see
- * src/test/noTrialLanguage.test.ts for the guard.
+ * src/test/noTrialLanguage.test.ts for the guard. // trial-allowlist: refers to test file name
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {

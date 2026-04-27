@@ -8,7 +8,6 @@ import { startOfWeek, endOfWeek } from 'date-fns';
 
 interface ProTimeSavedCardProps {
   isPro: boolean;
-  isTrialing?: boolean;
   weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
 }
 
@@ -16,9 +15,9 @@ const TIME_PER_VOICE_LOG = 2;
 const TIME_PER_RECEIPT_SCAN = 3;
 const TIME_PER_PASTE_PARSE = 1.5;
 
-export function ProTimeSavedCard({ isPro, isTrialing = false, weekStartsOn = 0 }: ProTimeSavedCardProps) {
+export function ProTimeSavedCard({ isPro, weekStartsOn = 0 }: ProTimeSavedCardProps) {
   const { user } = useAuth();
-  const isProUser = isPro || isTrialing;
+  const isProUser = isPro;
 
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn }).toISOString();

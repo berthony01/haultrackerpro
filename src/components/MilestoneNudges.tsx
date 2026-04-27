@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 interface MilestoneNudgesProps {
   loadsCount: number;
   expensesCount: number;
-  isTrialing?: boolean;
   isPro: boolean;
   onUpgrade: () => void;
   onNavigate: (page: string) => void;

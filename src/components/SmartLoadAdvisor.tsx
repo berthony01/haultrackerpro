@@ -14,7 +14,6 @@ interface SmartLoadAdvisorProps {
   loads: Load[];
   expenses: Expense[];
   isPro: boolean;
-  isTrialing?: boolean;
 }
 
 interface LaneData {
@@ -32,9 +31,9 @@ function normalizeCityName(location: string): string {
   return location.trim().split(',')[0].trim().substring(0, 25);
 }
 
-export function SmartLoadAdvisor({ loads, isPro, isTrialing = false }: SmartLoadAdvisorProps) {
+export function SmartLoadAdvisor({ loads, isPro }: SmartLoadAdvisorProps) {
   const navigate = useNavigate();
-  const isProAccess = isPro || isTrialing;
+  const isProAccess = isPro;
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 

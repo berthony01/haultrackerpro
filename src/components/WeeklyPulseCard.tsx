@@ -11,7 +11,6 @@ import { formatCurrency, getEffectiveDate } from '@/lib/loadUtils';
 
 interface WeeklyPulseCardProps {
   isPro: boolean;
-  isTrialing?: boolean;
 }
 
 function dismissKey() {
@@ -19,11 +18,11 @@ function dismissKey() {
   return `weekly_pulse_dismissed_${getISOWeekYear(now)}-W${String(getISOWeek(now)).padStart(2, '0')}`;
 }
 
-export function WeeklyPulseCard({ isPro, isTrialing = false }: WeeklyPulseCardProps) {
+export function WeeklyPulseCard({ isPro }: WeeklyPulseCardProps) {
   const navigate = useNavigate();
   const { loads, isLoading } = useLoads();
   const { lanes, brokers, operatingMetrics } = usePersonalIntelligence();
-  const hasAccess = isPro || isTrialing;
+  const hasAccess = isPro;
 
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {

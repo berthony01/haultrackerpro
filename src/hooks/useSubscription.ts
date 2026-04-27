@@ -7,14 +7,10 @@ import { isProStatus, PlanKey } from '@/lib/billing/plans';
 export interface SubscriptionState {
   isLoading: boolean;
   isPro: boolean;
-  /** @deprecated Trials removed. Always false. Kept for backward compatibility. */
-  isTrialing: boolean;
   planKey: PlanKey;
   status: string;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: string | null;
-  /** @deprecated Trials removed. Always null. Kept for backward compatibility. */
-  trialEnd: string | null;
   refetch: () => void;
 }
 
@@ -117,12 +113,10 @@ export function useSubscription(): SubscriptionState {
   return {
     isLoading,
     isPro,
-    isTrialing: false,
     planKey,
     status,
     cancelAtPeriodEnd,
     currentPeriodEnd,
-    trialEnd: null,
     refetch: fetchSubscription,
   };
 }

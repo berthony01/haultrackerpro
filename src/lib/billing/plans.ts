@@ -11,7 +11,6 @@ export interface PlanDefinition {
   priceId: string | null; // null for free
   monthlyPrice: number;
   interval: 'month' | 'year' | null;
-  trialDays: number;
 }
 
 /**
@@ -25,7 +24,6 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     priceId: null,
     monthlyPrice: 0,
     interval: null,
-    trialDays: 0,
   },
   pro_monthly: {
     key: 'pro_monthly',
@@ -33,7 +31,6 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     priceId: 'price_1TGMZ7I2TXbeuHi41ceyf1zP',
     monthlyPrice: 19.99,
     interval: 'month',
-    trialDays: 0,
   },
   pro_yearly: {
     key: 'pro_yearly',
@@ -41,11 +38,10 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     priceId: 'price_1TGMZ8I2TXbeuHi4VmSGUcRK',
     monthlyPrice: 14.99,
     interval: 'year',
-    trialDays: 0,
   },
 };
 
-/** Subscription statuses that grant Pro access (no trials) */
+/** Subscription statuses that grant Pro access */
 export const PRO_STATUSES = ['active'] as const;
 
 /** Check if a subscription status grants Pro access */

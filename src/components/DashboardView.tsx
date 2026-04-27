@@ -41,7 +41,6 @@ interface DashboardViewProps {
   onNavigate?: (page: string, options?: { filter?: string }) => void;
   smartAlerts?: { alerts: any[]; dismissAlert: { mutate: (key: string) => void } };
   isPro?: boolean;
-  isTrialing?: boolean;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
@@ -67,7 +66,7 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
   }
 }
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, isTrialing = false }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
   useTierUpDetector();
   
@@ -182,7 +181,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* Driver Intelligence — gamified score card with next-tier hint */}
-      {!isLoading && <DriverIntelligenceCard isPro={isPro} isTrialing={isTrialing} />}
+      {!isLoading && <DriverIntelligenceCard isPro={isPro} />}
 
       {/* === ZONE 2 · COMPETITION ZONE === */}
       {!isLoading && (
@@ -210,7 +209,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
       {/* === ZONE 4 · QUICK SHORTCUTS / SUPPORT === */}
       {!isLoading && (
-        <HomeTimeDashboardCard isPro={isPro} isTrialing={isTrialing} onNavigate={onNavigate} />
+        <HomeTimeDashboardCard isPro={isPro} onNavigate={onNavigate} />
       )}
 
       {/* Date Range Filter */}
@@ -345,25 +344,25 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* === ZONE 6 · INSIGHTS (AI + trends) === */}
           {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
-          <WeeklyPulseCard isPro={isPro} isTrialing={isTrialing} />
+          <WeeklyPulseCard isPro={isPro} />
 
           {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
-          <PersonalIntelligenceBlocks isPro={isPro} isTrialing={isTrialing} />
+          <PersonalIntelligenceBlocks isPro={isPro} />
 
           {/* Smart Load Advisor — promoted */}
-          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} isTrialing={isTrialing} />
+          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} />
 
           {/* Personalized Pro Insight — free users only */}
           <ProInsightCard
             loads={loads}
             expenses={expenses}
             isPro={isPro}
-            isTrialing={isTrialing}
+
             onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
           />
 
           {/* Pro Time Saved */}
-          <ProTimeSavedCard isPro={isPro} isTrialing={isTrialing} weekStartsOn={weekStartsOn} />
+          <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />
 
           {/* Performance Trends */}
           <PerformanceTrends loads={loads} />

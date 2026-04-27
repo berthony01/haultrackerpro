@@ -9,7 +9,7 @@ import { join, relative, resolve } from 'path';
 
 const ROOT = resolve(__dirname, '..', '..');
 
-const SCAN_DIRS = ['src', 'public'];
+const SCAN_DIRS = ['src', 'public', 'supabase/functions'];
 const SCAN_ROOT_FILES = ['index.html', 'README.md'];
 const EXTS = new Set(['.tsx', '.ts', '.md', '.json', '.html']);
 
