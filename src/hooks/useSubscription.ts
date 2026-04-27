@@ -113,12 +113,10 @@ export function useSubscription(): SubscriptionState {
   return {
     isLoading,
     isPro,
-    isTrialing: false,
     planKey,
     status,
     cancelAtPeriodEnd,
     currentPeriodEnd,
-    trialEnd: null,
     refetch: fetchSubscription,
   };
 }
