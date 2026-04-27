@@ -36,20 +36,37 @@ export function useDriverPoints() {
   });
 
   // Realtime: refresh on any change to this user's points row.
+  // Depend on user.id (stable string) — not the whole user object —
+  // and use a unique channel name per mount to avoid colliding with a
+  // stale, not-yet-removed channel from a previous render.
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`driver-points-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'driver_points', filter: `user_id=eq.${user.id}` },
-        () => qc.invalidateQueries({ queryKey: ['driver-points', user.id] }),
-      )
-      .subscribe();
+    if (!userId) return;
+    const uniqueSuffix =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+    const channel = supabase.channel(`driver-points-${userId}-${uniqueSuffix}`);
+    try {
+      channel
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'driver_points', filter: `user_id=eq.${userId}` },
+          () => qc.invalidateQueries({ queryKey: ['driver-points', userId] }),
+        )
+        .subscribe();
+    } catch (err) {
+      // Never let a realtime hiccup take down the dashboard via ErrorBoundary.
+      console.warn('[useDriverPoints] realtime subscribe failed', err);
+    }
     return () => {
-      supabase.removeChannel(channel);
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        // ignore
+      }
     };
-  }, [user, qc]);
+  }, [userId, qc]);
 
   return query;
 }
