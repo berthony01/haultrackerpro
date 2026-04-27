@@ -177,3 +177,68 @@ Castleton, NY 12033`;
     expect(r.dropoff_location).toBe('Castleton, NY');
   });
 });
+
+describe('parseLoadText — Telegram paste regressions (user-reported)', () => {
+  it('Multi-line Telegram paste with pinned preview, DH 25, Trip 257.10mi', () => {
+    const sample = `Pinned Message #4
+🗺Trip ID : T-1123J49SR  📍1#: 111DF4KFK Loaded - P...
+
+🗺Trip ID : T-1123J49SR
+
+📍1#: 111DF4KFK
+Loaded - Preloaded
+Sun, Apr 26, 12:00 AM EDT ORH5
+515 Douglas St
+Uxbridge, MA 01569
+—————————————
+📍2#: 111DF4KFK
+Loaded - Preloaded
+Sun, Apr 26, 05:14 AM EDT WNY4
+1159 County Route 24
+Granville, NY 12832-9438
+—————————————
+📍3#: 115PBBXB5
+Empty - Drop
+Sun, Apr 26, 07:47 AM EDT ALB1
+1835 Us Route 9
+Castleton, NY 12033
+—————————————
+
+DH 25 miles
+
+🚛Trip: 257.10mi
+🕒Duration: 0d 7h
+
+❌Late PU: $1000
+❌Late DEL: $700
+❌No Update: $200
+❌No PU, DEL trailer photos: $200`;
+    const r = parseLoadText(sample);
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBe('257.10');
+  });
+
+  it('handles "267 mile" total wording without overwriting a stronger Trip match', () => {
+    const r = parseLoadText('Total: 267 mile\nTrip: 257.10mi\nDH 25 miles');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBe('257.10');
+  });
+
+  it('uses 267 as loaded miles when only total wording is present', () => {
+    const r = parseLoadText('Total miles: 267 mile\nDH 25 miles');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBe('267');
+  });
+
+  it('zero-width and NBSP Telegram artifacts do not break extraction', () => {
+    const r = parseLoadText('DH\u200B 25 miles\nTrip:\u00A0257.10\u200Bmi');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBe('257.10');
+  });
+
+  it('deadhead never collapses into loaded when both 25-style values exist', () => {
+    const r = parseLoadText('DH 25 miles\nTrip: 25 mi\nLoaded miles: 257.10');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBe('257.10');
+  });
+});
