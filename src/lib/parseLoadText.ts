@@ -290,6 +290,13 @@ export function parseLoadText(text: string): ParsedLoadData {
   if (dh && loaded && dh === loaded && mileageMatches.length <= 1) {
     dh = undefined;
   }
+  // Stronger guard: if both exist but are the same numeric value AND we have a
+  // distinct non-deadhead candidate elsewhere, prefer that other candidate for loaded
+  // so deadhead never duplicates into loaded miles.
+  if (dh && loaded && dh === loaded && mileageMatches.length > 1) {
+    const alt = pickLoaded(mileageMatches.filter(m => m.value !== dh), dh);
+    if (alt) loaded = alt;
+  }
 
   if (dh) result.deadhead_miles = dh;
   if (loaded) result.loaded_miles = loaded;
