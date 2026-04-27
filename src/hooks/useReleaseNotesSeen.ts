@@ -24,41 +24,45 @@ function writeLocal(userId: string, releaseId: string) {
 
 /**
  * Per-user "What's New" dismiss tracking, persisted in `profiles.last_seen_release_id`.
- * Uses localStorage as a fast cache to prevent the modal from flashing
- * on page load before the profile query resolves.
+ *
+ * - Waits for auth to settle before deciding whether to show the modal.
+ * - Treats a missing or unloaded value as NOT seen (so we never spam users
+ *   who already dismissed it on another device).
+ * - Persists with an upsert so users without a profile row still save state.
  */
 export function useReleaseNotesSeen() {
   const { user, loading } = useAuth();
-  const [lastSeenId, setLastSeenId] = useState<string | null>(() => readLocal(user?.id));
+  const userId = user?.id;
+  const [lastSeenId, setLastSeenId] = useState<string | null>(null);
   const [dbLoaded, setDbLoaded] = useState(false);
 
   // Reconcile from DB whenever the user changes
   useEffect(() => {
     let cancelled = false;
-    const uid = user?.id;
-    if (!uid) {
+    if (!userId) {
       setDbLoaded(false);
       setLastSeenId(null);
       return;
     }
 
-    // Hydrate cached value first to avoid a flash
-    setLastSeenId(readLocal(uid));
+    // Hydrate cached value first to avoid a flash for returning users on the same device
+    const cached = readLocal(userId);
+    if (cached) setLastSeenId(cached);
     setDbLoaded(false);
 
     (async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('last_seen_release_id')
-        .eq('user_id', uid)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (cancelled) return;
 
       if (!error && data) {
         const remote = (data as { last_seen_release_id: string | null }).last_seen_release_id ?? null;
-        setLastSeenId(remote);
-        if (remote) writeLocal(uid, remote);
+        setLastSeenId(remote ?? cached ?? null);
+        if (remote) writeLocal(userId, remote);
       }
       setDbLoaded(true);
     })();
@@ -66,31 +70,32 @@ export function useReleaseNotesSeen() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [userId]);
 
   const markSeen = useCallback(
     async (releaseId: string = LATEST_RELEASE_ID) => {
-      const uid = user?.id;
-      if (!uid) return;
+      if (!userId) return;
       // Optimistic local update
-      writeLocal(uid, releaseId);
+      writeLocal(userId, releaseId);
       setLastSeenId(releaseId);
-      // Persist to DB so it survives storage clearing / new devices
+      // Persist to DB so it survives storage clearing / new devices.
+      // Use upsert so users that don't have a profile row yet still save state.
       try {
         await supabase
           .from('profiles')
-          .update({ last_seen_release_id: releaseId })
-          .eq('user_id', uid);
+          .upsert(
+            { user_id: userId, last_seen_release_id: releaseId },
+            { onConflict: 'user_id' },
+          );
       } catch {
         /* keep local cache; will retry on next markSeen */
       }
     },
-    [user?.id],
+    [userId],
   );
 
-  // Wait for both auth and the DB read before deciding whether to show the modal,
-  // so we don't briefly show it to users who already dismissed it on another device.
-  const ready = !loading && !!user?.id && dbLoaded;
+  // Wait for both auth and the DB read before deciding whether to show the modal.
+  const ready = !loading && !!userId && dbLoaded;
   const hasSeenLatest = !ready ? true : lastSeenId === LATEST_RELEASE_ID;
 
   return { ready, hasSeenLatest, lastSeenId, markSeen };
