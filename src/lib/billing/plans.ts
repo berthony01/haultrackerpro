@@ -41,7 +41,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
   },
 };
 
-/** Subscription statuses that grant Pro access (no trials) */
+/** Subscription statuses that grant Pro access */
 export const PRO_STATUSES = ['active'] as const;
 
 /** Check if a subscription status grants Pro access */
