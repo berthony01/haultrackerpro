@@ -242,3 +242,42 @@ DH 25 miles
     expect(r.loaded_miles).toBe('257.10');
   });
 });
+
+describe('parseLoadText — strict spec (Trip vs Trip ID, A–E)', () => {
+  it('A. "DH 25 miles" + "🚛 Trip: 257.10mi" → loaded=257.10, dh=25', () => {
+    const r = parseLoadText('DH 25 miles\n🚛 Trip: 257.10mi');
+    expect(r.loaded_miles).toBe('257.10');
+    expect(r.deadhead_miles).toBe('25');
+  });
+
+  it('B. "Trip ID : T-1123J49SR" alone → no mileage captured', () => {
+    const r = parseLoadText('Trip ID : T-1123J49SR');
+    expect(r.loaded_miles).toBeUndefined();
+    expect(r.deadhead_miles).toBeUndefined();
+    expect(r.trip_id).toBe('T-1123J49SR');
+  });
+
+  it('C. "Trip: 800 miles" → loaded=800', () => {
+    const r = parseLoadText('Trip: 800 miles');
+    expect(r.loaded_miles).toBe('800');
+  });
+
+  it('D. "Deadhead: 35 mi" + "Trip Distance: 512.6 mi" → loaded=512.6, dh=35', () => {
+    const r = parseLoadText('Deadhead: 35 mi\nTrip Distance: 512.6 mi');
+    expect(r.loaded_miles).toBe('512.6');
+    expect(r.deadhead_miles).toBe('35');
+  });
+
+  it('E. "Loaded miles: 734" + "DH: 12" → loaded=734, dh=12', () => {
+    const r = parseLoadText('Loaded miles: 734\nDH: 12');
+    expect(r.loaded_miles).toBe('734');
+    expect(r.deadhead_miles).toBe('12');
+  });
+
+  it('Trip ID + Trip miles in same paste: ID extracted, miles assigned correctly', () => {
+    const r = parseLoadText('Trip ID : T-1123J49SR\nDH 25 miles\n🚛 Trip: 257.10mi');
+    expect(r.trip_id).toBe('T-1123J49SR');
+    expect(r.loaded_miles).toBe('257.10');
+    expect(r.deadhead_miles).toBe('25');
+  });
+});
