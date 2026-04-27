@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Camera, Loader2, Check, Upload, AlertCircle, Sparkles } from 'lucide-react';
+import { Camera, Loader2, Check, Image as ImageIcon, AlertCircle, Sparkles, ShieldCheck } from 'lucide-react';
 import { parseLoadText, ParsedLoadData } from '@/lib/parseLoadText';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -54,7 +54,8 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
   const [preview, setPreview] = useState<string | null>(null);
   const [fieldCount, setFieldCount] = useState(0);
   const [usedAI, setUsedAI] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) {
@@ -105,6 +106,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
 
       setParsed(result);
       setFieldCount(count);
+      toast.success(`Extracted ${count} field${count > 1 ? 's' : ''} — review below`);
     } catch {
       toast.error('Failed to scan image. Please try a clearer photo.');
     } finally {
@@ -135,7 +137,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
 
         <div className="space-y-4">
           <input
-            ref={fileRef}
+            ref={galleryRef}
             type="file"
             accept="image/*"
             className="hidden"
@@ -145,23 +147,46 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
               e.target.value = '';
             }}
           />
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+              e.target.value = '';
+            }}
+          />
 
-          {/* Upload button */}
+          {/* Upload buttons */}
           {!parsed && !scanning && (
             <div className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full h-28 flex-col gap-2 rounded-xl border-dashed border-2 border-primary/30 hover:border-primary"
-                onClick={() => fileRef.current?.click()}
-              >
-                <Upload className="h-8 w-8 text-primary" />
-                <span className="text-sm font-bold">Upload Rate Con Screenshot</span>
-                <span className="text-[11px] text-muted-foreground">JPG, PNG, or take a photo</span>
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  className="h-24 flex-col gap-1.5 rounded-xl border-dashed border-2 border-primary/30 hover:border-primary"
+                  onClick={() => galleryRef.current?.click()}
+                >
+                  <ImageIcon className="h-6 w-6 text-primary" />
+                  <span className="text-xs font-bold">Choose from Gallery</span>
+                  <span className="text-[10px] text-muted-foreground">Existing screenshot</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-24 flex-col gap-1.5 rounded-xl border-dashed border-2 border-primary/30 hover:border-primary"
+                  onClick={() => cameraRef.current?.click()}
+                >
+                  <Camera className="h-6 w-6 text-primary" />
+                  <span className="text-xs font-bold">Take Photo</span>
+                  <span className="text-[10px] text-muted-foreground">Use camera now</span>
+                </Button>
+              </div>
               <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-2.5">
-                <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  AI-enhanced parsing extracts more fields with higher accuracy. Always review before saving.
+                  Image is processed on your device and never uploaded or stored. Always review extracted fields before saving.
                 </p>
               </div>
             </div>
@@ -171,11 +196,11 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
           {scanning && (
             <div className="flex flex-col items-center gap-3 py-6">
               {preview && (
-                <img src={preview} alt="Rate con" className="w-24 h-24 object-cover rounded-xl border" />
+                <img src={preview} alt="Rate con preview" className="w-28 h-28 object-cover rounded-xl border" />
               )}
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Scanning with AI...</p>
-              <p className="text-[11px] text-muted-foreground">This may take a few seconds</p>
+              <p className="text-sm font-bold text-foreground">Extracting load details…</p>
+              <p className="text-[11px] text-muted-foreground">Reading text and parsing with AI</p>
             </div>
           )}
 
@@ -245,10 +270,18 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                 {fieldCount} field{fieldCount > 1 ? 's' : ''} extracted. Only empty fields in the form will be filled. Always review before saving.
               </p>
 
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  size="sm"
+                  onClick={() => galleryRef.current?.click()}
+                >
+                  <ImageIcon className="h-4 w-4 mr-1.5" />
+                  Replace
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setParsed(null);
                     setPreview(null);
@@ -257,13 +290,13 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                     setUsedAI(false);
                   }}
                 >
-                  Retry
-                </Button>
-                <Button onClick={handleConfirm} className="flex-1 font-bold">
-                  <Check className="h-4 w-4 mr-2" />
-                  Fill Form
+                  Cancel
                 </Button>
               </div>
+              <Button onClick={handleConfirm} className="w-full font-bold">
+                <Check className="h-4 w-4 mr-2" />
+                Fill Form with {fieldCount} Field{fieldCount > 1 ? 's' : ''}
+              </Button>
             </div>
           )}
         </div>
