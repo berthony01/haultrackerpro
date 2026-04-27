@@ -47,8 +47,22 @@ function cleanNum(s: string): string {
  * Covers the common ranges Telegram / dispatch bots use.
  */
 function normalizeUnicodeLetters(input: string): string {
+  // NFKC compatibility-fold + strip zero-width / invisible formatting chars
+  // (ZWSP, ZWNJ, ZWJ, BOM, LRM/RLM, soft hyphen) that Telegram and brokers
+  // sometimes embed and that can break adjacency in our regex matchers.
+  // Also normalize non-breaking / odd-width spaces to a regular space.
+  let pre: string;
+  try {
+    pre = input.normalize('NFKC');
+  } catch {
+    pre = input;
+  }
+  pre = pre
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF\u00AD]/g, '')
+    .replace(/[\u00A0\u2007\u202F\u2009\u200A\u205F\u3000]/g, ' ');
+
   let out = '';
-  for (const ch of input) {
+  for (const ch of pre) {
     const cp = ch.codePointAt(0)!;
     // Mathematical Bold (A–Z 1D400–1D419, a–z 1D41A–1D433)
     if (cp >= 0x1d400 && cp <= 0x1d419) out += String.fromCharCode(0x41 + (cp - 0x1d400));
