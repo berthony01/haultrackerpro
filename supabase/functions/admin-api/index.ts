@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       const [
         users, loads, loads7d, expenses, expenses7d,
         fuel, fuel7d, recurringActive,
-        subsActive, subsTrialing, subsFree, subsCanceled,
+        subsActive, _subsLegacyStub, subsFree, subsCanceled,
         parkingLocs, parkingReports7d, parkingVerifs7d,
         driverPointsActive,
         leadsTotal, leads7d, leads30d,
