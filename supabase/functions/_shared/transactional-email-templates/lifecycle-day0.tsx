@@ -49,7 +49,7 @@ const Day0Email = ({ name }: Props) => (
 
 export const template = {
   component: Day0Email,
-  subject: `Welcome to ${SITE_NAME} — your 14-day Pro trial is active`,
+  subject: `Welcome to ${SITE_NAME} — your account is ready`,
   displayName: 'Lifecycle — Day 0 (welcome)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry
