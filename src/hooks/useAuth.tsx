@@ -21,15 +21,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Subscribe first (synchronous handler — no await inside)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
+      setSession((prev) =>
+        prev?.access_token === newSession?.access_token ? prev : newSession,
+      );
+      setUser((prev) => {
+        const nextUser = newSession?.user ?? null;
+        return prev?.id === nextUser?.id ? prev : nextUser;
+      });
       setLoading(false);
     });
 
     // Then restore existing session
     supabase.auth.getSession().then(({ data: { session: existing } }) => {
-      setSession(existing);
-      setUser(existing?.user ?? null);
+      setSession((prev) =>
+        prev?.access_token === existing?.access_token ? prev : existing,
+      );
+      setUser((prev) => {
+        const nextUser = existing?.user ?? null;
+        return prev?.id === nextUser?.id ? prev : nextUser;
+      });
       setLoading(false);
     });
 
