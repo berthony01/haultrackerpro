@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
         adminDb.from("ai_insights").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
       ]);
       const totalUsers = users.count ?? 0;
-      const activePro = (subsActive.count ?? 0) + (subsTrialing.count ?? 0);
+      const activePro = (subsActive.count ?? 0) + (_subsLegacyStub.count ?? 0);
       const conversionRate = totalUsers > 0 ? Math.round((activePro / totalUsers) * 1000) / 10 : 0;
       return json({
         total_users: totalUsers,
