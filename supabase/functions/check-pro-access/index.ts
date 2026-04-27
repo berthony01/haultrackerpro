@@ -36,7 +36,7 @@ serve(async (req) => {
       });
     }
 
-    // Check Pro access from canonical subscriptions table (no trials)
+    // Check Pro access from canonical subscriptions table (no trials)  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
     const { data: sub } = await supabaseClient
       .from("subscriptions")
       .select("status")

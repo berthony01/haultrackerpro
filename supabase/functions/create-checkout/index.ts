@@ -93,9 +93,9 @@ serve(async (req) => {
 
       // Prevent double subscription
       const activeSubs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
-      const trialSubs = await stripe.subscriptions.list({ customer: customerId, status: 'trialing', limit: 1 });
-      if (activeSubs.data.length > 0 || trialSubs.data.length > 0) {
-        logStep("User already has active/trialing subscription");
+      const trialSubs = await stripe.subscriptions.list({ customer: customerId, status: 'trialing', limit: 1 });  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+      if (activeSubs.data.length > 0 || trialSubs.data.length > 0) {  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+        logStep("User already has active/trialing subscription");  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
         return new Response(JSON.stringify({ error: "You already have an active subscription. Manage it from your account settings." }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,

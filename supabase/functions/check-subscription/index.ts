@@ -34,11 +34,11 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Legacy: trial-expiry cron handler — no-op now that trials are removed.
+    // Legacy: trial-expiry cron handler — no-op now that trials are removed.  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body is fine */ }
     if (body?.action === "expire_trials") {
-      logStep("expire_trials called but trials are removed — no-op");
+      logStep("expire_trials called but trials are removed — no-op");  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
       return new Response(JSON.stringify({ ok: true, deprecated: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -128,10 +128,10 @@ serve(async (req) => {
       const planKey = resolvePlanKey(priceId);
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
-      const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;
-      const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
+      const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+      const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
       productId = subscription.items.data[0].price.product;
-      const isTrial = subscription.status === "trialing";
+      const isTrial = subscription.status === "trialing";  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
       logStep("Subscription found", { subscriptionId: subscription.id, status: subscription.status, isTrial, productId, endDate: subscriptionEnd });
 
       // Upsert subscriptions table
@@ -147,8 +147,8 @@ serve(async (req) => {
           cancel_at_period_end: subscription.cancel_at_period_end,
           current_period_start: subscriptionStart,
           current_period_end: subscriptionEnd,
-          trial_start: trialStart,
-          trial_end: trialEnd,
+          trial_start: trialStart,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+          trial_end: trialEnd,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
 
@@ -196,8 +196,8 @@ serve(async (req) => {
           stripe_price_id: null,
           current_period_start: null,
           current_period_end: null,
-          trial_start: null,
-          trial_end: null,
+          trial_start: null,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
+          trial_end: null,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
 
