@@ -11,7 +11,6 @@ import { ProUpgradeModal } from '@/components/ProUpgradeModal';
 
 interface HomeTimeDashboardCardProps {
   isPro: boolean;
-  isTrialing?: boolean;
   onNavigate?: (page: string) => void;
 }
 
@@ -19,7 +18,7 @@ interface HomeTimeDashboardCardProps {
  * Compact dashboard card surfacing Home Time Mode + a one-tap shortcut to the
  * Recurring Expenses page. Kept lightweight so it doesn't crowd the dashboard.
  */
-export function HomeTimeDashboardCard({ isPro, isTrialing = false, onNavigate }: HomeTimeDashboardCardProps) {
+export function HomeTimeDashboardCard({ isPro, onNavigate }: HomeTimeDashboardCardProps) {
   const { templates } = useRecurringExpenses();
   const { isActive, startedAt, start, end, isPending } = useHomeTimeMode();
 
@@ -27,7 +26,7 @@ export function HomeTimeDashboardCard({ isPro, isTrialing = false, onNavigate }:
   const [showEnd, setShowEnd] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  const hasAccess = isPro || isTrialing;
+  const hasAccess = isPro;
   const activeCount = templates.filter(isTemplateActive).length;
   const pausedCount = templates.length - activeCount;
 

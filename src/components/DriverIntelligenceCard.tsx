@@ -11,15 +11,14 @@ import { ProUpgradeModal } from '@/components/ProUpgradeModal';
 
 interface DriverIntelligenceCardProps {
   isPro: boolean;
-  isTrialing?: boolean;
 }
 
-export function DriverIntelligenceCard({ isPro, isTrialing = false }: DriverIntelligenceCardProps) {
+export function DriverIntelligenceCard({ isPro }: DriverIntelligenceCardProps) {
   const { user } = useAuth();
   const { data: points } = useDriverPoints();
   const { me, top, rows } = useMyLeaderboardRank(50);
   const navigate = useNavigate();
-  const hasAccess = isPro || isTrialing;
+  const hasAccess = isPro;
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const total = points?.total_points ?? 0;

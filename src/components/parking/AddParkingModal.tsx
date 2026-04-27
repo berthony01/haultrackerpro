@@ -33,8 +33,8 @@ type LocType = 'truck_stop' | 'rest_area' | 'warehouse' | 'street' | 'private';
 
 export function AddParkingModal({ open, onOpenChange }: AddParkingModalProps) {
   const { user } = useAuth();
-  const { isPro, isTrialing } = useSubscription();
-  const hasAccess = isPro || isTrialing;
+  const { isPro } = useSubscription();
+  const hasAccess = isPro;
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState('');

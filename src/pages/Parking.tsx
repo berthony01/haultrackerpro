@@ -11,8 +11,8 @@ import { useDriverPoints } from '@/hooks/useDriverPoints';
 
 export default function Parking() {
   const navigate = useNavigate();
-  const { isPro, isTrialing, isLoading: subLoading } = useSubscription();
-  const hasAccess = isPro || isTrialing;
+  const { isPro, isLoading: subLoading } = useSubscription();
+  const hasAccess = isPro;
   const { data: locations = [] } = useParkingLocations();
   const { data: recentReports = [] } = useRecentParkingReports();
   const { data: points } = useDriverPoints();

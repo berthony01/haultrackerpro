@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom';
 
 interface PersonalIntelligenceBlocksProps {
   isPro: boolean;
-  isTrialing?: boolean;
 }
 
 function SectionHeader({ icon: Icon, title, hint }: { icon: typeof TrendingUp; title: string; hint?: string }) {
@@ -21,11 +20,11 @@ function SectionHeader({ icon: Icon, title, hint }: { icon: typeof TrendingUp; t
   );
 }
 
-export function PersonalIntelligenceBlocks({ isPro, isTrialing = false }: PersonalIntelligenceBlocksProps) {
+export function PersonalIntelligenceBlocks({ isPro }: PersonalIntelligenceBlocksProps) {
   const navigate = useNavigate();
   const { lanes, brokers, operatingMetrics, isLoading } = usePersonalIntelligence();
   const { settings } = useUserSettings();
-  const hasAccess = isPro || isTrialing;
+  const hasAccess = isPro;
 
   if (isLoading) return null;
 
