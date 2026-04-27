@@ -1,57 +1,50 @@
-## What I found
+# Fix: "What's New" modal reappears on every page load
 
-- The mileage parser lives in `src/lib/parseLoadText.ts`.
-- The form wiring in `src/components/LoadForm.tsx` already maps `loaded_miles` and `deadhead_miles` into separate fields, so the visible `25 / 25` result is most likely coming from the parser missing the Trip value in the real paste, not from the form swapping fields.
-- The screenshot scan flow in `src/components/ScanLoadModal.tsx` still starts OCR immediately after file selection. That means the current UX is not a true “choose file -> preview -> confirm extraction” flow yet.
-- The camera flow is also still tied to `capture="environment"`, so mobile behavior can still feel forced or inconsistent depending on which input gets triggered.
+## Root cause
 
-## Plan
+The dismissal is tracked **only in `localStorage`** (`src/hooks/useReleaseNotesSeen.ts`, key `htp:release-seen:<userId>`). This breaks in several real-world scenarios:
 
-1. Harden Telegram load-mile parsing in `src/lib/parseLoadText.ts`
-   - Add a first-pass, line-level matcher for loaded-mile labels before the generic mileage classifier runs.
-   - Explicitly support `Trip`, `Trip Miles`, `Trip Mileage`, `Trip Distance`, `Total Trip`, and `Loaded Trip`, including emoji-prefixed variants.
-   - Keep `Trip ID` excluded by requiring a numeric mileage value after the label.
-   - Preserve deadhead precedence separately so `DH 25 miles` never overwrites loaded miles.
+- The Lovable preview runs in a cross-site iframe — many browsers (Safari ITP, Brave, Firefox strict, Chrome with third-party storage partitioning) clear or partition `localStorage` between sessions, so the dismissal is lost on reload.
+- Different origins (preview URL vs `haultrackerpro.lovable.app` vs custom domain) each have their own `localStorage`, so dismissing on one does not silence it on another.
+- Private/Incognito tabs and "Clear on close" settings wipe it.
+- Switching devices/browsers re-shows the modal.
 
-2. Keep the existing parser as a fallback, not a rewrite
-   - Use the new explicit Trip/Loaded line matcher as the highest-priority source.
-   - Fall back to the current generic token/context logic for all the formats that already work today.
-   - Add source tracking internally so development logs can show whether loaded miles came from `trip-line`, `loaded-line`, or generic context.
+Result: the modal pops up on (almost) every load, exactly as the user describes.
 
-3. Strengthen regression coverage in `src/test/parseLoadText.test.ts`
-   - Add exact tests for the user’s Telegram sample and the failing `Trip: 257.10mi` pattern.
-   - Add guard tests for `Trip ID`, `DH 25 miles`, `Trip Distance`, and same-message mixed cases.
-   - Add a regression asserting the final parsed result is:
-     - `loaded_miles = 257.10`
-     - `deadhead_miles = 25`
+## Fix
 
-4. Fix the screenshot scan UX in `src/components/ScanLoadModal.tsx`
-   - Change the flow to: select image -> preview image -> user taps `Extract Info` -> OCR/parsing starts.
-   - Keep separate `Choose from Gallery` and `Take Photo` actions.
-   - Ensure the gallery action opens the normal picker and the camera action is the only one that can request capture.
-   - Keep the privacy behavior: image stays local to the device/browser session and only extracted text is parsed.
-   - Add clearer loading, success, and failure states around the actual extraction step.
+Move the "last seen release" marker to the user's profile in the database, with `localStorage` kept only as a fast cache to avoid a flash on first paint.
 
-5. Verify end-to-end in the load form
-   - Paste the exact Telegram message into `Paste Load Info` and verify the form shows `Loaded Miles = 257.10` and `Deadhead Miles = 25`.
-   - Test the uploaded screenshot flow to confirm: gallery selection works, preview appears before extraction, replace works, and extraction feedback is visible.
-   - Do not change navigation, tabs, load layout, payment tracking, or other working form behavior.
+### What changes
 
-## Technical details
+1. **Database**
+   - Add a nullable `last_seen_release_id text` column to `profiles` (already user-owned with RLS).
+   - No backfill needed — `null` simply means "hasn't seen the latest release yet", which matches today's behavior for everyone.
 
-Files to update:
-- `src/lib/parseLoadText.ts`
-- `src/test/parseLoadText.test.ts`
-- `src/components/ScanLoadModal.tsx`
-- `src/components/LoadForm.tsx` only if a tiny UI integration tweak is needed for the new scan flow
+2. **`src/hooks/useReleaseNotesSeen.ts`**
+   - On mount (when `user.id` is ready):
+     - Hydrate `lastSeenId` from `localStorage` first (instant, prevents flash).
+     - Then fetch `profiles.last_seen_release_id` and reconcile (DB wins).
+   - `markSeen(releaseId)`:
+     - Write `localStorage` immediately (optimistic, snappy UX).
+     - `update profiles set last_seen_release_id = releaseId where id = user.id`.
+     - On error, keep the localStorage value so the user still doesn't get spammed in the same session.
+   - Keep the existing return shape (`ready`, `hasSeenLatest`, `lastSeenId`, `markSeen`) so `src/pages/Index.tsx` does not need changes.
 
-Planned loaded-mile regex family:
-```ts
-/(?:🚛|🚚)?\s*(?:loaded\s*)?(?:total\s*)?(?:trip|trip\s*miles|trip\s*mileage|trip\s*distance)\s*:?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:mi|mile|miles)\b/i
-```
+3. **No UI changes.** `WhatsNewModal`, `WhatsNewCard`, and the auto-open effect in `Index.tsx` stay as-is.
 
-Acceptance criteria:
-- `Trip: 257.10mi` fills Loaded Miles
-- `DH 25 miles` still fills Deadhead Miles
-- `Trip ID : T-1123J49SR` does not get mistaken for mileage
-- Scan modal supports gallery upload, pre-parse preview, replace, loading state, and success/error feedback
+### Why this works
+
+- DB persistence survives reloads, new devices, cleared browser storage, and origin changes.
+- `localStorage` cache prevents a one-frame flash of the modal while the profile query resolves.
+- Existing RLS on `profiles` already restricts each user to their own row — no new policies needed.
+
+## Out of scope
+
+- No changes to release notes content, the dashboard "What's New" card, or the modal layout.
+- No retroactive dismissal for users who have already seen it via localStorage — they will see it at most one more time, then it's silenced permanently via the DB.
+
+## Files touched
+
+- `supabase` migration: add `profiles.last_seen_release_id text`.
+- `src/hooks/useReleaseNotesSeen.ts`: read/write through Supabase with localStorage cache.
