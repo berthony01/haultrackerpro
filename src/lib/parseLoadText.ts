@@ -47,8 +47,22 @@ function cleanNum(s: string): string {
  * Covers the common ranges Telegram / dispatch bots use.
  */
 function normalizeUnicodeLetters(input: string): string {
+  // NFKC compatibility-fold + strip zero-width / invisible formatting chars
+  // (ZWSP, ZWNJ, ZWJ, BOM, LRM/RLM, soft hyphen) that Telegram and brokers
+  // sometimes embed and that can break adjacency in our regex matchers.
+  // Also normalize non-breaking / odd-width spaces to a regular space.
+  let pre: string;
+  try {
+    pre = input.normalize('NFKC');
+  } catch {
+    pre = input;
+  }
+  pre = pre
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF\u00AD]/g, '')
+    .replace(/[\u00A0\u2007\u202F\u2009\u200A\u205F\u3000]/g, ' ');
+
   let out = '';
-  for (const ch of input) {
+  for (const ch of pre) {
     const cp = ch.codePointAt(0)!;
     // Mathematical Bold (A–Z 1D400–1D419, a–z 1D41A–1D433)
     if (cp >= 0x1d400 && cp <= 0x1d419) out += String.fromCharCode(0x41 + (cp - 0x1d400));
@@ -153,11 +167,16 @@ function findAllMileage(t: string): MileageMatch[] {
     if (!Number.isFinite(numeric) || numeric <= 0) continue;
 
     const start = m.index;
-    const before = t.slice(Math.max(0, start - 30), start);
-    const after = t.slice(start + m[0].length, start + m[0].length + 10);
+    // Restrict context to the current line so labels from neighboring lines
+    // (e.g. "Trip:" on the next line) cannot be borrowed by this token.
+    const lineStart = t.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    const lineEndIdx = t.indexOf('\n', start);
+    const lineEnd = lineEndIdx === -1 ? t.length : lineEndIdx;
+    const before = t.slice(Math.max(lineStart, start - 30), start);
+    const after = t.slice(start + m[0].length, Math.min(lineEnd, start + m[0].length + 10));
     const ctx = `${before} ${after}`;
 
-    const isDeadhead = DEADHEAD_CTX_RE.test(before) || /^\s*(dh|deadhead|empty)/i.test(after);
+    const isDeadhead = DEADHEAD_CTX_RE.test(before);
 
     let loadedKind: LoadedKind = 'unknown';
     if (!isDeadhead) {
@@ -275,6 +294,13 @@ export function parseLoadText(text: string): ParsedLoadData {
   // If they ended up equal AND there's only one mileage token in the source, drop deadhead.
   if (dh && loaded && dh === loaded && mileageMatches.length <= 1) {
     dh = undefined;
+  }
+  // Stronger guard: if both exist but are the same numeric value AND we have a
+  // distinct non-deadhead candidate elsewhere, prefer that other candidate for loaded
+  // so deadhead never duplicates into loaded miles.
+  if (dh && loaded && dh === loaded && mileageMatches.length > 1) {
+    const alt = pickLoaded(mileageMatches.filter(m => m.value !== dh), dh);
+    if (alt) loaded = alt;
   }
 
   if (dh) result.deadhead_miles = dh;
