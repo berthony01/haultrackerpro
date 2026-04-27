@@ -106,6 +106,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
 
       setParsed(result);
       setFieldCount(count);
+      toast.success(`Extracted ${count} field${count > 1 ? 's' : ''} — review below`);
     } catch {
       toast.error('Failed to scan image. Please try a clearer photo.');
     } finally {
