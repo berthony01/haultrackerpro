@@ -657,6 +657,7 @@ export type Database = {
           dropoff_date: string | null
           dropoff_location: string
           estimated_pay: number | null
+          flat_rate_amount: number | null
           gross_revenue: number | null
           id: string
           invoice_submitted_date: string | null
@@ -665,6 +666,7 @@ export type Database = {
           notes: string | null
           other_fees: number
           paid_date: string | null
+          pay_model: string | null
           payment_due_date: string | null
           payment_notes: string | null
           payment_status: string
@@ -673,6 +675,7 @@ export type Database = {
           rate_per_mile: number
           short_paid_amount: number | null
           status: string
+          total_miles: number | null
           updated_at: string
           user_id: string
           wait_fee: number
@@ -687,6 +690,7 @@ export type Database = {
           dropoff_date?: string | null
           dropoff_location: string
           estimated_pay?: number | null
+          flat_rate_amount?: number | null
           gross_revenue?: number | null
           id?: string
           invoice_submitted_date?: string | null
@@ -695,6 +699,7 @@ export type Database = {
           notes?: string | null
           other_fees?: number
           paid_date?: string | null
+          pay_model?: string | null
           payment_due_date?: string | null
           payment_notes?: string | null
           payment_status?: string
@@ -703,6 +708,7 @@ export type Database = {
           rate_per_mile?: number
           short_paid_amount?: number | null
           status?: string
+          total_miles?: number | null
           updated_at?: string
           user_id: string
           wait_fee?: number
@@ -717,6 +723,7 @@ export type Database = {
           dropoff_date?: string | null
           dropoff_location?: string
           estimated_pay?: number | null
+          flat_rate_amount?: number | null
           gross_revenue?: number | null
           id?: string
           invoice_submitted_date?: string | null
@@ -725,6 +732,7 @@ export type Database = {
           notes?: string | null
           other_fees?: number
           paid_date?: string | null
+          pay_model?: string | null
           payment_due_date?: string | null
           payment_notes?: string | null
           payment_status?: string
@@ -733,6 +741,7 @@ export type Database = {
           rate_per_mile?: number
           short_paid_amount?: number | null
           status?: string
+          total_miles?: number | null
           updated_at?: string
           user_id?: string
           wait_fee?: number
@@ -1174,6 +1183,7 @@ export type Database = {
           default_dh_pay_rate: number | null
           default_dh_pay_status: string
           default_other_fees: number | null
+          default_pay_model: string | null
           default_rate_per_mile: number | null
           federal_tax_percent: number | null
           home_time_ended_at: string | null
@@ -1208,6 +1218,7 @@ export type Database = {
           default_dh_pay_rate?: number | null
           default_dh_pay_status?: string
           default_other_fees?: number | null
+          default_pay_model?: string | null
           default_rate_per_mile?: number | null
           federal_tax_percent?: number | null
           home_time_ended_at?: string | null
@@ -1242,6 +1253,7 @@ export type Database = {
           default_dh_pay_rate?: number | null
           default_dh_pay_status?: string
           default_other_fees?: number | null
+          default_pay_model?: string | null
           default_rate_per_mile?: number | null
           federal_tax_percent?: number | null
           home_time_ended_at?: string | null
