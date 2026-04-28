@@ -140,6 +140,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       company_start_date: companyStartDate ? format(companyStartDate, 'yyyy-MM-dd') : null,
       default_dh_pay_status: defaultDhPayStatus,
       default_dh_pay_rate: defaultDhPayStatus === 'custom' && defaultDhPayRate ? Number(defaultDhPayRate) : null,
+      default_pay_model: defaultPayModel,
     }, {
       onSuccess: () => toast.success('Settings saved!'),
       onError: (e) => toast.error(e.message),
