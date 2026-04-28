@@ -3,6 +3,13 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, subWeeks, parseISO, differenceInCalendarWeeks, isWithinInterval, endOfWeek } from 'date-fns';
 import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
+import {
+  fleetEffectiveRPM,
+  fleetDeadheadPct,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+} from '@/lib/loadMetrics';
 
 export type Tier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 
@@ -34,21 +41,20 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
     return (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24) <= 30;
   });
 
-  // 1. RPM Performance (0–25)
-  const totalMiles = last30Loads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const totalRev = last30Loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const rpm = totalMiles > 0 ? totalRev / totalMiles : 0;
+  // 1. RPM Performance (0–25) — uses effective RPM (pay_model aware)
+  const totalOpMiles = sumOperatingMiles(last30Loads);
+  const totalRev = sumExpectedPay(last30Loads);
+  const rpm = fleetEffectiveRPM(last30Loads);
   // Scale: $3+/mi = 25, $0 = 0, linear
   const rpmScore = Math.min(25, Math.round((rpm / 3) * 25));
-  const rpmDetail = totalMiles > 0 ? `$${rpm.toFixed(2)}/mi (30-day)` : 'No loads yet';
+  const rpmDetail = totalOpMiles > 0 ? `$${rpm.toFixed(2)}/mi (30-day)` : 'No loads yet';
 
   // 2. Deadhead Efficiency (0–20)
-  const totalDH = last30Loads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const totalAllMiles = totalMiles + totalDH;
-  const dhPct = totalAllMiles > 0 ? (totalDH / totalAllMiles) * 100 : 0;
+  const totalDH = sumDeadheadMiles(last30Loads);
+  const dhPct = fleetDeadheadPct(last30Loads);
   // Scale: 0% DH = 20, 40%+ = 0, linear
   const dhScore = Math.max(0, Math.min(20, Math.round((1 - dhPct / 40) * 20)));
-  const dhDetail = totalAllMiles > 0 ? `${dhPct.toFixed(1)}% deadhead` : 'No miles logged';
+  const dhDetail = totalOpMiles > 0 ? `${dhPct.toFixed(1)}% deadhead` : 'No miles logged';
 
   // 3. Expense Ratio Control (0–20)
   const last30Expenses = expenses.filter(e => {
@@ -66,8 +72,8 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
   const lastWeek = { start: startOfWeek(subWeeks(now, 1), { weekStartsOn }), end: endOfWeek(subWeeks(now, 1), { weekStartsOn }) };
   const twLoads = loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), thisWeek));
   const lwLoads = loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), lastWeek));
-  const twRev = twLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const lwRev = lwLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const twRev = sumExpectedPay(twLoads);
+  const lwRev = sumExpectedPay(lwLoads);
   const twExp = expenses.filter(e => isWithinInterval(parseISO(e.expense_date), thisWeek)).reduce((s, e) => s + Number(e.amount), 0);
   const lwExp = expenses.filter(e => isWithinInterval(parseISO(e.expense_date), lastWeek)).reduce((s, e) => s + Number(e.amount), 0);
   const twProfit = twRev - twExp;

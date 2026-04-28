@@ -3,6 +3,13 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
 import { formatCurrency, formatNumber, exportToCSV, exportToPDF, getEffectiveDate } from '@/lib/loadUtils';
+import {
+  getLoadExpectedPay,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+  fleetDeadheadPct,
+} from '@/lib/loadMetrics';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -55,19 +62,19 @@ export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryP
 function MonthCard({ label, loads, expenses = [], allStops = [] }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[] }) {
   const stats = useMemo(() => {
     const nonCancelled = loads.filter(l => l.status !== 'cancelled');
-    const estimated = nonCancelled.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+    const estimated = sumExpectedPay(nonCancelled);
     const paidLoads = nonCancelled.filter(l => l.actual_pay_received != null);
     const actual = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
-    const paidEstimated = paidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+    const paidEstimated = sumExpectedPay(paidLoads);
     const difference = paidLoads.length > 0 ? actual - paidEstimated : null;
     const loadedMiles = nonCancelled.reduce((s, l) => s + Number(l.loaded_miles), 0);
-    const deadheadMiles = nonCancelled.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-    const totalMiles = loadedMiles + deadheadMiles;
-    const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
+    const deadheadMiles = sumDeadheadMiles(nonCancelled);
+    const totalMiles = sumOperatingMiles(nonCancelled);
+    const deadheadPct = fleetDeadheadPct(nonCancelled);
 
-    // Gross revenue: actual for paid + estimated for unpaid
+    // Gross revenue: actual for paid + expected for unpaid (pay_model aware)
     const grossRevenue = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-      nonCancelled.filter(l => l.actual_pay_received == null).reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+      sumExpectedPay(nonCancelled.filter(l => l.actual_pay_received == null));
     const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const netProfit = grossRevenue - totalExpenses;
     const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
@@ -78,9 +85,9 @@ function MonthCard({ label, loads, expenses = [], allStops = [] }: { label: stri
     const totalGallons = fuelExpenses.reduce((s, e) => s + Number(e.gallons ?? 0), 0);
     const fuelCostPerMile = totalMiles > 0 && totalFuelCost > 0 ? totalFuelCost / totalMiles : null;
 
-    // Net profit per load for highest/lowest
+    // Net profit per load for highest/lowest — uses expected pay (pay_model aware)
     const loadsWithProfit = nonCancelled.map(l => {
-      const pay = l.actual_pay_received != null ? Number(l.actual_pay_received) : Number(l.estimated_pay ?? 0);
+      const pay = l.actual_pay_received != null ? Number(l.actual_pay_received) : getLoadExpectedPay(l);
       const linkedExp = expenses.filter(e => e.linked_load_id === l.id).reduce((s, e) => s + Number(e.amount), 0);
       return { ...l, netProfit: pay - linkedExp };
     });

@@ -8,6 +8,7 @@ import { Sparkles, TrendingUp, TrendingDown, Building2, X, Lock, Crown } from 'l
 import { useNavigate } from 'react-router-dom';
 import { buildWeeklyRecommendations } from '@/lib/profitDefenseAlerts';
 import { formatCurrency, getEffectiveDate } from '@/lib/loadUtils';
+import { sumExpectedPay, sumOperatingMiles } from '@/lib/loadMetrics';
 
 interface WeeklyPulseCardProps {
   isPro: boolean;
@@ -39,11 +40,12 @@ export function WeeklyPulseCard({ isPro }: WeeklyPulseCardProps) {
       const d = getEffectiveDate(l);
       return d >= startKey && d <= endKey;
     });
-    const revenue = inRange.reduce((s, l) => s + Number(l.actual_pay_received ?? l.estimated_pay ?? 0), 0);
+    const revenue = inRange.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
+      + sumExpectedPay(inRange.filter(l => l.actual_pay_received == null));
     const loadedMiles = inRange.reduce((s, l) => s + Number(l.loaded_miles ?? 0), 0);
-    const deadheadMiles = inRange.reduce((s, l) => s + Number(l.deadhead_miles ?? 0), 0);
+    const totalOpMiles = sumOperatingMiles(inRange);
     const cpm = Number(operatingMetrics?.rolling_cost_per_mile ?? 0);
-    const variableCost = (loadedMiles + deadheadMiles) * cpm;
+    const variableCost = totalOpMiles * cpm;
     const net = revenue - variableCost;
     const margin = revenue > 0 ? (net / revenue) * 100 : 0;
     return { start, end, loads: inRange, revenue, loadedMiles, net, margin };
