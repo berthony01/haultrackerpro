@@ -66,34 +66,38 @@ const PageFallback = forwardRef<HTMLDivElement>((_props, ref) => (
 ));
 PageFallback.displayName = 'PageFallback';
 
-function PublicRoute({ children }: { children: React.ReactNode }) {
+const PublicRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
   if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-}
+});
+PublicRoute.displayName = 'PublicRoute';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+const ProtectedRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
   if (!user) return <Navigate to="/" replace />;
   return <>{children}</>;
-}
+});
+ProtectedRoute.displayName = 'ProtectedRoute';
 
-function AuthRoute({ children }: { children: React.ReactNode }) {
+const AuthRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
   if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-}
+});
+AuthRoute.displayName = 'AuthRoute';
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
+const AdminRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
   const { user, loading } = useAuth();
   const { isAdmin, isLoading } = useAdmin();
   if (loading || isLoading) return <PageFallback />;
   if (!user || !isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-}
+});
+AdminRoute.displayName = 'AdminRoute';
 
 function PageViewTracker() {
   const location = useLocation();
