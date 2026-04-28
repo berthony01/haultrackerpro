@@ -107,13 +107,16 @@ export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
 }
 
 // Analytics helpers
-export function useFuelAnalytics(fuelLogs: FuelLog[], loads: { id: string; loaded_miles: number; estimated_pay?: number | null }[]) {
+export function useFuelAnalytics(fuelLogs: FuelLog[], loads: any[]) {
+  // Lazy import to avoid circular deps; loadMetrics is pure.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { sumOperatingMiles, sumExpectedPay } = require('@/lib/loadMetrics');
   const totalFuelCost = fuelLogs.reduce((sum, log) => sum + Number(log.total_cost), 0);
   const totalGallons = fuelLogs.reduce((sum, log) => sum + Number(log.gallons), 0);
-  const totalLoadedMiles = loads.reduce((sum, l) => sum + Number(l.loaded_miles), 0);
-  const totalRevenue = loads.reduce((sum, l) => sum + Number(l.estimated_pay ?? 0), 0);
+  const totalOperatingMiles = sumOperatingMiles(loads);
+  const totalRevenue = sumExpectedPay(loads);
 
-  const fuelCostPerMile = totalLoadedMiles > 0 ? totalFuelCost / totalLoadedMiles : 0;
+  const fuelCostPerMile = totalOperatingMiles > 0 ? totalFuelCost / totalOperatingMiles : 0;
   const fuelPercentOfRevenue = totalRevenue > 0 ? (totalFuelCost / totalRevenue) * 100 : 0;
   const avgPricePerGallon = totalGallons > 0 ? totalFuelCost / totalGallons : 0;
 
