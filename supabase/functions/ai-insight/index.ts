@@ -108,7 +108,7 @@ const PARSE_RATECON_TOOL = {
           },
         },
       },
-      required: ["pickup_location", "dropoff_location", "load_date", "estimated_pay"],
+      required: ["pickup_location", "dropoff_location"],
     },
   },
 };

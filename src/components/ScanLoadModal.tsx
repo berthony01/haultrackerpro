@@ -22,7 +22,7 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
     if (error) throw error;
 
     const parsed = data?.parsed;
-    if (parsed && (parsed.pickup_location || parsed.estimated_pay)) {
+    if (parsed && (parsed.pickup_location || parsed.dropoff_location || parsed.loaded_miles != null || parsed.total_miles != null || parsed.flat_rate != null || parsed.estimated_pay != null)) {
       const result: ParsedLoadData = {
         pickup_location: parsed.pickup_location || undefined,
         dropoff_location: parsed.dropoff_location || undefined,
