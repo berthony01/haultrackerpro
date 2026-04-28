@@ -335,10 +335,11 @@ describe('parseLoadText — deadhead + total ambiguity (Phase 6)', () => {
     expect(r.needsMileageReview).toBeFalsy();
   });
 
-  it('Test 2: DH + bare Total miles → DH only, loaded undefined, needsMileageReview', () => {
+  it('Test 2: DH + bare Total miles → derives loaded = total - dh, flags review', () => {
     const r = parseLoadText('Deadhead: 25 miles\nTotal miles: 282 miles');
     expect(r.deadhead_miles).toBe('25');
-    expect(r.loaded_miles).toBeUndefined();
+    expect(r.total_miles).toBe('282');
+    expect(r.loaded_miles).toBe('257');
     expect(r.needsMileageReview).toBe(true);
   });
 
