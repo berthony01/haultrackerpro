@@ -29,7 +29,7 @@ const SYSTEM_PROMPTS: Record<string, string> = {
 
   parse_expense: `You are an expense data extractor for a trucking app. Given natural language text (possibly from voice input), extract one or more expenses. Return structured data using the provided tool.`,
 
-  parse_ratecon: `You are a rate confirmation parser for a trucking app. Given raw OCR text from a rate confirmation document, extract the structured load data. Return structured data using the provided tool.`,
+  parse_ratecon: `You are a rate confirmation parser for a trucking app. Given raw OCR text from a rate confirmation document, extract the structured load data. Extract loaded_miles (line-haul / trip miles only) and deadhead_miles (empty / DH / bobtail miles only) as SEPARATE fields. Never guess deadhead — if it is not explicitly present in the text, omit the field. Never treat total miles as deadhead. Return structured data using the provided tool.`,
 };
 
 // ── Tool definitions for structured extraction ───────────────────────
@@ -80,7 +80,8 @@ const PARSE_RATECON_TOOL = {
         dropoff_location: { type: "string" },
         load_date: { type: "string", description: "ISO date" },
         dropoff_date: { type: "string", description: "ISO date or null" },
-        loaded_miles: { type: "number" },
+        loaded_miles: { type: "number", description: "Line-haul / trip miles only. Do not include deadhead." },
+        deadhead_miles: { type: "number", description: "Empty / deadhead / bobtail miles only. Omit if not explicitly present — never guess." },
         rate_per_mile: { type: "number" },
         estimated_pay: { type: "number" },
         detention_fee: { type: "number" },

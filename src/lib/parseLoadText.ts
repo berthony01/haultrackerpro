@@ -34,6 +34,12 @@ export interface ParsedLoadData {
   multiStopDetected?: boolean;
   detectedStopsCount?: number;
   stops?: ParsedStopData[];
+  /**
+   * True when the parser detected deadhead miles but could not confidently
+   * resolve loaded/line-haul miles (e.g. only ambiguous "total miles" present).
+   * Consumers should warn the user to confirm mileage before saving.
+   */
+  needsMileageReview?: boolean;
 }
 
 /** Strip $ and commas from a number string */
@@ -126,15 +132,18 @@ function tryParseDate(raw: string): string | undefined {
  * like "$1000" are ignored automatically). For each, inspects ~30 chars before and
  * ~10 chars after to classify by context.
  */
-type LoadedKind = 'loaded' | 'trip' | 'linehaul' | 'route' | 'distance' | 'total' | 'unknown';
+type LoadedKind = 'loaded' | 'trip' | 'linehaul' | 'route' | 'distance' | 'unknown';
 
 interface MileageMatch {
   value: string;       // cleaned numeric string, e.g. "257.10"
   numeric: number;     // parsed float for comparisons
   isDeadhead: boolean;
   loadedKind: LoadedKind;
+  hasTotalContext: boolean; // true if "total" appears nearby — ambiguous w/ deadhead
   index: number;       // start position in text
 }
+
+const TOTAL_CTX_RE = /\btotal\b/i;
 
 // Number-with-unit. Unit (mi/mile/miles) is REQUIRED — prevents matching "$1000".
 // `(?<![\w-])` so we don't grab the "10" out of "ORH5" / "ALB1" etc.
@@ -143,17 +152,18 @@ const MILEAGE_TOKEN_RE = /(?<![\w-])([\d]{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)
 const DEADHEAD_CTX_RE = /\b(dh|dead\s*head|empty|bobtail|reposition|non[\s-]?revenue|unpaid)\b/i;
 
 // Loaded-context keyword matchers, ranked. First match wins for that token.
+// NOTE: "total" is intentionally excluded — total miles often already include
+// deadhead and must never outrank an explicit loaded/trip/linehaul label.
 const LOADED_CTX_RANKED: { kind: Exclude<LoadedKind, 'unknown'>; re: RegExp }[] = [
   { kind: 'loaded',   re: /\bloaded\b/i },
   { kind: 'trip',     re: /\btrip\b/i },
   { kind: 'linehaul', re: /\blinehaul\b/i },
   { kind: 'route',    re: /\broute\b/i },
   { kind: 'distance', re: /\bdistance\b/i },
-  { kind: 'total',    re: /\btotal\b/i },
 ];
 
 const LOADED_PRIORITY: Record<LoadedKind, number> = {
-  loaded: 6, trip: 5, linehaul: 4, route: 3, distance: 2, total: 1, unknown: 0,
+  loaded: 6, trip: 5, linehaul: 4, route: 3, distance: 2, unknown: 0,
 };
 
 function findAllMileage(t: string): MileageMatch[] {
@@ -177,6 +187,7 @@ function findAllMileage(t: string): MileageMatch[] {
     const ctx = `${before} ${after}`;
 
     const isDeadhead = DEADHEAD_CTX_RE.test(before);
+    const hasTotalContext = !isDeadhead && TOTAL_CTX_RE.test(ctx);
 
     let loadedKind: LoadedKind = 'unknown';
     if (!isDeadhead) {
@@ -185,7 +196,7 @@ function findAllMileage(t: string): MileageMatch[] {
       }
     }
 
-    out.push({ value, numeric, isDeadhead, loadedKind, index: start });
+    out.push({ value, numeric, isDeadhead, loadedKind, hasTotalContext, index: start });
   }
   return out;
 }
@@ -196,8 +207,18 @@ function pickDeadhead(matches: MileageMatch[]): string | undefined {
 }
 
 function pickLoaded(matches: MileageMatch[], deadheadValue?: string): string | undefined {
-  const nonDh = matches.filter(m => !m.isDeadhead && m.value !== deadheadValue);
+  let nonDh = matches.filter(m => !m.isDeadhead && m.value !== deadheadValue);
   if (nonDh.length === 0) return undefined;
+
+  // When deadhead is present, exclude tokens whose only nearby context is "total"
+  // — total miles often already include deadhead, so we can't safely use them as
+  // loaded miles. Only filter when this leaves at least one candidate; otherwise
+  // we'd return undefined and the caller will set needsMileageReview.
+  if (deadheadValue) {
+    const filtered = nonDh.filter(m => !(m.hasTotalContext && m.loadedKind === 'unknown'));
+    nonDh = filtered;
+    if (nonDh.length === 0) return undefined;
+  }
 
   // Strongest context wins; break ties by larger numeric value (likely the trip total).
   const sorted = [...nonDh].sort((a, b) => {
@@ -259,7 +280,7 @@ export function parseLoadText(text: string): ParsedLoadData {
   // if a noisy generic token elsewhere (e.g. another `25 mi`) might otherwise outrank it.
   // Keyword must NOT be "Trip ID" (we exclude that explicitly).
   const TRIP_LOADED_LINE_RE =
-    /(?:^|[\s\W])(?:loaded\s+)?(?:total\s+)?(trip\s*(?:miles?|mileage|distance)?|loaded\s*(?:miles?|mi|distance)?|linehaul(?:\s*miles?)?|route\s*miles?|distance)\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi|mile|miles)?\b/i;
+    /(?:^|[\s\W])(?:loaded\s+)?(trip\s*(?:miles?|mileage|distance)?|loaded\s*(?:miles?|mi|distance)?|linehaul(?:\s*miles?)?|route\s*miles?|distance)\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi|mile|miles)?\b/i;
   // Find ALL matches and pick the strongest one whose keyword isn't "trip id".
   const TRIP_LOADED_GLOBAL_RE = new RegExp(TRIP_LOADED_LINE_RE.source, 'gi');
   let bestExplicit: { value: string; priority: number } | null = null;
@@ -297,6 +318,7 @@ export function parseLoadText(text: string): ParsedLoadData {
   if (!dh) {
     const dhLabelled =
       t.match(/(?:dead\s*head|empty|bobtail|unpaid|reposition|non[\s-]?revenue)\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
+      t.match(/(?:dead\s*head|empty|bobtail|unpaid|reposition|non[\s-]?revenue)\s*[:=]\s*([\d,]+(?:\.\d+)?)/i) ||
       t.match(/\bdh\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
       t.match(/([\d,]+(?:\.\d+)?)\s*(?:dh|dead\s*head)\b/i);
     if (dhLabelled) dh = cleanNum(dhLabelled[1]);
@@ -318,14 +340,22 @@ export function parseLoadText(text: string): ParsedLoadData {
         if (v !== dh) { loaded = v; break; }
       }
     }
-    // Last-resort "Total Miles: 500"
-    if (!loaded) {
+    // Last-resort "Total Miles: 500" — ONLY when no deadhead was found.
+    // If deadhead is present alongside bare "total miles", we can't tell whether
+    // the total already includes deadhead, so we leave loaded undefined and
+    // flag the result for user review.
+    if (!loaded && !dh) {
       const totalM = t.match(/total\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i);
       if (totalM) {
         const v = cleanNum(totalM[1]);
-        if (v !== dh) loaded = v;
+        loaded = v;
       }
     }
+  }
+
+  // Flag ambiguous mileage: deadhead present but no confident loaded value.
+  if (dh && !loaded) {
+    result.needsMileageReview = true;
   }
 
   // Defensive guard: a single number can't be both loaded AND deadhead.
