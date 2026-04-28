@@ -113,7 +113,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     pay_model: resolvePayModel(initialData?.pay_model, (settings as any)?.default_pay_model) as PayModel,
     total_miles: initialData?.total_miles?.toString() ?? '',
     flat_rate_amount: initialData?.flat_rate_amount?.toString() ?? '',
-    dh_rate_per_mile: '',
+    dh_rate_per_mile: (initialData as any)?.deadhead_rate_per_mile?.toString() ?? '',
   });
   const [showPaymentTracking, setShowPaymentTracking] = useState(
     !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
@@ -286,6 +286,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       pay_model: form.pay_model,
       total_miles: form.total_miles ? parseFloat(form.total_miles) : null,
       flat_rate_amount: form.pay_model === 'flat_rate' && form.flat_rate_amount ? parseFloat(form.flat_rate_amount) : null,
+      deadhead_rate_per_mile: form.pay_model === 'loaded_plus_deadhead' && form.dh_rate_per_mile ? parseFloat(form.dh_rate_per_mile) : null,
+      // Persist computed expected gross pay (single source of truth from computeLoadPay)
+      // so dashboards/reports/exports reflect the active pay model. For percentage-pay
+      // users we already routed `estimated` through the percentage formula above.
+      estimated_pay: finalStatus === 'cancelled' ? 0 : Math.max(0, Number(estimated.toFixed(2))),
     } as any, formattedStops);
   };
 
@@ -593,7 +598,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="loaded_miles">{form.pay_model === 'flat_rate' ? 'Loaded Miles (optional)' : 'Loaded Miles'}</Label>
+              <Label htmlFor="loaded_miles">{form.pay_model === 'flat_rate' ? 'Trip / Loaded Miles (optional)' : 'Trip / Loaded Miles'}</Label>
               <Input id="loaded_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required={form.pay_model !== 'flat_rate' && form.pay_model !== 'manual' && form.pay_model !== 'total_miles'} />
               <FieldError field="loaded_miles" />
             </div>
@@ -604,14 +609,18 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           </div>
 
-          {/* Total Miles — surfaced for total_miles model and as optional reconciliation everywhere else */}
-          {(form.pay_model === 'total_miles' || form.pay_model === 'flat_rate') && (
-            <div>
-              <Label htmlFor="total_miles">Total Miles {form.pay_model === 'total_miles' ? '(paid)' : '(optional)'}</Label>
-              <Input id="total_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.total_miles} onChange={e => update('total_miles', e.target.value)} />
-              <p className="text-[10px] text-muted-foreground mt-0.5">Loaded + deadhead. Used for effective RPM and reconciliation.</p>
-            </div>
-          )}
+          {/* Total Miles is always available — dispatcher posts often include it
+              even when the driver is paid loaded miles only. Used for effective RPM
+              and reconciliation across all pay models. */}
+          <div>
+            <Label htmlFor="total_miles">
+              Total Miles {form.pay_model === 'total_miles' ? '(paid)' : '(optional)'}
+            </Label>
+            <Input id="total_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.total_miles} onChange={e => update('total_miles', e.target.value)} />
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Trip miles usually means loaded miles. Total miles usually means trip + deadhead.
+            </p>
+          </div>
 
           {/* Flat Rate amount */}
           {form.pay_model === 'flat_rate' && (
