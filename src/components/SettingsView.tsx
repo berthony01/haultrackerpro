@@ -23,6 +23,7 @@ import { CSVImport } from '@/components/CSVImport';
 import { PublicProfileSection } from '@/components/PublicProfileSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
+import { PAY_MODEL_VALUES, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PayModel } from '@/lib/payModels';
 
 interface SettingsViewProps {
   onBack: () => void;
