@@ -268,11 +268,31 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
 }
 
 export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Ld Mi', 'DH Mi', '$/Mi', 'Est Pay', 'Act Pay', 'Status'];
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Model', 'Ld Mi', 'DH Mi', 'Tot Mi', 'Eff RPM', 'Est Pay', 'Act Pay', 'Status'];
+  const payModelLabel = (m?: string | null) => {
+    switch (m) {
+      case 'total_miles': return 'Total';
+      case 'loaded_plus_deadhead': return 'Ld+DH';
+      case 'flat_rate': return 'Flat';
+      case 'manual': return 'Manual';
+      default: return 'Loaded';
+    }
+  };
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
-    return [getEffectiveDate(l), l.pickup_location, l.dropoff_location, String(l.loaded_miles), String(l.deadhead_miles), `$${Number(l.rate_per_mile).toFixed(2)}`, `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', l.status];
+    const tot = (l as any).total_miles != null && Number((l as any).total_miles) > 0
+      ? Number((l as any).total_miles)
+      : Number(l.loaded_miles) + Number(l.deadhead_miles);
+    const effRpm = tot > 0 ? est / tot : 0;
+    return [
+      getEffectiveDate(l), l.pickup_location, l.dropoff_location,
+      payModelLabel((l as any).pay_model),
+      String(l.loaded_miles), String(l.deadhead_miles),
+      tot ? String(tot) : '',
+      `$${effRpm.toFixed(2)}`,
+      `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', l.status,
+    ];
   });
 
   // Summary totals
@@ -281,7 +301,7 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
   const totalEst = loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const totalAct = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
 
-  const colWidths = [52, 68, 68, 35, 35, 38, 52, 52, 45];
+  const colWidths = [50, 60, 60, 38, 32, 32, 36, 44, 50, 50, 42];
   const pageW = 595;
   const pageH = 842;
   const marginX = 30;
