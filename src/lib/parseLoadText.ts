@@ -21,12 +21,25 @@ export interface ParsedStopData {
   stop_type: string;
 }
 
+export type ParsedPayModelSuggestion =
+  | 'loaded_miles_only'
+  | 'total_miles'
+  | 'loaded_plus_deadhead'
+  | 'flat_rate'
+  | 'manual';
+
 export interface ParsedLoadData {
   pickup_location?: string;
   dropoff_location?: string;
   loaded_miles?: string;
   deadhead_miles?: string;
+  /** Dispatcher-provided "total miles" (loaded + deadhead). Preserved separately. */
+  total_miles?: string;
   rate_per_mile?: string;
+  /** Separate deadhead pay rate when explicitly provided ("DH rate $1.00/mi"). */
+  deadhead_rate_per_mile?: string;
+  /** Flat-rate dollar amount for the whole load when explicitly stated ("flat $850"). */
+  flat_rate?: string;
   gross_revenue?: string;
   load_date?: string;
   notes?: string;
@@ -40,6 +53,10 @@ export interface ParsedLoadData {
    * Consumers should warn the user to confirm mileage before saving.
    */
   needsMileageReview?: boolean;
+  /** Human-readable note about mileage reconciliation (mismatch, derived value, etc.). */
+  mileage_warning?: string;
+  /** Best-guess pay model based on which fields were detected. UI may override. */
+  pay_model_suggestion?: ParsedPayModelSuggestion;
 }
 
 /** Strip $ and commas from a number string */
