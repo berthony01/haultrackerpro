@@ -6,6 +6,13 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { startOfWeek, endOfWeek, subWeeks, parseISO, isWithinInterval, differenceInDays } from 'date-fns';
 import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
+import {
+  fleetEffectiveRPM,
+  fleetDeadheadPct,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+} from '@/lib/loadMetrics';
 import { usePersonalIntelligence } from '@/hooks/usePersonalIntelligence';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { buildProfitDefenseAlerts } from '@/lib/profitDefenseAlerts';
@@ -44,14 +51,14 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   const thisWeekLoads = filterByRange(loads, thisWeek.start, thisWeek.end);
   const lastWeekLoads = filterByRange(loads, lastWeek.start, lastWeek.end);
 
-  // === Profit calculations (this week) ===
-  const thisWeekRevenue = thisWeekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  // === Profit calculations (this week) — pay_model aware via helpers ===
+  const thisWeekRevenue = sumExpectedPay(thisWeekLoads);
   const thisWeekExpenses = expenses
     .filter(e => isWithinInterval(parseISO(e.expense_date), { start: thisWeek.start, end: thisWeek.end }))
     .reduce((s, e) => s + Number(e.amount), 0);
   const thisWeekProfit = thisWeekRevenue - thisWeekExpenses;
 
-  const lastWeekRevenue = lastWeekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const lastWeekRevenue = sumExpectedPay(lastWeekLoads);
   const lastWeekExpenses = expenses
     .filter(e => isWithinInterval(parseISO(e.expense_date), { start: lastWeek.start, end: lastWeek.end }))
     .reduce((s, e) => s + Number(e.amount), 0);
@@ -89,33 +96,29 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
     }
   }
 
-  // 3. Deadhead ratio > 20% (all-time for period)
-  const totalLoaded = thisWeekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const totalDH = thisWeekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const totalMi = totalLoaded + totalDH;
+  // 3. Deadhead ratio > 20% (uses total operating miles, pay_model aware)
+  const totalDH = sumDeadheadMiles(thisWeekLoads);
+  const totalMi = sumOperatingMiles(thisWeekLoads);
+  const thisWeekRPM = fleetEffectiveRPM(thisWeekLoads);
   if (totalMi > 0 && (totalDH / totalMi) * 100 > 20) {
-    const avgRPM = totalLoaded > 0 ? thisWeekRevenue / totalLoaded : 0;
-    const dhCost = Math.round(avgRPM * totalDH * 0.3);
+    const dhCost = Math.round(thisWeekRPM * totalDH * 0.3);
     alerts.push({
       type: 'high_deadhead',
       severity: 'warning',
       tier: 'basic',
       title: 'High Deadhead This Week',
-      message: `Your deadhead ratio is ${((totalDH / totalMi) * 100).toFixed(1)}%. That's ~$${dhCost} in estimated lost revenue. Aim for under 20%.`,
+      message: `Your deadhead ratio is ${fleetDeadheadPct(thisWeekLoads).toFixed(1)}%. That's ~$${dhCost} in estimated lost revenue. Aim for under 20%.`,
       ctaLabel: 'View Loads',
       ctaRoute: 'loads',
       dedupeKey: `high_deadhead_${thisWeek.start.toISOString().slice(0, 10)}`,
     });
   }
 
-  // 4. RPM below 30-day average by ≥ 15%
+  // 4. RPM below 30-day average by ≥ 15% — uses effective RPM
   const last30Loads = loads.filter(l => differenceInDays(now, parseISO(getEffectiveDate(l))) <= 30);
-  const avg30Miles = last30Loads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const avg30Rev = last30Loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const avg30RPM = avg30Miles > 0 ? avg30Rev / avg30Miles : 0;
-  const thisWeekRPM = totalLoaded > 0 ? thisWeekRevenue / totalLoaded : 0;
+  const avg30RPM = fleetEffectiveRPM(last30Loads);
   if (avg30RPM > 0 && thisWeekRPM > 0 && ((avg30RPM - thisWeekRPM) / avg30RPM) * 100 >= 15) {
-    const rpmLoss = Math.round((avg30RPM - thisWeekRPM) * totalLoaded);
+    const rpmLoss = Math.round((avg30RPM - thisWeekRPM) * sumOperatingMiles(thisWeekLoads));
     alerts.push({
       type: 'low_rpm',
       severity: 'warning',

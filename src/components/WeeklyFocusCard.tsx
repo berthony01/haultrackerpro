@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { formatCurrency, formatNumber, getCurrentWeekLoads, weekStartDayToNumber } from '@/lib/loadUtils';
+import {
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+  fleetDeadheadPct,
+} from '@/lib/loadMetrics';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { DollarSign, Truck, TrendingUp, TrendingDown, MapPin } from 'lucide-react';
@@ -14,15 +20,15 @@ export function WeeklyFocusCard({ loads }: WeeklyFocusCardProps) {
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const weekLoads = useMemo(() => getCurrentWeekLoads(loads, weekStartsOn), [loads, weekStartsOn]);
 
-  const estimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const estimated = sumExpectedPay(weekLoads);
   const paidLoads = weekLoads.filter(l => l.actual_pay_received != null);
   const actual = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
-  const paidEstimated = paidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const paidEstimated = sumExpectedPay(paidLoads);
   const knownDiff = paidLoads.length > 0 ? actual - paidEstimated : null;
   const loadedMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const deadheadMiles = weekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const totalMiles = loadedMiles + deadheadMiles;
-  const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
+  const deadheadMiles = sumDeadheadMiles(weekLoads);
+  const totalMiles = sumOperatingMiles(weekLoads);
+  const deadheadPct = fleetDeadheadPct(weekLoads);
   const deadheadColor = deadheadPct < 15 ? 'text-success' : deadheadPct < 30 ? 'text-warning' : 'text-destructive';
 
   if (weekLoads.length === 0) return null;
