@@ -33,7 +33,7 @@ export function ContributionMarginCard({ loads, expenses }: ContributionMarginCa
     const cmPercent = grossRevenue > 0 ? (contributionMargin / grossRevenue) * 100 : 0;
     const netProfit = grossRevenue - totalExpenses;
 
-    const totalMiles = loads.reduce((s, l) => s + Number(l.loaded_miles) + Number(l.deadhead_miles), 0);
+    const totalMiles = sumOperatingMiles(loads);
     const cmPerMile = totalMiles > 0 ? contributionMargin / totalMiles : 0;
 
     return {
