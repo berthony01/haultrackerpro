@@ -266,7 +266,7 @@ export function parseLoadText(text: string): ParsedLoadData {
   // if a noisy generic token elsewhere (e.g. another `25 mi`) might otherwise outrank it.
   // Keyword must NOT be "Trip ID" (we exclude that explicitly).
   const TRIP_LOADED_LINE_RE =
-    /(?:^|[\s\W])(?:loaded\s+)?(?:total\s+)?(trip\s*(?:miles?|mileage|distance)?|loaded\s*(?:miles?|mi|distance)?|linehaul(?:\s*miles?)?|route\s*miles?|distance)\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi|mile|miles)?\b/i;
+    /(?:^|[\s\W])(?:loaded\s+)?(trip\s*(?:miles?|mileage|distance)?|loaded\s*(?:miles?|mi|distance)?|linehaul(?:\s*miles?)?|route\s*miles?|distance)\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi|mile|miles)?\b/i;
   // Find ALL matches and pick the strongest one whose keyword isn't "trip id".
   const TRIP_LOADED_GLOBAL_RE = new RegExp(TRIP_LOADED_LINE_RE.source, 'gi');
   let bestExplicit: { value: string; priority: number } | null = null;
