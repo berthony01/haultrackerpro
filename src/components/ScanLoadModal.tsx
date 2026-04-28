@@ -289,10 +289,28 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                     <p className="font-bold">{parsed.deadhead_miles}</p>
                   </div>
                 )}
+                {parsed.total_miles && (
+                  <div className="rounded-lg bg-muted/50 p-2">
+                    <span className="text-label">Total Miles</span>
+                    <p className="font-bold">{parsed.total_miles}</p>
+                  </div>
+                )}
                 {parsed.rate_per_mile && (
                   <div className="rounded-lg bg-muted/50 p-2">
                     <span className="text-label">Rate/Mile</span>
                     <p className="font-bold">${parsed.rate_per_mile}</p>
+                  </div>
+                )}
+                {parsed.deadhead_rate_per_mile && (
+                  <div className="rounded-lg bg-muted/50 p-2">
+                    <span className="text-label">DH Rate/Mile</span>
+                    <p className="font-bold">${parsed.deadhead_rate_per_mile}</p>
+                  </div>
+                )}
+                {parsed.flat_rate && (
+                  <div className="rounded-lg bg-muted/50 p-2">
+                    <span className="text-label">Flat Rate</span>
+                    <p className="font-bold">${parsed.flat_rate}</p>
                   </div>
                 )}
                 {parsed.gross_revenue && (
