@@ -443,28 +443,72 @@ export function parseLoadText(text: string): ParsedLoadData {
     });
   }
 
-  // --- Rate per mile ---
+  // --- Deadhead rate per mile (Phase 5) — must run BEFORE general rate to avoid stealing.
+  // "DH rate $1.00/mi", "deadhead rate: 1.00", "empty rate 0.85/mile"
+  const dhRateMatch =
+    t.match(/(?:dh|dead\s*head|empty)\s*rate\s*[:=]?\s*\$?([\d,.]+)/i) ||
+    t.match(/\$?([\d,.]+)\s*\/\s*mi(?:le)?\s+(?:dh|dead\s*head|empty)/i);
+  if (dhRateMatch) result.deadhead_rate_per_mile = cleanNum(dhRateMatch[1]);
+
+  // --- Loaded rate per mile (also accept explicit "loaded rate") ---
+  const loadedRateMatch = t.match(/loaded\s*rate\s*[:=]?\s*\$?([\d,.]+)/i);
+  if (loadedRateMatch) result.rate_per_mile = cleanNum(loadedRateMatch[1]);
+
+  // --- Rate per mile (generic) ---
   // "$2.45/mi", "$2.45 CPM", "$2.45 per mile", "2.45 rpm", "rate: $2.45"
-  m = t.match(/\$?([\d,.]+)\s*(?:\/\s*mi(?:le)?|cpm|rpm|per\s+mile)\b/i);
-  if (m) result.rate_per_mile = cleanNum(m[1]);
+  if (!result.rate_per_mile) {
+    m = t.match(/\$?([\d,.]+)\s*(?:\/\s*mi(?:le)?|cpm|rpm|per\s+mile)\b/i);
+    if (m) {
+      const v = cleanNum(m[1]);
+      if (v !== result.deadhead_rate_per_mile) result.rate_per_mile = v;
+    }
+  }
   if (!result.rate_per_mile) {
     m = t.match(/(?:rate|cpm|rpm)\s*[:=]?\s*\$?([\d,.]+)/i);
-    if (m) result.rate_per_mile = cleanNum(m[1]);
+    if (m) {
+      const v = cleanNum(m[1]);
+      if (v !== result.deadhead_rate_per_mile) result.rate_per_mile = v;
+    }
+  }
+
+  // --- Flat rate (Phase 5) ---
+  // "Flat rate: $850", "Flat $850", "Flat pay 850"
+  const flatMatch =
+    t.match(/\bflat\s*(?:rate|pay)?\s*[:=]?\s*\$?\s*([\d,]+(?:\.\d{1,2})?)\b/i);
+  if (flatMatch) {
+    const v = cleanNum(flatMatch[1]);
+    const num = parseFloat(v);
+    if (Number.isFinite(num) && num > 0) result.flat_rate = v;
   }
 
   // --- Gross Revenue ---
-  m = t.match(/(?:gross|revenue|total\s*(?:pay|revenue|load)?)\s*[:=]?\s*\$?([\d,.]+)/i);
+  // Use a more specific pattern that excludes "total miles" / "total mile" phrasing
+  // so it doesn't pick up mileage labels.
+  m = t.match(/(?:gross|revenue|total\s*(?:pay|revenue|load))\s*[:=]?\s*\$?([\d,.]+)/i);
   if (m) result.gross_revenue = cleanNum(m[1]);
   if (!result.gross_revenue) {
     m = t.match(/\$?([\d,.]+)\s*(?:gross|load\s*(?:pay|revenue)?)\b/i);
     if (m) result.gross_revenue = cleanNum(m[1]);
   }
-  if (!result.gross_revenue && !result.rate_per_mile) {
+  if (!result.gross_revenue && !result.rate_per_mile && !result.flat_rate) {
     m = t.match(/\$([\d,]+(?:\.\d{1,2})?)/);
     if (m) {
       const val = parseFloat(cleanNum(m[1]));
       if (val > 100) result.gross_revenue = cleanNum(m[1]);
     }
+  }
+
+  // --- Pay model suggestion (Phase 5) ---
+  if (result.flat_rate) {
+    result.pay_model_suggestion = 'flat_rate';
+  } else if (result.rate_per_mile && result.deadhead_rate_per_mile) {
+    result.pay_model_suggestion = 'loaded_plus_deadhead';
+  } else if (result.rate_per_mile && result.total_miles && !result.loaded_miles) {
+    result.pay_model_suggestion = 'total_miles';
+  } else if (result.rate_per_mile || result.loaded_miles) {
+    result.pay_model_suggestion = 'loaded_miles_only';
+  } else if (result.gross_revenue) {
+    result.pay_model_suggestion = 'manual';
   }
 
   // --- Date ---
