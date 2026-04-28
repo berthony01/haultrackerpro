@@ -11,8 +11,10 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { DateInput } from '@/components/ui/date-input';
-import { calculateEstimatedPay } from '@/lib/types';
+
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown } from 'lucide-react';
+import { PayModel, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PAY_MODEL_VALUES, isPayModel, resolvePayModel } from '@/lib/payModels';
+import { computeLoadPay } from '@/lib/computeLoadPay';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
@@ -108,6 +110,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     payment_notes: initialData?.payment_notes || '',
     dh_pay_status: (initialData ? initialDh.status : ((settings as any)?.default_dh_pay_status as DhPayStatus | undefined) ?? initialDh.status) as DhPayStatus,
     dh_pay_rate: initialData ? initialDh.rate : ((settings as any)?.default_dh_pay_rate?.toString() ?? initialDh.rate),
+    pay_model: resolvePayModel(initialData?.pay_model, (settings as any)?.default_pay_model) as PayModel,
+    total_miles: initialData?.total_miles?.toString() ?? '',
+    flat_rate_amount: initialData?.flat_rate_amount?.toString() ?? '',
+    dh_rate_per_mile: '',
   });
   const [showPaymentTracking, setShowPaymentTracking] = useState(
     !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
@@ -162,23 +168,32 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     return 0; // unpaid
   }, [form.deadhead_miles, form.rate_per_mile, form.dh_pay_status, form.dh_pay_rate, isCancelled, isPercentagePay]);
 
+  const payCalc = useMemo(() => {
+    return computeLoadPay({
+      payModel: form.pay_model,
+      loadedMiles: parseFloat(form.loaded_miles) || 0,
+      deadheadMiles: parseFloat(form.deadhead_miles) || 0,
+      totalMiles: parseFloat(form.total_miles) || 0,
+      loadedRpm: parseFloat(form.rate_per_mile) || 0,
+      dhRpm: parseFloat(form.dh_rate_per_mile) || 0,
+      flatRate: parseFloat(form.flat_rate_amount) || 0,
+      manualGross: parseFloat(form.gross_revenue) || 0,
+      fees: (parseFloat(form.wait_fee) || 0) + (parseFloat(form.detention_fee) || 0) + (parseFloat(form.other_fees) || 0),
+      legacyDhPayMode: form.dh_pay_status,
+      legacyDhPayRate: parseFloat(form.dh_pay_rate) || 0,
+    });
+  }, [form.pay_model, form.loaded_miles, form.deadhead_miles, form.total_miles, form.rate_per_mile, form.dh_rate_per_mile, form.flat_rate_amount, form.gross_revenue, form.wait_fee, form.detention_fee, form.other_fees, form.dh_pay_status, form.dh_pay_rate]);
+
   const estimated = useMemo(() => {
     if (isCancelled) return 0;
-    // Percentage-based pay calculation
+    // Percentage-based pay: gross × percentage + fees (handled separately from pay_model)
     if (isPercentagePay && form.gross_revenue && settings?.pay_percentage) {
       const grossRev = parseFloat(form.gross_revenue) || 0;
       const pct = Number(settings.pay_percentage) / 100;
       return grossRev * pct + (parseFloat(form.wait_fee) || 0) + (parseFloat(form.detention_fee) || 0) + (parseFloat(form.other_fees) || 0);
     }
-    // CPM-based pay calculation (default) + paid deadhead layer
-    return calculateEstimatedPay(
-      parseFloat(form.loaded_miles) || 0,
-      parseFloat(form.rate_per_mile) || 0,
-      parseFloat(form.wait_fee) || 0,
-      parseFloat(form.detention_fee) || 0,
-      parseFloat(form.other_fees) || 0
-    ) + deadheadRevenue;
-  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage, deadheadRevenue]);
+    return payCalc.expectedGrossPay;
+  }, [payCalc, form.gross_revenue, form.wait_fee, form.detention_fee, form.other_fees, isCancelled, isPercentagePay, settings?.pay_percentage]);
 
   // Phase 3: Pre-load profit check (deterministic, personal-history based)
   const profitCheckInput = useMemo(() => {
@@ -268,7 +283,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       short_paid_amount: form.short_paid_amount ? parseFloat(form.short_paid_amount) : null,
       payment_status: form.payment_status,
       payment_notes: form.payment_notes.trim() || null,
-    }, formattedStops);
+      pay_model: form.pay_model,
+      total_miles: form.total_miles ? parseFloat(form.total_miles) : null,
+      flat_rate_amount: form.pay_model === 'flat_rate' && form.flat_rate_amount ? parseFloat(form.flat_rate_amount) : null,
+    } as any, formattedStops);
   };
 
   const update = (key: string, value: string) => {
@@ -317,6 +335,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       payment_notes: '',
       dh_pay_status: lastDh.status,
       dh_pay_rate: lastDh.rate,
+      pay_model: resolvePayModel(lastLoad.pay_model, (settings as any)?.default_pay_model),
+      total_miles: lastLoad.total_miles?.toString() ?? '',
+      flat_rate_amount: lastLoad.flat_rate_amount?.toString() ?? '',
+      dh_rate_per_mile: '',
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
@@ -400,6 +422,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
                   gross_revenue: data.gross_revenue ?? prev.gross_revenue,
                   load_date: data.load_date ?? prev.load_date,
+                  total_miles: data.total_miles ?? prev.total_miles,
+                  flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
+                  pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
                 }));
                 // Phase 6: surface a confirmation summary so the user can verify
                 // detected miles + DH + trip ID before saving. DH defaults to "Unpaid".
@@ -546,10 +571,30 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <MultiStopEditor stops={stops} onChange={setStops} errors={stopErrors} />
           )}
 
+          {/* Pay Model selector — drives how pay is calculated for this load */}
+          {!isPercentagePay && (
+            <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 space-y-2">
+              <Label htmlFor="pay_model" className="text-xs font-bold flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Pay Model
+              </Label>
+              <Select value={form.pay_model} onValueChange={v => update('pay_model', v)}>
+                <SelectTrigger id="pay_model" className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAY_MODEL_VALUES.map(m => (
+                    <SelectItem key={m} value={m}>{PAY_MODEL_LABELS[m]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
+                {PAY_MODEL_DESCRIPTIONS[form.pay_model]}
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="loaded_miles">Loaded Miles</Label>
-              <Input id="loaded_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
+              <Label htmlFor="loaded_miles">{form.pay_model === 'flat_rate' ? 'Loaded Miles (optional)' : 'Loaded Miles'}</Label>
+              <Input id="loaded_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required={form.pay_model !== 'flat_rate' && form.pay_model !== 'manual' && form.pay_model !== 'total_miles'} />
               <FieldError field="loaded_miles" />
             </div>
             <div>
@@ -559,8 +604,48 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           </div>
 
-          {/* Deadhead Pay Status (Phase 4) — only shown when DH miles > 0 and CPM pay */}
-          {!isPercentagePay && (parseFloat(form.deadhead_miles) || 0) > 0 && (
+          {/* Total Miles — surfaced for total_miles model and as optional reconciliation everywhere else */}
+          {(form.pay_model === 'total_miles' || form.pay_model === 'flat_rate') && (
+            <div>
+              <Label htmlFor="total_miles">Total Miles {form.pay_model === 'total_miles' ? '(paid)' : '(optional)'}</Label>
+              <Input id="total_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.total_miles} onChange={e => update('total_miles', e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-0.5">Loaded + deadhead. Used for effective RPM and reconciliation.</p>
+            </div>
+          )}
+
+          {/* Flat Rate amount */}
+          {form.pay_model === 'flat_rate' && (
+            <div>
+              <Label htmlFor="flat_rate_amount" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Flat Rate ($)
+              </Label>
+              <Input id="flat_rate_amount" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.flat_rate_amount} onChange={e => update('flat_rate_amount', e.target.value)} required />
+            </div>
+          )}
+
+          {/* Deadhead rate input for loaded_plus_deadhead model */}
+          {form.pay_model === 'loaded_plus_deadhead' && (
+            <div>
+              <Label htmlFor="dh_rate_per_mile" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Deadhead Rate ($/mi)
+              </Label>
+              <Input id="dh_rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.dh_rate_per_mile} onChange={e => update('dh_rate_per_mile', e.target.value)} />
+            </div>
+          )}
+
+          {/* Mileage reconciliation warnings */}
+          {!isPercentagePay && payCalc.warnings.length > 0 && (
+            <div className="rounded-lg border border-warning/40 bg-warning/10 p-2.5 space-y-1">
+              {payCalc.warnings.map((w, i) => (
+                <p key={i} className="text-[11px] text-warning-foreground flex items-start gap-1.5">
+                  <AlertCircle className="h-3 w-3 text-warning mt-0.5 shrink-0" /> {w}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {/* Deadhead Pay Status (legacy) — only relevant for the Loaded Miles Only model */}
+          {!isPercentagePay && form.pay_model === 'loaded_miles_only' && (parseFloat(form.deadhead_miles) || 0) > 0 && (
             <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
               <Label htmlFor="dh_pay_status" className="text-xs font-bold flex items-center gap-1">
                 <DollarSign className="h-3 w-3 text-primary" /> Deadhead Pay
@@ -769,6 +854,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
             gross_revenue: data.gross_revenue ?? prev.gross_revenue,
             load_date: data.load_date ?? prev.load_date,
+            total_miles: data.total_miles ?? prev.total_miles,
+            flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
+            pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
           }));
           if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
             setMultiStop(true);

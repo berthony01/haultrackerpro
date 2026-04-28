@@ -23,6 +23,7 @@ import { CSVImport } from '@/components/CSVImport';
 import { PublicProfileSection } from '@/components/PublicProfileSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
+import { PAY_MODEL_VALUES, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PayModel } from '@/lib/payModels';
 
 interface SettingsViewProps {
   onBack: () => void;
@@ -70,6 +71,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [companyStartDate, setCompanyStartDate] = useState<Date | undefined>(undefined);
   const [defaultDhPayStatus, setDefaultDhPayStatus] = useState<'unpaid' | 'same' | 'custom'>('unpaid');
   const [defaultDhPayRate, setDefaultDhPayRate] = useState('');
+  const [defaultPayModel, setDefaultPayModel] = useState<string>('loaded_miles_only');
   const [lifecycleEmailsOptIn, setLifecycleEmailsOptIn] = useState(true);
   const [savingEmailPref, setSavingEmailPref] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -115,6 +117,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setCompanyStartDate(settings.company_start_date ? parseISO(settings.company_start_date) : undefined);
     setDefaultDhPayStatus(((settings as any).default_dh_pay_status ?? 'unpaid') as 'unpaid' | 'same' | 'custom');
     setDefaultDhPayRate((settings as any).default_dh_pay_rate?.toString() ?? '');
+    setDefaultPayModel(((settings as any).default_pay_model as string) ?? 'loaded_miles_only');
     setLifecycleEmailsOptIn((settings as any).lifecycle_emails_opt_in ?? true);
     setInitialized(true);
   }
@@ -138,6 +141,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       company_start_date: companyStartDate ? format(companyStartDate, 'yyyy-MM-dd') : null,
       default_dh_pay_status: defaultDhPayStatus,
       default_dh_pay_rate: defaultDhPayStatus === 'custom' && defaultDhPayRate ? Number(defaultDhPayRate) : null,
+      default_pay_model: defaultPayModel,
     }, {
       onSuccess: () => toast.success('Settings saved!'),
       onError: (e) => toast.error(e.message),
@@ -405,6 +409,22 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             )}
             <p className="text-[10px] text-muted-foreground">
               New loads will use this as the default. You can still override it per load.
+            </p>
+          </div>
+
+          {/* Default Pay Model — applied to new loads automatically */}
+          <div className="space-y-2 rounded-xl border border-border/60 p-3 bg-muted/30">
+            <Label className="text-xs font-semibold">Default Pay Model</Label>
+            <Select value={defaultPayModel} onValueChange={setDefaultPayModel}>
+              <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAY_MODEL_VALUES.map(m => (
+                  <SelectItem key={m} value={m}>{PAY_MODEL_LABELS[m]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              {PAY_MODEL_DESCRIPTIONS[defaultPayModel as PayModel] ?? ''} You can override per load.
             </p>
           </div>
 

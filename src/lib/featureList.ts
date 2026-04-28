@@ -24,6 +24,7 @@ export const featureList: FeatureCategory[] = [
       { icon: Calculator, title: 'Net Profit Calculation', description: 'See real net profit per load after all expenses — not just gross revenue.' },
       { icon: Route, title: 'Deadhead Awareness', description: 'Track deadhead miles and percentage to understand how empty miles impact your earnings.' },
       { icon: Sparkles, title: 'Smart Multi-Stop Paste Detection', description: 'When you paste load details with numbered stops (1#:, 2#:), the system auto-detects them, toggles multi-stop mode, and pre-fills each stop location for you.' },
+      { icon: DollarSign, title: 'Driver Pay Model Support', description: 'Built for every 1099 setup: owner-operators (loaded miles only), 1099 contractors (paid for total miles including empty), lease-purchase drivers (loaded + deadhead at separate rates), flat-rate loads, and manual overrides. Pick a per-load pay model or set a default in Settings — profit and effective RPM stay accurate either way.' },
     ],
   },
   {
