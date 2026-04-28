@@ -283,7 +283,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       short_paid_amount: form.short_paid_amount ? parseFloat(form.short_paid_amount) : null,
       payment_status: form.payment_status,
       payment_notes: form.payment_notes.trim() || null,
-    }, formattedStops);
+      pay_model: form.pay_model,
+      total_miles: form.total_miles ? parseFloat(form.total_miles) : null,
+      flat_rate_amount: form.pay_model === 'flat_rate' && form.flat_rate_amount ? parseFloat(form.flat_rate_amount) : null,
+    } as any, formattedStops);
   };
 
   const update = (key: string, value: string) => {
