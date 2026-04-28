@@ -717,13 +717,18 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           )}
 
-          <div>
-            <Label htmlFor="rate_per_mile" className="flex items-center gap-1">
-              <DollarSign className="h-3 w-3 text-primary" /> Rate Per Mile
-            </Label>
-            <Input id="rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.rate_per_mile} onChange={e => update('rate_per_mile', e.target.value)} required />
-            <FieldError field="rate_per_mile" />
-          </div>
+          {form.pay_model !== 'flat_rate' && form.pay_model !== 'manual' && (
+            <div>
+              <Label htmlFor="rate_per_mile" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Rate Per Mile
+                {(form.pay_model === 'loaded_miles_only' || form.pay_model === 'total_miles' || form.pay_model === 'loaded_plus_deadhead') && (
+                  <span className="text-destructive">*</span>
+                )}
+              </Label>
+              <Input id="rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.rate_per_mile} onChange={e => update('rate_per_mile', e.target.value)} />
+              <FieldError field="rate_per_mile" />
+            </div>
+          )}
 
           {/* Gross Revenue field for Percentage pay type */}
           {isPercentagePay && (
