@@ -224,8 +224,40 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (isNaN(loadedMiles) || loadedMiles < 0) errs.loaded_miles = 'Must be 0 or positive';
     const deadheadMiles = parseFloat(form.deadhead_miles);
     if (form.deadhead_miles && (isNaN(deadheadMiles) || deadheadMiles < 0)) errs.deadhead_miles = 'Must be 0 or positive';
-    const rpm = parseFloat(form.rate_per_mile);
-    if (isNaN(rpm) || rpm < 0) errs.rate_per_mile = 'Must be 0 or positive';
+    // Rate per mile is conditionally required based on pay model
+    const rpmRaw = form.rate_per_mile;
+    const rpm = parseFloat(rpmRaw);
+    const rpmRequired =
+      form.pay_model === 'loaded_miles_only' ||
+      form.pay_model === 'total_miles' ||
+      form.pay_model === 'loaded_plus_deadhead';
+    if (rpmRequired) {
+      if (rpmRaw === '' || isNaN(rpm) || rpm <= 0) errs.rate_per_mile = 'Rate per mile is required';
+    } else if (rpmRaw !== '' && (isNaN(rpm) || rpm < 0)) {
+      errs.rate_per_mile = 'Must be 0 or positive';
+    }
+    // Flat rate requires flat_rate_amount
+    if (form.pay_model === 'flat_rate') {
+      const flat = parseFloat(form.flat_rate_amount);
+      if (!form.flat_rate_amount || isNaN(flat) || flat <= 0) {
+        errs.flat_rate_amount = 'Flat rate amount is required';
+      }
+    }
+    // Manual requires either gross revenue (percentage) or actual pay
+    if (form.pay_model === 'manual') {
+      const gross = parseFloat(form.gross_revenue);
+      const actual = parseFloat(form.actual_pay_received);
+      const hasGross = !isNaN(gross) && gross > 0;
+      const hasActual = !isNaN(actual) && actual > 0;
+      if (!hasGross && !hasActual) {
+        errs.actual_pay_received = 'Enter expected gross or actual pay received';
+      }
+    }
+    // Loaded + deadhead: dh rate optional but must be valid if present
+    if (form.pay_model === 'loaded_plus_deadhead' && form.dh_rate_per_mile) {
+      const dhr = parseFloat(form.dh_rate_per_mile);
+      if (isNaN(dhr) || dhr < 0) errs.dh_rate_per_mile = 'Must be 0 or positive';
+    }
     if (form.wait_fee && parseFloat(form.wait_fee) < 0) errs.wait_fee = 'Cannot be negative';
     if (form.detention_fee && parseFloat(form.detention_fee) < 0) errs.detention_fee = 'Cannot be negative';
     if (form.other_fees && parseFloat(form.other_fees) < 0) errs.other_fees = 'Cannot be negative';
@@ -685,13 +717,18 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           )}
 
-          <div>
-            <Label htmlFor="rate_per_mile" className="flex items-center gap-1">
-              <DollarSign className="h-3 w-3 text-primary" /> Rate Per Mile
-            </Label>
-            <Input id="rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.rate_per_mile} onChange={e => update('rate_per_mile', e.target.value)} required />
-            <FieldError field="rate_per_mile" />
-          </div>
+          {form.pay_model !== 'flat_rate' && form.pay_model !== 'manual' && (
+            <div>
+              <Label htmlFor="rate_per_mile" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Rate Per Mile
+                {(form.pay_model === 'loaded_miles_only' || form.pay_model === 'total_miles' || form.pay_model === 'loaded_plus_deadhead') && (
+                  <span className="text-destructive">*</span>
+                )}
+              </Label>
+              <Input id="rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.rate_per_mile} onChange={e => update('rate_per_mile', e.target.value)} />
+              <FieldError field="rate_per_mile" />
+            </div>
+          )}
 
           {/* Gross Revenue field for Percentage pay type */}
           {isPercentagePay && (
@@ -705,17 +742,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor="wait_fee" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" /> Wait Fee
-              </Label>
-              <Input id="wait_fee" type="number" step="0.01" {...numericProps} placeholder="0" value={form.wait_fee} onChange={e => update('wait_fee', e.target.value)} />
-              <FieldError field="wait_fee" />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="detention_fee" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" /> Detention
+                <Clock className="h-3 w-3" /> Detention Fee
               </Label>
               <Input id="detention_fee" type="number" step="0.01" {...numericProps} placeholder="0" value={form.detention_fee} onChange={e => update('detention_fee', e.target.value)} />
               <FieldError field="detention_fee" />
@@ -854,20 +884,30 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
         open={showScanLoad}
         onOpenChange={setShowScanLoad}
         onParsed={(data: ParsedLoadData) => {
-          // Atomic apply (same reasoning as PasteLoadParser handler above).
+          // Scanner safety: only fill EMPTY fields. Never overwrite values the
+          // user (or a previous paste) already set, and never write null/undefined.
+          const fillIfEmpty = (current: string, incoming: string | undefined): string => {
+            const hasIncoming = incoming != null && String(incoming).trim() !== '';
+            if (!hasIncoming) return current;
+            const isEmpty = current == null || String(current).trim() === '' || current === '0';
+            return isEmpty ? String(incoming) : current;
+          };
           setForm(prev => ({
             ...prev,
-            pickup_location: data.pickup_location ?? prev.pickup_location,
-            dropoff_location: data.dropoff_location ?? prev.dropoff_location,
-            loaded_miles: data.loaded_miles ?? '',
-            deadhead_miles: data.deadhead_miles ?? '',
-            rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
-            gross_revenue: data.gross_revenue ?? prev.gross_revenue,
-            load_date: data.load_date ?? prev.load_date,
-            total_miles: data.total_miles ?? prev.total_miles,
-            flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
-            dh_rate_per_mile: data.deadhead_rate_per_mile ?? prev.dh_rate_per_mile,
-            pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
+            pickup_location: fillIfEmpty(prev.pickup_location, data.pickup_location),
+            dropoff_location: fillIfEmpty(prev.dropoff_location, data.dropoff_location),
+            loaded_miles: fillIfEmpty(prev.loaded_miles, data.loaded_miles),
+            deadhead_miles: fillIfEmpty(prev.deadhead_miles, data.deadhead_miles),
+            rate_per_mile: fillIfEmpty(prev.rate_per_mile, data.rate_per_mile),
+            gross_revenue: fillIfEmpty(prev.gross_revenue, data.gross_revenue),
+            load_date: fillIfEmpty(prev.load_date, data.load_date),
+            total_miles: fillIfEmpty(prev.total_miles, data.total_miles),
+            flat_rate_amount: fillIfEmpty(prev.flat_rate_amount, data.flat_rate),
+            dh_rate_per_mile: fillIfEmpty(prev.dh_rate_per_mile, data.deadhead_rate_per_mile),
+            // Pay model: only adopt suggestion if user hasn't explicitly chosen one yet
+            pay_model: isPayModel(data.pay_model_suggestion) && (prev.pay_model === 'loaded_miles_only')
+              ? data.pay_model_suggestion
+              : prev.pay_model,
           }));
           if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
             setMultiStop(true);

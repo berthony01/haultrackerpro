@@ -1,6 +1,7 @@
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency } from '@/lib/loadUtils';
+import { sumExpectedPay, sumOperatingMiles } from '@/lib/loadMetrics';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,15 +19,13 @@ export function ProfitOverview({ loads, expenses, onAddExpense }: ProfitOverview
 
   const grossRevenue = hasActual
     ? paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-      loads.filter(l => l.actual_pay_received == null).reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0)
-    : loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+      sumExpectedPay(loads.filter(l => l.actual_pay_received == null))
+    : sumExpectedPay(loads);
 
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const netProfit = grossRevenue - totalExpenses;
 
-  const loadedMiles = loads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const deadheadMiles = loads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const totalMiles = loadedMiles + deadheadMiles;
+  const totalMiles = sumOperatingMiles(loads);
   const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
 
   if (expenses.length === 0) {

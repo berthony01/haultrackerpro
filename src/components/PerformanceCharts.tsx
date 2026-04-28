@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, forwardRef } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -59,10 +59,10 @@ function CurrencyTooltip({ active, payload, label }: any) {
   );
 }
 
-function PercentTooltip({ active, payload, label }: any) {
+const PercentTooltip = forwardRef<HTMLDivElement, any>(function PercentTooltip({ active, payload, label }, ref) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border bg-card p-2 shadow-card text-xs">
+    <div ref={ref} className="rounded-lg border bg-card p-2 shadow-card text-xs">
       <p className="font-semibold text-card-foreground mb-1">{label}</p>
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }}>
@@ -71,7 +71,7 @@ function PercentTooltip({ active, payload, label }: any) {
       ))}
     </div>
   );
-}
+});
 
 function EmptyState({ message }: { message: string }) {
   return (

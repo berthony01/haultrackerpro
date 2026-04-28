@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { formatCurrency, weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
+import { sumExpectedPay, sumOperatingMiles, fleetEffectiveRPM } from '@/lib/loadMetrics';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
@@ -27,7 +28,7 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
         const d = parseISO(getEffectiveDate(l));
         return isWithinInterval(d, { start, end });
       });
-      const est = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+      const est = sumExpectedPay(weekLoads);
       const act = weekLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
       weeks.push({
         label: format(start, 'MMM d'),
@@ -37,14 +38,13 @@ export function PerformanceTrends({ loads }: PerformanceTrendsProps) {
     }
 
     const last30 = loads.filter(l => parseISO(getEffectiveDate(l)) >= thirtyDaysAgo);
-    const totalEst = last30.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-    const totalMiles = last30.reduce((s, l) => s + Number(l.loaded_miles), 0);
+    const totalEst = sumExpectedPay(last30);
     const weeksCount = Math.max(1, Math.ceil(last30.length > 0 ? 4 : 1));
 
     return {
       weeklyData: weeks,
       avg30Earnings: last30.length > 0 ? totalEst / weeksCount : 0,
-      avg30PerMile: totalMiles > 0 ? totalEst / totalMiles : 0,
+      avg30PerMile: fleetEffectiveRPM(last30),
       hasEnoughData: loads.length >= 3,
     };
   }, [loads, wso]);

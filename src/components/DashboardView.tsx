@@ -1,6 +1,14 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { getEffectiveDate } from '@/lib/loadUtils';
+import {
+  sumExpectedPay,
+  sumActualPay,
+  sumLoadedMiles,
+  sumDeadheadMiles,
+  sumOperatingMiles,
+  fleetDeadheadPct,
+} from '@/lib/loadMetrics';
 import { Expense } from '@/hooks/useExpenses';
 import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -108,21 +116,19 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     });
   }, [expenses, activePreset, customFrom, customTo, weekStartsOn]);
 
-  const estimated = filteredLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const actual = filteredLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
-  const loadedMiles = filteredLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const deadheadMiles = filteredLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  
+  const estimated = sumExpectedPay(filteredLoads);
+  const actual = sumActualPay(filteredLoads);
+  const loadedMiles = sumLoadedMiles(filteredLoads);
+  const deadheadMiles = sumDeadheadMiles(filteredLoads);
+
   const paidLoads = filteredLoads.filter(l => l.actual_pay_received != null);
   const missingPayCount = filteredLoads.filter(l => l.actual_pay_received == null).length;
-  const paidEstimated = paidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const paidEstimated = sumExpectedPay(paidLoads);
   const knownDifference = paidLoads.length > 0 ? actual - paidEstimated : null;
-  const unpaidEstimated = filteredLoads
-    .filter(l => l.actual_pay_received == null)
-    .reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const unpaidEstimated = sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
 
-  const totalMiles = loadedMiles + deadheadMiles;
-  const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
+  const totalMiles = sumOperatingMiles(filteredLoads);
+  const deadheadPct = fleetDeadheadPct(filteredLoads);
   const deadheadColor = deadheadPct < 15 ? 'success' : deadheadPct < 30 ? 'warning' : 'destructive';
 
   const isLastDayOfPayWeek = new Date().getDay() === ((weekStartsOn + 6) % 7);

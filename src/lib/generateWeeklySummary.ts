@@ -30,7 +30,6 @@ export function generateWeeklySummary({ weekLoads, allLoads, weekStartsOn }: Wee
 
   // This week metrics — use total operating miles + pay_model-aware revenue
   const twRevenue = sumExpectedPay(weekLoads);
-  const twMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const twDH = sumDeadheadMiles(weekLoads);
   const twTotalMiles = sumOperatingMiles(weekLoads);
   const twDHPct = fleetDeadheadPct(weekLoads);
@@ -43,9 +42,9 @@ export function generateWeeklySummary({ weekLoads, allLoads, weekStartsOn }: Wee
   const lwRevenue = sumExpectedPay(lwLoads);
   const lwRPM = fleetEffectiveRPM(lwLoads);
 
-  // Opening sentence
+  // Opening sentence — use TOTAL operating miles, not loaded only
   sentences.push(
-    `You completed ${weekLoads.length} load${weekLoads.length > 1 ? 's' : ''} this week, earning an estimated ${formatCurrency(twRevenue)} across ${twMiles.toLocaleString()} loaded miles.`
+    `You completed ${weekLoads.length} load${weekLoads.length > 1 ? 's' : ''} this week, earning an estimated ${formatCurrency(twRevenue)} across ${twTotalMiles.toLocaleString()} total miles.`
   );
 
   // RPM comparison

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency } from '@/lib/loadUtils';
+import { sumExpectedPay, sumOperatingMiles } from '@/lib/loadMetrics';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TrendingUp, TrendingDown, Info, Layers } from 'lucide-react';
@@ -17,7 +18,7 @@ export function ContributionMarginCard({ loads, expenses }: ContributionMarginCa
 
     const paidLoads = loads.filter(l => l.actual_pay_received != null);
     const grossRevenue = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-      loads.filter(l => l.actual_pay_received == null).reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+      sumExpectedPay(loads.filter(l => l.actual_pay_received == null));
 
     const variableExpenses = expenses
       .filter(e => (e as any).expense_type === 'variable' || !(e as any).expense_type)
@@ -32,7 +33,7 @@ export function ContributionMarginCard({ loads, expenses }: ContributionMarginCa
     const cmPercent = grossRevenue > 0 ? (contributionMargin / grossRevenue) * 100 : 0;
     const netProfit = grossRevenue - totalExpenses;
 
-    const totalMiles = loads.reduce((s, l) => s + Number(l.loaded_miles) + Number(l.deadhead_miles), 0);
+    const totalMiles = sumOperatingMiles(loads);
     const cmPerMile = totalMiles > 0 ? contributionMargin / totalMiles : 0;
 
     return {

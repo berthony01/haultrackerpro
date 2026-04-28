@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, forwardRef } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { UserSettings } from '@/hooks/useUserSettings';
@@ -6,14 +6,14 @@ import { formatCurrency } from '@/lib/loadUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calculator, Info, Sparkles, Loader2, ChevronDown } from 'lucide-react';
 
-function TaxTipCollapsible({ tip }: { tip: string }) {
+const TaxTipCollapsible = forwardRef<HTMLDivElement, { tip: string }>(function TaxTipCollapsible({ tip }, ref) {
   const [expanded, setExpanded] = useState(false);
   const previewLength = 180;
   const needsTruncation = tip.length > previewLength;
   const displayText = !expanded && needsTruncation ? tip.slice(0, previewLength).trimEnd() + '…' : tip;
 
   return (
-    <div className="mt-2 pt-2 border-t border-border/50">
+    <div ref={ref} className="mt-2 pt-2 border-t border-border/50">
       <div className="rounded-lg bg-primary/5 p-2.5">
         <div className="flex items-center gap-1 mb-1">
           <Sparkles className="h-2.5 w-2.5 text-primary" />
@@ -32,7 +32,7 @@ function TaxTipCollapsible({ tip }: { tip: string }) {
       </div>
     </div>
   );
-}
+});
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 

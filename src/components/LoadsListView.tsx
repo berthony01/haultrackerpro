@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { formatCurrency, formatNumber } from '@/lib/loadUtils';
+import { sumExpectedPay, sumOperatingMiles, fleetEffectiveRPM } from '@/lib/loadMetrics';
 
 interface LoadsListViewProps {
   loads: Load[];
@@ -79,9 +80,9 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       {/* Summary Card */}
       {(() => {
         const totalLoads = filtered.length;
-        const totalRevenue = filtered.reduce((s, l) => s + (l.gross_revenue ?? l.estimated_pay ?? 0), 0);
-        const totalMiles = filtered.reduce((s, l) => s + (l.loaded_miles || 0), 0);
-        const avgPerMile = totalMiles > 0 ? totalRevenue / totalMiles : 0;
+        const totalRevenue = sumExpectedPay(filtered);
+        const totalMiles = sumOperatingMiles(filtered);
+        const avgPerMile = fleetEffectiveRPM(filtered);
 
         return totalLoads > 0 ? (
           <Card className="card-premium shadow-card">
