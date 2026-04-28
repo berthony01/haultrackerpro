@@ -422,6 +422,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
                   gross_revenue: data.gross_revenue ?? prev.gross_revenue,
                   load_date: data.load_date ?? prev.load_date,
+                  total_miles: data.total_miles ?? prev.total_miles,
+                  flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
+                  pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
                 }));
                 // Phase 6: surface a confirmation summary so the user can verify
                 // detected miles + DH + trip ID before saving. DH defaults to "Unpaid".
