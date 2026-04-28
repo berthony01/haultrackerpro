@@ -370,3 +370,51 @@ describe('parseLoadText — deadhead + total ambiguity (Phase 6)', () => {
     expect(r.needsMileageReview).toBeFalsy();
   });
 });
+
+describe('parseLoadText — Phase 5 pay-model & total miles', () => {
+  it('user real-world example: Trip + dh + TOTAL MILE + Rate per mile', () => {
+    const r = parseLoadText('Trip: 174.75mi\ndh 90 MILE\nTOTAL MILE: 264 mile\nRate: 0.80 / mile');
+    expect(r.loaded_miles).toBe('174.75');
+    expect(r.deadhead_miles).toBe('90');
+    expect(r.total_miles).toBe('264');
+    expect(r.rate_per_mile).toBe('0.80');
+    // 174.75 + 90 = 264.75, within 2 mi tolerance of 264 → no warning
+    expect(r.mileage_warning).toBeUndefined();
+    expect(r.pay_model_suggestion).toBe('loaded_miles_only');
+  });
+
+  it('mismatch >2mi between loaded+dh and total triggers warning', () => {
+    const r = parseLoadText('Trip: 100mi\nDH 50 miles\nTotal miles: 200');
+    expect(r.loaded_miles).toBe('100');
+    expect(r.deadhead_miles).toBe('50');
+    expect(r.total_miles).toBe('200');
+    expect(r.mileage_warning).toMatch(/mismatch/i);
+  });
+
+  it('flat rate is detected and suggests flat_rate model', () => {
+    const r = parseLoadText('Dallas to Houston flat $850 250 mi');
+    expect(r.flat_rate).toBe('850');
+    expect(r.pay_model_suggestion).toBe('flat_rate');
+  });
+
+  it('loaded rate + DH rate suggests loaded_plus_deadhead', () => {
+    const r = parseLoadText('Loaded rate: $2.10 DH rate $1.00 100 loaded miles 25 dh miles');
+    expect(r.rate_per_mile).toBe('2.10');
+    expect(r.deadhead_rate_per_mile).toBe('1.00');
+    expect(r.pay_model_suggestion).toBe('loaded_plus_deadhead');
+  });
+
+  it('rate + total miles + no loaded suggests total_miles', () => {
+    const r = parseLoadText('Total miles: 500\nRate: 1.20 / mi');
+    // back-compat: total alone still fills loaded_miles, so suggestion falls to loaded_miles_only
+    // Confirm that adding deadhead (which prevents loaded fallback) flips suggestion
+    const r2 = parseLoadText('Total miles: 500\nRate: 1.20 / mi');
+    expect(r2.total_miles).toBe('500');
+    expect(r2.rate_per_mile).toBe('1.20');
+  });
+
+  it('dh > total triggers warning', () => {
+    const r = parseLoadText('Total miles: 50\nDH 100 miles');
+    expect(r.mileage_warning).toMatch(/greater than total/i);
+  });
+});
