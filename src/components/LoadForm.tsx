@@ -110,6 +110,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     payment_notes: initialData?.payment_notes || '',
     dh_pay_status: (initialData ? initialDh.status : ((settings as any)?.default_dh_pay_status as DhPayStatus | undefined) ?? initialDh.status) as DhPayStatus,
     dh_pay_rate: initialData ? initialDh.rate : ((settings as any)?.default_dh_pay_rate?.toString() ?? initialDh.rate),
+    pay_model: resolvePayModel(initialData?.pay_model, (settings as any)?.default_pay_model) as PayModel,
+    total_miles: initialData?.total_miles?.toString() ?? '',
+    flat_rate_amount: initialData?.flat_rate_amount?.toString() ?? '',
+    dh_rate_per_mile: '',
   });
   const [showPaymentTracking, setShowPaymentTracking] = useState(
     !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
