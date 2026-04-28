@@ -109,9 +109,6 @@ export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
 
 // Analytics helpers
 export function useFuelAnalytics(fuelLogs: FuelLog[], loads: any[]) {
-  // Lazy import to avoid circular deps; loadMetrics is pure.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { sumOperatingMiles, sumExpectedPay } = require('@/lib/loadMetrics');
   const totalFuelCost = fuelLogs.reduce((sum, log) => sum + Number(log.total_cost), 0);
   const totalGallons = fuelLogs.reduce((sum, log) => sum + Number(log.gallons), 0);
   const totalOperatingMiles = sumOperatingMiles(loads);
