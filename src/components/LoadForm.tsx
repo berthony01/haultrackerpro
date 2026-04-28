@@ -644,8 +644,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           )}
 
-          {/* Deadhead Pay Status (Phase 4) — only shown when DH miles > 0 and CPM pay */}
-          {!isPercentagePay && (parseFloat(form.deadhead_miles) || 0) > 0 && (
+          {/* Deadhead Pay Status (legacy) — only relevant for the Loaded Miles Only model */}
+          {!isPercentagePay && form.pay_model === 'loaded_miles_only' && (parseFloat(form.deadhead_miles) || 0) > 0 && (
             <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
               <Label htmlFor="dh_pay_status" className="text-xs font-bold flex items-center gap-1">
                 <DollarSign className="h-3 w-3 text-primary" /> Deadhead Pay
