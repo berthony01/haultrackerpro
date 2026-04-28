@@ -2,24 +2,35 @@
 <html lang="en">
   <head>
     <script>
-      // CRITICAL: Runs before ANY other tag. Aggressively unregisters any stale
-      // PWA service worker and clears all caches on every host EXCEPT the live
-      // production domains. A previously-installed SW would otherwise intercept
-      // requests and serve a blank/cached page in the Lovable preview iframe.
+      // CRITICAL: Runs before ANY other tag.
+      // 1) Aggressively unregister any stale PWA service worker + caches on
+      //    every host EXCEPT the live production domains. A previously-
+      //    installed SW would otherwise intercept requests and serve a blank/
+      //    cached page in the Lovable preview iframe.
+      // 2) Remove the PWA manifest <link> in non-production hosts so the
+      //    preview iframe doesn't try to fetch /manifest.webmanifest (which
+      //    returns 401 in preview) and pollute the console.
       (function () {
         try {
           var h = window.location.hostname;
           var isProdHost =
             h === 'haultrackerpro.com' || h === 'www.haultrackerpro.com';
-          if (!isProdHost && 'serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (regs) {
-              regs.forEach(function (r) { r.unregister(); });
-            }).catch(function () {});
-            if (window.caches && caches.keys) {
-              caches.keys().then(function (keys) {
-                keys.forEach(function (k) { caches.delete(k); });
+          if (!isProdHost) {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function (regs) {
+                regs.forEach(function (r) { r.unregister(); });
               }).catch(function () {});
+              if (window.caches && caches.keys) {
+                caches.keys().then(function (keys) {
+                  keys.forEach(function (k) { caches.delete(k); });
+                }).catch(function () {});
+              }
             }
+            // Strip the manifest link before the browser fetches it.
+            document.addEventListener('DOMContentLoaded', function () {
+              var m = document.querySelector('link[rel="manifest"]');
+              if (m && m.parentNode) m.parentNode.removeChild(m);
+            });
           }
         } catch (e) {}
       })();

@@ -118,6 +118,9 @@ const App = () => (
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/landing" element={<Navigate to="/" replace />} />
+              {/* Legacy/preview aliases — keep deep links and stale preview URLs working */}
+              <Route path="/index" element={<Navigate to="/" replace />} />
+              <Route path="/index.html" element={<Navigate to="/" replace />} />
               <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
