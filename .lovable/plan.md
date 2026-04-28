@@ -1,39 +1,43 @@
-The preview is still not showing because this is not just a stale browser tab anymore — the app is failing before React actually mounts any visible UI.
+# Why the preview is still blank
 
-What’s confirmed:
-- The dev server is up and serving `index.html` and the app scripts.
-- The page title loads, but the viewport stays blank and the DOM remains nearly empty.
-- There are no meaningful runtime errors from the current route guards, so the `forwardRef` change did not fix the real issue.
-- The failure is happening in the top-level startup path in `src/App.tsx` before the landing page renders.
-- The current bootstrap path includes two likely culprits:
-  1. `src/components/ui/sonner.tsx` uses `next-themes` at the app root, but there is no theme provider mounted in `src/main.tsx`.
-  2. The `TooltipProvider` import chain is showing an aborted/failed module request during app startup.
+The codebase itself is healthy:
+- TypeScript compiles cleanly (`tsc --noEmit` → 0 errors).
+- The Vite dev server is running normally on port 8080 with no errors in the log.
+- `src/App.tsx`, `src/main.tsx`, `src/components/ui/sonner.tsx`, and `src/hooks/useAuth.tsx` all look correct. There is no missing provider and no broken import.
+- The runtime-error feed and the preview console are **completely empty** — meaning the page renders, but no app JavaScript is running at all.
+- The network panel for the preview shows zero requests.
 
-Plan
-1. Repair the app bootstrap first
-   - Remove the bad assumption that the issue was the route guards.
-   - Patch the root-level toast/theme setup so it no longer depends on a missing theme provider, or add the proper provider in `src/main.tsx`.
+That pattern (HTML loads, zero JS, zero errors, zero network) is the classic fingerprint of a **stale PWA service worker** serving a cached broken bundle and short-circuiting all real requests.
 
-2. Simplify the top-level render path
-   - Reduce `src/App.tsx` to the minimal safe providers needed for first paint.
-   - Keep auth guards functional, but stop wrapping them in unnecessary `forwardRef` if that added noise without solving the startup problem.
+This project has `vite-plugin-pwa` configured in `vite.config.ts` with `registerType: "autoUpdate"` and no dev-mode opt-out. During the last few rounds of debugging, the SW almost certainly cached an earlier broken build. Now every reload of the preview is being answered by that cached SW instead of the live dev server, so none of the recent fixes (sonner, App.tsx, useDriverScorecard, loadMetrics, LoadForm, etc.) are actually being executed in the preview.
 
-3. Verify the remaining import chain
-   - Re-check the `TooltipProvider` path after the bootstrap fix.
-   - If needed, temporarily isolate it and restore it once the page renders again.
+# Plan
 
-4. Re-test the preview
-   - Confirm `/` renders the landing page.
-   - Confirm auth-gated routes still show the correct fallback/redirect behavior.
-   - Confirm the app is back to a state that is safe to continue the pay-model phases.
+## 1. Stop the PWA from registering during development
+Update `vite.config.ts` so `VitePWA` is only active in production builds. In dev, do not register a service worker at all. This prevents the same problem from happening again on every future change.
 
-Technical details
-- Files to patch first:
-  - `src/components/ui/sonner.tsx`
-  - `src/main.tsx`
-  - `src/App.tsx`
-- Most likely concrete fix:
-  - Either add a proper theme provider around `<App />`, or make the Sonner wrapper not rely on `next-themes` at the root.
-- This is a startup/bootstrap problem, not a data, routing-hosting, or hard-refresh-only problem.
+Concretely:
+- Keep the existing PWA manifest/icons/workbox config for production.
+- Add `devOptions: { enabled: false }` (the default, made explicit) and gate `VitePWA(...)` behind `mode === "production"` in the plugin list.
 
-Approve this and I’ll apply the bootstrap fix first, then verify the preview renders before continuing the remaining phased pay-model work.
+## 2. Actively unregister any service worker that is already installed
+Add a tiny inline script in `index.html` (runs before `main.tsx`) that, in development only, calls `navigator.serviceWorker.getRegistrations()` and unregisters every registration, then clears `caches`. This guarantees the next reload of the preview talks to the dev server directly, even for users who already have the bad SW cached.
+
+This is a one-time cleanup that is safe to leave in place — in production builds the dev guard skips it.
+
+## 3. Verify
+After the change:
+- Hard reload the preview once.
+- Confirm the landing page (`/`) renders.
+- Confirm `/auth`, `/dashboard` (redirects), and one SEO page load.
+- Confirm console is clean and network shows real requests to `/src/...` modules.
+
+## What I will NOT touch
+- No changes to `src/App.tsx`, `src/main.tsx`, `src/components/ui/sonner.tsx`, route guards, or any pay-model / loadMetrics code. Those are working — the SW was hiding that fact.
+- No changes to PWA behavior in production. Installable PWA continues to work for published builds.
+
+## Files to modify
+- `vite.config.ts` — gate `VitePWA` to production only.
+- `index.html` — add a small dev-only SW-unregister + cache-clear script.
+
+Approve and I will apply both changes and verify the preview renders.
