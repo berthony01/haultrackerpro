@@ -70,6 +70,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const [companyStartDate, setCompanyStartDate] = useState<Date | undefined>(undefined);
   const [defaultDhPayStatus, setDefaultDhPayStatus] = useState<'unpaid' | 'same' | 'custom'>('unpaid');
   const [defaultDhPayRate, setDefaultDhPayRate] = useState('');
+  const [defaultPayModel, setDefaultPayModel] = useState<string>('loaded_miles_only');
   const [lifecycleEmailsOptIn, setLifecycleEmailsOptIn] = useState(true);
   const [savingEmailPref, setSavingEmailPref] = useState(false);
   const [initialized, setInitialized] = useState(false);
