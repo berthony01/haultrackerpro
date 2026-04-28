@@ -391,14 +391,53 @@ export function parseLoadText(text: string): ParsedLoadData {
   if (dh) result.deadhead_miles = dh;
   if (loaded) result.loaded_miles = loaded;
 
+  // --- Total miles (Phase 5) — captured as its own field, NOT collapsed into loaded.
+  // Match labels: "total miles", "total mile", "total trip miles", "total distance",
+  // "all miles". Numeric value can be followed by mi/mile/miles or nothing.
+  let totalMiles: string | undefined;
+  const totalLabelRe =
+    /\b(?:total\s*(?:trip\s*)?(?:miles?|distance)|all\s*miles?)\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i;
+  const tm = t.match(totalLabelRe);
+  if (tm) totalMiles = cleanNum(tm[1]);
+  if (totalMiles) result.total_miles = totalMiles;
+
+  // Mileage reconciliation warnings + derivation
+  const loadedNum = loaded ? parseFloat(loaded) : NaN;
+  const dhNum = dh ? parseFloat(dh) : NaN;
+  const totalNum = totalMiles ? parseFloat(totalMiles) : NaN;
+
+  if (Number.isFinite(loadedNum) && Number.isFinite(dhNum) && Number.isFinite(totalNum)) {
+    if (Math.abs(loadedNum + dhNum - totalNum) > 2) {
+      result.mileage_warning =
+        `Mileage mismatch: loaded (${loaded}) + deadhead (${dh}) ≠ total (${totalMiles}). Please verify.`;
+    }
+  }
+  if (Number.isFinite(dhNum) && Number.isFinite(totalNum) && dhNum > totalNum) {
+    result.mileage_warning = `Deadhead miles (${dh}) is greater than total miles (${totalMiles}).`;
+  }
+  if (Number.isFinite(loadedNum) && Number.isFinite(totalNum) && totalNum < loadedNum) {
+    result.mileage_warning = `Total miles (${totalMiles}) is less than loaded miles (${loaded}).`;
+  }
+  // Total + DH only (no explicit loaded): derive loaded = total - dh, flag for review.
+  if (!loaded && Number.isFinite(totalNum) && Number.isFinite(dhNum) && totalNum > dhNum) {
+    const derived = (totalNum - dhNum).toString();
+    result.loaded_miles = derived;
+    result.needsMileageReview = true;
+    result.mileage_warning =
+      result.mileage_warning ??
+      'Loaded miles calculated from total minus deadhead. Please verify.';
+  }
+
   // Dev-only debug trace (stripped in production builds by Vite).
   if (import.meta.env?.DEV) {
     const loadedSrc = mileageMatches.find(mm => mm.value === loaded);
     const dhSrc = mileageMatches.find(mm => mm.value === dh && mm.isDeadhead);
     // eslint-disable-next-line no-console
     console.log('[Load Parser]', {
-      detectedLoadedMiles: loaded,
-      detectedDeadheadMiles: dh,
+      detectedLoadedMiles: result.loaded_miles,
+      detectedDeadheadMiles: result.deadhead_miles,
+      detectedTotalMiles: result.total_miles,
+      mileageWarning: result.mileage_warning,
       matchedLoadedMilesSource: loadedSrc?.loadedKind ?? 'labelled-fallback',
       matchedDeadheadMilesSource: dhSrc ? 'context' : (dh ? 'labelled-fallback' : null),
     });
