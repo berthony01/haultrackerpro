@@ -1,6 +1,14 @@
 import { useState, useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { getEffectiveDate } from '@/lib/loadUtils';
+import {
+  sumExpectedPay,
+  sumActualPay,
+  sumLoadedMiles,
+  sumDeadheadMiles,
+  sumOperatingMiles,
+  fleetDeadheadPct,
+} from '@/lib/loadMetrics';
 import { Expense } from '@/hooks/useExpenses';
 import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
