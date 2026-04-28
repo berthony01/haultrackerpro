@@ -28,6 +28,7 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
         dropoff_location: parsed.dropoff_location || undefined,
         load_date: parsed.load_date || undefined,
         loaded_miles: parsed.loaded_miles?.toString() || undefined,
+        deadhead_miles: parsed.deadhead_miles != null ? parsed.deadhead_miles.toString() : undefined,
         rate_per_mile: parsed.rate_per_mile?.toString() || undefined,
         gross_revenue: parsed.estimated_pay?.toString() || undefined,
         notes: parsed.notes || undefined,
@@ -204,7 +205,7 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
               <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-2.5">
                 <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Image is processed on your device and never uploaded or stored. Always review extracted fields before saving.
+                  Your image is read on your device. The extracted text may be sent to our AI to help fill the form. Nothing is saved until you review and confirm.
                 </p>
               </div>
             </div>
@@ -273,8 +274,14 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                 )}
                 {parsed.loaded_miles && (
                   <div className="rounded-lg bg-muted/50 p-2">
-                    <span className="text-label">Miles</span>
+                    <span className="text-label">Loaded Miles</span>
                     <p className="font-bold">{parsed.loaded_miles}</p>
+                  </div>
+                )}
+                {parsed.deadhead_miles && (
+                  <div className="rounded-lg bg-muted/50 p-2">
+                    <span className="text-label">Deadhead Miles</span>
+                    <p className="font-bold">{parsed.deadhead_miles}</p>
                   </div>
                 )}
                 {parsed.rate_per_mile && (
