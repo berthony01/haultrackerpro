@@ -10,13 +10,17 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { computeLoadPay } from '@/lib/computeLoadPay';
+import { isPayModel, PayModel } from '@/lib/payModels';
 
 interface CSVImportProps {
   isPro: boolean;
 }
 
 const EXPECTED_COLUMNS = [
-  'date', 'pickup', 'dropoff', 'loaded_miles', 'deadhead_miles', 'rate_per_mile', 'actual_pay'
+  'date', 'pickup', 'dropoff', 'loaded_miles', 'deadhead_miles', 'total_miles',
+  'rate_per_mile', 'deadhead_rate_per_mile', 'flat_rate', 'pay_model',
+  'expected_gross_pay', 'actual_pay',
 ];
 
 function parseCSV(text: string): string[][] {
@@ -44,9 +48,14 @@ function autoMapColumns(headers: string[]): Record<string, number> {
     ['date', ['date', 'loaddate', 'pickupdate']],
     ['pickup', ['pickup', 'pickuplocation', 'origin', 'from']],
     ['dropoff', ['dropoff', 'dropofflocation', 'destination', 'to', 'delivery']],
-    ['loaded_miles', ['loadedmiles', 'miles', 'distance']],
-    ['deadhead_miles', ['deadheadmiles', 'deadhead', 'dh', 'emptymiles']],
-    ['rate_per_mile', ['ratepermile', 'rate', 'rpm', 'cpm']],
+    ['loaded_miles', ['loadedmiles', 'tripmiles', 'linehaul', 'miles', 'distance']],
+    ['deadhead_miles', ['deadheadmiles', 'deadhead', 'dhmiles', 'emptymiles']],
+    ['total_miles', ['totalmiles', 'allmiles']],
+    ['rate_per_mile', ['ratepermile', 'loadedrate', 'linehaulrate', 'rate', 'rpm', 'cpm']],
+    ['deadhead_rate_per_mile', ['deadheadrate', 'dhrate', 'dhratepermile', 'emptyrate']],
+    ['flat_rate', ['flatrate', 'flatpay', 'flatamount']],
+    ['pay_model', ['paymodel', 'paytype', 'paymentmodel']],
+    ['expected_gross_pay', ['expectedgrosspay', 'expectedpay', 'estimatedpay', 'gross']],
     ['actual_pay', ['actualpay', 'pay', 'amount', 'total', 'revenue']],
   ];
 
@@ -56,6 +65,19 @@ function autoMapColumns(headers: string[]): Record<string, number> {
   }
 
   return mapping;
+}
+
+function normalizePayModelLabel(raw: string | undefined): PayModel | null {
+  if (!raw) return null;
+  const v = raw.toLowerCase().trim().replace(/[\s-]+/g, '_');
+  if (isPayModel(v)) return v;
+  // Friendly synonyms
+  if (v.includes('flat')) return 'flat_rate';
+  if (v.includes('total')) return 'total_miles';
+  if (v.includes('manual')) return 'manual';
+  if (v.includes('deadhead') || v.includes('plus')) return 'loaded_plus_deadhead';
+  if (v.includes('loaded')) return 'loaded_miles_only';
+  return null;
 }
 
 export function CSVImport({ isPro }: CSVImportProps) {
@@ -148,20 +170,60 @@ export function CSVImport({ isPro }: CSVImportProps) {
           }
         }
 
+        const num = (idx: number | undefined): number => {
+          if (idx == null || idx < 0) return 0;
+          const v = parseFloat(row[idx]); return Number.isFinite(v) && v >= 0 ? v : 0;
+        };
+        const optNum = (idx: number | undefined): number | null => {
+          if (idx == null || idx < 0 || !row[idx]?.trim()) return null;
+          const v = parseFloat(row[idx]); return Number.isFinite(v) && v >= 0 ? v : null;
+        };
+
+        const loadedMiles = num(mapping.loaded_miles);
+        const deadheadMiles = num(mapping.deadhead_miles);
+        const totalMiles = optNum(mapping.total_miles);
+        const ratePerMile = num(mapping.rate_per_mile);
+        const deadheadRpm = optNum(mapping.deadhead_rate_per_mile);
+        const flatRate = optNum(mapping.flat_rate);
+        const expectedGrossPay = optNum(mapping.expected_gross_pay);
+        const actualPay = optNum(mapping.actual_pay);
+        const payModel = normalizePayModelLabel(mapping.pay_model != null && mapping.pay_model >= 0 ? row[mapping.pay_model] : undefined)
+          ?? (flatRate != null ? 'flat_rate'
+              : deadheadRpm != null ? 'loaded_plus_deadhead'
+              : (totalMiles != null && loadedMiles === 0) ? 'total_miles'
+              : 'loaded_miles_only');
+
+        // Single source of truth for expected pay across the app.
+        const calc = computeLoadPay({
+          payModel,
+          loadedMiles,
+          deadheadMiles,
+          totalMiles: totalMiles ?? undefined,
+          loadedRpm: ratePerMile,
+          dhRpm: deadheadRpm ?? undefined,
+          flatRate: flatRate ?? undefined,
+          manualGross: expectedGrossPay ?? undefined,
+          fees: 0,
+        });
+
         const loadData: any = {
           user_id: user.id,
           load_date: parsedDate,
           pickup_location: pickup,
           dropoff_location: dropoff,
-          loaded_miles: mapping.loaded_miles != null ? parseFloat(row[mapping.loaded_miles]) || 0 : 0,
-          deadhead_miles: mapping.deadhead_miles != null ? parseFloat(row[mapping.deadhead_miles]) || 0 : 0,
-          rate_per_mile: mapping.rate_per_mile != null ? parseFloat(row[mapping.rate_per_mile]) || 0 : 0,
-          actual_pay_received: mapping.actual_pay != null && row[mapping.actual_pay]?.trim() ? parseFloat(row[mapping.actual_pay]) : null,
+          loaded_miles: loadedMiles,
+          deadhead_miles: deadheadMiles,
+          rate_per_mile: ratePerMile,
+          total_miles: totalMiles,
+          deadhead_rate_per_mile: deadheadRpm,
+          flat_rate_amount: payModel === 'flat_rate' ? flatRate : null,
+          pay_model: payModel,
+          actual_pay_received: actualPay,
           status: 'completed',
+          // Persist computed expected pay so dashboards/reports/exports stay aligned
+          // with the imported pay model — replaces the old `loaded_miles * rate` math.
+          estimated_pay: expectedGrossPay ?? Math.max(0, Number(calc.expectedGrossPay.toFixed(2))),
         };
-
-        // Calculate estimated pay
-        loadData.estimated_pay = (loadData.loaded_miles * loadData.rate_per_mile);
 
         const { error } = await supabase.from('loads').insert(loadData);
         if (!error) successCount++;
