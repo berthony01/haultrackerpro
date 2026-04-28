@@ -13,8 +13,9 @@ export function getEffectiveDate(load: Load): string {
 // ── Canonical CSV header rows (single source of truth) ──────────────────────
 // FAQ live previews import these so docs cannot drift from the real exports.
 export const CSV_HEADERS_LOADS = [
-  'Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Loaded Miles', 'Deadhead Miles',
-  'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay',
+  'Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Pay Model', 'Loaded Miles',
+  'Deadhead Miles', 'Total Miles', 'Rate/Mile', 'Deadhead Rate/Mile', 'Flat Rate',
+  'Effective RPM', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay',
   'Actual Pay', 'Difference', 'Status', 'Notes', 'Company Name', 'Company Start Date',
 ] as const;
 
