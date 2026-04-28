@@ -323,6 +323,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       payment_notes: '',
       dh_pay_status: lastDh.status,
       dh_pay_rate: lastDh.rate,
+      pay_model: resolvePayModel(lastLoad.pay_model, (settings as any)?.default_pay_model),
+      total_miles: lastLoad.total_miles?.toString() ?? '',
+      flat_rate_amount: lastLoad.flat_rate_amount?.toString() ?? '',
+      dh_rate_per_mile: '',
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
