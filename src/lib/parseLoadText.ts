@@ -132,7 +132,7 @@ function tryParseDate(raw: string): string | undefined {
  * like "$1000" are ignored automatically). For each, inspects ~30 chars before and
  * ~10 chars after to classify by context.
  */
-type LoadedKind = 'loaded' | 'trip' | 'linehaul' | 'route' | 'distance' | 'total' | 'unknown';
+type LoadedKind = 'loaded' | 'trip' | 'linehaul' | 'route' | 'distance' | 'unknown';
 
 interface MileageMatch {
   value: string;       // cleaned numeric string, e.g. "257.10"
@@ -149,17 +149,18 @@ const MILEAGE_TOKEN_RE = /(?<![\w-])([\d]{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)
 const DEADHEAD_CTX_RE = /\b(dh|dead\s*head|empty|bobtail|reposition|non[\s-]?revenue|unpaid)\b/i;
 
 // Loaded-context keyword matchers, ranked. First match wins for that token.
+// NOTE: "total" is intentionally excluded — total miles often already include
+// deadhead and must never outrank an explicit loaded/trip/linehaul label.
 const LOADED_CTX_RANKED: { kind: Exclude<LoadedKind, 'unknown'>; re: RegExp }[] = [
   { kind: 'loaded',   re: /\bloaded\b/i },
   { kind: 'trip',     re: /\btrip\b/i },
   { kind: 'linehaul', re: /\blinehaul\b/i },
   { kind: 'route',    re: /\broute\b/i },
   { kind: 'distance', re: /\bdistance\b/i },
-  { kind: 'total',    re: /\btotal\b/i },
 ];
 
 const LOADED_PRIORITY: Record<LoadedKind, number> = {
-  loaded: 6, trip: 5, linehaul: 4, route: 3, distance: 2, total: 1, unknown: 0,
+  loaded: 6, trip: 5, linehaul: 4, route: 3, distance: 2, unknown: 0,
 };
 
 function findAllMileage(t: string): MileageMatch[] {
