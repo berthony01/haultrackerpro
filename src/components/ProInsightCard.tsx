@@ -2,6 +2,13 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { getEffectiveDate } from '@/lib/loadUtils';
+import {
+  fleetEffectiveRPM,
+  fleetDeadheadPct,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+} from '@/lib/loadMetrics';
 import { parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,13 +53,13 @@ export function ProInsightCard({ loads, expenses, isPro, onNavigate }: ProInsigh
       return (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24) <= 30;
     });
 
-    const totalMiles = recentLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-    const totalRev = recentLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-    const totalDH = recentLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
+    const totalOpMiles = sumOperatingMiles(recentLoads);
+    const totalRev = sumExpectedPay(recentLoads);
+    const totalDH = sumDeadheadMiles(recentLoads);
     const totalExp = recentExpenses.reduce((s, e) => s + Number(e.amount), 0);
-    const totalAllMiles = totalMiles + totalDH;
-    const dhPct = totalAllMiles > 0 ? (totalDH / totalAllMiles) * 100 : 0;
-    const rpm = totalMiles > 0 ? totalRev / totalMiles : 0;
+    const totalAllMiles = totalOpMiles;
+    const dhPct = fleetDeadheadPct(recentLoads);
+    const rpm = fleetEffectiveRPM(recentLoads);
     const expRatio = totalRev > 0 ? (totalExp / totalRev) * 100 : 0;
 
     // Compute estimated scorecard score (simplified version)

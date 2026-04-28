@@ -4,6 +4,14 @@ import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
 import { getScheduleCLine, groupByScheduleC } from '@/lib/scheduleCMapping';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import {
+  getLoadOperatingMiles,
+  getLoadEffectiveRPM,
+  getLoadExpectedPay,
+  sumOperatingMiles,
+  sumExpectedPay,
+  fleetEffectiveRPM,
+} from '@/lib/loadMetrics';
 
 /** Get the effective date for grouping — uses dropoff_date if available, otherwise load_date */
 export function getEffectiveDate(load: Load): string {
@@ -60,7 +68,7 @@ export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 
     const start = parseISO(key);
     const end = endOfWeek(start, { weekStartsOn });
     const totalLoadedMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-    const totalEstimatedPay = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+    const totalEstimatedPay = sumExpectedPay(weekLoads);
     const totalActualPay = weekLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
     summaries.push({
       weekLabel: `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`,
@@ -71,7 +79,8 @@ export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 
       totalDeadheadMiles: weekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0),
       totalEstimatedPay,
       totalActualPay,
-      avgRatePerMile: totalLoadedMiles > 0 ? totalEstimatedPay / totalLoadedMiles : 0,
+      // Effective RPM uses TOTAL operating miles and respects pay_model.
+      avgRatePerMile: fleetEffectiveRPM(weekLoads),
     });
   });
 
@@ -190,14 +199,12 @@ export function buildStopsSummary(load: Load, stops: LoadStop[]): string {
 export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
   const headers = [...CSV_HEADERS_LOADS];
   const rows = loads.map(l => {
-    const est = Number(l.estimated_pay ?? 0);
+    const est = getLoadExpectedPay(l);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
     const diff = act != null ? (act - est).toFixed(2) : '';
     const summary = buildStopsSummary(l, stops);
-    const totalMi = (l as any).total_miles != null && Number((l as any).total_miles) > 0
-      ? Number((l as any).total_miles)
-      : Number(l.loaded_miles) + Number(l.deadhead_miles);
-    const effRpm = totalMi > 0 ? est / totalMi : 0;
+    const totalMi = getLoadOperatingMiles(l);
+    const effRpm = getLoadEffectiveRPM(l);
     const payModel = (l as any).pay_model ?? 'loaded_miles_only';
     const dhRate = (l as any).deadhead_rate_per_mile;
     const flatRate = (l as any).flat_rate_amount;
@@ -227,15 +234,15 @@ export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] =
 }
 
 export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: string = 'profit-report', stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
-  const totalRevenue = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? l.estimated_pay ?? 0), 0);
+  const totalRevenue = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? getLoadExpectedPay(l) ?? 0), 0);
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const totalMiles = loads.reduce((s, l) => s + Number(l.loaded_miles) + Number(l.deadhead_miles), 0);
+  const totalMiles = sumOperatingMiles(loads);
   const netProfit = totalRevenue - totalExpenses;
   const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
 
   const headers = [...CSV_HEADERS_PROFIT];
   const rows = loads.map(l => {
-    const est = Number(l.estimated_pay ?? 0);
+    const est = getLoadExpectedPay(l);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
     const linkedExp = expenses.filter(e => e.linked_load_id === l.id).reduce((s, e) => s + Number(e.amount), 0);
     const pay = act ?? est;
@@ -279,12 +286,10 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
     }
   };
   const rows = loads.map(l => {
-    const est = Number(l.estimated_pay ?? 0);
+    const est = getLoadExpectedPay(l);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
-    const tot = (l as any).total_miles != null && Number((l as any).total_miles) > 0
-      ? Number((l as any).total_miles)
-      : Number(l.loaded_miles) + Number(l.deadhead_miles);
-    const effRpm = tot > 0 ? est / tot : 0;
+    const tot = getLoadOperatingMiles(l);
+    const effRpm = getLoadEffectiveRPM(l);
     return [
       getEffectiveDate(l), l.pickup_location, l.dropoff_location,
       payModelLabel((l as any).pay_model),
@@ -298,7 +303,7 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
   // Summary totals
   const totalLoaded = loads.reduce((s, l) => s + Number(l.loaded_miles), 0);
   const totalDH = loads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const totalEst = loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const totalEst = sumExpectedPay(loads);
   const totalAct = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
 
   const colWidths = [50, 60, 60, 38, 32, 32, 36, 44, 50, 50, 42];
