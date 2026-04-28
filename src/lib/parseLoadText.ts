@@ -21,12 +21,25 @@ export interface ParsedStopData {
   stop_type: string;
 }
 
+export type ParsedPayModelSuggestion =
+  | 'loaded_miles_only'
+  | 'total_miles'
+  | 'loaded_plus_deadhead'
+  | 'flat_rate'
+  | 'manual';
+
 export interface ParsedLoadData {
   pickup_location?: string;
   dropoff_location?: string;
   loaded_miles?: string;
   deadhead_miles?: string;
+  /** Dispatcher-provided "total miles" (loaded + deadhead). Preserved separately. */
+  total_miles?: string;
   rate_per_mile?: string;
+  /** Separate deadhead pay rate when explicitly provided ("DH rate $1.00/mi"). */
+  deadhead_rate_per_mile?: string;
+  /** Flat-rate dollar amount for the whole load when explicitly stated ("flat $850"). */
+  flat_rate?: string;
   gross_revenue?: string;
   load_date?: string;
   notes?: string;
@@ -40,6 +53,10 @@ export interface ParsedLoadData {
    * Consumers should warn the user to confirm mileage before saving.
    */
   needsMileageReview?: boolean;
+  /** Human-readable note about mileage reconciliation (mismatch, derived value, etc.). */
+  mileage_warning?: string;
+  /** Best-guess pay model based on which fields were detected. UI may override. */
+  pay_model_suggestion?: ParsedPayModelSuggestion;
 }
 
 /** Strip $ and commas from a number string */
@@ -374,41 +391,124 @@ export function parseLoadText(text: string): ParsedLoadData {
   if (dh) result.deadhead_miles = dh;
   if (loaded) result.loaded_miles = loaded;
 
+  // --- Total miles (Phase 5) — captured as its own field, NOT collapsed into loaded.
+  // Match labels: "total miles", "total mile", "total trip miles", "total distance",
+  // "all miles". Numeric value can be followed by mi/mile/miles or nothing.
+  let totalMiles: string | undefined;
+  const totalLabelRe =
+    /\b(?:total\s*(?:trip\s*)?(?:miles?|distance)|all\s*miles?)\s*[:=]?\s*([\d,]+(?:\.\d+)?)\s*(?:mi(?:les?)?)?\b/i;
+  const tm = t.match(totalLabelRe);
+  if (tm) totalMiles = cleanNum(tm[1]);
+  if (totalMiles) result.total_miles = totalMiles;
+
+  // Mileage reconciliation warnings + derivation
+  const loadedNum = loaded ? parseFloat(loaded) : NaN;
+  const dhNum = dh ? parseFloat(dh) : NaN;
+  const totalNum = totalMiles ? parseFloat(totalMiles) : NaN;
+
+  if (Number.isFinite(loadedNum) && Number.isFinite(dhNum) && Number.isFinite(totalNum)) {
+    if (Math.abs(loadedNum + dhNum - totalNum) > 2) {
+      result.mileage_warning =
+        `Mileage mismatch: loaded (${loaded}) + deadhead (${dh}) ≠ total (${totalMiles}). Please verify.`;
+    }
+  }
+  if (Number.isFinite(dhNum) && Number.isFinite(totalNum) && dhNum > totalNum) {
+    result.mileage_warning = `Deadhead miles (${dh}) is greater than total miles (${totalMiles}).`;
+  }
+  if (Number.isFinite(loadedNum) && Number.isFinite(totalNum) && totalNum < loadedNum) {
+    result.mileage_warning = `Total miles (${totalMiles}) is less than loaded miles (${loaded}).`;
+  }
+  // Total + DH only (no explicit loaded): derive loaded = total - dh, flag for review.
+  if (!loaded && Number.isFinite(totalNum) && Number.isFinite(dhNum) && totalNum > dhNum) {
+    const derived = (totalNum - dhNum).toString();
+    result.loaded_miles = derived;
+    result.needsMileageReview = true;
+    result.mileage_warning =
+      result.mileage_warning ??
+      'Loaded miles calculated from total minus deadhead. Please verify.';
+  }
+
   // Dev-only debug trace (stripped in production builds by Vite).
   if (import.meta.env?.DEV) {
     const loadedSrc = mileageMatches.find(mm => mm.value === loaded);
     const dhSrc = mileageMatches.find(mm => mm.value === dh && mm.isDeadhead);
     // eslint-disable-next-line no-console
     console.log('[Load Parser]', {
-      detectedLoadedMiles: loaded,
-      detectedDeadheadMiles: dh,
+      detectedLoadedMiles: result.loaded_miles,
+      detectedDeadheadMiles: result.deadhead_miles,
+      detectedTotalMiles: result.total_miles,
+      mileageWarning: result.mileage_warning,
       matchedLoadedMilesSource: loadedSrc?.loadedKind ?? 'labelled-fallback',
       matchedDeadheadMilesSource: dhSrc ? 'context' : (dh ? 'labelled-fallback' : null),
     });
   }
 
-  // --- Rate per mile ---
+  // --- Deadhead rate per mile (Phase 5) — must run BEFORE general rate to avoid stealing.
+  // "DH rate $1.00/mi", "deadhead rate: 1.00", "empty rate 0.85/mile"
+  const dhRateMatch =
+    t.match(/(?:dh|dead\s*head|empty)\s*rate\s*[:=]?\s*\$?([\d,.]+)/i) ||
+    t.match(/\$?([\d,.]+)\s*\/\s*mi(?:le)?\s+(?:dh|dead\s*head|empty)/i);
+  if (dhRateMatch) result.deadhead_rate_per_mile = cleanNum(dhRateMatch[1]);
+
+  // --- Loaded rate per mile (also accept explicit "loaded rate") ---
+  const loadedRateMatch = t.match(/loaded\s*rate\s*[:=]?\s*\$?([\d,.]+)/i);
+  if (loadedRateMatch) result.rate_per_mile = cleanNum(loadedRateMatch[1]);
+
+  // --- Rate per mile (generic) ---
   // "$2.45/mi", "$2.45 CPM", "$2.45 per mile", "2.45 rpm", "rate: $2.45"
-  m = t.match(/\$?([\d,.]+)\s*(?:\/\s*mi(?:le)?|cpm|rpm|per\s+mile)\b/i);
-  if (m) result.rate_per_mile = cleanNum(m[1]);
+  if (!result.rate_per_mile) {
+    m = t.match(/\$?([\d,.]+)\s*(?:\/\s*mi(?:le)?|cpm|rpm|per\s+mile)\b/i);
+    if (m) {
+      const v = cleanNum(m[1]);
+      if (v !== result.deadhead_rate_per_mile) result.rate_per_mile = v;
+    }
+  }
   if (!result.rate_per_mile) {
     m = t.match(/(?:rate|cpm|rpm)\s*[:=]?\s*\$?([\d,.]+)/i);
-    if (m) result.rate_per_mile = cleanNum(m[1]);
+    if (m) {
+      const v = cleanNum(m[1]);
+      if (v !== result.deadhead_rate_per_mile) result.rate_per_mile = v;
+    }
+  }
+
+  // --- Flat rate (Phase 5) ---
+  // "Flat rate: $850", "Flat $850", "Flat pay 850"
+  const flatMatch =
+    t.match(/\bflat\s*(?:rate|pay)?\s*[:=]?\s*\$?\s*([\d,]+(?:\.\d{1,2})?)\b/i);
+  if (flatMatch) {
+    const v = cleanNum(flatMatch[1]);
+    const num = parseFloat(v);
+    if (Number.isFinite(num) && num > 0) result.flat_rate = v;
   }
 
   // --- Gross Revenue ---
-  m = t.match(/(?:gross|revenue|total\s*(?:pay|revenue|load)?)\s*[:=]?\s*\$?([\d,.]+)/i);
+  // Use a more specific pattern that excludes "total miles" / "total mile" phrasing
+  // so it doesn't pick up mileage labels.
+  m = t.match(/(?:gross|revenue|total\s*(?:pay|revenue|load))\s*[:=]?\s*\$?([\d,.]+)/i);
   if (m) result.gross_revenue = cleanNum(m[1]);
   if (!result.gross_revenue) {
     m = t.match(/\$?([\d,.]+)\s*(?:gross|load\s*(?:pay|revenue)?)\b/i);
     if (m) result.gross_revenue = cleanNum(m[1]);
   }
-  if (!result.gross_revenue && !result.rate_per_mile) {
+  if (!result.gross_revenue && !result.rate_per_mile && !result.flat_rate) {
     m = t.match(/\$([\d,]+(?:\.\d{1,2})?)/);
     if (m) {
       const val = parseFloat(cleanNum(m[1]));
       if (val > 100) result.gross_revenue = cleanNum(m[1]);
     }
+  }
+
+  // --- Pay model suggestion (Phase 5) ---
+  if (result.flat_rate) {
+    result.pay_model_suggestion = 'flat_rate';
+  } else if (result.rate_per_mile && result.deadhead_rate_per_mile) {
+    result.pay_model_suggestion = 'loaded_plus_deadhead';
+  } else if (result.rate_per_mile && result.total_miles && !result.loaded_miles) {
+    result.pay_model_suggestion = 'total_miles';
+  } else if (result.rate_per_mile || result.loaded_miles) {
+    result.pay_model_suggestion = 'loaded_miles_only';
+  } else if (result.gross_revenue) {
+    result.pay_model_suggestion = 'manual';
   }
 
   // --- Date ---

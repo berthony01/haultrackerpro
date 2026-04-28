@@ -29,7 +29,7 @@ const SYSTEM_PROMPTS: Record<string, string> = {
 
   parse_expense: `You are an expense data extractor for a trucking app. Given natural language text (possibly from voice input), extract one or more expenses. Return structured data using the provided tool.`,
 
-  parse_ratecon: `You are a rate confirmation parser for a trucking app. Given raw OCR text from a rate confirmation document, extract the structured load data. Extract loaded_miles (line-haul / trip miles only) and deadhead_miles (empty / DH / bobtail miles only) as SEPARATE fields. Never guess deadhead — if it is not explicitly present in the text, omit the field. Never treat total miles as deadhead. Return structured data using the provided tool.`,
+  parse_ratecon: `You are a rate confirmation parser for a trucking app. Extract structured load data from raw OCR text. Rules: (1) loaded_miles = line-haul/trip miles only. (2) deadhead_miles = empty/DH/bobtail miles only — never guess; omit if not explicitly present. (3) total_miles = dispatcher-provided total/all miles when explicitly labeled — keep separate from loaded. (4) Never treat total miles as deadhead. (5) Extract deadhead_rate_per_mile and flat_rate only if explicitly stated. (6) Suggest pay_model_suggestion based on detected fields: 'flat_rate' if flat amount present, 'loaded_plus_deadhead' if separate DH rate present, 'total_miles' if rate + total miles but no loaded miles, otherwise 'loaded_miles_only'. (7) If loaded+deadhead disagree with total by more than 2 miles, set mileage_warning. Use the provided tool.`,
 };
 
 // ── Tool definitions for structured extraction ───────────────────────
@@ -82,11 +82,19 @@ const PARSE_RATECON_TOOL = {
         dropoff_date: { type: "string", description: "ISO date or null" },
         loaded_miles: { type: "number", description: "Line-haul / trip miles only. Do not include deadhead." },
         deadhead_miles: { type: "number", description: "Empty / deadhead / bobtail miles only. Omit if not explicitly present — never guess." },
-        rate_per_mile: { type: "number" },
+        total_miles: { type: "number", description: "Dispatcher-provided total/all miles. Omit if not explicitly labeled." },
+        rate_per_mile: { type: "number", description: "Loaded rate per mile." },
+        deadhead_rate_per_mile: { type: "number", description: "Separate deadhead rate per mile, only if explicitly stated." },
+        flat_rate: { type: "number", description: "Flat-rate dollar amount for the load, only if explicitly stated." },
         estimated_pay: { type: "number" },
         detention_fee: { type: "number" },
         other_fees: { type: "number" },
         notes: { type: "string" },
+        pay_model_suggestion: {
+          type: "string",
+          enum: ["loaded_miles_only", "total_miles", "loaded_plus_deadhead", "flat_rate", "manual"],
+        },
+        mileage_warning: { type: "string", description: "Set if loaded+deadhead disagrees with total by >2 miles or other ambiguity." },
         stops: {
           type: "array",
           items: {

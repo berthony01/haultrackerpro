@@ -29,9 +29,14 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
         load_date: parsed.load_date || undefined,
         loaded_miles: parsed.loaded_miles?.toString() || undefined,
         deadhead_miles: parsed.deadhead_miles != null ? parsed.deadhead_miles.toString() : undefined,
+        total_miles: parsed.total_miles != null ? parsed.total_miles.toString() : undefined,
         rate_per_mile: parsed.rate_per_mile?.toString() || undefined,
+        deadhead_rate_per_mile: parsed.deadhead_rate_per_mile != null ? parsed.deadhead_rate_per_mile.toString() : undefined,
+        flat_rate: parsed.flat_rate != null ? parsed.flat_rate.toString() : undefined,
         gross_revenue: parsed.estimated_pay?.toString() || undefined,
         notes: parsed.notes || undefined,
+        mileage_warning: parsed.mileage_warning || undefined,
+        pay_model_suggestion: parsed.pay_model_suggestion || undefined,
         multiStopDetected: parsed.stops && parsed.stops.length > 2,
         detectedStopsCount: parsed.stops?.length,
         stops: parsed.stops?.map((s: any) => ({
@@ -284,10 +289,28 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                     <p className="font-bold">{parsed.deadhead_miles}</p>
                   </div>
                 )}
+                {parsed.total_miles && (
+                  <div className="rounded-lg bg-muted/50 p-2">
+                    <span className="text-label">Total Miles</span>
+                    <p className="font-bold">{parsed.total_miles}</p>
+                  </div>
+                )}
                 {parsed.rate_per_mile && (
                   <div className="rounded-lg bg-muted/50 p-2">
                     <span className="text-label">Rate/Mile</span>
                     <p className="font-bold">${parsed.rate_per_mile}</p>
+                  </div>
+                )}
+                {parsed.deadhead_rate_per_mile && (
+                  <div className="rounded-lg bg-muted/50 p-2">
+                    <span className="text-label">DH Rate/Mile</span>
+                    <p className="font-bold">${parsed.deadhead_rate_per_mile}</p>
+                  </div>
+                )}
+                {parsed.flat_rate && (
+                  <div className="rounded-lg bg-muted/50 p-2">
+                    <span className="text-label">Flat Rate</span>
+                    <p className="font-bold">${parsed.flat_rate}</p>
                   </div>
                 )}
                 {parsed.gross_revenue && (
