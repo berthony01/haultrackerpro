@@ -6,6 +6,14 @@
 
 import { Load } from '@/hooks/useLoads';
 import { getEffectiveDate, formatCurrency } from '@/lib/loadUtils';
+import {
+  getLoadEffectiveRPM,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+  fleetEffectiveRPM,
+  fleetDeadheadPct,
+} from '@/lib/loadMetrics';
 import { parseISO, startOfWeek, endOfWeek, subWeeks, isWithinInterval } from 'date-fns';
 
 interface WeeklySummaryInput {
@@ -20,21 +28,20 @@ export function generateWeeklySummary({ weekLoads, allLoads, weekStartsOn }: Wee
   const sentences: string[] = [];
   const now = new Date();
 
-  // This week metrics
-  const twRevenue = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  // This week metrics — use total operating miles + pay_model-aware revenue
+  const twRevenue = sumExpectedPay(weekLoads);
   const twMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const twDH = weekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const twTotalMiles = twMiles + twDH;
-  const twDHPct = twTotalMiles > 0 ? (twDH / twTotalMiles) * 100 : 0;
-  const twRPM = twMiles > 0 ? twRevenue / twMiles : 0;
+  const twDH = sumDeadheadMiles(weekLoads);
+  const twTotalMiles = sumOperatingMiles(weekLoads);
+  const twDHPct = fleetDeadheadPct(weekLoads);
+  const twRPM = fleetEffectiveRPM(weekLoads);
 
   // Last week metrics for comparison
   const lwStart = startOfWeek(subWeeks(now, 1), { weekStartsOn });
   const lwEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn });
   const lwLoads = allLoads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start: lwStart, end: lwEnd }));
-  const lwRevenue = lwLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-  const lwMiles = lwLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const lwRPM = lwMiles > 0 ? lwRevenue / lwMiles : 0;
+  const lwRevenue = sumExpectedPay(lwLoads);
+  const lwRPM = fleetEffectiveRPM(lwLoads);
 
   // Opening sentence
   sentences.push(
@@ -46,14 +53,14 @@ export function generateWeeklySummary({ weekLoads, allLoads, weekStartsOn }: Wee
     if (lwLoads.length > 0 && lwRPM > 0) {
       const rpmChange = ((twRPM - lwRPM) / lwRPM) * 100;
       if (rpmChange > 5) {
-        sentences.push(`Your rate per mile improved to $${twRPM.toFixed(2)}/mi — up ${rpmChange.toFixed(0)}% from last week. Great work negotiating better loads.`);
+        sentences.push(`Your effective rate per mile improved to $${twRPM.toFixed(2)}/mi — up ${rpmChange.toFixed(0)}% from last week. Great work negotiating better loads.`);
       } else if (rpmChange < -5) {
-        sentences.push(`Your RPM dipped to $${twRPM.toFixed(2)}/mi, down ${Math.abs(rpmChange).toFixed(0)}% from last week ($${lwRPM.toFixed(2)}/mi). Consider targeting higher-paying lanes.`);
+        sentences.push(`Your effective RPM dipped to $${twRPM.toFixed(2)}/mi, down ${Math.abs(rpmChange).toFixed(0)}% from last week ($${lwRPM.toFixed(2)}/mi). Consider targeting higher-paying lanes.`);
       } else {
-        sentences.push(`Your RPM held steady at $${twRPM.toFixed(2)}/mi, consistent with last week.`);
+        sentences.push(`Your effective RPM held steady at $${twRPM.toFixed(2)}/mi, consistent with last week.`);
       }
     } else {
-      sentences.push(`Your average rate was $${twRPM.toFixed(2)} per loaded mile.`);
+      sentences.push(`Your average effective rate was $${twRPM.toFixed(2)} per mile.`);
     }
   }
 
@@ -74,14 +81,12 @@ export function generateWeeklySummary({ weekLoads, allLoads, weekStartsOn }: Wee
     }
   }
 
-  // Best load highlight
+  // Best load highlight — uses effective RPM (pay_model aware)
   if (weekLoads.length >= 2) {
-    const best = weekLoads.reduce((a, b) => {
-      const aRPM = Number(a.loaded_miles) > 0 ? Number(a.estimated_pay ?? 0) / Number(a.loaded_miles) : 0;
-      const bRPM = Number(b.loaded_miles) > 0 ? Number(b.estimated_pay ?? 0) / Number(b.loaded_miles) : 0;
-      return bRPM > aRPM ? b : a;
-    });
-    const bestRPM = Number(best.loaded_miles) > 0 ? Number(best.estimated_pay ?? 0) / Number(best.loaded_miles) : 0;
+    const best = weekLoads.reduce((a, b) =>
+      getLoadEffectiveRPM(b) > getLoadEffectiveRPM(a) ? b : a,
+    );
+    const bestRPM = getLoadEffectiveRPM(best);
     if (bestRPM > 0) {
       sentences.push(`Your best load was ${best.pickup_location} → ${best.dropoff_location} at $${bestRPM.toFixed(2)}/mi. Look for more runs on that lane.`);
     }

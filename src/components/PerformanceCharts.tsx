@@ -3,6 +3,13 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber, formatCurrency, formatNumber, getEffectiveDate } from '@/lib/loadUtils';
+import {
+  fleetEffectiveRPM,
+  fleetDeadheadPct,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+} from '@/lib/loadMetrics';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -122,17 +129,16 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
 
       const revenue = bLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? l.estimated_pay ?? 0), 0);
       const expenseTotal = bExpenses.reduce((s, e) => s + Number(e.amount), 0);
-      const loadedMiles = bLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-      const deadheadMiles = bLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-      const totalMiles = loadedMiles + deadheadMiles;
+      const totalOpMiles = sumOperatingMiles(bLoads);
 
       return {
         label: b.label,
         revenue,
         expenses: expenseTotal,
         netProfit: revenue - expenseTotal,
-        rpm: loadedMiles > 0 ? revenue / loadedMiles : null,
-        deadheadPct: totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : null,
+        // Effective RPM = expected gross / total operating miles, pay_model aware.
+        rpm: bLoads.length > 0 && totalOpMiles > 0 ? fleetEffectiveRPM(bLoads) : null,
+        deadheadPct: totalOpMiles > 0 ? fleetDeadheadPct(bLoads) : null,
       };
     });
   }, [buckets, filteredLoads, filteredExpenses, activeRange]);
@@ -152,8 +158,8 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
 
   const hasLoads = filteredLoads.length > 0;
   const hasExpenses = filteredExpenses.length > 0;
-  const hasLoadedMiles = filteredLoads.some(l => Number(l.loaded_miles) > 0);
-  const hasDeadhead = filteredLoads.some(l => Number(l.deadhead_miles) > 0);
+  const hasOperatingMiles = sumOperatingMiles(filteredLoads) > 0;
+  const hasDeadhead = sumDeadheadMiles(filteredLoads) > 0;
 
   const primaryColor = 'hsl(25, 95%, 53%)';
   const successColor = 'hsl(152, 60%, 42%)';

@@ -2,6 +2,15 @@ import { useMemo, useState, useEffect } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { getEffectiveDate, formatCurrency } from '@/lib/loadUtils';
+import {
+  getLoadExpectedPay,
+  getLoadOperatingMiles,
+  fleetEffectiveRPM,
+  fleetDeadheadPct,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+} from '@/lib/loadMetrics';
 import { parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,20 +69,20 @@ export function SmartLoadAdvisor({ loads, isPro }: SmartLoadAdvisorProps) {
     laneMap.forEach((laneLoads, lane) => {
       if (laneLoads.length < 2) return;
       const parts = lane.split(' → ');
-      const totalMiles = laneLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-      const totalRev = laneLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-      const totalDH = laneLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-      const totalAllMiles = totalMiles + totalDH;
+      // Operating miles + revenue respect pay_model via shared helpers.
+      const totalOpMiles = sumOperatingMiles(laneLoads);
+      const totalRev = sumExpectedPay(laneLoads);
+      const totalDH = sumDeadheadMiles(laneLoads);
 
       lanes.push({
         lane,
         pickup: parts[0],
         dropoff: parts[1],
         count: laneLoads.length,
-        avgRPM: totalMiles > 0 ? totalRev / totalMiles : 0,
+        avgRPM: fleetEffectiveRPM(laneLoads),
         totalRevenue: totalRev,
-        totalMiles,
-        avgDeadheadPct: totalAllMiles > 0 ? (totalDH / totalAllMiles) * 100 : 0,
+        totalMiles: totalOpMiles,
+        avgDeadheadPct: totalOpMiles > 0 ? (totalDH / totalOpMiles) * 100 : 0,
       });
     });
 
@@ -83,16 +92,13 @@ export function SmartLoadAdvisor({ loads, isPro }: SmartLoadAdvisorProps) {
 
     const bestLane = lanes[0];
     const worstLane = lanes[lanes.length - 1];
-    const avgRPM = recentLoads.reduce((s, l) => s + Number(l.loaded_miles), 0) > 0
-      ? recentLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0) / recentLoads.reduce((s, l) => s + Number(l.loaded_miles), 0)
-      : 0;
+    const avgRPM = fleetEffectiveRPM(recentLoads);
 
     const worstLaneWeeklyLoads = worstLane.count / 8;
     const rpmDiff = avgRPM - worstLane.avgRPM;
     const potentialWeeklyGain = rpmDiff > 0 ? rpmDiff * (worstLane.totalMiles / worstLane.count) * worstLaneWeeklyLoads : 0;
 
-    const overallDeadheadPct = recentLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0) /
-      (recentLoads.reduce((s, l) => s + Number(l.loaded_miles) + Number(l.deadhead_miles), 0) || 1) * 100;
+    const overallDeadheadPct = fleetDeadheadPct(recentLoads);
 
     return { lanes, bestLane, worstLane, avgRPM, potentialWeeklyGain, totalLoadsAnalyzed: recentLoads.length, overallDeadheadPct };
   }, [loads]);

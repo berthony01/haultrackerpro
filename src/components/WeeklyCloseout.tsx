@@ -4,6 +4,16 @@ import { Expense } from '@/hooks/useExpenses';
 import { useWeeklySnapshots } from '@/hooks/useWeeklySnapshots';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency, getCurrentWeekLoads, weekStartDayToNumber } from '@/lib/loadUtils';
+import {
+  getLoadExpectedPay,
+  getLoadEffectiveRPM,
+  getDeadheadPercentage,
+  sumExpectedPay,
+  sumOperatingMiles,
+  sumDeadheadMiles,
+  fleetEffectiveRPM,
+  fleetDeadheadPct,
+} from '@/lib/loadMetrics';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -80,19 +90,19 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
     );
   }
 
-  const estimated = weekLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const estimated = sumExpectedPay(weekLoads);
   const paidLoads = weekLoads.filter(l => l.actual_pay_received != null);
   const actual = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
-  const paidEstimated = paidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const paidEstimated = sumExpectedPay(paidLoads);
   const knownDifference = paidLoads.length > 0 ? actual - paidEstimated : 0;
   const unpaidLoads = weekLoads.filter(l => l.actual_pay_received == null && l.status !== 'cancelled');
-  const unpaidEstimated = unpaidLoads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+  const unpaidEstimated = sumExpectedPay(unpaidLoads);
   const loadedMiles = weekLoads.reduce((s, l) => s + Number(l.loaded_miles), 0);
-  const deadheadMiles = weekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0);
-  const totalMiles = loadedMiles + deadheadMiles;
-  const deadheadPct = totalMiles > 0 ? (deadheadMiles / totalMiles) * 100 : 0;
+  const deadheadMiles = sumDeadheadMiles(weekLoads);
+  const totalMiles = sumOperatingMiles(weekLoads);
+  const deadheadPct = fleetDeadheadPct(weekLoads);
 
-  const avgRPM = loadedMiles > 0 ? estimated / loadedMiles : 0;
+  const avgRPM = fleetEffectiveRPM(weekLoads);
 
   // Fetch AI weekly report after finalization
   const fetchAiReport = async () => {
@@ -114,12 +124,10 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
         weekExpenses: weekExpenseTotal.toFixed(0),
         bestLoad: weekLoads.length > 0
           ? (() => {
-              const best = weekLoads.reduce((a, b) => {
-                const aRPM = Number(a.loaded_miles) > 0 ? Number(a.estimated_pay ?? 0) / Number(a.loaded_miles) : 0;
-                const bRPM = Number(b.loaded_miles) > 0 ? Number(b.estimated_pay ?? 0) / Number(b.loaded_miles) : 0;
-                return bRPM > aRPM ? b : a;
-              });
-              return `${best.pickup_location} → ${best.dropoff_location} at $${(Number(best.loaded_miles) > 0 ? Number(best.estimated_pay ?? 0) / Number(best.loaded_miles) : 0).toFixed(2)}/mi`;
+              const best = weekLoads.reduce((a, b) =>
+                getLoadEffectiveRPM(b) > getLoadEffectiveRPM(a) ? b : a,
+              );
+              return `${best.pickup_location} → ${best.dropoff_location} at $${getLoadEffectiveRPM(best).toFixed(2)}/mi`;
             })()
           : null,
       };
@@ -291,9 +299,8 @@ export function WeeklyCloseout({ loads, expenses = [], onNavigate, onBack, isPro
           {weekLoads.length >= 2 && (() => {
             const loadsWithRPM = weekLoads.map(l => ({
               load: l,
-              rpm: Number(l.loaded_miles) > 0 ? Number(l.estimated_pay ?? 0) / Number(l.loaded_miles) : 0,
-              dhPct: (Number(l.loaded_miles) + Number(l.deadhead_miles)) > 0
-                ? (Number(l.deadhead_miles) / (Number(l.loaded_miles) + Number(l.deadhead_miles))) * 100 : 0,
+              rpm: getLoadEffectiveRPM(l),
+              dhPct: getDeadheadPercentage(l),
             }));
             const best = loadsWithRPM.reduce((a, b) => b.rpm > a.rpm ? b : a);
             const worst = loadsWithRPM.reduce((a, b) => b.rpm < a.rpm && b.rpm > 0 ? b : a);
