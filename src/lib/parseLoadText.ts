@@ -139,8 +139,11 @@ interface MileageMatch {
   numeric: number;     // parsed float for comparisons
   isDeadhead: boolean;
   loadedKind: LoadedKind;
+  hasTotalContext: boolean; // true if "total" appears nearby — ambiguous w/ deadhead
   index: number;       // start position in text
 }
+
+const TOTAL_CTX_RE = /\btotal\b/i;
 
 // Number-with-unit. Unit (mi/mile/miles) is REQUIRED — prevents matching "$1000".
 // `(?<![\w-])` so we don't grab the "10" out of "ORH5" / "ALB1" etc.
@@ -184,6 +187,7 @@ function findAllMileage(t: string): MileageMatch[] {
     const ctx = `${before} ${after}`;
 
     const isDeadhead = DEADHEAD_CTX_RE.test(before);
+    const hasTotalContext = !isDeadhead && TOTAL_CTX_RE.test(ctx);
 
     let loadedKind: LoadedKind = 'unknown';
     if (!isDeadhead) {
@@ -192,7 +196,7 @@ function findAllMileage(t: string): MileageMatch[] {
       }
     }
 
-    out.push({ value, numeric, isDeadhead, loadedKind, index: start });
+    out.push({ value, numeric, isDeadhead, loadedKind, hasTotalContext, index: start });
   }
   return out;
 }
