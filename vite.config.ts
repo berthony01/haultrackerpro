@@ -16,8 +16,9 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
-    VitePWA({
+    mode === "production" && VitePWA({
       registerType: "autoUpdate",
+      devOptions: { enabled: false },
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/, /\.xml$/, /\.txt$/, /\.json$/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
