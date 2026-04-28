@@ -571,10 +571,30 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <MultiStopEditor stops={stops} onChange={setStops} errors={stopErrors} />
           )}
 
+          {/* Pay Model selector — drives how pay is calculated for this load */}
+          {!isPercentagePay && (
+            <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 space-y-2">
+              <Label htmlFor="pay_model" className="text-xs font-bold flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Pay Model
+              </Label>
+              <Select value={form.pay_model} onValueChange={v => update('pay_model', v)}>
+                <SelectTrigger id="pay_model" className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAY_MODEL_VALUES.map(m => (
+                    <SelectItem key={m} value={m}>{PAY_MODEL_LABELS[m]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
+                {PAY_MODEL_DESCRIPTIONS[form.pay_model]}
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="loaded_miles">Loaded Miles</Label>
-              <Input id="loaded_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required />
+              <Label htmlFor="loaded_miles">{form.pay_model === 'flat_rate' ? 'Loaded Miles (optional)' : 'Loaded Miles'}</Label>
+              <Input id="loaded_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.loaded_miles} onChange={e => update('loaded_miles', e.target.value)} required={form.pay_model !== 'flat_rate' && form.pay_model !== 'manual' && form.pay_model !== 'total_miles'} />
               <FieldError field="loaded_miles" />
             </div>
             <div>
@@ -583,6 +603,46 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               <FieldError field="deadhead_miles" />
             </div>
           </div>
+
+          {/* Total Miles — surfaced for total_miles model and as optional reconciliation everywhere else */}
+          {(form.pay_model === 'total_miles' || form.pay_model === 'flat_rate') && (
+            <div>
+              <Label htmlFor="total_miles">Total Miles {form.pay_model === 'total_miles' ? '(paid)' : '(optional)'}</Label>
+              <Input id="total_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.total_miles} onChange={e => update('total_miles', e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-0.5">Loaded + deadhead. Used for effective RPM and reconciliation.</p>
+            </div>
+          )}
+
+          {/* Flat Rate amount */}
+          {form.pay_model === 'flat_rate' && (
+            <div>
+              <Label htmlFor="flat_rate_amount" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Flat Rate ($)
+              </Label>
+              <Input id="flat_rate_amount" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.flat_rate_amount} onChange={e => update('flat_rate_amount', e.target.value)} required />
+            </div>
+          )}
+
+          {/* Deadhead rate input for loaded_plus_deadhead model */}
+          {form.pay_model === 'loaded_plus_deadhead' && (
+            <div>
+              <Label htmlFor="dh_rate_per_mile" className="flex items-center gap-1">
+                <DollarSign className="h-3 w-3 text-primary" /> Deadhead Rate ($/mi)
+              </Label>
+              <Input id="dh_rate_per_mile" type="number" step="0.01" {...numericProps} placeholder="0.00" value={form.dh_rate_per_mile} onChange={e => update('dh_rate_per_mile', e.target.value)} />
+            </div>
+          )}
+
+          {/* Mileage reconciliation warnings */}
+          {!isPercentagePay && payCalc.warnings.length > 0 && (
+            <div className="rounded-lg border border-warning/40 bg-warning/10 p-2.5 space-y-1">
+              {payCalc.warnings.map((w, i) => (
+                <p key={i} className="text-[11px] text-warning-foreground flex items-start gap-1.5">
+                  <AlertCircle className="h-3 w-3 text-warning mt-0.5 shrink-0" /> {w}
+                </p>
+              ))}
+            </div>
+          )}
 
           {/* Deadhead Pay Status (Phase 4) — only shown when DH miles > 0 and CPM pay */}
           {!isPercentagePay && (parseFloat(form.deadhead_miles) || 0) > 0 && (
