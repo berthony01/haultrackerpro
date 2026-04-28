@@ -34,6 +34,12 @@ export interface ParsedLoadData {
   multiStopDetected?: boolean;
   detectedStopsCount?: number;
   stops?: ParsedStopData[];
+  /**
+   * True when the parser detected deadhead miles but could not confidently
+   * resolve loaded/line-haul miles (e.g. only ambiguous "total miles" present).
+   * Consumers should warn the user to confirm mileage before saving.
+   */
+  needsMileageReview?: boolean;
 }
 
 /** Strip $ and commas from a number string */
