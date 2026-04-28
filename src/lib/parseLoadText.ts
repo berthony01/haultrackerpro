@@ -318,6 +318,7 @@ export function parseLoadText(text: string): ParsedLoadData {
   if (!dh) {
     const dhLabelled =
       t.match(/(?:dead\s*head|empty|bobtail|unpaid|reposition|non[\s-]?revenue)\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
+      t.match(/(?:dead\s*head|empty|bobtail|unpaid|reposition|non[\s-]?revenue)\s*[:=]\s*([\d,]+(?:\.\d+)?)/i) ||
       t.match(/\bdh\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i) ||
       t.match(/([\d,]+(?:\.\d+)?)\s*(?:dh|dead\s*head)\b/i);
     if (dhLabelled) dh = cleanNum(dhLabelled[1]);
