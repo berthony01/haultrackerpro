@@ -168,23 +168,32 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     return 0; // unpaid
   }, [form.deadhead_miles, form.rate_per_mile, form.dh_pay_status, form.dh_pay_rate, isCancelled, isPercentagePay]);
 
+  const payCalc = useMemo(() => {
+    return computeLoadPay({
+      payModel: form.pay_model,
+      loadedMiles: parseFloat(form.loaded_miles) || 0,
+      deadheadMiles: parseFloat(form.deadhead_miles) || 0,
+      totalMiles: parseFloat(form.total_miles) || 0,
+      loadedRpm: parseFloat(form.rate_per_mile) || 0,
+      dhRpm: parseFloat(form.dh_rate_per_mile) || 0,
+      flatRate: parseFloat(form.flat_rate_amount) || 0,
+      manualGross: parseFloat(form.gross_revenue) || 0,
+      fees: (parseFloat(form.wait_fee) || 0) + (parseFloat(form.detention_fee) || 0) + (parseFloat(form.other_fees) || 0),
+      legacyDhPayMode: form.dh_pay_status,
+      legacyDhPayRate: parseFloat(form.dh_pay_rate) || 0,
+    });
+  }, [form.pay_model, form.loaded_miles, form.deadhead_miles, form.total_miles, form.rate_per_mile, form.dh_rate_per_mile, form.flat_rate_amount, form.gross_revenue, form.wait_fee, form.detention_fee, form.other_fees, form.dh_pay_status, form.dh_pay_rate]);
+
   const estimated = useMemo(() => {
     if (isCancelled) return 0;
-    // Percentage-based pay calculation
+    // Percentage-based pay: gross × percentage + fees (handled separately from pay_model)
     if (isPercentagePay && form.gross_revenue && settings?.pay_percentage) {
       const grossRev = parseFloat(form.gross_revenue) || 0;
       const pct = Number(settings.pay_percentage) / 100;
       return grossRev * pct + (parseFloat(form.wait_fee) || 0) + (parseFloat(form.detention_fee) || 0) + (parseFloat(form.other_fees) || 0);
     }
-    // CPM-based pay calculation (default) + paid deadhead layer
-    return calculateEstimatedPay(
-      parseFloat(form.loaded_miles) || 0,
-      parseFloat(form.rate_per_mile) || 0,
-      parseFloat(form.wait_fee) || 0,
-      parseFloat(form.detention_fee) || 0,
-      parseFloat(form.other_fees) || 0
-    ) + deadheadRevenue;
-  }, [form.loaded_miles, form.rate_per_mile, form.wait_fee, form.detention_fee, form.other_fees, form.gross_revenue, isCancelled, isPercentagePay, settings?.pay_percentage, deadheadRevenue]);
+    return payCalc.expectedGrossPay;
+  }, [payCalc, form.gross_revenue, form.wait_fee, form.detention_fee, form.other_fees, isCancelled, isPercentagePay, settings?.pay_percentage]);
 
   // Phase 3: Pre-load profit check (deterministic, personal-history based)
   const profitCheckInput = useMemo(() => {
