@@ -18,7 +18,7 @@ export function ContributionMarginCard({ loads, expenses }: ContributionMarginCa
 
     const paidLoads = loads.filter(l => l.actual_pay_received != null);
     const grossRevenue = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-      loads.filter(l => l.actual_pay_received == null).reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+      sumExpectedPay(loads.filter(l => l.actual_pay_received == null));
 
     const variableExpenses = expenses
       .filter(e => (e as any).expense_type === 'variable' || !(e as any).expense_type)
