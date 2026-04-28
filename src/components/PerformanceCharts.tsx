@@ -236,7 +236,7 @@ export function PerformanceCharts({ loads, expenses, isPro = false }: Props) {
             {/* Chart 3: Avg RPM Trend */}
             <div>
               <p className="text-label mb-2">Avg Rate Per Mile</p>
-              {hasLoadedMiles ? (
+              {hasOperatingMiles ? (
                 <ResponsiveContainer width="100%" height={140}>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 87%)" opacity={0.3} />
