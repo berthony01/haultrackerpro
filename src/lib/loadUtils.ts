@@ -13,8 +13,9 @@ export function getEffectiveDate(load: Load): string {
 // ── Canonical CSV header rows (single source of truth) ──────────────────────
 // FAQ live previews import these so docs cannot drift from the real exports.
 export const CSV_HEADERS_LOADS = [
-  'Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Loaded Miles', 'Deadhead Miles',
-  'Rate/Mile', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay',
+  'Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Pay Model', 'Loaded Miles',
+  'Deadhead Miles', 'Total Miles', 'Rate/Mile', 'Deadhead Rate/Mile', 'Flat Rate',
+  'Effective RPM', 'Wait Fee', 'Detention Fee', 'Other Fees', 'Estimated Pay',
   'Actual Pay', 'Difference', 'Status', 'Notes', 'Company Name', 'Company Start Date',
 ] as const;
 
@@ -193,9 +194,22 @@ export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] =
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
     const diff = act != null ? (act - est).toFixed(2) : '';
     const summary = buildStopsSummary(l, stops);
+    const totalMi = (l as any).total_miles != null && Number((l as any).total_miles) > 0
+      ? Number((l as any).total_miles)
+      : Number(l.loaded_miles) + Number(l.deadhead_miles);
+    const effRpm = totalMi > 0 ? est / totalMi : 0;
+    const payModel = (l as any).pay_model ?? 'loaded_miles_only';
+    const dhRate = (l as any).deadhead_rate_per_mile;
+    const flatRate = (l as any).flat_rate_amount;
     return [
       getEffectiveDate(l), l.pickup_location, l.dropoff_location, summary,
-      l.loaded_miles, l.deadhead_miles, l.rate_per_mile,
+      payModel,
+      l.loaded_miles, l.deadhead_miles,
+      (l as any).total_miles ?? '',
+      l.rate_per_mile,
+      dhRate != null ? Number(dhRate).toFixed(2) : '',
+      flatRate != null ? Number(flatRate).toFixed(2) : '',
+      effRpm.toFixed(2),
       Number(l.wait_fee).toFixed(2), Number(l.detention_fee).toFixed(2), Number(l.other_fees).toFixed(2),
       est.toFixed(2), act != null ? act.toFixed(2) : '', diff,
       l.status, l.notes ?? '',
@@ -254,11 +268,31 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
 }
 
 export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
-  const headers = ['Date', 'Pickup', 'Dropoff', 'Ld Mi', 'DH Mi', '$/Mi', 'Est Pay', 'Act Pay', 'Status'];
+  const headers = ['Date', 'Pickup', 'Dropoff', 'Model', 'Ld Mi', 'DH Mi', 'Tot Mi', 'Eff RPM', 'Est Pay', 'Act Pay', 'Status'];
+  const payModelLabel = (m?: string | null) => {
+    switch (m) {
+      case 'total_miles': return 'Total';
+      case 'loaded_plus_deadhead': return 'Ld+DH';
+      case 'flat_rate': return 'Flat';
+      case 'manual': return 'Manual';
+      default: return 'Loaded';
+    }
+  };
   const rows = loads.map(l => {
     const est = Number(l.estimated_pay ?? 0);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
-    return [getEffectiveDate(l), l.pickup_location, l.dropoff_location, String(l.loaded_miles), String(l.deadhead_miles), `$${Number(l.rate_per_mile).toFixed(2)}`, `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', l.status];
+    const tot = (l as any).total_miles != null && Number((l as any).total_miles) > 0
+      ? Number((l as any).total_miles)
+      : Number(l.loaded_miles) + Number(l.deadhead_miles);
+    const effRpm = tot > 0 ? est / tot : 0;
+    return [
+      getEffectiveDate(l), l.pickup_location, l.dropoff_location,
+      payModelLabel((l as any).pay_model),
+      String(l.loaded_miles), String(l.deadhead_miles),
+      tot ? String(tot) : '',
+      `$${effRpm.toFixed(2)}`,
+      `$${est.toFixed(2)}`, act != null ? `$${act.toFixed(2)}` : '', l.status,
+    ];
   });
 
   // Summary totals
@@ -267,7 +301,7 @@ export function exportToPDF(loads: Load[], filename: string, stops: LoadStop[] =
   const totalEst = loads.reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
   const totalAct = loads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
 
-  const colWidths = [52, 68, 68, 35, 35, 38, 52, 52, 45];
+  const colWidths = [50, 60, 60, 38, 32, 32, 36, 44, 50, 50, 42];
   const pageW = 595;
   const pageH = 842;
   const marginX = 30;
