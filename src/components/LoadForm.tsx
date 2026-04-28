@@ -224,8 +224,40 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (isNaN(loadedMiles) || loadedMiles < 0) errs.loaded_miles = 'Must be 0 or positive';
     const deadheadMiles = parseFloat(form.deadhead_miles);
     if (form.deadhead_miles && (isNaN(deadheadMiles) || deadheadMiles < 0)) errs.deadhead_miles = 'Must be 0 or positive';
-    const rpm = parseFloat(form.rate_per_mile);
-    if (isNaN(rpm) || rpm < 0) errs.rate_per_mile = 'Must be 0 or positive';
+    // Rate per mile is conditionally required based on pay model
+    const rpmRaw = form.rate_per_mile;
+    const rpm = parseFloat(rpmRaw);
+    const rpmRequired =
+      form.pay_model === 'loaded_miles_only' ||
+      form.pay_model === 'total_miles' ||
+      form.pay_model === 'loaded_plus_deadhead';
+    if (rpmRequired) {
+      if (rpmRaw === '' || isNaN(rpm) || rpm <= 0) errs.rate_per_mile = 'Rate per mile is required';
+    } else if (rpmRaw !== '' && (isNaN(rpm) || rpm < 0)) {
+      errs.rate_per_mile = 'Must be 0 or positive';
+    }
+    // Flat rate requires flat_rate_amount
+    if (form.pay_model === 'flat_rate') {
+      const flat = parseFloat(form.flat_rate_amount);
+      if (!form.flat_rate_amount || isNaN(flat) || flat <= 0) {
+        errs.flat_rate_amount = 'Flat rate amount is required';
+      }
+    }
+    // Manual requires either gross revenue (percentage) or actual pay
+    if (form.pay_model === 'manual') {
+      const gross = parseFloat(form.gross_revenue);
+      const actual = parseFloat(form.actual_pay_received);
+      const hasGross = !isNaN(gross) && gross > 0;
+      const hasActual = !isNaN(actual) && actual > 0;
+      if (!hasGross && !hasActual) {
+        errs.actual_pay_received = 'Enter expected gross or actual pay received';
+      }
+    }
+    // Loaded + deadhead: dh rate optional but must be valid if present
+    if (form.pay_model === 'loaded_plus_deadhead' && form.dh_rate_per_mile) {
+      const dhr = parseFloat(form.dh_rate_per_mile);
+      if (isNaN(dhr) || dhr < 0) errs.dh_rate_per_mile = 'Must be 0 or positive';
+    }
     if (form.wait_fee && parseFloat(form.wait_fee) < 0) errs.wait_fee = 'Cannot be negative';
     if (form.detention_fee && parseFloat(form.detention_fee) < 0) errs.detention_fee = 'Cannot be negative';
     if (form.other_fees && parseFloat(form.other_fees) < 0) errs.other_fees = 'Cannot be negative';
