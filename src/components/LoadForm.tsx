@@ -343,7 +343,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       pay_model: resolvePayModel(lastLoad.pay_model, (settings as any)?.default_pay_model),
       total_miles: lastLoad.total_miles?.toString() ?? '',
       flat_rate_amount: lastLoad.flat_rate_amount?.toString() ?? '',
-      dh_rate_per_mile: '',
+      dh_rate_per_mile: (lastLoad as any).deadhead_rate_per_mile?.toString() ?? '',
     });
     setSaveAsPending(true);
     toast.success('Last load copied');
@@ -429,6 +429,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   load_date: data.load_date ?? prev.load_date,
                   total_miles: data.total_miles ?? prev.total_miles,
                   flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
+                  dh_rate_per_mile: data.deadhead_rate_per_mile ?? prev.dh_rate_per_mile,
                   pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
                 }));
                 // Phase 6: surface a confirmation summary so the user can verify
@@ -865,6 +866,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             load_date: data.load_date ?? prev.load_date,
             total_miles: data.total_miles ?? prev.total_miles,
             flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
+            dh_rate_per_mile: data.deadhead_rate_per_mile ?? prev.dh_rate_per_mile,
             pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
           }));
           if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
