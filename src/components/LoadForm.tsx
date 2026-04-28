@@ -742,17 +742,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor="wait_fee" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" /> Wait Fee
-              </Label>
-              <Input id="wait_fee" type="number" step="0.01" {...numericProps} placeholder="0" value={form.wait_fee} onChange={e => update('wait_fee', e.target.value)} />
-              <FieldError field="wait_fee" />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="detention_fee" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" /> Detention
+                <Clock className="h-3 w-3" /> Detention Fee
               </Label>
               <Input id="detention_fee" type="number" step="0.01" {...numericProps} placeholder="0" value={form.detention_fee} onChange={e => update('detention_fee', e.target.value)} />
               <FieldError field="detention_fee" />
