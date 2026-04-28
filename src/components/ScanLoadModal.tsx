@@ -304,6 +304,24 @@ export function ScanLoadModal({ open, onOpenChange, onParsed }: ScanLoadModalPro
                 )}
               </div>
 
+              {parsed.deadhead_miles && !parsed.loaded_miles && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-foreground leading-relaxed">
+                    Deadhead miles detected, but loaded (line-haul) miles were not. Please enter loaded miles before saving.
+                  </p>
+                </div>
+              )}
+
+              {parsed.needsMileageReview && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-foreground leading-relaxed">
+                    Mileage is ambiguous (only "total miles" found alongside deadhead). Please confirm loaded miles before saving.
+                  </p>
+                </div>
+              )}
+
               {parsed.multiStopDetected && (
                 <div className="flex items-start gap-2 rounded-lg bg-primary/5 p-2.5">
                   <AlertCircle className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
