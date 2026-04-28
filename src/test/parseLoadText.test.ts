@@ -224,10 +224,14 @@ DH 25 miles
     expect(r.loaded_miles).toBe('257.10');
   });
 
-  it('uses 267 as loaded miles when only total wording is present', () => {
+  it('flags ambiguous "Total miles + DH" instead of guessing loaded miles', () => {
+    // SAFETY CHANGE: When deadhead is present alongside only a bare "total miles"
+    // label, we can't tell whether the total already includes deadhead. Previously
+    // we set loaded = total. Now we leave loaded undefined and flag for review.
     const r = parseLoadText('Total miles: 267 mile\nDH 25 miles');
     expect(r.deadhead_miles).toBe('25');
-    expect(r.loaded_miles).toBe('267');
+    expect(r.loaded_miles).toBeUndefined();
+    expect(r.needsMileageReview).toBe(true);
   });
 
   it('zero-width and NBSP Telegram artifacts do not break extraction', () => {
