@@ -1,6 +1,29 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // CRITICAL: Runs before ANY other tag. Aggressively unregisters any stale
+      // PWA service worker and clears all caches on every host EXCEPT the live
+      // production domains. A previously-installed SW would otherwise intercept
+      // requests and serve a blank/cached page in the Lovable preview iframe.
+      (function () {
+        try {
+          var h = window.location.hostname;
+          var isProdHost =
+            h === 'haultrackerpro.com' || h === 'www.haultrackerpro.com';
+          if (!isProdHost && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              regs.forEach(function (r) { r.unregister(); });
+            }).catch(function () {});
+            if (window.caches && caches.keys) {
+              caches.keys().then(function (keys) {
+                keys.forEach(function (k) { caches.delete(k); });
+              }).catch(function () {});
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HaulTrackerPro | Track Loads, Expenses &amp; Net Profit</title>
@@ -35,32 +58,6 @@
 
   <body>
     <div id="root"></div>
-    <script>
-      // Dev/preview safety: unregister any stale service worker and clear caches
-      // so the live dev server is never shadowed by a previously-installed PWA.
-      (function () {
-        try {
-          var h = window.location.hostname;
-          var isPreview =
-            h.indexOf('lovableproject.com') !== -1 ||
-            h.indexOf('id-preview--') !== -1 ||
-            h === 'localhost' ||
-            h === '127.0.0.1';
-          var inIframe = false;
-          try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
-          if ((isPreview || inIframe) && 'serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (regs) {
-              regs.forEach(function (r) { r.unregister(); });
-            }).catch(function () {});
-            if (window.caches && caches.keys) {
-              caches.keys().then(function (keys) {
-                keys.forEach(function (k) { caches.delete(k); });
-              }).catch(function () {});
-            }
-          }
-        } catch (e) {}
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
