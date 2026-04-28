@@ -325,14 +325,22 @@ export function parseLoadText(text: string): ParsedLoadData {
         if (v !== dh) { loaded = v; break; }
       }
     }
-    // Last-resort "Total Miles: 500"
-    if (!loaded) {
+    // Last-resort "Total Miles: 500" — ONLY when no deadhead was found.
+    // If deadhead is present alongside bare "total miles", we can't tell whether
+    // the total already includes deadhead, so we leave loaded undefined and
+    // flag the result for user review.
+    if (!loaded && !dh) {
       const totalM = t.match(/total\s*miles?\s*[:=]?\s*([\d,]+(?:\.\d+)?)/i);
       if (totalM) {
         const v = cleanNum(totalM[1]);
-        if (v !== dh) loaded = v;
+        loaded = v;
       }
     }
+  }
+
+  // Flag ambiguous mileage: deadhead present but no confident loaded value.
+  if (dh && !loaded) {
+    result.needsMileageReview = true;
   }
 
   // Defensive guard: a single number can't be both loaded AND deadhead.
