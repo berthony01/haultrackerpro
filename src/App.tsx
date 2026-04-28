@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { forwardRef, lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { trackPageView } from '@/lib/analytics';
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -59,45 +59,42 @@ const ToolsFuelCostPerMile = lazy(() => import("./pages/tools/FuelCostPerMileCal
 
 const queryClient = new QueryClient();
 
-const PageFallback = forwardRef<HTMLDivElement>((_props, ref) => (
-  <div ref={ref} className="min-h-screen bg-background flex items-center justify-center">
-    <p className="text-muted-foreground">Loading...</p>
-  </div>
-));
-PageFallback.displayName = 'PageFallback';
+function PageFallback() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  );
+}
 
-const PublicRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
+function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
   if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-});
-PublicRoute.displayName = 'PublicRoute';
+}
 
-const ProtectedRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
   if (!user) return <Navigate to="/" replace />;
   return <>{children}</>;
-});
-ProtectedRoute.displayName = 'ProtectedRoute';
+}
 
-const AuthRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
+function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <PageFallback />;
   if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-});
-AuthRoute.displayName = 'AuthRoute';
+}
 
-const AdminRoute = forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
+function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { isAdmin, isLoading } = useAdmin();
   if (loading || isLoading) return <PageFallback />;
   if (!user || !isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-});
-AdminRoute.displayName = 'AdminRoute';
+}
 
 function PageViewTracker() {
   const location = useLocation();
