@@ -325,3 +325,46 @@ DH 25 miles
     expect(r.deadhead_miles).toBe('25');
   });
 });
+
+describe('parseLoadText — deadhead + total ambiguity (Phase 6)', () => {
+  it('Test 1: DH + Trip → both captured, no warning', () => {
+    const r = parseLoadText('DH 25 miles\nTrip: 257.10mi');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBe('257.10');
+    expect(r.needsMileageReview).toBeFalsy();
+  });
+
+  it('Test 2: DH + bare Total miles → DH only, loaded undefined, needsMileageReview', () => {
+    const r = parseLoadText('Deadhead: 25 miles\nTotal miles: 282 miles');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.loaded_miles).toBeUndefined();
+    expect(r.needsMileageReview).toBe(true);
+  });
+
+  it('Test 3: explicit Loaded + Deadhead → both, no warning', () => {
+    const r = parseLoadText('Loaded miles: 257.10\nDeadhead: 25');
+    expect(r.loaded_miles).toBe('257.10');
+    expect(r.deadhead_miles).toBe('25');
+    expect(r.needsMileageReview).toBeFalsy();
+  });
+
+  it('Test 4: Trip wording variations all yield loaded=257.10', () => {
+    expect(parseLoadText('Trip 257.10 miles').loaded_miles).toBe('257.10');
+    expect(parseLoadText('Trip: 257.10mi').loaded_miles).toBe('257.10');
+    expect(parseLoadText('Trip miles: 257.10').loaded_miles).toBe('257.10');
+    expect(parseLoadText('Linehaul miles: 257.10').loaded_miles).toBe('257.10');
+  });
+
+  it('Test 5: Deadhead wording variations all yield deadhead=25', () => {
+    expect(parseLoadText('DH 25 miles').deadhead_miles).toBe('25');
+    expect(parseLoadText('Deadhead 25 mi').deadhead_miles).toBe('25');
+    expect(parseLoadText('Dead head: 25 miles').deadhead_miles).toBe('25');
+    expect(parseLoadText('Empty miles: 25').deadhead_miles).toBe('25');
+  });
+
+  it('Total miles alone (no DH) still resolves to loaded (back-compat)', () => {
+    const r = parseLoadText('Total miles: 500');
+    expect(r.loaded_miles).toBe('500');
+    expect(r.needsMileageReview).toBeFalsy();
+  });
+});
