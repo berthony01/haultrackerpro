@@ -207,8 +207,18 @@ function pickDeadhead(matches: MileageMatch[]): string | undefined {
 }
 
 function pickLoaded(matches: MileageMatch[], deadheadValue?: string): string | undefined {
-  const nonDh = matches.filter(m => !m.isDeadhead && m.value !== deadheadValue);
+  let nonDh = matches.filter(m => !m.isDeadhead && m.value !== deadheadValue);
   if (nonDh.length === 0) return undefined;
+
+  // When deadhead is present, exclude tokens whose only nearby context is "total"
+  // — total miles often already include deadhead, so we can't safely use them as
+  // loaded miles. Only filter when this leaves at least one candidate; otherwise
+  // we'd return undefined and the caller will set needsMileageReview.
+  if (deadheadValue) {
+    const filtered = nonDh.filter(m => !(m.hasTotalContext && m.loadedKind === 'unknown'));
+    nonDh = filtered;
+    if (nonDh.length === 0) return undefined;
+  }
 
   // Strongest context wins; break ties by larger numeric value (likely the trip total).
   const sorted = [...nonDh].sort((a, b) => {
