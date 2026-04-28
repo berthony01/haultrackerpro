@@ -884,20 +884,30 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
         open={showScanLoad}
         onOpenChange={setShowScanLoad}
         onParsed={(data: ParsedLoadData) => {
-          // Atomic apply (same reasoning as PasteLoadParser handler above).
+          // Scanner safety: only fill EMPTY fields. Never overwrite values the
+          // user (or a previous paste) already set, and never write null/undefined.
+          const fillIfEmpty = (current: string, incoming: string | undefined): string => {
+            const hasIncoming = incoming != null && String(incoming).trim() !== '';
+            if (!hasIncoming) return current;
+            const isEmpty = current == null || String(current).trim() === '' || current === '0';
+            return isEmpty ? String(incoming) : current;
+          };
           setForm(prev => ({
             ...prev,
-            pickup_location: data.pickup_location ?? prev.pickup_location,
-            dropoff_location: data.dropoff_location ?? prev.dropoff_location,
-            loaded_miles: data.loaded_miles ?? '',
-            deadhead_miles: data.deadhead_miles ?? '',
-            rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
-            gross_revenue: data.gross_revenue ?? prev.gross_revenue,
-            load_date: data.load_date ?? prev.load_date,
-            total_miles: data.total_miles ?? prev.total_miles,
-            flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
-            dh_rate_per_mile: data.deadhead_rate_per_mile ?? prev.dh_rate_per_mile,
-            pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
+            pickup_location: fillIfEmpty(prev.pickup_location, data.pickup_location),
+            dropoff_location: fillIfEmpty(prev.dropoff_location, data.dropoff_location),
+            loaded_miles: fillIfEmpty(prev.loaded_miles, data.loaded_miles),
+            deadhead_miles: fillIfEmpty(prev.deadhead_miles, data.deadhead_miles),
+            rate_per_mile: fillIfEmpty(prev.rate_per_mile, data.rate_per_mile),
+            gross_revenue: fillIfEmpty(prev.gross_revenue, data.gross_revenue),
+            load_date: fillIfEmpty(prev.load_date, data.load_date),
+            total_miles: fillIfEmpty(prev.total_miles, data.total_miles),
+            flat_rate_amount: fillIfEmpty(prev.flat_rate_amount, data.flat_rate),
+            dh_rate_per_mile: fillIfEmpty(prev.dh_rate_per_mile, data.deadhead_rate_per_mile),
+            // Pay model: only adopt suggestion if user hasn't explicitly chosen one yet
+            pay_model: isPayModel(data.pay_model_suggestion) && (prev.pay_model === 'loaded_miles_only')
+              ? data.pay_model_suggestion
+              : prev.pay_model,
           }));
           if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
             setMultiStop(true);
