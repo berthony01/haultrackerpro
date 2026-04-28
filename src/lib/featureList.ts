@@ -45,7 +45,7 @@ export const featureList: FeatureCategory[] = [
       { icon: Sparkles, title: 'AI Weekly Business Report', description: 'AI-generated narrative summary of your week — highlights best/worst loads, deadhead issues, and actionable recommendations.', pro: true },
       { icon: Target, title: 'AI Lane Advice', description: 'AI analyzes your load history and recommends your most profitable lanes with optimization tips.', pro: true },
       { icon: Calculator, title: 'AI Tax Optimization Tips', description: 'AI-generated quarterly tax tips based on your expense patterns to help maximize deductions.', pro: true },
-      { icon: Route, title: 'Deadhead Pay Parsing', description: 'Paste loads that include deadhead pay and the parser separates it from line-haul revenue automatically — no manual splitting.', pro: true },
+      { icon: Route, title: 'Deadhead Mile Parsing', description: 'Paste loads with deadhead miles and the parser separates them from line-haul miles automatically. Choose how deadhead is paid in the load form before saving.', pro: true },
     ],
   },
   {

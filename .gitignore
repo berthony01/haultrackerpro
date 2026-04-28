@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local env files (managed by Lovable Cloud — do not commit or include in shared exports)
+.env
+.env.local
+.env.*.local
+!.env.example
