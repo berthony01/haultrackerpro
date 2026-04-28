@@ -108,7 +108,7 @@ export function computeScorecard(loads: Load[], expenses: Expense[], weekStartsO
   // Actionable recommendations based on score thresholds
   const rpmRec = rpmScore >= 20 ? 'Great RPM — keep targeting high-paying lanes.' :
     rpmScore >= 10 ? 'Try negotiating rates above $2.50/mi or reducing short-haul loads.' :
-    totalMiles > 0 ? 'Focus on longer hauls and avoid loads under $2/mi to boost RPM.' : 'Log loads to start tracking your rate per mile.';
+    totalOpMiles > 0 ? 'Focus on longer hauls and avoid loads under $2/mi to boost RPM.' : 'Log loads to start tracking your rate per mile.';
 
   const dhRec = dhScore >= 16 ? 'Excellent deadhead control — your planning is paying off.' :
     dhScore >= 8 ? 'Look for backhauls or nearby loads to cut empty miles.' :
