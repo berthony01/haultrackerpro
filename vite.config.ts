@@ -4,8 +4,51 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
+// CRITICAL: Production-build resilience for Supabase env injection.
+//
+// Symptom we hit on launch: GitHub-triggered prod builds occasionally shipped
+// with empty `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`, which made
+// `createClient("", "")` throw `supabaseUrl is required.` at app boot. The
+// ErrorBoundary then rendered "Something went wrong" on every page — so every
+// publish "looked the same" in browsers and Google indexed only the static
+// SEO fallback.
+//
+// These two values are PUBLIC (the publishable/anon key + the project URL are
+// already shipped in every Supabase web app), so it is safe to bake them in
+// as a fallback. They are only used when the real env vars are missing.
+// `src/integrations/supabase/client.ts` is auto-managed and cannot be edited,
+// so we patch the values at the Vite level via `define`, which substitutes
+// `import.meta.env.VITE_SUPABASE_*` references at build time.
+const FALLBACK_SUPABASE_URL = "https://pngptztxwbtozwxrtbwo.supabase.co";
+const FALLBACK_SUPABASE_PUBLISHABLE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBuZ3B0enR4d2J0b3p3eHJ0YndvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NzYwOTAsImV4cCI6MjA4NzU1MjA5MH0.Y4X4nJdsAVEOuhyWPF9hSYv0RXyH_3D-SjXWxpJdn0s";
+const FALLBACK_SUPABASE_PROJECT_ID = "pngptztxwbtozwxrtbwo";
+
+const resolvedSupabaseUrl =
+  process.env.VITE_SUPABASE_URL && process.env.VITE_SUPABASE_URL.length > 0
+    ? process.env.VITE_SUPABASE_URL
+    : FALLBACK_SUPABASE_URL;
+const resolvedSupabaseKey =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY &&
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY.length > 0
+    ? process.env.VITE_SUPABASE_PUBLISHABLE_KEY
+    : FALLBACK_SUPABASE_PUBLISHABLE_KEY;
+const resolvedSupabaseProjectId =
+  process.env.VITE_SUPABASE_PROJECT_ID &&
+  process.env.VITE_SUPABASE_PROJECT_ID.length > 0
+    ? process.env.VITE_SUPABASE_PROJECT_ID
+    : FALLBACK_SUPABASE_PROJECT_ID;
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: {
+    // Replace empty/missing env references with the verified fallbacks so the
+    // production bundle always boots, even when the build runner forgot to
+    // inject the env vars. Stringified per Vite's `define` contract.
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(resolvedSupabaseUrl),
+    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(resolvedSupabaseKey),
+    "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(resolvedSupabaseProjectId),
+  },
   server: {
     host: "::",
     port: 8080,
