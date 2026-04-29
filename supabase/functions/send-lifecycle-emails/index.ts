@@ -116,6 +116,10 @@ Deno.serve(async (req) => {
       }
       const name = user.user_metadata?.display_name as string | undefined
       const { error } = await admin.functions.invoke('send-transactional-email', {
+        headers: {
+          // Internal server-to-server auth — see send-transactional-email policy.
+          'x-internal-secret': Deno.env.get('INTERNAL_FUNCTION_SECRET') ?? '',
+        },
         body: {
           templateName,
           recipientEmail: email,
