@@ -105,8 +105,12 @@ export function SettingsView({ onBack }: SettingsViewProps) {
   const subscription = useSubscription();
   const isPro = subscription.isPro;
 
-  // Sync from loaded settings once
-  if (settings && !initialized) {
+  // Sync from loaded settings once. Runs in an effect (NOT during render)
+  // to avoid React's "setState during render" warning. Guarded by
+  // `initialized` so the user's in-progress edits are never overwritten on
+  // a settings refetch.
+  useEffect(() => {
+    if (!settings || initialized) return;
     setRatePerMile(settings.default_rate_per_mile?.toString() ?? '');
     setOtherFees(settings.default_other_fees?.toString() ?? '');
     setWeekStart(settings.week_start_day ?? 'sunday');
@@ -120,7 +124,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
     setDefaultPayModel(((settings as any).default_pay_model as string) ?? 'loaded_miles_only');
     setLifecycleEmailsOptIn((settings as any).lifecycle_emails_opt_in ?? true);
     setInitialized(true);
-  }
+  }, [settings, initialized]);
 
   const handleSave = () => {
     if (payType === 'percentage' && payPercentage) {
