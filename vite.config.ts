@@ -16,41 +16,21 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
+    // PWA service worker is intentionally DISABLED in self-destroying mode.
+    // Reason: a previous Workbox precache SW (`/sw.js`) cached the entire
+    // build (`index.html` + hashed `/assets/*`) on every visitor's browser.
+    // After publishing a new version, returning users continued to see the
+    // OLD build because the SW served the stale cached `index.html`.
+    // `selfDestroying: true` makes vite-plugin-pwa emit a tiny SW under the
+    // same `/sw.js` URL that unregisters itself and clears caches the next
+    // time a previously-installed SW checks for an update — freeing every
+    // existing user from the stale cache. Once we want PWA back, swap
+    // `selfDestroying` for the previous `workbox`/`manifest` config.
     mode === "production" && VitePWA({
+      selfDestroying: true,
       registerType: "autoUpdate",
       devOptions: { enabled: false },
-      workbox: {
-        navigateFallbackDenylist: [/^\/~oauth/, /\.xml$/, /\.txt$/, /\.json$/],
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
-      },
-      manifest: {
-        name: "HaulTrackerPro",
-        short_name: "HaulTracker",
-        description: "Track loads, expenses & net profit for owner-operators",
-        theme_color: "#f97316",
-        background_color: "#f5f6f8",
-        display: "standalone",
-        orientation: "portrait",
-        start_url: "/",
-        icons: [
-          {
-            src: "/pwa-icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "/pwa-icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-          {
-            src: "/pwa-icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
-        ],
-      },
+      injectRegister: false,
     }),
   ].filter(Boolean),
   resolve: {

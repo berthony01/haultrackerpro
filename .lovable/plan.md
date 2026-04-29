@@ -1,125 +1,94 @@
-# HaulTrackerPro — Launch-Readiness Hardening Plan
 
-Targeted, surgical fixes only. No UI redesign, no route renames, no broad refactors. Each phase is verified before moving on.
+# Strict Analysis: Publish-not-updating + Not-on-Google
 
-## Audit findings (from read-only inspection)
+## Issue 1 — "I publish, but the browser still shows the old version"
 
-- **Scripts present** in `package.json`: `build`, `lint`, `test`, `seo:audit` — all four exist.
-- `**useAuth` shim**: `src/hooks/useAuth.ts` re-exports from `./useAuth.tsx`. All 36 importers use `@/hooks/useAuth` (extension-less), which Vite resolves to `useAuth.tsx` first. The `.ts` shim is only useful as a defensive 404 catch for stale HMR module URLs after the rename. **Recommendation: keep it as documented safety net** — removing it risks reintroducing the blank-preview HMR 404. Cost is zero.
-- **Admin seed**: Migration `20260228060534_…sql` does `INSERT … FROM auth.users WHERE email = 'berthonyxyz@gmail.com' ON CONFLICT DO NOTHING`. If the owner account didn't exist at migration time, the seed silently inserted nothing. There is no fallback in `useAdmin`.
-- `**send-transactional-email**`: Function comment claims `verify_jwt = true` but `supabase/config.toml` has no entry for it (defaults vary; we cannot rely on the gateway). The function has **no in-code auth check, no recipient validation, no template allowlist**. Callers: `src/pages/Auth.tsx` (signup, pre-confirmation — no session), `send-lifecycle-emails` (server, service role), `admin-api` (server, service role).
-- `**SettingsView**`: Lines 109-123 call `setState` during render guarded by `!initialized`. This is a known anti-pattern that can warn and cause an extra render; needs to move into `useEffect`.
+### Root cause (confirmed)
+The production build registers a **Workbox precache service worker** (`/sw.js`) via `vite-plugin-pwa` in `vite.config.ts`. I pulled the live `https://haultrackerpro.com/sw.js` and confirmed it precaches `index.html`, every `/assets/*.js`, the CSS bundle, the manifest, and PWA icons.
 
-## Phase 1 — Baseline audit
+What that means in practice:
+1. First visit installs the SW and caches the entire current build.
+2. You publish a new build. New `index.html` and new hashed `/assets/*` files are deployed.
+3. Returning visitor opens the site. The SW intercepts the navigation and serves the **old** cached `index.html`, which references the **old** hashed JS — so the user sees the previous version even though the deploy succeeded.
+4. `registerType: "autoUpdate"` does eventually fetch the new SW in the background, but the page they're looking at is already rendered from the stale cache. They have to close all tabs and reopen (sometimes twice) before the new version actually shows.
 
-Run `npm install && npm run build && npm run lint && npm run test && npm run seo:audit`. Capture failures with file/line and stop if anything blocks. (Lovable's harness runs build/typecheck automatically; we'll only re-run lint/test/seo manually.)
+The self-destroying `public/sw.js` we wrote earlier is **never used in production** — the PWA plugin overwrites it at build time with the Workbox precache SW (that's what's currently live). So the "fix" only protects preview/dev hosts, not production.
 
-## Phase 2 — `useAuth` shim
+This perfectly matches the symptom: "Lovable shows the new version, browser shows the old one."
 
-- Keep `src/hooks/useAuth.ts` as-is (already a 2-line re-export with a comment). No code change needed beyond confirming the comment is clear.
-- Verify no duplicate `AuthProvider` instances by confirming all imports resolve to the same module (they do — both `.ts` and `.tsx` paths point to the same `useAuth.tsx` symbols).
+### Fix
+Switch the PWA from precache-everything to a network-first navigation strategy, OR disable the SW entirely for now. Recommended: **disable the PWA service worker** for the launch, since the app already works fine without offline support and the precache is causing real harm.
 
-## Phase 3 — Owner/admin fallback for `berthonyxyz@gmail.com`
+Plan:
+1. In `vite.config.ts`, remove the `VitePWA` plugin (or set it to `selfDestroying: true`, which makes vite-plugin-pwa generate a SW that unregisters any previously installed one — exactly what we want for users who already have the cached SW installed).
+2. Remove the `<link rel="manifest">` and PWA meta references from `index.html` (or keep manifest but stop registering a SW).
+3. Keep `public/sw.js` (our self-destroying one) as a defensive backup so any browser still hitting `/sw.js` after the new build gets unregistered cleanly.
+4. Verify the build no longer emits `registerSW.js` and the deployed `/sw.js` is the simple self-destroying one.
 
-Edit `src/hooks/useAdmin.ts`:
+After deploy, **users with the old SW installed** will receive the self-destroying SW the next time their browser checks for an update (within ~24h, or immediately on hard reload). From that point forward, every publish shows up on first reload — no more stale builds.
 
-- After the DB lookup, if the row is missing **and** `user.email?.toLowerCase() === 'berthonyxyz@gmail.com'`, set `isAdmin = true`, `role = 'super_admin'`.
-- DB role still wins when present.
-- Add a clear comment: "Permanent platform-owner fallback — do not remove."
+I will recommend `selfDestroying: true` rather than fully removing the plugin, because that ships an explicit "unregister" SW under the same `/sw.js` URL that browsers are already polling. This is the cleanest path to reach users who installed the cached SW from previous builds.
 
-Add a new migration `…_owner_admin_backfill.sql`:
+---
 
-- Re-run the same `INSERT … ON CONFLICT DO NOTHING` for `berthonyxyz@gmail.com` so that once the auth user exists server-side, RLS-protected admin queries work too. Idempotent.
+## Issue 2 — "App is not showing on Google at all"
 
-Note: server-side admin checks (RLS via `is_admin()`) still require the DB row, so non-owners cannot bypass anything. The client fallback only unlocks the `/admin` route render; all admin data calls go through `admin-api` / RLS which enforce DB roles. We will document this clearly in the comment.
+### Root causes (confirmed)
+Three separate problems compound here:
 
-## Phase 4 — Harden `send-transactional-email`
+**A. The homepage is a blank SPA shell.**
+I fetched `https://haultrackerpro.com/` and the `<body>` contains only `<div id="root"></div>`. There is no server-side rendered content. Google can render JavaScript, but:
+- It only re-renders ~days/weeks after the initial crawl.
+- For a brand-new domain with no authority, Googlebot frequently indexes only the static HTML on first pass — which here has the title + meta description but **zero body content**, **zero internal links**, and **zero headings**. That gives Google almost nothing to rank, and the "thin content" signal can delay or suppress indexing entirely.
 
-Constraints: must NOT break the signup welcome email in `Auth.tsx`, which fires **before** email confirmation (user has anon JWT only, no authenticated session).
+**B. Google Site Verification meta tag is empty.**
+`index.html` has `<meta name="google-site-verification" content="" />`. This means Google Search Console has never been verified for the domain. Without GSC you cannot:
+- Submit the sitemap
+- Request indexing
+- See coverage / why pages aren't indexed
+- Confirm Google can even reach the site
 
-Edit `supabase/functions/send-transactional-email/index.ts`:
+**C. `robots.txt` and sitemap are fine** — I confirmed both are 200 OK and served correctly. So crawlability isn't blocked. But without GSC submission and with a JS-only homepage, Google has no incentive or signal to crawl deeply on a brand-new domain.
 
-1. **Template allowlist** — define `ALLOWED_TEMPLATES` (keys of `TEMPLATES` registry already act as one; explicitly enforce and 400 on unknown — already returns 404, change to 400 with neutral message).
-2. **Per-template policy** — add a small policy map:
-  - `lifecycle-day0`, `lifecycle-day2`, `lifecycle-day7`, `welcome`: allow **anonymous** (signup pre-confirmation). Recipient is taken from request body but rate-limited per email + per IP.
-  - All other templates: require an authenticated user JWT; recipient **must equal** the authenticated user's email (case-insensitive), unless the template defines a fixed `to` (admin notifications).
-3. **Auth verification** — read `Authorization` header, call `supabase.auth.getClaims(token)`. If present, capture `sub` + email. If absent and template is not in the anon-allowed list, return 401.
-4. **Service-role bypass** — accept calls from `send-lifecycle-emails` and `admin-api` by checking for `x-internal-secret` header equal to `SUPABASE_SERVICE_ROLE_KEY` env (never logged). Both internal callers already have this; we'll add the header in those two callers.
-5. **Anti-abuse rate limit** — for anon templates, query `email_send_log` for the last 60s by `recipient_email + template_name`. If a `pending`/`sent` exists, return `200 { success: true, queued: false, reason: 'rate_limited' }` (no info leak about whether the email exists).
-6. **Add `verify_jwt = false**` entry in `config.toml` for this function so the in-code auth logic is the single source of truth (avoids gateway rejecting the anon signup call).
-7. Keep all existing suppression / unsubscribe / enqueue logic unchanged.
+There is also a smaller item: the canonical for the home page is set by `<SEOHead path="/">` to `https://haultrackerpro.com/` which is correct, and the og-image is referenced — those are fine.
 
-Update callers:
+### Fix
+1. **Add a static, server-friendly `<noscript>` block in `index.html`** with the H1, primary value prop, primary CTA link to `/auth`, and a short paragraph. This gives Googlebot real text to index immediately on first crawl, without affecting users.
+2. **Add a small visible-on-load HTML hero fallback inside `<div id="root">`** that React replaces on mount. Same purpose, but also helps social previews and slow connections. (Optional — `<noscript>` covers the SEO baseline.)
+3. **Provide instructions** for the user to verify Google Search Console (it's a manual one-time action; we'll provide the meta tag slot). We will also leave a placeholder in `index.html` and tell the user exactly where to paste the verification token.
+4. **Recommend the user submit `https://haultrackerpro.com/sitemap.xml`** in GSC after verification — this is the single most effective lever for fast indexing.
+5. Confirm the canonical, OG image, and structured data are all valid (they are).
 
-- `supabase/functions/send-lifecycle-emails/index.ts` and `supabase/functions/admin-api/index.ts`: add `headers: { 'x-internal-secret': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') }` to their two `invoke` calls.
-- `src/pages/Auth.tsx`: no change (anon-allowed list covers it).
+I will not change the route structure, design, or any working features.
 
-## Phase 5 — `SettingsView` state init
+---
 
-Edit `src/components/SettingsView.tsx`:
+## Files changed
 
-- Remove the `if (settings && !initialized) { setX(...); setInitialized(true); }` block at lines 109-123.
-- Replace with a `useEffect(() => { if (!settings || initialized) return; … setInitialized(true); }, [settings, initialized])`.
-- All other behavior (save buttons, defaults, validation, leaderboard handle, tax/pay-week/deadhead settings) untouched.
+**Issue 1 (publish freshness):**
+- `vite.config.ts` — set PWA plugin to `selfDestroying: true` (or remove entirely), remove precache config
+- `index.html` — remove `<link rel="manifest">` and PWA-related meta if we fully disable PWA, OR leave manifest but stop registering SW (decision: keep manifest link removed in non-prod, drop `apple-mobile-web-app-capable` until PWA is intentionally re-enabled)
+- `public/sw.js` — keep as-is (already self-destroying)
 
-## Phase 6 — End-to-end verification (code-level review + manual smoke)
+**Issue 2 (Google indexing):**
+- `index.html` — add a `<noscript>` hero block with H1 + description + link to `/auth` + link to `/features`, `/pricing`, `/faq`. Also add a clearly-marked placeholder for the GSC verification token.
+- (Optional) `index.html` — add a minimal pre-render skeleton inside `<div id="root">` with the value prop, replaced on React mount.
 
-Code-level checks:
+## Verification after fixes
+1. Run tests (`72/72` should still pass).
+2. Production build succeeds and the emitted `dist/sw.js` is the small self-destroying one (not the Workbox precache).
+3. `curl https://haultrackerpro.com/` returns HTML containing the H1 and noscript content.
+4. After deploy, hard-reload the live site twice in a logged-in session and confirm new build shows.
+5. User verifies the domain in Google Search Console and submits the sitemap.
 
-- Confirm `Auth.tsx` signup still fires welcome email through new auth function (anon-allowed).
-- Confirm `useAdmin` returns `isAdmin=true` for owner email even when row missing; returns `false` for any other email when row missing.
-- Confirm `SettingsView` initializes once, no React warnings, user edits not overwritten on settings refetch.
-- Confirm Stripe upgrade flow untouched (`create-checkout`, `customer-portal`, `check-subscription`, `stripe-webhook` not edited).
-- Confirm parser, dashboard, loads, expenses, fuel, public pages, sitemap not touched.
+## What I will NOT change
+- Routes, auth, admin fallback, email hardening, Stripe flow, Settings render-state fix — all stay as-is.
+- No redesign, no refactor, no feature removal.
+- No changes to the Lovable preview unregister script (it's working correctly).
 
-Manual smoke (user-visible) — agent will note these as "user must verify in production":
-
-- Stripe sandbox upgrade end-to-end.
-- Owner login → `/admin` access.
-- Non-owner free + non-owner pro → `/admin` blocked.
-- Signup → welcome email arrives.
-
-## Phase 7 — Final scripts
-
-Run: `npm run lint`, `npm run test`, `npm run seo:audit`. Build is auto-run by harness.
-
-## Phase 8 — Final report
-
-Verdict, files changed, issues fixed, intentional non-changes (e.g. `useAuth.ts` shim kept), exact script results, remaining risks (Stripe live keys, DNS, owner first login), and manual checks list.
-
-## Files that will change
-
-- `src/hooks/useAdmin.ts` — owner fallback
-- `src/components/SettingsView.tsx` — move init to `useEffect`
-- `supabase/functions/send-transactional-email/index.ts` — auth + recipient + allowlist + rate limit
-- `supabase/functions/send-lifecycle-emails/index.ts` — add internal-secret header
-- `supabase/functions/admin-api/index.ts` — add internal-secret header (2 call sites)
-- `supabase/config.toml` — add `[functions.send-transactional-email] verify_jwt = false`
-- `supabase/migrations/<new>_owner_admin_backfill.sql` — re-run idempotent owner seed
-
-## Files explicitly NOT changed
-
-- `src/hooks/useAuth.ts` / `useAuth.tsx` — shim retained as documented preview-stability safety net
-- `src/App.tsx` — routes, redirects, providers untouched
-- Stripe functions, parser, dashboard, settings save logic, pricing UI — untouched
-- `index.html`, `public/sw.js` — service-worker cleanup left in place The plan is approved, but revise Phase 4 before implementation:
-  1. Do not use SUPABASE_SERVICE_ROLE_KEY as the internal function-to-function shared secret.
-  2. Add a separate environment variable named INTERNAL_FUNCTION_SECRET.
-  3. Internal callers such as send-lifecycle-emails and admin-api must pass x-internal-secret: INTERNAL_FUNCTION_SECRET.
-  4. send-transactional-email must validate x-internal-secret against INTERNAL_FUNCTION_SECRET.
-  5. Never log the internal secret or Authorization header.
-  For anonymous email sending:
-  1. Only allow the signup welcome template anonymously if it is required by the current signup flow.
-  2. Do not allow lifecycle-day2 or lifecycle-day7 anonymously unless there is a verified reason. Those should be internal/server-only lifecycle emails.
-  3. Anonymous callers must not be allowed to choose arbitrary recipients for any template except the tightly controlled signup welcome case.
-  4. Validate email format.
-  5. Normalize recipient emails to lowercase before rate limit checks.
-  6. Rate limit by normalized email and IP.
-  7. Do not reveal whether an email exists.
-  8. Do not allow the client to control subject, HTML body, sender, reply-to, or template internals.
-  Also, explicitly run and report:
-  - npm run build
-  - npm run lint
-  - npm run test
-  - npm run seo:audit
-  Do not mark the app public-ready unless all four pass or any warnings are clearly documented as non-blocking.
+## Approve to proceed
+On approval I will:
+1. Apply the `vite.config.ts` PWA change.
+2. Add the noscript hero + GSC placeholder to `index.html`.
+3. Re-run tests.
+4. Tell you exactly which line in `index.html` to paste your Google Search Console verification token into, and walk you through submitting the sitemap.
