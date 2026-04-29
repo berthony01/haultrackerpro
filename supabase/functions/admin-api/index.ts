@@ -746,6 +746,10 @@ Deno.serve(async (req) => {
         if (!email) return { email: "(none)", status: "skipped", reason: "no email" };
         const name = (u.user_metadata?.display_name as string | undefined) || undefined;
         const { error } = await adminDb.functions.invoke("send-transactional-email", {
+          headers: {
+            // Internal server-to-server auth — see send-transactional-email policy.
+            "x-internal-secret": Deno.env.get("INTERNAL_FUNCTION_SECRET") ?? "",
+          },
           body: {
             templateName,
             recipientEmail: email,
@@ -893,6 +897,10 @@ Deno.serve(async (req) => {
       const templateData = (meta.templateData as Record<string, unknown> | undefined) || {};
 
       const { error: invokeErr } = await adminDb.functions.invoke("send-transactional-email", {
+        headers: {
+          // Internal server-to-server auth — see send-transactional-email policy.
+          "x-internal-secret": Deno.env.get("INTERNAL_FUNCTION_SECRET") ?? "",
+        },
         body: {
           templateName: row.template_name,
           recipientEmail: row.recipient_email,
