@@ -196,6 +196,78 @@ export type Database = {
         }
         Relationships: []
       }
+      cost_profile: {
+        Row: {
+          avg_mpg: number | null
+          created_at: string
+          days_per_1000_miles: number | null
+          diesel_price_per_gallon: number | null
+          eld_software_monthly: number | null
+          estimated_monthly_miles: number | null
+          id: string
+          insurance_monthly: number | null
+          lodging_per_day: number | null
+          maintenance_per_mile: number | null
+          meals_per_day: number | null
+          min_margin_pct: number | null
+          min_rpm: number | null
+          other_fixed_monthly: number | null
+          permits_licensing_monthly: number | null
+          tires_per_mile: number | null
+          tolls_per_mile: number | null
+          trailer_payment: number | null
+          truck_payment: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_mpg?: number | null
+          created_at?: string
+          days_per_1000_miles?: number | null
+          diesel_price_per_gallon?: number | null
+          eld_software_monthly?: number | null
+          estimated_monthly_miles?: number | null
+          id?: string
+          insurance_monthly?: number | null
+          lodging_per_day?: number | null
+          maintenance_per_mile?: number | null
+          meals_per_day?: number | null
+          min_margin_pct?: number | null
+          min_rpm?: number | null
+          other_fixed_monthly?: number | null
+          permits_licensing_monthly?: number | null
+          tires_per_mile?: number | null
+          tolls_per_mile?: number | null
+          trailer_payment?: number | null
+          truck_payment?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_mpg?: number | null
+          created_at?: string
+          days_per_1000_miles?: number | null
+          diesel_price_per_gallon?: number | null
+          eld_software_monthly?: number | null
+          estimated_monthly_miles?: number | null
+          id?: string
+          insurance_monthly?: number | null
+          lodging_per_day?: number | null
+          maintenance_per_mile?: number | null
+          meals_per_day?: number | null
+          min_margin_pct?: number | null
+          min_rpm?: number | null
+          other_fixed_monthly?: number | null
+          permits_licensing_monthly?: number | null
+          tires_per_mile?: number | null
+          tolls_per_mile?: number | null
+          trailer_payment?: number | null
+          truck_payment?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       driver_points: {
         Row: {
           best_weekly_period_start: string | null

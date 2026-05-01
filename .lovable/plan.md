@@ -1,71 +1,122 @@
-# Fix: Recurring Expenses Not Generating
+# Plan: Cost Profile → True Pre-Acceptance Profitability Check
 
-## Full Analysis Summary
+## The decision
 
-I traced the entire recurring expenses pipeline and found one clear bug plus a missing-data side-effect.
+Yes, the platform should be able to tell a driver "Is this load profitable?" **before** they accept it — based on **costs the driver pre-registers themselves**, not just on rolling history. This builds on what already exists.
 
-### What's working ✅
-- The `recurring_expense_templates` table has your active "Daily Meals" template ($80/mo, status=active, is_active=true).
-- Your account has Pro access (active subscription + admin row), so the edge function would generate the expense.
-- The `generate-recurring-expenses` edge function is deployed correctly with `verify_jwt = false`.
-- The UI (RecurringExpensesView, HomeTimeDashboardCard, useRecurringExpenses hook) is fine — pause/resume/Home Time logic is sound.
-- A daily cron job `generate-recurring-expenses` exists and runs every day at 06:00 UTC.
+## What's already built (don't rebuild it)
 
-### What's broken ❌
-**The cron job has failed every single run since it was created.** Looking at `cron.job_run_details`, every invocation from Apr 22 through May 1 returned:
+- `useProfitCheck.ts` — runs as the driver types into LoadForm
+- `ProfitCheckCard.tsx` — shows Strong / Fair / Weak / Risky badge with reasons
+- It already uses lane history, broker reliability, and rolling cost-per-mile
 
+**Gap:** It depends on `operating_metrics.rolling_cost_per_mile`, which is computed from the last 60 days of expenses. New drivers, or anyone who hasn't logged enough expenses yet, get "Not enough history yet" and no real profitability answer.
+
+## What we'll add
+
+### 1. New "My Cost Profile" section in Settings
+
+A dedicated area where the driver pre-registers their known operating costs **once**. Exact fields:
+
+**Fixed monthly costs** (driver fills in dollar amounts):
+- Truck payment / lease
+- Trailer payment
+- Insurance
+- Permits & licensing
+- ELD / software / phone
+- Other fixed monthly
+
+**Variable per-mile costs:**
+- Fuel: average MPG + diesel price per gallon → app derives fuel $/mile
+- Maintenance reserve ($/mile, e.g. $0.10)
+- Tires reserve ($/mile, e.g. $0.03)
+- Tolls average ($/mile, optional)
+
+**Per-day costs:**
+- Meals & lodging ($/day on the road)
+
+**Driver expectation:**
+- Minimum acceptable profit margin % (e.g. "I won't run a load under 20% margin")
+- Minimum acceptable $/mile
+- Estimated days per 1,000 miles (default 2.5) — used to spread per-day costs
+
+The driver can save partial info. The more they fill in, the sharper the check.
+
+### 2. New `cost_profile` table
+
+```text
+cost_profile (one row per user)
+├─ Fixed monthly costs (truck, insurance, etc.)
+├─ Per-mile variable rates (maintenance, tires, tolls)
+├─ Fuel inputs (avg MPG, diesel $/gal)
+├─ Per-day costs (meals)
+├─ Targets (min margin %, min RPM, days per 1k mi)
+└─ Estimated monthly miles (used to convert fixed → per-mile)
 ```
-ERROR: function extensions.http_post(url => unknown, headers => jsonb, body => jsonb) does not exist
+
+RLS: user owns their row, standard CRUD policies.
+
+### 3. Upgraded profit-check math
+
+`useProfitCheck` will use a layered cost model — falls back gracefully:
+
+```text
+Cost-per-mile for THIS load =
+   Fuel CPM      = diesel_price / avg_mpg
+ + Maintenance   = user-entered $/mi
+ + Tires         = user-entered $/mi
+ + Tolls         = user-entered $/mi
+ + Fixed share   = (sum of fixed monthly) / estimated monthly miles
+ + Per-day share = (meals × estimated days for this load) / total miles
+
+Estimated load cost = CPM × total_miles (loaded + deadhead)
+Estimated net       = estimated_pay − estimated load cost
+Estimated margin %  = estimated_net / estimated_pay × 100
+
+Decision = compare margin % and RPM against driver's
+           pre-registered targets (min margin, min RPM)
 ```
 
-The cron was registered with `extensions.http_post(...)`, but in this project the HTTP function lives in the `net` schema (the `pg_net` extension). Every other working cron job in the project (e.g. `expire-ended-trials-hourly`, `send-lifecycle-emails-daily`) uses `net.http_post(...)`.
+**Priority order for CPM:**
+1. Cost Profile (driver-defined) — primary
+2. Rolling 60-day actuals — used as a sanity check / blends in if both exist
+3. Neither — show "Set up your Cost Profile" CTA inside the card
 
-**Result**: the edge function has never actually been called by the scheduler, so no `[Recurring: Daily Meals]` row was ever inserted into `expenses` — confirmed by my query (0 rows match `notes ILIKE '%[Recurring:%'`).
+### 4. UI changes
 
-## Fix Plan
+- **Settings page:** new "My Cost Profile" section with the inputs above (collapsible groups: Fixed / Variable / Targets)
+- **LoadForm:** ProfitCheckCard now shows real numbers from Day 1 if profile exists
+- **ProfitCheckCard:** new line "Based on your Cost Profile" or "Based on 60-day actuals" so the driver sees where the number comes from
+- **LoadForm decision banner:** add an explicit "❌ Below your minimum margin" / "✅ Meets your minimum margin" line when targets are set
+- **First-run nudge:** if a driver opens LoadForm without a cost profile, show a small banner: "Set up your costs in Settings to know if a load is profitable before you accept it." (one-tap to settings)
 
-### 1. Recreate the cron job with the correct function (`net.http_post`)
+### 5. Onboarding tie-in
 
-Run a non-migration SQL insert (per Lovable rules for cron jobs containing project-specific URLs/keys):
+Add a 5th onboarding step (skippable): "Tell us your costs so we can warn you about bad loads." Pre-fills with realistic sample numbers the driver can edit.
 
-```sql
-SELECT cron.unschedule('generate-recurring-expenses');
+## Out of scope (intentionally)
 
-SELECT cron.schedule(
-  'generate-recurring-expenses',
-  '0 6 * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://pngptztxwbtozwxrtbwo.supabase.co/functions/v1/generate-recurring-expenses',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer <anon-key>"}'::jsonb,
-    body := '{}'::jsonb
-  ) AS request_id;
-  $$
-);
-```
+- Editing per-load profit after acceptance — already covered by linked expenses + reports
+- Auto-pulling fuel prices from an API — driver enters their own, simpler & accurate
+- AI-generated cost profile — deterministic only, per project rule
 
-Including the `Authorization: Bearer <anon-key>` header to match the project's other cron jobs (defensive — even though `verify_jwt=false`, it keeps things consistent).
+## Why this is the right design (honest take)
 
-### 2. Manually trigger one run now to backfill April
+- **Predictive, not reactive** — works Day 1, before any history exists
+- **Driver-owned numbers** — they trust their own inputs more than a black-box average
+- **Self-correcting over time** — once 60-day actuals exist, app can compare profile vs reality and nudge: "Your real fuel CPM is $0.65, you have $0.55 in your profile — update?"
+- **Aligns with existing architecture** — extends `useProfitCheck` and `ProfitCheckCard`, no duplicate UI
+- **Surgical** — one new table, one settings section, one math upgrade. No refactor of LoadForm or reports
 
-After fixing the cron, invoke the edge function once so the template's April expense gets generated immediately (instead of waiting until tomorrow 06:00 UTC). The function's logic:
-- Inserts an $80 Meals expense dated `2026-04-20` (the template's start_date, since it falls in the current month).
-- Updates `last_generated_date` so May's run creates the May 1 expense and doesn't duplicate April's.
+## Files touched
 
-### 3. Verify
+- New: `supabase/migrations/...` (cost_profile table + RLS)
+- New: `src/hooks/useCostProfile.ts`
+- New: `src/components/CostProfileSettings.tsx`
+- Edit: `src/components/SettingsView.tsx` (mount new section)
+- Edit: `src/hooks/useProfitCheck.ts` (layered CPM math)
+- Edit: `src/components/ProfitCheckCard.tsx` (source-of-numbers label, target indicator)
+- Edit: `src/components/LoadForm.tsx` (first-run banner if profile empty)
+- Edit: `src/components/Onboarding.tsx` (optional 5th step)
 
-- Re-query `expenses` for `notes ILIKE '%[Recurring: Daily Meals%'` → should show one row.
-- Re-query `recurring_expense_templates` → `last_generated_date` should be set.
-- Check `cron.job_run_details` after the next 06:00 UTC run → should be `succeeded`.
-
-## Technical Notes
-
-- **No code changes needed** in `supabase/functions/generate-recurring-expenses/index.ts` — the function itself is correct (filters by `is_active=true AND status='active'`, gates on Pro/admin, skips paused templates, doesn't backfill skipped months). The `is_active`/`status` sync trigger is already in place.
-- **No frontend changes needed** — the UI was reading directly from the templates table, so the "1 active · 0 paused" counts you see are accurate; they just never produced expenses because the cron never reached the function.
-- **No config.toml changes** — `verify_jwt = false` is already set.
-
-## Files / Resources Touched
-
-- Cron job `generate-recurring-expenses` (database, via SQL insert tool, not migration).
-- One-time HTTP call to the edge function to backfill April for your template.
-- No source files modified.
+Approve and I'll build it.
