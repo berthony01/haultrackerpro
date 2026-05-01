@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { SendFeedbackModal } from '@/components/SendFeedbackModal';
 import { TaxPlannerSettings } from '@/components/TaxPlannerSettings';
+import { CostProfileSettings } from '@/components/CostProfileSettings';
 import { QuarterlyReminderSettings } from '@/components/QuarterlyReminderSettings';
 import { CSVImport } from '@/components/CSVImport';
 import { PublicProfileSection } from '@/components/PublicProfileSection';
@@ -519,6 +520,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Cost Profile - drives Pre-Load Profit Check */}
+      <CostProfileSettings />
 
       {/* Tax Set-Aside Planner */}
       <TaxPlannerSettings
