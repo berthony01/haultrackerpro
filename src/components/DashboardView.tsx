@@ -12,6 +12,7 @@ import {
 import { Expense } from '@/hooks/useExpenses';
 import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { useCostProfile, computeCostProfileCPM, profileHasUsableData } from '@/hooks/useCostProfile';
 import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
