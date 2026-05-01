@@ -21,13 +21,19 @@ export function ProfitCheckCard({ result }: ProfitCheckCardProps) {
   const meta = DECISION_META[result.decision];
   const { Icon } = meta;
   const hasHistory = result.hasLaneHistory || result.hasBrokerHistory;
+  const hasCost = result.costSource !== 'none';
+
+  const sourceLabel =
+    result.costSource === 'profile' ? 'Based on your Cost Profile'
+    : result.costSource === 'history' ? 'Based on 60-day actuals'
+    : null;
 
   return (
     <div className="rounded-xl border-2 border-primary/20 bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 bg-primary/5">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
         <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Profit Check</span>
-        {!hasHistory && (
+        {!hasHistory && !hasCost && (
           <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
             Estimate only
           </span>
@@ -79,10 +85,35 @@ export function ProfitCheckCard({ result }: ProfitCheckCardProps) {
           </ul>
         )}
 
-        {!hasHistory && (
+        {/* Personal target verdict */}
+        {result.hasTargets && hasCost && (
+          <div className="space-y-1 pt-1 border-t border-border/40">
+            {result.meetsMinMargin != null && (
+              <div className={`flex items-center gap-1.5 text-xs font-bold ${result.meetsMinMargin ? 'text-success' : 'text-destructive'}`}>
+                <span>{result.meetsMinMargin ? '✓' : '✗'}</span>
+                <span>{result.meetsMinMargin ? 'Meets your minimum margin' : 'Below your minimum margin'}</span>
+              </div>
+            )}
+            {result.meetsMinRpm != null && (
+              <div className={`flex items-center gap-1.5 text-xs font-bold ${result.meetsMinRpm ? 'text-success' : 'text-destructive'}`}>
+                <span>{result.meetsMinRpm ? '✓' : '✗'}</span>
+                <span>{result.meetsMinRpm ? 'Meets your minimum $/mile' : 'Below your minimum $/mile'}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {sourceLabel && (
           <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground pt-1 border-t border-border/40">
             <Info className="h-3 w-3 shrink-0 mt-0.5" />
-            <span>Log more loads on this lane to unlock history-based confidence.</span>
+            <span>{sourceLabel}</span>
+          </div>
+        )}
+
+        {!hasCost && (
+          <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground pt-1 border-t border-border/40">
+            <Info className="h-3 w-3 shrink-0 mt-0.5" />
+            <span>Set up your <span className="font-bold text-primary">Cost Profile</span> in Settings to see real profitability before you accept loads.</span>
           </div>
         )}
       </div>

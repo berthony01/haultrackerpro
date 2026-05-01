@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { useCostProfile, computeCostProfileCPM, profileHasUsableData } from '@/hooks/useCostProfile';
 
 export interface ProfitCheckInput {
   pickup_location: string;
@@ -24,6 +25,12 @@ export interface ProfitCheckResult {
   estimatedMarginPct: number;
   hasLaneHistory: boolean;
   hasBrokerHistory: boolean;
+  /** Where the cost-per-mile number came from. Drives the source label in the UI. */
+  costSource: 'profile' | 'history' | 'none';
+  /** True if user set min_margin_pct or min_rpm targets in their cost profile. */
+  hasTargets: boolean;
+  meetsMinMargin: boolean | null;
+  meetsMinRpm: boolean | null;
   laneAvgRpm?: number;
   laneAvgMarginPct?: number;
   laneAvgDeadheadPct?: number;
@@ -46,7 +53,7 @@ function buildLaneKey(pickup: string, dropoff: string): string {
 export function useProfitCheck(input: ProfitCheckInput | null) {
   const { user } = useAuth();
   const { settings } = useUserSettings();
-
+  const { profile: costProfile } = useCostProfile();
   const laneKey = input ? buildLaneKey(input.pickup_location, input.dropoff_location) : '';
 
   const laneStatsQuery = useQuery({
@@ -112,17 +119,32 @@ export function useProfitCheck(input: ProfitCheckInput | null) {
   const broker = brokerStatsQuery.data;
   const op = opMetricsQuery.data;
 
-  const cpm = op?.rolling_cost_per_mile ? Number(op.rolling_cost_per_mile) : 0;
-  // Variable cost estimate: CPM * total miles. If no CPM history, use 0 (will degrade gracefully).
+  // Layered CPM: prefer driver-defined Cost Profile, fall back to rolling 60-day actuals.
+  const profileCPM = profileHasUsableData(costProfile)
+    ? computeCostProfileCPM(costProfile, totalMiles).cpm
+    : 0;
+  const historyCPM = op?.rolling_cost_per_mile ? Number(op.rolling_cost_per_mile) : 0;
+  const cpm = profileCPM > 0 ? profileCPM : historyCPM;
+  const costSource: 'profile' | 'history' | 'none' =
+    profileCPM > 0 ? 'profile' : historyCPM > 0 ? 'history' : 'none';
+
   const estimatedVariableCost = cpm > 0 ? cpm * totalMiles : 0;
   const effectiveRpm = input.estimated_pay / totalMiles;
   const estimatedNet = input.estimated_pay - estimatedVariableCost;
   const estimatedMarginPct = input.estimated_pay > 0 ? (estimatedNet / input.estimated_pay) * 100 : 0;
   const deadheadPct = totalMiles > 0 ? (input.deadhead_miles / totalMiles) * 100 : 0;
 
-  const targetRpm = settings?.target_rpm ? Number(settings.target_rpm) : null;
-  const targetMargin = settings?.target_margin_pct ? Number(settings.target_margin_pct) : null;
+  // Personal targets — Cost Profile takes priority over user_settings (Cost Profile is the
+  // explicit "minimum acceptable" line, while user_settings targets are looser goals).
+  const profileMinMargin = costProfile?.min_margin_pct != null ? Number(costProfile.min_margin_pct) : null;
+  const profileMinRpm = costProfile?.min_rpm != null ? Number(costProfile.min_rpm) : null;
+  const targetRpm = profileMinRpm ?? (settings?.target_rpm ? Number(settings.target_rpm) : null);
+  const targetMargin = profileMinMargin ?? (settings?.target_margin_pct ? Number(settings.target_margin_pct) : null);
   const targetDeadhead = settings?.target_deadhead_pct ? Number(settings.target_deadhead_pct) : null;
+
+  const meetsMinMargin = profileMinMargin != null && cpm > 0 ? estimatedMarginPct >= profileMinMargin : null;
+  const meetsMinRpm = profileMinRpm != null ? effectiveRpm >= profileMinRpm : null;
+  const hasTargets = profileMinMargin != null || profileMinRpm != null;
 
   const reasons: string[] = [];
   let score = 0;
@@ -206,6 +228,10 @@ export function useProfitCheck(input: ProfitCheckInput | null) {
       estimatedMarginPct,
       hasLaneHistory: !!(lane && lane.load_count >= 2),
       hasBrokerHistory: !!(broker && broker.load_count >= 2),
+      costSource,
+      hasTargets,
+      meetsMinMargin,
+      meetsMinRpm,
       laneAvgRpm: lane ? Number(lane.avg_rpm) : undefined,
       laneAvgMarginPct: lane ? Number(lane.avg_margin_pct) : undefined,
       laneAvgDeadheadPct: lane && Number(lane.avg_loaded_miles) + Number(lane.avg_deadhead_miles) > 0
