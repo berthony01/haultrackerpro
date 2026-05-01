@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -16,34 +16,48 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  // Stay loading until BOTH the initial getSession() and the first
+  // onAuthStateChange have settled. This prevents the brief "logged out"
+  // flash where ProtectedRoute would <Navigate to="/" /> and paint the
+  // public Landing ("Start Free…") hero before the restored session arrives.
   const [loading, setLoading] = useState(true);
+  const initialResolvedRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const finalize = (next: Session | null) => {
+      if (cancelled) return;
+      setSession((prev) =>
+        prev?.access_token === next?.access_token ? prev : next,
+      );
+      setUser((prev) => {
+        const nextUser = next?.user ?? null;
+        return prev?.id === nextUser?.id ? prev : nextUser;
+      });
+    };
+
     // Subscribe first (synchronous handler — no await inside)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession((prev) =>
-        prev?.access_token === newSession?.access_token ? prev : newSession,
-      );
-      setUser((prev) => {
-        const nextUser = newSession?.user ?? null;
-        return prev?.id === nextUser?.id ? prev : nextUser;
-      });
-      setLoading(false);
+      finalize(newSession);
+      // Only flip loading off once the initial restoration has happened.
+      if (initialResolvedRef.current) {
+        setLoading(false);
+      }
     });
 
-    // Then restore existing session
+    // Then restore existing session — this is the source of truth for
+    // "was the user already logged in when the app booted?".
     supabase.auth.getSession().then(({ data: { session: existing } }) => {
-      setSession((prev) =>
-        prev?.access_token === existing?.access_token ? prev : existing,
-      );
-      setUser((prev) => {
-        const nextUser = existing?.user ?? null;
-        return prev?.id === nextUser?.id ? prev : nextUser;
-      });
-      setLoading(false);
+      finalize(existing);
+      initialResolvedRef.current = true;
+      if (!cancelled) setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
