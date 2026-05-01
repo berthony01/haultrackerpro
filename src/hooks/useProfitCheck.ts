@@ -25,6 +25,12 @@ export interface ProfitCheckResult {
   estimatedMarginPct: number;
   hasLaneHistory: boolean;
   hasBrokerHistory: boolean;
+  /** Where the cost-per-mile number came from. Drives the source label in the UI. */
+  costSource: 'profile' | 'history' | 'none';
+  /** True if user set min_margin_pct or min_rpm targets in their cost profile. */
+  hasTargets: boolean;
+  meetsMinMargin: boolean | null;
+  meetsMinRpm: boolean | null;
   laneAvgRpm?: number;
   laneAvgMarginPct?: number;
   laneAvgDeadheadPct?: number;
