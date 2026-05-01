@@ -77,6 +77,7 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
 
 export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
+  const { profile: costProfile } = useCostProfile();
   useTierUpDetector();
   
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
