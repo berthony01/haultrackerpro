@@ -5,7 +5,7 @@ import { sumExpectedPay, sumOperatingMiles } from '@/lib/loadMetrics';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, TrendingDown, Receipt, Info, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, Plus } from 'lucide-react';
 
 interface ProfitOverviewProps {
   loads: Load[];
@@ -28,37 +28,11 @@ export function ProfitOverview({ loads, expenses, onAddExpense }: ProfitOverview
   const totalMiles = sumOperatingMiles(loads);
   const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
 
-  if (expenses.length === 0) {
-    return (
-      <Card className="border border-primary/15 bg-primary/[0.03]">
-        <CardContent className="p-3.5">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Receipt className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold leading-tight">Track Your True Profit</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Log expenses to see net profit and cost-per-mile</p>
-            </div>
-            {onAddExpense && (
-              <Button
-                size="sm"
-                className="shrink-0 h-8 text-xs font-bold rounded-lg gap-1 px-3"
-                onClick={onAddExpense}
-              >
-                <Plus className="h-3 w-3" /> Add
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const revenueLabel = hasActual ? 'Gross Revenue' : 'Projected Revenue';
+  const noExpenses = expenses.length === 0;
 
   return (
-    <Card className="card-premium border-primary/10">
+    <Card className="card-premium border-primary/20 shadow-elevated">
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-1.5">
@@ -66,14 +40,25 @@ export function ProfitOverview({ loads, expenses, onAddExpense }: ProfitOverview
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
+                  <span className="inline-flex">
+                    <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p className="text-xs">Net Profit = Load Revenue − Expenses</p>
+                  <p className="text-xs">Net Profit = Gross Revenue − Logged Expenses</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
+          {noExpenses && onAddExpense && (
+            <Button
+              size="sm"
+              className="h-8 text-xs font-bold rounded-lg gap-1 px-3"
+              onClick={onAddExpense}
+            >
+              <Plus className="h-3 w-3" /> Add Expense
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-3">
@@ -102,6 +87,12 @@ export function ProfitOverview({ loads, expenses, onAddExpense }: ProfitOverview
             <p className="text-lg font-black font-mono text-primary">{formatCurrency(netPerMile)}</p>
           </div>
         </div>
+
+        {noExpenses && (
+          <p className="text-[11px] text-muted-foreground mt-3 leading-snug">
+            Log expenses to see your true net profit after fuel, repairs, meals, and other costs.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
