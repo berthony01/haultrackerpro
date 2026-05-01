@@ -1,72 +1,71 @@
-# Why your publishes "don't show" — and why Google can't load the app
+# Fix: Recurring Expenses Not Generating
 
-## What's actually broken (verified, not guessed)
+## Full Analysis Summary
 
-I just fetched your live site three different ways:
+I traced the entire recurring expenses pipeline and found one clear bug plus a missing-data side-effect.
 
-- `https://haultrackerpro.com`
-- `https://www.haultrackerpro.com`
-- `https://haultrackerpro.lovable.app` (the Lovable staging URL)
+### What's working ✅
+- The `recurring_expense_templates` table has your active "Daily Meals" template ($80/mo, status=active, is_active=true).
+- Your account has Pro access (active subscription + admin row), so the edge function would generate the expense.
+- The `generate-recurring-expenses` edge function is deployed correctly with `verify_jwt = false`.
+- The UI (RecurringExpensesView, HomeTimeDashboardCard, useRecurringExpenses hook) is fine — pause/resume/Home Time logic is sound.
+- A daily cron job `generate-recurring-expenses` exists and runs every day at 06:00 UTC.
 
-**All three serve the new HTML and the new build.** Cache is not the problem. The service-worker fix from last round did work — `/sw.js` is the self-destroying one, the manifest loads, headers are `cache-control: no-cache`, and Cloudflare is returning the latest deployment ID.
-
-But every visitor sees only the static "HaulTrackerPro — Track Loads, Expenses & Net Profit" headline + "Get started free" link with no app underneath. That's because the React app is **crashing the instant it boots**. The browser console on `haultrackerpro.com` shows:
+### What's broken ❌
+**The cron job has failed every single run since it was created.** Looking at `cron.job_run_details`, every invocation from Apr 22 through May 1 returned:
 
 ```
-Uncaught Error: supabaseUrl is required.
-  at ZR (/assets/index-qGFqFCoT.js)
+ERROR: function extensions.http_post(url => unknown, headers => jsonb, body => jsonb) does not exist
 ```
 
-`src/integrations/supabase/client.ts` reads `import.meta.env.VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` at build time. In your **production** build those two values are empty, so `createClient("", "")` throws, the ErrorBoundary catches it, and React renders the "Something went wrong / Reload App" screen. The static SEO `<div id="root">` fallback is what stays visible to anyone with JS disabled or to Googlebot's first pass.
+The cron was registered with `extensions.http_post(...)`, but in this project the HTTP function lives in the `net` schema (the `pg_net` extension). Every other working cron job in the project (e.g. `expire-ended-trials-hourly`, `send-lifecycle-emails-daily`) uses `net.http_post(...)`.
 
-This explains both symptoms perfectly:
+**Result**: the edge function has never actually been called by the scheduler, so no `[Recurring: Daily Meals]` row was ever inserted into `expenses` — confirmed by my query (0 rows match `notes ILIKE '%[Recurring:%'`).
 
-1. **"My publishes don't show in the browser."** They are showing — but the app immediately error-boundaries out, so the page looks identical no matter what you change.
-2. **"The app is not loading on Google at all."** Google indexes the static fallback because the React app crashes before mounting any real content (Landing page, schema, internal links, etc.). It's not a robots/sitemap problem — it's "the page has no app on it."
+## Fix Plan
 
-The local `.env` in the workspace has all three values set, which is why it works in the Lovable editor preview but breaks in production: the Lovable production build pipeline isn't injecting the Supabase env vars into the deployed bundle. Likely cause: pushing to GitHub and rebuilding on the production runner without those vars present in that build context.
+### 1. Recreate the cron job with the correct function (`net.http_post`)
 
-## The fix (3 small, surgical changes)
+Run a non-migration SQL insert (per Lovable rules for cron jobs containing project-specific URLs/keys):
 
-### 1. Make the Supabase client fail loudly with a real message instead of silently exploding
-File: `src/integrations/supabase/client.ts`. Add an explicit guard that throws a clear, user-visible error and logs the missing var names to the console. This way, if env injection ever fails again, you'll see "Backend not configured" instead of a cryptic minified error, and the ErrorBoundary screen will tell you exactly what's wrong.
+```sql
+SELECT cron.unschedule('generate-recurring-expenses');
 
-### 2. Hard-code the publishable Supabase URL + anon key as a fallback
-The Supabase URL and anon (publishable) key are **public** — they're already shipped in every published build of every Supabase app. Per Lovable's own guidance, publishable keys are safe to include in source. We add them as constants used **only** when the env vars come back empty:
-
-```ts
-const FALLBACK_URL = "https://pngptztxwbtozwxrtbwo.supabase.co";
-const FALLBACK_KEY = "<the existing anon key already in your context>";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || FALLBACK_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || FALLBACK_KEY;
+SELECT cron.schedule(
+  'generate-recurring-expenses',
+  '0 6 * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://pngptztxwbtozwxrtbwo.supabase.co/functions/v1/generate-recurring-expenses',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer <anon-key>"}'::jsonb,
+    body := '{}'::jsonb
+  ) AS request_id;
+  $$
+);
 ```
 
-This makes the production build resilient: even if the env-var injection on the build runner fails (which is what just happened), the app still boots and connects to the right backend. RLS protects the data — the anon key has no special privileges. This single change unblocks every future publish.
+Including the `Authorization: Bearer <anon-key>` header to match the project's other cron jobs (defensive — even though `verify_jwt=false`, it keeps things consistent).
 
-Same pattern applies to `src/pages/Admin.tsx` (lines 199, 203, 213, 218), which also uses `import.meta.env.VITE_SUPABASE_URL` directly — switch it to import the URL constant from the client file so there's one source of truth.
+### 2. Manually trigger one run now to backfill April
 
-### 3. Trigger a fresh production build with a new bundle hash
-Once the file is changed, the next publish produces a new `/assets/index-<NEWHASH>.js` bundle that boots successfully. The self-destroying service worker we shipped last round will clear out any leftover precache on devices that previously visited.
+After fixing the cron, invoke the edge function once so the template's April expense gets generated immediately (instead of waiting until tomorrow 06:00 UTC). The function's logic:
+- Inserts an $80 Meals expense dated `2026-04-20` (the template's start_date, since it falls in the current month).
+- Updates `last_generated_date` so May's run creates the May 1 expense and doesn't duplicate April's.
 
-## What I am NOT changing
+### 3. Verify
 
-- No PWA changes — the self-destroying SW from last round is correct, leave it.
-- No router/route changes — `BrowserRouter`, the SPA fallback, robots.txt and sitemap.xml are all fine.
-- No SEO file edits — the `<noscript>` block, sitemap, GA4, and Search Console placeholder all stay as-is.
-- No Cloudflare/DNS work — domain serves correctly with `x-deployment-id` updating per publish, so Lovable hosting is doing its job.
+- Re-query `expenses` for `notes ILIKE '%[Recurring: Daily Meals%'` → should show one row.
+- Re-query `recurring_expense_templates` → `last_generated_date` should be set.
+- Check `cron.job_run_details` after the next 06:00 UTC run → should be `succeeded`.
 
-## After the fix — what to verify
+## Technical Notes
 
-1. Click **Update** in the publish dialog.
-2. Hard-reload `https://haultrackerpro.com` once. You should land on the full dark-themed Landing page (nav, hero, "Stop Driving Blind. Know Your Real Profit." headline, dashboard mockup, etc.) — not the plain white headline.
-3. Open DevTools Console. The `supabaseUrl is required` error should be gone.
-4. Open `/auth` and `/pricing` in private windows on phone + desktop — both should now render the real React pages.
-5. In Google Search Console, request indexing for `https://haultrackerpro.com/` and `/features`, `/pricing`, `/faq`. Now that Googlebot can execute JS and reach a working app, indexing will start in 1–7 days.
+- **No code changes needed** in `supabase/functions/generate-recurring-expenses/index.ts` — the function itself is correct (filters by `is_active=true AND status='active'`, gates on Pro/admin, skips paused templates, doesn't backfill skipped months). The `is_active`/`status` sync trigger is already in place.
+- **No frontend changes needed** — the UI was reading directly from the templates table, so the "1 active · 0 paused" counts you see are accurate; they just never produced expenses because the cron never reached the function.
+- **No config.toml changes** — `verify_jwt = false` is already set.
 
-## Technical summary (for the record)
+## Files / Resources Touched
 
-- Files to edit: `src/integrations/supabase/client.ts`, `src/pages/Admin.tsx`.
-- No DB migrations, no edge function changes, no dependency changes.
-- Tests: re-run `vitest`. The existing 72 tests don't depend on env vars — they should stay green.
-- Memory note to add after fix: "Supabase client always falls back to hard-coded publishable URL+anon key so prod builds boot even if env injection fails. Why: lost a launch day to silent crash when GitHub-triggered build shipped empty `VITE_SUPABASE_*`."
+- Cron job `generate-recurring-expenses` (database, via SQL insert tool, not migration).
+- One-time HTTP call to the edge function to backfill April for your template.
+- No source files modified.
