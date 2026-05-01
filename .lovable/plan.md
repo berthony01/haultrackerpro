@@ -1,122 +1,71 @@
-# Plan: Cost Profile → True Pre-Acceptance Profitability Check
 
-## The decision
+## What's actually wrong
 
-Yes, the platform should be able to tell a driver "Is this load profitable?" **before** they accept it — based on **costs the driver pre-registers themselves**, not just on rolling history. This builds on what already exists.
+### 1. "I don't see profit on the dashboard"
 
-## What's already built (don't rebuild it)
+Profit math **is** rendered (`ProfitOverview`, `ContributionMarginCard`, `TaxEstimateCard`), but the user is right that it isn't *visible*:
 
-- `useProfitCheck.ts` — runs as the driver types into LoadForm
-- `ProfitCheckCard.tsx` — shows Strong / Fair / Weak / Risky badge with reasons
-- It already uses lane history, broker reliability, and rolling cost-per-mile
+- These cards sit far down the dashboard — below Quick Actions, Driver Intelligence, Leaderboard, Alerts, Weekly Focus, Home Time, Date Filter, and a 6-tile stat grid. On a 434×798 viewport, the user has to scroll ~5 screens before profit appears.
+- The **top stat grid** shows Est. Earnings, Actual Earnings, Loads, Miles, Deadhead, Known Difference — but **no Net Profit, Total Expenses, or Net $/Mile tile**. Eyes land there and never see profit.
+- When the user has zero expenses logged, `ProfitOverview` collapses to a "Track Your True Profit" CTA — math is hidden entirely. The driver who said "I added repair, fuel, meal expenses" hasn't actually logged them as Expenses, so `ProfitOverview` shows the CTA, not numbers.
+- The new **Cost Profile** isn't surfaced anywhere on the dashboard. After setting it up, the only place it's used is the per-load Profit Check inside the LoadForm. Drivers expect to see "Projected profit (using my cost profile)" on the dashboard too.
 
-**Gap:** It depends on `operating_metrics.rolling_cost_per_mile`, which is computed from the last 60 days of expenses. New drivers, or anyone who hasn't logged enough expenses yet, get "Not enough history yet" and no real profitability answer.
+### 2. "Start for free" white screen flash while logged in
 
-## What we'll add
+Two real causes layered together:
 
-### 1. New "My Cost Profile" section in Settings
+- **Lazy chunk failure.** Runtime errors show `Failed to fetch dynamically imported module: /src/pages/Index.tsx`. When that chunk fails to load (stale build / network blip), Suspense never resolves, the ErrorBoundary or router falls back, and the eagerly-imported Landing page (with the "Start Free — See Your Real Profit Today" hero) briefly paints behind the fallback. There is no retry logic for failed lazy imports.
+- **Auth race timing.** `useAuth` initializes `loading=true`, but `supabase.auth.getSession()` and `onAuthStateChange` both call `setLoading(false)`. Between the moment `loading` flips to false and the moment `Index.tsx` chunk arrives, `<Suspense fallback={<PageFallback/>}>` shows the gray "Loading..." — which is correct. But if `onAuthStateChange` fires *first* with `session=null` (initial fire before getSession completes), `ProtectedRoute` will `<Navigate to="/" replace />` for one render, mounting Landing, and then the real session arrives and bounces back. That bounce paints Landing for ~50–200ms.
 
-A dedicated area where the driver pre-registers their known operating costs **once**. Exact fields:
+## Fix plan
 
-**Fixed monthly costs** (driver fills in dollar amounts):
-- Truck payment / lease
-- Trailer payment
-- Insurance
-- Permits & licensing
-- ELD / software / phone
-- Other fixed monthly
+### A. Make profit unmistakable on the dashboard
 
-**Variable per-mile costs:**
-- Fuel: average MPG + diesel price per gallon → app derives fuel $/mile
-- Maintenance reserve ($/mile, e.g. $0.10)
-- Tires reserve ($/mile, e.g. $0.03)
-- Tolls average ($/mile, optional)
+1. **Promote a "Net Profit" tile into the top stat grid** in `DashboardView.tsx`. Replace one slot (Avg $/Mile fallback) with a dedicated **Net Profit** tile (variant=success/danger) and a **Total Expenses** tile so the very first thing the user sees includes profit math.
+2. **Move `ProfitOverview` up** — render it directly under the stat grid, before `ContributionMarginCard`, `FuelAnalyticsCard`, etc. (It already sits there; the move is to put it *above* the grid actually, so it's the first earnings card after Quick Actions on dashboard scroll. We'll place it right after the date-range filter, before the 2×3 stat grid.)
+3. **Always show the math, even with zero expenses.** Update `ProfitOverview.tsx` so when `expenses.length === 0` it still renders Gross / Expenses ($0) / Net Profit (= Gross) and keeps the "Add Expense" CTA inline at the top of the same card. The user explicitly said they "don't see profit" — never hide the numbers.
+4. **Add a "Projected Profit (Cost Profile)" tile** that uses the new `useCostProfile` hook. For the filtered date range, compute:
+   ```
+   projectedCost = computeCostProfileCPM(profile, totalMiles).cpm * totalMiles
+                 + (mealsPerDay + lodgingPerDay) * estimatedDays
+   projectedNet  = grossRevenue - projectedCost
+   ```
+   Show as a tile with a subtitle "Based on your Cost Profile" and link to Settings → Cost Profile if not configured.
 
-**Per-day costs:**
-- Meals & lodging ($/day on the road)
+### B. Fix the "Start for free" flash
 
-**Driver expectation:**
-- Minimum acceptable profit margin % (e.g. "I won't run a load under 20% margin")
-- Minimum acceptable $/mile
-- Estimated days per 1,000 miles (default 2.5) — used to spread per-day costs
+1. **Add a retry wrapper for lazy imports** in `App.tsx` so a transient chunk failure auto-retries instead of falling back to public Landing. Pattern:
+   ```ts
+   const lazyWithRetry = (factory) => lazy(() =>
+     factory().catch((err) => {
+       if (!sessionStorage.getItem('chunk-retried')) {
+         sessionStorage.setItem('chunk-retried', '1');
+         window.location.reload();
+       }
+       throw err;
+     })
+   );
+   ```
+   Apply to `Index` (and the other authenticated lazy routes).
+2. **Stabilize the auth race** in `useAuth.tsx`: don't flip `loading` to `false` from `onAuthStateChange` until the initial `getSession()` has resolved at least once. Track `initialResolved` so the first `onAuthStateChange(null)` event before session restoration doesn't briefly mark the user as logged-out and trigger a `<Navigate to="/" />`. Only after both calls have run does `loading` become false.
+3. **Render a neutral splash, not Landing, during auth resolution.** This is already the case via `PageFallback`, but we'll make `PublicRoute` also wait for `loading=false` *and* an explicit "no session after initial resolve" signal before mounting Landing — preventing the brief Landing paint between the chunk failing and the redirect happening.
 
-The driver can save partial info. The more they fill in, the sharper the check.
+## Files to change
 
-### 2. New `cost_profile` table
+- `src/components/DashboardView.tsx` — promote ProfitOverview above the stat grid; add Net Profit + Total Expenses + Projected Net (Cost Profile) tiles to the top grid.
+- `src/components/ProfitOverview.tsx` — always render numbers (even at $0 expenses); inline the Add Expense CTA instead of replacing the card.
+- `src/hooks/useAuth.tsx` — guard `loading=false` until `getSession()` has resolved; expose an `initialResolved` flag.
+- `src/App.tsx` — wrap lazy imports (at minimum `Index`) with a retry-on-chunk-failure helper; ensure `PublicRoute` waits on `initialResolved` before rendering Landing.
 
-```text
-cost_profile (one row per user)
-├─ Fixed monthly costs (truck, insurance, etc.)
-├─ Per-mile variable rates (maintenance, tires, tolls)
-├─ Fuel inputs (avg MPG, diesel $/gal)
-├─ Per-day costs (meals)
-├─ Targets (min margin %, min RPM, days per 1k mi)
-└─ Estimated monthly miles (used to convert fixed → per-mile)
-```
+## Out of scope
 
-RLS: user owns their row, standard CRUD policies.
+- No DB changes. Cost Profile table and migrations from the previous round stay as-is.
+- No changes to the in-form `ProfitCheckCard` (it's working).
+- No new Pro gating logic.
 
-### 3. Upgraded profit-check math
+## Acceptance check after build
 
-`useProfitCheck` will use a layered cost model — falls back gracefully:
-
-```text
-Cost-per-mile for THIS load =
-   Fuel CPM      = diesel_price / avg_mpg
- + Maintenance   = user-entered $/mi
- + Tires         = user-entered $/mi
- + Tolls         = user-entered $/mi
- + Fixed share   = (sum of fixed monthly) / estimated monthly miles
- + Per-day share = (meals × estimated days for this load) / total miles
-
-Estimated load cost = CPM × total_miles (loaded + deadhead)
-Estimated net       = estimated_pay − estimated load cost
-Estimated margin %  = estimated_net / estimated_pay × 100
-
-Decision = compare margin % and RPM against driver's
-           pre-registered targets (min margin, min RPM)
-```
-
-**Priority order for CPM:**
-1. Cost Profile (driver-defined) — primary
-2. Rolling 60-day actuals — used as a sanity check / blends in if both exist
-3. Neither — show "Set up your Cost Profile" CTA inside the card
-
-### 4. UI changes
-
-- **Settings page:** new "My Cost Profile" section with the inputs above (collapsible groups: Fixed / Variable / Targets)
-- **LoadForm:** ProfitCheckCard now shows real numbers from Day 1 if profile exists
-- **ProfitCheckCard:** new line "Based on your Cost Profile" or "Based on 60-day actuals" so the driver sees where the number comes from
-- **LoadForm decision banner:** add an explicit "❌ Below your minimum margin" / "✅ Meets your minimum margin" line when targets are set
-- **First-run nudge:** if a driver opens LoadForm without a cost profile, show a small banner: "Set up your costs in Settings to know if a load is profitable before you accept it." (one-tap to settings)
-
-### 5. Onboarding tie-in
-
-Add a 5th onboarding step (skippable): "Tell us your costs so we can warn you about bad loads." Pre-fills with realistic sample numbers the driver can edit.
-
-## Out of scope (intentionally)
-
-- Editing per-load profit after acceptance — already covered by linked expenses + reports
-- Auto-pulling fuel prices from an API — driver enters their own, simpler & accurate
-- AI-generated cost profile — deterministic only, per project rule
-
-## Why this is the right design (honest take)
-
-- **Predictive, not reactive** — works Day 1, before any history exists
-- **Driver-owned numbers** — they trust their own inputs more than a black-box average
-- **Self-correcting over time** — once 60-day actuals exist, app can compare profile vs reality and nudge: "Your real fuel CPM is $0.65, you have $0.55 in your profile — update?"
-- **Aligns with existing architecture** — extends `useProfitCheck` and `ProfitCheckCard`, no duplicate UI
-- **Surgical** — one new table, one settings section, one math upgrade. No refactor of LoadForm or reports
-
-## Files touched
-
-- New: `supabase/migrations/...` (cost_profile table + RLS)
-- New: `src/hooks/useCostProfile.ts`
-- New: `src/components/CostProfileSettings.tsx`
-- Edit: `src/components/SettingsView.tsx` (mount new section)
-- Edit: `src/hooks/useProfitCheck.ts` (layered CPM math)
-- Edit: `src/components/ProfitCheckCard.tsx` (source-of-numbers label, target indicator)
-- Edit: `src/components/LoadForm.tsx` (first-run banner if profile empty)
-- Edit: `src/components/Onboarding.tsx` (optional 5th step)
-
-Approve and I'll build it.
+- On `/dashboard` with even 1 load and 1 expense, **Net Profit** and **Total Expenses** are visible above the fold (top stat grid), and `ProfitOverview` shows the gross−expenses=net math right under the grid.
+- With a Cost Profile saved, a "Projected Net (Cost Profile)" tile appears in the grid with a sane number.
+- Hard-refreshing `/dashboard` while logged in never shows the Landing "Start Free" hero — it shows the gray "Loading..." splash and goes straight to the dashboard.
+- If the `Index.tsx` chunk fails once, the page auto-retries instead of bouncing to Landing.
