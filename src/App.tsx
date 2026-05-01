@@ -13,8 +13,32 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 
+// Lazy import with one-shot retry on chunk-load failure. A failed dynamic
+// import (stale build / transient network) used to flash Landing's
+// "Start Free…" hero — now we reload once and resume cleanly.
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  key: string,
+) {
+  return lazy(() =>
+    factory().catch((err) => {
+      const flag = `lwr:${key}`;
+      try {
+        if (!sessionStorage.getItem(flag)) {
+          sessionStorage.setItem(flag, '1');
+          window.location.reload();
+          // Return a never-resolving promise so Suspense keeps the fallback
+          // up while the page reloads.
+          return new Promise<{ default: T }>(() => {});
+        }
+      } catch {}
+      throw err;
+    }),
+  );
+}
+
 // Everything else — lazy loaded
-const Index = lazy(() => import("./pages/Index"));
+const Index = lazyWithRetry(() => import("./pages/Index"), "Index");
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const FAQ = lazy(() => import("./pages/FAQ"));
