@@ -254,70 +254,132 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       ) : (
         <>
           {/* === ZONE 5 · BUSINESS METRICS === */}
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} size="large" />
-            <StatCard
-              label="Actual Earnings"
-              value={formatCurrency(actual)}
-              icon={DollarSign}
-              subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
-              size="large"
-            />
-            <StatCard label="Total Loads" value={filteredLoads.length.toString()} icon={Truck} />
-            <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
+          {/* Profit Overview — promoted to top so Gross / Expenses / Net Profit are
+              the first thing the driver sees after the date filter. */}
+          <ProfitOverview
+            loads={filteredLoads}
+            expenses={filteredExpenses}
+            onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined}
+          />
+
+          {/* Headline Net Profit + Expenses tiles. Always rendered, even at $0,
+              so profit math is visible above the fold. */}
+          {(() => {
+            const grossForTiles = (() => {
+              const paid = filteredLoads.filter(l => l.actual_pay_received != null);
+              if (paid.length > 0) {
+                return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
+                  + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
+              }
+              return estimated;
+            })();
+            const totalExpensesForTiles = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
+            const netProfitForTiles = grossForTiles - totalExpensesForTiles;
+
+            // Cost Profile projection (only when user has set up a usable profile)
+            let projectedNet: number | null = null;
+            if (profileHasUsableData(costProfile) && totalMiles > 0) {
+              const { cpm } = computeCostProfileCPM(costProfile, totalMiles);
+              const variableCost = cpm * totalMiles;
+              const daysPer1k = Number(costProfile?.days_per_1000_miles ?? 2.5) || 2.5;
+              const days = (totalMiles / 1000) * daysPer1k;
+              const perDay = Number(costProfile?.meals_per_day ?? 0) + Number(costProfile?.lodging_per_day ?? 0);
+              const dailyCost = days * perDay;
+              projectedNet = grossForTiles - variableCost - dailyCost;
+            }
+
+            return (
+              <div className="grid grid-cols-2 gap-2.5">
+                <StatCard
+                  label="Net Profit"
+                  value={formatCurrency(netProfitForTiles)}
+                  icon={netProfitForTiles >= 0 ? TrendingUp : TrendingDown}
+                  subtitle={filteredExpenses.length > 0 ? 'Gross − Expenses' : 'Log expenses for true net'}
+                  variant={netProfitForTiles >= 0 ? 'success' : 'danger'}
+                  size="large"
+                />
+                <StatCard
+                  label="Total Expenses"
+                  value={formatCurrency(totalExpensesForTiles)}
+                  icon={Receipt}
+                  subtitle={`${filteredExpenses.length} logged`}
+                  variant="warning"
+                  size="large"
+                />
+                <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} />
+                <StatCard
+                  label="Actual Earnings"
+                  value={formatCurrency(actual)}
+                  icon={DollarSign}
+                  subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
+                />
+                <StatCard label="Total Loads" value={filteredLoads.length.toString()} icon={Truck} />
+                <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <StatCard
+                          label="Deadhead %"
+                          value={`${deadheadPct.toFixed(1)}%`}
+                          icon={MapPin}
+                          subtitle={`${formatNumber(deadheadMiles)} mi`}
+                          variant={deadheadColor === 'success' ? 'success' : deadheadColor === 'warning' ? 'warning' : 'danger'}
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">High deadhead reduces profit.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {projectedNet != null ? (
+                  <StatCard
+                    label="Projected Net"
+                    value={formatCurrency(projectedNet)}
+                    icon={projectedNet >= 0 ? TrendingUp : TrendingDown}
+                    subtitle="Based on Cost Profile"
+                    variant={projectedNet >= 0 ? 'success' : 'danger'}
+                  />
+                ) : (
+                  <div
+                    className="cursor-pointer active:scale-95 transition-transform"
+                    onClick={() => onNavigate?.('settings')}
+                  >
                     <StatCard
-                      label="Deadhead %"
-                      value={`${deadheadPct.toFixed(1)}%`}
-                      icon={MapPin}
-                      subtitle={`${formatNumber(deadheadMiles)} mi`}
-                      variant={deadheadColor === 'success' ? 'success' : deadheadColor === 'warning' ? 'warning' : 'danger'}
+                      label="Projected Net"
+                      value="Set up"
+                      icon={TrendingUp}
+                      subtitle="Add Cost Profile"
                     />
                   </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p className="text-xs">High deadhead reduces profit.</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            {knownDifference != null && (
-              <StatCard
-                label="Known Difference"
-                value={`${knownDifference >= 0 ? '+' : ''}${formatCurrency(knownDifference)}`}
-                icon={knownDifference >= 0 ? TrendingUp : TrendingDown}
-                subtitle={knownDifference >= 0 ? 'Overpaid' : 'Underpaid'}
-                variant={knownDifference >= 0 ? 'success' : 'danger'}
-              />
-            )}
-            {missingPayCount > 0 && (
-              <div
-                className="cursor-pointer active:scale-95 transition-transform"
-                onClick={() => onNavigate?.('loads', { filter: 'missing_pay' })}
-              >
-                <StatCard
-                  label="Pending Payment"
-                  value={formatCurrency(unpaidEstimated)}
-                  icon={AlertTriangle}
-                  subtitle={`${missingPayCount} load${missingPayCount > 1 ? 's' : ''} — tap to review`}
-                  variant="warning"
-                />
+                )}
+                {knownDifference != null && (
+                  <StatCard
+                    label="Known Difference"
+                    value={`${knownDifference >= 0 ? '+' : ''}${formatCurrency(knownDifference)}`}
+                    icon={knownDifference >= 0 ? TrendingUp : TrendingDown}
+                    subtitle={knownDifference >= 0 ? 'Overpaid' : 'Underpaid'}
+                    variant={knownDifference >= 0 ? 'success' : 'danger'}
+                  />
+                )}
+                {missingPayCount > 0 && (
+                  <div
+                    className="cursor-pointer active:scale-95 transition-transform"
+                    onClick={() => onNavigate?.('loads', { filter: 'missing_pay' })}
+                  >
+                    <StatCard
+                      label="Pending Payment"
+                      value={formatCurrency(unpaidEstimated)}
+                      icon={AlertTriangle}
+                      subtitle={`${missingPayCount} load${missingPayCount > 1 ? 's' : ''} — tap to review`}
+                      variant="warning"
+                    />
+                  </div>
+                )}
               </div>
-            )}
-            {knownDifference == null && missingPayCount === 0 && (
-              <StatCard
-                label="Avg $/Mile"
-                value={loadedMiles > 0 ? formatCurrency(estimated / loadedMiles) : '$0'}
-                icon={TrendingUp}
-              />
-            )}
-          </div>
-
-          {/* Profit Overview */}
-          <ProfitOverview loads={filteredLoads} expenses={filteredExpenses} onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined} />
+            );
+          })()}
 
           {/* Cost Breakdown: Fixed vs Variable + Contribution Margin */}
           <ContributionMarginCard loads={filteredLoads} expenses={filteredExpenses} />
