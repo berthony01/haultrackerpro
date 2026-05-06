@@ -1,73 +1,147 @@
-# Recurring Expense Fix Plan
+## " Pause the label/helper-text update.
 
-## Root Cause (confirmed from your data)
+Before changing wording, audit deadhead pay logic.
 
-Your template in the database:
-- **Name:** "Daily Meals"
-- **Amount:** $80
-- **Start date:** 2026-04-20
-- **Frequency:** `monthly` ← this is the bug
-- **Last generated:** 2026-05-01
-- **Status:** active
+Important business rule:
 
-The recurring system is **hardcoded to monthly-only**, even though the column is called `frequency`:
+Not all 1099 drivers have unpaid deadhead. Some drivers are paid for deadhead, some are not. My account should support paid deadhead because I personally get paid for deadhead.
 
-1. `RecurringExpensesView.tsx` line 586 hard-codes `frequency: 'monthly'` on every insert — there is no UI to choose daily/weekly.
-2. `generate-recurring-expenses` ignores `frequency` entirely. It only ever:
-   - Runs once per day at 6:00 AM UTC (cron is correct).
-   - Generates **one row per template per calendar month**, dated the 1st.
-   - Sets `last_generated_date = first of current month`, then the `last_generated_date < currentMonthStart` filter blocks any further generation until next month.
+Please verify whether the app is correctly reading and applying:
 
-So your "Daily Meals" template behaved correctly per the *current* code: April 20 (start month) → 1 row, May 1 → 1 row. June 1 will create the next one. Nothing crashed; the feature just doesn't support daily/weekly at all.
+1. Settings deadhead pay preference
 
-This also explains every other "missing date" — they were never supposed to be created under monthly mode.
+2. Default Pay Model
 
-## What to fix
+3. Load-level Pay Model
 
-### 1. Database
-Add a small CHECK-equivalent validation (via trigger to stay flexible) so `frequency` is one of `daily`, `weekly`, `monthly`. No schema change needed — column already exists and defaults to `monthly`.
+4. Deadhead rate
 
-### 2. Edge function `generate-recurring-expenses`
-Rewrite the generation loop to be frequency-aware and idempotent **per period**, using `last_generated_date` as the cursor:
+5. Loaded + Deadhead pay calculation
 
-- **monthly:** generate on the 1st of each month from `max(start_date, last_generated_date+1month)` up to current month. (Preserves today's behavior.)
-- **weekly:** generate every 7 days from `start_date`, advancing the cursor by 7 days until `> today`.
-- **daily:** generate one row per day from `max(start_date, last_generated_date+1)` through today (catch-up loop, capped at e.g. 366 rows per template per run as a safety net).
+6. LoadForm live preview calculation
 
-For each generated row:
-- Insert into `expenses` with `expense_date` = that period's date.
-- Update `last_generated_date` to that date.
-- Respect `end_date` (stop if exceeded).
-- Skip if template is paused or user is not Pro/admin (unchanged).
+7. computeLoadPay logic
 
-Date math will use explicit UTC construction (`Date.UTC(y, m, d)`) — no `new Date(string)` parsing — to avoid the timezone-shift bug pattern that bit us before.
+8. financialCalculations.ts summary logic
 
-### 3. UI — `RecurringExpensesView.tsx`
-- Add a Frequency selector (Daily / Weekly / Monthly) to the add/edit form.
-- Show frequency clearly on each template card (already partially shown via `template.frequency`).
-- Default remains Monthly so existing flows are unchanged.
+9. Dashboard/report/export logic
 
-### 4. Backfill your existing "Daily Meals" template
-Once the function is frequency-aware, change that template's `frequency` from `monthly` → `daily` (one-tap in the new UI, or I can do it via a one-off SQL update). The next 6 AM UTC run will then catch up all missing days from `last_generated_date` (May 1) through today, dated correctly. To avoid waiting until 6 AM UTC, I'll also call the function once after deploy to trigger an immediate catch-up.
+Expected behavior:
 
-### 5. Safety
-- Keep the per-template safety cap (max ~366 inserts per run) so a wildly old `start_date` can't insert 10k rows by accident.
-- Keep the existing Pro/admin gate and idempotency (no duplicate rows for the same date because `last_generated_date` always advances).
-- Leave the cron schedule (`0 6 * * *`) as-is.
+If deadhead is unpaid:
 
-## Files to change
+Gross Revenue = loaded miles × broker rate
 
-```text
-supabase/functions/generate-recurring-expenses/index.ts   (frequency-aware generator)
-src/components/RecurringExpensesView.tsx                  (add Frequency selector)
-src/hooks/useRecurringExpenses.ts                         (allow frequency in insert payload)
-supabase/migrations/<new>.sql                             (frequency CHECK trigger; safe default)
-```
+Effective RPM / Real Pay Per Mile = gross revenue ÷ total miles
 
-## Verification after deploy
-1. Manually invoke the function once → confirm your "Daily Meals" template generates rows for every missing day from May 2 → today.
-2. Confirm `last_generated_date` advances to today.
-3. Re-invoke → confirm zero new rows (idempotent).
-4. Add a test weekly template → confirm only one row per 7-day cycle.
+This can be lower than the broker rate.
 
-Approve and I'll implement.
+If deadhead is paid at the same rate:
+
+Gross Revenue = (loaded miles + deadhead miles) × broker rate
+
+Effective RPM / Real Pay Per Mile = gross revenue ÷ total miles
+
+This should stay close to the broker rate before expenses.
+
+If deadhead is paid at a custom rate:
+
+Gross Revenue = loaded miles × broker rate + deadhead miles × deadhead rate
+
+Effective RPM / Real Pay Per Mile = gross revenue ÷ total miles
+
+Check whether the Settings deadhead pay option is actually being applied to new loads and the live preview.
+
+Do not change labels yet.
+
+Do not change math until the audit identifies the exact issue.
+
+Do not change database, RLS, auth, billing, Stripe, routes, or unrelated UI.
+
+Return:
+
+1. Current deadhead settings fields found
+
+2. Current pay model options found
+
+3. Whether my Settings value is being used by LoadForm
+
+4. Whether deadhead pay is being included in gross revenue
+
+5. Why a load with $0.82/mile and paid deadhead would show $0.67/mile
+
+6. Exact file and function causing the issue, if any
+
+7. Recommended fix
+
+8. Confirmation no code changes were made during audit "  What you're seeing (and why it's not a bug)
+
+You entered **$0.82/mile contract rate**. The app shows:
+
+- **Contract Rate: $0.82/mi** ← what the broker pays you per loaded mile
+- **Effective RPM: $0.67/mi** ← what you actually earn per mile **once empty (deadhead) miles are included**
+
+Math: `$0.82 × loaded miles ÷ (loaded + deadhead miles) = $0.67`. The deadhead miles are dragging your real per-mile earnings down by 18.3%. That's the whole point of "Effective RPM" — it tells the truth about what your truck is actually earning while it rolls.
+
+So the **calculation is correct**, but the **wording is too technical**. A non-technical driver reads "Effective RPM $0.67" and thinks the app changed their rate. Same with "Estimated Variable Cost" — that's accountant language.
+
+## The fix: plain-English labels + inline explanations
+
+No math changes. No feature removals. Only label and helper-text rewrites in two files.
+
+### 1. `src/components/LoadForm.tsx` — live preview block
+
+
+| Current label   | New label                         | Inline helper (small gray text under the number)                                               |
+| --------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Contract Rate   | **Broker Rate (per loaded mile)** | "What the broker pays you per loaded mile."                                                    |
+| Effective RPM   | **Your Real Pay Per Mile**        | "Includes your empty/deadhead miles. This is what your truck actually earns per mile rolling." |
+| Est. Expenses   | **Est. Fuel & Truck Costs**       | (unchanged amount)                                                                             |
+| Est. Net Profit | **Est. Take-Home (after costs)**  | —                                                                                              |
+| Net RPM         | **Take-Home Per Mile**            | —                                                                                              |
+| Deadhead Impact | **Empty Miles Drag**              | "How much your empty miles lower your real pay per mile."                                      |
+
+
+Replace the current footer note with a clearer two-line version:
+
+> ℹ️ Your broker rate of **$0.82/mi** has not changed. "Real Pay Per Mile" just spreads your pay across **all** miles you drove (loaded + empty), so you can see what your truck actually earns.
+
+### 2. `src/components/ProfitCheckCard.tsx` — Profit Check tile
+
+
+| Current label      | New label                   |
+| ------------------ | --------------------------- |
+| Effective RPM      | **Real Pay/Mile**           |
+| Est. Variable Cost | **Est. Fuel & Truck Costs** |
+| Est. Net           | **Est. Take-Home**          |
+| Est. Margin        | **Profit Margin**           |
+
+
+Add a small info row under the 4 tiles:
+
+> ℹ️ "Real Pay/Mile" includes empty miles. "Fuel & Truck Costs" is the estimated cost of running this load (fuel, maintenance, etc., from your Cost Profile).
+
+### 3. Keep the technical terms discoverable (optional but recommended)
+
+Wrap each new label in a `Tooltip` so the original term ("Effective RPM", "Variable Cost") is shown on hover/tap for drivers who already know the lingo. One-liner tooltips, no layout change.
+
+## What does NOT change
+
+- All math, formulas, and stored values
+- Database, RLS, auth, billing, Stripe
+- Reports, CSV/PDF exports, Dashboard cards
+- Cancelled-load handling, payment status badges
+- Routes, navigation, Cost Profile, settings
+
+## Files touched
+
+1. `src/components/LoadForm.tsx` (label/helper text only, ~lines 875–929)
+2. `src/components/ProfitCheckCard.tsx` (label text only)
+
+## Validation
+
+- TypeScript build
+- Visual check on Add Load preview with the same scenario you tested ($0.82/mi + deadhead)
+- Confirm Profit Check tile reads naturally to a non-technical driver
+
+Approve and I'll implement only these two label/helper edits. 
