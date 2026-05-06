@@ -14,7 +14,7 @@ export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
   const sorted = [...loads].sort((a, b) => getEffectiveDate(b).localeCompare(getEffectiveDate(a))).slice(0, 6);
 
   const expensesByLoad = (loadId: string) =>
-    expenses.filter(e => (e as any).load_id === loadId).reduce((s, e) => s + Number(e.amount), 0);
+    expenses.filter(e => e.linked_load_id === loadId).reduce((s, e) => s + Number(e.amount), 0);
 
   let totalRev = 0, totalExp = 0, totalNet = 0, totalMiles = 0;
   const rows = sorted.map(l => {
