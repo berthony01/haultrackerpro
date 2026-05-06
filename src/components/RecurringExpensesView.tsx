@@ -584,7 +584,7 @@ function RecurringExpenseForm({ initialData, onSubmit, onCancel, loading }: Recu
       template_name: form.template_name.trim(),
       category: form.category,
       amount,
-      frequency: 'monthly',
+      frequency: form.frequency,
       start_date: form.start_date,
       end_date: form.end_date || null,
       notes: form.notes.trim() || null,
