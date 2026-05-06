@@ -128,10 +128,10 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
           </div>
 
           {/* Total Cost (calculated) */}
-          <div className="p-3 rounded-xl bg-primary/5 border border-primary/20">
+          <div className="p-3 rounded-xl bg-primary/10 ring-1 ring-primary/25">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Total Cost</span>
-              <span className="text-xl font-black font-mono text-primary">
+              <span className="text-label">Total Cost</span>
+              <span className="text-2xl font-mono font-black text-primary tracking-tight">
                 ${totalCost.toFixed(2)}
               </span>
             </div>
