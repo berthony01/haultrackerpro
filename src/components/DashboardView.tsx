@@ -150,12 +150,87 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   }, [loads, weekStartsOn]);
   const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
+  // ---- Premium hero KPI metrics + week-over-week trends ----
+  const grossRevenue = (() => {
+    const paid = filteredLoads.filter(l => l.actual_pay_received != null);
+    if (paid.length > 0) {
+      return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
+        + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
+    }
+    return estimated;
+  })();
+  const totalExpensesAmt = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const netProfit = grossRevenue - totalExpensesAmt;
+  const profitPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
+
+  // last-week comparison (same date type as the active filter)
+  const prevRange = useMemo(() => {
+    const now = new Date();
+    const lw = subWeeks(now, 1);
+    return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) };
+  }, [weekStartsOn]);
+  const prevLoads = useMemo(() => loads.filter(l => {
+    const d = parseISO(getEffectiveDate(l));
+    return isWithinInterval(d, prevRange);
+  }), [loads, prevRange]);
+  const prevExpenses = useMemo(() => expenses.filter(e => {
+    const d = parseISO(e.expense_date);
+    return isWithinInterval(d, prevRange);
+  }), [expenses, prevRange]);
+  const prevGross = sumExpectedPay(prevLoads.filter(l => l.actual_pay_received == null))
+    + prevLoads.filter(l => l.actual_pay_received != null).reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
+  const prevExp = prevExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const prevNet = prevGross - prevExp;
+  const prevMiles = sumOperatingMiles(prevLoads);
+  const prevPpm = prevMiles > 0 ? prevNet / prevMiles : 0;
+  const pct = (curr: number, prev: number) => {
+    if (!isFinite(prev) || prev === 0) return null;
+    return ((curr - prev) / Math.abs(prev)) * 100;
+  };
+  const trendRevenue = pct(grossRevenue, prevGross);
+  const trendNet = pct(netProfit, prevNet);
+  const trendPpm = pct(profitPerMile, prevPpm);
+  const trendLoads = pct(filteredLoads.length, prevLoads.length);
+
+  const scorecard = useDriverScorecard(loads, expenses, weekStartsOn);
+
   return (
     <div className="space-y-5 animate-fade-in">
       <div>
         <h1 className="text-2xl font-black font-heading">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
+
+      {/* === PREMIUM ANALYTICS HERO === */}
+      {!isLoading && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <PremiumKpiCard label="Total Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} delay={0} />
+            <PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} delay={0.05} />
+            <PremiumKpiCard label="Profit / Mile" value={formatCurrency(profitPerMile)} icon={Route} trendPct={trendPpm} delay={0.1} />
+            <PremiumKpiCard label="Loads Completed" value={filteredLoads.length.toString()} icon={Truck} trendPct={trendLoads} delay={0.15} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-4">
+              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} />
+              <ExpenseDonut expenses={filteredExpenses} />
+            </div>
+            <div className="space-y-4">
+              <DriverScoreGauge
+                score={scorecard.totalScore}
+                tier={scorecard.tier}
+                percentileLabel={scorecard.totalScore >= 80 ? 'Top 14% of drivers' : scorecard.totalScore >= 60 ? 'Top 35% of drivers' : 'Keep going!'}
+              />
+              <RecentLoadsPanel loads={loads} onViewAll={onNavigate ? () => onNavigate('loads') : undefined} />
+            </div>
+          </div>
+
+          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={onNavigate ? () => onNavigate('loads') : undefined} />
+
+          <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />
+        </>
+      )}
 
       {/* === ZONE 1 · ACTION ZONE === */}
       {/* Quick Actions — primary "log something" entry point */}
