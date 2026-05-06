@@ -305,7 +305,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
           ))}
         </div>
       ) : templates.length === 0 ? (
-        <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
+        <Card className="premium-card border-dashed">
           <CardContent className="py-14 text-center">
             <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
               <RefreshCcw className="h-12 w-12 text-muted-foreground/30" />
