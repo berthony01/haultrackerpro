@@ -257,9 +257,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       </div>
 
       {/* Account info */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-3">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Account</p>
+      <div className="premium-card p-4 space-y-3">
+          <p className="text-label">Account</p>
           <div className="flex items-center gap-2">
             <Lock className="h-3.5 w-3.5 text-muted-foreground/50" />
             <p className="text-sm font-medium truncate">{user?.email}</p>
