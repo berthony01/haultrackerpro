@@ -103,7 +103,14 @@ serve(async (req) => {
       }
     }
 
-    const origin = req.headers.get("origin") || "https://haultrackerpro.com";
+    // Validate Origin against an allowlist to prevent open-redirect via Stripe checkout URLs.
+    const ALLOWED_ORIGINS = new Set([
+      "https://haultrackerpro.com",
+      "https://www.haultrackerpro.com",
+      "https://haultrackerpro.lovable.app",
+    ]);
+    const reqOrigin = req.headers.get("origin") ?? "";
+    const origin = ALLOWED_ORIGINS.has(reqOrigin) ? reqOrigin : "https://haultrackerpro.com";
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,

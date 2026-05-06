@@ -18,6 +18,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Restrict to internal callers (cron job) only.
+  const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+  const provided = req.headers.get("x-internal-secret") ?? "";
+  if (!internalSecret || provided !== internalSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 401,
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
