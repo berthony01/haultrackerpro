@@ -254,32 +254,28 @@ export function ParkingFinder({ hasAccess, subscriptionLoading = false }: Parkin
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4 space-y-2">
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-3 w-2/3" />
-                <Skeleton className="h-3 w-1/3" />
-              </CardContent>
-            </Card>
+            <div key={i} className="premium-card p-4 space-y-2">
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">No parking matches your filters.</p>
-            <div className="flex items-center justify-center gap-2">
-              {filtersActive && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  Clear filters
-                </Button>
-              )}
-              <Button onClick={handleAddClick} size="sm">
-                {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                <span className="ml-1">Add a location</span>
+        <div className="premium-card p-8 text-center space-y-3">
+          <p className="text-sm text-muted-foreground">No parking matches your filters.</p>
+          <div className="flex items-center justify-center gap-2">
+            {filtersActive && (
+              <Button variant="outline" size="sm" onClick={resetFilters}>
+                Clear filters
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            )}
+            <Button onClick={handleAddClick} size="sm">
+              {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              <span className="ml-1">Add a location</span>
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className="space-y-2">
           {pageItems.map((loc) => (
@@ -361,24 +357,22 @@ export function ParkingFinder({ hasAccess, subscriptionLoading = false }: Parkin
       )}
 
       {/* Bottom CTA */}
-      <Card className="border-dashed bg-muted/20">
-        <CardContent className="p-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Spotted parking we don't have?
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Add it to help the network — earn points for every contribution.
-            </p>
-          </div>
-          <Button onClick={handleAddClick} className="shrink-0" size="sm">
-            {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-            <span className="ml-1">Add spot</span>
-            {!hasAccess && <span className="ml-1 text-[10px] opacity-80">Pro</span>}
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="premium-card p-4 flex items-center justify-between gap-3 border-dashed">
+        <div className="min-w-0">
+          <p className="text-sm font-bold flex items-center gap-1.5 text-foreground">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Spotted parking we don't have?
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Add it to help the network — earn points for every contribution.
+          </p>
+        </div>
+        <Button onClick={handleAddClick} className="shrink-0" size="sm">
+          {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+          <span className="ml-1">Add spot</span>
+          {!hasAccess && <span className="ml-1 text-[10px] opacity-80">Pro</span>}
+        </Button>
+      </div>
 
       <ParkingDetailSheet
         location={selected}
