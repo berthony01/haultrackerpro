@@ -1,71 +1,52 @@
+## Root cause
 
-## What's actually wrong
+The cream-colored "HaulTrackerPro — Track Loads, Expenses & Net Profit / Get started free / Explore: Features · Pricing · FAQ…" page that flashes on reload is **not** the React Landing page. It's the static SEO fallback HTML hard-coded inside `<div id="root">` in `index.html` (lines 76–86):
 
-### 1. "I don't see profit on the dashboard"
+```html
+<div id="root">
+  <div style="max-width:780px;margin:0 auto;padding:48px 20px;font-family:-apple-system,...;color:#0f172a">
+    <h1>HaulTrackerPro — Track Loads, Expenses & Net Profit</h1>
+    <p>Professional load, expense, and profit tracking…</p>
+    <p><a href="/auth" style="background:#f97316;...">Get started free</a></p>
+    <p>Explore: <a href="/features">Features</a> · <a href="/pricing">Pricing</a> · …</p>
+  </div>
+</div>
+```
 
-Profit math **is** rendered (`ProfitOverview`, `ContributionMarginCard`, `TaxEstimateCard`), but the user is right that it isn't *visible*:
+This block is what the browser paints **before** the JS bundle loads and React hydrates. On a logged-in reload, the sequence is:
 
-- These cards sit far down the dashboard — below Quick Actions, Driver Intelligence, Leaderboard, Alerts, Weekly Focus, Home Time, Date Filter, and a 6-tile stat grid. On a 434×798 viewport, the user has to scroll ~5 screens before profit appears.
-- The **top stat grid** shows Est. Earnings, Actual Earnings, Loads, Miles, Deadhead, Known Difference — but **no Net Profit, Total Expenses, or Net $/Mile tile**. Eyes land there and never see profit.
-- When the user has zero expenses logged, `ProfitOverview` collapses to a "Track Your True Profit" CTA — math is hidden entirely. The driver who said "I added repair, fuel, meal expenses" hasn't actually logged them as Expenses, so `ProfitOverview` shows the CTA, not numbers.
-- The new **Cost Profile** isn't surfaced anywhere on the dashboard. After setting it up, the only place it's used is the per-load Profit Check inside the LoadForm. Drivers expect to see "Projected profit (using my cost profile)" on the dashboard too.
+1. Browser paints `index.html` → user sees the cream "Get started free" page.
+2. React bundle loads, mounts `<App>` → `AuthProvider` is `loading: true` → `ProtectedRoute` shows `<PageFallback />` ("Loading…").
+3. `getSession()` resolves → `loading=false` → user lands on `/dashboard`.
 
-### 2. "Start for free" white screen flash while logged in
+The screenshot the user shared matches step 1 exactly (matches the inline styles: cream bg, orange button, underlined links). It has nothing to do with auth state — it's a paint flash that happens to every visitor on every cold load, just more noticeable on reload because the cached dashboard URL means you "expect" to land on the dashboard.
 
-Two real causes layered together:
+The previous `lazyWithRetry` work in `App.tsx` only addressed chunk-load failures; it doesn't help here because the flash happens *before* React even runs.
 
-- **Lazy chunk failure.** Runtime errors show `Failed to fetch dynamically imported module: /src/pages/Index.tsx`. When that chunk fails to load (stale build / network blip), Suspense never resolves, the ErrorBoundary or router falls back, and the eagerly-imported Landing page (with the "Start Free — See Your Real Profit Today" hero) briefly paints behind the fallback. There is no retry logic for failed lazy imports.
-- **Auth race timing.** `useAuth` initializes `loading=true`, but `supabase.auth.getSession()` and `onAuthStateChange` both call `setLoading(false)`. Between the moment `loading` flips to false and the moment `Index.tsx` chunk arrives, `<Suspense fallback={<PageFallback/>}>` shows the gray "Loading..." — which is correct. But if `onAuthStateChange` fires *first* with `session=null` (initial fire before getSession completes), `ProtectedRoute` will `<Navigate to="/" replace />` for one render, mounting Landing, and then the real session arrives and bounces back. That bounce paints Landing for ~50–200ms.
+## Fix
 
-## Fix plan
+Replace the SEO fallback markup in `index.html` with a neutral, dark, branded splash that matches the app shell (`#070B14`) and shows a subtle loader. The SEO content stays available to non-JS crawlers via the existing `<noscript>` block (lines 87–103), which already contains H1, description, and internal links — so we lose no SEO value. (Googlebot runs JS and gets the real React-rendered Landing/Dashboard, so the in-`#root` fallback was never doing meaningful SEO work that `<noscript>` doesn't already cover.)
 
-### A. Make profit unmistakable on the dashboard
+### Change in `index.html` (lines 76–86)
 
-1. **Promote a "Net Profit" tile into the top stat grid** in `DashboardView.tsx`. Replace one slot (Avg $/Mile fallback) with a dedicated **Net Profit** tile (variant=success/danger) and a **Total Expenses** tile so the very first thing the user sees includes profit math.
-2. **Move `ProfitOverview` up** — render it directly under the stat grid, before `ContributionMarginCard`, `FuelAnalyticsCard`, etc. (It already sits there; the move is to put it *above* the grid actually, so it's the first earnings card after Quick Actions on dashboard scroll. We'll place it right after the date-range filter, before the 2×3 stat grid.)
-3. **Always show the math, even with zero expenses.** Update `ProfitOverview.tsx` so when `expenses.length === 0` it still renders Gross / Expenses ($0) / Net Profit (= Gross) and keeps the "Add Expense" CTA inline at the top of the same card. The user explicitly said they "don't see profit" — never hide the numbers.
-4. **Add a "Projected Profit (Cost Profile)" tile** that uses the new `useCostProfile` hook. For the filtered date range, compute:
-   ```
-   projectedCost = computeCostProfileCPM(profile, totalMiles).cpm * totalMiles
-                 + (mealsPerDay + lodgingPerDay) * estimatedDays
-   projectedNet  = grossRevenue - projectedCost
-   ```
-   Show as a tile with a subtitle "Based on your Cost Profile" and link to Settings → Cost Profile if not configured.
+- Keep `<div id="root">` but replace its inner fallback HTML with a centered, dark splash:
+  - Background `#070B14` (matches `app-shell` and dashboard).
+  - Small "HaulTrackerPro" wordmark + a thin spinner.
+  - Inline styles only (no CSS file dependency, since this paints before any CSS loads).
+  - Full viewport height so there's no white edge.
+- Leave the `<noscript>` block untouched so crawlers without JS still see H1 + links.
 
-### B. Fix the "Start for free" flash
+### Result
 
-1. **Add a retry wrapper for lazy imports** in `App.tsx` so a transient chunk failure auto-retries instead of falling back to public Landing. Pattern:
-   ```ts
-   const lazyWithRetry = (factory) => lazy(() =>
-     factory().catch((err) => {
-       if (!sessionStorage.getItem('chunk-retried')) {
-         sessionStorage.setItem('chunk-retried', '1');
-         window.location.reload();
-       }
-       throw err;
-     })
-   );
-   ```
-   Apply to `Index` (and the other authenticated lazy routes).
-2. **Stabilize the auth race** in `useAuth.tsx`: don't flip `loading` to `false` from `onAuthStateChange` until the initial `getSession()` has resolved at least once. Track `initialResolved` so the first `onAuthStateChange(null)` event before session restoration doesn't briefly mark the user as logged-out and trigger a `<Navigate to="/" />`. Only after both calls have run does `loading` become false.
-3. **Render a neutral splash, not Landing, during auth resolution.** This is already the case via `PageFallback`, but we'll make `PublicRoute` also wait for `loading=false` *and* an explicit "no session after initial resolve" signal before mounting Landing — preventing the brief Landing paint between the chunk failing and the redirect happening.
+- Cold reload on `/dashboard` → user sees a dark branded splash (visually consistent with the dashboard) → React mounts → dashboard appears. No more cream "Get started free" flash.
+- Cold load on `/` → same dark splash → React mounts → Landing page renders.
+- Crawlers without JS → still see full H1, description, and link list inside `<noscript>`.
+- No changes to React, routing, auth, Supabase, Stripe, or any component logic.
 
-## Files to change
+## Files touched
 
-- `src/components/DashboardView.tsx` — promote ProfitOverview above the stat grid; add Net Profit + Total Expenses + Projected Net (Cost Profile) tiles to the top grid.
-- `src/components/ProfitOverview.tsx` — always render numbers (even at $0 expenses); inline the Add Expense CTA instead of replacing the card.
-- `src/hooks/useAuth.tsx` — guard `loading=false` until `getSession()` has resolved; expose an `initialResolved` flag.
-- `src/App.tsx` — wrap lazy imports (at minimum `Index`) with a retry-on-chunk-failure helper; ensure `PublicRoute` waits on `initialResolved` before rendering Landing.
+- `index.html` — replace lines 76–86 (the in-`#root` fallback) with a dark splash. ~15 lines changed, single file.
 
 ## Out of scope
 
-- No DB changes. Cost Profile table and migrations from the previous round stay as-is.
-- No changes to the in-form `ProfitCheckCard` (it's working).
-- No new Pro gating logic.
-
-## Acceptance check after build
-
-- On `/dashboard` with even 1 load and 1 expense, **Net Profit** and **Total Expenses** are visible above the fold (top stat grid), and `ProfitOverview` shows the gross−expenses=net math right under the grid.
-- With a Cost Profile saved, a "Projected Net (Cost Profile)" tile appears in the grid with a sane number.
-- Hard-refreshing `/dashboard` while logged in never shows the Landing "Start Free" hero — it shows the gray "Loading..." splash and goes straight to the dashboard.
-- If the `Index.tsx` chunk fails once, the page auto-retries instead of bouncing to Landing.
+- The unrelated console warnings about `forwardRef` on `PageFallback` and `ProfitIntelDemo` — cosmetic, not the cause of this flash. Can be addressed separately if you want.
