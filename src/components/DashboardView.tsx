@@ -201,6 +201,30 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
 
+      {/* Date Range Filter — moved above premium hero so it scopes the new charts */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map(p => (
+            <Button
+              key={p.key}
+              variant={activePreset === p.key ? 'default' : 'outline'}
+              size="sm"
+              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
+              onClick={() => setActivePreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        {showCustom && (
+          <div className="flex gap-2 items-center animate-fade-in">
+            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
+          </div>
+        )}
+      </div>
+
       {/* === PREMIUM ANALYTICS HERO === */}
       {!isLoading && (
         <>
@@ -233,7 +257,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* === ZONE 1 · ACTION ZONE === */}
-      {/* Quick Actions — primary "log something" entry point */}
       {!isLoading && onNavigate && (
         <div className="grid grid-cols-4 gap-2">
           <Button
@@ -271,10 +294,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       )}
 
-      {/* Driver Intelligence — gamified score card with next-tier hint */}
+      {/* Driver Intelligence */}
       {!isLoading && <DriverIntelligenceCard isPro={isPro} />}
 
-      {/* === ZONE 2 · COMPETITION ZONE === */}
+      {/* === ZONE 2 · COMPETITION === */}
       {!isLoading && (
         <DriverLeaderboardCard
           limit={5}
@@ -285,7 +308,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         />
       )}
 
-      {/* === ZONE 3 · ALERTS (urgent only) === */}
+      {/* === ZONE 3 · ALERTS === */}
       {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
       {!isLoading && smartAlerts && (
         <SmartAlertsCard
@@ -298,34 +321,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
       {!isLoading && <WeeklyFocusCard loads={loads} />}
 
-      {/* === ZONE 4 · QUICK SHORTCUTS / SUPPORT === */}
+      {/* === ZONE 4 · QUICK SHORTCUTS === */}
       {!isLoading && (
         <HomeTimeDashboardCard isPro={isPro} onNavigate={onNavigate} />
       )}
-
-      {/* Date Range Filter */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {presets.map(p => (
-            <Button
-              key={p.key}
-              variant={activePreset === p.key ? 'default' : 'outline'}
-              size="sm"
-              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
-              onClick={() => setActivePreset(p.key)}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
-        {showCustom && (
-          <div className="flex gap-2 items-center animate-fade-in">
-            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
-          </div>
-        )}
-      </div>
 
       {/* Loading skeletons */}
       {isLoading ? (
