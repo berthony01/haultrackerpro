@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, Route, FileText, CreditCard, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon } from 'lucide-react';
 
 interface AppSidebarProps {
   active: string;
@@ -10,9 +10,7 @@ const items = [
   { id: 'loads', label: 'Loads', icon: Truck },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'fuel', label: 'Fuel', icon: Fuel },
-  { id: 'deadhead', label: 'Deadhead', icon: Route, target: 'reports' },
   { id: 'reports', label: 'Reports', icon: FileText },
-  { id: 'payments', label: 'Payments', icon: CreditCard, target: 'loads' },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
@@ -30,15 +28,15 @@ export function AppSidebar({ active, onNavigate }: AppSidebarProps) {
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.18em]">Load &amp; Pay Manager</p>
         </div>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Primary">
         {items.map(item => {
-          const target = (item as any).target ?? item.id;
-          const isActive = active === target || active === item.id;
+          const isActive = active === item.id;
           const Icon = item.icon;
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(target)}
+              onClick={() => onNavigate(item.id)}
+              aria-current={isActive ? 'page' : undefined}
               className={`sidebar-link w-full text-left ${isActive ? 'active' : ''}`}
             >
               <Icon className="h-4 w-4 shrink-0" />
