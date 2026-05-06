@@ -20,20 +20,27 @@ export function LoadsKpiStrip({ loads }: LoadsKpiStripProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {tiles.map(t => (
-        <div key={t.label} className="premium-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t.label}</p>
-            <div className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-primary/20">
-              <t.icon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-            </div>
-          </div>
-          <p className="font-mono font-black tracking-tight text-foreground whitespace-nowrap" style={{ fontSize: 'clamp(1.1rem, 3.4vw, 1.5rem)' }}>
-            {t.value}
-          </p>
-        </div>
-      ))}
-    </div>
+    <TooltipProvider>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {tiles.map(t => (
+          <Tooltip key={t.label}>
+            <TooltipTrigger asChild>
+              <div className="premium-card p-4 cursor-help">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t.label}</p>
+                  <div className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-primary/20">
+                    <t.icon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                  </div>
+                </div>
+                <p className="font-mono font-black tracking-tight text-foreground whitespace-nowrap" style={{ fontSize: 'clamp(1.1rem, 3.4vw, 1.5rem)' }}>
+                  {t.value}
+                </p>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[240px] text-xs">{t.tip}</TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+    </TooltipProvider>
   );
 }
