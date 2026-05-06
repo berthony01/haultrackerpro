@@ -17,7 +17,7 @@ import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUt
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
 // PerformanceTrends + PerformanceCharts removed (duplicated by premium ProfitOverviewChart)
-import { ProfitOverview } from '@/components/ProfitOverview';
+// ProfitOverview removed (duplicated by premium ProfitOverviewChart + KPI row)
 import { ProInsightCard } from '@/components/ProInsightCard';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { ProTimeSavedCard } from '@/components/ProTimeSavedCard';
