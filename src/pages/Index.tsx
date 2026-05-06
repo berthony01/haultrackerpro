@@ -470,6 +470,7 @@ const Index = () => {
                   recentLoads={allLoadsQuery.loads}
                   isPro={isPro}
                   firstTimeUser={!editingLoad && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0}
+                  onOpenSettings={() => setPage('settings')}
                 />
               </div>
             )}

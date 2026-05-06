@@ -50,27 +50,35 @@ export function ProfitCheckCard({ result }: ProfitCheckCardProps) {
         {/* Numbers */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Effective RPM</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold" title="Technical term: Effective RPM">Real Pay/Mile</p>
             <p className="text-base font-black font-mono">${result.effectiveRpm.toFixed(2)}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Est. Net</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Est. Take-Home</p>
             <p className={`text-base font-black font-mono ${result.estimatedNet < 0 ? 'text-destructive' : 'text-foreground'}`}>
               {formatCurrency(result.estimatedNet)}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Est. Variable Cost</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold" title="Technical term: Estimated Variable Cost">Est. Fuel & Truck Costs</p>
             <p className="text-sm font-bold font-mono text-muted-foreground">
               {result.estimatedVariableCost > 0 ? formatCurrency(result.estimatedVariableCost) : '—'}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Est. Margin</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Profit Margin</p>
             <p className={`text-sm font-bold font-mono ${result.estimatedMarginPct < 0 ? 'text-destructive' : result.estimatedMarginPct < 15 ? 'text-warning' : 'text-success'}`}>
               {result.estimatedVariableCost > 0 ? `${result.estimatedMarginPct.toFixed(0)}%` : '—'}
             </p>
           </div>
+        </div>
+
+        {/* Plain-English info row */}
+        <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground pt-1 border-t border-border/40 leading-snug">
+          <Info className="h-3 w-3 shrink-0 mt-0.5" />
+          <span>
+            "Real Pay/Mile" includes empty miles. "Fuel & Truck Costs" is the estimated cost of running this load — fuel, maintenance, and other operating costs from your Cost Profile.
+          </span>
         </div>
 
         {/* Reasons */}
