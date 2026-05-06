@@ -229,11 +229,18 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       {!isLoading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <PremiumKpiCard label="Total Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} delay={0} />
-            <PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} delay={0.05} />
-            <PremiumKpiCard label="Profit / Mile" value={formatCurrency(profitPerMile)} icon={Route} trendPct={trendPpm} delay={0.1} />
-            <PremiumKpiCard label="Loads Completed" value={filteredLoads.length.toString()} icon={Truck} trendPct={trendLoads} delay={0.15} />
+            <TooltipProvider>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Gross Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} delay={0} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.grossRevenue}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} delay={0.05} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netProfit}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Net RPM" value={formatCurrency(netRPM)} icon={Route} trendPct={trendPpm} delay={0.1} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netRPM}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Loads Completed" value={summary.loadCount.toString()} icon={Truck} trendPct={trendLoads} delay={0.15} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">Active loads in this period (cancelled excluded).{summary.cancelledCount > 0 ? ` ${summary.cancelledCount} cancelled load${summary.cancelledCount === 1 ? '' : 's'} not counted.` : ''}</TooltipContent></Tooltip>
+            </TooltipProvider>
           </div>
+          {summary.cancelledCount > 0 && (
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              {summary.cancelledCount} cancelled load{summary.cancelledCount === 1 ? '' : 's'} excluded from totals.
+            </p>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
