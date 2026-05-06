@@ -297,7 +297,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="shadow-card">
+            <Card key={i} className="premium-card">
               <CardContent className="p-4">
                 <div className="skeleton-shimmer h-16 rounded" />
               </CardContent>
