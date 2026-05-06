@@ -13,21 +13,109 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
   );
 };
 
+// Hard cap so a wildly old start_date can never insert thousands of rows in
+// one run. 400 covers ~13 months of daily backfill, which is more than enough
+// for any realistic catch-up window.
+const MAX_GENERATIONS_PER_TEMPLATE_PER_RUN = 400;
+
+// --- Date helpers (UTC, no Date(string) parsing) ---
+function parseISODate(s: string): Date {
+  // "YYYY-MM-DD" -> UTC midnight
+  const [y, m, d] = s.split("-").map((n) => parseInt(n, 10));
+  return new Date(Date.UTC(y, m - 1, d));
+}
+function fmtISODate(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function addDaysUTC(d: Date, n: number): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n));
+}
+function addMonthsUTC(d: Date, n: number): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, d.getUTCDate()));
+}
+function startOfMonthUTC(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
+
+/**
+ * Compute the list of expense_dates that should be generated for a template,
+ * given its frequency, start_date, end_date, last_generated_date, and today.
+ *
+ * Cursor is `last_generated_date` (or null for never-generated). For each
+ * frequency we step forward and emit dates up to and including `today`,
+ * respecting end_date and the per-run safety cap.
+ */
+function computeDueDates(opts: {
+  frequency: string;
+  startDate: string;
+  endDate: string | null;
+  lastGenerated: string | null;
+  todayUTC: Date;
+}): string[] {
+  const { frequency, startDate, endDate, lastGenerated, todayUTC } = opts;
+  const start = parseISODate(startDate);
+  const end = endDate ? parseISODate(endDate) : null;
+  const last = lastGenerated ? parseISODate(lastGenerated) : null;
+
+  const dates: string[] = [];
+  const horizon = end && end < todayUTC ? end : todayUTC;
+  if (start > horizon) return dates;
+
+  if (frequency === "daily") {
+    // First due day = max(start, last+1)
+    let cursor = last ? addDaysUTC(last, 1) : start;
+    if (cursor < start) cursor = start;
+    while (cursor <= horizon && dates.length < MAX_GENERATIONS_PER_TEMPLATE_PER_RUN) {
+      dates.push(fmtISODate(cursor));
+      cursor = addDaysUTC(cursor, 1);
+    }
+    return dates;
+  }
+
+  if (frequency === "weekly") {
+    // Anchored to start_date, every 7 days. First due = max(start, last+7).
+    let cursor = last ? addDaysUTC(last, 7) : start;
+    if (cursor < start) cursor = start;
+    while (cursor <= horizon && dates.length < MAX_GENERATIONS_PER_TEMPLATE_PER_RUN) {
+      dates.push(fmtISODate(cursor));
+      cursor = addDaysUTC(cursor, 7);
+    }
+    return dates;
+  }
+
+  // monthly (default) — emit on the 1st of each month from the start month
+  // forward. If start_date's month equals start_date itself in the start month,
+  // we use the start_date as the first emitted date to mirror prior behavior.
+  const firstMonth = startOfMonthUTC(start);
+  let cursor = last ? addMonthsUTC(startOfMonthUTC(last), 1) : firstMonth;
+  if (cursor < firstMonth) cursor = firstMonth;
+  const horizonMonthStart = startOfMonthUTC(horizon);
+  while (cursor <= horizonMonthStart && dates.length < MAX_GENERATIONS_PER_TEMPLATE_PER_RUN) {
+    // Use start_date itself for the very first emission in its own month;
+    // every subsequent month uses the 1st.
+    let emit = cursor;
+    if (cursor.getUTCFullYear() === start.getUTCFullYear() &&
+        cursor.getUTCMonth() === start.getUTCMonth()) {
+      emit = start;
+    }
+    if (!end || emit <= end) {
+      dates.push(fmtISODate(emit));
+    }
+    cursor = addMonthsUTC(cursor, 1);
+  }
+  return dates;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // No auth gate: this function is invoked by a pg_cron job (which sends the
-  // anon Bearer, not a custom secret). The function is safe to expose because:
-  //   1. It only inserts rows for templates whose `last_generated_date` is
-  //      older than the current month, so repeated calls are idempotent.
-  //   2. It only generates expenses for Pro / admin users.
-  //   3. It performs no destructive work.
-  // If you re-add an auth gate, also update the cron job in
-  // 20260501140600_…sql to send the matching header, otherwise daily
-  // generation will silently 401 and Pro users will stop receiving their
-  // monthly recurring expenses.
+  // No auth gate: invoked by pg_cron (anon Bearer). Function is idempotent
+  // (last_generated_date cursor) and Pro-gated.
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
@@ -38,28 +126,16 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Current month boundaries
     const now = new Date();
-    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const todayISO = fmtISODate(todayUTC);
 
-    // Find active templates that haven't generated for this month yet
-    // and whose start_date <= current month and (end_date is null or >= current month).
-    //
-    // PAUSED TEMPLATES ARE INTENTIONALLY SKIPPED HERE.
-    // Users pause templates during home time / downtime so the system stops creating
-    // new fixed expenses they aren't actually incurring. We do NOT backfill skipped
-    // months when a template is later resumed — `last_generated_date` is left untouched
-    // during the pause, and on resume we simply pick up from the current month forward.
-    // We filter on both `is_active=true` and `status='active'` (kept in sync via DB
-    // trigger `sync_recurring_template_status`) for defense in depth.
     const { data: activeTemplates, error: tplErr } = await supabase
       .from("recurring_expense_templates")
       .select("*")
       .eq("is_active", true)
       .eq("status", "active")
-      .or(`last_generated_date.is.null,last_generated_date.lt.${currentMonthStart}`)
-      .lte("start_date", currentMonthStart)
-      .or(`end_date.is.null,end_date.gte.${currentMonthStart}`);
+      .lte("start_date", todayISO);
 
     if (tplErr) {
       logStep("Error fetching templates", { message: tplErr.message });
@@ -76,7 +152,6 @@ serve(async (req) => {
 
     logStep("Templates found", { count: activeTemplates.length });
 
-    // Get unique user IDs and check their subscription status
     const userIds = [...new Set(activeTemplates.map((t) => t.user_id))];
     const { data: subs } = await supabase
       .from("subscriptions")
@@ -84,12 +159,9 @@ serve(async (req) => {
       .in("user_id", userIds);
 
     const proUsers = new Set(
-      (subs || [])
-        .filter((s) => s.status === "active")
-        .map((s) => s.user_id)
+      (subs || []).filter((s) => s.status === "active").map((s) => s.user_id)
     );
 
-    // Also check admin_users for admin override
     const { data: admins } = await supabase
       .from("admin_users")
       .select("user_id")
@@ -99,55 +171,71 @@ serve(async (req) => {
     let generated = 0;
 
     for (const template of activeTemplates) {
-      // Only generate for Pro/admin users
       if (!proUsers.has(template.user_id)) {
         logStep("Skipping non-Pro user", { userId: template.user_id });
         continue;
       }
 
-      // Determine expense date: 1st of current month, or start_date if it's this month
-      const startDate = new Date(template.start_date);
-      let expenseDate = currentMonthStart;
-      if (
-        startDate.getFullYear() === now.getFullYear() &&
-        startDate.getMonth() === now.getMonth()
-      ) {
-        expenseDate = template.start_date;
-      }
-
-      // Insert the expense
-      const { error: insertErr } = await supabase.from("expenses").insert({
-        user_id: template.user_id,
-        expense_date: expenseDate,
-        category: template.category,
-        amount: template.amount,
-        notes: template.notes
-          ? `[Recurring: ${template.template_name}] ${template.notes}`
-          : `[Recurring: ${template.template_name}]`,
-        expense_type: template.expense_type || "fixed",
+      const freq = (template.frequency || "monthly").toLowerCase();
+      const dueDates = computeDueDates({
+        frequency: freq,
+        startDate: template.start_date,
+        endDate: template.end_date,
+        lastGenerated: template.last_generated_date,
+        todayUTC,
       });
 
-      if (insertErr) {
-        logStep("Error inserting expense", {
-          templateId: template.id,
-          message: insertErr.message,
-        });
+      if (dueDates.length === 0) {
         continue;
       }
 
-      // Update last_generated_date to prevent duplicate generation
-      await supabase
-        .from("recurring_expense_templates")
-        .update({ last_generated_date: currentMonthStart })
-        .eq("id", template.id);
-
-      generated++;
-      logStep("Generated expense", {
+      logStep("Template due dates", {
         templateId: template.id,
-        userId: template.user_id,
-        category: template.category,
-        amount: template.amount,
+        frequency: freq,
+        count: dueDates.length,
+        first: dueDates[0],
+        last: dueDates[dueDates.length - 1],
       });
+
+      // Insert one row per due date. We advance last_generated_date after
+      // each successful insert so a mid-loop failure can resume cleanly.
+      for (const expenseDate of dueDates) {
+        const { error: insertErr } = await supabase.from("expenses").insert({
+          user_id: template.user_id,
+          expense_date: expenseDate,
+          category: template.category,
+          amount: template.amount,
+          notes: template.notes
+            ? `[Recurring: ${template.template_name}] ${template.notes}`
+            : `[Recurring: ${template.template_name}]`,
+          expense_type: template.expense_type || "fixed",
+        });
+
+        if (insertErr) {
+          logStep("Error inserting expense", {
+            templateId: template.id,
+            expenseDate,
+            message: insertErr.message,
+          });
+          break;
+        }
+
+        const { error: updErr } = await supabase
+          .from("recurring_expense_templates")
+          .update({ last_generated_date: expenseDate })
+          .eq("id", template.id);
+
+        if (updErr) {
+          logStep("Error updating last_generated_date", {
+            templateId: template.id,
+            expenseDate,
+            message: updErr.message,
+          });
+          break;
+        }
+
+        generated++;
+      }
     }
 
     logStep("Generation complete", { generated });
