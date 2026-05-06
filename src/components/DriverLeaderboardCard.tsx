@@ -95,18 +95,18 @@ export function DriverLeaderboardCard({
   );
 }
 
-function LeaderRow({
-  row,
-  isMe,
-}: {
+type LeaderRowProps = {
   row: ReturnType<typeof useDriverLeaderboard>['data'] extends (infer T)[] | undefined ? T : never;
   isMe: boolean;
-}) {
+};
+
+const LeaderRow = forwardRef<HTMLDivElement, LeaderRowProps>(function LeaderRow({ row, isMe }, ref) {
   const tier = tierFor(row.total_points);
   const source = pointsSource(row.parking_points, row.load_points);
 
   return (
     <div
+      ref={ref}
       className={`flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm ${
         isMe ? 'bg-primary/10 border border-primary/30' : ''
       }`}
@@ -127,18 +127,19 @@ function LeaderRow({
       </div>
     </div>
   );
-}
+});
 
-function RankBadge({ rank }: { rank: number }) {
+const RankBadge = forwardRef<HTMLSpanElement, { rank: number }>(function RankBadge({ rank }, ref) {
   if (rank === 1) {
     return (
-      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-yellow-400/20 text-yellow-400">
+      <span ref={ref} className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-yellow-400/20 text-yellow-400">
         <Crown className="h-3.5 w-3.5" />
       </span>
     );
   }
   return (
     <span
+      ref={ref}
       className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-bold tabular-nums ${
         rank <= 3 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
       }`}
@@ -146,4 +147,4 @@ function RankBadge({ rank }: { rank: number }) {
       {rank}
     </span>
   );
-}
+});
