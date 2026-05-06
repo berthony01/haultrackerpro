@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
+import { getLoadEffectiveRPM } from '@/lib/loadMetrics';
 import { LoadStop } from '@/hooks/useLoadStops';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { MapPin, Pencil, Trash2, ChevronRight, DollarSign, Check, X } from 'lucide-react';
+import { Pencil, Trash2, ChevronRight, DollarSign, Check, X, ArrowRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -25,7 +26,7 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
-export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: LoadCardProps) {
+function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: LoadCardProps) {
   const [showPayInput, setShowPayInput] = useState(false);
   const [payValue, setPayValue] = useState('');
 
@@ -34,6 +35,8 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
   const diff = actual != null ? actual - estimated : null;
   const showAddPay = actual == null && load.status !== 'cancelled';
   const stopsCount = stops.length;
+  const rpm = getLoadEffectiveRPM(load);
+  const payShown = actual ?? estimated;
 
   const handleSavePay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -52,82 +55,89 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
 
   return (
     <Card
-      className="shadow-card hover:shadow-card-hover transition-all duration-200 cursor-pointer active:scale-[0.98] animate-slide-up"
+      className="premium-card cursor-pointer active:scale-[0.99] transition-transform duration-150"
       onClick={onTap}
+      role="button"
+      aria-label={`Load ${formatLocation(load.pickup_location)} to ${formatLocation(load.dropoff_location)}, ${formatCurrency(payShown)}`}
     >
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            {/* Date + Status row */}
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="text-xs font-semibold text-muted-foreground">
-                {format(parseISO(getEffectiveDate(load)), 'MMM d, yyyy')}
-              </span>
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
-                {load.status}
+        {/* Top meta row */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
+              {format(parseISO(getEffectiveDate(load)), 'MMM d')}
+            </span>
+            <span className="h-1 w-1 rounded-full bg-border shrink-0" />
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
+              {load.status}
+            </Badge>
+            {load.payment_status && load.payment_status !== 'unpaid' && (
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${
+                load.payment_status === 'paid' ? 'bg-success/15 text-success border-success/30' :
+                load.payment_status === 'overdue' || (load.payment_due_date && !load.paid_date && new Date(load.payment_due_date) < new Date()) ? 'bg-destructive/15 text-destructive border-destructive/30' :
+                load.payment_status === 'short_paid' ? 'bg-warning/15 text-warning border-warning/30' :
+                'bg-primary/15 text-primary border-primary/30'
+              }`}>
+                {load.payment_status === 'short_paid' ? 'short' : load.payment_status}
               </Badge>
-              {load.payment_status && load.payment_status !== 'unpaid' && (
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold ${
-                  load.payment_status === 'paid' ? 'bg-success/15 text-success border-success/30' :
-                  load.payment_status === 'overdue' || (load.payment_due_date && !load.paid_date && new Date(load.payment_due_date) < new Date()) ? 'bg-destructive/15 text-destructive border-destructive/30' :
-                  load.payment_status === 'short_paid' ? 'bg-warning/15 text-warning border-warning/30' :
-                  'bg-primary/15 text-primary border-primary/30'
-                }`}>
-                  {load.payment_status === 'short_paid' ? 'short paid' : load.payment_status}
-                </Badge>
-              )}
-              {stopsCount > 0 && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold">
-                  +{stopsCount} stop{stopsCount !== 1 ? 's' : ''}
-                </Badge>
-              )}
-            </div>
-
-            {/* Route */}
-            <div className="space-y-1.5 mb-3">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-success shrink-0" />
-                <span className="truncate font-medium">{formatLocation(load.pickup_location)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-destructive shrink-0" />
-                <span className="truncate font-medium">{formatLocation(load.dropoff_location)}</span>
-              </div>
-            </div>
-
-            {/* Stats row */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span className="font-medium">{load.loaded_miles} mi</span>
-              <span>{load.deadhead_miles} DH</span>
-              <span>${load.rate_per_mile}/mi</span>
-            </div>
-          </div>
-
-          {/* Pay column */}
-          <div className="text-right shrink-0 flex flex-col items-end">
-            <p className="text-lg font-black font-mono text-primary leading-tight">
-              {formatCurrency(estimated)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">estimated</p>
-            {actual != null && (
-              <div className="mt-1.5">
-                <p className={`text-sm font-bold font-mono leading-tight ${actual >= estimated ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(actual)}
-                </p>
-                <p className={`text-[10px] font-mono font-semibold ${diff! >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {diff! >= 0 ? '+' : ''}{formatCurrency(diff!)}
-                </p>
-              </div>
             )}
-            <div className="flex gap-1 mt-2.5">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(load); }}>
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(load.id); }}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+            {stopsCount > 0 && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold">
+                +{stopsCount}
+              </Badge>
+            )}
+          </div>
+          <div className="flex gap-0.5 shrink-0">
+            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={(e) => { e.stopPropagation(); onEdit(load); }} aria-label="Edit load">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(load.id); }} aria-label="Delete load">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Route — primary scan target */}
+        <div className="flex items-center gap-2 mb-3 min-w-0">
+          <span className="font-semibold text-[15px] truncate">{formatLocation(load.pickup_location)}</span>
+          <ArrowRight className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-[15px] truncate">{formatLocation(load.dropoff_location)}</span>
+        </div>
+
+        {/* Profit row — biggest visual weight */}
+        <div className="flex items-end justify-between gap-3 pt-2 border-t border-border/60">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+              {actual != null ? 'Actual Pay' : 'Estimated'}
+            </p>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <p className={`font-mono font-black leading-tight tracking-tight ${actual != null ? (actual >= estimated ? 'text-success' : 'text-destructive') : 'text-foreground'}`} style={{ fontSize: 'clamp(1.25rem, 5vw, 1.5rem)' }}>
+                {formatCurrency(payShown)}
+              </p>
+              {diff != null && (
+                <span className={`text-[11px] font-mono font-bold ${diff >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+                </span>
+              )}
             </div>
           </div>
+          <div className="text-right shrink-0">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">$/Mile</p>
+            <p className="font-mono font-black text-primary text-lg leading-tight">${rpm.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground font-medium">
+          <span className="font-mono">{load.loaded_miles} mi</span>
+          {Number(load.deadhead_miles) > 0 && (
+            <>
+              <span className="h-0.5 w-0.5 rounded-full bg-border" />
+              <span className="font-mono">{load.deadhead_miles} DH</span>
+            </>
+          )}
+          <span className="h-0.5 w-0.5 rounded-full bg-border" />
+          <span className="font-mono">${load.rate_per_mile}/mi rate</span>
         </div>
 
         {/* Add Actual Pay CTA */}
@@ -135,10 +145,10 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
           <Button
             variant="outline"
             size="sm"
-            className="w-full mt-3 h-9 text-xs font-semibold gap-1.5 rounded-xl border-primary/30 text-primary hover:bg-primary/5 active:scale-95 transition-transform"
+            className="w-full mt-3 h-9 text-xs font-semibold gap-1.5 rounded-lg border-primary/30 text-primary hover:bg-primary/10"
             onClick={(e) => { e.stopPropagation(); setPayValue(estimated.toString()); setShowPayInput(true); }}
           >
-            <DollarSign className="h-3.5 w-3.5" /> Add Actual Pay
+            <DollarSign className="h-3.5 w-3.5" /> Record Actual Pay
           </Button>
         )}
 
@@ -153,15 +163,15 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
                 min="0"
                 value={payValue}
                 onChange={e => setPayValue(e.target.value)}
-                className="h-9 text-sm font-mono pl-8 rounded-xl"
+                className="h-9 text-sm font-mono pl-8 rounded-lg"
                 placeholder="0.00"
                 autoFocus
               />
             </div>
-            <Button size="icon" className="h-9 w-9 rounded-xl shrink-0" onClick={handleSavePay}>
+            <Button size="icon" className="h-9 w-9 rounded-lg shrink-0" onClick={handleSavePay} aria-label="Save actual pay">
               <Check className="h-4 w-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-xl shrink-0" onClick={(e) => { e.stopPropagation(); setShowPayInput(false); }}>
+            <Button size="icon" variant="ghost" className="h-9 w-9 rounded-lg shrink-0" onClick={(e) => { e.stopPropagation(); setShowPayInput(false); }} aria-label="Cancel">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -169,9 +179,9 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
 
         {/* Tap hint */}
         {!showPayInput && (
-          <div className="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-border/50">
-            <span className="text-[10px] text-muted-foreground/60 font-medium">Tap for details</span>
-            <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
+          <div className="flex items-center justify-end gap-0.5 mt-2 text-muted-foreground/50">
+            <span className="text-[10px] font-medium">Details</span>
+            <ChevronRight className="h-3 w-3" />
           </div>
         )}
       </CardContent>
@@ -179,9 +189,11 @@ export function LoadCard({ load, stops = [], onEdit, onDelete, onUpdate, onTap }
   );
 }
 
+export const LoadCard = memo(LoadCardImpl);
+
 export function LoadCardSkeleton() {
   return (
-    <Card className="shadow-card">
+    <Card className="premium-card">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 space-y-3">
@@ -189,15 +201,9 @@ export function LoadCardSkeleton() {
               <div className="skeleton-shimmer h-4 w-20 rounded" />
               <div className="skeleton-shimmer h-4 w-16 rounded" />
             </div>
-            <div className="space-y-2">
-              <div className="skeleton-shimmer h-4 w-40 rounded" />
-              <div className="skeleton-shimmer h-4 w-36 rounded" />
-            </div>
+            <div className="skeleton-shimmer h-5 w-48 rounded" />
+            <div className="skeleton-shimmer h-6 w-32 rounded" />
             <div className="skeleton-shimmer h-3 w-28 rounded" />
-          </div>
-          <div className="space-y-2 text-right">
-            <div className="skeleton-shimmer h-6 w-20 rounded ml-auto" />
-            <div className="skeleton-shimmer h-3 w-12 rounded ml-auto" />
           </div>
         </div>
       </CardContent>
