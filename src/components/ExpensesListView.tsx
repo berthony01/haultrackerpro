@@ -133,19 +133,19 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Premium Header */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="space-y-3">
         <div className="flex items-center gap-3 min-w-0">
           {onBack && (
             <Button variant="ghost" size="icon" className="rounded-xl shrink-0" onClick={onBack}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-3xl font-black tracking-tight truncate">Expenses</h1>
-            <p className="text-sm text-muted-foreground">Track every dollar that hits your bottom line</p>
+            <p className="text-sm text-muted-foreground truncate">Track every dollar that hits your bottom line</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
           <ParkingExportButton expenses={expenses} loads={loads} />
           {onNavigate && (
             <Button
