@@ -131,18 +131,36 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
         <div className="flex items-end justify-between gap-3 pt-2 border-t border-border/60">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-              {actual != null ? 'Actual Pay' : 'Estimated'}
+              {isCancelled ? 'Cancelled' : actual != null ? 'Actual Pay' : 'Estimated'}
             </p>
             <div className="flex items-baseline gap-2 flex-wrap">
-              <p className={`font-mono font-black leading-tight tracking-tight ${actual != null ? (actual >= estimated ? 'text-success' : 'text-destructive') : 'text-foreground'}`} style={{ fontSize: 'clamp(1.25rem, 5vw, 1.5rem)' }}>
+              <p className={`font-mono font-black leading-tight tracking-tight ${
+                isCancelled ? 'text-destructive' :
+                actual != null ? (paymentStatus === 'paid' ? 'text-success' : paymentStatus === 'overpaid' ? 'text-primary' : 'text-warning')
+                : 'text-foreground'
+              }`} style={{ fontSize: 'clamp(1.25rem, 5vw, 1.5rem)' }}>
                 {formatCurrency(payShown)}
               </p>
-              {diff != null && (
-                <span className={`text-[11px] font-mono font-bold ${diff >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+              {paymentDiff != null && Math.abs(paymentDiff) >= 0.005 && (
+                <span className={`text-[11px] font-mono font-bold ${paymentDiff >= 0 ? 'text-primary' : 'text-warning'}`}>
+                  {paymentDiff >= 0 ? '+' : ''}{formatCurrency(paymentDiff)}
                 </span>
               )}
             </div>
+            {/* Payment status detail line */}
+            <p className={`text-[10px] font-medium mt-1 ${
+              paymentStatus === 'paid' ? 'text-success' :
+              paymentStatus === 'underpaid' ? 'text-warning' :
+              paymentStatus === 'overpaid' ? 'text-primary' :
+              paymentStatus === 'cancelled' ? 'text-destructive' :
+              'text-muted-foreground'
+            }`}>
+              {paymentStatus === 'paid' && 'Paid in full'}
+              {paymentStatus === 'underpaid' && paymentDiff != null && `Amount Still Owed: ${formatCurrency(Math.abs(paymentDiff))}`}
+              {paymentStatus === 'overpaid' && paymentDiff != null && `Overpaid by: ${formatCurrency(Math.abs(paymentDiff))}`}
+              {paymentStatus === 'pending' && 'Pending actual payment entry'}
+              {paymentStatus === 'cancelled' && 'Excluded from totals'}
+            </p>
           </div>
           <div className="text-right shrink-0">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold" title="Effective RPM = gross ÷ all miles, including deadhead.">Eff. RPM</p>
