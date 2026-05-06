@@ -29,7 +29,7 @@ import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
 import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { PersonalIntelligenceBlocks } from '@/components/PersonalIntelligenceBlocks';
 import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel, ParkingCircle } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel, ParkingCircle, Gauge } from 'lucide-react';
 import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { DriverIntelligenceCard } from '@/components/DriverIntelligenceCard';
 import { useTierUpDetector } from '@/hooks/useTierUpDetector';
@@ -40,6 +40,14 @@ import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval, format } from 'date-fns';
 import { Shield } from 'lucide-react';
+import { PremiumKpiCard } from '@/components/premium/PremiumKpiCard';
+import { ProfitOverviewChart } from '@/components/premium/ProfitOverviewChart';
+import { DriverScoreGauge } from '@/components/premium/DriverScoreGauge';
+import { RecentLoadsPanel } from '@/components/premium/RecentLoadsPanel';
+import { ExpenseDonut } from '@/components/premium/ExpenseDonut';
+import { ProfitByLoadTable } from '@/components/premium/ProfitByLoadTable';
+import { DashboardFooterCTA } from '@/components/premium/DashboardFooterCTA';
+import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 
 
 interface DashboardViewProps {
