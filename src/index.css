@@ -164,6 +164,98 @@
   }
 }
 
+/* === Premium dark "app shell" theme — scoped to authenticated app only ===
+   Marketing/landing pages keep their existing palette. */
+.app-shell {
+  --background: 220 51% 5%;          /* #070B14 */
+  --foreground: 0 0% 100%;
+  --card: 220 46% 9%;                /* #0D1422 */
+  --card-foreground: 0 0% 100%;
+  --popover: 220 46% 11%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 25 100% 50%;            /* #FF6B00 */
+  --primary-foreground: 0 0% 100%;
+  --primary-glow: 22 100% 58%;       /* #FF7A1A */
+  --secondary: 220 30% 14%;
+  --secondary-foreground: 220 12% 82%;
+  --muted: 220 30% 14%;
+  --muted-foreground: 220 12% 62%;
+  --accent: 25 100% 50%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 30% 18%;
+  --input: 220 30% 18%;
+  --ring: 25 100% 50%;
+  --success: 142 71% 45%;            /* #22C55E */
+  --success-foreground: 0 0% 100%;
+  --warning: 48 96% 53%;             /* #FACC15 */
+  --warning-foreground: 220 25% 10%;
+  --shadow-primary: 0 0 0 1px hsl(25 100% 50% / 0.25), 0 8px 28px -6px hsl(25 100% 50% / 0.45);
+  --shadow-card: 0 1px 0 0 hsl(0 0% 100% / 0.03) inset, 0 8px 24px -12px hsl(0 0% 0% / 0.6);
+  --shadow-card-hover: 0 1px 0 0 hsl(0 0% 100% / 0.05) inset, 0 14px 36px -14px hsl(0 0% 0% / 0.75);
+  --shadow-elevated: 0 1px 0 0 hsl(0 0% 100% / 0.04) inset, 0 18px 40px -18px hsl(0 0% 0% / 0.8);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Premium card surface — subtle gradient + glow border */
+.app-shell .premium-card {
+  background:
+    linear-gradient(180deg, hsl(220 40% 12% / 0.7), hsl(220 46% 9% / 0.95)),
+    hsl(var(--card));
+  border: 1px solid hsl(220 30% 20%);
+  box-shadow:
+    0 1px 0 0 hsl(0 0% 100% / 0.04) inset,
+    0 12px 32px -16px hsl(0 0% 0% / 0.7);
+  border-radius: 1rem;
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+.app-shell .premium-card:hover {
+  border-color: hsl(25 100% 50% / 0.35);
+  box-shadow:
+    0 1px 0 0 hsl(0 0% 100% / 0.06) inset,
+    0 18px 40px -18px hsl(25 100% 50% / 0.25);
+}
+
+/* Orange CTA button glow */
+.app-shell .btn-orange-glow {
+  background: linear-gradient(135deg, hsl(25 100% 52%), hsl(22 100% 58%));
+  color: #fff;
+  box-shadow:
+    0 0 0 1px hsl(25 100% 50% / 0.4),
+    0 8px 24px -8px hsl(25 100% 50% / 0.6);
+  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+}
+.app-shell .btn-orange-glow:hover {
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px hsl(25 100% 50% / 0.5),
+    0 12px 32px -8px hsl(25 100% 50% / 0.75);
+}
+.app-shell .btn-orange-glow:active { transform: translateY(1px); }
+
+/* Sidebar nav active state */
+.app-shell .sidebar-link {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600; font-size: 0.875rem;
+  transition: all 180ms ease;
+  border: 1px solid transparent;
+}
+.app-shell .sidebar-link:hover {
+  color: hsl(var(--foreground));
+  background: hsl(220 30% 13%);
+}
+.app-shell .sidebar-link.active {
+  color: hsl(var(--primary));
+  background: linear-gradient(90deg, hsl(25 100% 50% / 0.18), hsl(25 100% 50% / 0.04));
+  border-color: hsl(25 100% 50% / 0.35);
+  box-shadow: inset 2px 0 0 0 hsl(var(--primary));
+}
+
 @layer components {
   /* Skeleton shimmer for loading states */
   .skeleton-shimmer {

@@ -14,6 +14,7 @@ import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
 import { BottomNav } from '@/components/BottomNav';
+import { AppSidebar } from '@/components/premium/AppSidebar';
 import { DashboardView } from '@/components/DashboardView';
 import { LoadForm } from '@/components/LoadForm';
 import { ExpenseForm } from '@/components/ExpenseForm';
@@ -366,29 +367,38 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      {/* Premium header */}
-      <header className="sticky top-0 z-40 bg-secondary">
-        <div className="flex items-center justify-between px-4 py-3.5 max-w-lg mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-primary p-2 shadow-primary">
-              <Truck className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-base font-black font-heading tracking-tight text-secondary-foreground">
-                Haul<span className="text-primary">TrackerPro</span>
-              </h1>
-              <p className="text-[10px] text-secondary-foreground/40 font-semibold uppercase tracking-[0.2em]">Load & Pay Manager</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" className="text-secondary-foreground/30 hover:text-secondary-foreground rounded-xl h-10 w-10" onClick={signOut}>
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
-      </header>
+      <AppSidebar active={page} onNavigate={handleNavigate} />
 
-      <main className="px-4 py-5 max-w-lg mx-auto">
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Premium header (mobile + desktop) */}
+        <header className="sticky top-0 z-40 bg-card/70 backdrop-blur-md border-b border-border/60 lg:bg-transparent lg:border-b-0">
+          <div className="flex items-center justify-between px-4 py-3.5 max-w-7xl mx-auto w-full">
+            <div className="flex items-center gap-3 lg:hidden">
+              <div className="rounded-xl bg-primary p-2 shadow-primary">
+                <Truck className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-base font-black font-heading tracking-tight text-foreground">
+                  Haul<span className="text-primary">TrackerPro</span>
+                </h1>
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em]">Load &amp; Pay Manager</p>
+              </div>
+            </div>
+            <div className="hidden lg:block">
+              <h2 className="text-lg font-black tracking-tight text-foreground">
+                {page === 'dashboard' ? 'Dashboard' : page.charAt(0).toUpperCase() + page.slice(1).replace('_', ' ')}
+              </h2>
+              <p className="text-xs text-muted-foreground">Your hauling overview</p>
+            </div>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl h-10 w-10" onClick={signOut}>
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        </header>
+
+        <main className="px-4 py-5 max-w-7xl mx-auto w-full">
         {/* Smart Reminders */}
         {!showOnboarding && page === 'dashboard' && (
           <div className="mb-4">
@@ -554,8 +564,11 @@ const Index = () => {
           </>
         )}
       </main>
+      </div>
 
-      <BottomNav active={page} onNavigate={handleNavigate} />
+      <div className="lg:hidden">
+        <BottomNav active={page} onNavigate={handleNavigate} />
+      </div>
       <AddActionModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
