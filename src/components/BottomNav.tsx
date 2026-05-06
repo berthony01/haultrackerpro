@@ -15,7 +15,7 @@ const navItems = [
 
 export function BottomNav({ active, onNavigate }: BottomNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-secondary/95 backdrop-blur-sm border-t border-border/20 safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">
       <div className="flex items-center justify-around h-[72px] max-w-lg mx-auto px-2">
         {navItems.map(item => {
           const isActive = active === item.id;
@@ -45,7 +45,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
               className={`flex flex-col items-center gap-1 min-w-[64px] min-h-[48px] justify-center rounded-xl px-3 py-2 transition-all duration-200 active:scale-90 ${
                 isActive
                   ? 'text-primary'
-                  : 'text-secondary-foreground/40 hover:text-secondary-foreground/70'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <item.icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
