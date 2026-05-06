@@ -67,6 +67,8 @@ interface LoadFormProps {
   isPro?: boolean;
   /** Pre-fill the form with a sample load for first-time users with zero loads logged. */
   firstTimeUser?: boolean;
+  /** Navigate user to settings page (used by deadhead-pay warning). */
+  onOpenSettings?: () => void;
 }
 
 const SAMPLE_LOAD = {
