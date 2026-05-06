@@ -592,7 +592,7 @@ function RecurringExpenseForm({ initialData, onSubmit, onCancel, loading }: Recu
   };
 
   return (
-    <Card className="border-2 border-primary/20 shadow-lg animate-fade-in">
+    <Card className="premium-card animate-fade-in">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl font-heading flex items-center gap-2">
