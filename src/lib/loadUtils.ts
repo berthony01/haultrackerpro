@@ -28,8 +28,9 @@ export const CSV_HEADERS_LOADS = [
 ] as const;
 
 export const CSV_HEADERS_PROFIT = [
-  'Date', 'Pickup', 'Dropoff', 'Stops Summary', 'Estimated Pay', 'Actual Pay',
-  'Linked Expenses', 'Net Load Profit', 'Company Name', 'Company Start Date',
+  'Date', 'Pickup', 'Dropoff', 'Status', 'Loaded Miles', 'Deadhead Miles',
+  'Total Miles', 'Contract Rate', 'Gross Revenue', 'Actual Pay Received',
+  'Difference', 'Expenses', 'Net Profit', 'Effective RPM', 'Net RPM', 'Notes',
 ] as const;
 
 export const CSV_HEADERS_SCHEDULE_C = [
