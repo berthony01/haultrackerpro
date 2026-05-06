@@ -1,58 +1,73 @@
-## Fix: Radix portals render in light theme inside the app shell
+# Recurring Expense Fix Plan
 
-### Bug
+## Root Cause (confirmed from your data)
 
-`LoadDetailSheet` (and any Radix Sheet/Dialog/Popover/Tooltip) opens with the **light marketing palette** instead of the premium dark theme. Confirmed visually in the live preview — Load Details sheet shows light grey background, dark text, while the `.app-shell` page behind it is dark.
+Your template in the database:
+- **Name:** "Daily Meals"
+- **Amount:** $80
+- **Start date:** 2026-04-20
+- **Frequency:** `monthly` ← this is the bug
+- **Last generated:** 2026-05-01
+- **Status:** active
 
-### Root cause
+The recurring system is **hardcoded to monthly-only**, even though the column is called `frequency`:
 
-The dark tokens are defined under `.app-shell { ... }` in `src/index.css`. Radix `<Portal>` mounts overlay content as a child of `document.body`, outside the `.app-shell` subtree, so none of those tokens cascade into the portal.
+1. `RecurringExpensesView.tsx` line 586 hard-codes `frequency: 'monthly'` on every insert — there is no UI to choose daily/weekly.
+2. `generate-recurring-expenses` ignores `frequency` entirely. It only ever:
+   - Runs once per day at 6:00 AM UTC (cron is correct).
+   - Generates **one row per template per calendar month**, dated the 1st.
+   - Sets `last_generated_date = first of current month`, then the `last_generated_date < currentMonthStart` filter blocks any further generation until next month.
 
-### Fix (small, safe)
+So your "Daily Meals" template behaved correctly per the *current* code: April 20 (start month) → 1 row, May 1 → 1 row. June 1 will create the next one. Nothing crashed; the feature just doesn't support daily/weekly at all.
 
-1. `**src/index.css**` — extend the selector so the same tokens also apply when the `<body>` carries an activation class:
-  ```css
-   .app-shell,
-   body.app-shell-active { /* identical token block */ }
-  ```
-   Same change for `.app-shell .premium-card` → `.app-shell .premium-card, body.app-shell-active .premium-card` (and `.btn-orange-glow`, `.sidebar-link`).
-2. `**src/pages/Index.tsx**` — add an effect that toggles `app-shell-active` on `document.body` while the authenticated app is mounted, and removes it on unmount:
-  ```ts
-   useEffect(() => {
-     document.body.classList.add('app-shell-active');
-     return () => document.body.classList.remove('app-shell-active');
-   }, []);
-  ```
+This also explains every other "missing date" — they were never supposed to be created under monthly mode.
 
-### Why this is safe
+## What to fix
 
-- Marketing/public pages (`/`, `/pricing`, etc.) never mount `Index.tsx`, so they never get the class. No bleed.
-- Tokens stay HSL, no new colors, no new shadows.
-- Zero changes to LoadDetailSheet, LoadForm, or any logic.
+### 1. Database
+Add a small CHECK-equivalent validation (via trigger to stay flexible) so `frequency` is one of `daily`, `weekly`, `monthly`. No schema change needed — column already exists and defaults to `monthly`.
 
-### Verification
+### 2. Edge function `generate-recurring-expenses`
+Rewrite the generation loop to be frequency-aware and idempotent **per period**, using `last_generated_date` as the cursor:
 
-- Reopen Loads → tap a load → confirm the sheet now uses the dark premium palette (card surface `#0D1422`, orange accent, mono values).
-- Open Add Load and any Dialog/Popover/Tooltip → confirm they also render dark.
-- Marketing routes unchanged.
+- **monthly:** generate on the 1st of each month from `max(start_date, last_generated_date+1month)` up to current month. (Preserves today's behavior.)
+- **weekly:** generate every 7 days from `start_date`, advancing the cursor by 7 days until `> today`.
+- **daily:** generate one row per day from `max(start_date, last_generated_date+1)` through today (catch-up loop, capped at e.g. 366 rows per template per run as a safety net).
 
-### Files touched
+For each generated row:
+- Insert into `expenses` with `expense_date` = that period's date.
+- Update `last_generated_date` to that date.
+- Respect `end_date` (stop if exceeded).
+- Skip if template is paused or user is not Pro/admin (unchanged).
 
-- `src/index.css` (selector extension only)
-- `src/pages/Index.tsx` (one `useEffect`).  Approved. Apply the Radix portal theme fix exactly as proposed.
-  Requirements:
-  - Extend the existing .app-shell token selectors to also support [body.app](http://body.app)-shell-active.
-  - Add the body class toggle only inside src/pages/Index.tsx.
-  - Remove the class on unmount.
-  - Do not modify LoadDetailSheet, LoadForm, Dialog, Sheet, Popover, Tooltip logic.
-  - Do not change marketing/public page styles.
-  - Do not introduce new colors, gradients, shadows, or tokens.
-  After implementation, verify:
-  1. LoadDetailSheet opens in the premium dark theme.
-  2. Add Load modal/sheet opens in the premium dark theme.
-  3. DateRangeFilter popover opens in the premium dark theme.
-  4. Tooltips render readable in dark mode.
-  5. Marketing/public pages remain unchanged.
-  6. Type-check passes.
-  7. Production build passes.
-  8. No console errors.
+Date math will use explicit UTC construction (`Date.UTC(y, m, d)`) — no `new Date(string)` parsing — to avoid the timezone-shift bug pattern that bit us before.
+
+### 3. UI — `RecurringExpensesView.tsx`
+- Add a Frequency selector (Daily / Weekly / Monthly) to the add/edit form.
+- Show frequency clearly on each template card (already partially shown via `template.frequency`).
+- Default remains Monthly so existing flows are unchanged.
+
+### 4. Backfill your existing "Daily Meals" template
+Once the function is frequency-aware, change that template's `frequency` from `monthly` → `daily` (one-tap in the new UI, or I can do it via a one-off SQL update). The next 6 AM UTC run will then catch up all missing days from `last_generated_date` (May 1) through today, dated correctly. To avoid waiting until 6 AM UTC, I'll also call the function once after deploy to trigger an immediate catch-up.
+
+### 5. Safety
+- Keep the per-template safety cap (max ~366 inserts per run) so a wildly old `start_date` can't insert 10k rows by accident.
+- Keep the existing Pro/admin gate and idempotency (no duplicate rows for the same date because `last_generated_date` always advances).
+- Leave the cron schedule (`0 6 * * *`) as-is.
+
+## Files to change
+
+```text
+supabase/functions/generate-recurring-expenses/index.ts   (frequency-aware generator)
+src/components/RecurringExpensesView.tsx                  (add Frequency selector)
+src/hooks/useRecurringExpenses.ts                         (allow frequency in insert payload)
+supabase/migrations/<new>.sql                             (frequency CHECK trigger; safe default)
+```
+
+## Verification after deploy
+1. Manually invoke the function once → confirm your "Daily Meals" template generates rows for every missing day from May 2 → today.
+2. Confirm `last_generated_date` advances to today.
+3. Re-invoke → confirm zero new rows (idempotent).
+4. Add a test weekly template → confirm only one row per 7-day cycle.
+
+Approve and I'll implement.

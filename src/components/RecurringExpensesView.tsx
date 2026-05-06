@@ -558,6 +558,7 @@ function RecurringExpenseForm({ initialData, onSubmit, onCancel, loading }: Recu
     end_date: initialData?.end_date ?? '',
     notes: initialData?.notes ?? '',
     expense_type: initialData?.expense_type ?? 'fixed' as string,
+    frequency: initialData?.frequency ?? 'monthly',
   });
 
   const update = (key: string, value: string) => {
@@ -583,7 +584,7 @@ function RecurringExpenseForm({ initialData, onSubmit, onCancel, loading }: Recu
       template_name: form.template_name.trim(),
       category: form.category,
       amount,
-      frequency: 'monthly',
+      frequency: form.frequency,
       start_date: form.start_date,
       end_date: form.end_date || null,
       notes: form.notes.trim() || null,
@@ -679,8 +680,20 @@ function RecurringExpenseForm({ initialData, onSubmit, onCancel, loading }: Recu
           </div>
 
           <div>
-            <Label>Frequency</Label>
-            <p className="text-sm text-muted-foreground mt-1">Monthly (generated on the 1st of each month)</p>
+            <Label htmlFor="frequency">Frequency</Label>
+            <Select value={form.frequency} onValueChange={(v) => update('frequency', v)}>
+              <SelectTrigger id="frequency"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily (every day)</SelectItem>
+                <SelectItem value="weekly">Weekly (every 7 days from start)</SelectItem>
+                <SelectItem value="monthly">Monthly (1st of each month)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {form.frequency === 'daily' && 'Generates one expense per day, automatically.'}
+              {form.frequency === 'weekly' && 'Generates one expense every 7 days starting from the start date.'}
+              {form.frequency === 'monthly' && 'Generates one expense per month on the 1st (or start date in the first month).'}
+            </p>
           </div>
 
           <div>
