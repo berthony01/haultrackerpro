@@ -335,59 +335,30 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       ) : (
         <>
-          {/* === ZONE 5 · BUSINESS METRICS === */}
-          {/* Profit Overview — promoted to top so Gross / Expenses / Net Profit are
-              the first thing the driver sees after the date filter. */}
-          <ProfitOverview
-            loads={filteredLoads}
-            expenses={filteredExpenses}
-            onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined}
-          />
-
-          {/* Headline Net Profit + Expenses tiles. Always rendered, even at $0,
-              so profit math is visible above the fold. */}
+          {/* === ZONE 5 · BUSINESS METRICS (secondary tiles, non-duplicated) === */}
           {(() => {
-            const grossForTiles = (() => {
-              const paid = filteredLoads.filter(l => l.actual_pay_received != null);
-              if (paid.length > 0) {
-                return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
-                  + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
-              }
-              return estimated;
-            })();
-            const totalExpensesForTiles = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-            const netProfitForTiles = grossForTiles - totalExpensesForTiles;
-
             // Cost Profile projection (only when user has set up a usable profile)
             let projectedNet: number | null = null;
             if (profileHasUsableData(costProfile) && totalMiles > 0) {
+              const grossForProj = (() => {
+                const paid = filteredLoads.filter(l => l.actual_pay_received != null);
+                if (paid.length > 0) {
+                  return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
+                    + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
+                }
+                return estimated;
+              })();
               const { cpm } = computeCostProfileCPM(costProfile, totalMiles);
               const variableCost = cpm * totalMiles;
               const daysPer1k = Number(costProfile?.days_per_1000_miles ?? 2.5) || 2.5;
               const days = (totalMiles / 1000) * daysPer1k;
               const perDay = Number(costProfile?.meals_per_day ?? 0) + Number(costProfile?.lodging_per_day ?? 0);
               const dailyCost = days * perDay;
-              projectedNet = grossForTiles - variableCost - dailyCost;
+              projectedNet = grossForProj - variableCost - dailyCost;
             }
 
             return (
               <div className="grid grid-cols-2 gap-2.5">
-                <StatCard
-                  label="Net Profit"
-                  value={formatCurrency(netProfitForTiles)}
-                  icon={netProfitForTiles >= 0 ? TrendingUp : TrendingDown}
-                  subtitle={filteredExpenses.length > 0 ? 'Gross − Expenses' : 'Log expenses for true net'}
-                  variant={netProfitForTiles >= 0 ? 'success' : 'danger'}
-                  size="large"
-                />
-                <StatCard
-                  label="Total Expenses"
-                  value={formatCurrency(totalExpensesForTiles)}
-                  icon={Receipt}
-                  subtitle={`${filteredExpenses.length} logged`}
-                  variant="warning"
-                  size="large"
-                />
                 <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} />
                 <StatCard
                   label="Actual Earnings"
@@ -395,7 +366,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   icon={DollarSign}
                   subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
                 />
-                <StatCard label="Total Loads" value={filteredLoads.length.toString()} icon={Truck} />
                 <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
                 <TooltipProvider>
                   <Tooltip>
