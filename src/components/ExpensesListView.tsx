@@ -323,3 +323,79 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
     </div>
   );
 }
+
+const categoryIconMap: Record<string, typeof Receipt> = {
+  Fuel: Fuel,
+  Maintenance: Wrench,
+  Insurance: Shield,
+};
+
+interface ExpenseRowCardProps {
+  expense: Expense;
+  linkedLoad: Load | null;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+const ExpenseRowCard = memo(function ExpenseRowCard({
+  expense,
+  linkedLoad,
+  onEdit,
+  onDelete,
+}: ExpenseRowCardProps) {
+  const Icon = categoryIconMap[expense.category] || Receipt;
+  return (
+    <Card className="premium-card">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-primary/10 p-2.5 shrink-0 ring-1 ring-primary/20">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm">{expense.category}</span>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    {format(parseISO(expense.expense_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+                <p className="text-xl font-mono font-black text-foreground mt-0.5 whitespace-nowrap">
+                  {formatCurrency(expense.amount)}
+                </p>
+                {expense.gallons && (
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{expense.gallons} gal</p>
+                )}
+                {linkedLoad ? (
+                  <p className="text-[11px] text-primary mt-1 truncate flex items-center gap-1">
+                    <Link2 className="h-3 w-3 shrink-0" />
+                    {linkedLoad.pickup_location} → {linkedLoad.dropoff_location}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground/50 mt-1">No linked load</p>
+                )}
+                {expense.notes && (
+                  <p className="text-[11px] text-muted-foreground mt-1 truncate">{expense.notes}</p>
+                )}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onEdit}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg text-destructive hover:text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
