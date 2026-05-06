@@ -126,19 +126,26 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     });
   }, [expenses, activePreset, customFrom, customTo, weekStartsOn]);
 
-  const estimated = sumExpectedPay(filteredLoads);
-  const actual = sumActualPay(filteredLoads);
-  const loadedMiles = sumLoadedMiles(filteredLoads);
-  const deadheadMiles = sumDeadheadMiles(filteredLoads);
+  // Canonical financial summary (cancelled loads automatically excluded)
+  const summary = useMemo(
+    () => summarizeLoads(filteredLoads, filteredExpenses),
+    [filteredLoads, filteredExpenses],
+  );
 
-  const paidLoads = filteredLoads.filter(l => l.actual_pay_received != null);
-  const missingPayCount = filteredLoads.filter(l => l.actual_pay_received == null).length;
+  const estimated = summary.estimatedPay;
+  const actual = summary.actualPay;
+  const loadedMiles = summary.loadedMiles;
+  const deadheadMiles = summary.deadheadMiles;
+
+  const activeLoads = useMemo(() => excludeCancelled(filteredLoads), [filteredLoads]);
+  const paidLoads = activeLoads.filter(l => l.actual_pay_received != null);
+  const missingPayCount = summary.pendingPaymentCount;
   const paidEstimated = sumExpectedPay(paidLoads);
   const knownDifference = paidLoads.length > 0 ? actual - paidEstimated : null;
-  const unpaidEstimated = sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
+  const unpaidEstimated = summary.pendingPaymentEstimated;
 
-  const totalMiles = sumOperatingMiles(filteredLoads);
-  const deadheadPct = fleetDeadheadPct(filteredLoads);
+  const totalMiles = summary.totalMiles;
+  const deadheadPct = summary.deadheadPct;
   const deadheadColor = deadheadPct < 15 ? 'success' : deadheadPct < 30 ? 'warning' : 'destructive';
 
   const isLastDayOfPayWeek = new Date().getDay() === ((weekStartsOn + 6) % 7);
@@ -151,17 +158,12 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
   // ---- Premium hero KPI metrics + week-over-week trends ----
-  const grossRevenue = (() => {
-    const paid = filteredLoads.filter(l => l.actual_pay_received != null);
-    if (paid.length > 0) {
-      return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
-        + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
-    }
-    return estimated;
-  })();
-  const totalExpensesAmt = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-  const netProfit = grossRevenue - totalExpensesAmt;
-  const profitPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
+  // Driver-facing Gross Revenue uses actual when present, else expected.
+  // Cancelled loads are excluded by summarizeLoads (above).
+  const grossRevenue = summary.grossRevenue;
+  const totalExpensesAmt = summary.expensesTotal;
+  const netProfit = summary.netProfit;
+  const netRPM = summary.netRPM;
 
   // last-week comparison (same date type as the active filter)
   const prevRange = useMemo(() => {
@@ -177,20 +179,18 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     const d = parseISO(e.expense_date);
     return isWithinInterval(d, prevRange);
   }), [expenses, prevRange]);
-  const prevGross = sumExpectedPay(prevLoads.filter(l => l.actual_pay_received == null))
-    + prevLoads.filter(l => l.actual_pay_received != null).reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0);
-  const prevExp = prevExpenses.reduce((s, e) => s + Number(e.amount), 0);
-  const prevNet = prevGross - prevExp;
-  const prevMiles = sumOperatingMiles(prevLoads);
-  const prevPpm = prevMiles > 0 ? prevNet / prevMiles : 0;
+  const prevSummary = useMemo(() => summarizeLoads(prevLoads, prevExpenses), [prevLoads, prevExpenses]);
+  const prevGross = prevSummary.grossRevenue;
+  const prevNet = prevSummary.netProfit;
+  const prevPpm = prevSummary.netRPM;
   const pct = (curr: number, prev: number) => {
     if (!isFinite(prev) || prev === 0) return null;
     return ((curr - prev) / Math.abs(prev)) * 100;
   };
   const trendRevenue = pct(grossRevenue, prevGross);
   const trendNet = pct(netProfit, prevNet);
-  const trendPpm = pct(profitPerMile, prevPpm);
-  const trendLoads = pct(filteredLoads.length, prevLoads.length);
+  const trendPpm = pct(netRPM, prevPpm);
+  const trendLoads = pct(summary.loadCount, prevSummary.loadCount);
 
   const scorecard = useDriverScorecard(loads, expenses, settings?.week_start_day);
 
