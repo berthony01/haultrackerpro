@@ -558,6 +558,7 @@ function RecurringExpenseForm({ initialData, onSubmit, onCancel, loading }: Recu
     end_date: initialData?.end_date ?? '',
     notes: initialData?.notes ?? '',
     expense_type: initialData?.expense_type ?? 'fixed' as string,
+    frequency: initialData?.frequency ?? 'monthly',
   });
 
   const update = (key: string, value: string) => {
