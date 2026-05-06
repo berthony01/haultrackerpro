@@ -57,7 +57,7 @@ export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
                 <th className="text-right font-semibold py-2 px-2">Revenue</th>
                 <th className="text-right font-semibold py-2 px-2">Expenses</th>
                 <th className="text-right font-semibold py-2 px-2">Net Profit</th>
-                <th className="text-right font-semibold py-2 px-2">$/Mile</th>
+                <th className="text-right font-semibold py-2 px-2" title="Effective RPM = gross ÷ all miles, including deadhead.">Eff. RPM</th>
               </tr>
             </thead>
             <tbody className="font-mono">

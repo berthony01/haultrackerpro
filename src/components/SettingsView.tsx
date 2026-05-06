@@ -371,6 +371,9 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input type="number" step="0.01" placeholder="0.00" value={ratePerMile} onChange={e => setRatePerMile(e.target.value)} className="h-10 pl-8 text-sm rounded-xl" />
               </div>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                This is your default <span className="font-semibold text-foreground">contract rate</span>. Effective RPM may be lower when deadhead miles are included — your contract rate doesn't change.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Default Other Fees</Label>
@@ -406,8 +409,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 />
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground">
-              New loads will use this as the default. You can still override it per load.
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              New loads use this by default. You can override per load. If deadhead is unpaid, HaulTrackerPro still includes those miles in <span className="font-semibold text-foreground">Effective RPM</span> so you can see the load's true value.
             </p>
           </div>
 

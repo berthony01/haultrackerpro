@@ -101,7 +101,7 @@ export function LoadsTable({ loads, stops, onEdit, onDelete, onSelect }: LoadsTa
               <th scope="col" className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Date</th>
               <th scope="col" className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Route</th>
               <th scope="col" className="px-3 py-2.5 text-right text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Miles</th>
-              <th scope="col" className="px-3 py-2.5 text-right text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">$/Mi</th>
+              <th scope="col" className="px-3 py-2.5 text-right text-[10px] uppercase tracking-widest text-muted-foreground font-semibold" title="Effective RPM = gross ÷ all miles, including deadhead.">Eff. RPM</th>
               <th scope="col" className="px-3 py-2.5 text-right text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Estimated</th>
               <th scope="col" className="px-3 py-2.5 text-right text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Actual</th>
               <th scope="col" className="px-3 py-2.5 text-right text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Δ</th>
