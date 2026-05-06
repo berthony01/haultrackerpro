@@ -74,14 +74,12 @@
 
   <body>
     <div id="root">
-      <!-- Server-friendly SEO fallback. React replaces this on mount.
-           Gives Googlebot real H1 + content + internal links on the first
-           crawl before client-side JS runs. -->
-      <div style="max-width:780px;margin:0 auto;padding:48px 20px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a">
-        <h1 style="font-size:2rem;line-height:1.2;margin:0 0 12px">HaulTrackerPro — Track Loads, Expenses &amp; Net Profit</h1>
-        <p style="font-size:1.05rem;color:#334155;margin:0 0 20px">Professional load, expense, and profit tracking built for owner-operators and lease drivers. Know exactly what every load earns — without spreadsheets.</p>
-        <p style="margin:0 0 24px"><a href="/auth" style="display:inline-block;background:#f97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Get started free</a></p>
-        <p style="font-size:0.95rem;color:#475569;margin:0">Explore: <a href="/features">Features</a> · <a href="/pricing">Pricing</a> · <a href="/faq">FAQ</a> · <a href="/trucker-bookkeeping-guide">Trucker Bookkeeping Guide</a> · <a href="/trucking-cost-per-mile">Cost per Mile</a></p>
+      <!-- Pre-hydration splash. React replaces this on mount.
+           Crawlers without JS get the full SEO content from <noscript> below. -->
+      <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#070B14;color:#E5E7EB;font-family:-apple-system,Segoe UI,Roboto,sans-serif;gap:18px">
+        <div style="font-size:1.25rem;font-weight:800;letter-spacing:-0.01em">Haul<span style="color:#FF6B00">TrackerPro</span></div>
+        <div style="width:28px;height:28px;border:2px solid rgba(255,255,255,0.12);border-top-color:#FF6B00;border-radius:50%;animation:htp-spin 0.8s linear infinite"></div>
+        <style>@keyframes htp-spin{to{transform:rotate(360deg)}}</style>
       </div>
     </div>
     <noscript>
