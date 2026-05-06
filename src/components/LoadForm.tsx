@@ -79,7 +79,7 @@ const SAMPLE_LOAD = {
   rate_per_mile: '2.50',
 };
 
-export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [], isPro = false, firstTimeUser = false }: LoadFormProps) {
+export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [], isPro = false, firstTimeUser = false, onOpenSettings }: LoadFormProps) {
   const { settings } = useUserSettings();
   const { profile: costProfile } = useCostProfile();
   const lastLoad = recentLoads[0] ?? null;
