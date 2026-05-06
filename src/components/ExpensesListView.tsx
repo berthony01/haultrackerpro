@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Expense, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { Load } from '@/hooks/useLoads';
@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Receipt, Search, Pencil, Trash2, Fuel, Wrench, Shield, CircleDollarSign, ArrowLeft, RefreshCcw } from 'lucide-react';
+import { Receipt, Search, Pencil, Trash2, Fuel, Wrench, Shield, ArrowLeft, RefreshCcw, Link2 } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths } from 'date-fns';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber } from '@/lib/loadUtils';
 import { ParkingExportButton } from '@/components/ParkingExportButton';
+import { ExpensesKpiStrip } from '@/components/expenses/ExpensesKpiStrip';
+import { ExpensesTable } from '@/components/expenses/ExpensesTable';
 
 interface ExpensesListViewProps {
   expenses: Expense[];
