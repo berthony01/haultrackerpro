@@ -84,21 +84,18 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
   const monthLoads = useMemo(() => getCurrentMonthLoads(loads), [loads]);
   const hasFilter = !!(dateRange.from || dateRange.to);
 
-  const kpis = useMemo(() => {
-    const revenue = filteredLoads.reduce(
-      (s, l) => s + (l.actual_pay_received != null ? Number(l.actual_pay_received) : getLoadExpectedPay(l)),
-      0
-    );
-    const expenseTotal = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-    const miles = filteredLoads.reduce((s, l) => s + Number(l.loaded_miles ?? 0), 0);
-    return {
-      revenue,
-      expenseTotal,
-      net: revenue - expenseTotal,
-      miles,
-      loadsCount: filteredLoads.length,
-    };
-  }, [filteredLoads, filteredExpenses]);
+  const summary = useMemo(
+    () => summarizeLoads(filteredLoads, filteredExpenses),
+    [filteredLoads, filteredExpenses]
+  );
+  const cancelledLoads = useMemo(() => onlyCancelled(filteredLoads), [filteredLoads]);
+  const actualPayTotal = useMemo(
+    () => excludeCancelled(filteredLoads).reduce(
+      (s, l) => s + (l.actual_pay_received != null ? Number(l.actual_pay_received) : 0),
+      0,
+    ),
+    [filteredLoads],
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
