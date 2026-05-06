@@ -212,8 +212,8 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-black font-heading">Recurring Expenses</h1>
-            <p className="text-sm text-muted-foreground">Auto-generate monthly expenses</p>
+            <h1 className="text-3xl font-black tracking-tight">Recurring Expenses</h1>
+            <p className="text-sm text-muted-foreground">Auto-generate monthly expenses on the 1st</p>
           </div>
         </div>
         <Button size="sm" className="rounded-xl gap-1.5 font-bold" onClick={handleAdd}>
@@ -222,7 +222,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
       </div>
 
       {!isPro && (
-        <Card className="border-primary/30 bg-primary/5">
+        <Card className="premium-card border-primary/30">
           <CardContent className="p-4 flex items-center gap-3">
             <Lock className="h-5 w-5 text-primary shrink-0" />
             <div className="flex-1 min-w-0">
@@ -238,7 +238,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
 
       {/* Home Time Mode card — only shown when Pro and at least one template exists, OR home time is already active */}
       {isPro && (templates.length > 0 || homeTimeActive) && (
-        <Card className={`shadow-card transition-colors ${homeTimeActive ? 'border-primary/40 bg-primary/5' : ''}`}>
+        <Card className={`premium-card transition-colors ${homeTimeActive ? 'border-primary/40' : ''}`}>
           <CardContent className="p-4 flex items-start gap-3">
             <div className={`rounded-xl p-2.5 shrink-0 ${homeTimeActive ? 'bg-primary/15' : 'bg-muted'}`}>
               <Home className={`h-5 w-5 ${homeTimeActive ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -297,7 +297,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="shadow-card">
+            <Card key={i} className="premium-card">
               <CardContent className="p-4">
                 <div className="skeleton-shimmer h-16 rounded" />
               </CardContent>
@@ -305,7 +305,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
           ))}
         </div>
       ) : templates.length === 0 ? (
-        <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
+        <Card className="premium-card border-dashed">
           <CardContent className="py-14 text-center">
             <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
               <RefreshCcw className="h-12 w-12 text-muted-foreground/30" />
@@ -321,7 +321,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
           {templates.map((template) => {
             const active = isTemplateActive(template);
             return (
-              <Card key={template.id} className={`card-premium shadow-card transition-all duration-300 ${!active ? 'opacity-70' : ''}`}>
+              <Card key={template.id} className={`premium-card transition-all duration-300 ${!active ? 'opacity-70' : ''}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <div className={`rounded-xl p-2.5 shrink-0 ${active ? 'bg-primary/10' : 'bg-muted'}`}>
@@ -592,7 +592,7 @@ function RecurringExpenseForm({ initialData, onSubmit, onCancel, loading }: Recu
   };
 
   return (
-    <Card className="border-2 border-primary/20 shadow-lg animate-fade-in">
+    <Card className="premium-card animate-fade-in">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-xl font-heading flex items-center gap-2">

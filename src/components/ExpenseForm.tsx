@@ -189,12 +189,14 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
 
   return (
     <>
-      <Card className="border-2 border-primary/20 shadow-lg">
+      <Card className="premium-card">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-heading flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-primary" />
-              {isEdit ? 'Edit Expense' : 'Add Expense'}
+            <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
+              <div className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-primary/20">
+                <Receipt className="h-4 w-4 text-primary" />
+              </div>
+              {isEdit ? 'Edit Expense' : 'Log Expense'}
             </CardTitle>
             {onCancel && (
               <Button variant="ghost" size="icon" onClick={onCancel}>
@@ -209,7 +211,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 type="button"
                 variant="outline"
                 size="sm"
-                className="flex-1 h-9 text-xs rounded-xl border-primary/30 hover:border-primary"
+                className="flex-1 h-9 text-xs rounded-xl border-primary/30 hover:border-primary bg-card/40"
                 onClick={() => handleAIButton('voice')}
               >
                 <Mic className="h-3.5 w-3.5 mr-1.5 text-primary" />
@@ -219,7 +221,7 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 type="button"
                 variant="outline"
                 size="sm"
-                className="flex-1 h-9 text-xs rounded-xl border-primary/30 hover:border-primary"
+                className="flex-1 h-9 text-xs rounded-xl border-primary/30 hover:border-primary bg-card/40"
                 onClick={() => handleAIButton('receipt')}
               >
                 <Camera className="h-3.5 w-3.5 mr-1.5 text-primary" />

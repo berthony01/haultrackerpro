@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Expense, EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { Load } from '@/hooks/useLoads';
@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Receipt, Search, Pencil, Trash2, Fuel, Wrench, Shield, CircleDollarSign, ArrowLeft, RefreshCcw } from 'lucide-react';
+import { Receipt, Search, Pencil, Trash2, Fuel, Wrench, Shield, ArrowLeft, RefreshCcw, Link2 } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths } from 'date-fns';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber } from '@/lib/loadUtils';
 import { ParkingExportButton } from '@/components/ParkingExportButton';
+import { ExpensesKpiStrip } from '@/components/expenses/ExpensesKpiStrip';
+import { ExpensesTable } from '@/components/expenses/ExpensesTable';
 
 interface ExpensesListViewProps {
   expenses: Expense[];
@@ -115,7 +117,7 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
   const paginatedExpenses = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   // Reset page when filters change
-  useMemo(() => { setCurrentPage(0); }, [activePreset, customFrom, customTo, categoryFilter, search]);
+  useEffect(() => { setCurrentPage(0); }, [activePreset, customFrom, customTo, categoryFilter, search]);
 
   const totalFiltered = filtered.reduce((s, e) => s + Number(e.amount), 0);
 
@@ -126,28 +128,30 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
     }
   };
 
+  const loadsMapForTable = loadsMap;
+
   return (
-    <div className="space-y-4 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="space-y-5 animate-fade-in">
+      {/* Premium Header */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 min-w-0">
           {onBack && (
-            <Button variant="ghost" size="icon" className="rounded-xl" onClick={onBack}>
+            <Button variant="ghost" size="icon" className="rounded-xl shrink-0" onClick={onBack}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-          <div>
-            <h1 className="text-2xl font-black font-heading">Expenses</h1>
-            <p className="text-sm text-muted-foreground">Manage your expenses</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-3xl font-black tracking-tight truncate">Expenses</h1>
+            <p className="text-sm text-muted-foreground truncate">Track every dollar that hits your bottom line</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <ParkingExportButton expenses={expenses} loads={loads} />
           {onNavigate && (
             <Button
               variant="outline"
               size="sm"
-              className="rounded-xl gap-1.5 text-xs font-bold"
+              className="rounded-xl gap-1.5 text-xs font-bold border-border/60 bg-card/40"
               onClick={() => onNavigate('recurring_expenses')}
             >
               <RefreshCcw className="h-3.5 w-3.5" /> Recurring
@@ -156,57 +160,30 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
         </div>
       </div>
 
-      {/* Total Summary */}
-      {(() => {
-        const catTotals = filtered.reduce((acc, e) => {
-          acc[e.category] = (acc[e.category] || 0) + Number(e.amount);
-          return acc;
-        }, {} as Record<string, number>);
-        const topCats = Object.entries(catTotals)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3);
+      {/* KPI Strip — premium tokens */}
+      <ExpensesKpiStrip expenses={filtered} />
 
-        return (
-          <Card className="card-premium shadow-card">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-xl bg-primary/10 p-2.5 shrink-0">
-                <CircleDollarSign className="h-5 w-5 text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-label">Total Expenses (filtered)</p>
-                <p className="text-value-lg mt-0.5 whitespace-nowrap" style={{ fontSize: 'clamp(1rem, 5vw, 1.5rem)' }}>
-                  {formatCurrency(totalFiltered)}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{filtered.length} expense{filtered.length !== 1 ? 's' : ''}</p>
-                {topCats.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {topCats.map(([cat, amt]) => (
-                      <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
-                        {cat}: {formatCurrency(amt)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      {/* Date Presets */}
+      {/* Date Presets — ghost pills, orange active */}
       <div className="space-y-2">
         <div className="flex flex-wrap gap-1.5">
-          {presetOptions.map(p => (
-            <Button
-              key={p.key}
-              variant={activePreset === p.key ? 'default' : 'outline'}
-              size="sm"
-              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
-              onClick={() => setActivePreset(p.key)}
-            >
-              {p.label}
-            </Button>
-          ))}
+          {presetOptions.map(p => {
+            const active = activePreset === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setActivePreset(p.key)}
+                className={[
+                  'h-8 px-3 rounded-full text-xs font-semibold transition-all duration-200',
+                  active
+                    ? 'bg-primary text-primary-foreground shadow-primary'
+                    : 'bg-card/40 text-muted-foreground border border-border/60 hover:text-foreground hover:border-primary/40',
+                ].join(' ')}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
         {activePreset === 'custom' && (
           <div className="flex gap-2 items-center animate-fade-in">
@@ -220,7 +197,7 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
       {/* Category + Search Filters */}
       <div className="flex gap-2">
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="h-9 text-xs rounded-xl flex-1">
+          <SelectTrigger className="h-10 text-xs rounded-xl flex-1 bg-card/40 border-border/60">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -231,13 +208,13 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
           </SelectContent>
         </Select>
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search notes..."
+            placeholder="Search notes…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="h-9 text-xs pl-8 rounded-xl"
+            className="h-10 text-xs pl-9 rounded-xl bg-card/40 border-border/60"
           />
         </div>
       </div>
@@ -246,84 +223,53 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="shadow-card">
-              <CardContent className="p-4">
-                <div className="flex gap-3">
-                  <div className="skeleton-shimmer rounded-xl w-10 h-10 shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="skeleton-shimmer h-3 w-20 rounded" />
-                    <div className="skeleton-shimmer h-5 w-16 rounded" />
-                  </div>
+            <div key={i} className="premium-card p-4">
+              <div className="flex gap-3">
+                <div className="skeleton-shimmer rounded-xl w-10 h-10 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton-shimmer h-3 w-20 rounded" />
+                  <div className="skeleton-shimmer h-5 w-24 rounded" />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
-          <CardContent className="py-14 text-center">
-            <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
-              <Receipt className="h-12 w-12 text-muted-foreground/30" />
+        <div className="premium-card border-dashed">
+          <div className="py-14 text-center">
+            <div className="inline-flex items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20 p-5 mb-5">
+              <Receipt className="h-12 w-12 text-primary/60" />
             </div>
             <p className="font-bold text-lg">No expenses found</p>
             <p className="text-sm text-muted-foreground mt-1.5">
               {expenses.length === 0 ? 'Start logging expenses to see them here.' : 'Try adjusting your filters.'}
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {paginatedExpenses.map(expense => {
-            const IconComp = categoryIcons[expense.category] || Receipt;
-            const linkedLoad = expense.linked_load_id ? loadsMap.get(expense.linked_load_id) : null;
-
-            return (
-              <Card key={expense.id} className="card-premium shadow-card hover:shadow-card-hover transition-all duration-300">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-primary/10 p-2.5 shrink-0">
-                      <IconComp className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm">{expense.category}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {format(parseISO(expense.expense_date), 'MMM d, yyyy')}
-                            </span>
-                          </div>
-                          <p className="text-lg font-black mt-0.5">{formatCurrency(expense.amount)}</p>
-                          {expense.gallons && (
-                            <p className="text-xs text-muted-foreground">{expense.gallons} gal</p>
-                          )}
-                          {linkedLoad ? (
-                            <p className="text-xs text-primary mt-1 truncate">
-                              🔗 {linkedLoad.pickup_location} → {linkedLoad.dropoff_location}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-muted-foreground/50 mt-1">No linked load</p>
-                          )}
-                          {expense.notes && (
-                            <p className="text-xs text-muted-foreground mt-1 truncate">{expense.notes}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => onEdit(expense)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive hover:text-destructive" onClick={() => setDeleteTarget(expense.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          </div>
         </div>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <div className="space-y-2 md:hidden">
+            {paginatedExpenses.map(expense => (
+              <ExpenseRowCard
+                key={expense.id}
+                expense={expense}
+                linkedLoad={expense.linked_load_id ? loadsMap.get(expense.linked_load_id) ?? null : null}
+                onEdit={() => onEdit(expense)}
+                onDelete={() => setDeleteTarget(expense.id)}
+              />
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <ExpensesTable
+              expenses={paginatedExpenses}
+              loadsMap={loadsMapForTable}
+              onEdit={onEdit}
+              onDelete={(id) => setDeleteTarget(id)}
+            />
+          </div>
+        </>
       )}
 
       {totalPages > 1 && (
@@ -377,3 +323,79 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
     </div>
   );
 }
+
+const categoryIconMap: Record<string, typeof Receipt> = {
+  Fuel: Fuel,
+  Maintenance: Wrench,
+  Insurance: Shield,
+};
+
+interface ExpenseRowCardProps {
+  expense: Expense;
+  linkedLoad: Load | null;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+const ExpenseRowCard = memo(function ExpenseRowCard({
+  expense,
+  linkedLoad,
+  onEdit,
+  onDelete,
+}: ExpenseRowCardProps) {
+  const Icon = categoryIconMap[expense.category] || Receipt;
+  return (
+    <Card className="premium-card">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-primary/10 p-2.5 shrink-0 ring-1 ring-primary/20">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm">{expense.category}</span>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    {format(parseISO(expense.expense_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+                <p className="text-xl font-mono font-black text-foreground mt-0.5 whitespace-nowrap">
+                  {formatCurrency(expense.amount)}
+                </p>
+                {expense.gallons && (
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{expense.gallons} gal</p>
+                )}
+                {linkedLoad ? (
+                  <p className="text-[11px] text-primary mt-1 truncate flex items-center gap-1">
+                    <Link2 className="h-3 w-3 shrink-0" />
+                    {linkedLoad.pickup_location} → {linkedLoad.dropoff_location}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground/50 mt-1">No linked load</p>
+                )}
+                {expense.notes && (
+                  <p className="text-[11px] text-muted-foreground mt-1 truncate">{expense.notes}</p>
+                )}
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onEdit}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg text-destructive hover:text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
