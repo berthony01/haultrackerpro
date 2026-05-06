@@ -90,8 +90,7 @@ export function PublicProfileSection() {
   if (isLoading) return null;
 
   return (
-    <Card className="shadow-card">
-      <CardContent className="p-4 space-y-3">
+    <div className="premium-card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
             <UserCircle2 className="h-3.5 w-3.5" /> Public Profile
@@ -190,7 +189,6 @@ export function PublicProfileSection() {
         >
           {updateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save profile'}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
   );
 }

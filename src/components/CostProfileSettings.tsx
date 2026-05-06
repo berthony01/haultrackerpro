@@ -68,8 +68,7 @@ export function CostProfileSettings() {
   const { cpm, breakdown } = computeCostProfileCPM(previewProfile, sampleMiles);
 
   return (
-    <Card className="card-premium">
-      <CardContent className="p-5 space-y-4">
+    <div className="premium-card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Calculator className="h-4 w-4 text-primary" />
           <h3 className="text-base font-bold">My Cost Profile</h3>
@@ -232,7 +231,6 @@ export function CostProfileSettings() {
         >
           {upsertProfile.isPending ? 'Saving...' : hasUsableData ? 'Update Cost Profile' : 'Save Cost Profile'}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
   );
 }
