@@ -56,12 +56,12 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h2 className="text-xl font-black font-heading">{initialData ? 'Edit Fuel Log' : 'Log Fuel Purchase'}</h2>
+          <h2 className="text-2xl font-black tracking-tight">{initialData ? 'Edit Fuel Log' : 'Log Fuel Purchase'}</h2>
           <p className="text-sm text-muted-foreground">Track your fuel costs</p>
         </div>
       </div>
 
-      <Card className="shadow-card">
+      <Card className="premium-card">
         <CardContent className="p-4 space-y-4">
           {/* Date */}
           <div className="space-y-1.5">
