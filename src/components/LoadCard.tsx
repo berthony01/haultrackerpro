@@ -122,22 +122,21 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
             </div>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">$/Mile</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold" title="Effective RPM = gross ÷ all miles, including deadhead.">Eff. RPM</p>
             <p className="font-mono font-black text-primary text-lg leading-tight">${rpm.toFixed(2)}</p>
+            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Contract ${Number(load.rate_per_mile).toFixed(2)}/mi</p>
           </div>
         </div>
 
         {/* Stats row */}
         <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground font-medium">
-          <span className="font-mono">{load.loaded_miles} mi</span>
+          <span className="font-mono">{load.loaded_miles} mi loaded</span>
           {Number(load.deadhead_miles) > 0 && (
             <>
               <span className="h-0.5 w-0.5 rounded-full bg-border" />
-              <span className="font-mono">{load.deadhead_miles} DH</span>
+              <span className="font-mono">{load.deadhead_miles} mi DH</span>
             </>
           )}
-          <span className="h-0.5 w-0.5 rounded-full bg-border" />
-          <span className="font-mono">${load.rate_per_mile}/mi rate</span>
         </div>
 
         {/* Add Actual Pay CTA */}
