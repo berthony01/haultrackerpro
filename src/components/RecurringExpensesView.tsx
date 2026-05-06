@@ -222,7 +222,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
       </div>
 
       {!isPro && (
-        <Card className="border-primary/30 bg-primary/5">
+        <Card className="premium-card border-primary/30">
           <CardContent className="p-4 flex items-center gap-3">
             <Lock className="h-5 w-5 text-primary shrink-0" />
             <div className="flex-1 min-w-0">
