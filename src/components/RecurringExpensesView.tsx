@@ -238,7 +238,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
 
       {/* Home Time Mode card — only shown when Pro and at least one template exists, OR home time is already active */}
       {isPro && (templates.length > 0 || homeTimeActive) && (
-        <Card className={`shadow-card transition-colors ${homeTimeActive ? 'border-primary/40 bg-primary/5' : ''}`}>
+        <Card className={`premium-card transition-colors ${homeTimeActive ? 'border-primary/40' : ''}`}>
           <CardContent className="p-4 flex items-start gap-3">
             <div className={`rounded-xl p-2.5 shrink-0 ${homeTimeActive ? 'bg-primary/15' : 'bg-muted'}`}>
               <Home className={`h-5 w-5 ${homeTimeActive ? 'text-primary' : 'text-muted-foreground'}`} />
