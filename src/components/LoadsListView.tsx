@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
@@ -6,12 +6,12 @@ import { useLoadStops } from '@/hooks/useLoadStops';
 import { LoadCard, LoadCardSkeleton } from '@/components/LoadCard';
 import { LoadDetailSheet } from '@/components/LoadDetailSheet';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Truck, Search, TrendingUp, Route, Hash, DollarSign } from 'lucide-react';
+import { LoadsKpiStrip } from '@/components/loads/LoadsKpiStrip';
+import { LoadsTable } from '@/components/loads/LoadsTable';
+import { Truck, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { formatCurrency, formatNumber } from '@/lib/loadUtils';
-import { sumExpectedPay, sumOperatingMiles, fleetEffectiveRPM } from '@/lib/loadMetrics';
 
 interface LoadsListViewProps {
   loads: Load[];
@@ -33,10 +33,10 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
   const [currentPage, setCurrentPage] = useState(0);
   const PAGE_SIZE = 50;
 
-  const loadIds = loads.map(l => l.id);
+  const loadIds = useMemo(() => loads.map(l => l.id), [loads]);
   const { stops } = useLoadStops(loadIds);
 
-  const filtered = loads.filter(l => {
+  const filtered = useMemo(() => loads.filter(l => {
     if (statusFilter !== 'all' && l.status !== statusFilter) return false;
     if (payFilter === 'missing_pay') {
       if (l.status === 'cancelled') return false;
@@ -60,102 +60,71 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       if (!l.pickup_location.toLowerCase().includes(q) && !l.dropoff_location.toLowerCase().includes(q)) return false;
     }
     return true;
-  });
+  }), [loads, statusFilter, payFilter, searchQuery]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginatedLoads = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const paginatedLoads = useMemo(
+    () => filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE),
+    [filtered, currentPage]
+  );
 
-  // Reset page when filters change
   useEffect(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery]);
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-black font-heading">My Loads</h1>
-        <p className="text-sm text-muted-foreground">{filtered.length} load{filtered.length !== 1 ? 's' : ''}</p>
+    <div className="space-y-5 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">My Loads</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {filtered.length} load{filtered.length !== 1 ? 's' : ''}
+          </p>
+        </div>
       </div>
 
+      {/* Date range */}
       <DateRangeFilter onRangeChange={onDateRangeChange} />
 
-      {/* Summary Card */}
-      {(() => {
-        const totalLoads = filtered.length;
-        const totalRevenue = sumExpectedPay(filtered);
-        const totalMiles = sumOperatingMiles(filtered);
-        const avgPerMile = fleetEffectiveRPM(filtered);
+      {/* KPI strip */}
+      {filtered.length > 0 && <LoadsKpiStrip loads={filtered} />}
 
-        return totalLoads > 0 ? (
-          <Card className="card-premium shadow-card">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-4 gap-3">
-                <div className="text-center">
-                  <div className="flex items-center justify-center mb-1">
-                    <Hash className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                  <p className="text-lg font-black">{totalLoads}</p>
-                  <p className="text-[10px] text-muted-foreground">Loads</p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center mb-1">
-                    <DollarSign className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                  <p className="text-lg font-black">{formatCurrency(totalRevenue)}</p>
-                  <p className="text-[10px] text-muted-foreground">Revenue</p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center mb-1">
-                    <Route className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                  <p className="text-lg font-black">{formatNumber(totalMiles)}</p>
-                  <p className="text-[10px] text-muted-foreground">Miles</p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center mb-1">
-                    <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                  <p className="text-lg font-black">${avgPerMile.toFixed(2)}</p>
-                  <p className="text-[10px] text-muted-foreground">Avg $/mi</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null;
-      })()}
-
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search city or state..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="h-8 text-xs pl-8 rounded-xl"
-          />
+      {/* Filter bar */}
+      <div className="premium-card p-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search city or state..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="h-9 text-xs pl-8 rounded-lg bg-secondary/40 border-border/60"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-32 h-9 text-xs rounded-lg bg-secondary/40 border-border/60">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={payFilter} onValueChange={setPayFilter}>
+            <SelectTrigger className="w-32 h-9 text-xs rounded-lg bg-secondary/40 border-border/60">
+              <SelectValue placeholder="All pay" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Pay</SelectItem>
+              <SelectItem value="missing_pay">Pending Pay</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="short_paid">Short Paid</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-28 h-8 text-xs rounded-xl">
-            <SelectValue placeholder="All statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={payFilter} onValueChange={setPayFilter}>
-          <SelectTrigger className="w-28 h-8 text-xs rounded-xl">
-            <SelectValue placeholder="All pay" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Pay</SelectItem>
-            <SelectItem value="missing_pay">Pending Pay</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="short_paid">Short Paid</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {isLoading ? (
@@ -165,29 +134,42 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
+        <Card className="premium-card border-dashed">
           <CardContent className="py-14 text-center">
-            <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
-              <Truck className="h-12 w-12 text-muted-foreground/30" />
+            <div className="inline-flex items-center justify-center rounded-2xl bg-secondary/60 p-5 mb-5">
+              <Truck className="h-10 w-10 text-muted-foreground/40" />
             </div>
-            <p className="font-bold text-lg">No loads match your filters</p>
-            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">Try adjusting your date range or filters above.</p>
+            <p className="font-bold text-base">No loads match your filters</p>
+            <p className="text-sm text-muted-foreground mt-1.5">Try adjusting your date range or filters above.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {paginatedLoads.map(load => (
-            <LoadCard
-              key={load.id}
-              load={load}
-              stops={stops.filter(s => s.load_id === load.id)}
+        <>
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {paginatedLoads.map(load => (
+              <LoadCard
+                key={load.id}
+                load={load}
+                stops={stops.filter(s => s.load_id === load.id)}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onUpdate={onUpdate}
+                onTap={() => setSelectedLoad(load)}
+              />
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <LoadsTable
+              loads={paginatedLoads}
+              stops={stops}
               onEdit={onEdit}
               onDelete={onDelete}
-              onUpdate={onUpdate}
-              onTap={() => setSelectedLoad(load)}
+              onSelect={setSelectedLoad}
             />
-          ))}
-        </div>
+          </div>
+        </>
       )}
 
       {totalPages > 1 && (
