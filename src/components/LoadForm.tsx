@@ -15,6 +15,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown } from 'lucide-react';
 import { PayModel, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PAY_MODEL_VALUES, isPayModel, resolvePayModel } from '@/lib/payModels';
 import { computeLoadPay } from '@/lib/computeLoadPay';
+import { useCostProfile, computeCostProfileCPM } from '@/hooks/useCostProfile';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
@@ -78,6 +79,7 @@ const SAMPLE_LOAD = {
 
 export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [], isPro = false, firstTimeUser = false }: LoadFormProps) {
   const { settings } = useUserSettings();
+  const { profile: costProfile } = useCostProfile();
   const lastLoad = recentLoads[0] ?? null;
 
   const isPercentagePay = settings?.pay_type === 'percentage';
@@ -849,26 +851,87 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           )}
 
-          {/* Live pay calculation */}
-          <div className={`rounded-lg p-4 ${isCancelled ? 'bg-destructive/10' : 'bg-secondary'}`}>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-xs text-muted-foreground">Estimated Pay</p>
-                <p className={`text-2xl font-black font-mono ${isCancelled ? 'text-destructive' : 'text-primary'}`}>
-                  {formatCurrency(estimated)}
-                </p>
-                {isCancelled && <p className="text-xs text-destructive mt-0.5">Cancelled — pay set to $0</p>}
-              </div>
-              {form.actual_pay_received && !isCancelled && (
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Actual</p>
-                  <p className={`text-2xl font-black font-mono ${parseFloat(form.actual_pay_received) >= estimated ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(parseFloat(form.actual_pay_received) || 0)}
-                  </p>
+          {/* Live financial preview */}
+          {(() => {
+            const loaded = parseFloat(form.loaded_miles) || 0;
+            const dh = parseFloat(form.deadhead_miles) || 0;
+            const totalMi = loaded + dh;
+            const contractRate = parseFloat(form.rate_per_mile) || 0;
+            const gross = isCancelled ? 0 : estimated;
+            const effRPM = totalMi > 0 ? gross / totalMi : 0;
+            const loadedRPM = loaded > 0 ? gross / loaded : 0;
+            const cpm = computeCostProfileCPM(costProfile, totalMi).cpm;
+            const estExpenses = cpm * totalMi;
+            const netProfit = gross - estExpenses;
+            const netRPM = totalMi > 0 ? netProfit / totalMi : 0;
+            const dhImpactPct = loadedRPM > 0 ? ((loadedRPM - effRPM) / loadedRPM) * 100 : 0;
+            const actualNum = parseFloat(form.actual_pay_received);
+            const hasActual = !isCancelled && form.actual_pay_received && Number.isFinite(actualNum);
+
+            return (
+              <div className={`rounded-lg p-4 space-y-3 ${isCancelled ? 'bg-destructive/10' : 'bg-secondary'}`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Estimated Gross Revenue</p>
+                    <p className={`text-2xl font-black font-mono ${isCancelled ? 'text-destructive' : 'text-primary'}`}>
+                      {formatCurrency(gross)}
+                    </p>
+                    {isCancelled && <p className="text-xs text-destructive mt-0.5">Cancelled — pay set to $0</p>}
+                  </div>
+                  {hasActual && (
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Actual</p>
+                      <p className={`text-2xl font-black font-mono ${actualNum >= gross ? 'text-success' : 'text-destructive'}`}>
+                        {formatCurrency(actualNum)}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+
+                {!isCancelled && (
+                  <>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs pt-2 border-t border-border/50">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Contract Rate</span>
+                        <span className="font-mono font-semibold">${contractRate.toFixed(2)}/mi</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Effective RPM</span>
+                        <span className="font-mono font-semibold text-primary">${effRPM.toFixed(2)}/mi</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Est. Expenses</span>
+                        <span className="font-mono font-semibold">{cpm > 0 ? formatCurrency(estExpenses) : '—'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Est. Net Profit</span>
+                        <span className={`font-mono font-semibold ${cpm > 0 ? (netProfit >= 0 ? 'text-success' : 'text-destructive') : ''}`}>
+                          {cpm > 0 ? formatCurrency(netProfit) : '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Net RPM</span>
+                        <span className={`font-mono font-semibold ${cpm > 0 ? (netRPM >= 0 ? 'text-success' : 'text-destructive') : ''}`}>
+                          {cpm > 0 ? `$${netRPM.toFixed(2)}/mi` : '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Deadhead Impact</span>
+                        <span className="font-mono font-semibold">
+                          {dh > 0 && loadedRPM > 0 ? `−${dhImpactPct.toFixed(1)}%` : '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-snug pt-1 border-t border-border/30">
+                      <Info className="inline h-3 w-3 mr-1 -mt-0.5" />
+                      Effective RPM includes deadhead miles. Your contract rate has not changed.
+                      {cpm <= 0 && ' Add a Cost Profile in Settings to see Net Profit & Net RPM.'}
+                    </p>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Phase 3: Profit Check */}
           {profitCheck && !isCancelled && <ProfitCheckCard result={profitCheck} />}

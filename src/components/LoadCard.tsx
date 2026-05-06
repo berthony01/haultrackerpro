@@ -2,6 +2,7 @@ import { useState, memo } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadEffectiveRPM } from '@/lib/loadMetrics';
+import { derivePaymentDisplayStatus, getPaymentDifference, getLoadExpectedPay } from '@/lib/financialCalculations';
 import { LoadStop } from '@/hooks/useLoadStops';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,17 +27,36 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
+const paymentBadgeStyles: Record<string, string> = {
+  paid: 'bg-success/15 text-success border-success/30',
+  underpaid: 'bg-warning/15 text-warning border-warning/30',
+  overpaid: 'bg-primary/15 text-primary border-primary/30',
+  pending: 'bg-muted text-muted-foreground border-border',
+  cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
+};
+
+const paymentBadgeLabel: Record<string, string> = {
+  paid: 'Paid',
+  underpaid: 'Underpaid',
+  overpaid: 'Overpaid',
+  pending: 'Pending Payment',
+  cancelled: 'Cancelled',
+};
+
 function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: LoadCardProps) {
   const [showPayInput, setShowPayInput] = useState(false);
   const [payValue, setPayValue] = useState('');
 
-  const estimated = Number(load.estimated_pay ?? 0);
+  const grossRevenue = getLoadExpectedPay(load);
+  const estimated = Number(load.estimated_pay ?? grossRevenue);
   const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
-  const diff = actual != null ? actual - estimated : null;
-  const showAddPay = actual == null && load.status !== 'cancelled';
+  const paymentStatus = derivePaymentDisplayStatus(load);
+  const paymentDiff = getPaymentDifference(load); // actual - gross, or null
+  const isCancelled = load.status === 'cancelled';
+  const showAddPay = actual == null && !isCancelled;
   const stopsCount = stops.length;
   const rpm = getLoadEffectiveRPM(load);
-  const payShown = actual ?? estimated;
+  const payShown = isCancelled ? 0 : (actual ?? estimated);
 
   const handleSavePay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -71,16 +91,19 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
               {load.status}
             </Badge>
-            {load.payment_status && load.payment_status !== 'unpaid' && (
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${
-                load.payment_status === 'paid' ? 'bg-success/15 text-success border-success/30' :
-                load.payment_status === 'overdue' || (load.payment_due_date && !load.paid_date && new Date(load.payment_due_date) < new Date()) ? 'bg-destructive/15 text-destructive border-destructive/30' :
-                load.payment_status === 'short_paid' ? 'bg-warning/15 text-warning border-warning/30' :
-                'bg-primary/15 text-primary border-primary/30'
-              }`}>
-                {load.payment_status === 'short_paid' ? 'short' : load.payment_status}
-              </Badge>
-            )}
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${paymentBadgeStyles[paymentStatus]}`}
+              title={
+                paymentStatus === 'paid' ? 'Actual pay matches estimated gross' :
+                paymentStatus === 'underpaid' ? 'Actual pay is less than estimated gross' :
+                paymentStatus === 'overpaid' ? 'Actual pay is more than estimated gross' :
+                paymentStatus === 'pending' ? 'Awaiting actual pay entry' :
+                'Load was cancelled'
+              }
+            >
+              {paymentBadgeLabel[paymentStatus]}
+            </Badge>
             {stopsCount > 0 && (
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-semibold">
                 +{stopsCount}
@@ -108,18 +131,36 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
         <div className="flex items-end justify-between gap-3 pt-2 border-t border-border/60">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-              {actual != null ? 'Actual Pay' : 'Estimated'}
+              {isCancelled ? 'Cancelled' : actual != null ? 'Actual Pay' : 'Estimated'}
             </p>
             <div className="flex items-baseline gap-2 flex-wrap">
-              <p className={`font-mono font-black leading-tight tracking-tight ${actual != null ? (actual >= estimated ? 'text-success' : 'text-destructive') : 'text-foreground'}`} style={{ fontSize: 'clamp(1.25rem, 5vw, 1.5rem)' }}>
+              <p className={`font-mono font-black leading-tight tracking-tight ${
+                isCancelled ? 'text-destructive' :
+                actual != null ? (paymentStatus === 'paid' ? 'text-success' : paymentStatus === 'overpaid' ? 'text-primary' : 'text-warning')
+                : 'text-foreground'
+              }`} style={{ fontSize: 'clamp(1.25rem, 5vw, 1.5rem)' }}>
                 {formatCurrency(payShown)}
               </p>
-              {diff != null && (
-                <span className={`text-[11px] font-mono font-bold ${diff >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
+              {paymentDiff != null && Math.abs(paymentDiff) >= 0.005 && (
+                <span className={`text-[11px] font-mono font-bold ${paymentDiff >= 0 ? 'text-primary' : 'text-warning'}`}>
+                  {paymentDiff >= 0 ? '+' : ''}{formatCurrency(paymentDiff)}
                 </span>
               )}
             </div>
+            {/* Payment status detail line */}
+            <p className={`text-[10px] font-medium mt-1 ${
+              paymentStatus === 'paid' ? 'text-success' :
+              paymentStatus === 'underpaid' ? 'text-warning' :
+              paymentStatus === 'overpaid' ? 'text-primary' :
+              paymentStatus === 'cancelled' ? 'text-destructive' :
+              'text-muted-foreground'
+            }`}>
+              {paymentStatus === 'paid' && 'Paid in full'}
+              {paymentStatus === 'underpaid' && paymentDiff != null && `Amount Still Owed: ${formatCurrency(Math.abs(paymentDiff))}`}
+              {paymentStatus === 'overpaid' && paymentDiff != null && `Overpaid by: ${formatCurrency(Math.abs(paymentDiff))}`}
+              {paymentStatus === 'pending' && 'Pending actual payment entry'}
+              {paymentStatus === 'cancelled' && 'Excluded from totals'}
+            </p>
           </div>
           <div className="text-right shrink-0">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold" title="Effective RPM = gross ÷ all miles, including deadhead.">Eff. RPM</p>
