@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency } from '@/lib/loadUtils';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface Props { expenses: Expense[]; }
 
@@ -37,9 +37,10 @@ export function ExpenseDonut({ expenses }: Props) {
     return { data, total };
   }, [expenses]);
 
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-4 sm:p-5"
@@ -56,7 +57,9 @@ export function ExpenseDonut({ expenses }: Props) {
                   {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ background: 'hsl(220 46% 9%)', border: '1px solid hsl(220 30% 22%)', borderRadius: 12, fontSize: 12 }}
+                  contentStyle={{ background: 'hsl(220 46% 9%)', border: '1px solid hsl(220 30% 22%)', borderRadius: 12, fontSize: 12, color: 'hsl(220 12% 92%)' }}
+                  itemStyle={{ color: 'hsl(220 12% 88%)' }}
+                  labelStyle={{ color: 'hsl(220 12% 92%)' }}
                   formatter={(v: any) => formatCurrency(Number(v))}
                 />
               </PieChart>

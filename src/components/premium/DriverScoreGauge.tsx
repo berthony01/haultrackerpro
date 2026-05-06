@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface Props {
   score: number;          // 0-100
@@ -11,16 +11,18 @@ export function DriverScoreGauge({ score, tier, percentileLabel }: Props) {
   const angle = (clamped / 100) * 180; // half-circle
   const color = clamped >= 80 ? 'hsl(142 71% 45%)' : clamped >= 60 ? 'hsl(48 96% 53%)' : clamped >= 40 ? 'hsl(25 100% 55%)' : 'hsl(0 84% 60%)';
 
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-5"
     >
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-3">Driver Score</p>
       <div className="relative w-full aspect-[2/1] max-w-[220px] mx-auto">
-        <svg viewBox="0 0 200 110" className="w-full h-full">
+        <svg viewBox="0 0 200 110" className="w-full h-full" role="img" aria-label={`Driver score ${Math.round(clamped)} out of 100${tier ? `, tier ${tier}` : ''}`}>
+          <title>{`Driver score: ${Math.round(clamped)} / 100`}</title>
           {/* track */}
           <path d="M 15 100 A 85 85 0 0 1 185 100" fill="none" stroke="hsl(220 30% 18%)" strokeWidth="14" strokeLinecap="round" />
           {/* progress */}
@@ -28,9 +30,9 @@ export function DriverScoreGauge({ score, tier, percentileLabel }: Props) {
             d="M 15 100 A 85 85 0 0 1 185 100"
             fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
             strokeDasharray="267"
-            initial={{ strokeDashoffset: 267 }}
+            initial={reduce ? { strokeDashoffset: 267 - (267 * angle) / 180 } : { strokeDashoffset: 267 }}
             animate={{ strokeDashoffset: 267 - (267 * angle) / 180 }}
-            transition={{ duration: 1, ease: 'easeOut' }}
+            transition={{ duration: reduce ? 0 : 1, ease: 'easeOut' }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">

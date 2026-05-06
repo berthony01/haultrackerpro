@@ -3,7 +3,7 @@ import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtil
 import { getLoadExpectedPay } from '@/lib/loadMetrics';
 import { format, parseISO } from 'date-fns';
 import { CheckCircle2, Clock, CalendarClock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface Props {
   loads: Load[];
@@ -23,9 +23,10 @@ function statusFor(load: Load): { key: 'completed' | 'in_progress' | 'scheduled'
 export function RecentLoadsPanel({ loads, onViewAll }: Props) {
   const sorted = [...loads].sort((a, b) => getEffectiveDate(b).localeCompare(getEffectiveDate(a))).slice(0, 5);
 
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-4 sm:p-5"

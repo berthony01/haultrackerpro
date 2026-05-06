@@ -16,9 +16,8 @@ import { useCostProfile, computeCostProfileCPM, profileHasUsableData } from '@/h
 import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
-import { PerformanceTrends } from '@/components/PerformanceTrends';
-import { PerformanceCharts } from '@/components/PerformanceCharts';
-import { ProfitOverview } from '@/components/ProfitOverview';
+// PerformanceTrends + PerformanceCharts removed (duplicated by premium ProfitOverviewChart)
+// ProfitOverview removed (duplicated by premium ProfitOverviewChart + KPI row)
 import { ProInsightCard } from '@/components/ProInsightCard';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
 import { ProTimeSavedCard } from '@/components/ProTimeSavedCard';
@@ -201,6 +200,30 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
 
+      {/* Date Range Filter — moved above premium hero so it scopes the new charts */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map(p => (
+            <Button
+              key={p.key}
+              variant={activePreset === p.key ? 'default' : 'outline'}
+              size="sm"
+              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
+              onClick={() => setActivePreset(p.key)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        {showCustom && (
+          <div className="flex gap-2 items-center animate-fade-in">
+            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
+          </div>
+        )}
+      </div>
+
       {/* === PREMIUM ANALYTICS HERO === */}
       {!isLoading && (
         <>
@@ -233,7 +256,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* === ZONE 1 · ACTION ZONE === */}
-      {/* Quick Actions — primary "log something" entry point */}
       {!isLoading && onNavigate && (
         <div className="grid grid-cols-4 gap-2">
           <Button
@@ -271,10 +293,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       )}
 
-      {/* Driver Intelligence — gamified score card with next-tier hint */}
+      {/* Driver Intelligence */}
       {!isLoading && <DriverIntelligenceCard isPro={isPro} />}
 
-      {/* === ZONE 2 · COMPETITION ZONE === */}
+      {/* === ZONE 2 · COMPETITION === */}
       {!isLoading && (
         <DriverLeaderboardCard
           limit={5}
@@ -285,7 +307,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         />
       )}
 
-      {/* === ZONE 3 · ALERTS (urgent only) === */}
+      {/* === ZONE 3 · ALERTS === */}
       {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
       {!isLoading && smartAlerts && (
         <SmartAlertsCard
@@ -298,34 +320,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
       {!isLoading && <WeeklyFocusCard loads={loads} />}
 
-      {/* === ZONE 4 · QUICK SHORTCUTS / SUPPORT === */}
+      {/* === ZONE 4 · QUICK SHORTCUTS === */}
       {!isLoading && (
         <HomeTimeDashboardCard isPro={isPro} onNavigate={onNavigate} />
       )}
-
-      {/* Date Range Filter */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {presets.map(p => (
-            <Button
-              key={p.key}
-              variant={activePreset === p.key ? 'default' : 'outline'}
-              size="sm"
-              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
-              onClick={() => setActivePreset(p.key)}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
-        {showCustom && (
-          <div className="flex gap-2 items-center animate-fade-in">
-            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
-          </div>
-        )}
-      </div>
 
       {/* Loading skeletons */}
       {isLoading ? (
@@ -336,59 +334,30 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       ) : (
         <>
-          {/* === ZONE 5 · BUSINESS METRICS === */}
-          {/* Profit Overview — promoted to top so Gross / Expenses / Net Profit are
-              the first thing the driver sees after the date filter. */}
-          <ProfitOverview
-            loads={filteredLoads}
-            expenses={filteredExpenses}
-            onAddExpense={onNavigate ? () => onNavigate('add_expense') : undefined}
-          />
-
-          {/* Headline Net Profit + Expenses tiles. Always rendered, even at $0,
-              so profit math is visible above the fold. */}
+          {/* === ZONE 5 · BUSINESS METRICS (secondary tiles, non-duplicated) === */}
           {(() => {
-            const grossForTiles = (() => {
-              const paid = filteredLoads.filter(l => l.actual_pay_received != null);
-              if (paid.length > 0) {
-                return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
-                  + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
-              }
-              return estimated;
-            })();
-            const totalExpensesForTiles = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-            const netProfitForTiles = grossForTiles - totalExpensesForTiles;
-
             // Cost Profile projection (only when user has set up a usable profile)
             let projectedNet: number | null = null;
             if (profileHasUsableData(costProfile) && totalMiles > 0) {
+              const grossForProj = (() => {
+                const paid = filteredLoads.filter(l => l.actual_pay_received != null);
+                if (paid.length > 0) {
+                  return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
+                    + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
+                }
+                return estimated;
+              })();
               const { cpm } = computeCostProfileCPM(costProfile, totalMiles);
               const variableCost = cpm * totalMiles;
               const daysPer1k = Number(costProfile?.days_per_1000_miles ?? 2.5) || 2.5;
               const days = (totalMiles / 1000) * daysPer1k;
               const perDay = Number(costProfile?.meals_per_day ?? 0) + Number(costProfile?.lodging_per_day ?? 0);
               const dailyCost = days * perDay;
-              projectedNet = grossForTiles - variableCost - dailyCost;
+              projectedNet = grossForProj - variableCost - dailyCost;
             }
 
             return (
               <div className="grid grid-cols-2 gap-2.5">
-                <StatCard
-                  label="Net Profit"
-                  value={formatCurrency(netProfitForTiles)}
-                  icon={netProfitForTiles >= 0 ? TrendingUp : TrendingDown}
-                  subtitle={filteredExpenses.length > 0 ? 'Gross − Expenses' : 'Log expenses for true net'}
-                  variant={netProfitForTiles >= 0 ? 'success' : 'danger'}
-                  size="large"
-                />
-                <StatCard
-                  label="Total Expenses"
-                  value={formatCurrency(totalExpensesForTiles)}
-                  icon={Receipt}
-                  subtitle={`${filteredExpenses.length} logged`}
-                  variant="warning"
-                  size="large"
-                />
                 <StatCard label="Est. Earnings" value={formatCurrency(estimated)} icon={DollarSign} />
                 <StatCard
                   label="Actual Earnings"
@@ -396,7 +365,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   icon={DollarSign}
                   subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid` : 'No payments yet'}
                 />
-                <StatCard label="Total Loads" value={filteredLoads.length.toString()} icon={Truck} />
                 <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
                 <TooltipProvider>
                   <Tooltip>
@@ -517,11 +485,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           {/* Pro Time Saved */}
           <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />
 
-          {/* Performance Trends */}
-          <PerformanceTrends loads={loads} />
-
-          {/* Performance Charts */}
-          <PerformanceCharts loads={loads} expenses={expenses} isPro={isPro} />
+          {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
 
           {/* Last Updated */}
           {loads.length > 0 && (

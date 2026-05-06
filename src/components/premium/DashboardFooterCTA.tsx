@@ -1,12 +1,13 @@
 import { TrendingUp, ArrowRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface Props { onClick?: () => void; }
 
 export function DashboardFooterCTA({ onClick }: Props) {
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4"

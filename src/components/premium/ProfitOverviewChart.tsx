@@ -7,7 +7,7 @@ import { format, parseISO } from 'date-fns';
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface Props {
   loads: Load[];
@@ -31,15 +31,20 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
       map.set(d, e);
     });
     return Array.from(map.values())
-      .map(d => ({ ...d, expenses: -Math.abs(d.expenses), net: d.revenue + (-Math.abs(d.expenses) * 0) - Math.abs(d.expenses) === 0 ? d.revenue : d.revenue - Math.abs(d.expenses) }))
+      .map(d => ({
+        ...d,
+        net: d.revenue - Math.abs(d.expenses),
+        expenses: -Math.abs(d.expenses),
+      }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [loads, expenses]);
 
   const empty = data.length === 0;
+  const reduce = useReducedMotion();
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={reduce ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-4 sm:p-5"
@@ -69,8 +74,10 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
                 tickFormatter={(v) => `$${Math.round(Number(v) / 1000)}k`}
               />
               <Tooltip
-                contentStyle={{ background: 'hsl(220 46% 9%)', border: '1px solid hsl(220 30% 22%)', borderRadius: 12, fontSize: 12 }}
-                labelStyle={{ color: 'hsl(220 12% 82%)' }}
+                contentStyle={{ background: 'hsl(220 46% 9%)', border: '1px solid hsl(220 30% 22%)', borderRadius: 12, fontSize: 12, color: 'hsl(220 12% 92%)' }}
+                labelStyle={{ color: 'hsl(220 12% 92%)', fontWeight: 600 }}
+                itemStyle={{ color: 'hsl(220 12% 88%)' }}
+                formatter={(v: any, name: any) => [`$${Math.abs(Number(v)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="revenue" name="Revenue" fill="hsl(142 71% 45%)" radius={[4, 4, 0, 0]} maxBarSize={28} />
