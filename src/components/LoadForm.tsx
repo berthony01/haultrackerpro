@@ -854,6 +854,40 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
           )}
 
+          {/* Phase 2: Deadhead unpaid education card */}
+          {(() => {
+            const dh = parseFloat(form.deadhead_miles) || 0;
+            if (isCancelled) return null;
+            if (dh <= 0) return null;
+            if (form.pay_model !== 'loaded_miles_only') return null;
+            if (form.dh_pay_status !== 'unpaid') return null;
+            return (
+              <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                  <div className="text-xs leading-relaxed">
+                    <p className="font-bold text-warning mb-1">Heads up: deadhead miles are set to unpaid.</p>
+                    <p className="text-foreground/80">
+                      If your company actually pays you for empty miles, change <span className="font-semibold">Deadhead Pay → "Paid at same rate"</span> or
+                      <span className="font-semibold"> Pay Model → "Total Miles Paid"</span> so HaulTrackerPro shows your real earnings.
+                    </p>
+                  </div>
+                </div>
+                {onOpenSettings && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs w-full"
+                    onClick={onOpenSettings}
+                  >
+                    Open Pay Settings
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Live financial preview */}
           {(() => {
             const loaded = parseFloat(form.loaded_miles) || 0;
@@ -871,7 +905,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             const actualNum = parseFloat(form.actual_pay_received);
             const hasActual = !isCancelled && form.actual_pay_received && Number.isFinite(actualNum);
 
+            const LabelWithTip = ({ label, tip }: { label: string; tip: string }) => (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground underline decoration-dotted decoration-muted-foreground/40 cursor-help">
+                    {label}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-xs">{tip}</TooltipContent>
+              </Tooltip>
+            );
+
             return (
+              <TooltipProvider delayDuration={150}>
               <div className={`rounded-lg p-4 space-y-3 ${isCancelled ? 'bg-destructive/10' : 'bg-secondary'}`}>
                 <div className="flex justify-between items-start">
                   <div>
@@ -893,46 +939,62 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
                 {!isCancelled && (
                   <>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs pt-2 border-t border-border/50">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Contract Rate</span>
-                        <span className="font-mono font-semibold">${contractRate.toFixed(2)}/mi</span>
+                    <div className="space-y-2 text-xs pt-2 border-t border-border/50">
+                      {/* Broker rate */}
+                      <div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Broker Rate (per loaded mile)</span>
+                          <span className="font-mono font-semibold">${contractRate.toFixed(2)}/mi</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/80 leading-tight mt-0.5">What the broker pays you per loaded mile.</p>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Effective RPM</span>
-                        <span className="font-mono font-semibold text-primary">${effRPM.toFixed(2)}/mi</span>
+
+                      {/* Real pay per mile */}
+                      <div>
+                        <div className="flex justify-between">
+                          <LabelWithTip label="Your Real Pay Per Mile" tip="Technical term: Effective RPM" />
+                          <span className="font-mono font-semibold text-primary">${effRPM.toFixed(2)}/mi</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/80 leading-tight mt-0.5">Includes your empty/deadhead miles. This is what your truck actually earns per mile rolling.</p>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Est. Expenses</span>
-                        <span className="font-mono font-semibold">{cpm > 0 ? formatCurrency(estExpenses) : '—'}</span>
+
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-1">
+                        <div className="flex justify-between">
+                          <LabelWithTip label="Est. Fuel & Truck Costs" tip="Technical term: Estimated Variable Cost" />
+                          <span className="font-mono font-semibold">{cpm > 0 ? formatCurrency(estExpenses) : '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Est. Take-Home (after costs)</span>
+                          <span className={`font-mono font-semibold ${cpm > 0 ? (netProfit >= 0 ? 'text-success' : 'text-destructive') : ''}`}>
+                            {cpm > 0 ? formatCurrency(netProfit) : '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <LabelWithTip label="Take-Home Per Mile" tip="Technical term: Net RPM" />
+                          <span className={`font-mono font-semibold ${cpm > 0 ? (netRPM >= 0 ? 'text-success' : 'text-destructive') : ''}`}>
+                            {cpm > 0 ? `$${netRPM.toFixed(2)}/mi` : '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Empty Miles Drag</span>
+                          <span className="font-mono font-semibold">
+                            {dh > 0 && loadedRPM > 0 ? `−${dhImpactPct.toFixed(1)}%` : '—'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Est. Net Profit</span>
-                        <span className={`font-mono font-semibold ${cpm > 0 ? (netProfit >= 0 ? 'text-success' : 'text-destructive') : ''}`}>
-                          {cpm > 0 ? formatCurrency(netProfit) : '—'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Net RPM</span>
-                        <span className={`font-mono font-semibold ${cpm > 0 ? (netRPM >= 0 ? 'text-success' : 'text-destructive') : ''}`}>
-                          {cpm > 0 ? `$${netRPM.toFixed(2)}/mi` : '—'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Deadhead Impact</span>
-                        <span className="font-mono font-semibold">
-                          {dh > 0 && loadedRPM > 0 ? `−${dhImpactPct.toFixed(1)}%` : '—'}
-                        </span>
-                      </div>
+                      {dh > 0 && loadedRPM > 0 && (
+                        <p className="text-[10px] text-muted-foreground/80 leading-tight">How much your empty miles lower your real pay per mile.</p>
+                      )}
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-snug pt-1 border-t border-border/30">
                       <Info className="inline h-3 w-3 mr-1 -mt-0.5" />
-                      Effective RPM includes deadhead miles. Your contract rate has not changed.
-                      {cpm <= 0 && ' Add a Cost Profile in Settings to see Net Profit & Net RPM.'}
+                      Your broker rate has not changed. "Real Pay Per Mile" spreads your pay across all miles you drove, loaded + empty, so you can see what your truck actually earns.
+                      {cpm <= 0 && ' Add a Cost Profile in Settings to see Take-Home & Take-Home Per Mile.'}
                     </p>
                   </>
                 )}
               </div>
+              </TooltipProvider>
             );
           })()}
 
