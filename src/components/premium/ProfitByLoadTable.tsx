@@ -2,7 +2,7 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadExpectedPay, getLoadOperatingMiles } from '@/lib/loadMetrics';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface Props {
   loads: Load[];
@@ -29,9 +29,10 @@ export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
   });
   const totalPpm = totalMiles > 0 ? totalNet / totalMiles : 0;
 
+  const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-4 sm:p-5"
