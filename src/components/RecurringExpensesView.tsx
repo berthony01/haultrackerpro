@@ -212,8 +212,8 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-black font-heading">Recurring Expenses</h1>
-            <p className="text-sm text-muted-foreground">Auto-generate monthly expenses</p>
+            <h1 className="text-3xl font-black tracking-tight">Recurring Expenses</h1>
+            <p className="text-sm text-muted-foreground">Auto-generate monthly expenses on the 1st</p>
           </div>
         </div>
         <Button size="sm" className="rounded-xl gap-1.5 font-bold" onClick={handleAdd}>
