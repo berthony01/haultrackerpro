@@ -3,11 +3,11 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, exportScheduleCSummary, getCurrentMonthLoads, getEffectiveDate } from '@/lib/loadUtils';
-import { getLoadExpectedPay } from '@/lib/loadMetrics';
+import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, exportScheduleCSummary, getCurrentMonthLoads, getEffectiveDate, weekStartDayToNumber } from '@/lib/loadUtils';
+import { summarizeLoads, excludeCancelled, onlyCancelled, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock, Receipt, BarChart3, Fuel, DollarSign } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock, Receipt, BarChart3, Fuel, DollarSign, Ban } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { parseISO, isWithinInterval } from 'date-fns';
 import { toast } from 'sonner';
@@ -84,21 +84,18 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
   const monthLoads = useMemo(() => getCurrentMonthLoads(loads), [loads]);
   const hasFilter = !!(dateRange.from || dateRange.to);
 
-  const kpis = useMemo(() => {
-    const revenue = filteredLoads.reduce(
-      (s, l) => s + (l.actual_pay_received != null ? Number(l.actual_pay_received) : getLoadExpectedPay(l)),
-      0
-    );
-    const expenseTotal = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
-    const miles = filteredLoads.reduce((s, l) => s + Number(l.loaded_miles ?? 0), 0);
-    return {
-      revenue,
-      expenseTotal,
-      net: revenue - expenseTotal,
-      miles,
-      loadsCount: filteredLoads.length,
-    };
-  }, [filteredLoads, filteredExpenses]);
+  const summary = useMemo(
+    () => summarizeLoads(filteredLoads, filteredExpenses),
+    [filteredLoads, filteredExpenses]
+  );
+  const cancelledLoads = useMemo(() => onlyCancelled(filteredLoads), [filteredLoads]);
+  const actualPayTotal = useMemo(
+    () => excludeCancelled(filteredLoads).reduce(
+      (s, l) => s + (l.actual_pay_received != null ? Number(l.actual_pay_received) : 0),
+      0,
+    ),
+    [filteredLoads],
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -120,26 +117,26 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
         <DateRangeFilter onRangeChange={(from, to) => setDateRange({ from, to })} />
       </div>
 
-      {/* KPI Strip */}
+      {/* Financial KPI Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="premium-card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="rounded-lg bg-primary/10 ring-1 ring-primary/20 p-1.5 text-primary">
               <DollarSign className="h-3.5 w-3.5" />
             </div>
-            <p className="text-label">Revenue</p>
+            <p className="text-label" title={FINANCIAL_TOOLTIPS.grossRevenue}>Gross Revenue</p>
           </div>
-          <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatCurrency(kpis.revenue)}</p>
-          <p className="text-[11px] text-muted-foreground mt-1">{kpis.loadsCount} loads</p>
+          <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatCurrency(summary.grossRevenue)}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{summary.loadCount} loads · cancelled excluded</p>
         </div>
         <div className="premium-card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="rounded-lg bg-primary/10 ring-1 ring-primary/20 p-1.5 text-primary">
               <Receipt className="h-3.5 w-3.5" />
             </div>
-            <p className="text-label">Expenses</p>
+            <p className="text-label">Total Expenses</p>
           </div>
-          <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatCurrency(kpis.expenseTotal)}</p>
+          <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatCurrency(summary.expensesTotal)}</p>
           <p className="text-[11px] text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
         </div>
         <div className="premium-card p-4">
@@ -147,24 +144,101 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
             <div className="rounded-lg bg-primary/10 ring-1 ring-primary/20 p-1.5 text-primary">
               <TrendingUp className="h-3.5 w-3.5" />
             </div>
-            <p className="text-label">Net Profit</p>
+            <p className="text-label" title={FINANCIAL_TOOLTIPS.netProfit}>Net Profit</p>
           </div>
-          <p className={`text-xl font-mono font-black whitespace-nowrap ${kpis.net >= 0 ? 'text-primary' : 'text-destructive'}`}>
-            {formatCurrency(kpis.net)}
+          <p className={`text-xl font-mono font-black whitespace-nowrap ${summary.netProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+            {formatCurrency(summary.netProfit)}
           </p>
-          <p className="text-[11px] text-muted-foreground mt-1">Revenue − Expenses</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{summary.marginPct.toFixed(1)}% margin</p>
         </div>
         <div className="premium-card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="rounded-lg bg-primary/10 ring-1 ring-primary/20 p-1.5 text-primary">
               <BarChart3 className="h-3.5 w-3.5" />
             </div>
-            <p className="text-label">Miles</p>
+            <p className="text-label">Total Miles</p>
           </div>
-          <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatNumber(kpis.miles)}</p>
-          <p className="text-[11px] text-muted-foreground mt-1">Loaded miles</p>
+          <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatNumber(summary.totalMiles)}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{formatNumber(summary.loadedMiles)} loaded · {formatNumber(summary.deadheadMiles)} DH</p>
         </div>
       </div>
+
+      {/* Detailed Financial Breakdown */}
+      <div className="premium-card p-4">
+        <p className="text-label mb-3">Financial Breakdown</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs">
+          <div>
+            <p className="text-muted-foreground">Actual Pay Received</p>
+            <p className="font-mono font-bold text-foreground">{formatCurrency(actualPayTotal)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Pending Pay</p>
+            <p className="font-mono font-bold text-foreground">{formatCurrency(summary.pendingPaymentEstimated)}</p>
+            <p className="text-[10px] text-muted-foreground">{summary.pendingPaymentCount} loads</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Payment Difference</p>
+            <p className={`font-mono font-bold ${summary.paymentDifferenceTotal >= 0 ? 'text-success' : 'text-warning'}`}>
+              {summary.paymentDifferenceTotal >= 0 ? '+' : ''}{formatCurrency(summary.paymentDifferenceTotal)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">{summary.underpaidCount} under · {summary.overpaidCount} over</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground" title={FINANCIAL_TOOLTIPS.contractRate}>Avg Contract Rate</p>
+            <p className="font-mono font-bold text-foreground">${summary.avgContractRate.toFixed(2)}/mi</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground" title={FINANCIAL_TOOLTIPS.effectiveRPM}>Effective RPM</p>
+            <p className="font-mono font-bold text-primary">${summary.effectiveRPM.toFixed(2)}/mi</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground" title={FINANCIAL_TOOLTIPS.netRPM}>Net RPM</p>
+            <p className={`font-mono font-bold ${summary.netRPM >= 0 ? 'text-success' : 'text-destructive'}`}>
+              ${summary.netRPM.toFixed(2)}/mi
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground" title={FINANCIAL_TOOLTIPS.costPerMile}>Cost / Mile</p>
+            <p className="font-mono font-bold text-foreground">${summary.costPerMile.toFixed(2)}/mi</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground" title={FINANCIAL_TOOLTIPS.deadheadPct}>Deadhead %</p>
+            <p className={`font-mono font-bold ${summary.deadheadPct < 15 ? 'text-success' : summary.deadheadPct > 30 ? 'text-destructive' : 'text-warning'}`}>
+              {summary.deadheadPct.toFixed(1)}%
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Cancelled Loads</p>
+            <p className="font-mono font-bold text-foreground">{summary.cancelledCount}</p>
+          </div>
+        </div>
+        <p className="text-[10px] text-muted-foreground/70 mt-3 pt-3 border-t border-border/40">
+          Cancelled loads are excluded from Gross Revenue, Net Profit, RPM, and load counts.
+        </p>
+      </div>
+
+      {/* Cancelled Loads Section */}
+      {cancelledLoads.length > 0 && (
+        <div className="premium-card p-4 border-destructive/20">
+          <div className="flex items-center gap-2 mb-3">
+            <Ban className="h-3.5 w-3.5 text-destructive" />
+            <p className="text-label text-destructive">Cancelled Loads ({cancelledLoads.length})</p>
+          </div>
+          <div className="space-y-1.5">
+            {cancelledLoads.slice(0, 8).map(l => (
+              <div key={l.id} className="flex items-center justify-between text-xs gap-2">
+                <span className="truncate">
+                  {getEffectiveDate(l)} · {l.pickup_location} → {l.dropoff_location}
+                </span>
+                <span className="text-destructive font-mono shrink-0">$0</span>
+              </div>
+            ))}
+            {cancelledLoads.length > 8 && (
+              <p className="text-[11px] text-muted-foreground pt-1">+ {cancelledLoads.length - 8} more</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Monthly Summary Button */}
       {onNavigate && (
