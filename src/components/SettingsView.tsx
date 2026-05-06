@@ -409,8 +409,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                 />
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground">
-              New loads will use this as the default. You can still override it per load.
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              New loads use this by default. You can override per load. If deadhead is unpaid, HaulTrackerPro still includes those miles in <span className="font-semibold text-foreground">Effective RPM</span> so you can see the load's true value.
             </p>
           </div>
 
