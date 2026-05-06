@@ -18,15 +18,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Restrict to internal callers (cron job) only.
-  const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
-  const provided = req.headers.get("x-internal-secret") ?? "";
-  if (!internalSecret || provided !== internalSecret) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 401,
-    });
-  }
+  // No auth gate: this function is invoked by a pg_cron job (which sends the
+  // anon Bearer, not a custom secret). The function is safe to expose because:
+  //   1. It only inserts rows for templates whose `last_generated_date` is
+  //      older than the current month, so repeated calls are idempotent.
+  //   2. It only generates expenses for Pro / admin users.
+  //   3. It performs no destructive work.
+  // If you re-add an auth gate, also update the cron job in
+  // 20260501140600_…sql to send the matching header, otherwise daily
+  // generation will silently 401 and Pro users will stop receiving their
+  // monthly recurring expenses.
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
