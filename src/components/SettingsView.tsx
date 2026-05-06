@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -279,7 +278,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </div>
           {!isPro && !subscription.isLoading && (
             <div className="pt-2 space-y-1">
-              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Free Plan Includes:</p>
+              <p className="text-label">Free Plan Includes:</p>
               {freePlanIncludes.map((item, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <CheckCircle className="h-3 w-3 text-success" />
@@ -293,7 +292,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           )}
           {isPro && !subscription.isLoading && (
             <div className="pt-2 space-y-1">
-              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Pro Plan Active</p>
+              <p className="text-label">Pro Plan Active</p>
               <p className="text-xs text-muted-foreground">All features unlocked including advanced alerts, scorecard, exports, and unlimited parsing.</p>
             </div>
           )}
@@ -306,7 +305,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Billing */}
       <div className="premium-card p-4 space-y-3">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+          <p className="text-label flex items-center gap-1.5">
             <CreditCard className="h-3.5 w-3.5" /> Billing
           </p>
           {isAdmin ? (
@@ -363,7 +362,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Defaults */}
       <div className="premium-card p-4 space-y-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Defaults</p>
+          <p className="text-label">Defaults</p>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -461,7 +460,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Company & Pay */}
       <div className="premium-card p-4 space-y-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+          <p className="text-label flex items-center gap-1.5">
             <Building2 className="h-3.5 w-3.5" /> Company & Pay
           </p>
 
@@ -547,7 +546,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Email Preferences */}
       <div className="premium-card p-4 space-y-3">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
+          <p className="text-label flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5" /> Email Preferences
           </p>
           <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 p-3">
@@ -591,7 +590,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Data Management */}
       <div className="premium-card p-4 space-y-3">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Data</p>
+          <p className="text-label">Data</p>
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" onClick={handleExportData} disabled={exporting}>
             <Download className="h-4 w-4" />
             {exporting ? 'Exporting...' : 'Export All My Data'}
@@ -604,7 +603,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Support */}
       <div className="premium-card p-4 space-y-3">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Support</p>
+          <p className="text-label">Support</p>
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => setShowFeedbackModal(true)}>
             <MessageSquare className="h-4 w-4 text-primary" /> Send Feedback
           </Button>
@@ -632,7 +631,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
 
       {/* Legal */}
       <div className="premium-card p-4 space-y-3">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Legal</p>
+          <p className="text-label">Legal</p>
           <Button variant="ghost" className="w-full h-10 rounded-xl font-semibold gap-2 justify-between text-sm" onClick={() => navigate('/terms')}>
             <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Terms of Service</span>
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50" />
