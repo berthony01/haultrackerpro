@@ -647,24 +647,24 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </div>
 
       {/* Pro Plan Features */}
-      <Card className="shadow-card border-primary/20 overflow-hidden">
-        <div className="bg-gradient-to-r from-primary/10 to-warning/10 px-4 py-3">
+      <div className="premium-card overflow-hidden">
+        <div className="bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3 border-b border-border/40">
           <div className="flex items-center gap-2">
             <Crown className="h-4 w-4 text-primary" />
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">Pro Plan Features</p>
+            <p className="text-label text-primary">Pro Plan Features</p>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Unlock AI-powered insights for $19.99/month or $179.88/year.
+            Unlock AI-powered insights for <span className="font-mono">$19.99</span>/month or <span className="font-mono">$179.88</span>/year.
           </p>
         </div>
-        <CardContent className="p-4 space-y-2">
+        <div className="p-4 space-y-2">
           {proFeatures.map((f, i) => (
-            <div key={i} className="flex items-start gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
-              <div className="rounded-lg bg-muted p-1.5 shrink-0 mt-0.5">
-                <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
+            <div key={i} className="flex items-start gap-3 rounded-xl bg-secondary/40 ring-1 ring-border/40 px-3 py-2.5">
+              <div className="rounded-lg bg-primary/10 ring-1 ring-primary/20 p-1.5 shrink-0 mt-0.5">
+                <Lock className="h-3.5 w-3.5 text-primary" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold">{f.label}</p>
+                <p className="text-sm font-bold text-foreground">{f.label}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
               </div>
             </div>
@@ -675,6 +675,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             </Button>
           </div>
         </div>
+      </div>
 
       {/* Modals */}
       <DeleteAccountModal open={showDeleteModal} onOpenChange={setShowDeleteModal} />
