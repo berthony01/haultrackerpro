@@ -27,17 +27,36 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
+const paymentBadgeStyles: Record<string, string> = {
+  paid: 'bg-success/15 text-success border-success/30',
+  underpaid: 'bg-warning/15 text-warning border-warning/30',
+  overpaid: 'bg-primary/15 text-primary border-primary/30',
+  pending: 'bg-muted text-muted-foreground border-border',
+  cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
+};
+
+const paymentBadgeLabel: Record<string, string> = {
+  paid: 'Paid',
+  underpaid: 'Underpaid',
+  overpaid: 'Overpaid',
+  pending: 'Pending Payment',
+  cancelled: 'Cancelled',
+};
+
 function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: LoadCardProps) {
   const [showPayInput, setShowPayInput] = useState(false);
   const [payValue, setPayValue] = useState('');
 
-  const estimated = Number(load.estimated_pay ?? 0);
+  const grossRevenue = getLoadExpectedPay(load);
+  const estimated = Number(load.estimated_pay ?? grossRevenue);
   const actual = load.actual_pay_received != null ? Number(load.actual_pay_received) : null;
-  const diff = actual != null ? actual - estimated : null;
-  const showAddPay = actual == null && load.status !== 'cancelled';
+  const paymentStatus = derivePaymentDisplayStatus(load);
+  const paymentDiff = getPaymentDifference(load); // actual - gross, or null
+  const isCancelled = load.status === 'cancelled';
+  const showAddPay = actual == null && !isCancelled;
   const stopsCount = stops.length;
   const rpm = getLoadEffectiveRPM(load);
-  const payShown = actual ?? estimated;
+  const payShown = isCancelled ? 0 : (actual ?? estimated);
 
   const handleSavePay = (e: React.MouseEvent) => {
     e.stopPropagation();
