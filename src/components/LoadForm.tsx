@@ -15,6 +15,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown } from 'lucide-react';
 import { PayModel, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PAY_MODEL_VALUES, isPayModel, resolvePayModel } from '@/lib/payModels';
 import { computeLoadPay } from '@/lib/computeLoadPay';
+import { useCostProfile, computeCostProfileCPM } from '@/hooks/useCostProfile';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
 import { MultiStopEditor } from '@/components/MultiStopEditor';
