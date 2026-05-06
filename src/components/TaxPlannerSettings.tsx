@@ -75,8 +75,7 @@ export function TaxPlannerSettings({ settings, onSave, isPending, isPro = false 
   };
 
   return (
-    <Card className="shadow-card">
-      <CardContent className="p-4 space-y-4">
+    <div className="premium-card p-4 space-y-4">
         <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
           <Calculator className="h-3.5 w-3.5" /> Tax Set-Aside Planner (Optional)
         </p>
@@ -201,7 +200,6 @@ export function TaxPlannerSettings({ settings, onSave, isPending, isPro = false 
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
   );
 }

@@ -92,8 +92,7 @@ export function CSVImport({ isPro }: CSVImportProps) {
 
   if (!isPro) {
     return (
-      <Card className="shadow-card">
-        <CardContent className="p-4 text-center space-y-3">
+      <div className="premium-card p-4 text-center space-y-3">
           <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-4">
             <Upload className="h-8 w-8 text-muted-foreground/30" />
           </div>
@@ -102,8 +101,7 @@ export function CSVImport({ isPro }: CSVImportProps) {
           <Button className="gap-1.5 rounded-xl font-bold" onClick={() => navigate('/pricing')}>
             <Crown className="h-3.5 w-3.5" /> Upgrade to Pro
           </Button>
-        </CardContent>
-      </Card>
+        </div>
     );
   }
 
@@ -238,8 +236,7 @@ export function CSVImport({ isPro }: CSVImportProps) {
   };
 
   return (
-    <Card className="shadow-card">
-      <CardContent className="p-4 space-y-4">
+    <div className="premium-card p-4 space-y-4">
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-primary/10 p-2">
             <Upload className="h-4 w-4 text-primary" />
@@ -303,7 +300,6 @@ export function CSVImport({ isPro }: CSVImportProps) {
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
   );
 }

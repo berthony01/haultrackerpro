@@ -52,8 +52,7 @@ export function QuarterlyReminderSettings({ settings, onSave, isPending, isPro =
 
   if (!isPro) {
     return (
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-3">
+      <div className="premium-card p-4 space-y-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
             <CalendarClock className="h-3.5 w-3.5" /> Quarterly Estimated Tax Reminders
           </p>
@@ -65,14 +64,12 @@ export function QuarterlyReminderSettings({ settings, onSave, isPending, isPro =
               <Crown className="h-3.5 w-3.5" /> Upgrade to Pro
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
     );
   }
 
   return (
-    <Card className="shadow-card">
-      <CardContent className="p-4 space-y-4">
+    <div className="premium-card p-4 space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
             <CalendarClock className="h-3.5 w-3.5" /> Quarterly Estimated Tax Reminders
@@ -133,7 +130,6 @@ export function QuarterlyReminderSettings({ settings, onSave, isPending, isPro =
         >
           {isPending ? 'Saving...' : 'Save Reminder Settings'}
         </Button>
-      </CardContent>
-    </Card>
+      </div>
   );
 }
