@@ -297,8 +297,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               <p className="text-xs text-muted-foreground">All features unlocked including advanced alerts, scorecard, exports, and unlimited parsing.</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Public Profile (leaderboard handle) */}
       <div ref={publicProfileRef} tabIndex={-1} className="outline-none scroll-mt-20">
