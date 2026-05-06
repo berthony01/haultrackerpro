@@ -251,33 +251,51 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
     const est = getLoadExpectedPay(l);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
     const linkedExp = expenses.filter(e => e.linked_load_id === l.id).reduce((s, e) => s + Number(e.amount), 0);
-    const pay = act ?? est;
-    const netLoadProfit = pay - linkedExp;
-    const summary = buildStopsSummary(l, stops);
+    const gross = act ?? est;
+    const diff = act != null ? (act - est) : 0;
+    const totalMi = getLoadOperatingMiles(l);
+    const effRpm = getLoadEffectiveRPM(l);
+    const netLoadProfit = gross - linkedExp;
+    const netRpm = totalMi > 0 ? netLoadProfit / totalMi : 0;
     return [
-      getEffectiveDate(l), l.pickup_location, l.dropoff_location, summary,
-      est.toFixed(2), act != null ? act.toFixed(2) : '',
-      linkedExp.toFixed(2), netLoadProfit.toFixed(2),
-      companyMeta?.companyName ?? '', companyMeta?.companyStartDate ?? ''
+      getEffectiveDate(l), l.pickup_location, l.dropoff_location,
+      l.status,
+      String(l.loaded_miles), String(l.deadhead_miles), String(totalMi),
+      Number(l.rate_per_mile).toFixed(2),
+      gross.toFixed(2),
+      act != null ? act.toFixed(2) : '',
+      act != null ? diff.toFixed(2) : '',
+      linkedExp.toFixed(2),
+      netLoadProfit.toFixed(2),
+      effRpm.toFixed(2),
+      netRpm.toFixed(2),
+      l.notes ?? '',
     ].map(escapeCSV);
   });
+
+  const blank = new Array(headers.length).fill('');
 
   // Summary rows
   rows.push([]);
   rows.push(['SUMMARY (cancelled loads excluded)'].map(escapeCSV));
-  rows.push(['Total Revenue', '', '', '', totalRevenue.toFixed(2), '', '', '', '', ''].map(escapeCSV));
-  rows.push(['Total Expenses', '', '', '', '', '', totalExpenses.toFixed(2), '', '', ''].map(escapeCSV));
-  rows.push(['Net Profit', '', '', '', '', '', '', netProfit.toFixed(2), '', ''].map(escapeCSV));
-  rows.push(['Net $/Mile', '', '', '', '', '', '', netPerMile.toFixed(2), '', ''].map(escapeCSV));
+  rows.push(['Total Gross Revenue', totalRevenue.toFixed(2)].map(escapeCSV));
+  rows.push(['Total Expenses', totalExpenses.toFixed(2)].map(escapeCSV));
+  rows.push(['Net Profit', netProfit.toFixed(2)].map(escapeCSV));
+  rows.push(['Net $/Mile', netPerMile.toFixed(2)].map(escapeCSV));
 
   // Cancelled loads section
   if (cancelledLoads.length > 0) {
     rows.push([]);
     rows.push([`CANCELLED LOADS (${cancelledLoads.length}) — excluded from totals`].map(escapeCSV));
     cancelledLoads.forEach(l => {
+      const totalMi = getLoadOperatingMiles(l);
       rows.push([
-        getEffectiveDate(l), l.pickup_location, l.dropoff_location, buildStopsSummary(l, stops),
-        '0.00', '0.00', '0.00', '0.00', '', ''
+        getEffectiveDate(l), l.pickup_location, l.dropoff_location,
+        'cancelled',
+        String(l.loaded_miles), String(l.deadhead_miles), String(totalMi),
+        Number(l.rate_per_mile).toFixed(2),
+        '0.00', '0.00', '0.00', '0.00', '0.00', '0.00', '0.00',
+        l.notes ?? '',
       ].map(escapeCSV));
     });
   }
