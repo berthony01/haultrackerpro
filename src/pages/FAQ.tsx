@@ -25,7 +25,7 @@ type ExportKey = keyof typeof CSV_EXPORT_TYPES;
 
 const EXPECTED_HEADER_SNAPSHOT = {
   loads: ['Date','Pickup','Dropoff','Stops Summary','Loaded Miles','Deadhead Miles','Rate/Mile','Wait Fee','Detention Fee','Other Fees','Estimated Pay','Actual Pay','Difference','Status','Notes','Company Name','Company Start Date'],
-  profit: ['Date','Pickup','Dropoff','Stops Summary','Estimated Pay','Actual Pay','Linked Expenses','Net Load Profit','Company Name','Company Start Date'],
+  profit: ['Date','Pickup','Dropoff','Status','Loaded Miles','Deadhead Miles','Total Miles','Contract Rate','Gross Revenue','Actual Pay Received','Difference','Expenses','Net Profit','Effective RPM','Net RPM','Notes'],
   scheduleC: ['Schedule C Line','Line Description','Categories','Total Amount'],
 };
 
