@@ -192,7 +192,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const trendPpm = pct(profitPerMile, prevPpm);
   const trendLoads = pct(filteredLoads.length, prevLoads.length);
 
-  const scorecard = useDriverScorecard(loads, expenses, weekStartsOn);
+  const scorecard = useDriverScorecard(loads, expenses, settings?.week_start_day);
 
   return (
     <div className="space-y-5 animate-fade-in">
