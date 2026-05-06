@@ -254,32 +254,28 @@ export function ParkingFinder({ hasAccess, subscriptionLoading = false }: Parkin
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4 space-y-2">
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-3 w-2/3" />
-                <Skeleton className="h-3 w-1/3" />
-              </CardContent>
-            </Card>
+            <div key={i} className="premium-card p-4 space-y-2">
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">No parking matches your filters.</p>
-            <div className="flex items-center justify-center gap-2">
-              {filtersActive && (
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  Clear filters
-                </Button>
-              )}
-              <Button onClick={handleAddClick} size="sm">
-                {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                <span className="ml-1">Add a location</span>
+        <div className="premium-card p-8 text-center space-y-3">
+          <p className="text-sm text-muted-foreground">No parking matches your filters.</p>
+          <div className="flex items-center justify-center gap-2">
+            {filtersActive && (
+              <Button variant="outline" size="sm" onClick={resetFilters}>
+                Clear filters
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            )}
+            <Button onClick={handleAddClick} size="sm">
+              {hasAccess ? <Plus className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              <span className="ml-1">Add a location</span>
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className="space-y-2">
           {pageItems.map((loc) => (
