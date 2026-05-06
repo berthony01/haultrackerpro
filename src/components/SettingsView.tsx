@@ -305,8 +305,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       </div>
 
       {/* Billing */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-3">
+      <div className="premium-card p-4 space-y-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
             <CreditCard className="h-3.5 w-3.5" /> Billing
           </p>
@@ -360,12 +359,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               </Button>
             </>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Defaults */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-4">
+      <div className="premium-card p-4 space-y-4">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Defaults</p>
 
           <div className="grid grid-cols-2 gap-3">
@@ -460,12 +457,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <Button className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
             {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Company & Pay */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-4">
+      <div className="premium-card p-4 space-y-4">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
             <Building2 className="h-3.5 w-3.5" /> Company & Pay
           </p>
@@ -516,8 +511,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <Button className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
             {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Cost Profile - drives Pre-Load Profit Check */}
       <CostProfileSettings />
@@ -552,8 +546,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       <CSVImport isPro={isPro ?? false} />
 
       {/* Email Preferences */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-3">
+      <div className="premium-card p-4 space-y-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
             <Mail className="h-3.5 w-3.5" /> Email Preferences
           </p>
@@ -594,12 +587,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <p className="text-[10px] text-muted-foreground/60">
             You can change this anytime. Unsubscribe links in our emails will also flip this off.
           </p>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Data Management */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-3">
+      <div className="premium-card p-4 space-y-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Data</p>
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" onClick={handleExportData} disabled={exporting}>
             <Download className="h-4 w-4" />
@@ -609,12 +600,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <Trash2 className="h-4 w-4" />
             Delete Account
           </Button>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Support */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-3">
+      <div className="premium-card p-4 space-y-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Support</p>
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => setShowFeedbackModal(true)}>
             <MessageSquare className="h-4 w-4 text-primary" /> Send Feedback
@@ -639,12 +628,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <Mail className="h-3.5 w-3.5 text-muted-foreground/50" />
             <p className="text-xs text-muted-foreground">support@haultrackerpro.app</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Legal */}
-      <Card className="shadow-card">
-        <CardContent className="p-4 space-y-3">
+      <div className="premium-card p-4 space-y-3">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Legal</p>
           <Button variant="ghost" className="w-full h-10 rounded-xl font-semibold gap-2 justify-between text-sm" onClick={() => navigate('/terms')}>
             <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Terms of Service</span>
@@ -657,8 +644,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <p className="text-[10px] text-muted-foreground/50 pt-1">
             HaulTrackerPro provides tracking tools only. Always verify financial and tax information with qualified professionals.
           </p>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Pro Plan Features */}
       <Card className="shadow-card border-primary/20 overflow-hidden">
@@ -688,8 +674,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
               <Crown className="h-4 w-4" /> View Pricing & Upgrade
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Modals */}
       <DeleteAccountModal open={showDeleteModal} onOpenChange={setShowDeleteModal} />
