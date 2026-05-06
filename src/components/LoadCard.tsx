@@ -2,6 +2,7 @@ import { useState, memo } from 'react';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadEffectiveRPM } from '@/lib/loadMetrics';
+import { derivePaymentDisplayStatus, getPaymentDifference, getLoadExpectedPay } from '@/lib/financialCalculations';
 import { LoadStop } from '@/hooks/useLoadStops';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
