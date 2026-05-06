@@ -79,6 +79,7 @@ const SAMPLE_LOAD = {
 
 export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loading, recentLoads = [], isPro = false, firstTimeUser = false }: LoadFormProps) {
   const { settings } = useUserSettings();
+  const { profile: costProfile } = useCostProfile();
   const lastLoad = recentLoads[0] ?? null;
 
   const isPercentagePay = settings?.pay_type === 'percentage';
