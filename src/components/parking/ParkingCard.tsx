@@ -1,4 +1,3 @@
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Shield, ChevronRight, DollarSign, BadgeCheck } from 'lucide-react';
 import { ParkingLocation, computeConfidence, ParkingReportRow, Confidence } from '@/hooks/useParkingLocations';
