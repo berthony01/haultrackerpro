@@ -56,65 +56,66 @@ export function ParkingCard({ location, reports, verifications = [], userCoords,
         : 'No recent reports';
 
   return (
-    <Card
-      className={`shadow-card hover:shadow-md transition-all active:scale-[0.99] cursor-pointer border-l-2 ${confidenceBorder(level)}`}
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(location)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(location); } }}
+      className={`premium-card p-4 cursor-pointer transition-all hover:border-primary/30 hover:-translate-y-px active:scale-[0.99] border-l-2 ${confidenceBorder(level)}`}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold text-sm truncate">{location.name}</h3>
-              <Badge variant="outline" className={`text-[10px] px-2 py-0 h-5 ${confidenceColor(level)}`}>
-                {level === 'high' && (
-                  <span className="mr-1 h-1.5 w-1.5 rounded-full bg-success animate-pulse inline-block" />
-                )}
-                {confidenceLabel(level)}
-              </Badge>
-            </div>
-            {location.address && (
-              <p className="text-xs text-muted-foreground mt-1 truncate flex items-center gap-1">
-                <MapPin className="h-3 w-3 shrink-0" />
-                {location.address}
-              </p>
-            )}
-            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-              {location.is_paid ? (
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5 gap-0.5">
-                  <DollarSign className="h-2.5 w-2.5" /> Paid
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-success border-success/30">
-                  Free
-                </Badge>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-bold text-sm text-foreground truncate">{location.name}</h3>
+            <Badge variant="outline" className={`text-[10px] px-2 py-0 h-5 ${confidenceColor(level)}`}>
+              {level === 'high' && (
+                <span className="mr-1 h-1.5 w-1.5 rounded-full bg-success inline-block" />
               )}
-              {location.overnight_allowed && (
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5">Overnight</Badge>
-              )}
-              {location.truck_friendly && (
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5 gap-0.5">
-                  <Shield className="h-2.5 w-2.5" /> Truck-friendly
-                </Badge>
-              )}
-              {location.total_spots != null && (
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5">{location.total_spots} spots</Badge>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1">
-              {lastSignalKind === 'verification' && <BadgeCheck className="h-3 w-3 text-primary" />}
-              {verifiedLabel}
+              {confidenceLabel(level)}
+            </Badge>
+          </div>
+          {location.address && (
+            <p className="text-xs text-muted-foreground mt-1 truncate flex items-center gap-1">
+              <MapPin className="h-3 w-3 shrink-0" />
+              {location.address}
             </p>
-          </div>
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            {distance != null && (
-              <Badge variant="secondary" className="text-[10px] h-5 px-2 font-bold">
-                {distance.toFixed(1)} mi
+          )}
+          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+            {location.is_paid ? (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 gap-0.5 border-border/60">
+                <DollarSign className="h-2.5 w-2.5" /> Paid
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-success border-success/30 bg-success/10">
+                Free
               </Badge>
             )}
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            {location.overnight_allowed && (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-border/60">Overnight</Badge>
+            )}
+            {location.truck_friendly && (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 gap-0.5 border-border/60">
+                <Shield className="h-2.5 w-2.5" /> Truck-friendly
+              </Badge>
+            )}
+            {location.total_spots != null && (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-border/60 font-mono">{location.total_spots} spots</Badge>
+            )}
           </div>
+          <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1">
+            {lastSignalKind === 'verification' && <BadgeCheck className="h-3 w-3 text-primary" />}
+            {verifiedLabel}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          {distance != null && (
+            <Badge variant="outline" className="text-[10px] h-5 px-2 font-mono font-bold border-primary/30 text-primary bg-primary/10">
+              {distance.toFixed(1)} mi
+            </Badge>
+          )}
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
+    </div>
   );
 }
