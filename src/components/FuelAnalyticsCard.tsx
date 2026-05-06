@@ -24,31 +24,31 @@ export function FuelAnalyticsCard({ fuelLogs, loads, isPro, onNavigate }: FuelAn
   // Free users see basic total
   if (!isPro) {
     return (
-      <Card className="shadow-card">
+      <Card className="premium-card">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-warning/10 p-2">
-                <Fuel className="h-4 w-4 text-warning" />
+              <div className="rounded-lg bg-primary/10 p-2 ring-1 ring-primary/20">
+                <Fuel className="h-4 w-4 text-primary" />
               </div>
               <div>
                 <p className="text-sm font-bold">Fuel Costs</p>
                 <p className="text-[10px] text-muted-foreground">Period total</p>
               </div>
             </div>
-            <p className="text-xl font-black font-mono text-primary">
+            <p className="text-xl font-mono font-black text-foreground">
               {formatCurrency(analytics.totalFuelCost)}
             </p>
           </div>
           <div className="relative">
             <div className="grid grid-cols-2 gap-3 blur-sm select-none">
-              <div className="text-center p-2 rounded-lg bg-muted/50">
-                <p className="text-[10px] text-muted-foreground">Cost/Mile</p>
-                <p className="text-sm font-bold font-mono">$0.58</p>
+              <div className="text-center p-2 rounded-lg bg-muted/40">
+                <p className="text-label">Cost/Mile</p>
+                <p className="text-sm font-mono font-black mt-1">$0.58</p>
               </div>
-              <div className="text-center p-2 rounded-lg bg-muted/50">
-                <p className="text-[10px] text-muted-foreground">% of Revenue</p>
-                <p className="text-sm font-bold font-mono">24%</p>
+              <div className="text-center p-2 rounded-lg bg-muted/40">
+                <p className="text-label">% of Revenue</p>
+                <p className="text-sm font-mono font-black mt-1">24%</p>
               </div>
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
@@ -64,11 +64,11 @@ export function FuelAnalyticsCard({ fuelLogs, loads, isPro, onNavigate }: FuelAn
 
   // Pro users see full analytics
   return (
-    <Card className="shadow-card card-premium">
+    <Card className="premium-card">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-3">
-          <div className="rounded-lg bg-warning/10 p-2">
-            <Fuel className="h-4 w-4 text-warning" />
+          <div className="rounded-lg bg-primary/10 p-2 ring-1 ring-primary/20">
+            <Fuel className="h-4 w-4 text-primary" />
           </div>
           <div>
             <p className="text-sm font-bold">Fuel Analytics</p>
@@ -77,24 +77,24 @@ export function FuelAnalyticsCard({ fuelLogs, loads, isPro, onNavigate }: FuelAn
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-2.5 rounded-xl bg-primary/5 border border-primary/10">
-            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Total</p>
-            <p className="text-lg font-black font-mono text-primary">{formatCurrency(analytics.totalFuelCost)}</p>
+          <div className="text-center p-2.5 rounded-xl bg-primary/10 ring-1 ring-primary/20">
+            <p className="text-label">Total</p>
+            <p className="text-lg font-mono font-black text-primary mt-1">{formatCurrency(analytics.totalFuelCost)}</p>
           </div>
-          <div className="text-center p-2.5 rounded-xl bg-muted/50">
-            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Cost/Mile</p>
-            <p className="text-lg font-black font-mono">${analytics.fuelCostPerMile.toFixed(2)}</p>
+          <div className="text-center p-2.5 rounded-xl bg-muted/40">
+            <p className="text-label">Cost/Mile</p>
+            <p className="text-lg font-mono font-black mt-1">${analytics.fuelCostPerMile.toFixed(2)}</p>
           </div>
-          <div className="text-center p-2.5 rounded-xl bg-muted/50">
-            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">% Revenue</p>
-            <p className="text-lg font-black font-mono">{analytics.fuelPercentOfRevenue.toFixed(1)}%</p>
+          <div className="text-center p-2.5 rounded-xl bg-muted/40">
+            <p className="text-label">% Revenue</p>
+            <p className="text-lg font-mono font-black mt-1">{analytics.fuelPercentOfRevenue.toFixed(1)}%</p>
           </div>
         </div>
 
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
-          <div className="text-xs text-muted-foreground">
-            <span className="font-medium">{analytics.totalGallons.toFixed(1)}</span> gal @ avg{' '}
-            <span className="font-medium">${analytics.avgPricePerGallon.toFixed(3)}</span>/gal
+          <div className="text-xs text-muted-foreground font-mono">
+            <span className="font-semibold text-foreground">{analytics.totalGallons.toFixed(1)}</span> gal @ avg{' '}
+            <span className="font-semibold text-foreground">${analytics.avgPricePerGallon.toFixed(3)}</span>/gal
           </div>
           {onNavigate && (
             <Button
