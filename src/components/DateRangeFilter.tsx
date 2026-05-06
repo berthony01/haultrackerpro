@@ -40,15 +40,20 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {presets.map(p => {
           const { from, to } = p.getRange();
+          const isActive = active === p.label;
           return (
             <Button
               key={p.label}
-              variant={active === p.label ? 'default' : 'outline'}
+              variant="ghost"
               size="sm"
-              className="text-xs h-8"
+              className={`text-xs h-8 rounded-lg font-semibold border ${
+                isActive
+                  ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/20'
+                  : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+              }`}
               onClick={() => handlePreset(p.label, from, to)}
             >
               {p.label}
@@ -56,9 +61,13 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
           );
         })}
         <Button
-          variant={showCustom ? 'default' : 'outline'}
+          variant="ghost"
           size="sm"
-          className="text-xs h-8"
+          className={`text-xs h-8 rounded-lg font-semibold border ${
+            showCustom
+              ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/20'
+              : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
           onClick={() => setShowCustom(!showCustom)}
         >
           Custom
@@ -67,13 +76,13 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
       {showCustom && (
         <div className="flex gap-2 items-end">
           <div className="flex-1">
-            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-8 text-xs" />
+            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs rounded-lg" />
           </div>
-          <span className="text-xs text-muted-foreground pb-1">to</span>
+          <span className="text-xs text-muted-foreground pb-2">to</span>
           <div className="flex-1">
-            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-8 text-xs" />
+            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs rounded-lg" />
           </div>
-          <Button size="sm" className="h-8 text-xs" onClick={handleCustom}>Apply</Button>
+          <Button size="sm" className="h-9 text-xs rounded-lg" onClick={handleCustom}>Apply</Button>
         </div>
       )}
     </div>
