@@ -321,7 +321,7 @@ export function RecurringExpensesView({ isPro, onBack }: RecurringExpensesViewPr
           {templates.map((template) => {
             const active = isTemplateActive(template);
             return (
-              <Card key={template.id} className={`card-premium shadow-card transition-all duration-300 ${!active ? 'opacity-70' : ''}`}>
+              <Card key={template.id} className={`premium-card transition-all duration-300 ${!active ? 'opacity-70' : ''}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <div className={`rounded-xl p-2.5 shrink-0 ${active ? 'bg-primary/10' : 'bg-muted'}`}>
