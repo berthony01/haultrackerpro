@@ -179,6 +179,13 @@ const Index = () => {
     }
   }, [allLoadsQuery.isLoading, allLoadsQuery.loads.length, feedbackResponses.length]);
 
+  // Activate premium dark theme on body so Radix portals (Sheet/Dialog/Popover/Tooltip)
+  // — which mount outside the .app-shell subtree — inherit the same tokens.
+  useEffect(() => {
+    document.body.classList.add('app-shell-active');
+    return () => document.body.classList.remove('app-shell-active');
+  }, []);
+
   // Show onboarding modal for first-time users
   useEffect(() => {
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {

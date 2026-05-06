@@ -165,8 +165,11 @@
 }
 
 /* === Premium dark "app shell" theme — scoped to authenticated app only ===
-   Marketing/landing pages keep their existing palette. */
-.app-shell {
+   Marketing/landing pages keep their existing palette.
+   `body.app-shell-active` propagates tokens to Radix portals (Sheet/Dialog/Popover)
+   that render outside the .app-shell subtree. */
+.app-shell,
+body.app-shell-active {
   --background: 220 51% 5%;          /* #070B14 */
   --foreground: 0 0% 100%;
   --card: 220 46% 9%;                /* #0D1422 */
@@ -195,12 +198,15 @@
   --shadow-card: 0 1px 0 0 hsl(0 0% 100% / 0.03) inset, 0 8px 24px -12px hsl(0 0% 0% / 0.6);
   --shadow-card-hover: 0 1px 0 0 hsl(0 0% 100% / 0.05) inset, 0 14px 36px -14px hsl(0 0% 0% / 0.75);
   --shadow-elevated: 0 1px 0 0 hsl(0 0% 100% / 0.04) inset, 0 18px 40px -18px hsl(0 0% 0% / 0.8);
+}
+.app-shell {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
 }
 
 /* Premium card surface — subtle gradient + glow border */
-.app-shell .premium-card {
+.app-shell .premium-card,
+body.app-shell-active .premium-card {
   background:
     linear-gradient(180deg, hsl(220 40% 12% / 0.7), hsl(220 46% 9% / 0.95)),
     hsl(var(--card));
@@ -211,7 +217,8 @@
   border-radius: 1rem;
   transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
-.app-shell .premium-card:hover {
+.app-shell .premium-card:hover,
+body.app-shell-active .premium-card:hover {
   border-color: hsl(25 100% 50% / 0.35);
   box-shadow:
     0 1px 0 0 hsl(0 0% 100% / 0.06) inset,
@@ -219,7 +226,8 @@
 }
 
 /* Orange CTA button glow */
-.app-shell .btn-orange-glow {
+.app-shell .btn-orange-glow,
+body.app-shell-active .btn-orange-glow {
   background: linear-gradient(135deg, hsl(25 100% 52%), hsl(22 100% 58%));
   color: #fff;
   box-shadow:
@@ -227,13 +235,15 @@
     0 8px 24px -8px hsl(25 100% 50% / 0.6);
   transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
 }
-.app-shell .btn-orange-glow:hover {
+.app-shell .btn-orange-glow:hover,
+body.app-shell-active .btn-orange-glow:hover {
   filter: brightness(1.06);
   box-shadow:
     0 0 0 1px hsl(25 100% 50% / 0.5),
     0 12px 32px -8px hsl(25 100% 50% / 0.75);
 }
-.app-shell .btn-orange-glow:active { transform: translateY(1px); }
+.app-shell .btn-orange-glow:active,
+body.app-shell-active .btn-orange-glow:active { transform: translateY(1px); }
 
 /* Sidebar nav active state */
 .app-shell .sidebar-link {
