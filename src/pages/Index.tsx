@@ -564,8 +564,11 @@ const Index = () => {
           </>
         )}
       </main>
+      </div>
 
-      <BottomNav active={page} onNavigate={handleNavigate} />
+      <div className="lg:hidden">
+        <BottomNav active={page} onNavigate={handleNavigate} />
+      </div>
       <AddActionModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
