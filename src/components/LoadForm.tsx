@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import { DateInput } from '@/components/ui/date-input';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown } from 'lucide-react';
 import { PayModel, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PAY_MODEL_VALUES, isPayModel, resolvePayModel } from '@/lib/payModels';
