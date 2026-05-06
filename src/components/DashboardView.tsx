@@ -16,8 +16,7 @@ import { useCostProfile, computeCostProfileCPM, profileHasUsableData } from '@/h
 import { formatCurrency, formatNumber, weekStartDayToNumber } from '@/lib/loadUtils';
 import { StatCard, StatCardSkeleton } from '@/components/StatCard';
 import { WeeklyFocusCard } from '@/components/WeeklyFocusCard';
-import { PerformanceTrends } from '@/components/PerformanceTrends';
-import { PerformanceCharts } from '@/components/PerformanceCharts';
+// PerformanceTrends + PerformanceCharts removed (duplicated by premium ProfitOverviewChart)
 import { ProfitOverview } from '@/components/ProfitOverview';
 import { ProInsightCard } from '@/components/ProInsightCard';
 import { TaxEstimateCard } from '@/components/TaxEstimateCard';
@@ -486,11 +485,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           {/* Pro Time Saved */}
           <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />
 
-          {/* Performance Trends */}
-          <PerformanceTrends loads={loads} />
-
-          {/* Performance Charts */}
-          <PerformanceCharts loads={loads} expenses={expenses} isPro={isPro} />
+          {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
 
           {/* Last Updated */}
           {loads.length > 0 && (
