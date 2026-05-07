@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
+import reportsMockup from '@/assets/reports-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
 import { trackLandingFaqDeepLink, trackStarterKitCTAClicked } from '@/lib/analytics';
