@@ -294,7 +294,7 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
   const reportTitle = REPORT_TYPE_LABELS[type];
   const header = {
     reportTitle,
-    rangeLabel: `${agg.range.from} → ${agg.range.to} (${agg.range.label})`,
+    rangeLabel: `${agg.range.from} to ${agg.range.to} (${agg.range.label})`,
     generated: format(new Date(), 'yyyy-MM-dd'),
     preparedFor: agg.preparedFor,
   };
