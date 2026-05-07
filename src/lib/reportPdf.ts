@@ -253,33 +253,35 @@ function buildPdfBlob(reportTitle: string, header: Parameters<typeof drawHeader>
 }
 
 function assemblePdf(contents: string[]): Blob {
+  // All content is ASCII after clean(), so byte-length === string-length.
+  // Use TextEncoder for byte-accurate length to be safe if that ever changes.
+  const enc = new TextEncoder();
+  const byteLen = (s: string) => enc.encode(s).length;
+
   const objs: string[] = [];
-  // 1: Catalog, 2: Pages, 3: Font Helv, 4: Font Helv-Bold
   objs.push('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj');
-  // page refs start at 5
   const pageObjStart = 5;
   const refs = contents.map((_, i) => `${pageObjStart + i} 0 R`).join(' ');
   objs.push(`2 0 obj<</Type/Pages/Kids[${refs}]/Count ${contents.length}>>endobj`);
   objs.push('3 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj');
   objs.push('4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>endobj');
 
-  // Page objects
   contents.forEach((_c, i) => {
     const streamId = pageObjStart + contents.length + i;
     objs.push(`${pageObjStart + i} 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PAGE_W} ${PAGE_H}]/Contents ${streamId} 0 R/Resources<</Font<</F1 3 0 R/F2 4 0 R>>>>>>endobj`);
   });
   contents.forEach((c, i) => {
     const id = pageObjStart + contents.length + i;
-    objs.push(`${id} 0 obj<</Length ${c.length}>>stream\n${c}endstream\nendobj`);
+    objs.push(`${id} 0 obj<</Length ${byteLen(c)}>>stream\n${c}endstream\nendobj`);
   });
 
   let pdf = '%PDF-1.4\n';
   const offsets: number[] = [];
   for (const obj of objs) {
-    offsets.push(pdf.length);
+    offsets.push(byteLen(pdf));
     pdf += obj + '\n';
   }
-  const xrefPos = pdf.length;
+  const xrefPos = byteLen(pdf);
   pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
   for (const o of offsets) pdf += `${String(o).padStart(10, '0')} 00000 n \n`;
   pdf += `trailer<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xrefPos}\n%%EOF`;
