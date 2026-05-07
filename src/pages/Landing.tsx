@@ -150,7 +150,7 @@ export default function Landing() {
                   <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Most loads look profitable. Many aren't. HaulTrackerPro shows your true profit after fuel, deadhead, and expenses — so you stop losing money on bad loads.
+                  Most loads look profitable. Many aren't. HaulTrackerPro shows your <span className="font-semibold" style={{ color: 'hsl(0, 0%, 90%)' }}>real pay per mile</span> after fuel, deadhead, and expenses — so you stop losing money on bad loads.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
