@@ -84,15 +84,17 @@ function drawHeader(doc: jsPDF, agg: ReportAggregation, type: ReportType) {
   doc.text('Prepared For:', labelX, 36);
   doc.text('Date Range:', labelX, 50);
   doc.text('Generated:', labelX, 64);
-  doc.text('haultrackerpro.com', labelX, 80);
+  doc.text('Website:', labelX, 80);
 
   setText(doc, WHITE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  const preparedFor = agg.preparedFor.length > 28 ? agg.preparedFor.slice(0, 27) + '…' : agg.preparedFor;
+  const preparedFor = agg.preparedFor.length > 28 ? agg.preparedFor.slice(0, 27) + '...' : agg.preparedFor;
   doc.text(preparedFor, valueX, 36, { align: 'right' });
-  doc.text(`${fmtDate(agg.range.from)} – ${fmtDate(agg.range.to)}`, valueX, 50, { align: 'right' });
+  doc.text(`${fmtDate(agg.range.from)} - ${fmtDate(agg.range.to)}`, valueX, 50, { align: 'right' });
   doc.text(format(new Date(), 'MMM d, yyyy'), valueX, 64, { align: 'right' });
+  setText(doc, ORANGE);
+  doc.text('haultrackerpro.com', valueX, 80, { align: 'right' });
 }
 
 function drawFooter(doc: jsPDF) {
