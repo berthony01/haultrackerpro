@@ -3,14 +3,21 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { useFuelLogs } from '@/hooks/useFuelLogs';
+import { useAuth } from '@/hooks/useAuth';
 import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, exportScheduleCSummary, getCurrentMonthLoads, getEffectiveDate, weekStartDayToNumber } from '@/lib/loadUtils';
 import { summarizeLoads, excludeCancelled, onlyCancelled, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock, Receipt, BarChart3, Fuel, DollarSign, Ban } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock, Receipt, BarChart3, Fuel, DollarSign, Ban, FileDown, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { parseISO, isWithinInterval } from 'date-fns';
+import { parseISO, isWithinInterval, format } from 'date-fns';
 import { toast } from 'sonner';
+import { aggregateReport, REPORT_TYPE_LABELS, type ReportType } from '@/lib/reportAggregator';
+import { buildReportCSV, downloadCSV } from '@/lib/reportCsv';
+import { buildReportPdf, downloadPdfBlob } from '@/lib/reportPdf';
+import { TAX_DISCLAIMER } from '@/lib/reportTax';
 
 interface ReportsViewProps {
   loads: Load[];
@@ -97,24 +104,111 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
     [filteredLoads],
   );
 
+  // ── Report Center state ──────────────────────────────────────────────
+  const { user } = useAuth();
+  const { fuelLogs } = useFuelLogs();
+  const [reportType, setReportType] = useState<ReportType>('full_profit');
+
+  const aggregation = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return null;
+    const range = { from: dateRange.from, to: dateRange.to, label: 'Selected Range', key: 'custom' as const };
+    return aggregateReport({
+      loads,
+      expenses,
+      fuelLogs,
+      settings: settings ?? null,
+      range,
+      preparedFor: settings?.company_name || (user?.user_metadata as any)?.display_name || user?.email || 'HaulTrackerPro Driver',
+    });
+  }, [dateRange.from, dateRange.to, loads, expenses, fuelLogs, settings, user]);
+
+  const handleDownload = (kind: 'pdf' | 'csv') => {
+    if (!isPro) { toast.error(`${kind.toUpperCase()} reports are a Pro feature. Upgrade to unlock.`); return; }
+    if (!aggregation) { toast.error('Select a date range first.'); return; }
+    if (aggregation.isEmpty) { toast.error('No data found in the selected date range.'); return; }
+    try {
+      const base = `haultrackerpro-${reportType.replace(/_/g, '-')}-${aggregation.range.from}-to-${aggregation.range.to}`;
+      if (kind === 'pdf') downloadPdfBlob(`${base}.pdf`, buildReportPdf(reportType, aggregation));
+      else downloadCSV(`${base}.csv`, buildReportCSV(reportType, aggregation));
+      toast.success(`${kind.toUpperCase()} report downloaded.`);
+    } catch (err) {
+      console.error(err);
+      toast.error(`Failed to generate ${kind.toUpperCase()}.`);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="space-y-1">
         <p className="text-label">Analytics Center</p>
-        <h1 className="text-2xl font-black font-heading tracking-tight">Reports</h1>
+        <h1 className="text-2xl font-black font-heading tracking-tight">Reports Center</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Export summaries for payroll, tax, or carrier disputes.
+          Download professional trucking reports for taxes, settlements, profit tracking, and business records.
         </p>
       </div>
 
-      {/* Date Range */}
-      <div className="premium-card p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Calendar className="h-3.5 w-3.5 text-primary" />
-          <p className="text-label">Date Range</p>
+      {/* Report Center: type + range + download */}
+      <div className="premium-card p-4 space-y-4">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <p className="text-label mb-2 flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-primary" /> Report Type</p>
+            <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
+              <SelectTrigger className="h-10 rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(REPORT_TYPE_LABELS).map(([k, label]) => (
+                  <SelectItem key={k} value={k}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="text-label mb-2 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-primary" /> Date Range</p>
+            <DateRangeFilter onRangeChange={(from, to) => setDateRange({ from, to })} />
+          </div>
         </div>
-        <DateRangeFilter onRangeChange={(from, to) => setDateRange({ from, to })} />
+
+        {!isPro && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-start gap-3">
+            <Lock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-foreground">Upgrade to Pro to download reports</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Upgrade to Pro to download professional PDF and CSV reports for taxes, settlements, and profit tracking.
+              </p>
+              {onNavigate && (
+                <Button size="sm" className="mt-2 h-8 rounded-lg" onClick={() => onNavigate('upgrade')}>
+                  Upgrade to Pro
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {aggregation?.isEmpty && (
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+            No loads, expenses, or fuel logs were found for this date range.
+          </div>
+        )}
+
+        {!aggregation && (
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+            Select a preset or apply a custom date range to preview and download a report.
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-11 rounded-xl gap-2 font-bold" onClick={() => handleDownload('pdf')} disabled={!isPro || !aggregation || aggregation.isEmpty}>
+            {!isPro && <Lock className="h-3.5 w-3.5" />}
+            <FileDown className="h-4 w-4" /> Download PDF
+          </Button>
+          <Button variant="outline" className="h-11 rounded-xl gap-2 font-bold" onClick={() => handleDownload('csv')} disabled={!isPro || !aggregation || aggregation.isEmpty}>
+            {!isPro && <Lock className="h-3.5 w-3.5" />}
+            <FileSpreadsheet className="h-4 w-4" /> Export CSV
+          </Button>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground/70">{TAX_DISCLAIMER}</p>
       </div>
 
       {/* Financial KPI Strip */}
