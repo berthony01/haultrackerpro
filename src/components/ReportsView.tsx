@@ -3,14 +3,21 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { useFuelLogs } from '@/hooks/useFuelLogs';
+import { useAuth } from '@/hooks/useAuth';
 import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, exportScheduleCSummary, getCurrentMonthLoads, getEffectiveDate, weekStartDayToNumber } from '@/lib/loadUtils';
 import { summarizeLoads, excludeCancelled, onlyCancelled, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock, Receipt, BarChart3, Fuel, DollarSign, Ban } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock, Receipt, BarChart3, Fuel, DollarSign, Ban, FileDown, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { parseISO, isWithinInterval } from 'date-fns';
+import { parseISO, isWithinInterval, format } from 'date-fns';
 import { toast } from 'sonner';
+import { aggregateReport, REPORT_TYPE_LABELS, type ReportType } from '@/lib/reportAggregator';
+import { buildReportCSV, downloadCSV } from '@/lib/reportCsv';
+import { buildReportPdf, downloadPdfBlob } from '@/lib/reportPdf';
+import { TAX_DISCLAIMER } from '@/lib/reportTax';
 
 interface ReportsViewProps {
   loads: Load[];
