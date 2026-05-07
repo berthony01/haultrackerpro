@@ -473,6 +473,49 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 4.5: FUEL + REPORTS */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Fuel, Miles, and Reports —{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>All In One Place.</span>
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Track every gallon, see your true cost per mile, and pull a clean report for tax day, your bookkeeper, or a pay dispute — in two taps.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div className="space-y-5">
+              {[
+                { icon: Zap, title: 'Fuel Tracking & MPG', desc: 'Log fuel stops in seconds. See your real MPG, fuel cost per mile, and which lanes are quietly burning your margin.' },
+                { icon: BarChart3, title: 'Cost Per Mile, Live', desc: 'Fixed costs + variable costs + fuel = your true CPM. Compare it to every load before you commit.' },
+                { icon: FileText, title: 'Reports & Exports', desc: 'Filter by week, month, quarter, or custom range. CSV on every plan, branded PDF on Pro — ready for tax prep or short-pay disputes.' },
+              ].map((item) => (
+                <div key={item.title} className="flex gap-4 p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                  <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                    <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
+                    <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-2xl overflow-hidden border" style={{
+              borderColor: 'hsl(220, 16%, 18%)',
+              boxShadow: '0 24px 48px -12px hsl(0, 0%, 0%, 0.5), 0 0 0 1px hsl(220, 16%, 16%)'
+            }}>
+              <img src={reportsMockup} alt="HaulTrackerPro Reports view with weekly profit chart, totals, and exportable loads table" className="w-full" loading="lazy" width={1536} height={1024} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
       {/* SECTION 5: SOCIAL PROOF (NEW) */}
       {/* ═══════════════════════════════════════════ */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
