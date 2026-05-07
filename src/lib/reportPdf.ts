@@ -1,446 +1,691 @@
-// Branded PDF report builder for HaulTrackerPro.
-// Hand-rolled PDF writer (no jsPDF) — keeps bundle small and matches the
-// existing exporter style in src/lib/loadUtils.ts.
-//
-// Design:
-//   - Dark navy header band with orange accent rule
-//   - White body for print readability
-//   - Sectioned tables (Loads, Fuel, Expenses, Tax, Profit)
-//   - Footer with haultrackerpro.com + page number
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format, parseISO } from 'date-fns';
 import type { ReportAggregation, ReportType } from '@/lib/reportAggregator';
-import { REPORT_TYPE_LABELS } from '@/lib/reportAggregator';
+import { REPORT_TYPE_LABELS, REPORT_SUBTITLES } from '@/lib/reportAggregator';
 import { TAX_DISCLAIMER } from '@/lib/reportTax';
 import { getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadExpectedPay, getLoadOperatingMiles } from '@/lib/loadMetrics';
-import { format } from 'date-fns';
 
-// ── Page geometry (US Letter) ─────────────────────────────────────────────
-const PAGE_W = 612;
-const PAGE_H = 792;
+// Brand palette (RGB tuples)
+const NAVY: [number, number, number] = [11, 23, 50];        // dark navy header/footer
+const NAVY_2: [number, number, number] = [16, 32, 64];
+const ORANGE: [number, number, number] = [243, 132, 30];    // primary accent
+const TEXT: [number, number, number] = [22, 28, 45];
+const MUTED: [number, number, number] = [110, 118, 138];
+const BORDER: [number, number, number] = [223, 227, 235];
+const CARD_BG: [number, number, number] = [250, 251, 253];
+const SUCCESS: [number, number, number] = [22, 163, 74];
+const DANGER: [number, number, number] = [220, 38, 38];
+const WHITE: [number, number, number] = [255, 255, 255];
+
+const PAGE_W = 612;   // letter portrait pt (8.5")
+const PAGE_H = 792;   // 11"
 const MARGIN_X = 36;
-const HEADER_H = 78;
-const FOOTER_H = 36;
-const BODY_TOP = HEADER_H + 18;
-const BODY_BOTTOM = FOOTER_H + 24;
+const HEADER_H = 110;
 
-// HaulTrackerPro brand (approximations of the dark-navy + amber theme)
-const NAVY = '0.05 0.10 0.18';      // header/footer band
-const AMBER = '0.96 0.62 0.04';     // accent / primary
-const GREEN = '0.10 0.55 0.30';     // profit positive
-const RED = '0.78 0.16 0.16';       // negative / warning
-const GREY_LIGHT = '0.94 0.94 0.94';
-const GREY_MID = '0.45 0.45 0.45';
-const BLACK = '0 0 0';
+const fmtMoney = (n: number) =>
+  Number.isFinite(n)
+    ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '$0.00';
+const fmtNum = (n: number, d = 0) =>
+  Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '0';
+const fmtDate = (iso: string) => {
+  try { return format(parseISO(iso), 'MMM d, yyyy'); } catch { return iso; }
+};
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-// Helvetica (WinAnsi) cannot render most non-ASCII glyphs, AND our PDF
-// writer measures /Length and xref offsets in JS string length while the
-// Blob is serialized as UTF-8 bytes. Any multi-byte char would corrupt the
-// file. So normalize aggressively to printable ASCII before emitting.
-function clean(s: string | number | null | undefined, max = 80): string {
-  let str = (s == null ? '' : String(s))
-    .replace(/[\r\n\t]/g, ' ')
-    .replace(/[()\\]/g, ' ')
-    .replace(/→|➔|➜/g, '->')
-    .replace(/←/g, '<-')
-    .replace(/[—–]/g, '-')
-    .replace(/…/g, '...')
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/•/g, '*')
-    // Drop anything outside printable ASCII
-    .replace(/[^\x20-\x7E]/g, '');
-  return str.length > max ? str.slice(0, max - 1) + '...' : str;
-}
-const money = (n: number) =>
-  '$' + (Number.isFinite(n) ? n : 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const intStr = (n: number) =>
-  (Number.isFinite(n) ? Math.round(n) : 0).toLocaleString('en-US');
+interface Card { label: string; value: string; tone?: 'default' | 'success' | 'danger' | 'orange' }
 
-// ── Page builder ──────────────────────────────────────────────────────────
-type FontWeight = 'F1' | 'F2'; // F1=Helvetica, F2=Helvetica-Bold
+function setFill(doc: jsPDF, c: [number, number, number]) { doc.setFillColor(c[0], c[1], c[2]); }
+function setText(doc: jsPDF, c: [number, number, number]) { doc.setTextColor(c[0], c[1], c[2]); }
+function setDraw(doc: jsPDF, c: [number, number, number]) { doc.setDrawColor(c[0], c[1], c[2]); }
 
-class PageBuilder {
-  private content = '';
-  y = BODY_TOP;
-
-  raw(s: string) { this.content += s + '\n'; }
-
-  fillRect(rgb: string, x: number, y: number, w: number, h: number) {
-    this.raw(`${rgb} rg ${x} ${PAGE_H - y - h} ${w} ${h} re f`);
-  }
-  text(rgb: string, font: FontWeight, size: number, x: number, y: number, str: string) {
-    this.raw(`${rgb} rg BT /${font} ${size} Tf ${x} ${PAGE_H - y} Td (${clean(str)}) Tj ET`);
-  }
-
-  finalize(): string { return this.content; }
-}
-
-function drawHeader(p: PageBuilder, opts: {
-  reportTitle: string;
-  rangeLabel: string;
-  generated: string;
-  preparedFor: string;
-}) {
+function drawHeader(doc: jsPDF, agg: ReportAggregation, type: ReportType) {
   // Navy band
-  p.raw(`${NAVY} rg 0 ${PAGE_H - HEADER_H} ${PAGE_W} ${HEADER_H} re f`);
-  // Amber accent rule
-  p.raw(`${AMBER} rg 0 ${PAGE_H - HEADER_H - 3} ${PAGE_W} 3 re f`);
-  // Brand
-  p.raw(`1 1 1 rg BT /F2 16 Tf ${MARGIN_X} ${PAGE_H - 28} Td (HaulTrackerPro) Tj ET`);
-  p.raw(`${AMBER} rg BT /F1 8 Tf ${MARGIN_X} ${PAGE_H - 42} Td (haultrackerpro.com) Tj ET`);
-  // Title + meta (right column)
-  p.raw(`1 1 1 rg BT /F2 12 Tf ${MARGIN_X} ${PAGE_H - 60} Td (${clean(opts.reportTitle)}) Tj ET`);
-  p.raw(`0.78 0.78 0.78 rg BT /F1 8 Tf ${PAGE_W - MARGIN_X - 250} ${PAGE_H - 28} Td (Date Range: ${clean(opts.rangeLabel)}) Tj ET`);
-  p.raw(`0.78 0.78 0.78 rg BT /F1 8 Tf ${PAGE_W - MARGIN_X - 250} ${PAGE_H - 42} Td (Generated: ${clean(opts.generated)}) Tj ET`);
-  p.raw(`0.78 0.78 0.78 rg BT /F1 8 Tf ${PAGE_W - MARGIN_X - 250} ${PAGE_H - 56} Td (Prepared For: ${clean(opts.preparedFor, 60)}) Tj ET`);
+  setFill(doc, NAVY);
+  doc.rect(0, 0, PAGE_W, HEADER_H, 'F');
+  // Orange accent stripe
+  setFill(doc, ORANGE);
+  doc.rect(0, HEADER_H, PAGE_W, 3, 'F');
+
+  // Logo mark — orange rounded square with HT
+  setFill(doc, ORANGE);
+  doc.roundedRect(MARGIN_X, 28, 38, 38, 6, 6, 'F');
+  setText(doc, WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('HT', MARGIN_X + 19, 53, { align: 'center' });
+
+  // Brand text
+  setText(doc, WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('HaulTracker', MARGIN_X + 50, 48);
+  setText(doc, ORANGE);
+  doc.text(' Pro', MARGIN_X + 50 + doc.getTextWidth('HaulTracker'), 48);
+
+  setText(doc, WHITE);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setCharSpace(2);
+  doc.text(REPORT_TYPE_LABELS[type].toUpperCase(), MARGIN_X + 50, 62);
+  doc.setCharSpace(0);
+  doc.setFontSize(8);
+  setText(doc, [180, 195, 220]);
+  doc.text(REPORT_SUBTITLES[type], MARGIN_X + 50, 74);
+
+  // Right meta block
+  const rightX = PAGE_W - MARGIN_X;
+  const labelX = rightX - 175;
+  const valueX = rightX;
+  setText(doc, [180, 195, 220]);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('Prepared For:', labelX, 36);
+  doc.text('Date Range:', labelX, 50);
+  doc.text('Generated:', labelX, 64);
+  doc.text('haultrackerpro.com', labelX, 80);
+
+  setText(doc, WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  const preparedFor = agg.preparedFor.length > 28 ? agg.preparedFor.slice(0, 27) + '…' : agg.preparedFor;
+  doc.text(preparedFor, valueX, 36, { align: 'right' });
+  doc.text(`${fmtDate(agg.range.from)} – ${fmtDate(agg.range.to)}`, valueX, 50, { align: 'right' });
+  doc.text(format(new Date(), 'MMM d, yyyy'), valueX, 64, { align: 'right' });
 }
 
-function drawFooter(p: PageBuilder, page: number, totalPages: number) {
-  const y = FOOTER_H;
-  p.raw(`${NAVY} rg 0 0 ${PAGE_W} ${y} re f`);
-  p.raw(`${AMBER} rg 0 ${y} ${PAGE_W} 2 re f`);
-  p.raw(`1 1 1 rg BT /F1 8 Tf ${MARGIN_X} 16 Td (Generated by HaulTrackerPro  -  haultrackerpro.com) Tj ET`);
-  p.raw(`0.78 0.78 0.78 rg BT /F1 8 Tf ${PAGE_W - MARGIN_X - 60} 16 Td (Page ${page} of ${totalPages}) Tj ET`);
-}
+function drawFooter(doc: jsPDF) {
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    setFill(doc, NAVY);
+    doc.rect(0, PAGE_H - 32, PAGE_W, 32, 'F');
+    // Mini logo
+    setFill(doc, ORANGE);
+    doc.roundedRect(MARGIN_X, PAGE_H - 24, 16, 16, 3, 3, 'F');
+    setText(doc, WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text('HT', MARGIN_X + 8, PAGE_H - 13, { align: 'center' });
 
-// ── Section drawing primitives ────────────────────────────────────────────
-function sectionTitle(p: PageBuilder, label: string) {
-  ensureSpace(p, 28);
-  p.raw(`${AMBER} rg ${MARGIN_X} ${PAGE_H - p.y - 2} 3 14 re f`);
-  p.text(BLACK, 'F2', 11, MARGIN_X + 8, p.y + 9, label);
-  p.y += 22;
-}
+    setText(doc, WHITE);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text('Generated by HaulTracker Pro', MARGIN_X + 24, PAGE_H - 17);
+    setText(doc, [180, 195, 220]);
+    doc.text('•', MARGIN_X + 24 + doc.getTextWidth('Generated by HaulTracker Pro') + 4, PAGE_H - 17);
+    setText(doc, WHITE);
+    doc.text('haultrackerpro.com', MARGIN_X + 24 + doc.getTextWidth('Generated by HaulTracker Pro') + 12, PAGE_H - 17);
 
-function ensureSpace(p: PageBuilder, needed: number): boolean {
-  if (p.y + needed > PAGE_H - BODY_BOTTOM) return false;
-  return true;
-}
-
-function row(p: PageBuilder, cells: string[], widths: number[], opts: { bold?: boolean; bg?: string; size?: number } = {}) {
-  const size = opts.size ?? 8;
-  const rowH = size + 6;
-  if (opts.bg) {
-    p.raw(`${opts.bg} rg ${MARGIN_X} ${PAGE_H - p.y - 4} ${widths.reduce((a, b) => a + b, 0)} ${rowH} re f`);
+    setText(doc, WHITE);
+    doc.text(`Page ${i} of ${pageCount}`, PAGE_W - MARGIN_X, PAGE_H - 17, { align: 'right' });
   }
-  let x = MARGIN_X + 4;
-  cells.forEach((c, i) => {
-    p.text(BLACK, opts.bold ? 'F2' : 'F1', size, x, p.y + size, c);
-    x += widths[i];
+}
+
+function sectionTitle(doc: jsPDF, y: number, text: string): number {
+  setFill(doc, ORANGE);
+  doc.roundedRect(MARGIN_X, y, 4, 14, 1, 1, 'F');
+  setText(doc, TEXT);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setCharSpace(1);
+  doc.text(text.toUpperCase(), MARGIN_X + 12, y + 11);
+  doc.setCharSpace(0);
+  return y + 22;
+}
+
+function drawCardGrid(doc: jsPDF, y: number, cards: Card[]): number {
+  const cols = 4;
+  const gap = 8;
+  const cardW = (PAGE_W - MARGIN_X * 2 - gap * (cols - 1)) / cols;
+  const cardH = 54;
+  let cy = y;
+  cards.forEach((card, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = MARGIN_X + col * (cardW + gap);
+    const yy = cy + row * (cardH + gap);
+    // Card body
+    setFill(doc, CARD_BG);
+    setDraw(doc, BORDER);
+    doc.setLineWidth(0.6);
+    doc.roundedRect(x, yy, cardW, cardH, 6, 6, 'FD');
+    // Label
+    setText(doc, MUTED);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setCharSpace(0.5);
+    const label = card.label.toUpperCase();
+    doc.text(label, x + 10, yy + 16);
+    doc.setCharSpace(0);
+    // Value
+    let tone = TEXT;
+    if (card.tone === 'success') tone = SUCCESS;
+    else if (card.tone === 'danger') tone = DANGER;
+    else if (card.tone === 'orange') tone = ORANGE;
+    setText(doc, tone);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    // Truncate value if too wide
+    let v = card.value;
+    while (doc.getTextWidth(v) > cardW - 20 && v.length > 4) v = v.slice(0, -2);
+    doc.text(v, x + 10, yy + 38);
   });
-  p.y += rowH;
+  const rows = Math.ceil(cards.length / cols);
+  return cy + rows * (cardH + gap);
 }
 
-// Summary card with two columns of label/value pairs
-function summaryCard(p: PageBuilder, items: Array<[string, string, string?]>) {
-  const cardH = Math.ceil(items.length / 2) * 18 + 16;
-  ensureSpace(p, cardH + 8);
-  // Light grey card background
-  p.raw(`${GREY_LIGHT} rg ${MARGIN_X} ${PAGE_H - p.y - cardH} ${PAGE_W - MARGIN_X * 2} ${cardH} re f`);
-  // Amber left rule
-  p.raw(`${AMBER} rg ${MARGIN_X} ${PAGE_H - p.y - cardH} 3 ${cardH} re f`);
-  const colW = (PAGE_W - MARGIN_X * 2 - 16) / 2;
-  items.forEach((it, i) => {
-    const col = i % 2;
-    const rowIdx = Math.floor(i / 2);
-    const x = MARGIN_X + 12 + col * colW;
-    const y = p.y + 14 + rowIdx * 18;
-    const valueColor = it[2] ?? BLACK;
-    p.text(GREY_MID, 'F1', 7, x, y - 4, it[0].toUpperCase());
-    p.text(valueColor, 'F2', 10, x, y + 7, it[1]);
+function drawSnapshot(doc: jsPDF, y: number, parts: { label: string; value: string; op?: string; tone?: Card['tone'] }[]): number {
+  // Outer panel
+  const h = 60;
+  setFill(doc, CARD_BG);
+  setDraw(doc, BORDER);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(MARGIN_X, y, PAGE_W - MARGIN_X * 2, h, 6, 6, 'FD');
+  const totalW = PAGE_W - MARGIN_X * 2;
+  const colW = totalW / parts.length;
+  parts.forEach((p, i) => {
+    const cx = MARGIN_X + colW * i + colW / 2;
+    setText(doc, MUTED);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setCharSpace(0.5);
+    doc.text(p.label.toUpperCase(), cx, y + 18, { align: 'center' });
+    doc.setCharSpace(0);
+    let tone: [number, number, number] = TEXT;
+    if (p.tone === 'success') tone = SUCCESS;
+    else if (p.tone === 'danger') tone = DANGER;
+    else if (p.tone === 'orange') tone = ORANGE;
+    setText(doc, tone);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.text(p.value, cx, y + 42, { align: 'center' });
+    if (p.op && i < parts.length - 1) {
+      setText(doc, MUTED);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text(p.op, MARGIN_X + colW * (i + 1), y + 36, { align: 'center' });
+    }
   });
-  p.y += cardH + 8;
+  return y + h + 12;
 }
 
-function paragraph(p: PageBuilder, text: string, size = 8, color = GREY_MID) {
-  ensureSpace(p, size + 6);
-  p.text(color, 'F1', size, MARGIN_X, p.y + size, text);
-  p.y += size + 6;
-}
-
-// ── Multi-page rendering ──────────────────────────────────────────────────
-type Section = (p: PageBuilder, addPage: () => void) => void;
-
-function renderPages(sections: Section[], header: Parameters<typeof drawHeader>[1]): { contents: string[] } {
-  const pages: PageBuilder[] = [];
-  let current: PageBuilder;
-
-  const addPage = () => {
-    current = new PageBuilder();
-    drawHeader(current, header);
-    pages.push(current);
-  };
-
-  addPage();
-
-  // Wrap ensureSpace logic: if a section runs out of space, callers call addPage.
-  for (const section of sections) {
-    section(current!, () => addPage());
-    // After each section, the section may have called addPage internally.
-    // We need to refresh `current` to the latest page.
-    current = pages[pages.length - 1];
+function ensureSpace(doc: jsPDF, y: number, needed: number, agg: ReportAggregation, type: ReportType): number {
+  if (y + needed > PAGE_H - 50) {
+    doc.addPage();
+    drawHeader(doc, agg, type);
+    return HEADER_H + 18;
   }
-
-  // Footer on every page after content is laid out
-  pages.forEach((pg, i) => drawFooter(pg, i + 1, pages.length));
-
-  return { contents: pages.map(pg => pg.finalize()) };
+  return y;
 }
 
-// Build a paginated table that auto-overflows to new pages.
-function tableSection(opts: {
-  title: string;
-  headers: string[];
-  widths: number[];
-  rows: string[][];
-  emptyMessage: string;
-}) {
-  const { title, headers, widths, rows, emptyMessage } = opts;
-  return (p: PageBuilder, addPage: () => void) => {
-    let cur = p;
-    sectionTitle(cur, title);
-    if (rows.length === 0) {
-      paragraph(cur, emptyMessage, 9, GREY_MID);
-      cur.y += 4;
-      return;
-    }
-    // Header row
-    row(cur, headers, widths, { bold: true, bg: GREY_LIGHT, size: 8 });
-    let alt = false;
-    for (const r of rows) {
-      if (cur.y + 14 > PAGE_H - BODY_BOTTOM) {
-        addPage();
-        cur = (globalThis as any).__pdfPageRef ?? cur; // unused; addPage handled by closure below
-      }
-      row(cur, r, widths, { bg: alt ? GREY_LIGHT : undefined, size: 8 });
-      alt = !alt;
-    }
-  };
-}
-
-// The simple sequential renderer above doesn't easily refresh `current` for
-// table overflow. Use a single-pass renderer that tracks pages directly.
-function buildPdfBlob(reportTitle: string, header: Parameters<typeof drawHeader>[1], draw: (api: {
-  page: PageBuilder;
-  newPage: () => PageBuilder;
-}) => void): Blob {
-  const pages: PageBuilder[] = [];
-  let page = new PageBuilder();
-  drawHeader(page, header);
-  pages.push(page);
-
-  const newPage = () => {
-    page = new PageBuilder();
-    drawHeader(page, header);
-    pages.push(page);
-    return page;
-  };
-
-  // Provide a Proxy that always points at the current page
-  const api = new Proxy({} as any, {
-    get(_t, prop) {
-      if (prop === 'page') return page;
-      if (prop === 'newPage') return newPage;
-      return undefined;
+function drawTable(
+  doc: jsPDF,
+  startY: number,
+  head: string[][],
+  body: (string | number)[][],
+  agg: ReportAggregation,
+  type: ReportType,
+  opts: { columnStyles?: any } = {},
+): number {
+  autoTable(doc, {
+    startY,
+    head,
+    body,
+    theme: 'grid',
+    margin: { left: MARGIN_X, right: MARGIN_X, top: HEADER_H + 18, bottom: 50 },
+    headStyles: {
+      fillColor: NAVY,
+      textColor: WHITE,
+      fontStyle: 'bold',
+      fontSize: 8,
+      cellPadding: 6,
+      lineColor: NAVY,
+    },
+    bodyStyles: {
+      fontSize: 8,
+      textColor: TEXT,
+      cellPadding: 5,
+      lineColor: BORDER,
+      lineWidth: 0.4,
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: opts.columnStyles,
+    didDrawPage: () => {
+      // Re-draw header on subsequent pages
+      drawHeader(doc, agg, type);
     },
   });
-
-  draw({ get page() { return page; }, newPage } as any);
-
-  pages.forEach((pg, i) => drawFooter(pg, i + 1, pages.length));
-
-  return assemblePdf(pages.map(p => p.finalize()));
+  // @ts-expect-error - autotable injects lastAutoTable
+  return (doc.lastAutoTable?.finalY ?? startY) + 14;
 }
 
-function assemblePdf(contents: string[]): Blob {
-  // All content is ASCII after clean(), so byte-length === string-length.
-  // Use TextEncoder for byte-accurate length to be safe if that ever changes.
-  const enc = new TextEncoder();
-  const byteLen = (s: string) => enc.encode(s).length;
+function drawCalloutCard(doc: jsPDF, y: number, title: string, body: string, tone: 'note' | 'warn' = 'note'): number {
+  const pad = 12;
+  const w = PAGE_W - MARGIN_X * 2;
+  // Measure body height
+  const lines = doc.splitTextToSize(body, w - pad * 2);
+  const h = 28 + lines.length * 11;
+  const bg: [number, number, number] = tone === 'warn' ? [254, 242, 230] : [253, 248, 240];
+  const accent = ORANGE;
+  setFill(doc, bg);
+  setDraw(doc, BORDER);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(MARGIN_X, y, w, h, 6, 6, 'FD');
+  setFill(doc, accent);
+  doc.rect(MARGIN_X, y, 3, h, 'F');
+  setText(doc, TEXT);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text(title, MARGIN_X + pad, y + 16);
+  setText(doc, MUTED);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.text(lines, MARGIN_X + pad, y + 30);
+  return y + h + 10;
+}
 
-  const objs: string[] = [];
-  objs.push('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj');
-  const pageObjStart = 5;
-  const refs = contents.map((_, i) => `${pageObjStart + i} 0 R`).join(' ');
-  objs.push(`2 0 obj<</Type/Pages/Kids[${refs}]/Count ${contents.length}>>endobj`);
-  objs.push('3 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj');
-  objs.push('4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold>>endobj');
+// Section selectors per report type
+function wantsSummaryCards(_type: ReportType) { return true; }
+function wantsSnapshot(type: ReportType) {
+  return type === 'full_profit' || type === 'weekly_performance' || type === 'tax_estimate' || type === 'year_end_tax';
+}
+function wantsLoadsTable(type: ReportType) {
+  return type !== 'expense' && type !== 'fuel' && type !== 'tax_estimate';
+}
+function wantsExpensesTable(type: ReportType) {
+  return type === 'full_profit' || type === 'weekly_performance' || type === 'expense' || type === 'year_end_tax';
+}
+function wantsFuelTable(type: ReportType) {
+  return type === 'full_profit' || type === 'weekly_performance' || type === 'fuel' || type === 'mileage' || type === 'year_end_tax';
+}
+function wantsTaxBlock(type: ReportType) {
+  return type === 'full_profit' || type === 'tax_estimate' || type === 'year_end_tax';
+}
+function wantsMonthly(type: ReportType) { return type === 'year_end_tax'; }
+function wantsCancelled(type: ReportType) {
+  return type === 'load_summary' || type === 'settlement_dispute' || type === 'full_profit';
+}
 
-  contents.forEach((_c, i) => {
-    const streamId = pageObjStart + contents.length + i;
-    objs.push(`${pageObjStart + i} 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PAGE_W} ${PAGE_H}]/Contents ${streamId} 0 R/Resources<</Font<</F1 3 0 R/F2 4 0 R>>>>>>endobj`);
-  });
-  contents.forEach((c, i) => {
-    const id = pageObjStart + contents.length + i;
-    objs.push(`${id} 0 obj<</Length ${byteLen(c)}>>stream\n${c}endstream\nendobj`);
-  });
+function buildSummaryCards(type: ReportType, agg: ReportAggregation): Card[] {
+  const s = agg.summary;
+  const p = agg.profit;
+  const f = agg.fuel;
+  const ls = agg.loadStats;
+  const es = agg.expenseStats;
+  const t = agg.tax;
 
-  let pdf = '%PDF-1.4\n';
-  const offsets: number[] = [];
-  for (const obj of objs) {
-    offsets.push(byteLen(pdf));
-    pdf += obj + '\n';
+  switch (type) {
+    case 'full_profit':
+    case 'weekly_performance':
+      return [
+        { label: 'Total Loads', value: String(s.loadCount + ls.cancelled) },
+        { label: 'Completed Loads', value: String(s.loadCount), tone: 'success' },
+        { label: 'Cancelled Loads', value: String(ls.cancelled), tone: ls.cancelled > 0 ? 'danger' : 'default' },
+        { label: 'Gross Pay', value: fmtMoney(p.grossRevenue) },
+        { label: 'Actual Pay', value: fmtMoney(p.actualPay) },
+        { label: 'Difference / Unpaid', value: fmtMoney(p.differenceUnpaid), tone: p.differenceUnpaid > 0 ? 'orange' : 'default' },
+        { label: 'Loaded Miles', value: fmtNum(s.loadedMiles, 2) },
+        { label: 'Deadhead Miles', value: fmtNum(s.deadheadMiles, 2) },
+        { label: 'Total Miles', value: fmtNum(s.totalMiles, 2) },
+        { label: 'Average Rate/Mile', value: fmtMoney(p.avgRatePerMile) },
+        { label: 'Estimated Tax Reserve', value: fmtMoney(p.estimatedTaxReserve) },
+        { label: 'Estimated Net Profit', value: fmtMoney(p.netAfterTax), tone: p.netAfterTax >= 0 ? 'success' : 'danger' },
+      ];
+    case 'load_summary':
+      return [
+        { label: 'Total Loads', value: String(s.loadCount + ls.cancelled) },
+        { label: 'Completed Loads', value: String(s.loadCount), tone: 'success' },
+        { label: 'Cancelled Loads', value: String(ls.cancelled), tone: ls.cancelled > 0 ? 'danger' : 'default' },
+        { label: 'Gross Pay', value: fmtMoney(p.grossRevenue) },
+        { label: 'Actual Pay', value: fmtMoney(p.actualPay) },
+        { label: 'Difference / Unpaid', value: fmtMoney(p.differenceUnpaid), tone: 'orange' },
+        { label: 'Loaded Miles', value: fmtNum(s.loadedMiles, 2) },
+        { label: 'Deadhead Miles', value: fmtNum(s.deadheadMiles, 2) },
+        { label: 'Total Miles', value: fmtNum(s.totalMiles, 2) },
+        { label: 'Avg Pay Per Load', value: fmtMoney(p.avgPayPerLoad) },
+        { label: 'Average Rate/Mile', value: fmtMoney(p.avgRatePerMile) },
+        { label: 'Best Paying Load', value: fmtMoney(ls.bestPaying?.amount ?? 0), tone: 'success' },
+      ];
+    case 'expense':
+      return [
+        { label: 'Total Expenses', value: fmtMoney(p.expensesTotal + f.totalCost), tone: 'danger' },
+        { label: 'Fuel Expenses', value: fmtMoney(es.fuel) },
+        { label: 'Maintenance', value: fmtMoney(es.maintenance) },
+        { label: 'Toll Expenses', value: fmtMoney(es.tolls) },
+        { label: 'Parking Expenses', value: fmtMoney(es.parking) },
+        { label: 'Other Expenses', value: fmtMoney(es.other) },
+        { label: 'Largest Expense', value: fmtMoney(es.largest) },
+        { label: 'Average Expense', value: fmtMoney(es.average) },
+        { label: 'Entries', value: String(es.totalEntries) },
+        { label: 'Est. Deductible Total', value: fmtMoney(es.deductibleEstimate), tone: 'orange' },
+        { label: 'Date Range Days', value: String(daysInRange(agg)) },
+        { label: 'Per-Day Avg', value: fmtMoney(es.deductibleEstimate / Math.max(1, daysInRange(agg))) },
+      ];
+    case 'fuel':
+      return [
+        { label: 'Total Fuel Cost', value: fmtMoney(f.totalCost), tone: 'danger' },
+        { label: 'Total Gallons', value: fmtNum(f.totalGallons, 2) },
+        { label: 'Avg Price / Gallon', value: fmtMoney(f.avgPricePerGallon) },
+        { label: 'Fuel Stops', value: String(f.stops) },
+        { label: 'Avg Fuel Cost / Load', value: fmtMoney(f.avgFuelCostPerLoad) },
+        { label: 'Fuel Cost / Mile', value: fmtMoney(f.fuelCostPerMile) },
+        { label: 'Highest Purchase', value: fmtMoney(f.highestPurchase) },
+        { label: 'Lowest Purchase', value: fmtMoney(f.lowestPurchase) },
+      ];
+    case 'mileage':
+      return [
+        { label: 'Loaded Miles', value: fmtNum(s.loadedMiles, 2) },
+        { label: 'Deadhead Miles', value: fmtNum(s.deadheadMiles, 2) },
+        { label: 'Total Miles', value: fmtNum(s.totalMiles, 2) },
+        { label: 'Deadhead %', value: `${ls.deadheadPct.toFixed(1)}%`, tone: ls.deadheadPct > 30 ? 'danger' : ls.deadheadPct < 15 ? 'success' : 'orange' },
+        { label: 'Avg Miles / Load', value: fmtNum(ls.avgMilesPerLoad, 1) },
+        { label: 'Revenue / Loaded Mi', value: fmtMoney(ls.revenuePerLoadedMile) },
+        { label: 'Real Pay / Total Mi', value: fmtMoney(ls.realPayPerTotalMile) },
+        { label: 'Best Mileage Load', value: fmtNum(ls.bestMileage?.miles ?? 0, 0) + ' mi' },
+      ];
+    case 'tax_estimate':
+      return [
+        { label: 'Gross Pay', value: fmtMoney(p.grossRevenue) },
+        { label: 'Total Expenses', value: fmtMoney(p.expensesTotal + f.totalCost) },
+        { label: 'Estimated Taxable Income', value: fmtMoney(t.netProfit) },
+        { label: 'Estimated Tax Reserve', value: fmtMoney(t.totalTax), tone: 'orange' },
+        { label: 'Net Before Tax', value: fmtMoney(p.netAfterExpenses) },
+        { label: 'Net After Tax', value: fmtMoney(p.netAfterTax), tone: p.netAfterTax >= 0 ? 'success' : 'danger' },
+        { label: 'Tax Rate Used', value: `${t.totalPercent.toFixed(1)}%` },
+        { label: 'Date Range Days', value: String(daysInRange(agg)) },
+      ];
+    case 'settlement_dispute':
+      return [
+        { label: 'Expected Pay', value: fmtMoney(p.grossRevenue) },
+        { label: 'Actual Pay', value: fmtMoney(p.actualPay) },
+        { label: 'Difference / Unpaid', value: fmtMoney(p.differenceUnpaid), tone: p.differenceUnpaid > 0 ? 'danger' : 'default' },
+        { label: 'Missing Actual Pay', value: String(s.pendingPaymentCount) },
+        { label: 'Cancelled Loads', value: String(ls.cancelled) },
+        { label: 'Underpaid Loads', value: String(s.underpaidCount), tone: 'danger' },
+        { label: 'Overpaid Loads', value: String(s.overpaidCount), tone: 'success' },
+        { label: 'Total Dispute Amount', value: fmtMoney(Math.max(0, p.differenceUnpaid)), tone: 'orange' },
+      ];
+    case 'year_end_tax': {
+      const months = Math.max(1, agg.monthly.length);
+      return [
+        { label: 'Annual Gross Pay', value: fmtMoney(p.grossRevenue) },
+        { label: 'Annual Expenses', value: fmtMoney(p.expensesTotal) },
+        { label: 'Annual Fuel Cost', value: fmtMoney(f.totalCost) },
+        { label: 'Est. Tax Reserve', value: fmtMoney(p.estimatedTaxReserve), tone: 'orange' },
+        { label: 'Annual Net Profit', value: fmtMoney(p.netAfterTax), tone: p.netAfterTax >= 0 ? 'success' : 'danger' },
+        { label: 'Total Loads', value: String(s.loadCount) },
+        { label: 'Total Miles', value: fmtNum(s.totalMiles, 0) },
+        { label: 'Loaded Miles', value: fmtNum(s.loadedMiles, 0) },
+        { label: 'Deadhead Miles', value: fmtNum(s.deadheadMiles, 0) },
+        { label: 'Avg Monthly Gross', value: fmtMoney(p.grossRevenue / months) },
+        { label: 'Avg Monthly Expenses', value: fmtMoney((p.expensesTotal + f.totalCost) / months) },
+        { label: 'Avg Monthly Net', value: fmtMoney(p.netAfterTax / months) },
+      ];
+    }
   }
-  const xrefPos = byteLen(pdf);
-  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
-  for (const o of offsets) pdf += `${String(o).padStart(10, '0')} 00000 n \n`;
-  pdf += `trailer<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xrefPos}\n%%EOF`;
-
-  return new Blob([pdf], { type: 'application/pdf' });
 }
 
-// ── Public API ────────────────────────────────────────────────────────────
+function daysInRange(agg: ReportAggregation): number {
+  const ms = parseISO(agg.range.to).getTime() - parseISO(agg.range.from).getTime();
+  return Math.max(1, Math.round(ms / 86400000) + 1);
+}
+
 export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
-  const reportTitle = REPORT_TYPE_LABELS[type];
-  const header = {
-    reportTitle,
-    rangeLabel: `${agg.range.from} to ${agg.range.to} (${agg.range.label})`,
-    generated: format(new Date(), 'yyyy-MM-dd'),
-    preparedFor: agg.preparedFor,
-  };
+  const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: true });
+  drawHeader(doc, agg, type);
+  let y = HEADER_H + 18;
 
-  return buildPdfBlob(reportTitle, header, ({ page, newPage }) => {
-    let p = page;
+  if (agg.isEmpty) {
+    y = sectionTitle(doc, y, 'No Data In Range');
+    y = drawCalloutCard(
+      doc, y, 'No records found',
+      `No loads, expenses, or fuel logs were recorded between ${fmtDate(agg.range.from)} and ${fmtDate(agg.range.to)}. Adjust the date range and try again.`
+    );
+    drawFooter(doc);
+    return doc.output('blob');
+  }
 
-    // Empty-state
-    if (agg.isEmpty) {
-      sectionTitle(p, 'No Data In Range');
-      paragraph(p, 'No loads, expenses, or fuel logs were found for this date range.', 10, BLACK);
-      return;
-    }
+  // 1. Executive Summary
+  if (wantsSummaryCards(type)) {
+    y = sectionTitle(doc, y, 'Executive Summary');
+    y = drawCardGrid(doc, y, buildSummaryCards(type, agg));
+    y += 4;
+  }
 
-    const wantsLoads = type !== 'expense' && type !== 'fuel' && type !== 'tax_estimate';
-    const wantsExpenses = type === 'full_profit' || type === 'expense' || type === 'year_end_tax';
-    const wantsFuel = type === 'full_profit' || type === 'fuel' || type === 'year_end_tax' || type === 'mileage';
-    const wantsTax = type === 'full_profit' || type === 'tax_estimate' || type === 'year_end_tax';
-
-    // ── Executive Summary ───────────────────────────────────────────────
-    sectionTitle(p, 'Executive Summary');
-    summaryCard(p, [
-      ['Total Gross Pay', money(agg.profit.grossRevenue)],
-      ['Total Loads', String(agg.summary.loadCount)],
-      ['Total Miles', intStr(agg.summary.totalMiles)],
-      ['Loaded Miles', intStr(agg.summary.loadedMiles)],
-      ['Deadhead Miles', intStr(agg.summary.deadheadMiles)],
-      ['Fuel Cost', money(agg.profit.fuelCost)],
-      ['Other Expenses', money(agg.profit.expensesTotal)],
-      ['Est. Tax Reserve', money(agg.profit.estimatedTaxReserve)],
-      ['Net After Expenses', money(agg.profit.netAfterExpenses), agg.profit.netAfterExpenses >= 0 ? GREEN : RED],
-      ['Net After Est. Tax', money(agg.profit.netAfterTax), agg.profit.netAfterTax >= 0 ? GREEN : RED],
-      ['Profit / Mile', money(agg.profit.profitPerMile)],
-      ['Avg Pay / Load', money(agg.profit.avgPayPerLoad)],
+  // 2. Performance Snapshot
+  if (wantsSnapshot(type)) {
+    y = ensureSpace(doc, y, 90, agg, type);
+    y = sectionTitle(doc, y, 'Performance Snapshot');
+    y = drawSnapshot(doc, y, [
+      { label: 'Gross Pay', value: fmtMoney(agg.profit.grossRevenue), op: '−' },
+      { label: 'Fuel + Expenses', value: fmtMoney(agg.profit.fuelCost + agg.profit.expensesTotal), op: '−' },
+      { label: 'Tax Reserve (Est.)', value: fmtMoney(agg.profit.estimatedTaxReserve), op: '=' },
+      { label: 'Net Profit (Est.)', value: fmtMoney(agg.profit.netAfterTax), tone: agg.profit.netAfterTax >= 0 ? 'success' : 'danger' },
     ]);
+  }
 
-    const ensure = (need: number) => {
-      if (p.y + need > PAGE_H - BODY_BOTTOM) p = newPage();
-    };
-    const drawRow = (cells: string[], widths: number[], o: Parameters<typeof row>[3] = {}) => {
-      ensure(16);
-      row(p, cells, widths, o);
-    };
+  // 3. Loads Table
+  if (wantsLoadsTable(type) && agg.loads.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, 'Load Breakdown');
+    const head = [['Date', 'Pickup', 'Dropoff', 'Pay Model', 'Loaded Mi', 'DH Mi', 'Est. Pay', 'Actual Pay', 'Status']];
+    const body = agg.loads.map(l => {
+      const status = (l.status ?? 'completed') === 'cancelled' ? 'Cancelled' : 'Completed';
+      return [
+        fmtDate(getEffectiveDate(l)),
+        l.pickup_location,
+        l.dropoff_location,
+        prettyPayModel((l as any).pay_model),
+        fmtNum(Number(l.loaded_miles), 0),
+        fmtNum(Number(l.deadhead_miles), 0),
+        fmtMoney(getLoadExpectedPay(l)),
+        l.actual_pay_received != null ? fmtMoney(Number(l.actual_pay_received)) : '—',
+        status,
+      ];
+    });
+    y = drawTable(doc, y, head, body, agg, type, {
+      columnStyles: {
+        0: { cellWidth: 60 },
+        4: { halign: 'right', cellWidth: 50 },
+        5: { halign: 'right', cellWidth: 45 },
+        6: { halign: 'right', cellWidth: 60 },
+        7: { halign: 'right', cellWidth: 60 },
+        8: { halign: 'center', cellWidth: 60 },
+      },
+    });
+  } else if (wantsLoadsTable(type)) {
+    y = sectionTitle(doc, y, 'Load Breakdown');
+    y = drawCalloutCard(doc, y, 'No loads in range', 'No loads were recorded in this period.');
+  }
 
-    // ── Loads ───────────────────────────────────────────────────────────
-    if (wantsLoads) {
-      ensure(40);
-      sectionTitle(p, 'Load Breakdown');
-      const widths = [60, 100, 100, 50, 50, 70, 70];
-      drawRow(['Date', 'Pickup', 'Dropoff', 'Loaded', 'DH', 'Est Pay', 'Actual'], widths, { bold: true, bg: GREY_LIGHT });
-      let alt = false;
-      if (agg.loads.length === 0) {
-        paragraph(p, 'No loads in this date range.');
-      } else {
-        for (const l of agg.loads) {
-          drawRow([
-            getEffectiveDate(l),
-            clean(l.pickup_location, 22),
-            clean(l.dropoff_location, 22),
-            intStr(Number(l.loaded_miles)),
-            intStr(Number(l.deadhead_miles)),
-            money(getLoadExpectedPay(l)),
-            l.actual_pay_received != null ? money(Number(l.actual_pay_received)) : '—',
-          ], widths, { bg: alt ? GREY_LIGHT : undefined });
-          alt = !alt;
-        }
-      }
-    }
-
-    // ── Fuel ────────────────────────────────────────────────────────────
-    if (wantsFuel) {
-      ensure(40);
-      sectionTitle(p, 'Fuel Breakdown');
-      const widths = [70, 130, 60, 70, 80, 80];
-      drawRow(['Date', 'Station', 'Gallons', 'Price/Gal', 'Total', 'Odometer'], widths, { bold: true, bg: GREY_LIGHT });
-      if (agg.fuelLogs.length === 0) {
-        paragraph(p, 'No fuel logs in this date range.');
-      } else {
-        let alt = false;
-        for (const f of agg.fuelLogs) {
-          drawRow([
-            f.date,
-            clean(f.station ?? '—', 30),
-            Number(f.gallons).toFixed(2),
-            money(Number(f.price_per_gallon)),
-            money(Number(f.total_cost)),
-            f.odometer != null ? intStr(Number(f.odometer)) : '—',
-          ], widths, { bg: alt ? GREY_LIGHT : undefined });
-          alt = !alt;
-        }
-        drawRow(['Totals', '', agg.fuel.totalGallons.toFixed(2), money(agg.fuel.avgPricePerGallon), money(agg.fuel.totalCost), ''], widths, { bold: true, bg: GREY_LIGHT });
-      }
-    }
-
-    // ── Expenses ────────────────────────────────────────────────────────
-    if (wantsExpenses) {
-      ensure(40);
-      sectionTitle(p, 'Expense Breakdown');
-      const widths = [70, 140, 80, 80];
-      drawRow(['Date', 'Category', 'Type', 'Amount'], widths, { bold: true, bg: GREY_LIGHT });
-      if (agg.expenses.length === 0) {
-        paragraph(p, 'No expenses in this date range.');
-      } else {
-        let alt = false;
-        for (const e of agg.expenses) {
-          drawRow([
-            e.expense_date,
-            clean(e.category, 32),
-            (e as any).expense_type ?? '—',
-            money(Number(e.amount)),
-          ], widths, { bg: alt ? GREY_LIGHT : undefined });
-          alt = !alt;
-        }
-        drawRow(['', 'Total', '', money(agg.profit.expensesTotal)], widths, { bold: true, bg: GREY_LIGHT });
-      }
-    }
-
-    // ── Tax Estimate ────────────────────────────────────────────────────
-    if (wantsTax) {
-      ensure(60);
-      sectionTitle(p, 'Tax Estimate');
-      if (!agg.tax.enabled) {
-        paragraph(p, 'Tax estimator is not enabled in your HaulTrackerPro settings.');
-      } else {
-        const widths = [200, 120];
-        drawRow(['Component', 'Amount'], widths, { bold: true, bg: GREY_LIGHT });
-        drawRow([`Self-Employment Tax`, money(agg.tax.seTax)], widths);
-        drawRow([`Federal Income Tax`, money(agg.tax.federalTax)], widths);
-        drawRow([`State Income Tax`, money(agg.tax.stateTax)], widths);
-        drawRow([`Buffer`, money(agg.tax.bufferTax)], widths);
-        drawRow([`Total Estimated Tax (${agg.tax.baseLabel} basis)`, money(agg.tax.totalTax)], widths, { bold: true, bg: GREY_LIGHT });
-        drawRow([`Profit After Est. Tax`, money(agg.tax.profitAfterTax)], widths, { bold: true });
-      }
-      paragraph(p, TAX_DISCLAIMER, 7, GREY_MID);
-    }
-
-    // ── Profit Per Mile recap ───────────────────────────────────────────
-    ensure(40);
-    sectionTitle(p, 'Profit Per Mile');
-    summaryCard(p, [
-      ['Net After Expenses', money(agg.profit.netAfterExpenses), agg.profit.netAfterExpenses >= 0 ? GREEN : RED],
-      ['Net After Est. Tax', money(agg.profit.netAfterTax), agg.profit.netAfterTax >= 0 ? GREEN : RED],
-      ['Profit / Mile', money(agg.profit.profitPerMile)],
-      ['Total Miles', intStr(agg.summary.totalMiles)],
+  // 4. Cancelled loads (if requested)
+  if (wantsCancelled(type) && agg.cancelledLoads.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, 'Cancelled Loads');
+    const body = agg.cancelledLoads.map(l => [
+      fmtDate(getEffectiveDate(l)),
+      l.pickup_location,
+      l.dropoff_location,
+      fmtMoney(0),
     ]);
-  });
+    y = drawTable(doc, y, [['Date', 'Pickup', 'Dropoff', 'Pay']], body, agg, type, {
+      columnStyles: { 3: { halign: 'right' } },
+    });
+  }
+
+  // 5. Pay model summary (load_summary)
+  if (type === 'load_summary' && agg.loadStats.payModelBreakdown.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, 'Pay Model Summary');
+    const body = agg.loadStats.payModelBreakdown.map(p => [
+      prettyPayModel(p.model), String(p.count), fmtMoney(p.gross),
+    ]);
+    y = drawTable(doc, y, [['Pay Model', 'Loads', 'Gross']], body, agg, type, {
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+    });
+  }
+
+  // 6. Expense Category Summary
+  if (type === 'expense' && agg.expenseStats.byCategory.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, 'Expense Category Summary');
+    const body = agg.expenseStats.byCategory.map(c => [c.category, String(c.count), fmtMoney(c.total)]);
+    y = drawTable(doc, y, [['Category', 'Entries', 'Total']], body, agg, type, {
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+    });
+  }
+
+  // 7. Expenses Table
+  if (wantsExpensesTable(type) && agg.expenses.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, type === 'expense' ? 'Expense Breakdown' : 'Expenses');
+    const body = agg.expenses.map(e => [
+      fmtDate(e.expense_date),
+      e.category,
+      (e as any).expense_type ?? '',
+      fmtMoney(Number(e.amount)),
+      (e as any).notes ?? '',
+    ]);
+    y = drawTable(doc, y, [['Date', 'Category', 'Type', 'Amount', 'Notes']], body, agg, type, {
+      columnStyles: { 3: { halign: 'right', cellWidth: 70 } },
+    });
+  } else if (wantsExpensesTable(type)) {
+    y = ensureSpace(doc, y, 60, agg, type);
+    y = drawCalloutCard(doc, y, 'No expenses recorded', 'No expense entries were found for this date range.');
+  }
+
+  // 8. Fuel Table
+  if (wantsFuelTable(type) && agg.fuelLogs.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, 'Fuel Log');
+    const body = agg.fuelLogs.map(f => [
+      fmtDate(f.date),
+      f.station ?? '—',
+      fmtNum(Number(f.gallons), 2),
+      fmtMoney(Number(f.price_per_gallon)),
+      fmtMoney(Number(f.total_cost)),
+      f.odometer != null ? fmtNum(Number(f.odometer), 0) : '—',
+    ]);
+    body.push(['TOTALS', '', fmtNum(agg.fuel.totalGallons, 2), fmtMoney(agg.fuel.avgPricePerGallon), fmtMoney(agg.fuel.totalCost), '']);
+    y = drawTable(doc, y, [['Date', 'Station', 'Gallons', 'Price/Gal', 'Total Cost', 'Odometer']], body, agg, type, {
+      columnStyles: {
+        2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
+      },
+    });
+  } else if (wantsFuelTable(type)) {
+    y = ensureSpace(doc, y, 60, agg, type);
+    y = drawCalloutCard(doc, y, 'No fuel logs recorded', 'No fuel logs were recorded for this date range.');
+  }
+
+  // 9. Mileage breakdown (mileage report)
+  if (type === 'mileage' && agg.loads.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, 'Mileage Breakdown');
+    const body = agg.loads.map(l => {
+      const op = getLoadOperatingMiles(l);
+      const dh = Number(l.deadhead_miles);
+      const dhPct = op > 0 ? (dh / op) * 100 : 0;
+      return [
+        fmtDate(getEffectiveDate(l)),
+        l.pickup_location,
+        l.dropoff_location,
+        fmtNum(Number(l.loaded_miles), 0),
+        fmtNum(dh, 0),
+        fmtNum(op, 0),
+        `${dhPct.toFixed(1)}%`,
+      ];
+    });
+    y = drawTable(doc, y, [['Date', 'Pickup', 'Dropoff', 'Loaded', 'DH', 'Total', 'DH %']], body, agg, type, {
+      columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } },
+    });
+  }
+
+  // 10. Settlement: missing pay table
+  if (type === 'settlement_dispute') {
+    const issues = agg.loads.filter(l => {
+      const expected = getLoadExpectedPay(l);
+      const actual = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
+      return actual == null || Math.abs((actual ?? 0) - expected) > 0.01;
+    });
+    if (issues.length > 0) {
+      y = ensureSpace(doc, y, 80, agg, type);
+      y = sectionTitle(doc, y, 'Disputed / Unpaid Loads');
+      const body = issues.map(l => {
+        const expected = getLoadExpectedPay(l);
+        const actual = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
+        const diff = actual == null ? expected : expected - actual;
+        return [
+          fmtDate(getEffectiveDate(l)),
+          `${l.pickup_location} → ${l.dropoff_location}`,
+          fmtMoney(expected),
+          actual == null ? 'Missing' : fmtMoney(actual),
+          fmtMoney(diff),
+        ];
+      });
+      y = drawTable(doc, y, [['Date', 'Lane', 'Expected', 'Actual', 'Difference']], body, agg, type, {
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+      });
+    }
+  }
+
+  // 11. Tax block
+  if (wantsTaxBlock(type)) {
+    y = ensureSpace(doc, y, 100, agg, type);
+    y = sectionTitle(doc, y, 'Tax Estimate');
+    if (!agg.tax.enabled) {
+      y = drawCalloutCard(
+        doc, y, 'Tax estimator is not enabled',
+        'Enable the Tax Planner in your HaulTracker Pro settings to populate this section.'
+      );
+    } else {
+      const body = [
+        ['Base', agg.tax.baseLabel === 'gross' ? 'Gross Revenue' : 'Net Profit', ''],
+        ['Self-Employment Tax', '', fmtMoney(agg.tax.seTax)],
+        ['Federal Income Tax', '', fmtMoney(agg.tax.federalTax)],
+        ['State Income Tax', '', fmtMoney(agg.tax.stateTax)],
+        ['Buffer', '', fmtMoney(agg.tax.bufferTax)],
+        ['Total Estimated Tax', '', fmtMoney(agg.tax.totalTax)],
+        ['Profit After Est. Tax', '', fmtMoney(agg.tax.profitAfterTax)],
+      ];
+      y = drawTable(doc, y, [['Item', 'Detail', 'Amount']], body, agg, type, {
+        columnStyles: { 2: { halign: 'right' } },
+      });
+      y = drawCalloutCard(doc, y, 'Tax Disclaimer', TAX_DISCLAIMER);
+    }
+  }
+
+  // 12. Monthly breakdown (year-end)
+  if (wantsMonthly(type) && agg.monthly.length > 0) {
+    y = ensureSpace(doc, y, 80, agg, type);
+    y = sectionTitle(doc, y, 'Monthly Breakdown');
+    const body = agg.monthly.map(m => [
+      format(parseISO(m.month + '-01'), 'MMM yyyy'),
+      String(m.loads),
+      fmtMoney(m.gross),
+      fmtMoney(m.fuel),
+      fmtMoney(m.expenses),
+      fmtMoney(m.net),
+    ]);
+    y = drawTable(doc, y, [['Month', 'Loads', 'Gross', 'Fuel', 'Expenses', 'Net']], body, agg, type, {
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
+    });
+  }
+
+  drawFooter(doc);
+  return doc.output('blob');
+}
+
+function prettyPayModel(model?: string): string {
+  switch (model) {
+    case 'loaded_miles_only': return 'Loaded Miles';
+    case 'total_miles': return 'Total Miles';
+    case 'loaded_plus_deadhead': return 'Loaded + DH';
+    case 'flat_rate': return 'Flat Rate';
+    case 'manual': return 'Manual';
+    default: return model ?? 'Loaded Miles';
+  }
 }
 
 export function downloadPdfBlob(filename: string, blob: Blob) {

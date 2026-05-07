@@ -43,8 +43,8 @@ export function buildReportCSV(type: ReportType, agg: ReportAggregation): string
   lines.push('');
 
   const wantsLoads = type !== 'expense' && type !== 'fuel' && type !== 'tax_estimate';
-  const wantsExpenses = type === 'full_profit' || type === 'expense' || type === 'year_end_tax';
-  const wantsFuel = type === 'full_profit' || type === 'fuel' || type === 'year_end_tax' || type === 'mileage';
+  const wantsExpenses = type === 'full_profit' || type === 'weekly_performance' || type === 'expense' || type === 'year_end_tax';
+  const wantsFuel = type === 'full_profit' || type === 'weekly_performance' || type === 'fuel' || type === 'year_end_tax' || type === 'mileage';
   const wantsTax = type === 'full_profit' || type === 'tax_estimate' || type === 'year_end_tax';
 
   if (wantsLoads) {

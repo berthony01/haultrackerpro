@@ -5,12 +5,12 @@ import { useLoadStops } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useFuelLogs } from '@/hooks/useFuelLogs';
 import { useAuth } from '@/hooks/useAuth';
-import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, exportToPDF, exportProfitCSV, exportScheduleCSummary, getCurrentMonthLoads, getEffectiveDate, weekStartDayToNumber } from '@/lib/loadUtils';
+import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, getCurrentMonthLoads, getEffectiveDate } from '@/lib/loadUtils';
 import { summarizeLoads, excludeCancelled, onlyCancelled, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet, Filter, Calendar, TrendingUp, Lock, Receipt, BarChart3, Fuel, DollarSign, Ban, FileDown, Sparkles } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Calendar, TrendingUp, Lock, Receipt, BarChart3, DollarSign, Ban, FileDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { parseISO, isWithinInterval, format } from 'date-fns';
 import { toast } from 'sonner';
@@ -345,137 +345,7 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
         </Button>
       )}
 
-      {/* Exports */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-label">Export Options</h2>
-          <span className="text-[10px] text-muted-foreground">CSV · PDF</span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ExportRow
-            icon={<FileSpreadsheet className="h-4 w-4" />}
-            title="All Loads (CSV)"
-            subtitle={`${loads.length} loads`}
-            onClick={() => exportToCSV(loads, 'all-loads', stops, companyMeta)}
-            disabled={loads.length === 0}
-          />
-
-          {hasFilter && (
-            <ExportRow
-              icon={<Filter className="h-4 w-4" />}
-              title="Filtered Loads (CSV)"
-              subtitle={`${filteredLoads.length} loads in range`}
-              onClick={() => exportToCSV(filteredLoads, 'filtered-loads', stops, companyMeta)}
-              disabled={filteredLoads.length === 0}
-            />
-          )}
-
-          <ExportRow
-            icon={<FileText className="h-4 w-4" />}
-            title="Monthly Summary (CSV)"
-            subtitle={`${monthLoads.length} loads this month`}
-            onClick={() => exportToCSV(monthLoads, 'monthly-summary', stops, companyMeta)}
-            disabled={monthLoads.length === 0}
-          />
-
-          <ExportRow
-            icon={<Download className="h-4 w-4" />}
-            title="Export as PDF"
-            subtitle={hasFilter ? `${filteredLoads.length} filtered loads` : `${loads.length} loads`}
-            onClick={() => {
-              if (!isPro) { toast.error('PDF export is a Pro feature. Upgrade to unlock.'); return; }
-              exportToPDF(filteredLoads.length > 0 ? filteredLoads : loads, hasFilter ? 'filtered-loads' : 'all-loads', stops, companyMeta);
-            }}
-            disabled={loads.length === 0}
-            locked={!isPro}
-          />
-
-          <ExportRow
-            icon={<TrendingUp className="h-4 w-4" />}
-            title="Profit Report (CSV)"
-            subtitle="Includes expenses & net profit"
-            onClick={() => {
-              if (!isPro) { toast.error('Profit reports are a Pro feature. Upgrade to unlock.'); return; }
-              exportProfitCSV(filteredLoads.length > 0 ? filteredLoads : loads, expenses, 'profit-report', stops, companyMeta);
-            }}
-            disabled={loads.length === 0}
-            locked={!isPro}
-          />
-
-          <ExportRow
-            icon={<Receipt className="h-4 w-4" />}
-            title="Schedule C Summary (CSV)"
-            subtitle="Expenses grouped by IRS Schedule C lines"
-            onClick={() => {
-              if (!isPro) { toast.error('Schedule C export is a Pro feature. Upgrade to unlock.'); return; }
-              exportScheduleCSummary(
-                expenses.map(e => ({ category: e.category, amount: e.amount, expense_date: e.expense_date })),
-                'schedule-c-summary',
-                companyMeta
-              );
-            }}
-            disabled={expenses.length === 0}
-            locked={!isPro}
-          />
-        </div>
-      </div>
-
-      {/* Schedule C Preview */}
-      {isPro && expenses.length > 0 && (() => {
-        const scGroups: Record<string, { desc: string; cats: Set<string>; total: number }> = {};
-        const SC_MAP: Record<string, { line: string; desc: string }> = {
-          'Fuel': { line: '9', desc: 'Car & truck' }, 'Tolls': { line: '9', desc: 'Car & truck' },
-          'Parking': { line: '9', desc: 'Car & truck' }, 'Maintenance': { line: '21', desc: 'Repairs & maint.' },
-          'Repairs': { line: '21', desc: 'Repairs & maint.' }, 'Tires': { line: '21', desc: 'Repairs & maint.' },
-          'Insurance': { line: '15', desc: 'Insurance' }, 'Permits': { line: '22', desc: 'Taxes & licenses' },
-          'Licensing': { line: '22', desc: 'Taxes & licenses' }, 'Truck Payment': { line: '13', desc: 'Depreciation' },
-          'Lease Payment': { line: '20a', desc: 'Rent/lease' }, 'Phone': { line: '25', desc: 'Utilities' },
-          'ELD/Software': { line: '18', desc: 'Office expense' }, 'Meals': { line: '24b', desc: 'Meals (50%)' },
-          'Lodging': { line: '24a', desc: 'Travel' }, 'Supplies': { line: '22', desc: 'Supplies' },
-        };
-        const getLine = (c: string) => SC_MAP[c] ?? { line: '27a', desc: 'Other' };
-
-        expenses.forEach(e => {
-          const sc = getLine(e.category);
-          if (!scGroups[sc.line]) scGroups[sc.line] = { desc: sc.desc, cats: new Set(), total: 0 };
-          scGroups[sc.line].cats.add(e.category);
-          scGroups[sc.line].total += Number(e.amount);
-        });
-
-        const sorted = Object.entries(scGroups)
-          .map(([line, d]) => ({ line, desc: d.desc, cats: [...d.cats], total: d.total }))
-          .sort((a, b) => parseFloat(a.line) - parseFloat(b.line));
-
-        const totalExp = expenses.reduce((s, e) => s + Number(e.amount), 0);
-
-        return (
-          <div>
-            <h2 className="text-label mb-3">Schedule C Preview</h2>
-            <div className="premium-card p-4 space-y-2">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Receipt className="h-3.5 w-3.5 text-primary" />
-                <p className="text-label">IRS Schedule C Line Totals</p>
-              </div>
-              {sorted.map(g => (
-                <div key={g.line} className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-foreground">Line {g.line}: {g.desc}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{g.cats.join(', ')}</p>
-                  </div>
-                  <p className="text-sm font-mono font-bold shrink-0 ml-3 whitespace-nowrap">{formatCurrency(g.total)}</p>
-                </div>
-              ))}
-              <div className="flex items-center justify-between pt-2 border-t border-border">
-                <p className="text-xs font-bold">Total Deductible Expenses</p>
-                <p className="text-sm font-mono font-black text-primary whitespace-nowrap">{formatCurrency(totalExp)}</p>
-              </div>
-              <p className="text-[9px] text-muted-foreground/60 pt-1">
-                Preview only. Verify all line assignments with your tax preparer.
-              </p>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Legacy raw exports removed — replaced by the unified Report Center above. */}
 
       {/* Weekly Breakdown */}
       {summaries.length > 0 && (
