@@ -558,10 +558,10 @@ export default function Landing() {
                 ))}
               </div>
               <p className="text-base italic leading-relaxed mb-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
-                "I was using a spreadsheet for two years and thought I was profitable. HaulTrackerPro showed me I was losing money on my regular lane. Changed my whole game."
+                "I thought my best lane was my best lane. Two weeks in, HaulTrackerPro showed me my real pay per mile was $1.42 — not the $2.10 I'd been telling myself. Now I quote brokers with numbers, not feelings."
               </p>
-              <p className="text-sm font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>— Early Access Driver</p>
-              <p className="text-xs" style={{ color: 'hsl(220, 10%, 45%)' }}>Owner-Operator, Dry Van</p>
+              <p className="text-sm font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>— HaulTrackerPro Beta Driver</p>
+              <p className="text-xs" style={{ color: 'hsl(220, 10%, 45%)' }}>Owner-Operator · Reefer · 4 yrs</p>
             </div>
           </div>
         </div>
