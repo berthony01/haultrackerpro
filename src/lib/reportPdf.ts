@@ -33,9 +33,24 @@ const GREY_MID = '0.45 0.45 0.45';
 const BLACK = '0 0 0';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+// Helvetica (WinAnsi) cannot render most non-ASCII glyphs, AND our PDF
+// writer measures /Length and xref offsets in JS string length while the
+// Blob is serialized as UTF-8 bytes. Any multi-byte char would corrupt the
+// file. So normalize aggressively to printable ASCII before emitting.
 function clean(s: string | number | null | undefined, max = 80): string {
-  const str = (s == null ? '' : String(s)).replace(/[()\\]/g, ' ').replace(/[\r\n\t]/g, ' ');
-  return str.length > max ? str.slice(0, max - 1) + '…' : str;
+  let str = (s == null ? '' : String(s))
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/[()\\]/g, ' ')
+    .replace(/→|➔|➜/g, '->')
+    .replace(/←/g, '<-')
+    .replace(/[—–]/g, '-')
+    .replace(/…/g, '...')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/•/g, '*')
+    // Drop anything outside printable ASCII
+    .replace(/[^\x20-\x7E]/g, '');
+  return str.length > max ? str.slice(0, max - 1) + '...' : str;
 }
 const money = (n: number) =>
   '$' + (Number.isFinite(n) ? n : 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
