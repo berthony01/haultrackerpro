@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, format } from 'date-fns';
+import {
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
+  startOfQuarter, endOfQuarter, subWeeks, subMonths, subQuarters, subYears, format,
+} from 'date-fns';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber } from '@/lib/loadUtils';
+import { validateCustomRange } from '@/lib/reportRanges';
 
 interface DateRangeFilterProps {
   onRangeChange: (from?: string, to?: string) => void;
@@ -14,28 +18,39 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
   const wso = weekStartDayToNumber(settings?.week_start_day);
 
   const presets = [
-    { label: 'This Week', getRange: () => ({ from: startOfWeek(new Date(), { weekStartsOn: wso }), to: endOfWeek(new Date(), { weekStartsOn: wso }) }) },
-    { label: 'Last Week', getRange: () => { const lw = subWeeks(new Date(), 1); return { from: startOfWeek(lw, { weekStartsOn: wso }), to: endOfWeek(lw, { weekStartsOn: wso }) }; } },
-    { label: 'This Month', getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
-    { label: 'Last Month', getRange: () => { const lm = subMonths(new Date(), 1); return { from: startOfMonth(lm), to: endOfMonth(lm) }; } },
-    { label: 'This Year', getRange: () => ({ from: startOfYear(new Date()), to: endOfYear(new Date()) }) },
-    { label: 'All Time', getRange: () => ({ from: undefined, to: undefined }) },
+    { label: 'This Week',         getRange: () => ({ from: startOfWeek(new Date(), { weekStartsOn: wso }), to: endOfWeek(new Date(), { weekStartsOn: wso }) }) },
+    { label: 'Last Week',         getRange: () => { const d = subWeeks(new Date(), 1); return { from: startOfWeek(d, { weekStartsOn: wso }), to: endOfWeek(d, { weekStartsOn: wso }) }; } },
+    { label: 'This Month',        getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
+    { label: 'Last Month',        getRange: () => { const d = subMonths(new Date(), 1); return { from: startOfMonth(d), to: endOfMonth(d) }; } },
+    { label: 'Current Quarter',   getRange: () => ({ from: startOfQuarter(new Date()), to: endOfQuarter(new Date()) }) },
+    { label: 'Previous Quarter',  getRange: () => { const d = subQuarters(new Date(), 1); return { from: startOfQuarter(d), to: endOfQuarter(d) }; } },
+    { label: 'Year to Date',      getRange: () => ({ from: startOfYear(new Date()), to: new Date() }) },
+    { label: 'Last Year',         getRange: () => { const d = subYears(new Date(), 1); return { from: startOfYear(d), to: endOfYear(d) }; } },
+    { label: 'All Time',          getRange: () => ({ from: undefined, to: undefined }) },
   ];
 
   const [active, setActive] = useState('All Time');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [showCustom, setShowCustom] = useState(false);
+  const [customError, setCustomError] = useState<string | null>(null);
 
   const handlePreset = (label: string, from?: Date, to?: Date) => {
     setActive(label);
     setShowCustom(false);
+    setCustomError(null);
     onRangeChange(from ? format(from, 'yyyy-MM-dd') : undefined, to ? format(to, 'yyyy-MM-dd') : undefined);
   };
 
   const handleCustom = () => {
+    const v = validateCustomRange(customFrom, customTo);
+    if (!v.valid) {
+      setCustomError(v.error ?? 'Invalid date range.');
+      return;
+    }
+    setCustomError(null);
     setActive('Custom');
-    onRangeChange(customFrom || undefined, customTo || undefined);
+    onRangeChange(customFrom, customTo);
   };
 
   return (
@@ -70,19 +85,24 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
           }`}
           onClick={() => setShowCustom(!showCustom)}
         >
-          Custom
+          Custom Range
         </Button>
       </div>
       {showCustom && (
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs rounded-lg" />
+        <div className="space-y-1.5">
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <Input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setCustomError(null); }} className="h-9 text-xs rounded-lg" />
+            </div>
+            <span className="text-xs text-muted-foreground pb-2">to</span>
+            <div className="flex-1">
+              <Input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setCustomError(null); }} className="h-9 text-xs rounded-lg" />
+            </div>
+            <Button size="sm" className="h-9 text-xs rounded-lg" onClick={handleCustom}>Apply</Button>
           </div>
-          <span className="text-xs text-muted-foreground pb-2">to</span>
-          <div className="flex-1">
-            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs rounded-lg" />
-          </div>
-          <Button size="sm" className="h-9 text-xs rounded-lg" onClick={handleCustom}>Apply</Button>
+          {customError && (
+            <p className="text-[11px] text-destructive font-medium">{customError}</p>
+          )}
         </div>
       )}
     </div>
