@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
+import reportsMockup from '@/assets/reports-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
 import { trackLandingFaqDeepLink, trackStarterKitCTAClicked } from '@/lib/analytics';
@@ -150,7 +151,7 @@ export default function Landing() {
                   <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Most loads look profitable. Many aren't. HaulTrackerPro shows your true profit after fuel, deadhead, and expenses — so you stop losing money on bad loads.
+                  Most loads look profitable. Many aren't. HaulTrackerPro shows your <span className="font-semibold" style={{ color: 'hsl(0, 0%, 90%)' }}>real pay per mile</span> after fuel, deadhead, and expenses — so you stop losing money on bad loads.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -406,18 +407,45 @@ export default function Landing() {
             </div>
 
             {/* Rate Con Scanner Demo */}
-            <div className="p-6 sm:p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
+            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
                   <Camera className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Scan Rate Con</h3>
+                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Scan Rate Con (OCR)</h3>
               </div>
               <div className="space-y-4">
                 {[
                   { step: '1', label: 'You upload:', text: 'Screenshot or photo of your rate confirmation' },
                   { step: '2', label: 'AI extracts:', text: 'Pickup, dropoff, miles, rate, revenue, date' },
                   { step: '3', label: 'Result:', text: 'Load form auto-filled — review and save in seconds' },
+                ].map((s) => (
+                  <div key={s.step} className="flex gap-3 items-start">
+                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
+                      {s.step}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
+                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Telegram / Paste Load Demo */}
+            <div className="p-6 sm:p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
+                  <FileText className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Paste From Telegram / SMS</h3>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { step: '1', label: 'You paste:', text: 'Dispatch text from Telegram, SMS, or broker email' },
+                  { step: '2', label: 'AI parses:', text: 'Pickup, dropoff, loaded miles, deadhead, rate' },
+                  { step: '3', label: 'Result:', text: 'Load logged in seconds — 5/wk free, unlimited on Pro' },
                 ].map((s) => (
                   <div key={s.step} className="flex gap-3 items-start">
                     <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
@@ -441,6 +469,49 @@ export default function Landing() {
             }}>
               Start Tracking Free <ArrowRight className="h-5 w-5" />
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 4.5: FUEL + REPORTS */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Fuel, Miles, and Reports —{' '}
+              <span style={{ color: 'hsl(25, 95%, 53%)' }}>All In One Place.</span>
+            </h2>
+            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Track every gallon, see your true cost per mile, and pull a clean report for tax day, your bookkeeper, or a pay dispute — in two taps.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div className="space-y-5">
+              {[
+                { icon: Zap, title: 'Fuel Tracking & MPG', desc: 'Log fuel stops in seconds. See your real MPG, fuel cost per mile, and which lanes are quietly burning your margin.' },
+                { icon: BarChart3, title: 'Cost Per Mile, Live', desc: 'Fixed costs + variable costs + fuel = your true CPM. Compare it to every load before you commit.' },
+                { icon: FileText, title: 'Reports & Exports', desc: 'Filter by week, month, quarter, or custom range. CSV on every plan, branded PDF on Pro — ready for tax prep or short-pay disputes.' },
+              ].map((item) => (
+                <div key={item.title} className="flex gap-4 p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                  <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                    <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
+                    <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-2xl overflow-hidden border" style={{
+              borderColor: 'hsl(220, 16%, 18%)',
+              boxShadow: '0 24px 48px -12px hsl(0, 0%, 0%, 0.5), 0 0 0 1px hsl(220, 16%, 16%)'
+            }}>
+              <img src={reportsMockup} alt="HaulTrackerPro Reports view with weekly profit chart, totals, and exportable loads table" className="w-full" loading="lazy" width={1536} height={1024} />
+            </div>
           </div>
         </div>
       </section>
@@ -487,10 +558,10 @@ export default function Landing() {
                 ))}
               </div>
               <p className="text-base italic leading-relaxed mb-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
-                "I was using a spreadsheet for two years and thought I was profitable. HaulTrackerPro showed me I was losing money on my regular lane. Changed my whole game."
+                "I thought my best lane was my best lane. Two weeks in, HaulTrackerPro showed me my real pay per mile was $1.42 — not the $2.10 I'd been telling myself. Now I quote brokers with numbers, not feelings."
               </p>
-              <p className="text-sm font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>— Early Access Driver</p>
-              <p className="text-xs" style={{ color: 'hsl(220, 10%, 45%)' }}>Owner-Operator, Dry Van</p>
+              <p className="text-sm font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>— HaulTrackerPro Beta Driver</p>
+              <p className="text-xs" style={{ color: 'hsl(220, 10%, 45%)' }}>Owner-Operator · Reefer · 4 yrs</p>
             </div>
           </div>
         </div>
