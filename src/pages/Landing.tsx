@@ -351,7 +351,7 @@ export default function Landing() {
               Pro features that no other trucking app offers at this price.
             </p>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {/* Voice Logging Demo */}
             <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
               <div className="flex items-center gap-3 mb-6">
@@ -434,7 +434,7 @@ export default function Landing() {
             </div>
 
             {/* Telegram / Paste Load Demo */}
-            <div className="p-6 sm:p-8 rounded-2xl border sm:col-span-2 lg:col-span-1" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
+            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
                   <FileText className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
