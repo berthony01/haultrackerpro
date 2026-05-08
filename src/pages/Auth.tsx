@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Truck, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { lovable } from '@/integrations/lovable';
 import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead';
 import { trackSignUp, trackLogin } from '@/lib/analytics';
@@ -14,7 +15,27 @@ export default function Auth() {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', name: '' });
+
+  const handleGoogleSignIn = async () => {
+    if (googleLoading || loading) return;
+    setGoogleLoading(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth('google', {
+        redirect_uri: window.location.origin,
+      });
+      if (result?.error) {
+        toast.error("Couldn't start Google sign-in. Please try again.");
+        setGoogleLoading(false);
+        return;
+      }
+      // On success: browser redirects to Google. Keep loading state.
+    } catch {
+      toast.error("Couldn't start Google sign-in. Please try again.");
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +90,22 @@ export default function Auth() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || loading}
+              className="w-full h-12 text-base font-semibold border-2 mb-4"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.74-6-6.1s2.7-6.1 6-6.1c1.88 0 3.14.8 3.86 1.49l2.63-2.54C16.78 3.4 14.6 2.5 12 2.5 6.76 2.5 2.5 6.76 2.5 12S6.76 21.5 12 21.5c6.94 0 9.5-4.87 9.5-9.5 0-.64-.07-1.13-.16-1.6H12z"/>
+              </svg>
+              {googleLoading ? 'Connecting...' : 'Continue with Google'}
+            </Button>
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or continue with</span></div>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'signup' && (
                 <div>
