@@ -15,7 +15,27 @@ export default function Auth() {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', name: '' });
+
+  const handleGoogleSignIn = async () => {
+    if (googleLoading || loading) return;
+    setGoogleLoading(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth('google', {
+        redirect_uri: window.location.origin,
+      });
+      if (result?.error) {
+        toast.error("Couldn't start Google sign-in. Please try again.");
+        setGoogleLoading(false);
+        return;
+      }
+      // On success: browser redirects to Google. Keep loading state.
+    } catch {
+      toast.error("Couldn't start Google sign-in. Please try again.");
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
