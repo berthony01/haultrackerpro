@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Truck, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { lovable } from '@/integrations/lovable';
 import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead';
 import { trackSignUp, trackLogin } from '@/lib/analytics';
