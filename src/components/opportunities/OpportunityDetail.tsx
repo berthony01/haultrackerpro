@@ -24,6 +24,7 @@ import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunity
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { Info } from 'lucide-react';
+import { OpportunityProfitBreakdown } from './OpportunityProfitBreakdown';
 
 interface Props {
   opportunity: Opportunity;
@@ -139,9 +140,12 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         </Grid>
       </Section>
 
-      {/* Pro: Profit Clarity */}
-      {isPro ? (
-        <Section icon={CheckCircle2} title="Profit Clarity">
+      {/* Profit Intelligence */}
+      <OpportunityProfitBreakdown opportunity={o} isPro={isPro} onUpgrade={onUpgrade} />
+
+      {/* Pro: deduction details */}
+      {isPro && (
+        <Section icon={CheckCircle2} title="Deduction Details">
           <Grid>
             <KV label="Fuel paid by" value={o.fuel_paid_by || '—'} />
             <KV label="Lease payment" value={fmtMoney(o.lease_payment)} />
@@ -154,26 +158,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
               warn={!!o.escrow_required}
             />
           </Grid>
-          {o.deadhead_paid === false && (Number(o.estimated_deadhead_miles) || 0) > 0 && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Unpaid deadhead reduces effective RPM. Compare carefully with current operating cost-per-mile.</span>
-            </div>
-          )}
         </Section>
-      ) : (
-        <Card className="p-6 border-primary/30 bg-primary/5">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-primary/15 p-2"><Lock className="h-5 w-5 text-primary" /></div>
-            <div className="flex-1">
-              <h3 className="text-base font-bold text-foreground mb-1">Unlock full Profit Clarity</h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                Upgrade to Pro to unlock full profit breakdown, deduction warnings, and opportunity comparison.
-              </p>
-              <Button onClick={onUpgrade}>Upgrade to Pro</Button>
-            </div>
-          </div>
-        </Card>
       )}
 
       {/* Lifestyle */}

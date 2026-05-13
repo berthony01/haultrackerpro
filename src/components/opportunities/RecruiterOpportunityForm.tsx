@@ -305,6 +305,9 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       </Section>
 
       <Section icon={DollarSign} title="Pay Details">
+        <div className="sm:col-span-2 rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+          HaulTrackerPro uses these numbers to estimate gross, net, RPM, and driver-facing profit clarity. Be accurate. Misleading opportunities may be removed.
+        </div>
         <Field label="Pay Model">
           <Select value={form.pay_model || 'unset'} onValueChange={(v) => set('pay_model', v === 'unset' ? '' : v)}>
             <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -344,6 +347,9 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       </Section>
 
       <Section icon={Wallet} title="Deductions / Costs">
+        <div className="sm:col-span-2 rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+          Deductions feed driver-facing net pay and Profit Clarity score. Accurate disclosure builds trust.
+        </div>
         <Field label="Fuel Paid By">
           <Input placeholder="Carrier / Driver / Split" value={form.fuel_paid_by} onChange={(e) => set('fuel_paid_by', e.target.value)} />
         </Field>
