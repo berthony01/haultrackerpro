@@ -41,7 +41,7 @@ const TRAILERS = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Tanker', 'Power 
 const VISIBILITY: Array<{ value: 'private' | 'apply_only' | 'verified_recruiters'; label: string }> = [
   { value: 'private', label: 'Private — only I can see it' },
   { value: 'apply_only', label: 'Application only — shared when I request info' },
-  { value: 'verified_recruiters', label: 'Verified recruiters — allow approved recruiters to contact me' },
+  { value: 'verified_recruiters', label: 'Approved recruiters — allow recruiters approved by HaulTrackerPro to contact me' },
 ];
 const CONTACT: Array<{ value: 'in_app' | 'phone' | 'email'; label: string }> = [
   { value: 'in_app', label: 'In-app message' },
