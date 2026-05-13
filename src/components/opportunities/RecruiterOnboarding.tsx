@@ -189,7 +189,18 @@ export function RecruiterOnboarding({ onBack }: Props) {
       driver_types_hired: splitList(form.driver_types_hired),
     };
     upsertProfile.mutate(payload, {
-      onSuccess: () => toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted'),
+      onSuccess: async () => {
+        if (isRejected && profile) {
+          const { error } = await supabase.rpc('resubmit_recruiter_profile', { profile_id: profile.id });
+          if (error) {
+            toast.error(error.message);
+            return;
+          }
+          toast.success('Recruiter profile resubmitted for review.');
+        } else {
+          toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
+        }
+      },
       onError: (e: Error) => toast.error(e.message),
     });
   };
