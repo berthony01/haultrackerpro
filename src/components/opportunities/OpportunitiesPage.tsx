@@ -31,7 +31,8 @@ import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
 import { RecruiterOnboarding } from './RecruiterOnboarding';
-import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban } from 'lucide-react';
+import { RecruiterOpportunityManager } from './RecruiterOpportunityManager';
+import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase } from 'lucide-react';
 
 interface Props {
   onUpgrade: () => void;
@@ -49,6 +50,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showRecruiter, setShowRecruiter] = useState(false);
+  const [showRecruiterManager, setShowRecruiterManager] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
@@ -152,6 +154,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showRecruiterManager) {
+    return <RecruiterOpportunityManager onBack={() => setShowRecruiterManager(false)} />;
+  }
+
   if (showRecruiter) {
     return <RecruiterOnboarding onBack={() => setShowRecruiter(false)} />;
   }
@@ -205,6 +211,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         <RecruiterEntryCard
           profile={recruiterProfile}
           onClick={() => setShowRecruiter(true)}
+          onManage={() => setShowRecruiterManager(true)}
         />
       )}
 
@@ -441,9 +448,11 @@ function ProfileEntryCard({
 function RecruiterEntryCard({
   profile,
   onClick,
+  onManage,
 }: {
   profile: ReturnType<typeof useRecruiterProfile>['profile'];
   onClick: () => void;
+  onManage: () => void;
 }) {
   // No recruiter profile yet → simple CTA
   if (!profile) {
@@ -470,11 +479,12 @@ function RecruiterEntryCard({
   // With profile → reflect verification state
   const v = profile.verification_status;
   const s = profile.status;
+  const isApproved = v === 'approved' && s !== 'suspended';
   const cfg =
     s === 'suspended' || v === 'suspended'
       ? { title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', badge: 'Suspended', variant: 'destructive' as const, Icon: Ban }
       : v === 'approved'
-      ? { title: 'Recruiter Access Approved', body: 'You will soon be able to create opportunities and manage driver requests.', badge: 'Approved', variant: 'default' as const, Icon: CheckCircle2 }
+      ? { title: 'Recruiter Access Approved', body: 'Create and manage opportunities for serious drivers.', badge: 'Approved', variant: 'default' as const, Icon: CheckCircle2 }
       : v === 'rejected'
       ? { title: 'Recruiter Profile Needs Attention', body: 'Please review your recruiter information and contact support if needed.', badge: 'Needs Attention', variant: 'secondary' as const, Icon: AlertTriangle }
       : { title: 'Recruiter Profile Submitted', body: 'Your recruiter profile is currently under review.', badge: 'Pending Review', variant: 'outline' as const, Icon: Clock };
@@ -492,11 +502,19 @@ function RecruiterEntryCard({
             <Badge variant={cfg.variant}>{cfg.badge}</Badge>
           </div>
           <p className="text-sm text-muted-foreground mb-3">{cfg.body}</p>
-          <Button onClick={onClick} variant="outline">
-            View Recruiter Profile <ArrowRight className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {isApproved && (
+              <Button onClick={onManage}>
+                <Briefcase className="h-4 w-4" /> Manage Opportunities
+              </Button>
+            )}
+            <Button onClick={onClick} variant="outline">
+              View Recruiter Profile <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </Card>
   );
 }
+
