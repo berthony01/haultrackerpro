@@ -26,10 +26,12 @@ import { useOpportunities } from '@/hooks/opportunities/useOpportunities';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
-import { UserCog, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { RecruiterOnboarding } from './RecruiterOnboarding';
+import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban } from 'lucide-react';
 
 interface Props {
   onUpgrade: () => void;
