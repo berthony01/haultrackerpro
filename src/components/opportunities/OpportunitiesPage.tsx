@@ -351,3 +351,73 @@ function EmptyState({ title, body, action }: { title: string; body: string; acti
     </Card>
   );
 }
+
+function ProfileEntryCard({
+  state,
+  profile,
+  onClick,
+}: {
+  state: 'none' | 'incomplete' | 'complete';
+  profile: ReturnType<typeof useDriverOpportunityProfile>['profile'];
+  onClick: () => void;
+}) {
+  const cfg =
+    state === 'none'
+      ? {
+          title: 'Set Up Your Driver Opportunity Profile',
+          body: 'Create a profile so HaulTrackerPro can help match you with opportunities that fit your pay goals, experience, home time, and equipment preferences.',
+          cta: 'Create Profile',
+          icon: UserCog,
+        }
+      : state === 'incomplete'
+      ? {
+          title: 'Finish Your Driver Profile',
+          body: 'A few more details unlock better-matched opportunities and richer recruiter context.',
+          cta: 'Complete Profile',
+          icon: UserCog,
+        }
+      : {
+          title: 'Your Driver Profile Is Ready',
+          body: 'Recruiters will see this context when you request info on an opportunity.',
+          cta: 'Edit Profile',
+          icon: CheckCircle2,
+        };
+
+  const Icon = cfg.icon;
+
+  return (
+    <Card className="p-5 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
+      <div className="flex items-start gap-4">
+        <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-foreground mb-1">{cfg.title}</h3>
+          <p className="text-sm text-muted-foreground mb-3">{cfg.body}</p>
+          {state === 'complete' && profile && (
+            <div className="flex flex-wrap gap-2 mb-3 text-xs">
+              {profile.preferred_driver_type && (
+                <Badge variant="outline">{profile.preferred_driver_type}</Badge>
+              )}
+              {profile.preferred_route_type && (
+                <Badge variant="outline">{profile.preferred_route_type}</Badge>
+              )}
+              {(profile.min_weekly_net || profile.min_weekly_gross) && (
+                <Badge variant="outline">
+                  Min ${Number(profile.min_weekly_net || profile.min_weekly_gross).toLocaleString()}/wk
+                  {profile.min_weekly_net ? ' net' : ' gross'}
+                </Badge>
+              )}
+              <Badge variant="outline" className="capitalize">
+                {String(profile.visibility).replace('_', ' ')}
+              </Badge>
+            </div>
+          )}
+          <Button onClick={onClick} variant={state === 'complete' ? 'outline' : 'default'}>
+            {cfg.cta} <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
