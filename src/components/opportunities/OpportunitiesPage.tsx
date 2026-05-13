@@ -36,6 +36,7 @@ import { DriverApplicationsPanel } from './DriverApplicationsPanel';
 import { RecruiterApplicationsDashboard } from './RecruiterApplicationsDashboard';
 import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase, Mailbox, Users } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
+import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
 
 interface Props {
   onUpgrade: () => void;
