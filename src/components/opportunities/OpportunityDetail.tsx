@@ -59,6 +59,8 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
     });
   };
 
+  const profileIncomplete = !driverProfile || !driverProfile.profile_completed;
+
   const handleRequestInfo = async () => {
     if (alreadyApplied) return;
     setSubmitting(true);
@@ -67,7 +69,10 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         opportunity_id: o.id,
         recruiter_id: o.recruiter_id,
         application_type: 'request_info',
-        preferred_contact_method: 'in_app',
+        driver_profile_id: driverProfile?.id ?? null,
+        preferred_contact_method: driverProfile?.contact_preference ?? 'in_app',
+        driver_phone_snapshot: driverProfile?.phone ?? null,
+        driver_email_snapshot: driverProfile?.email ?? null,
         message: "I'm interested in learning more about this opportunity.",
       },
       {
