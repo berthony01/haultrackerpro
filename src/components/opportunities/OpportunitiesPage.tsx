@@ -35,7 +35,7 @@ interface Props {
 const ANY = 'any';
 
 export function OpportunitiesPage({ onUpgrade }: Props) {
-  const { opportunities, isLoading, refetch } = useOpportunities();
+  const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
 
@@ -145,7 +145,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={BriefcaseBusiness} label="Available" value={kpis.count.toString()} />
-        <Kpi icon={ShieldCheck} label="Verified Recruiters" value={kpis.recruiters.toString()} />
+        <Kpi icon={ShieldCheck} label="Active Recruiters" value={kpis.recruiters.toString()} />
         <Kpi
           icon={DollarSign}
           label="Highest Weekly Gross"

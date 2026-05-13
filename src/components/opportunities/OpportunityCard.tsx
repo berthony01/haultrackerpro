@@ -41,7 +41,7 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
               </Badge>
             )}
             <Badge variant="outline" className="border-success/40 text-success gap-1">
-              <ShieldCheck className="h-3 w-3" /> Verified
+              <ShieldCheck className="h-3 w-3" /> Approved
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground font-semibold truncate">{o.company_name}</p>
@@ -72,8 +72,10 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
         <Stat
           icon={Truck}
           label="Deadhead"
-          value={`${fmtMiles(o.estimated_deadhead_miles)}${o.deadhead_paid ? ' • paid' : ' • unpaid'}`}
-          warn={o.deadhead_paid === false}
+          value={`${fmtMiles(o.estimated_deadhead_miles)}${
+            o.deadhead_paid === true ? ' • paid' : o.deadhead_paid === false ? ' • unpaid' : ''
+          }`}
+          warn={o.deadhead_paid === false && (Number(o.estimated_deadhead_miles) || 0) > 0}
         />
       </div>
 
