@@ -26,10 +26,12 @@ import { useOpportunities } from '@/hooks/opportunities/useOpportunities';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
-import { UserCog, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { RecruiterOnboarding } from './RecruiterOnboarding';
+import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban } from 'lucide-react';
 
 interface Props {
   onUpgrade: () => void;
@@ -42,9 +44,11 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
   const { profile, isLoading: profileLoading } = useDriverOpportunityProfile();
+  const { profile: recruiterProfile, isLoading: recruiterLoading } = useRecruiterProfile();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showRecruiter, setShowRecruiter] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
@@ -148,6 +152,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showRecruiter) {
+    return <RecruiterOnboarding onBack={() => setShowRecruiter(false)} />;
+  }
+
   if (showProfile) {
     return <DriverOpportunityProfile onBack={() => setShowProfile(false)} />;
   }
@@ -189,6 +197,14 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
           state={!profile ? 'none' : profile.profile_completed ? 'complete' : 'incomplete'}
           profile={profile}
           onClick={() => setShowProfile(true)}
+        />
+      )}
+
+      {/* Recruiter access CTA */}
+      {!recruiterLoading && (
+        <RecruiterEntryCard
+          profile={recruiterProfile}
+          onClick={() => setShowRecruiter(true)}
         />
       )}
 
@@ -415,6 +431,69 @@ function ProfileEntryCard({
           )}
           <Button onClick={onClick} variant={state === 'complete' ? 'outline' : 'default'}>
             {cfg.cta} <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function RecruiterEntryCard({
+  profile,
+  onClick,
+}: {
+  profile: ReturnType<typeof useRecruiterProfile>['profile'];
+  onClick: () => void;
+}) {
+  // No recruiter profile yet → simple CTA
+  if (!profile) {
+    return (
+      <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+            <Building2 className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-foreground mb-1">Recruiting Drivers?</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Apply for recruiter access to connect with serious drivers through HaulTrackerPro.
+            </p>
+            <Button onClick={onClick} variant="outline">
+              Recruiter Access <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // With profile → reflect verification state
+  const v = profile.verification_status;
+  const s = profile.status;
+  const cfg =
+    s === 'suspended' || v === 'suspended'
+      ? { title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', badge: 'Suspended', variant: 'destructive' as const, Icon: Ban }
+      : v === 'approved'
+      ? { title: 'Recruiter Access Approved', body: 'You will soon be able to create opportunities and manage driver requests.', badge: 'Approved', variant: 'default' as const, Icon: CheckCircle2 }
+      : v === 'rejected'
+      ? { title: 'Recruiter Profile Needs Attention', body: 'Please review your recruiter information and contact support if needed.', badge: 'Needs Attention', variant: 'secondary' as const, Icon: AlertTriangle }
+      : { title: 'Recruiter Profile Submitted', body: 'Your recruiter profile is currently under review.', badge: 'Pending Review', variant: 'outline' as const, Icon: Clock };
+
+  const Icon = cfg.Icon;
+  return (
+    <Card className="p-5 border-border/60">
+      <div className="flex items-start gap-4">
+        <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h3 className="text-base font-bold text-foreground">{cfg.title}</h3>
+            <Badge variant={cfg.variant}>{cfg.badge}</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">{cfg.body}</p>
+          <Button onClick={onClick} variant="outline">
+            View Recruiter Profile <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
