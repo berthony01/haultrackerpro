@@ -148,6 +148,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showProfile) {
+    return <DriverOpportunityProfile onBack={() => setShowProfile(false)} />;
+  }
+
   if (selected) {
     return (
       <OpportunityDetail
@@ -155,6 +159,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         onBack={() => setSelectedId(null)}
         isPro={isPro}
         onUpgrade={onUpgrade}
+        driverProfile={profile}
       />
     );
   }
