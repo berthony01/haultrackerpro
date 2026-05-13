@@ -183,6 +183,15 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         </div>
       </Card>
 
+      {/* Driver Profile entry card */}
+      {!profileLoading && (
+        <ProfileEntryCard
+          state={!profile ? 'none' : profile.profile_completed ? 'complete' : 'incomplete'}
+          profile={profile}
+          onClick={() => setShowProfile(true)}
+        />
+      )}
+
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={BriefcaseBusiness} label="Available" value={kpis.count.toString()} />
