@@ -1446,6 +1446,56 @@ export type Database = {
         }
         Relationships: []
       }
+      recruiter_billing_profiles: {
+        Row: {
+          active_opportunity_limit: number
+          created_at: string
+          current_period_end: string | null
+          id: string
+          plan: string
+          recruiter_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_opportunity_limit?: number
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          plan?: string
+          recruiter_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_opportunity_limit?: number
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          plan?: string
+          recruiter_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_billing_profiles_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruiter_profiles: {
         Row: {
           admin_notes: string | null
@@ -1963,6 +2013,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: undefined
       }
+      recruiter_plan_limit: { Args: { _plan: string }; Returns: number }
       resubmit_recruiter_profile: {
         Args: { profile_id: string }
         Returns: undefined
