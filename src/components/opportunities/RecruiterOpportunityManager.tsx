@@ -216,11 +216,11 @@ function OpportunityRow({
               <PauseCircle className="h-4 w-4" /> Pause
             </Button>
           ) : o.status === 'draft' ? (
-            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy}>
+            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy || !canActivate}>
               <Send className="h-4 w-4" /> Submit for Review
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy}>
+            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy || !canActivate}>
               <PlayCircle className="h-4 w-4" /> Activate
             </Button>
           )}
