@@ -326,11 +326,29 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
             />
           </div>
         </div>
-        <div className="flex items-center gap-2 pt-1">
-          <Switch checked={paidDeadheadOnly} onCheckedChange={setPaidDeadheadOnly} id="paid-dh" />
-          <label htmlFor="paid-dh" className="text-sm text-foreground cursor-pointer">
-            Paid deadhead only
-          </label>
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <div className="flex items-center gap-2">
+            <Switch checked={paidDeadheadOnly} onCheckedChange={setPaidDeadheadOnly} id="paid-dh" />
+            <label htmlFor="paid-dh" className="text-sm text-foreground cursor-pointer">
+              Paid deadhead only
+            </label>
+          </div>
+          {matchEnabled && (
+            <div className="ml-auto min-w-[180px]">
+              <Select value={matchTierFilter} onValueChange={setMatchTierFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All matches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>All matches</SelectItem>
+                  <SelectItem value="excellent">Excellent Fit</SelectItem>
+                  <SelectItem value="strong">Strong Fit</SelectItem>
+                  <SelectItem value="possible">Possible Fit</SelectItem>
+                  <SelectItem value="weak">Weak Fit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </Card>
 
