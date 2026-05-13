@@ -32,7 +32,9 @@ import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
 import { RecruiterOnboarding } from './RecruiterOnboarding';
 import { RecruiterOpportunityManager } from './RecruiterOpportunityManager';
-import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase } from 'lucide-react';
+import { DriverApplicationsPanel } from './DriverApplicationsPanel';
+import { RecruiterApplicationsDashboard } from './RecruiterApplicationsDashboard';
+import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase, Mailbox, Users } from 'lucide-react';
 
 interface Props {
   onUpgrade: () => void;
@@ -51,6 +53,8 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const [showProfile, setShowProfile] = useState(false);
   const [showRecruiter, setShowRecruiter] = useState(false);
   const [showRecruiterManager, setShowRecruiterManager] = useState(false);
+  const [showDriverApps, setShowDriverApps] = useState(false);
+  const [showRecruiterApps, setShowRecruiterApps] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
@@ -154,8 +158,21 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showRecruiterApps) {
+    return <RecruiterApplicationsDashboard onBack={() => setShowRecruiterApps(false)} />;
+  }
+
   if (showRecruiterManager) {
     return <RecruiterOpportunityManager onBack={() => setShowRecruiterManager(false)} />;
+  }
+
+  if (showDriverApps) {
+    return (
+      <DriverApplicationsPanel
+        onBack={() => setShowDriverApps(false)}
+        onViewOpportunity={(id) => { setShowDriverApps(false); setSelectedId(id); }}
+      />
+    );
   }
 
   if (showRecruiter) {
@@ -222,8 +239,27 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
           profile={recruiterProfile}
           onClick={() => setShowRecruiter(true)}
           onManage={() => setShowRecruiterManager(true)}
+          onApplications={() => setShowRecruiterApps(true)}
         />
       )}
+
+      {/* My Requests entry */}
+      <Card className="p-5 border-border/60">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+            <Mailbox className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-foreground mb-1">My Requests</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Track the opportunities you requested information about.
+            </p>
+            <Button onClick={() => setShowDriverApps(true)} variant="outline">
+              View My Requests <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -459,10 +495,12 @@ function RecruiterEntryCard({
   profile,
   onClick,
   onManage,
+  onApplications,
 }: {
   profile: ReturnType<typeof useRecruiterProfile>['profile'];
   onClick: () => void;
   onManage: () => void;
+  onApplications: () => void;
 }) {
   // No recruiter profile yet → simple CTA
   if (!profile) {
@@ -514,9 +552,14 @@ function RecruiterEntryCard({
           <p className="text-sm text-muted-foreground mb-3">{cfg.body}</p>
           <div className="flex flex-wrap gap-2">
             {isApproved && (
-              <Button onClick={onManage}>
-                <Briefcase className="h-4 w-4" /> Manage Opportunities
-              </Button>
+              <>
+                <Button onClick={onManage}>
+                  <Briefcase className="h-4 w-4" /> Manage Opportunities
+                </Button>
+                <Button onClick={onApplications} variant="outline">
+                  <Users className="h-4 w-4" /> Applications
+                </Button>
+              </>
             )}
             <Button onClick={onClick} variant="outline">
               View Recruiter Profile <ArrowRight className="h-4 w-4" />
