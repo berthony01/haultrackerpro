@@ -348,7 +348,7 @@ export function DriverOpportunityProfile({ onBack }: Props) {
           </Select>
         </Field>
         <ToggleRow
-          label="Allow verified recruiters to contact me"
+          label="Allow approved recruiters to contact me"
           checked={form.allow_verified_recruiter_contact}
           onChange={(v) => set('allow_verified_recruiter_contact', v)}
         />
