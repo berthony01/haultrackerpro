@@ -41,8 +41,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
+  const { profile, isLoading: profileLoading } = useDriverOpportunityProfile();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
