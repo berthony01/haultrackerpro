@@ -25,8 +25,11 @@ import { toast } from 'sonner';
 import { useOpportunities } from '@/hooks/opportunities/useOpportunities';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
+import { DriverOpportunityProfile } from './DriverOpportunityProfile';
+import { UserCog, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   onUpgrade: () => void;
@@ -38,8 +41,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
+  const { profile, isLoading: profileLoading } = useDriverOpportunityProfile();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
@@ -143,6 +148,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showProfile) {
+    return <DriverOpportunityProfile onBack={() => setShowProfile(false)} />;
+  }
+
   if (selected) {
     return (
       <OpportunityDetail
@@ -150,6 +159,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         onBack={() => setSelectedId(null)}
         isPro={isPro}
         onUpgrade={onUpgrade}
+        driverProfile={profile}
       />
     );
   }
@@ -172,6 +182,15 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
           </div>
         </div>
       </Card>
+
+      {/* Driver Profile entry card */}
+      {!profileLoading && (
+        <ProfileEntryCard
+          state={!profile ? 'none' : profile.profile_completed ? 'complete' : 'incomplete'}
+          profile={profile}
+          onClick={() => setShowProfile(true)}
+        />
+      )}
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -329,6 +348,76 @@ function EmptyState({ title, body, action }: { title: string; body: string; acti
       <h3 className="text-base font-bold text-foreground mb-1">{title}</h3>
       <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">{body}</p>
       {action}
+    </Card>
+  );
+}
+
+function ProfileEntryCard({
+  state,
+  profile,
+  onClick,
+}: {
+  state: 'none' | 'incomplete' | 'complete';
+  profile: ReturnType<typeof useDriverOpportunityProfile>['profile'];
+  onClick: () => void;
+}) {
+  const cfg =
+    state === 'none'
+      ? {
+          title: 'Set Up Your Driver Opportunity Profile',
+          body: 'Create a profile so HaulTrackerPro can help match you with opportunities that fit your pay goals, experience, home time, and equipment preferences.',
+          cta: 'Create Profile',
+          icon: UserCog,
+        }
+      : state === 'incomplete'
+      ? {
+          title: 'Finish Your Driver Profile',
+          body: 'A few more details unlock better-matched opportunities and richer recruiter context.',
+          cta: 'Complete Profile',
+          icon: UserCog,
+        }
+      : {
+          title: 'Your Driver Profile Is Ready',
+          body: 'Recruiters will see this context when you request info on an opportunity.',
+          cta: 'Edit Profile',
+          icon: CheckCircle2,
+        };
+
+  const Icon = cfg.icon;
+
+  return (
+    <Card className="p-5 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
+      <div className="flex items-start gap-4">
+        <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-foreground mb-1">{cfg.title}</h3>
+          <p className="text-sm text-muted-foreground mb-3">{cfg.body}</p>
+          {state === 'complete' && profile && (
+            <div className="flex flex-wrap gap-2 mb-3 text-xs">
+              {profile.preferred_driver_type && (
+                <Badge variant="outline">{profile.preferred_driver_type}</Badge>
+              )}
+              {profile.preferred_route_type && (
+                <Badge variant="outline">{profile.preferred_route_type}</Badge>
+              )}
+              {(profile.min_weekly_net || profile.min_weekly_gross) && (
+                <Badge variant="outline">
+                  Min ${Number(profile.min_weekly_net || profile.min_weekly_gross).toLocaleString()}/wk
+                  {profile.min_weekly_net ? ' net' : ' gross'}
+                </Badge>
+              )}
+              <Badge variant="outline" className="capitalize">
+                {String(profile.visibility).replace('_', ' ')}
+              </Badge>
+            </div>
+          )}
+          <Button onClick={onClick} variant={state === 'complete' ? 'outline' : 'default'}>
+            {cfg.cta} <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }

@@ -22,12 +22,15 @@ import { toast } from 'sonner';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
+import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { Info } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
   onBack: () => void;
   isPro: boolean;
   onUpgrade: () => void;
+  driverProfile?: DriverOpportunityProfile | null;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
@@ -35,7 +38,7 @@ const fmtMoney = (v: number | null | undefined) =>
 const fmtMiles = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString()} mi`;
 
-export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: Props) {
+export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, driverProfile }: Props) {
   const { saved, save, unsave } = useSavedOpportunities();
   const { driverApplications, createApplication } = useOpportunityApplications();
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +59,8 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: 
     });
   };
 
+  const profileIncomplete = !driverProfile || !driverProfile.profile_completed;
+
   const handleRequestInfo = async () => {
     if (alreadyApplied) return;
     setSubmitting(true);
@@ -64,7 +69,10 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: 
         opportunity_id: o.id,
         recruiter_id: o.recruiter_id,
         application_type: 'request_info',
-        preferred_contact_method: 'in_app',
+        driver_profile_id: driverProfile?.id ?? null,
+        preferred_contact_method: driverProfile?.contact_preference ?? 'in_app',
+        driver_phone_snapshot: driverProfile?.phone ?? null,
+        driver_email_snapshot: driverProfile?.email ?? null,
         message: "I'm interested in learning more about this opportunity.",
       },
       {
@@ -193,15 +201,23 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: 
       )}
 
       {/* Sticky actions */}
-      <div className="flex flex-col sm:flex-row gap-3 sticky bottom-20 lg:bottom-4 bg-card/80 backdrop-blur-md p-3 rounded-xl border border-border/60">
-        <Button variant="outline" onClick={handleToggleSave} className="flex-1">
-          {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-          {isSaved ? 'Saved' : 'Save'}
-        </Button>
-        <Button onClick={handleRequestInfo} disabled={alreadyApplied || submitting} className="flex-1">
-          <Send className="h-4 w-4" />
-          {alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}
-        </Button>
+      <div className="space-y-2 sticky bottom-20 lg:bottom-4">
+        {profileIncomplete && !alreadyApplied && (
+          <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground">
+            <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+            <span>Complete your Driver Opportunity Profile to give recruiters better context.</span>
+          </div>
+        )}
+        <div className="flex flex-col sm:flex-row gap-3 bg-card/80 backdrop-blur-md p-3 rounded-xl border border-border/60">
+          <Button variant="outline" onClick={handleToggleSave} className="flex-1">
+            {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+            {isSaved ? 'Saved' : 'Save'}
+          </Button>
+          <Button onClick={handleRequestInfo} disabled={alreadyApplied || submitting} className="flex-1">
+            <Send className="h-4 w-4" />
+            {alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}
+          </Button>
+        </div>
       </div>
     </div>
   );
