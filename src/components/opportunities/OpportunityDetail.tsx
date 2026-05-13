@@ -22,12 +22,15 @@ import { toast } from 'sonner';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
+import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { Info } from 'lucide-react';
 
 interface Props {
   opportunity: Opportunity;
   onBack: () => void;
   isPro: boolean;
   onUpgrade: () => void;
+  driverProfile?: DriverOpportunityProfile | null;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
