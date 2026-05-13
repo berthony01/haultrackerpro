@@ -32,6 +32,7 @@ import { MonthlySummary } from '@/components/MonthlySummary';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AlertsView } from '@/components/AlertsView';
+import { OpportunitiesPlaceholder } from '@/components/opportunities/OpportunitiesPlaceholder';
 
 import { RecurringExpensesView } from '@/components/RecurringExpensesView';
 import { MilestoneNudges } from '@/components/MilestoneNudges';
@@ -568,6 +569,7 @@ const Index = () => {
                 isPro={isPro}
               />
             )}
+            {page === 'opportunities' && <OpportunitiesPlaceholder />}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
         )}

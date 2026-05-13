@@ -1,147 +1,90 @@
-## " Pause the label/helper-text update.
 
-Before changing wording, audit deadhead pay logic.
+# Phase 1 — Opportunities Foundation
 
-Important business rule:
+Foundation only. No marketplace UI, no recruiter billing, no Stripe changes, no edits to loads/expenses/fuel/reports/parking/admin/landing/SEO logic.
 
-Not all 1099 drivers have unpaid deadhead. Some drivers are paid for deadhead, some are not. My account should support paid deadhead because I personally get paid for deadhead.
+## 1. Database Migration
 
-Please verify whether the app is correctly reading and applying:
+Single migration creating 6 tables, all with RLS enabled and `update_updated_at_column()` triggers (reuses existing function).
 
-1. Settings deadhead pay preference
+**Tables (exact columns/constraints as specified in request):**
+- `driver_opportunity_profiles` — unique(user_id); CHECK on `visibility` (private|apply_only|verified_recruiters), `contact_preference` (in_app|phone|email)
+- `recruiter_profiles` — unique(user_id); CHECK on `verification_status` (pending|approved|rejected|suspended), `status` (active|inactive|suspended)
+- `opportunities` — FK→recruiter_profiles; CHECK on `status` (draft|active|paused|closed|removed), `admin_review_status` (pending|approved|rejected|flagged), `pay_model` (cpm|percentage|flat_weekly|salary|mixed|other)
+- `saved_opportunities` — unique(user_id, opportunity_id)
+- `opportunity_applications` — unique(opportunity_id, driver_user_id); CHECK on `application_type` (apply|request_info|callback), `status` (new|viewed|contacted|interviewing|hired|rejected|withdrawn)
+- `opportunity_reports` — CHECK on `status` (open|reviewing|resolved|dismissed)
 
-2. Default Pay Model
+**Helper:** Reuse existing `public.is_admin(uuid)`. Add a new SECURITY DEFINER helper `public.is_recruiter_owner(_user_id uuid, _recruiter_id uuid)` to avoid recursive RLS when checking opportunity ownership.
 
-3. Load-level Pay Model
+**Triggers:** Reuse existing `public.update_updated_at_column()` for all tables with `updated_at`.
 
-4. Deadhead rate
+**Featured/approval guard:** Add a `BEFORE INSERT OR UPDATE` trigger on `opportunities` that resets `featured` and `admin_review_status` to safe values when caller is not admin (prevents non-admin self-approval / self-feature).
 
-5. Loaded + Deadhead pay calculation
+**Recruiter suspension guard:** RLS UPDATE policies on `recruiter_profiles` and `opportunities` check that the owning recruiter row's `status <> 'suspended'` via the helper.
 
-6. LoadForm live preview calculation
+## 2. RLS Policies (summary)
 
-7. computeLoadPay logic
+| Table | Read | Insert | Update | Delete |
+|---|---|---|---|---|
+| driver_opportunity_profiles | own + admin | own | own | own + admin |
+| recruiter_profiles | own + admin; authenticated may read approved+active rows (id, name, company, verification_status, hiring_states, equipment_types only — enforced by limiting policy to non-sensitive scenarios via separate SELECT policy on approved+active) | own | own (only if not suspended) + admin | admin only |
+| opportunities | authenticated: only `status='active' AND admin_review_status='approved'`; recruiter: own; admin: all | recruiter for their own recruiter_id (trigger forces draft/pending) | recruiter own (not suspended) + admin | admin |
+| saved_opportunities | own + admin | own | — | own |
+| opportunity_applications | driver own; recruiter for their opportunities; admin all | driver for self | recruiter (status only, own opps); admin | — |
+| opportunity_reports | own + admin | own (reporter_user_id = auth.uid()) | admin | — |
 
-8. financialCalculations.ts summary logic
+## 3. TypeScript Hooks
 
-9. Dashboard/report/export logic
+New folder `src/hooks/opportunities/` with:
+- `useDriverOpportunityProfile.ts` — get/upsert own profile
+- `useRecruiterProfile.ts` — get/upsert own recruiter; expose `isApproved` derived from `verification_status === 'approved' && status === 'active'`
+- `useOpportunities.ts` — list approved+active; simple optional filters: `state`, `driver_type`, `route_type`
+- `useSavedOpportunities.ts` — list/save/unsave
+- `useOpportunityApplications.ts` — driver create + list own; recruiter list (filtered server-side via RLS)
 
-Expected behavior:
+Style follows existing `useLoads`/`useExpenses` (React Query, supabase client, typed via regenerated `Database` types).
 
-If deadhead is unpaid:
+## 4. Placeholder UI
 
-Gross Revenue = loaded miles × broker rate
+`src/components/opportunities/OpportunitiesPlaceholder.tsx` — premium dark Card layout using existing tokens: headline, subheadline, 5 feature bullets (verified recruiters, gross/net, RPM, deadhead/deductions, privacy), 2 disabled CTAs ("Driver Profile Coming Soon", "Recruiter Access Coming Soon"). Uses existing `Card`, `Button`, `Badge`.
 
-Effective RPM / Real Pay Per Mile = gross revenue ÷ total miles
+## 5. Navigation Wiring
 
-This can be lower than the broker rate.
+- `src/components/premium/AppSidebar.tsx`: add `Opportunities` (icon: `BriefcaseBusiness`) between Loads and Expenses.
+- `src/components/BottomNav.tsx`: replace `expenses` slot with `opportunities` (icon: `BriefcaseBusiness`). Order: Dashboard, Loads, Add (FAB), Opportunities, Settings. Center FAB layout untouched.
+- `src/pages/Index.tsx`: add `case 'opportunities'` rendering `<OpportunitiesPlaceholder />` and header title "Opportunities". No new route added.
 
-If deadhead is paid at the same rate:
+## 6. Files Changed / Created
 
-Gross Revenue = (loaded miles + deadhead miles) × broker rate
+**Created:**
+- `supabase/migrations/<timestamp>_opportunities_foundation.sql`
+- `src/hooks/opportunities/useDriverOpportunityProfile.ts`
+- `src/hooks/opportunities/useRecruiterProfile.ts`
+- `src/hooks/opportunities/useOpportunities.ts`
+- `src/hooks/opportunities/useSavedOpportunities.ts`
+- `src/hooks/opportunities/useOpportunityApplications.ts`
+- `src/components/opportunities/OpportunitiesPlaceholder.tsx`
 
-Effective RPM / Real Pay Per Mile = gross revenue ÷ total miles
+**Edited (surgical, additive only):**
+- `src/components/premium/AppSidebar.tsx` — add nav item
+- `src/components/BottomNav.tsx` — swap expenses → opportunities
+- `src/pages/Index.tsx` — add page case + title
 
-This should stay close to the broker rate before expenses.
+**Untouched:** LoadForm, computeLoadPay, reportPdf/CSV, useSubscription, Stripe edge functions, admin-api, parking, Landing, all SEO pages, `src/integrations/supabase/{client,types}.ts` (types regenerate automatically).
 
-If deadhead is paid at a custom rate:
+## 7. QA Checklist
 
-Gross Revenue = loaded miles × broker rate + deadhead miles × deadhead rate
+- [ ] Build passes, no TS errors (types regenerated post-migration)
+- [ ] Dashboard, Loads, Expenses (via desktop nav), Fuel, Reports, Settings all still load
+- [ ] Opportunities nav item opens placeholder on desktop and mobile
+- [ ] Mobile FAB still centered, not overlapping
+- [ ] Pro gating, admin access, Stripe flows unchanged
+- [ ] RLS: cannot read/edit another user's driver/recruiter profile, saved items, or applications
+- [ ] Non-admin INSERT into `opportunities` cannot set `featured=true` or `admin_review_status='approved'` (trigger forces safe values)
+- [ ] Suspended recruiter cannot UPDATE their opportunities or recruiter profile
+- [ ] Manual: confirm `is_admin()` helper exists and is reused (verified — exists in db functions)
 
-Effective RPM / Real Pay Per Mile = gross revenue ÷ total miles
+## 8. Open Decision
 
-Check whether the Settings deadhead pay option is actually being applied to new loads and the live preview.
-
-Do not change labels yet.
-
-Do not change math until the audit identifies the exact issue.
-
-Do not change database, RLS, auth, billing, Stripe, routes, or unrelated UI.
-
-Return:
-
-1. Current deadhead settings fields found
-
-2. Current pay model options found
-
-3. Whether my Settings value is being used by LoadForm
-
-4. Whether deadhead pay is being included in gross revenue
-
-5. Why a load with $0.82/mile and paid deadhead would show $0.67/mile
-
-6. Exact file and function causing the issue, if any
-
-7. Recommended fix
-
-8. Confirmation no code changes were made during audit "  What you're seeing (and why it's not a bug)
-
-You entered **$0.82/mile contract rate**. The app shows:
-
-- **Contract Rate: $0.82/mi** ← what the broker pays you per loaded mile
-- **Effective RPM: $0.67/mi** ← what you actually earn per mile **once empty (deadhead) miles are included**
-
-Math: `$0.82 × loaded miles ÷ (loaded + deadhead miles) = $0.67`. The deadhead miles are dragging your real per-mile earnings down by 18.3%. That's the whole point of "Effective RPM" — it tells the truth about what your truck is actually earning while it rolls.
-
-So the **calculation is correct**, but the **wording is too technical**. A non-technical driver reads "Effective RPM $0.67" and thinks the app changed their rate. Same with "Estimated Variable Cost" — that's accountant language.
-
-## The fix: plain-English labels + inline explanations
-
-No math changes. No feature removals. Only label and helper-text rewrites in two files.
-
-### 1. `src/components/LoadForm.tsx` — live preview block
-
-
-| Current label   | New label                         | Inline helper (small gray text under the number)                                               |
-| --------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Contract Rate   | **Broker Rate (per loaded mile)** | "What the broker pays you per loaded mile."                                                    |
-| Effective RPM   | **Your Real Pay Per Mile**        | "Includes your empty/deadhead miles. This is what your truck actually earns per mile rolling." |
-| Est. Expenses   | **Est. Fuel & Truck Costs**       | (unchanged amount)                                                                             |
-| Est. Net Profit | **Est. Take-Home (after costs)**  | —                                                                                              |
-| Net RPM         | **Take-Home Per Mile**            | —                                                                                              |
-| Deadhead Impact | **Empty Miles Drag**              | "How much your empty miles lower your real pay per mile."                                      |
-
-
-Replace the current footer note with a clearer two-line version:
-
-> ℹ️ Your broker rate of **$0.82/mi** has not changed. "Real Pay Per Mile" just spreads your pay across **all** miles you drove (loaded + empty), so you can see what your truck actually earns.
-
-### 2. `src/components/ProfitCheckCard.tsx` — Profit Check tile
-
-
-| Current label      | New label                   |
-| ------------------ | --------------------------- |
-| Effective RPM      | **Real Pay/Mile**           |
-| Est. Variable Cost | **Est. Fuel & Truck Costs** |
-| Est. Net           | **Est. Take-Home**          |
-| Est. Margin        | **Profit Margin**           |
-
-
-Add a small info row under the 4 tiles:
-
-> ℹ️ "Real Pay/Mile" includes empty miles. "Fuel & Truck Costs" is the estimated cost of running this load (fuel, maintenance, etc., from your Cost Profile).
-
-### 3. Keep the technical terms discoverable (optional but recommended)
-
-Wrap each new label in a `Tooltip` so the original term ("Effective RPM", "Variable Cost") is shown on hover/tap for drivers who already know the lingo. One-liner tooltips, no layout change.
-
-## What does NOT change
-
-- All math, formulas, and stored values
-- Database, RLS, auth, billing, Stripe
-- Reports, CSV/PDF exports, Dashboard cards
-- Cancelled-load handling, payment status badges
-- Routes, navigation, Cost Profile, settings
-
-## Files touched
-
-1. `src/components/LoadForm.tsx` (label/helper text only, ~lines 875–929)
-2. `src/components/ProfitCheckCard.tsx` (label text only)
-
-## Validation
-
-- TypeScript build
-- Visual check on Add Load preview with the same scenario you tested ($0.82/mi + deadhead)
-- Confirm Profit Check tile reads naturally to a non-technical driver
-
-Approve and I'll implement only these two label/helper edits. 
+Mobile nav swap: this plan removes **Expenses** from the bottom bar (per the spec's recommended order). Expenses remains reachable via dashboard quick-action grid and desktop sidebar. Confirm this trade-off is acceptable before implementation — if not, alternative is to drop **Settings** instead and keep Expenses.

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness } from 'lucide-react';
 
 interface AppSidebarProps {
   active: string;
@@ -8,6 +8,7 @@ interface AppSidebarProps {
 const items = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
+  { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'fuel', label: 'Fuel', icon: Fuel },
   { id: 'reports', label: 'Reports', icon: FileText },
