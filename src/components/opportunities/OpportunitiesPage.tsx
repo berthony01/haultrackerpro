@@ -152,6 +152,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showRecruiter) {
+    return <RecruiterOnboarding onBack={() => setShowRecruiter(false)} />;
+  }
+
   if (showProfile) {
     return <DriverOpportunityProfile onBack={() => setShowProfile(false)} />;
   }
