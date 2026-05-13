@@ -123,6 +123,23 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
         )}
       </div>
 
+      {match && (match.reasons.length > 0 || match.hasSevereWarning) && (
+        <div className="space-y-1.5 rounded-lg bg-muted/30 border border-border/40 p-3">
+          {match.reasons.slice(0, 2).map((r) => (
+            <div key={r} className="flex items-start gap-2 text-xs text-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
+              <span>{r}</span>
+            </div>
+          ))}
+          {match.hasSevereWarning && match.warnings[0] && (
+            <div className="flex items-start gap-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>{match.warnings[0]}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <Button onClick={onView} className="w-full">View Details</Button>
     </Card>
   );
