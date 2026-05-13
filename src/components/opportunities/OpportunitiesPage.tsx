@@ -200,6 +200,14 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         />
       )}
 
+      {/* Recruiter access CTA */}
+      {!recruiterLoading && (
+        <RecruiterEntryCard
+          profile={recruiterProfile}
+          onClick={() => setShowRecruiter(true)}
+        />
+      )}
+
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={BriefcaseBusiness} label="Available" value={kpis.count.toString()} />
