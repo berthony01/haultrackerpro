@@ -10,12 +10,17 @@ import {
   Bookmark,
   BookmarkCheck,
   TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
 import {
   calculateOpportunityFinancials,
   profitScoreLabel,
 } from '@/lib/opportunities/opportunityProfit';
+import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
+import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 
 interface Props {
   opportunity: Opportunity;
@@ -24,6 +29,7 @@ interface Props {
   onToggleSave: () => void;
   saving?: boolean;
   isPro?: boolean;
+  driverProfile?: DriverOpportunityProfile | null;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
@@ -33,7 +39,7 @@ const fmtMiles = (v: number | null | undefined) =>
 const fmtRpm = (v: number | null | undefined) =>
   v == null ? '—' : `$${Number(v).toFixed(2)}`;
 
-export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave, saving, isPro }: Props) {
+export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave, saving, isPro, driverProfile }: Props) {
   const location = [o.hiring_city, o.hiring_state].filter(Boolean).join(', ') || 'Multiple states';
   const f = calculateOpportunityFinancials(o);
   const score = profitScoreLabel(f.profitScore);
@@ -45,6 +51,10 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
       : score.tone === 'warn'
       ? 'border-warning/40 text-warning'
       : 'border-destructive/40 text-destructive';
+
+  const match = driverProfile && driverProfile.profile_completed
+    ? calculateOpportunityMatch({ opportunity: o, driverProfile, opportunityFinancials: f })
+    : null;
 
   return (
     <Card className="p-5 border-border/60 hover:border-primary/40 transition-colors flex flex-col gap-4">
@@ -64,6 +74,9 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
               <Badge variant="outline" className={`gap-1 ${scoreClass}`}>
                 <TrendingUp className="h-3 w-3" /> {f.profitScore}
               </Badge>
+            )}
+            {match && (
+              <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />
             )}
           </div>
           <p className="text-sm text-muted-foreground font-semibold truncate">{o.company_name}</p>
@@ -109,6 +122,23 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
           </>
         )}
       </div>
+
+      {match && (match.reasons.length > 0 || match.hasSevereWarning) && (
+        <div className="space-y-1.5 rounded-lg bg-muted/30 border border-border/40 p-3">
+          {match.reasons.slice(0, 2).map((r) => (
+            <div key={r} className="flex items-start gap-2 text-xs text-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
+              <span>{r}</span>
+            </div>
+          ))}
+          {match.hasSevereWarning && match.warnings[0] && (
+            <div className="flex items-start gap-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>{match.warnings[0]}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <Button onClick={onView} className="w-full">View Details</Button>
     </Card>

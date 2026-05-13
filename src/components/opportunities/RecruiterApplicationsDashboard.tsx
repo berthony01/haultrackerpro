@@ -15,6 +15,9 @@ import { ArrowLeft, Inbox, RefreshCw, Search, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOpportunityApplications, type RecruiterApplicationStatus } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
+import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
+import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 
 interface Props {
   onBack: () => void;
@@ -248,6 +251,13 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
             const dp = a.driver_profile;
             const opp = a.opportunities;
             const isTerminal = ['hired', 'rejected', 'withdrawn'].includes(a.status);
+            const match = dp && opp
+              ? calculateOpportunityMatch({
+                  opportunity: opp,
+                  driverProfile: dp,
+                  opportunityFinancials: calculateOpportunityFinancials(opp),
+                })
+              : null;
             return (
               <Card key={a.id} className="p-5 border-border/60">
                 <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
@@ -261,7 +271,10 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                       {dp?.years_experience != null ? <> · {dp.years_experience} yrs</> : null}
                     </p>
                   </div>
-                  <StatusBadge status={a.status} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    {match && <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />}
+                    <StatusBadge status={a.status} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">

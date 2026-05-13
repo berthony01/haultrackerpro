@@ -36,6 +36,7 @@ import { DriverApplicationsPanel } from './DriverApplicationsPanel';
 import { RecruiterApplicationsDashboard } from './RecruiterApplicationsDashboard';
 import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase, Mailbox, Users } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
+import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
 
 interface Props {
   onUpgrade: () => void;
@@ -62,6 +63,9 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const [trailerType, setTrailerType] = useState<string>(ANY);
   const [minGross, setMinGross] = useState<string>('');
   const [paidDeadheadOnly, setPaidDeadheadOnly] = useState(false);
+  const [matchTierFilter, setMatchTierFilter] = useState<string>(ANY);
+
+  const matchEnabled = !!profile && profile.profile_completed;
 
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 
@@ -81,7 +85,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const filtered = useMemo(() => {
     const min = Number(minGross) || 0;
     const q = search.trim().toLowerCase();
-    return opportunities.filter((o) => {
+    const base = opportunities.filter((o) => {
       if (q) {
         const hay = [o.title, o.company_name, o.hiring_city, o.hiring_state]
           .filter(Boolean)
@@ -96,7 +100,23 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       if (paidDeadheadOnly && o.deadhead_paid !== true) return false;
       return true;
     });
-  }, [opportunities, search, driverType, routeType, trailerType, minGross, paidDeadheadOnly]);
+
+    if (!matchEnabled || !profile) {
+      return base.map((o) => ({ opportunity: o, match: null as ReturnType<typeof calculateOpportunityMatch> | null }));
+    }
+
+    const scored = base.map((o) => {
+      const f = calculateOpportunityFinancials(o);
+      const match = calculateOpportunityMatch({ opportunity: o, driverProfile: profile, opportunityFinancials: f });
+      return { opportunity: o, match };
+    });
+
+    const tierFiltered = matchTierFilter === ANY
+      ? scored
+      : scored.filter((s) => s.match?.matchTier === matchTierFilter);
+
+    return tierFiltered.sort((a, b) => (b.match?.matchScore ?? 0) - (a.match?.matchScore ?? 0));
+  }, [opportunities, search, driverType, routeType, trailerType, minGross, paidDeadheadOnly, matchEnabled, profile, matchTierFilter]);
 
   const kpis = useMemo(() => {
     const recruiterIds = new Set(opportunities.map((o) => o.recruiter_id));
@@ -306,11 +326,29 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
             />
           </div>
         </div>
-        <div className="flex items-center gap-2 pt-1">
-          <Switch checked={paidDeadheadOnly} onCheckedChange={setPaidDeadheadOnly} id="paid-dh" />
-          <label htmlFor="paid-dh" className="text-sm text-foreground cursor-pointer">
-            Paid deadhead only
-          </label>
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <div className="flex items-center gap-2">
+            <Switch checked={paidDeadheadOnly} onCheckedChange={setPaidDeadheadOnly} id="paid-dh" />
+            <label htmlFor="paid-dh" className="text-sm text-foreground cursor-pointer">
+              Paid deadhead only
+            </label>
+          </div>
+          {matchEnabled && (
+            <div className="ml-auto min-w-[180px]">
+              <Select value={matchTierFilter} onValueChange={setMatchTierFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All matches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>All matches</SelectItem>
+                  <SelectItem value="excellent">Excellent Fit</SelectItem>
+                  <SelectItem value="strong">Strong Fit</SelectItem>
+                  <SelectItem value="possible">Possible Fit</SelectItem>
+                  <SelectItem value="weak">Weak Fit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -353,7 +391,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filtered.map((o) => (
+          {filtered.map(({ opportunity: o }) => (
             <OpportunityCard
               key={o.id}
               opportunity={o}
@@ -362,6 +400,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
               onToggleSave={() => handleToggleSave(o.id)}
               saving={save.isPending || unsave.isPending}
               isPro={isPro}
+              driverProfile={profile}
             />
           ))}
         </div>
