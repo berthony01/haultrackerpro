@@ -361,6 +361,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
               onView={() => setSelectedId(o.id)}
               onToggleSave={() => handleToggleSave(o.id)}
               saving={save.isPending || unsave.isPending}
+              isPro={isPro}
             />
           ))}
         </div>
