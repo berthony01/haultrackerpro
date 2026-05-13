@@ -53,6 +53,8 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const [showProfile, setShowProfile] = useState(false);
   const [showRecruiter, setShowRecruiter] = useState(false);
   const [showRecruiterManager, setShowRecruiterManager] = useState(false);
+  const [showDriverApps, setShowDriverApps] = useState(false);
+  const [showRecruiterApps, setShowRecruiterApps] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
