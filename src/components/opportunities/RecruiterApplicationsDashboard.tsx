@@ -43,6 +43,26 @@ const RECRUITER_TRANSITIONS: { value: RecruiterApplicationStatus; label: string 
   { value: 'rejected', label: 'Mark Rejected' },
 ];
 
+const STATUS_RANK: Record<string, number> = {
+  new: 1,
+  viewed: 2,
+  contacted: 3,
+  interviewing: 4,
+  hired: 5,
+  rejected: 5,
+  withdrawn: 5,
+};
+
+function getAllowedTransitions(currentStatus: string): RecruiterApplicationStatus[] {
+  const currentRank = STATUS_RANK[currentStatus] ?? 0;
+  // Terminal statuses get no recruiter actions
+  if (['hired', 'rejected', 'withdrawn'].includes(currentStatus)) return [];
+  return RECRUITER_TRANSITIONS.filter((t) => {
+    const targetRank = STATUS_RANK[t.value] ?? 0;
+    return targetRank > currentRank;
+  }).map((t) => t.value);
+}
+
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_VARIANT[status] ?? { label: status, cls: 'bg-muted text-foreground border-border' };
   return <Badge variant="outline" className={cfg.cls}>{cfg.label}</Badge>;
@@ -250,7 +270,6 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           {filtered.map((a: any) => {
             const dp = a.driver_profile;
             const opp = a.opportunities;
-            const isTerminal = ['hired', 'rejected', 'withdrawn'].includes(a.status);
             const match = dp && opp
               ? calculateOpportunityMatch({
                   opportunity: opp,
@@ -294,21 +313,28 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                   </div>
                 )}
 
-                {!isTerminal && (
-                  <div className="flex flex-wrap gap-2">
-                    {RECRUITER_TRANSITIONS.filter((t) => t.value !== a.status).map((t) => (
-                      <Button
-                        key={t.value}
-                        variant={t.value === 'hired' ? 'default' : t.value === 'rejected' ? 'ghost' : 'outline'}
-                        size="sm"
-                        onClick={() => handleUpdate(a.id, t.value)}
-                        disabled={pendingId === a.id || updateApplicationStatus.isPending}
-                      >
-                        {t.label}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const allowed = getAllowedTransitions(a.status);
+                  if (allowed.length === 0) return null;
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {allowed.map((status) => {
+                        const t = RECRUITER_TRANSITIONS.find((x) => x.value === status)!;
+                        return (
+                          <Button
+                            key={t.value}
+                            variant={t.value === 'hired' ? 'default' : t.value === 'rejected' ? 'ghost' : 'outline'}
+                            size="sm"
+                            onClick={() => handleUpdate(a.id, t.value)}
+                            disabled={pendingId === a.id || updateApplicationStatus.isPending}
+                          >
+                            {t.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </Card>
             );
           })}
