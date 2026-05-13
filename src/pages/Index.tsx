@@ -32,7 +32,7 @@ import { MonthlySummary } from '@/components/MonthlySummary';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AlertsView } from '@/components/AlertsView';
-import { OpportunitiesPlaceholder } from '@/components/opportunities/OpportunitiesPlaceholder';
+import { OpportunitiesPage } from '@/components/opportunities/OpportunitiesPage';
 
 import { RecurringExpensesView } from '@/components/RecurringExpensesView';
 import { MilestoneNudges } from '@/components/MilestoneNudges';
