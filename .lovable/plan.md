@@ -1,90 +1,83 @@
+# Phase 10 Audit Report — Admin Dashboard + Opportunities/Recruiters Moderation
 
-# Phase 1 — Opportunities Foundation
+**Overall verdict: PASS (with minor notes)**
 
-Foundation only. No marketplace UI, no recruiter billing, no Stripe changes, no edits to loads/expenses/fuel/reports/parking/admin/landing/SEO logic.
+No confirmed regressions or security issues. No code changes required. A handful of low‑severity observations below — flag for follow‑up only.
 
-## 1. Database Migration
+---
 
-Single migration creating 6 tables, all with RLS enabled and `update_updated_at_column()` triggers (reuses existing function).
+## 1. Build / type safety
+- `tsc --noEmit` → **0 errors, 0 warnings**.
+- Imports in `Admin.tsx`, `AdminOpportunitiesPanel`, `AdminRecruitersPanel`, `useAdminOpportunities`, `useAdminRecruiters` all resolve. Sheet/Dialog/Badge/Card/Button/Skeleton/Tabs/lucide icons all valid.
+- Supabase nested‑select casts (`as AdminOpportunity[]`, `Array.isArray(r.billing) ? r.billing[0] ...`) are type‑safe.
 
-**Tables (exact columns/constraints as specified in request):**
-- `driver_opportunity_profiles` — unique(user_id); CHECK on `visibility` (private|apply_only|verified_recruiters), `contact_preference` (in_app|phone|email)
-- `recruiter_profiles` — unique(user_id); CHECK on `verification_status` (pending|approved|rejected|suspended), `status` (active|inactive|suspended)
-- `opportunities` — FK→recruiter_profiles; CHECK on `status` (draft|active|paused|closed|removed), `admin_review_status` (pending|approved|rejected|flagged), `pay_model` (cpm|percentage|flat_weekly|salary|mixed|other)
-- `saved_opportunities` — unique(user_id, opportunity_id)
-- `opportunity_applications` — unique(opportunity_id, driver_user_id); CHECK on `application_type` (apply|request_info|callback), `status` (new|viewed|contacted|interviewing|hired|rejected|withdrawn)
-- `opportunity_reports` — CHECK on `status` (open|reviewing|resolved|dismissed)
+## 2. Admin route protection
+- `Admin.tsx` still calls `useAdmin()` and runs `if (!adminLoading && !isAdmin) navigate('/', { replace: true })` plus `if (!isAdmin) return null`.
+- Both new hooks gate queries with `enabled: isAdmin`, so non‑admins never hit `opportunities`, `recruiter_profiles`, or `recruiter_billing_profiles`.
+- `useAdmin` platform‑owner fallback (`berthonyxyz@gmail.com`) preserved.
+- All sensitive mutations rely on existing RLS policies (`Admins update all opportunities`, `Admins view all billing`, etc.) — no service‑role key is shipped to the client.
 
-**Helper:** Reuse existing `public.is_admin(uuid)`. Add a new SECURITY DEFINER helper `public.is_recruiter_owner(_user_id uuid, _recruiter_id uuid)` to avoid recursive RLS when checking opportunity ownership.
+## 3. Opportunities moderation
+- Filters Pending / Approved / Rejected / Flagged map to `admin_review_status`. **Removed** correctly maps to `status='removed'`. **All** drops both filters.
+- Action mutations:
+  - Approve → `admin_review_status='approved'`, `status='active'`, `published_at=now()`. `opportunities_guard` and `opportunities_billing_guard` both `RETURN NEW` for admins, so admin approve intentionally bypasses recruiter billing limits (acknowledged in audit prompt).
+  - Reject → `admin_review_status='rejected'` only.
+  - Flag → `admin_review_status='flagged'`.
+  - Remove → `status='removed'` + `admin_review_status='rejected'`.
+- Driver‑facing RLS (`Authenticated view approved active opportunities`) still requires `status='active' AND admin_review_status='approved'` — moderation pipeline intact.
+- FK `opportunities_recruiter_id_fkey` exists, so the `recruiter:recruiter_profiles!opportunities_recruiter_id_fkey(...)` embed resolves.
+- Detail drawer guards `o.recruiter ?` and uses `f.estimatedGross != null ? ... : '—'` for all numeric fields → no NaN/Infinity, no crash on null pay.
+- Deadhead display: shows `Unpaid deadhead` only when `deadhead_paid === false`; null/undefined falls through silently. ✅
 
-**Triggers:** Reuse existing `public.update_updated_at_column()` for all tables with `updated_at`.
+## 4. Recruiter moderation
+- Filters Pending / Approved / Rejected map to `verification_status`; **Suspended** correctly maps to `status='suspended'`.
+- Approve → `verification_status='approved'`, `status='active'`, `verified_at=now()`, `verified_by=user.id`. `recruiter_profile_guard` bypasses for admin → fields persist.
+- Reject → `verification_status='rejected'` only (preserves resubmit flow via `resubmit_recruiter_profile` RPC).
+- Suspend → both `status='suspended'` and `verification_status='suspended'`. Matches `is_recruiter_owner()` and the resubmit‑block check.
+- Active opportunity counts use a single `IN (...)` query → no N+1.
+- `useRecruiterBillingSummary` tolerates zero rows and unknown plan/status via lowercased fallbacks; counters default to 0 → no crash on empty billing.
 
-**Featured/approval guard:** Add a `BEFORE INSERT OR UPDATE` trigger on `opportunities` that resets `featured` and `admin_review_status` to safe values when caller is not admin (prevents non-admin self-approval / self-feature).
+## 5. Existing admin tabs regression
+- All 12 `TabsTrigger` values are unique: overview, activation, users, parking, drivers, leads, opportunities, recruiters, admins, billing, feedback, emails. Two new tabs added without renaming or removing existing ones.
+- `TabsList className="w-full flex flex-wrap h-auto justify-start gap-1"` wraps cleanly on mobile (434 px viewport: 2–3 rows of pills), no horizontal overflow.
+- `max-w-6xl` container (was narrower) does not break the existing wide tables (Users, Emails) — they already scroll horizontally inside their own wrappers.
 
-**Recruiter suspension guard:** RLS UPDATE policies on `recruiter_profiles` and `opportunities` check that the owning recruiter row's `status <> 'suspended'` via the helper.
+## 6. UI / design
+- New panels reuse `bg-card/60`, `border-border/60`, semantic Badge variants → consistent with dark premium theme; no plain‑white card regressions.
+- Recruiter Billing Summary grid scales 2/4/8 columns; mini stat cards readable on dark.
+- Action button column wraps under cards on small screens (`lg:flex-col lg:w-40`).
+- Minor cosmetic: 12 tabs gets crowded on phones; not blocking.
 
-## 2. RLS Policies (summary)
+## 7. Security / RLS
+- No changes to: `opportunities_guard`, `opportunities_billing_guard`, `recruiter_profile_guard`, `opportunity_applications_update_guard`, `recruiter_billing_field_guard`, driver profile RLS, applications RLS.
+- No service‑role keys, Stripe secrets, or edge‑function secrets referenced in browser code (all admin actions go directly through RLS, not through a privileged endpoint).
+- Admin notes are only rendered inside the admin sheet (admin‑only RLS already gates the read).
 
-| Table | Read | Insert | Update | Delete |
-|---|---|---|---|---|
-| driver_opportunity_profiles | own + admin | own | own | own + admin |
-| recruiter_profiles | own + admin; authenticated may read approved+active rows (id, name, company, verification_status, hiring_states, equipment_types only — enforced by limiting policy to non-sensitive scenarios via separate SELECT policy on approved+active) | own | own (only if not suspended) + admin | admin only |
-| opportunities | authenticated: only `status='active' AND admin_review_status='approved'`; recruiter: own; admin: all | recruiter for their own recruiter_id (trigger forces draft/pending) | recruiter own (not suspended) + admin | admin |
-| saved_opportunities | own + admin | own | — | own |
-| opportunity_applications | driver own; recruiter for their opportunities; admin all | driver for self | recruiter (status only, own opps); admin | — |
-| opportunity_reports | own + admin | own (reporter_user_id = auth.uid()) | admin | — |
+## 8. Data safety / empty states
+- Both panels show empty‑state cards (`Briefcase` / `Building2`) when zero rows.
+- Loading skeletons render before data.
+- All numeric / date fields use `?? '—'` or `!= null ? ... : '—'`.
+- Mutations call `qc.invalidateQueries(...)` on success → list refreshes after action.
+- `confirm()` prompt before each destructive action (Approve/Reject/Flag/Remove/Suspend).
 
-## 3. TypeScript Hooks
+## 9. Confirmed issues fixed
+- **None.** Audit found no defects requiring code changes.
 
-New folder `src/hooks/opportunities/` with:
-- `useDriverOpportunityProfile.ts` — get/upsert own profile
-- `useRecruiterProfile.ts` — get/upsert own recruiter; expose `isApproved` derived from `verification_status === 'approved' && status === 'active'`
-- `useOpportunities.ts` — list approved+active; simple optional filters: `state`, `driver_type`, `route_type`
-- `useSavedOpportunities.ts` — list/save/unsave
-- `useOpportunityApplications.ts` — driver create + list own; recruiter list (filtered server-side via RLS)
+## 10. Minor observations (non‑blocking, no fix applied)
+1. `src/components/admin/opportunities/RecruiterReviewCard.tsx` (123 lines) is not imported anywhere — leftover from an earlier iteration. Safe to delete in a future cleanup but harmless today.
+2. The "Rejected" opportunity filter will also surface rows that were *removed* (since Remove sets `admin_review_status='rejected'`). Consider excluding `status='removed'` from the Rejected view if reviewers report confusion.
+3. With 12 tabs, the tab strip becomes 2–3 rows on a 434 px viewport. Acceptable but a future redesign (sidebar) would help.
+4. Admin approve of a draft opportunity intentionally bypasses recruiter billing limits via the trigger admin bypass — acknowledged in the prompt as acceptable.
 
-Style follows existing `useLoads`/`useExpenses` (React Query, supabase client, typed via regenerated `Database` types).
-
-## 4. Placeholder UI
-
-`src/components/opportunities/OpportunitiesPlaceholder.tsx` — premium dark Card layout using existing tokens: headline, subheadline, 5 feature bullets (verified recruiters, gross/net, RPM, deadhead/deductions, privacy), 2 disabled CTAs ("Driver Profile Coming Soon", "Recruiter Access Coming Soon"). Uses existing `Card`, `Button`, `Badge`.
-
-## 5. Navigation Wiring
-
-- `src/components/premium/AppSidebar.tsx`: add `Opportunities` (icon: `BriefcaseBusiness`) between Loads and Expenses.
-- `src/components/BottomNav.tsx`: replace `expenses` slot with `opportunities` (icon: `BriefcaseBusiness`). Order: Dashboard, Loads, Add (FAB), Opportunities, Settings. Center FAB layout untouched.
-- `src/pages/Index.tsx`: add `case 'opportunities'` rendering `<OpportunitiesPlaceholder />` and header title "Opportunities". No new route added.
-
-## 6. Files Changed / Created
-
-**Created:**
-- `supabase/migrations/<timestamp>_opportunities_foundation.sql`
-- `src/hooks/opportunities/useDriverOpportunityProfile.ts`
-- `src/hooks/opportunities/useRecruiterProfile.ts`
-- `src/hooks/opportunities/useOpportunities.ts`
-- `src/hooks/opportunities/useSavedOpportunities.ts`
-- `src/hooks/opportunities/useOpportunityApplications.ts`
-- `src/components/opportunities/OpportunitiesPlaceholder.tsx`
-
-**Edited (surgical, additive only):**
-- `src/components/premium/AppSidebar.tsx` — add nav item
-- `src/components/BottomNav.tsx` — swap expenses → opportunities
-- `src/pages/Index.tsx` — add page case + title
-
-**Untouched:** LoadForm, computeLoadPay, reportPdf/CSV, useSubscription, Stripe edge functions, admin-api, parking, Landing, all SEO pages, `src/integrations/supabase/{client,types}.ts` (types regenerate automatically).
-
-## 7. QA Checklist
-
-- [ ] Build passes, no TS errors (types regenerated post-migration)
-- [ ] Dashboard, Loads, Expenses (via desktop nav), Fuel, Reports, Settings all still load
-- [ ] Opportunities nav item opens placeholder on desktop and mobile
-- [ ] Mobile FAB still centered, not overlapping
-- [ ] Pro gating, admin access, Stripe flows unchanged
-- [ ] RLS: cannot read/edit another user's driver/recruiter profile, saved items, or applications
-- [ ] Non-admin INSERT into `opportunities` cannot set `featured=true` or `admin_review_status='approved'` (trigger forces safe values)
-- [ ] Suspended recruiter cannot UPDATE their opportunities or recruiter profile
-- [ ] Manual: confirm `is_admin()` helper exists and is reused (verified — exists in db functions)
-
-## 8. Open Decision
-
-Mobile nav swap: this plan removes **Expenses** from the bottom bar (per the spec's recommended order). Expenses remains reachable via dashboard quick-action grid and desktop sidebar. Confirm this trade-off is acceptable before implementation — if not, alternative is to drop **Settings** instead and keep Expenses.
+## 11. Manual QA checklist
+- [ ] Open `/admin` as admin → all 12 tabs render, no console errors.
+- [ ] Open `/admin` as non‑admin → redirected to `/`.
+- [ ] Opportunities tab → Pending list loads; Approve sets status `active` and the opportunity appears on the driver page.
+- [ ] Opportunities tab → Reject, Flag, Remove each move the row out of Pending into the right filter.
+- [ ] Opportunities detail drawer → opens for opportunity with no recruiter row → renders "No recruiter linked." instead of crashing.
+- [ ] Opportunities detail drawer → opportunity with no pay data shows "—" everywhere, no NaN.
+- [ ] Recruiters tab → Pending list loads; Approve flips to Approved view; verified_at and verified_by are set.
+- [ ] Recruiters tab → Suspend hides the recruiter from public posting; resubmission RPC still rejected for suspended recruiters.
+- [ ] Recruiter Billing Summary renders with zero billing rows (counters all 0) without throwing.
+- [ ] Existing tabs (Overview, Activation, Users, Parking, Drivers, Starter Kit, Admins, Billing, Feedback, Emails) still render and fetch data.
+- [ ] Mobile (≤ 434 px) → tab strip wraps; cards do not overflow horizontally.
