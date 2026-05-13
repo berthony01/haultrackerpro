@@ -345,9 +345,18 @@ export function RecruiterOnboarding({ onBack }: Props) {
                 </p>
                 <div className="flex gap-2 ml-auto">
                   <Button variant="outline" onClick={onBack}>Cancel</Button>
-                  <Button onClick={handleSave} disabled={upsertProfile.isPending}>
+                  <Button
+                    onClick={handleSave}
+                    disabled={upsertProfile.isPending || isSuspended}
+                  >
                     <Save className="h-4 w-4" />
-                    {isEditMode ? 'Save Changes' : 'Submit Recruiter Profile'}
+                    {isSuspended
+                      ? 'Access Suspended'
+                      : isRejected
+                      ? 'Resubmit for Review'
+                      : isEditMode
+                      ? 'Save Changes'
+                      : 'Submit Recruiter Profile'}
                   </Button>
                 </div>
               </Card>
