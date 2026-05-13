@@ -92,7 +92,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: 
           <h1 className="text-2xl font-black text-foreground">{o.title}</h1>
           {o.featured && <Badge className="bg-primary/15 text-primary border-primary/20" variant="secondary">Featured</Badge>}
           <Badge variant="outline" className="border-success/40 text-success gap-1">
-            <ShieldCheck className="h-3 w-3" /> Verified
+            <ShieldCheck className="h-3 w-3" /> Approved Opportunity
           </Badge>
         </div>
         <p className="text-base font-semibold text-muted-foreground mb-3">{o.company_name}</p>
@@ -125,7 +125,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: 
           <KV label="Deadhead miles" value={fmtMiles(o.estimated_deadhead_miles)} />
           <KV
             label="Deadhead paid?"
-            value={o.deadhead_paid ? 'Yes' : 'No'}
+            value={o.deadhead_paid === true ? 'Yes' : o.deadhead_paid === false ? 'No' : 'Not disclosed'}
             warn={o.deadhead_paid === false}
           />
         </Grid>
@@ -146,7 +146,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: 
               warn={!!o.escrow_required}
             />
           </Grid>
-          {o.deadhead_paid === false && (
+          {o.deadhead_paid === false && (Number(o.estimated_deadhead_miles) || 0) > 0 && (
             <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>Unpaid deadhead reduces effective RPM. Compare carefully with current operating cost-per-mile.</span>
