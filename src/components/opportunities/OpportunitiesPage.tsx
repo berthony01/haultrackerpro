@@ -239,6 +239,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
           profile={recruiterProfile}
           onClick={() => setShowRecruiter(true)}
           onManage={() => setShowRecruiterManager(true)}
+          onApplications={() => setShowRecruiterApps(true)}
         />
       )}
 
