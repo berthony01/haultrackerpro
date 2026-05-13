@@ -6,12 +6,16 @@ import {
   Truck,
   DollarSign,
   Gauge,
-  Home,
   ShieldCheck,
   Bookmark,
   BookmarkCheck,
+  TrendingUp,
 } from 'lucide-react';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
+import {
+  calculateOpportunityFinancials,
+  profitScoreLabel,
+} from '@/lib/opportunities/opportunityProfit';
 
 interface Props {
   opportunity: Opportunity;
@@ -19,15 +23,28 @@ interface Props {
   onView: () => void;
   onToggleSave: () => void;
   saving?: boolean;
+  isPro?: boolean;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
   v == null ? '—' : `$${Math.round(Number(v)).toLocaleString()}`;
 const fmtMiles = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString()} mi`;
+const fmtRpm = (v: number | null | undefined) =>
+  v == null ? '—' : `$${Number(v).toFixed(2)}`;
 
-export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave, saving }: Props) {
+export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave, saving, isPro }: Props) {
   const location = [o.hiring_city, o.hiring_state].filter(Boolean).join(', ') || 'Multiple states';
+  const f = calculateOpportunityFinancials(o);
+  const score = profitScoreLabel(f.profitScore);
+  const scoreClass =
+    score.tone === 'success'
+      ? 'border-success/40 text-success'
+      : score.tone === 'primary'
+      ? 'border-primary/40 text-primary'
+      : score.tone === 'warn'
+      ? 'border-warning/40 text-warning'
+      : 'border-destructive/40 text-destructive';
 
   return (
     <Card className="p-5 border-border/60 hover:border-primary/40 transition-colors flex flex-col gap-4">
@@ -43,6 +60,11 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
             <Badge variant="outline" className="border-success/40 text-success gap-1">
               <ShieldCheck className="h-3 w-3" /> Approved
             </Badge>
+            {isPro && (
+              <Badge variant="outline" className={`gap-1 ${scoreClass}`}>
+                <TrendingUp className="h-3 w-3" /> {f.profitScore}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground font-semibold truncate">{o.company_name}</p>
         </div>
@@ -67,16 +89,25 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <Stat icon={MapPin} label="Hiring" value={location} />
-        <Stat icon={DollarSign} label="Est. weekly gross" value={fmtMoney(o.estimated_weekly_gross)} />
-        <Stat icon={Gauge} label="Weekly miles" value={fmtMiles(o.estimated_weekly_miles)} />
-        <Stat
-          icon={Truck}
-          label="Deadhead"
-          value={`${fmtMiles(o.estimated_deadhead_miles)}${
-            o.deadhead_paid === true ? ' • paid' : o.deadhead_paid === false ? ' • unpaid' : ''
-          }`}
-          warn={o.deadhead_paid === false && (Number(o.estimated_deadhead_miles) || 0) > 0}
-        />
+        <Stat icon={DollarSign} label="Est. weekly gross" value={fmtMoney(f.estimatedGross)} />
+        {isPro ? (
+          <>
+            <Stat icon={TrendingUp} label="Est. net" value={fmtMoney(f.estimatedNet)} />
+            <Stat icon={Gauge} label="Effective RPM" value={fmtRpm(f.effectiveRpm)} />
+          </>
+        ) : (
+          <>
+            <Stat icon={Gauge} label="Weekly miles" value={fmtMiles(f.estimatedWeeklyMiles)} />
+            <Stat
+              icon={Truck}
+              label="Deadhead"
+              value={`${fmtMiles(f.estimatedDeadheadMiles)}${
+                o.deadhead_paid === true ? ' • paid' : o.deadhead_paid === false ? ' • unpaid' : ''
+              }`}
+              warn={f.hasUnpaidDeadhead}
+            />
+          </>
+        )}
       </div>
 
       <Button onClick={onView} className="w-full">View Details</Button>
