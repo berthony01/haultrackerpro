@@ -119,6 +119,8 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
         </div>
       </Card>
 
+      <RecruiterBillingPanel />
+
       {isLoading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 w-full" />)}
