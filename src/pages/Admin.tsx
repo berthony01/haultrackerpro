@@ -13,8 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp, ParkingCircle, Trophy, Gift, Sparkles } from 'lucide-react';
+import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp, ParkingCircle, Trophy, Gift, Sparkles, Briefcase, Building2, Truck } from 'lucide-react';
 import { toast } from 'sonner';
+import { AdminOpportunitiesPanel } from '@/components/admin/opportunities/AdminOpportunitiesPanel';
+import { AdminRecruitersPanel } from '@/components/admin/opportunities/AdminRecruitersPanel';
 
 interface OverviewData {
   total_users: number;
@@ -538,16 +540,28 @@ export default function Admin() {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-background">
       <SEOHead title="Admin | HaulTrackerPro" description="Admin dashboard." path="/admin" noindex />
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-bold">Admin Dashboard</h1>
-          <Badge variant="secondary" className="ml-auto">{role}</Badge>
-        </div>
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
+        <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/10">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
+              <Truck className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                Admin Dashboard
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Real-time overview of your HaulTrackerPro platform.
+              </p>
+            </div>
+            <Badge variant="secondary" className="shrink-0 capitalize">{role}</Badge>
+          </div>
+        </Card>
 
         <Tabs defaultValue="overview">
           <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1">
@@ -557,11 +571,20 @@ export default function Admin() {
             <TabsTrigger value="parking"><ParkingCircle className="h-4 w-4 mr-1" />Parking</TabsTrigger>
             <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
             <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
+            <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
+            <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
             <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
             <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
             <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
             <TabsTrigger value="emails"><Mail className="h-4 w-4 mr-1" />Emails</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="opportunities" className="space-y-3">
+            <AdminOpportunitiesPanel />
+          </TabsContent>
+          <TabsContent value="recruiters" className="space-y-3">
+            <AdminRecruitersPanel />
+          </TabsContent>
 
           {/* OVERVIEW */}
           <TabsContent value="overview" className="space-y-4">
