@@ -130,6 +130,7 @@ export default function Landing() {
         )}
       </nav>
 
+      <main>
       {/* ═══════════════════════════════════════════ */}
       {/* SECTION 1: HERO */}
       {/* ═══════════════════════════════════════════ */}
@@ -712,6 +713,7 @@ export default function Landing() {
           </p>
         </div>
       </section>
+      </main>
 
       {/* ═══════════════════════════════════════════ */}
       {/* FOOTER */}

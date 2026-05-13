@@ -1,0 +1,50 @@
+# HaulTrackerPro
+
+> Professional load, expense, and profit tracking built for owner-operators and lease drivers. Track every load, log expenses, monitor fuel, and see real net profit per load and per week.
+
+HaulTrackerPro replaces notebooks and spreadsheets with a mobile-first system designed for truck drivers. Core capabilities include load logging, multi-stop trips, expense and fuel tracking, weekly closeouts, broker reliability scoring, IRS Schedule C tax reports, pre-load profit checks, and PDF/CSV exports.
+
+## Pages
+
+- [Home](/): Product overview and primary call-to-action.
+- [Features](/features): Full feature catalog for free and Pro plans.
+- [Pricing](/pricing): Free vs Pro plan comparison.
+- [FAQ](/faq): Common questions about HaulTrackerPro.
+- [How to use HaulTrackerPro](/how-to-use-haultrackerpro): Step-by-step usage guide.
+- [Starter Kit](/starter-kit): Free downloadable starter resources for owner-operators.
+
+## Guides
+
+- [Trucker bookkeeping guide](/trucker-bookkeeping-guide): How drivers should organize finances.
+- [Owner-operator expense tracker](/owner-operator-expense-tracker): What to track and why.
+- [Truck driver tax deductions](/truck-driver-tax-deductions): Common write-offs.
+- [Owner-operator tax write-offs](/owner-operator-tax-write-offs): Schedule C deductions.
+- [Truck driver per diem](/truck-driver-per-diem): Per diem rules and rates.
+- [Owner-operator salary](/owner-operator-salary): Realistic income breakdown.
+- [Trucking cost per mile](/trucking-cost-per-mile): How to calculate CPM.
+- [Trucker cost per mile breakdown](/trucker-cost-per-mile-breakdown): Fixed vs variable costs.
+- [Fuel cost per mile](/fuel-cost-per-mile-trucking): Fuel CPM math and benchmarks.
+- [Trucking maintenance cost per mile](/trucking-maintenance-cost-per-mile): Maintenance CPM benchmarks.
+- [Trucking mileage expense guide](/trucking-mileage-expense-guide): Mileage tracking for taxes.
+- [Trucking expense categories](/trucking-expense-categories): Category list mapped to Schedule C.
+- [Trucking expenses list](/trucking-expenses-list): Common trucking expenses.
+- [Owner-operator expenses list](/owner-operator-expenses-list): Owner-operator-specific expenses.
+- [Truck driver expenses](/truck-driver-expenses): Expense overview for drivers.
+- [Truck driver fuel expenses](/truck-driver-fuel-expenses): Fuel-specific guidance.
+- [Truck driver operating expenses](/truck-driver-operating-expenses): Day-to-day operating costs.
+- [Owner-operator operating costs](/owner-operator-operating-costs): Annualized operating costs.
+- [Trucking finance guides](/trucking-finance-guides): Index of all finance guides.
+
+## Tools
+
+- [Trucking profit calculator](/trucking-profit-calculator): Calculate net profit on a load.
+- [Trucking load profit calculator](/trucking-load-profit-calculator): Per-load profit math.
+- [Load profit calculator](/tools/load-profit-calculator): Standalone load calculator.
+- [Trucking cost per mile calculator](/trucking-cost-per-mile-calculator): CPM calculator.
+- [Trucker fuel cost calculator](/trucker-fuel-cost-calculator): Fuel cost calculator.
+- [Fuel cost per mile calculator](/tools/fuel-cost-per-mile): Fuel CPM calculator.
+
+## Optional
+
+- [Terms of service](/terms): Legal terms.
+- [Privacy policy](/privacy): How user data is handled.
