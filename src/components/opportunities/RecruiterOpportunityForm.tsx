@@ -12,7 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Briefcase, DollarSign, Gift, Wallet, Home, ShieldCheck, Save } from 'lucide-react';
+import {
+  ArrowLeft, Briefcase, DollarSign, Gift, Wallet, Home, ShieldCheck, Save, Lock,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useRecruiterOpportunities,
@@ -24,6 +26,8 @@ interface Props {
   initial?: Opportunity | null;
   onBack: () => void;
   onSaved: () => void;
+  canSubmitForReview?: boolean;
+  submitBlockReason?: string | null;
 }
 
 const PAY_MODELS = ['cpm', 'percentage', 'flat_weekly', 'mixed'];
