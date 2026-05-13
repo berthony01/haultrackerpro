@@ -211,6 +211,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         <RecruiterEntryCard
           profile={recruiterProfile}
           onClick={() => setShowRecruiter(true)}
+          onManage={() => setShowRecruiterManager(true)}
         />
       )}
 
