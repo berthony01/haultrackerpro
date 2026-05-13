@@ -44,7 +44,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
-  const { profile, isLoading: profileLoading } = useDriverOpportunityProfile();
+  const { profile, isLoading: profileLoading, isError: profileIsError, refetch: refetchProfile } = useDriverOpportunityProfile();
   const { profile: recruiterProfile, isLoading: recruiterLoading } = useRecruiterProfile();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
