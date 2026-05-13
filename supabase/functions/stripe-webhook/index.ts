@@ -336,6 +336,11 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription deleted", { subscriptionId: subscription.id });
 
+        if (subscription.metadata?.billing_type === "recruiter") {
+          await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
+          break;
+        }
+
         // Find user
         const { data: subRow } = await supabaseClient
           .from("subscriptions")
