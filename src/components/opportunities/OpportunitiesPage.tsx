@@ -25,8 +25,11 @@ import { toast } from 'sonner';
 import { useOpportunities } from '@/hooks/opportunities/useOpportunities';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
+import { DriverOpportunityProfile } from './DriverOpportunityProfile';
+import { UserCog, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   onUpgrade: () => void;
