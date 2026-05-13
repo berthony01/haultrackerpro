@@ -552,9 +552,14 @@ function RecruiterEntryCard({
           <p className="text-sm text-muted-foreground mb-3">{cfg.body}</p>
           <div className="flex flex-wrap gap-2">
             {isApproved && (
-              <Button onClick={onManage}>
-                <Briefcase className="h-4 w-4" /> Manage Opportunities
-              </Button>
+              <>
+                <Button onClick={onManage}>
+                  <Briefcase className="h-4 w-4" /> Manage Opportunities
+                </Button>
+                <Button onClick={onApplications} variant="outline">
+                  <Users className="h-4 w-4" /> Applications
+                </Button>
+              </>
             )}
             <Button onClick={onClick} variant="outline">
               View Recruiter Profile <ArrowRight className="h-4 w-4" />
