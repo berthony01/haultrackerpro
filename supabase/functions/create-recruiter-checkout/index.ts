@@ -76,21 +76,38 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    // Reuse existing customer when possible
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId = customers.data[0]?.id;
-    if (!customerId) {
-      const c = await stripe.customers.create({ email: user.email, metadata: { user_id: user.id } });
-      customerId = c.id;
-    }
-
-    // Ensure billing row exists (defaults locked by guard for non-admins)
-    await supabaseService
+    // Look up existing recruiter billing row for customer isolation
+    const { data: billingRow } = await supabaseService
       .from("recruiter_billing_profiles")
-      .upsert(
-        { recruiter_id: recruiter.id, user_id: user.id },
-        { onConflict: "recruiter_id" },
-      );
+      .select("stripe_customer_id")
+      .eq("recruiter_id", recruiter.id)
+      .maybeSingle();
+
+    let customerId = billingRow?.stripe_customer_id ?? null;
+
+    if (!customerId) {
+      const c = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          billing_type: "recruiter",
+          user_id: user.id,
+          recruiter_id: recruiter.id,
+        },
+      });
+      customerId = c.id;
+
+      // Persist the recruiter-specific customer ID so future checkouts reuse it
+      await supabaseService
+        .from("recruiter_billing_profiles")
+        .upsert(
+          {
+            recruiter_id: recruiter.id,
+            user_id: user.id,
+            stripe_customer_id: customerId,
+          },
+          { onConflict: "recruiter_id" },
+        );
+    }
 
     const ALLOWED = new Set([
       "https://haultrackerpro.com",
