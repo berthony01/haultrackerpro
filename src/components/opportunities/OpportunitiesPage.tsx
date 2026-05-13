@@ -63,6 +63,9 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const [trailerType, setTrailerType] = useState<string>(ANY);
   const [minGross, setMinGross] = useState<string>('');
   const [paidDeadheadOnly, setPaidDeadheadOnly] = useState(false);
+  const [matchTierFilter, setMatchTierFilter] = useState<string>(ANY);
+
+  const matchEnabled = !!profile && profile.profile_completed;
 
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 
