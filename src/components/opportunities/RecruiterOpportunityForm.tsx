@@ -305,6 +305,9 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       </Section>
 
       <Section icon={DollarSign} title="Pay Details">
+        <div className="col-span-full rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+          HaulTrackerPro uses these numbers to estimate gross, net, RPM, and driver-facing profit clarity. Be accurate. Misleading opportunities may be removed.
+        </div>
         <Field label="Pay Model">
           <Select value={form.pay_model || 'unset'} onValueChange={(v) => set('pay_model', v === 'unset' ? '' : v)}>
             <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
