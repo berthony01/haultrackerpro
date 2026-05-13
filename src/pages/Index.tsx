@@ -569,7 +569,7 @@ const Index = () => {
                 isPro={isPro}
               />
             )}
-            {page === 'opportunities' && <OpportunitiesPlaceholder />}
+            {page === 'opportunities' && <OpportunitiesPage onUpgrade={handleUpgrade} />}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
         )}
