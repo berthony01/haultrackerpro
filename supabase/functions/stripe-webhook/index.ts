@@ -153,6 +153,18 @@ serve(async (req) => {
         logStep("Checkout completed", { sessionId: session.id, customerId: session.customer, subscriptionId: session.subscription });
 
         const userId = session.metadata?.user_id;
+        const billingType = session.metadata?.billing_type;
+
+        // Recruiter checkout — handle separately, do NOT touch driver Pro tables
+        if (billingType === "recruiter" && session.subscription) {
+          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+          await handleRecruiterSubscription(supabaseClient, sub, {
+            ...(session.metadata ?? {}),
+            ...(sub.metadata ?? {}),
+          });
+          break;
+        }
+
         if (userId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const priceId = subscription.items.data[0]?.price?.id || "";
