@@ -44,7 +44,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
-  const { profile, isLoading: profileLoading } = useDriverOpportunityProfile();
+  const { profile, isLoading: profileLoading, isError: profileIsError, refetch: refetchProfile } = useDriverOpportunityProfile();
   const { profile: recruiterProfile, isLoading: recruiterLoading } = useRecruiterProfile();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -198,7 +198,17 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       </Card>
 
       {/* Driver Profile entry card */}
-      {!profileLoading && (
+      {profileIsError ? (
+        <EmptyState
+          title="Unable to load driver profile"
+          body="Something went wrong while loading your Driver Opportunity Profile."
+          action={
+            <Button variant="outline" onClick={() => refetchProfile()}>
+              <RefreshCw className="h-4 w-4" /> Retry
+            </Button>
+          }
+        />
+      ) : !profileLoading && (
         <ProfileEntryCard
           state={!profile ? 'none' : profile.profile_completed ? 'complete' : 'incomplete'}
           profile={profile}

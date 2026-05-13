@@ -19,6 +19,7 @@ import {
   Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useRecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
 
 interface Props {
@@ -75,7 +76,7 @@ const isUrlish = (v: string) => {
 };
 
 export function RecruiterOnboarding({ onBack }: Props) {
-  const { profile, isLoading, upsertProfile } = useRecruiterProfile();
+  const { profile, isLoading, isSuspended, upsertProfile } = useRecruiterProfile();
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [agree1, setAgree1] = useState(false);
@@ -110,6 +111,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
     setForm((f) => ({ ...f, [k]: v }));
 
   const isEditMode = !!profile;
+  const isRejected = profile?.verification_status === 'rejected';
   const allAgreed = agree1 && agree2 && agree3;
 
   const statusCfg = useMemo(() => {
@@ -166,6 +168,10 @@ export function RecruiterOnboarding({ onBack }: Props) {
   };
 
   const handleSave = () => {
+    if (isSuspended) {
+      toast.error('Recruiter access suspended. Please contact support.');
+      return;
+    }
     const err = validate();
     if (err) {
       toast.error(err);
@@ -188,7 +194,18 @@ export function RecruiterOnboarding({ onBack }: Props) {
       driver_types_hired: splitList(form.driver_types_hired),
     };
     upsertProfile.mutate(payload, {
-      onSuccess: () => toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted'),
+      onSuccess: async () => {
+        if (isRejected && profile) {
+          const { error } = await supabase.rpc('resubmit_recruiter_profile', { profile_id: profile.id });
+          if (error) {
+            toast.error(error.message);
+            return;
+          }
+          toast.success('Recruiter profile resubmitted for review.');
+        } else {
+          toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
+        }
+      },
       onError: (e: Error) => toast.error(e.message),
     });
   };
@@ -332,9 +349,18 @@ export function RecruiterOnboarding({ onBack }: Props) {
                 </p>
                 <div className="flex gap-2 ml-auto">
                   <Button variant="outline" onClick={onBack}>Cancel</Button>
-                  <Button onClick={handleSave} disabled={upsertProfile.isPending}>
+                  <Button
+                    onClick={handleSave}
+                    disabled={upsertProfile.isPending || isSuspended}
+                  >
                     <Save className="h-4 w-4" />
-                    {isEditMode ? 'Save Changes' : 'Submit Recruiter Profile'}
+                    {isSuspended
+                      ? 'Access Suspended'
+                      : isRejected
+                      ? 'Resubmit for Review'
+                      : isEditMode
+                      ? 'Save Changes'
+                      : 'Submit Recruiter Profile'}
                   </Button>
                 </div>
               </Card>

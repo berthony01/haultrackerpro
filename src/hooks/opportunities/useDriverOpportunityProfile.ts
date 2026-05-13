@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type DriverOpportunityProfile = Tables<'driver_opportunity_profiles'>;
 export type DriverOpportunityProfileUpsert = Omit<TablesInsert<'driver_opportunity_profiles'>, 'user_id'>;
@@ -51,6 +51,9 @@ export function useDriverOpportunityProfile() {
   return {
     profile: profileQuery.data ?? null,
     isLoading: profileQuery.isLoading,
+    isError: profileQuery.isError,
+    error: profileQuery.error as Error | null,
+    refetch: profileQuery.refetch,
     upsertProfile,
     deleteProfile,
   };

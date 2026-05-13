@@ -1963,6 +1963,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: undefined
       }
+      resubmit_recruiter_profile: {
+        Args: { profile_id: string }
+        Returns: undefined
+      }
       submit_lead_magnet_signup: {
         Args: {
           _bundle_name?: string
