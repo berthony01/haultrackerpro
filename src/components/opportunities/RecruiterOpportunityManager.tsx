@@ -149,6 +149,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               onActivate={() => handleStatus(o.id, 'active')}
               onClose={() => handleStatus(o.id, 'closed')}
               busy={setStatus.isPending}
+              canActivate={canActivate}
             />
           ))}
         </div>
@@ -158,7 +159,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
 }
 
 function OpportunityRow({
-  o, onEdit, onPause, onActivate, onClose, busy,
+  o, onEdit, onPause, onActivate, onClose, busy, canActivate,
 }: {
   o: Opportunity;
   onEdit: () => void;
@@ -166,6 +167,7 @@ function OpportunityRow({
   onActivate: () => void;
   onClose: () => void;
   busy: boolean;
+  canActivate: boolean;
 }) {
   const statusVariant: Record<string, 'default' | 'outline' | 'secondary' | 'destructive'> = {
     active: 'default',
