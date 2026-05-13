@@ -25,6 +25,8 @@ import {
   type Opportunity,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
+import { RecruiterBillingPanel } from './RecruiterBillingPanel';
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 
 interface Props {
   onBack: () => void;
@@ -35,6 +37,7 @@ type View = 'list' | 'edit';
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
   const { opportunities, isLoading, setStatus, refetch } = useRecruiterOpportunities();
+  const billing = useRecruiterBilling();
 
   const [view, setView] = useState<View>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
@@ -73,14 +76,24 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   }
 
   const handleStatus = (id: string, status: 'active' | 'paused' | 'closed') => {
+    if (status === 'active' && !billing.canSubmitMore) {
+      if (!billing.isBillingActive) {
+        toast.error('Recruiter billing required to submit opportunities for review.');
+      } else {
+        toast.error("You've reached your active opportunity limit. Upgrade your plan.");
+      }
+      return;
+    }
     setStatus.mutate(
       { id, status },
       {
-        onSuccess: () => toast.success(`Opportunity ${status}`),
+        onSuccess: () => { toast.success(`Opportunity ${status}`); billing.refresh(); },
         onError: (e: Error) => toast.error(e.message),
       }
     );
   };
+
+  const canActivate = billing.canSubmitMore;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -105,6 +118,8 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
           </Button>
         </div>
       </Card>
+
+      <RecruiterBillingPanel />
 
       {isLoading ? (
         <div className="space-y-3">
@@ -134,6 +149,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               onActivate={() => handleStatus(o.id, 'active')}
               onClose={() => handleStatus(o.id, 'closed')}
               busy={setStatus.isPending}
+              canActivate={canActivate}
             />
           ))}
         </div>
@@ -143,7 +159,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
 }
 
 function OpportunityRow({
-  o, onEdit, onPause, onActivate, onClose, busy,
+  o, onEdit, onPause, onActivate, onClose, busy, canActivate,
 }: {
   o: Opportunity;
   onEdit: () => void;
@@ -151,6 +167,7 @@ function OpportunityRow({
   onActivate: () => void;
   onClose: () => void;
   busy: boolean;
+  canActivate: boolean;
 }) {
   const statusVariant: Record<string, 'default' | 'outline' | 'secondary' | 'destructive'> = {
     active: 'default',
@@ -199,11 +216,11 @@ function OpportunityRow({
               <PauseCircle className="h-4 w-4" /> Pause
             </Button>
           ) : o.status === 'draft' ? (
-            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy}>
+            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy || !canActivate}>
               <Send className="h-4 w-4" /> Submit for Review
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy}>
+            <Button size="sm" variant="outline" onClick={onActivate} disabled={busy || !canActivate}>
               <PlayCircle className="h-4 w-4" /> Activate
             </Button>
           )}

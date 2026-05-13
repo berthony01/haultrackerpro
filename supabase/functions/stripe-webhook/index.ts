@@ -21,6 +21,62 @@ function resolvePlanKey(priceId: string): string {
   return "pro_monthly";
 }
 
+const RECRUITER_PLAN_LIMITS: Record<string, number> = {
+  none: 0, starter: 1, growth: 5, fleet: 25,
+};
+
+function resolveRecruiterPlan(priceId: string, metadataPlan?: string | null): string | null {
+  if (metadataPlan && RECRUITER_PLAN_LIMITS[metadataPlan] != null) return metadataPlan;
+  const map: Record<string, string> = {
+    [Deno.env.get("STRIPE_RECRUITER_STARTER_PRICE_ID") ?? ""]: "starter",
+    [Deno.env.get("STRIPE_RECRUITER_GROWTH_PRICE_ID") ?? ""]: "growth",
+    [Deno.env.get("STRIPE_RECRUITER_FLEET_PRICE_ID") ?? ""]: "fleet",
+  };
+  return map[priceId] ?? null;
+}
+
+async function handleRecruiterSubscription(
+  supabaseClient: any,
+  subscription: Stripe.Subscription,
+  metadata: Record<string, string>,
+) {
+  const userId = metadata.user_id;
+  const recruiterId = metadata.recruiter_id;
+  if (!userId || !recruiterId) {
+    logStep("Recruiter sub missing metadata", { subId: subscription.id });
+    return;
+  }
+  const priceId = subscription.items.data[0]?.price?.id ?? "";
+  const isCanceledLike = ["canceled", "incomplete_expired"].includes(subscription.status);
+  const plan = isCanceledLike
+    ? "none"
+    : (resolveRecruiterPlan(priceId, metadata.plan) ?? "none");
+  const limit = RECRUITER_PLAN_LIMITS[plan] ?? 0;
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null;
+  const status = isCanceledLike ? "canceled" : subscription.status;
+
+  const { error } = await supabaseClient
+    .from("recruiter_billing_profiles")
+    .upsert(
+      {
+        recruiter_id: recruiterId,
+        user_id: userId,
+        stripe_customer_id: subscription.customer as string,
+        stripe_subscription_id: subscription.id,
+        plan,
+        status,
+        active_opportunity_limit: limit,
+        current_period_end: periodEnd,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "recruiter_id" },
+    );
+  if (error) logStep("Recruiter billing upsert error", { error: error.message });
+  else logStep("Recruiter billing updated", { recruiterId, plan, status, limit });
+}
+
 /** Upsert the subscriptions table row */
 async function upsertSubscription(
   supabaseClient: any,
@@ -97,6 +153,18 @@ serve(async (req) => {
         logStep("Checkout completed", { sessionId: session.id, customerId: session.customer, subscriptionId: session.subscription });
 
         const userId = session.metadata?.user_id;
+        const billingType = session.metadata?.billing_type;
+
+        // Recruiter checkout — handle separately, do NOT touch driver Pro tables
+        if (billingType === "recruiter" && session.subscription) {
+          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+          await handleRecruiterSubscription(supabaseClient, sub, {
+            ...(session.metadata ?? {}),
+            ...(sub.metadata ?? {}),
+          });
+          break;
+        }
+
         if (userId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const priceId = subscription.items.data[0]?.price?.id || "";
@@ -138,6 +206,12 @@ serve(async (req) => {
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription updated", { subscriptionId: subscription.id, status: subscription.status });
+
+        // Recruiter billing branch
+        if (subscription.metadata?.billing_type === "recruiter") {
+          await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
+          break;
+        }
 
         const customerId = subscription.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
@@ -261,6 +335,11 @@ serve(async (req) => {
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription deleted", { subscriptionId: subscription.id });
+
+        if (subscription.metadata?.billing_type === "recruiter") {
+          await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
+          break;
+        }
 
         // Find user
         const { data: subRow } = await supabaseClient
