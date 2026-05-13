@@ -25,6 +25,8 @@ import {
   type Opportunity,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
+import { RecruiterBillingPanel } from './RecruiterBillingPanel';
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 
 interface Props {
   onBack: () => void;
@@ -35,6 +37,7 @@ type View = 'list' | 'edit';
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
   const { opportunities, isLoading, setStatus, refetch } = useRecruiterOpportunities();
+  const billing = useRecruiterBilling();
 
   const [view, setView] = useState<View>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
