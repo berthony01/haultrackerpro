@@ -24,6 +24,7 @@ import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunity
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { Info } from 'lucide-react';
+import { OpportunityProfitBreakdown } from './OpportunityProfitBreakdown';
 
 interface Props {
   opportunity: Opportunity;
