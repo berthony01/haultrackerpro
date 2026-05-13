@@ -270,7 +270,6 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           {filtered.map((a: any) => {
             const dp = a.driver_profile;
             const opp = a.opportunities;
-            const isTerminal = ['hired', 'rejected', 'withdrawn'].includes(a.status);
             const match = dp && opp
               ? calculateOpportunityMatch({
                   opportunity: opp,
