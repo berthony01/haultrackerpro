@@ -373,7 +373,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filtered.map((o) => (
+          {filtered.map(({ opportunity: o }) => (
             <OpportunityCard
               key={o.id}
               opportunity={o}
@@ -382,6 +382,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
               onToggleSave={() => handleToggleSave(o.id)}
               saving={save.isPending || unsave.isPending}
               isPro={isPro}
+              driverProfile={profile}
             />
           ))}
         </div>
