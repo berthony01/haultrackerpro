@@ -96,7 +96,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       if (driverType !== ANY && o.driver_type !== driverType) return false;
       if (routeType !== ANY && o.route_type !== routeType) return false;
       if (trailerType !== ANY && o.trailer_type !== trailerType) return false;
-      if (min > 0 && (Number(o.estimated_weekly_gross) || 0) < min) return false;
+      if (min > 0) {
+        const gross = calculateOpportunityFinancials(o).estimatedGross;
+        if (gross == null || gross < min) return false;
+      }
       if (paidDeadheadOnly && o.deadhead_paid !== true) return false;
       return true;
     });
