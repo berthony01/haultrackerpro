@@ -76,14 +76,24 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   }
 
   const handleStatus = (id: string, status: 'active' | 'paused' | 'closed') => {
+    if (status === 'active' && !billing.canSubmitMore) {
+      if (!billing.isBillingActive) {
+        toast.error('Recruiter billing required to submit opportunities for review.');
+      } else {
+        toast.error("You've reached your active opportunity limit. Upgrade your plan.");
+      }
+      return;
+    }
     setStatus.mutate(
       { id, status },
       {
-        onSuccess: () => toast.success(`Opportunity ${status}`),
+        onSuccess: () => { toast.success(`Opportunity ${status}`); billing.refresh(); },
         onError: (e: Error) => toast.error(e.message),
       }
     );
   };
+
+  const canActivate = billing.canSubmitMore;
 
   return (
     <div className="space-y-6 animate-fade-in">
