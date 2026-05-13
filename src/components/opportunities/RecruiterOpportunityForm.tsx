@@ -305,7 +305,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       </Section>
 
       <Section icon={DollarSign} title="Pay Details">
-        <div className="col-span-full rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+        <div className="sm:col-span-2 rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
           HaulTrackerPro uses these numbers to estimate gross, net, RPM, and driver-facing profit clarity. Be accurate. Misleading opportunities may be removed.
         </div>
         <Field label="Pay Model">
@@ -347,7 +347,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       </Section>
 
       <Section icon={Wallet} title="Deductions / Costs">
-        <div className="col-span-full rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+        <div className="sm:col-span-2 rounded-lg bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
           Deductions feed driver-facing net pay and Profit Clarity score. Accurate disclosure builds trust.
         </div>
         <Field label="Fuel Paid By">
