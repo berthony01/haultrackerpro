@@ -110,6 +110,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
     setForm((f) => ({ ...f, [k]: v }));
 
   const isEditMode = !!profile;
+  const isRejected = profile?.verification_status === 'rejected';
   const allAgreed = agree1 && agree2 && agree3;
 
   const statusCfg = useMemo(() => {
