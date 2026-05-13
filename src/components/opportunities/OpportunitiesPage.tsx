@@ -154,6 +154,10 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showRecruiterManager) {
+    return <RecruiterOpportunityManager onBack={() => setShowRecruiterManager(false)} />;
+  }
+
   if (showRecruiter) {
     return <RecruiterOnboarding onBack={() => setShowRecruiter(false)} />;
   }
