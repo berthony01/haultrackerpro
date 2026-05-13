@@ -207,6 +207,12 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription updated", { subscriptionId: subscription.id, status: subscription.status });
 
+        // Recruiter billing branch
+        if (subscription.metadata?.billing_type === "recruiter") {
+          await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
+          break;
+        }
+
         const customerId = subscription.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
         const email = (customer as Stripe.Customer).email;
