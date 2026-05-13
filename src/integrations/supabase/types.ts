@@ -1983,6 +1983,10 @@ export type Database = {
         }
         Returns: string
       }
+      withdraw_opportunity_application: {
+        Args: { application_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
