@@ -1,0 +1,395 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  ArrowLeft,
+  Building2,
+  ShieldCheck,
+  User,
+  Truck,
+  Save,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Ban,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useRecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
+
+interface Props {
+  onBack: () => void;
+}
+
+type FormState = {
+  recruiter_name: string;
+  recruiter_email: string;
+  recruiter_phone: string;
+  company_name: string;
+  company_website: string;
+  company_phone: string;
+  company_address: string;
+  company_city: string;
+  company_state: string;
+  dot_number: string;
+  mc_number: string;
+  hiring_states: string;
+  equipment_types: string;
+  driver_types_hired: string;
+};
+
+const EMPTY: FormState = {
+  recruiter_name: '',
+  recruiter_email: '',
+  recruiter_phone: '',
+  company_name: '',
+  company_website: '',
+  company_phone: '',
+  company_address: '',
+  company_city: '',
+  company_state: '',
+  dot_number: '',
+  mc_number: '',
+  hiring_states: '',
+  equipment_types: '',
+  driver_types_hired: '',
+};
+
+const splitList = (s: string): string[] =>
+  s.split(',').map((p) => p.trim()).filter(Boolean);
+
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+const isUrlish = (v: string) => {
+  if (!v.trim()) return true;
+  try {
+    const u = v.includes('://') ? v : `https://${v}`;
+    new URL(u);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export function RecruiterOnboarding({ onBack }: Props) {
+  const { profile, isLoading, upsertProfile } = useRecruiterProfile();
+
+  const [form, setForm] = useState<FormState>(EMPTY);
+  const [agree1, setAgree1] = useState(false);
+  const [agree2, setAgree2] = useState(false);
+  const [agree3, setAgree3] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        recruiter_name: profile.recruiter_name ?? '',
+        recruiter_email: profile.recruiter_email ?? '',
+        recruiter_phone: profile.recruiter_phone ?? '',
+        company_name: profile.company_name ?? '',
+        company_website: profile.company_website ?? '',
+        company_phone: profile.company_phone ?? '',
+        company_address: profile.company_address ?? '',
+        company_city: profile.company_city ?? '',
+        company_state: profile.company_state ?? '',
+        dot_number: profile.dot_number ?? '',
+        mc_number: profile.mc_number ?? '',
+        hiring_states: (profile.hiring_states ?? []).join(', '),
+        equipment_types: (profile.equipment_types ?? []).join(', '),
+        driver_types_hired: (profile.driver_types_hired ?? []).join(', '),
+      });
+      setAgree1(true);
+      setAgree2(true);
+      setAgree3(true);
+    }
+  }, [profile]);
+
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const isEditMode = !!profile;
+  const allAgreed = agree1 && agree2 && agree3;
+
+  const statusCfg = useMemo(() => {
+    if (!profile) return null;
+    const v = profile.verification_status;
+    const s = profile.status;
+    if (s === 'suspended' || v === 'suspended') {
+      return {
+        title: 'Recruiter Access Suspended',
+        text: 'Please contact support regarding your recruiter account.',
+        badge: 'Suspended',
+        variant: 'destructive' as const,
+        Icon: Ban,
+      };
+    }
+    if (v === 'approved') {
+      return {
+        title: 'Recruiter Access Approved',
+        text: 'You will soon be able to create opportunities and manage driver requests.',
+        badge: 'Approved',
+        variant: 'default' as const,
+        Icon: CheckCircle2,
+      };
+    }
+    if (v === 'rejected') {
+      return {
+        title: 'Recruiter Profile Needs Attention',
+        text: 'Please review your recruiter information and contact support if needed.',
+        badge: 'Needs Attention',
+        variant: 'secondary' as const,
+        Icon: AlertTriangle,
+      };
+    }
+    return {
+      title: 'Recruiter Profile Submitted',
+      text: 'Your recruiter profile is currently under review.',
+      badge: 'Pending Review',
+      variant: 'outline' as const,
+      Icon: Clock,
+    };
+  }, [profile]);
+
+  const validate = (): string | null => {
+    if (!form.recruiter_name.trim()) return 'Recruiter name is required.';
+    if (!form.company_name.trim()) return 'Company name is required.';
+    if (!form.recruiter_email.trim()) return 'Recruiter email is required.';
+    if (!isEmail(form.recruiter_email)) return 'Please enter a valid recruiter email.';
+    if (!form.dot_number.trim() && !form.mc_number.trim())
+      return 'Please provide at least a DOT or MC number.';
+    if (form.company_website && !isUrlish(form.company_website))
+      return 'Please enter a valid company website.';
+    if (!allAgreed) return 'Please confirm all agreements before submitting.';
+    return null;
+  };
+
+  const handleSave = () => {
+    const err = validate();
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    const payload: RecruiterProfileUpsert = {
+      recruiter_name: form.recruiter_name.trim(),
+      recruiter_email: form.recruiter_email.trim() || null,
+      recruiter_phone: form.recruiter_phone.trim() || null,
+      company_name: form.company_name.trim(),
+      company_website: form.company_website.trim() || null,
+      company_phone: form.company_phone.trim() || null,
+      company_address: form.company_address.trim() || null,
+      company_city: form.company_city.trim() || null,
+      company_state: form.company_state.trim() || null,
+      dot_number: form.dot_number.trim() || null,
+      mc_number: form.mc_number.trim() || null,
+      hiring_states: splitList(form.hiring_states),
+      equipment_types: splitList(form.equipment_types),
+      driver_types_hired: splitList(form.driver_types_hired),
+    };
+    upsertProfile.mutate(payload, {
+      onSuccess: () => toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted'),
+      onError: (e: Error) => toast.error(e.message),
+    });
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-32">
+      {/* Header */}
+      <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+        <div className="flex items-start gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
+            <Building2 className="h-6 w-6 text-primary-foreground" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
+              Recruiter & Carrier Access
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Connect with financially serious drivers through HaulTrackerPro.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Status state card (only when profile exists) */}
+      {statusCfg && (
+        <Card className="p-5 border-border/60">
+          <div className="flex items-start gap-4">
+            <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+              <statusCfg.Icon className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h3 className="text-base font-bold text-foreground">{statusCfg.title}</h3>
+                <Badge variant={statusCfg.variant}>{statusCfg.badge}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">{statusCfg.text}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {isLoading && !profile ? (
+        <Card className="p-6 border-border/60">
+          <p className="text-sm text-muted-foreground">Loading recruiter profile…</p>
+        </Card>
+      ) : (
+        <>
+          {/* A. Recruiter Information */}
+          <Section icon={User} title="Recruiter Information">
+            <Field label="Recruiter Name *">
+              <Input value={form.recruiter_name} onChange={(e) => set('recruiter_name', e.target.value)} />
+            </Field>
+            <Field label="Recruiter Email *">
+              <Input type="email" value={form.recruiter_email} onChange={(e) => set('recruiter_email', e.target.value)} />
+            </Field>
+            <Field label="Recruiter Phone">
+              <Input value={form.recruiter_phone} onChange={(e) => set('recruiter_phone', e.target.value)} />
+            </Field>
+          </Section>
+
+          {/* B. Company Information */}
+          <Section icon={Building2} title="Company Information">
+            <Field label="Company Name *">
+              <Input value={form.company_name} onChange={(e) => set('company_name', e.target.value)} />
+            </Field>
+            <Field label="Company Website">
+              <Input placeholder="https://" value={form.company_website} onChange={(e) => set('company_website', e.target.value)} />
+            </Field>
+            <Field label="Company Phone">
+              <Input value={form.company_phone} onChange={(e) => set('company_phone', e.target.value)} />
+            </Field>
+            <Field label="Company Address" full>
+              <Input value={form.company_address} onChange={(e) => set('company_address', e.target.value)} />
+            </Field>
+            <Field label="City">
+              <Input value={form.company_city} onChange={(e) => set('company_city', e.target.value)} />
+            </Field>
+            <Field label="State">
+              <Input value={form.company_state} onChange={(e) => set('company_state', e.target.value)} />
+            </Field>
+          </Section>
+
+          {/* C. Verification Information */}
+          <Section icon={ShieldCheck} title="Verification Information">
+            <Field label="DOT Number">
+              <Input value={form.dot_number} onChange={(e) => set('dot_number', e.target.value)} />
+            </Field>
+            <Field label="MC Number">
+              <Input value={form.mc_number} onChange={(e) => set('mc_number', e.target.value)} />
+            </Field>
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              Provide at least one of DOT or MC number. We use this to verify your authority before approval.
+            </p>
+          </Section>
+
+          {/* D. Hiring Information */}
+          <Section icon={Truck} title="Hiring Information">
+            <Field label="Hiring States" full>
+              <Textarea
+                rows={2}
+                placeholder="e.g. TX, OK, AR, LA"
+                value={form.hiring_states}
+                onChange={(e) => set('hiring_states', e.target.value)}
+              />
+            </Field>
+            <Field label="Equipment Types" full>
+              <Textarea
+                rows={2}
+                placeholder="e.g. Dry Van, Reefer, Flatbed"
+                value={form.equipment_types}
+                onChange={(e) => set('equipment_types', e.target.value)}
+              />
+            </Field>
+            <Field label="Driver Types Hired" full>
+              <Textarea
+                rows={2}
+                placeholder="e.g. Company Driver, Owner Operator, Lease Purchase"
+                value={form.driver_types_hired}
+                onChange={(e) => set('driver_types_hired', e.target.value)}
+              />
+            </Field>
+          </Section>
+
+          {/* E. Agreements */}
+          <Card className="p-5 border-border/60 space-y-3">
+            <h3 className="text-sm font-bold text-foreground">Agreements</h3>
+            <Agreement checked={agree1} onChange={setAgree1} text="I confirm that my company information is accurate." />
+            <Agreement checked={agree2} onChange={setAgree2} text="I understand misleading opportunities may be removed." />
+            <Agreement checked={agree3} onChange={setAgree3} text="I understand HaulTrackerPro may suspend misleading recruiter accounts." />
+          </Card>
+
+          {/* Sticky save */}
+          <div className="fixed bottom-20 lg:bottom-6 inset-x-0 z-30 px-4">
+            <div className="max-w-4xl mx-auto">
+              <Card className="p-3 border-border/60 bg-card/95 backdrop-blur shadow-lg flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground hidden sm:block">
+                  {isEditMode ? 'Update your recruiter profile.' : 'Submit for verification review.'}
+                </p>
+                <div className="flex gap-2 ml-auto">
+                  <Button variant="outline" onClick={onBack}>Cancel</Button>
+                  <Button onClick={handleSave} disabled={upsertProfile.isPending}>
+                    <Save className="h-4 w-4" />
+                    {isEditMode ? 'Save Changes' : 'Submit Recruiter Profile'}
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Section({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: typeof User;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="p-5 border-border/60">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="rounded-lg bg-primary/10 p-1.5">
+          <Icon className="h-4 w-4 text-primary" />
+        </div>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">{title}</h3>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
+    </Card>
+  );
+}
+
+function Field({ label, full, children }: { label: string; full?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={full ? 'sm:col-span-2 space-y-1.5' : 'space-y-1.5'}>
+      <Label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function Agreement({
+  checked,
+  onChange,
+  text,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  text: string;
+}) {
+  return (
+    <label className="flex items-start gap-3 cursor-pointer">
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} className="mt-0.5" />
+      <span className="text-sm text-foreground">{text}</span>
+    </label>
+  );
+}
