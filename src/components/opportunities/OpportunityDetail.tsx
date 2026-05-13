@@ -38,7 +38,7 @@ const fmtMoney = (v: number | null | undefined) =>
 const fmtMiles = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString()} mi`;
 
-export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade }: Props) {
+export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, driverProfile }: Props) {
   const { saved, save, unsave } = useSavedOpportunities();
   const { driverApplications, createApplication } = useOpportunityApplications();
   const [submitting, setSubmitting] = useState(false);
