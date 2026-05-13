@@ -125,6 +125,68 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         </div>
       </Card>
 
+      {/* Match Insights */}
+      {match ? (
+        <Card className="p-5 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-primary/15 p-1.5">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+              </div>
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Your Match</h3>
+            </div>
+            <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} size="md" />
+          </div>
+          {match.reasons.length > 0 && (
+            <div className="mb-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                Why This Matches You
+              </p>
+              <ul className="space-y-1.5">
+                {match.reasons.map((r) => (
+                  <li key={r} className="flex items-start gap-2 text-sm text-foreground">
+                    <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                    <span>{r}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {match.warnings.length > 0 && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                Potential Concerns
+              </p>
+              <ul className="space-y-1.5">
+                {match.warnings.map((w) => (
+                  <li key={w} className="flex items-start gap-2 text-sm text-foreground">
+                    <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <span>{w}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {match.reasons.length === 0 && match.warnings.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              We couldn't pull strong signals from this opportunity. Review the pay and deduction details below.
+            </p>
+          )}
+        </Card>
+      ) : (
+        <Card className="p-5 border-border/60 bg-muted/20">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-sm font-bold text-foreground mb-1">Unlock Match Insights</h3>
+              <p className="text-sm text-muted-foreground">
+                Complete your Driver Opportunity Profile to see how well this opportunity fits your pay goals, route preference, and equipment.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Pay breakdown */}
       <Section icon={DollarSign} title="Pay Breakdown">
         <Grid>
