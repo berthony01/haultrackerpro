@@ -269,8 +269,8 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         <Kpi icon={ShieldCheck} label="Active Recruiters" value={kpis.recruiters.toString()} />
         <Kpi
           icon={DollarSign}
-          label="Highest Weekly Gross"
-          value={kpis.maxGross > 0 ? `$${Math.round(kpis.maxGross).toLocaleString()}` : '—'}
+          label="Highest Estimated Net"
+          value={kpis.maxNet > 0 ? `$${Math.round(kpis.maxNet).toLocaleString()}` : '—'}
         />
         <Kpi
           icon={Gauge}
