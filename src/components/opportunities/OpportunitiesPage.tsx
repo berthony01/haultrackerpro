@@ -495,10 +495,12 @@ function RecruiterEntryCard({
   profile,
   onClick,
   onManage,
+  onApplications,
 }: {
   profile: ReturnType<typeof useRecruiterProfile>['profile'];
   onClick: () => void;
   onManage: () => void;
+  onApplications: () => void;
 }) {
   // No recruiter profile yet → simple CTA
   if (!profile) {
