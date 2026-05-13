@@ -10,12 +10,17 @@ import {
   Bookmark,
   BookmarkCheck,
   TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
 import {
   calculateOpportunityFinancials,
   profitScoreLabel,
 } from '@/lib/opportunities/opportunityProfit';
+import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
+import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 
 interface Props {
   opportunity: Opportunity;
@@ -24,6 +29,7 @@ interface Props {
   onToggleSave: () => void;
   saving?: boolean;
   isPro?: boolean;
+  driverProfile?: DriverOpportunityProfile | null;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
