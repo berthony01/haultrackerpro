@@ -29,7 +29,7 @@ serve(async (req) => {
     );
     if (userErr) throw new Error(userErr.message);
     const user = userData.user;
-    if (!user?.email) throw new Error("Not authenticated");
+    if (!user) throw new Error("Not authenticated");
 
     const { data: billing } = await supabase
       .from("recruiter_billing_profiles")
@@ -37,14 +37,12 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-
-    let customerId = billing?.stripe_customer_id ?? null;
+    const customerId = billing?.stripe_customer_id ?? null;
     if (!customerId) {
-      const cs = await stripe.customers.list({ email: user.email, limit: 1 });
-      customerId = cs.data[0]?.id ?? null;
+      throw new Error("Recruiter billing customer not found. Please start a recruiter subscription first.");
     }
-    if (!customerId) throw new Error("No Stripe customer found");
+
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
     const ALLOWED = new Set([
       "https://haultrackerpro.com",

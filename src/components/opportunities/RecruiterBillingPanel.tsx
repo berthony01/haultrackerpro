@@ -11,9 +11,9 @@ import {
 } from '@/hooks/opportunities/useRecruiterBilling';
 
 const PLANS: { key: Exclude<RecruiterPlan, 'none'>; price: string; perks: string[] }[] = [
-  { key: 'starter', price: '$49/mo', perks: ['1 active opportunity', 'Approved listings', 'Driver applications'] },
-  { key: 'growth', price: '$149/mo', perks: ['Up to 5 active opportunities', 'Driver applications', 'Profit-first listings'] },
-  { key: 'fleet', price: '$399/mo', perks: ['Up to 25 active opportunities', 'Driver applications', 'Full visibility'] },
+  { key: 'starter', price: '$19/mo', perks: ['1 active opportunity', 'Approved listings', 'Driver applications'] },
+  { key: 'growth', price: '$49/mo', perks: ['Up to 5 active opportunities', 'Driver applications', 'Profit-first listings'] },
+  { key: 'fleet', price: '$149/mo', perks: ['Up to 25 active opportunities', 'Driver applications', 'Full visibility'] },
 ];
 
 export function RecruiterBillingPanel() {

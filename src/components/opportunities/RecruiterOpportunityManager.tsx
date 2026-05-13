@@ -71,6 +71,14 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
         initial={editing}
         onBack={() => { setView('list'); setEditing(null); }}
         onSaved={() => { setView('list'); setEditing(null); refetch(); }}
+        canSubmitForReview={billing.canSubmitMore}
+        submitBlockReason={
+          !billing.isBillingActive
+            ? 'Recruiter billing required to submit opportunities for review.'
+            : billing.activeCount >= billing.limit
+              ? "You've reached your active opportunity limit. Upgrade your plan."
+              : null
+        }
       />
     );
   }
