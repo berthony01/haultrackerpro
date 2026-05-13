@@ -168,6 +168,10 @@ export function RecruiterOnboarding({ onBack }: Props) {
   };
 
   const handleSave = () => {
+    if (isSuspended) {
+      toast.error('Recruiter access suspended. Please contact support.');
+      return;
+    }
     const err = validate();
     if (err) {
       toast.error(err);
