@@ -268,6 +268,93 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_opportunity_profiles: {
+        Row: {
+          allow_verified_recruiter_contact: boolean
+          available_start_date: string | null
+          cdl_class: string | null
+          city: string | null
+          contact_preference: string
+          created_at: string
+          email: string | null
+          endorsements: string[]
+          full_name: string | null
+          id: string
+          min_effective_rpm: number | null
+          min_weekly_gross: number | null
+          min_weekly_net: number | null
+          phone: string | null
+          preferred_driver_type: string | null
+          preferred_home_time: string | null
+          preferred_route_type: string | null
+          preferred_states: string[]
+          profile_completed: boolean
+          state: string | null
+          trailer_experience: string[]
+          updated_at: string
+          user_id: string
+          visibility: string
+          willing_to_relocate: boolean
+          years_experience: number | null
+        }
+        Insert: {
+          allow_verified_recruiter_contact?: boolean
+          available_start_date?: string | null
+          cdl_class?: string | null
+          city?: string | null
+          contact_preference?: string
+          created_at?: string
+          email?: string | null
+          endorsements?: string[]
+          full_name?: string | null
+          id?: string
+          min_effective_rpm?: number | null
+          min_weekly_gross?: number | null
+          min_weekly_net?: number | null
+          phone?: string | null
+          preferred_driver_type?: string | null
+          preferred_home_time?: string | null
+          preferred_route_type?: string | null
+          preferred_states?: string[]
+          profile_completed?: boolean
+          state?: string | null
+          trailer_experience?: string[]
+          updated_at?: string
+          user_id: string
+          visibility?: string
+          willing_to_relocate?: boolean
+          years_experience?: number | null
+        }
+        Update: {
+          allow_verified_recruiter_contact?: boolean
+          available_start_date?: string | null
+          cdl_class?: string | null
+          city?: string | null
+          contact_preference?: string
+          created_at?: string
+          email?: string | null
+          endorsements?: string[]
+          full_name?: string | null
+          id?: string
+          min_effective_rpm?: number | null
+          min_weekly_gross?: number | null
+          min_weekly_net?: number | null
+          phone?: string | null
+          preferred_driver_type?: string | null
+          preferred_home_time?: string | null
+          preferred_route_type?: string | null
+          preferred_states?: string[]
+          profile_completed?: boolean
+          state?: string | null
+          trailer_experience?: string[]
+          updated_at?: string
+          user_id?: string
+          visibility?: string
+          willing_to_relocate?: boolean
+          years_experience?: number | null
+        }
+        Relationships: []
+      }
       driver_points: {
         Row: {
           best_weekly_period_start: string | null
@@ -867,6 +954,279 @@ export type Database = {
         }
         Relationships: []
       }
+      opportunities: {
+        Row: {
+          admin_review_status: string
+          benefits: string | null
+          company_name: string
+          cpm: number | null
+          created_at: string
+          deadhead_paid: boolean | null
+          description: string | null
+          detention_pay: string | null
+          driver_type: string | null
+          equipment_year: string | null
+          escrow_amount: number | null
+          escrow_required: boolean
+          estimated_deadhead_miles: number | null
+          estimated_loaded_miles: number | null
+          estimated_weekly_gross: number | null
+          estimated_weekly_miles: number | null
+          featured: boolean
+          flat_weekly_pay: number | null
+          forced_dispatch: boolean | null
+          fuel_paid_by: string | null
+          hiring_city: string | null
+          hiring_state: string | null
+          hiring_states: string[]
+          home_time: string | null
+          id: string
+          insurance_deductions: number | null
+          layover_pay: string | null
+          lease_payment: number | null
+          maintenance_deductions: number | null
+          other_deductions: number | null
+          pay_model: string | null
+          percentage_pay: number | null
+          pets_allowed: boolean | null
+          published_at: string | null
+          recruiter_id: string
+          riders_allowed: boolean | null
+          route_type: string | null
+          sign_on_bonus: number | null
+          status: string
+          title: string
+          trailer_type: string | null
+          transparency_confirmed: boolean
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          admin_review_status?: string
+          benefits?: string | null
+          company_name: string
+          cpm?: number | null
+          created_at?: string
+          deadhead_paid?: boolean | null
+          description?: string | null
+          detention_pay?: string | null
+          driver_type?: string | null
+          equipment_year?: string | null
+          escrow_amount?: number | null
+          escrow_required?: boolean
+          estimated_deadhead_miles?: number | null
+          estimated_loaded_miles?: number | null
+          estimated_weekly_gross?: number | null
+          estimated_weekly_miles?: number | null
+          featured?: boolean
+          flat_weekly_pay?: number | null
+          forced_dispatch?: boolean | null
+          fuel_paid_by?: string | null
+          hiring_city?: string | null
+          hiring_state?: string | null
+          hiring_states?: string[]
+          home_time?: string | null
+          id?: string
+          insurance_deductions?: number | null
+          layover_pay?: string | null
+          lease_payment?: number | null
+          maintenance_deductions?: number | null
+          other_deductions?: number | null
+          pay_model?: string | null
+          percentage_pay?: number | null
+          pets_allowed?: boolean | null
+          published_at?: string | null
+          recruiter_id: string
+          riders_allowed?: boolean | null
+          route_type?: string | null
+          sign_on_bonus?: number | null
+          status?: string
+          title: string
+          trailer_type?: string | null
+          transparency_confirmed?: boolean
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          admin_review_status?: string
+          benefits?: string | null
+          company_name?: string
+          cpm?: number | null
+          created_at?: string
+          deadhead_paid?: boolean | null
+          description?: string | null
+          detention_pay?: string | null
+          driver_type?: string | null
+          equipment_year?: string | null
+          escrow_amount?: number | null
+          escrow_required?: boolean
+          estimated_deadhead_miles?: number | null
+          estimated_loaded_miles?: number | null
+          estimated_weekly_gross?: number | null
+          estimated_weekly_miles?: number | null
+          featured?: boolean
+          flat_weekly_pay?: number | null
+          forced_dispatch?: boolean | null
+          fuel_paid_by?: string | null
+          hiring_city?: string | null
+          hiring_state?: string | null
+          hiring_states?: string[]
+          home_time?: string | null
+          id?: string
+          insurance_deductions?: number | null
+          layover_pay?: string | null
+          lease_payment?: number | null
+          maintenance_deductions?: number | null
+          other_deductions?: number | null
+          pay_model?: string | null
+          percentage_pay?: number | null
+          pets_allowed?: boolean | null
+          published_at?: string | null
+          recruiter_id?: string
+          riders_allowed?: boolean | null
+          route_type?: string | null
+          sign_on_bonus?: number | null
+          status?: string
+          title?: string
+          trailer_type?: string | null
+          transparency_confirmed?: boolean
+          updated_at?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_applications: {
+        Row: {
+          application_type: string
+          created_at: string
+          driver_email_snapshot: string | null
+          driver_phone_snapshot: string | null
+          driver_profile_id: string | null
+          driver_user_id: string
+          id: string
+          message: string | null
+          opportunity_id: string
+          preferred_contact_method: string | null
+          recruiter_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_type?: string
+          created_at?: string
+          driver_email_snapshot?: string | null
+          driver_phone_snapshot?: string | null
+          driver_profile_id?: string | null
+          driver_user_id: string
+          id?: string
+          message?: string | null
+          opportunity_id: string
+          preferred_contact_method?: string | null
+          recruiter_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_type?: string
+          created_at?: string
+          driver_email_snapshot?: string | null
+          driver_phone_snapshot?: string | null
+          driver_profile_id?: string | null
+          driver_user_id?: string
+          id?: string
+          message?: string | null
+          opportunity_id?: string
+          preferred_contact_method?: string | null
+          recruiter_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_applications_driver_profile_id_fkey"
+            columns: ["driver_profile_id"]
+            isOneToOne: false
+            referencedRelation: "driver_opportunity_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_applications_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_applications_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_reports: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          details: string | null
+          id: string
+          opportunity_id: string | null
+          reason: string
+          recruiter_id: string | null
+          reporter_user_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          opportunity_id?: string | null
+          reason: string
+          recruiter_id?: string | null
+          reporter_user_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          opportunity_id?: string | null
+          reason?: string
+          recruiter_id?: string | null
+          reporter_user_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_reports_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_reports_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parking_favorites: {
         Row: {
           created_at: string
@@ -1086,6 +1446,84 @@ export type Database = {
         }
         Relationships: []
       }
+      recruiter_profiles: {
+        Row: {
+          admin_notes: string | null
+          company_address: string | null
+          company_city: string | null
+          company_name: string
+          company_phone: string | null
+          company_state: string | null
+          company_website: string | null
+          created_at: string
+          dot_number: string | null
+          driver_types_hired: string[]
+          equipment_types: string[]
+          hiring_states: string[]
+          id: string
+          mc_number: string | null
+          recruiter_email: string | null
+          recruiter_name: string
+          recruiter_phone: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          verification_status: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          company_address?: string | null
+          company_city?: string | null
+          company_name: string
+          company_phone?: string | null
+          company_state?: string | null
+          company_website?: string | null
+          created_at?: string
+          dot_number?: string | null
+          driver_types_hired?: string[]
+          equipment_types?: string[]
+          hiring_states?: string[]
+          id?: string
+          mc_number?: string | null
+          recruiter_email?: string | null
+          recruiter_name: string
+          recruiter_phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          company_address?: string | null
+          company_city?: string | null
+          company_name?: string
+          company_phone?: string | null
+          company_state?: string | null
+          company_website?: string | null
+          created_at?: string
+          dot_number?: string | null
+          driver_types_hired?: string[]
+          equipment_types?: string[]
+          hiring_states?: string[]
+          id?: string
+          mc_number?: string | null
+          recruiter_email?: string | null
+          recruiter_name?: string
+          recruiter_phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
       recurring_expense_templates: {
         Row: {
           amount: number
@@ -1148,6 +1586,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      saved_opportunities: {
+        Row: {
+          created_at: string
+          id: string
+          opportunity_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          opportunity_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          opportunity_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_opportunities_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -1464,6 +1931,10 @@ export type Database = {
         }[]
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_recruiter_owner: {
+        Args: { _recruiter_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       move_to_dlq: {
         Args: {
