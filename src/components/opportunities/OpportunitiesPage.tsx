@@ -99,17 +99,18 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
 
   const kpis = useMemo(() => {
     const recruiterIds = new Set(opportunities.map((o) => o.recruiter_id));
-    const grosses = opportunities.map((o) => Number(o.estimated_weekly_gross) || 0);
-    const rpms = opportunities.map((o) => {
-      const miles = Number(o.estimated_loaded_miles) || Number(o.estimated_weekly_miles) || 0;
-      const gross = Number(o.estimated_weekly_gross) || 0;
-      return miles > 0 ? gross / miles : 0;
-    });
+    let maxNet = 0;
+    let bestRpm = 0;
+    for (const o of opportunities) {
+      const f = calculateOpportunityFinancials(o);
+      if (f.estimatedNet != null && f.estimatedNet > maxNet) maxNet = f.estimatedNet;
+      if (f.effectiveRpm != null && f.effectiveRpm > bestRpm) bestRpm = f.effectiveRpm;
+    }
     return {
       count: opportunities.length,
       recruiters: recruiterIds.size,
-      maxGross: grosses.length ? Math.max(...grosses) : 0,
-      bestRpm: rpms.length ? Math.max(...rpms) : 0,
+      maxNet,
+      bestRpm,
     };
   }, [opportunities]);
 
