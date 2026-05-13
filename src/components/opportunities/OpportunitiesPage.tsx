@@ -31,7 +31,8 @@ import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
 import { RecruiterOnboarding } from './RecruiterOnboarding';
-import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban } from 'lucide-react';
+import { RecruiterOpportunityManager } from './RecruiterOpportunityManager';
+import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase } from 'lucide-react';
 
 interface Props {
   onUpgrade: () => void;
