@@ -113,7 +113,9 @@ const boolToDh = (b: boolean | null | undefined): DhOpt =>
   b === true ? 'paid' : b === false ? 'unpaid' : 'unspecified';
 const splitList = (s: string) => s.split(',').map((p) => p.trim()).filter(Boolean);
 
-export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
+export function RecruiterOpportunityForm({
+  initial, onBack, onSaved, canSubmitForReview = true, submitBlockReason,
+}: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const [form, setForm] = useState<FormState>(EMPTY);
 
@@ -410,13 +412,20 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
         <div className="max-w-4xl mx-auto">
           <Card className="p-3 border-border/60 bg-card/95 backdrop-blur shadow-lg flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground hidden sm:block">
-              Drafts stay private. Submit for Review to publish after admin approval.
+              {canSubmitForReview
+                ? 'Drafts stay private. Submit for Review to publish after admin approval.'
+                : (submitBlockReason ?? 'Recruiter billing required to submit opportunities for review.')}
             </p>
             <div className="flex gap-2 ml-auto">
               <Button variant="outline" onClick={() => save('draft')} disabled={pending}>
                 <Save className="h-4 w-4" /> Save Draft
               </Button>
-              <Button onClick={() => save('submit')} disabled={pending}>
+              <Button
+                onClick={() => save('submit')}
+                disabled={pending || !canSubmitForReview}
+                title={submitBlockReason ?? undefined}
+              >
+                {!canSubmitForReview && <Lock className="h-4 w-4 mr-1.5" />}
                 Submit for Review
               </Button>
             </div>
