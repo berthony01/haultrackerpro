@@ -85,7 +85,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const filtered = useMemo(() => {
     const min = Number(minGross) || 0;
     const q = search.trim().toLowerCase();
-    return opportunities.filter((o) => {
+    const base = opportunities.filter((o) => {
       if (q) {
         const hay = [o.title, o.company_name, o.hiring_city, o.hiring_state]
           .filter(Boolean)
@@ -100,7 +100,23 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       if (paidDeadheadOnly && o.deadhead_paid !== true) return false;
       return true;
     });
-  }, [opportunities, search, driverType, routeType, trailerType, minGross, paidDeadheadOnly]);
+
+    if (!matchEnabled || !profile) {
+      return base.map((o) => ({ opportunity: o, match: null as ReturnType<typeof calculateOpportunityMatch> | null }));
+    }
+
+    const scored = base.map((o) => {
+      const f = calculateOpportunityFinancials(o);
+      const match = calculateOpportunityMatch({ opportunity: o, driverProfile: profile, opportunityFinancials: f });
+      return { opportunity: o, match };
+    });
+
+    const tierFiltered = matchTierFilter === ANY
+      ? scored
+      : scored.filter((s) => s.match?.matchTier === matchTierFilter);
+
+    return tierFiltered.sort((a, b) => (b.match?.matchScore ?? 0) - (a.match?.matchScore ?? 0));
+  }, [opportunities, search, driverType, routeType, trailerType, minGross, paidDeadheadOnly, matchEnabled, profile, matchTierFilter]);
 
   const kpis = useMemo(() => {
     const recruiterIds = new Set(opportunities.map((o) => o.recruiter_id));
