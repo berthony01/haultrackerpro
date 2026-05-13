@@ -35,7 +35,7 @@ interface Props {
 const ANY = 'any';
 
 export function OpportunitiesPage({ onUpgrade }: Props) {
-  const { opportunities, isLoading, refetch } = useOpportunities();
+  const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
 
@@ -112,6 +112,37 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     [opportunities, selectedId]
   );
 
+  if (isError) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+          <div className="flex items-start gap-4">
+            <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
+              <BriefcaseBusiness className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
+                Opportunities
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Profit-first trucking opportunities with real pay clarity.
+              </p>
+            </div>
+          </div>
+        </Card>
+        <EmptyState
+          title="Unable to load opportunities"
+          body={error && (error as Error).message ? (error as Error).message : 'Something went wrong while loading opportunities. Please try again.'}
+          action={
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" /> Retry
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (selected) {
     return (
       <OpportunityDetail
@@ -145,7 +176,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={BriefcaseBusiness} label="Available" value={kpis.count.toString()} />
-        <Kpi icon={ShieldCheck} label="Verified Recruiters" value={kpis.recruiters.toString()} />
+        <Kpi icon={ShieldCheck} label="Active Recruiters" value={kpis.recruiters.toString()} />
         <Kpi
           icon={DollarSign}
           label="Highest Weekly Gross"
@@ -203,7 +234,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       ) : opportunities.length === 0 ? (
         <EmptyState
           title="No opportunities yet"
-          body="Verified recruiters are joining HaulTrackerPro now. Check back soon for profit-first openings."
+          body="Recruiters are joining HaulTrackerPro now. Check back soon for profit-first openings."
           action={
             <Button variant="outline" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" /> Refresh

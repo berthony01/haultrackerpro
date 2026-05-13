@@ -39,6 +39,8 @@ export function useOpportunities(filters: OpportunityFilters = {}) {
   return {
     opportunities: query.data ?? [],
     isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
     refetch: query.refetch,
   };
 }
