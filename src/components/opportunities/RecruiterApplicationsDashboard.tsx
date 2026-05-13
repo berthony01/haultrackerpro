@@ -314,21 +314,28 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                   </div>
                 )}
 
-                {!isTerminal && (
-                  <div className="flex flex-wrap gap-2">
-                    {RECRUITER_TRANSITIONS.filter((t) => t.value !== a.status).map((t) => (
-                      <Button
-                        key={t.value}
-                        variant={t.value === 'hired' ? 'default' : t.value === 'rejected' ? 'ghost' : 'outline'}
-                        size="sm"
-                        onClick={() => handleUpdate(a.id, t.value)}
-                        disabled={pendingId === a.id || updateApplicationStatus.isPending}
-                      >
-                        {t.label}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const allowed = getAllowedTransitions(a.status);
+                  if (allowed.length === 0) return null;
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      {allowed.map((status) => {
+                        const t = RECRUITER_TRANSITIONS.find((x) => x.value === status)!;
+                        return (
+                          <Button
+                            key={t.value}
+                            variant={t.value === 'hired' ? 'default' : t.value === 'rejected' ? 'ghost' : 'outline'}
+                            size="sm"
+                            onClick={() => handleUpdate(a.id, t.value)}
+                            disabled={pendingId === a.id || updateApplicationStatus.isPending}
+                          >
+                            {t.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </Card>
             );
           })}
