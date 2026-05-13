@@ -75,6 +75,9 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
                 <TrendingUp className="h-3 w-3" /> {f.profitScore}
               </Badge>
             )}
+            {match && (
+              <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />
+            )}
           </div>
           <p className="text-sm text-muted-foreground font-semibold truncate">{o.company_name}</p>
         </div>
