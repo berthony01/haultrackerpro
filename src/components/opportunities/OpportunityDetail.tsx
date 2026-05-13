@@ -55,6 +55,14 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
 
   const location = [o.hiring_city, o.hiring_state].filter(Boolean).join(', ') || 'Multiple states';
 
+  const match = driverProfile && driverProfile.profile_completed
+    ? calculateOpportunityMatch({
+        opportunity: o,
+        driverProfile,
+        opportunityFinancials: calculateOpportunityFinancials(o),
+      })
+    : null;
+
   const handleToggleSave = () => {
     const m = isSaved ? unsave : save;
     m.mutate(o.id, {
