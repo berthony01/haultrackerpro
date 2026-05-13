@@ -158,8 +158,21 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
+  if (showRecruiterApps) {
+    return <RecruiterApplicationsDashboard onBack={() => setShowRecruiterApps(false)} />;
+  }
+
   if (showRecruiterManager) {
     return <RecruiterOpportunityManager onBack={() => setShowRecruiterManager(false)} />;
+  }
+
+  if (showDriverApps) {
+    return (
+      <DriverApplicationsPanel
+        onBack={() => setShowDriverApps(false)}
+        onViewOpportunity={(id) => { setShowDriverApps(false); setSelectedId(id); }}
+      />
+    );
   }
 
   if (showRecruiter) {
