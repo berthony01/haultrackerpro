@@ -39,7 +39,7 @@ const fmtMiles = (v: number | null | undefined) =>
 const fmtRpm = (v: number | null | undefined) =>
   v == null ? '—' : `$${Number(v).toFixed(2)}`;
 
-export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave, saving, isPro }: Props) {
+export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave, saving, isPro, driverProfile }: Props) {
   const location = [o.hiring_city, o.hiring_state].filter(Boolean).join(', ') || 'Multiple states';
   const f = calculateOpportunityFinancials(o);
   const score = profitScoreLabel(f.profitScore);
@@ -51,6 +51,10 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
       : score.tone === 'warn'
       ? 'border-warning/40 text-warning'
       : 'border-destructive/40 text-destructive';
+
+  const match = driverProfile && driverProfile.profile_completed
+    ? calculateOpportunityMatch({ opportunity: o, driverProfile, opportunityFinancials: f })
+    : null;
 
   return (
     <Card className="p-5 border-border/60 hover:border-primary/40 transition-colors flex flex-col gap-4">
