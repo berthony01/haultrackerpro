@@ -314,6 +314,10 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                   </div>
                 )}
 
+                <div className="mb-3">
+                  <ContractAttachment applicationId={a.id} role="recruiter" />
+                </div>
+
                 {(() => {
                   const allowed = getAllowedTransitions(a.status);
                   if (allowed.length === 0) return null;
