@@ -41,6 +41,7 @@ export function useApplicationContract(applicationId?: string | null) {
           .from('contract_versions')
           .select('*')
           .eq('id', contract.current_version_id)
+          .eq('upload_status', 'uploaded')
           .maybeSingle();
         currentVersion = v ?? null;
       }
