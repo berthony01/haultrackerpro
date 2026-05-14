@@ -115,8 +115,10 @@ const Index = () => {
       toast.success('Recruiter plan activated! You can now post opportunities.', { duration: 5000 });
       queryClient.invalidateQueries({ queryKey: ['recruiter_billing'] });
       queryClient.invalidateQueries({ queryKey: ['recruiter_active_opportunity_count'] });
+      window.history.replaceState({}, '', window.location.pathname);
     } else if (params.get('recruiter_checkout') === 'cancel') {
       toast.info('Checkout canceled. You can pick a plan whenever you’re ready.');
+      window.history.replaceState({}, '', window.location.pathname);
     }
     // Prefill from Landing Profit Intelligence demo
     if (params.get('prefill') === 'load') {
