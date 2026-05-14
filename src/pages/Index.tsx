@@ -40,7 +40,7 @@ import { WhatsNewCard } from '@/components/WhatsNewCard';
 import { WhatsNewModal } from '@/components/WhatsNewModal';
 import { useReleaseNotesSeen } from '@/hooks/useReleaseNotesSeen';
 import { DriverScorecard } from '@/components/DriverScorecard';
-import { Truck, LogOut } from 'lucide-react';
+import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
