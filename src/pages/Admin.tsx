@@ -1504,7 +1504,7 @@ export default function Admin() {
             </AlertDialog>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+      </AdminShell>
+    </>
   );
 }
