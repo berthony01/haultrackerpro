@@ -196,6 +196,343 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_audit_log: {
+        Row: {
+          action: string
+          actor_role: string | null
+          actor_user_id: string | null
+          contract_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          version_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_role?: string | null
+          actor_user_id?: string | null
+          contract_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          version_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string | null
+          actor_user_id?: string | null
+          contract_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_audit_log_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_audit_log_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "contract_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_clauses: {
+        Row: {
+          clause_type: string
+          contract_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          page_ref: number | null
+          raw_excerpt: string | null
+          severity: string
+          summary: string | null
+          version_id: string
+        }
+        Insert: {
+          clause_type: string
+          contract_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          page_ref?: number | null
+          raw_excerpt?: string | null
+          severity?: string
+          summary?: string | null
+          version_id: string
+        }
+        Update: {
+          clause_type?: string
+          contract_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          page_ref?: number | null
+          raw_excerpt?: string | null
+          severity?: string
+          summary?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_clauses_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_clauses_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "contract_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_reviews: {
+        Row: {
+          ai_findings: Json | null
+          ai_summary: string | null
+          contract_id: string
+          created_at: string
+          decision: string | null
+          id: string
+          notes: string | null
+          reviewer_role: string
+          reviewer_user_id: string | null
+          updated_at: string
+          version_id: string | null
+        }
+        Insert: {
+          ai_findings?: Json | null
+          ai_summary?: string | null
+          contract_id: string
+          created_at?: string
+          decision?: string | null
+          id?: string
+          notes?: string | null
+          reviewer_role: string
+          reviewer_user_id?: string | null
+          updated_at?: string
+          version_id?: string | null
+        }
+        Update: {
+          ai_findings?: Json | null
+          ai_summary?: string | null
+          contract_id?: string
+          created_at?: string
+          decision?: string | null
+          id?: string
+          notes?: string | null
+          reviewer_role?: string
+          reviewer_user_id?: string | null
+          updated_at?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_reviews_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_reviews_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "contract_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_signatures: {
+        Row: {
+          contract_id: string
+          created_at: string
+          evidence: Json
+          id: string
+          ip_address: string | null
+          signature_method: string
+          signed_at: string | null
+          signer_role: string
+          signer_user_id: string
+          user_agent: string | null
+          version_id: string
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          evidence?: Json
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signed_at?: string | null
+          signer_role: string
+          signer_user_id: string
+          user_agent?: string | null
+          version_id: string
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          evidence?: Json
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signed_at?: string | null
+          signer_role?: string
+          signer_user_id?: string
+          user_agent?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_signatures_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_signatures_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "contract_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_versions: {
+        Row: {
+          contract_id: string
+          created_at: string
+          extracted_text: string | null
+          file_name: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          page_count: number | null
+          parse_error: string | null
+          parse_status: string
+          storage_bucket: string
+          storage_path: string
+          updated_at: string
+          uploaded_by: string
+          version_number: number
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          extracted_text?: string | null
+          file_name: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          page_count?: number | null
+          parse_error?: string | null
+          parse_status?: string
+          storage_bucket?: string
+          storage_path: string
+          updated_at?: string
+          uploaded_by: string
+          version_number: number
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          extracted_text?: string | null
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          page_count?: number | null
+          parse_error?: string | null
+          parse_status?: string
+          storage_bucket?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_versions_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contracts: {
+        Row: {
+          application_id: string
+          created_at: string
+          current_version_id: string | null
+          driver_user_id: string
+          id: string
+          metadata: Json
+          opportunity_id: string
+          recruiter_id: string
+          recruiter_user_id: string
+          risk_score: number | null
+          risk_tier: string | null
+          status: Database["public"]["Enums"]["contract_status"]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          current_version_id?: string | null
+          driver_user_id: string
+          id?: string
+          metadata?: Json
+          opportunity_id: string
+          recruiter_id: string
+          recruiter_user_id: string
+          risk_score?: number | null
+          risk_tier?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          current_version_id?: string | null
+          driver_user_id?: string
+          id?: string
+          metadata?: Json
+          opportunity_id?: string
+          recruiter_id?: string
+          recruiter_user_id?: string
+          risk_score?: number | null
+          risk_tier?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_current_version_fk"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "contract_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_profile: {
         Row: {
           avg_mpg: number | null
@@ -1981,6 +2318,10 @@ export type Database = {
         }[]
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_application_party: {
+        Args: { _application_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_recruiter_owner: {
         Args: { _recruiter_id: string; _user_id: string }
         Returns: boolean
@@ -2040,7 +2381,18 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      contract_status:
+        | "uploaded"
+        | "parsing"
+        | "parsed"
+        | "ai_reviewed"
+        | "driver_reviewing"
+        | "changes_requested"
+        | "rejected"
+        | "approved"
+        | "signed"
+        | "expired"
+        | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2167,6 +2519,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      contract_status: [
+        "uploaded",
+        "parsing",
+        "parsed",
+        "ai_reviewed",
+        "driver_reviewing",
+        "changes_requested",
+        "rejected",
+        "approved",
+        "signed",
+        "expired",
+        "archived",
+      ],
+    },
   },
 } as const
