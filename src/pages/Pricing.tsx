@@ -130,7 +130,7 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Pricing | HaulTrackerPro" description="Start free with HaulTrackerPro. Upgrade to Pro for automation, insights, and advanced reporting." path="/pricing" />
+      <SEOHead title="Pricing | HaulTrackerPro" description="HaulTrackerPro pricing — driver plans for profit tracking and recruiter plans for approved trucking opportunity posting." path="/pricing" />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
@@ -165,6 +165,21 @@ export default function Pricing() {
           <p className="mt-4 text-base sm:text-lg max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
             Choose the right HaulTrackerPro plan for how you use the platform — track your trucking profit as a driver or post approved opportunities as a recruiter.
           </p>
+        </div>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <span className="text-sm font-semibold" style={{ color: 'hsl(220, 10%, 70%)' }}>Recruiter or carrier?</span>
+          <Button
+            onClick={() => {
+              const el = document.getElementById('for-recruiters');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              else window.location.hash = 'for-recruiters';
+            }}
+            variant="outline"
+            className="rounded-xl font-bold gap-2"
+            style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
+          >
+            View Recruiter Plans <ArrowRight className="h-4 w-4" />
+          </Button>
         </div>
       </section>
 
@@ -230,7 +245,7 @@ export default function Pricing() {
       </div>
 
       {/* Pricing Cards */}
-      <section id="driver-plans" className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
+      <section id="driver-plans" className="max-w-4xl mx-auto px-4 sm:px-6 pb-16 scroll-mt-24">
         <div className="grid sm:grid-cols-2 gap-6">
           {/* Free Card */}
           <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
@@ -355,7 +370,7 @@ export default function Pricing() {
       </section>
 
       {/* For Recruiters */}
-      <section id="for-recruiters" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+      <section id="for-recruiters" className="py-16 sm:py-24 scroll-mt-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           {/* Header Card */}
           <div className="p-6 sm:p-8 rounded-2xl border text-center mb-10" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>

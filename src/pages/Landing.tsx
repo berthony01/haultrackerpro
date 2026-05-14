@@ -61,7 +61,7 @@ export default function Landing() {
     <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
         title="HaulTrackerPro | Know Your Real Profit Per Load"
-        description="Stop driving blind. HaulTrackerPro shows truck drivers their true profit after fuel, deadhead, and expenses — so you stop losing money on bad loads."
+        description="HaulTrackerPro: trucking profit tracking for drivers, profit-first Opportunities, and approved recruiter access — all in one platform."
         path="/"
         jsonLd={[
           {
@@ -93,7 +93,7 @@ export default function Landing() {
           <div className="hidden sm:flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
             <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing#for-recruiters')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
+            <Button variant="ghost" onClick={() => navigate('/recruiters')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
             <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
             <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
               Start Tracking Free
@@ -114,7 +114,7 @@ export default function Landing() {
               {[
                 { label: 'Features', href: '/features' },
                 { label: 'Pricing', href: '/pricing' },
-                { label: 'For Recruiters', href: '/pricing#for-recruiters' },
+                { label: 'For Recruiters', href: '/recruiters' },
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Sign In', href: '/auth' },
               ].map(item => (
@@ -164,7 +164,7 @@ export default function Landing() {
                 }}>
                   Start Tracking Free <ArrowRight className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => navigate('/pricing#for-recruiters')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
+                <Button variant="outline" size="lg" onClick={() => navigate('/recruiters')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
                   borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
                 }}>
                   Explore Recruiter Access
@@ -231,7 +231,7 @@ export default function Landing() {
           </div>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button
-              onClick={() => navigate('/pricing#for-recruiters')}
+              onClick={() => navigate('/recruiters')}
               size="lg"
               className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
               style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
@@ -789,7 +789,7 @@ export default function Landing() {
                   <li key={b} className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />{b}</li>
                 ))}
               </ul>
-              <Button onClick={() => navigate('/pricing#for-recruiters')} variant="outline" className="w-full rounded-xl font-bold gap-2" style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
+              <Button onClick={() => navigate('/recruiters')} variant="outline" className="w-full rounded-xl font-bold gap-2" style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
                 Apply for Recruiter Access <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
@@ -840,7 +840,7 @@ export default function Landing() {
                 {[
                   { label: 'Features', href: '/features' },
                   { label: 'Pricing', href: '/pricing' },
-                  { label: 'For Recruiters', href: '/pricing#for-recruiters' },
+                  { label: 'For Recruiters', href: '/recruiters' },
                   { label: 'FAQ', href: '/faq' },
                 ].map(link => (
                   <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>

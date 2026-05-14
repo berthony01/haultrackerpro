@@ -158,16 +158,32 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
-    // Route to Opportunities from external recruiter CTA
+    // Route to Opportunities from external recruiter CTA OR from auth intent (URL/sessionStorage)
+    let recruiterIntent = false;
+    try {
+      const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
+      if (storedAuthIntent === 'recruiter') {
+        recruiterIntent = true;
+        sessionStorage.removeItem('htp_auth_intent');
+      }
+    } catch {}
     if (params.get('page') === 'opportunities') {
       setPage('opportunities');
       const view = params.get('view');
       if (view === 'recruiter') {
         sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
+        recruiterIntent = true;
       } else if (view === 'driver-profile') {
         sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
       }
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (recruiterIntent) {
+      sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
+      setPage('opportunities');
+    }
+    if (recruiterIntent) {
+      // Suppress driver-first onboarding modal once for recruiter signups
+      try { sessionStorage.setItem('htp_recruiter_intent', '1'); } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey]);
@@ -204,6 +220,12 @@ const Index = () => {
   // Show onboarding modal for first-time users
   useEffect(() => {
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
+      let recruiter = false;
+      try { recruiter = sessionStorage.getItem('htp_recruiter_intent') === '1'; } catch {}
+      if (recruiter) {
+        try { sessionStorage.removeItem('htp_recruiter_intent'); } catch {}
+        return;
+      }
       setShowOnboardingModal(true);
     }
   }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length]);
@@ -472,8 +494,8 @@ const Index = () => {
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
-                        { icon: Route, label: 'Find Opportunities', action: () => handleNavigate('opportunities') },
-                        { icon: Users, label: 'Recruit Drivers', action: () => handleNavigate('opportunities') },
+                        { icon: Route, label: 'Find Opportunities', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile'); } catch {} ; handleNavigate('opportunities'); } },
+                        { icon: Users, label: 'Recruit Drivers', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter'); } catch {} ; handleNavigate('opportunities'); } },
                       ].map((item) => (
                         <button
                           key={item.label}
