@@ -159,11 +159,11 @@ export default function Pricing() {
         }} />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-8 text-center relative">
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-            Stop Driving Blind.{' '}
-            <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
+            Choose the Right Plan.{' '}
+            <span style={{ color: 'hsl(25, 95%, 53%)' }}>For Drivers &amp; Recruiters.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            See the real profit on every load, get warned before money slips, and know which lanes and brokers are actually worth your time.
+            Choose the right HaulTrackerPro plan for how you use the platform — track your trucking profit as a driver or post approved opportunities as a recruiter.
           </p>
         </div>
       </section>
