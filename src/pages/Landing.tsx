@@ -727,6 +727,7 @@ export default function Landing() {
                 {[
                   { label: 'Features', href: '/features' },
                   { label: 'Pricing', href: '/pricing' },
+                  { label: 'For Recruiters', href: '/pricing#for-recruiters' },
                   { label: 'FAQ', href: '/faq' },
                 ].map(link => (
                   <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
