@@ -70,6 +70,41 @@ export default function Features() {
         ))}
       </section>
 
+      {/* Opportunities / Recruiter ecosystem */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+        <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
+            Opportunities Built Around Real Numbers
+          </h2>
+          <p className="text-sm mb-6 max-w-2xl" style={{ color: 'hsl(220, 10%, 55%)' }}>
+            HaulTrackerPro connects drivers and approved recruiters through a structured, profit-first opportunity ecosystem.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3 mb-6">
+            {[
+              'Driver Opportunity Profiles for accurate matching',
+              'Profit Intelligence applied to every opportunity',
+              'Deterministic match scores (no black-box AI claims)',
+              'Approved recruiter access only',
+              'Applications & request-info dashboard',
+              'Estimates only — no guaranteed jobs or income',
+            ].map((t) => (
+              <div key={t} className="text-sm flex items-start gap-2" style={{ color: 'hsl(220, 10%, 75%)' }}>
+                <span className="mt-1 h-1.5 w-1.5 rounded-full shrink-0" style={{ background: 'hsl(25, 95%, 53%)' }} />
+                {t}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={() => navigate('/recruiters')} className="rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+              Explore Recruiter Access
+            </Button>
+            <Button onClick={() => navigate('/pricing')} variant="outline" className="rounded-xl font-bold" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
+              View Pricing
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
