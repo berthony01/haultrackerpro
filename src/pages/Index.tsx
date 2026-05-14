@@ -40,7 +40,7 @@ import { WhatsNewCard } from '@/components/WhatsNewCard';
 import { WhatsNewModal } from '@/components/WhatsNewModal';
 import { useReleaseNotesSeen } from '@/hooks/useReleaseNotesSeen';
 import { DriverScorecard } from '@/components/DriverScorecard';
-import { Truck, LogOut } from 'lucide-react';
+import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,6 +64,9 @@ const Index = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [roleCardDismissed, setRoleCardDismissed] = useState(() => {
+    try { return localStorage.getItem('htp_role_card_dismissed') === '1'; } catch { return false; }
+  });
   const { ready: releaseReady, hasSeenLatest, markSeen } = useReleaseNotesSeen();
 
   // Auto-open the What's New modal once per user (after onboarding modal isn't blocking)
@@ -450,6 +453,40 @@ const Index = () => {
                     onUpgrade={handleUpgrade}
                     onNavigate={handleNavigate}
                   />
+                )}
+                {/* Role path card for new / low-activity users */}
+                {!roleCardDismissed && allLoadsQuery.loads.length <= 3 && (
+                  <div className="mb-4 p-4 rounded-2xl border relative" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                    <button
+                      onClick={() => {
+                        try { localStorage.setItem('htp_role_card_dismissed', '1'); } catch {}
+                        setRoleCardDismissed(true);
+                      }}
+                      className="absolute top-3 right-3 p-1 rounded-lg hover:bg-white/5 transition-colors"
+                      style={{ color: 'hsl(220, 10%, 50%)' }}
+                      aria-label="Dismiss"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    <h3 className="text-sm font-bold mb-3" style={{ color: 'hsl(0, 0%, 100%)' }}>What do you want to do next?</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
+                        { icon: Route, label: 'Find Opportunities', action: () => handleNavigate('opportunities') },
+                        { icon: Users, label: 'Recruit Drivers', action: () => handleNavigate('opportunities') },
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          onClick={item.action}
+                          className="flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-colors hover:bg-white/5 active:scale-[0.98]"
+                          style={{ borderColor: 'hsl(220, 16%, 16%)', color: 'hsl(220, 10%, 70%)' }}
+                        >
+                          <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                          <span className="text-[11px] font-semibold text-center leading-tight">{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 <DashboardView
                   loads={allLoadsQuery.loads}

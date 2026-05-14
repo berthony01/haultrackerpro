@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowRight, Check, Minus, Truck, Shield, TrendingUp, Target, BarChart3, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -112,6 +112,22 @@ export default function Pricing() {
     }
   };
 
+  // Hash scroll handler — makes /pricing#for-recruiters reliably anchor
+  useEffect(() => {
+    if (!window.location.hash) return;
+    const id = window.location.hash.slice(1);
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'auto', block: 'start' });
+        return;
+      }
+      if (attempts++ < 20) requestAnimationFrame(tryScroll);
+    };
+    requestAnimationFrame(tryScroll);
+  }, []);
+
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead title="Pricing | HaulTrackerPro" description="Start free with HaulTrackerPro. Upgrade to Pro for automation, insights, and advanced reporting." path="/pricing" />
@@ -143,14 +159,49 @@ export default function Pricing() {
         }} />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-8 text-center relative">
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-            Stop Driving Blind.{' '}
-            <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
+            Choose the Right Plan.{' '}
+            <span style={{ color: 'hsl(25, 95%, 53%)' }}>For Drivers &amp; Recruiters.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            See the real profit on every load, get warned before money slips, and know which lanes and brokers are actually worth your time.
+            Choose the right HaulTrackerPro plan for how you use the platform — track your trucking profit as a driver or post approved opportunities as a recruiter.
           </p>
         </div>
       </section>
+
+      {/* Plan Type Switch */}
+      <div className="flex justify-center mb-6">
+        <div className="inline-flex items-center gap-2 p-1 rounded-xl" style={{ background: 'hsl(220, 20%, 12%)' }}>
+          <a
+            href="#driver-plans"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById('driver-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="px-5 py-2.5 rounded-lg text-sm font-bold transition-all"
+            style={{
+              background: 'transparent',
+              color: 'hsl(220, 10%, 70%)',
+            }}
+          >
+            Driver Plans
+          </a>
+          <a
+            href="#for-recruiters"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById('for-recruiters')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="px-5 py-2.5 rounded-lg text-sm font-bold transition-all"
+            style={{
+              background: 'transparent',
+              color: 'hsl(25, 95%, 60%)',
+              border: '1px solid hsl(25, 95%, 53%)',
+            }}
+          >
+            Recruiter Plans
+          </a>
+        </div>
+      </div>
 
       {/* Billing Toggle */}
       <div className="flex justify-center mb-8">
@@ -179,7 +230,7 @@ export default function Pricing() {
       </div>
 
       {/* Pricing Cards */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
+      <section id="driver-plans" className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
         <div className="grid sm:grid-cols-2 gap-6">
           {/* Free Card */}
           <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
@@ -306,15 +357,24 @@ export default function Pricing() {
       {/* For Recruiters */}
       <section id="for-recruiters" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              For Recruiters &amp; Carriers
+          {/* Header Card */}
+          <div className="p-6 sm:p-8 rounded-2xl border text-center mb-10" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+                For Recruiters &amp; Carriers
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'hsl(220, 20%, 16%)', color: 'hsl(220, 10%, 55%)' }}>
+                Approval required before posting
+              </div>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Reach Profit-Focused Drivers
+              Recruiter &amp; Carrier Plans
             </h2>
             <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              Post opportunities to drivers who already track their numbers. Recruiter access requires approval. Listings go through admin review before going live.
+              Post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers.
+            </p>
+            <p className="text-[11px] mt-4 max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
+              Opportunity pay and match details are estimates based on recruiter-provided information. No job or income is guaranteed.
             </p>
           </div>
 
