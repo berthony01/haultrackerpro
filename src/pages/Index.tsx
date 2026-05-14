@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
@@ -13,39 +13,47 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
+// Critical shell — keep eager so first paint never flickers.
 import { BottomNav } from '@/components/BottomNav';
 import { AppSidebar } from '@/components/premium/AppSidebar';
 import { DashboardView } from '@/components/DashboardView';
-import { LoadForm } from '@/components/LoadForm';
-import { ExpenseForm } from '@/components/ExpenseForm';
-import { FuelLogForm } from '@/components/FuelLogForm';
-import { FuelLogsListView } from '@/components/FuelLogsListView';
 import { AddActionModal } from '@/components/AddActionModal';
-import { ExpensesListView } from '@/components/ExpensesListView';
-import { LoadsListView } from '@/components/LoadsListView';
-import { ReportsView } from '@/components/ReportsView';
-import { SettingsView } from '@/components/SettingsView';
 import { Onboarding } from '@/components/Onboarding';
-import { WeeklyCloseout } from '@/components/WeeklyCloseout';
 import { SmartReminders } from '@/components/SmartReminders';
-import { MonthlySummary } from '@/components/MonthlySummary';
-import { FeedbackModal } from '@/components/FeedbackModal';
-import { OnboardingModal } from '@/components/OnboardingModal';
-import { AlertsView } from '@/components/AlertsView';
-import { OpportunitiesPage } from '@/components/opportunities/OpportunitiesPage';
-import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
-
-import { RecurringExpensesView } from '@/components/RecurringExpensesView';
 import { MilestoneNudges } from '@/components/MilestoneNudges';
 import { WhatsNewCard } from '@/components/WhatsNewCard';
-import { WhatsNewModal } from '@/components/WhatsNewModal';
+import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { useReleaseNotesSeen } from '@/hooks/useReleaseNotesSeen';
-import { DriverScorecard } from '@/components/DriverScorecard';
+
+// Heavy / route-rare views and modals — lazy so they don't bloat the dashboard chunk.
+const LoadForm = lazy(() => import('@/components/LoadForm').then(m => ({ default: m.LoadForm })));
+const ExpenseForm = lazy(() => import('@/components/ExpenseForm').then(m => ({ default: m.ExpenseForm })));
+const FuelLogForm = lazy(() => import('@/components/FuelLogForm').then(m => ({ default: m.FuelLogForm })));
+const FuelLogsListView = lazy(() => import('@/components/FuelLogsListView').then(m => ({ default: m.FuelLogsListView })));
+const ExpensesListView = lazy(() => import('@/components/ExpensesListView').then(m => ({ default: m.ExpensesListView })));
+const LoadsListView = lazy(() => import('@/components/LoadsListView').then(m => ({ default: m.LoadsListView })));
+const ReportsView = lazy(() => import('@/components/ReportsView').then(m => ({ default: m.ReportsView })));
+const SettingsView = lazy(() => import('@/components/SettingsView').then(m => ({ default: m.SettingsView })));
+const WeeklyCloseout = lazy(() => import('@/components/WeeklyCloseout').then(m => ({ default: m.WeeklyCloseout })));
+const MonthlySummary = lazy(() => import('@/components/MonthlySummary').then(m => ({ default: m.MonthlySummary })));
+const FeedbackModal = lazy(() => import('@/components/FeedbackModal').then(m => ({ default: m.FeedbackModal })));
+const OnboardingModal = lazy(() => import('@/components/OnboardingModal').then(m => ({ default: m.OnboardingModal })));
+const AlertsView = lazy(() => import('@/components/AlertsView').then(m => ({ default: m.AlertsView })));
+const OpportunitiesPage = lazy(() => import('@/components/opportunities/OpportunitiesPage').then(m => ({ default: m.OpportunitiesPage })));
+const RecurringExpensesView = lazy(() => import('@/components/RecurringExpensesView').then(m => ({ default: m.RecurringExpensesView })));
+const DriverScorecard = lazy(() => import('@/components/DriverScorecard').then(m => ({ default: m.DriverScorecard })));
+const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
+
 import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
+
+// Tiny inline fallback — avoids whole-app skeleton flicker for view swaps.
+const ViewFallback = () => (
+  <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+);
 
 const Index = () => {
   const { signOut, user } = useAuth();
