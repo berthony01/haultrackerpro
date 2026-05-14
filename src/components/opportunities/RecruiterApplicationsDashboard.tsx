@@ -18,6 +18,7 @@ import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
+import { ContractAttachment } from '@/components/contracts/ContractAttachment';
 
 interface Props {
   onBack: () => void;
