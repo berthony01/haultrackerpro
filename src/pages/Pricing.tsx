@@ -168,6 +168,41 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* Plan Type Switch */}
+      <div className="flex justify-center mb-6">
+        <div className="inline-flex items-center gap-2 p-1 rounded-xl" style={{ background: 'hsl(220, 20%, 12%)' }}>
+          <a
+            href="#driver-plans"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById('driver-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="px-5 py-2.5 rounded-lg text-sm font-bold transition-all"
+            style={{
+              background: 'transparent',
+              color: 'hsl(220, 10%, 70%)',
+            }}
+          >
+            Driver Plans
+          </a>
+          <a
+            href="#for-recruiters"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById('for-recruiters')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="px-5 py-2.5 rounded-lg text-sm font-bold transition-all"
+            style={{
+              background: 'transparent',
+              color: 'hsl(25, 95%, 60%)',
+              border: '1px solid hsl(25, 95%, 53%)',
+            }}
+          >
+            Recruiter Plans
+          </a>
+        </div>
+      </div>
+
       {/* Billing Toggle */}
       <div className="flex justify-center mb-8">
         <div className="inline-flex items-center gap-3 p-1 rounded-xl" style={{ background: 'hsl(220, 20%, 12%)' }}>
