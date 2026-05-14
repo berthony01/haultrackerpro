@@ -230,7 +230,7 @@ export default function Pricing() {
       </div>
 
       {/* Pricing Cards */}
-      <section id="driver-plans" className="max-w-4xl mx-auto px-4 sm:px-6 pb-16">
+      <section id="driver-plans" className="max-w-4xl mx-auto px-4 sm:px-6 pb-16 scroll-mt-24">
         <div className="grid sm:grid-cols-2 gap-6">
           {/* Free Card */}
           <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
