@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Bell, Search } from 'lucide-react';
 import { AdminSidebar } from './AdminSidebar';
@@ -17,6 +17,12 @@ interface AdminShellProps {
 
 export function AdminShell({ value, onChange, role, email, children, mobileNav }: AdminShellProps) {
   const navigate = useNavigate();
+  useEffect(() => {
+    document.body.classList.add('app-shell-active', 'admin-dark');
+    return () => {
+      document.body.classList.remove('app-shell-active', 'admin-dark');
+    };
+  }, []);
   return (
     <div
       className="app-shell admin-dark min-h-screen w-full text-white"
