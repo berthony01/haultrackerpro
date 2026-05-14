@@ -97,10 +97,6 @@ export async function exportParkingPDF(
 
   // Route through the premium HaulTracker Pro PDF builder so parking exports
   // share the same navy/orange branded shell as every other report.
-  const [{ aggregateReport }, { buildReportPdf, downloadPdfBlob }] = await Promise.all([
-    import('@/lib/reportAggregator'),
-    import('@/lib/reportPdf'),
-  ]);
 
   const parkingExpenses = expenses.filter(
     (e) => e.category === 'Parking' && e.expense_date >= range.from && e.expense_date <= range.to,
