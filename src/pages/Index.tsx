@@ -220,6 +220,12 @@ const Index = () => {
   // Show onboarding modal for first-time users
   useEffect(() => {
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
+      let recruiter = false;
+      try { recruiter = sessionStorage.getItem('htp_recruiter_intent') === '1'; } catch {}
+      if (recruiter) {
+        try { sessionStorage.removeItem('htp_recruiter_intent'); } catch {}
+        return;
+      }
       setShowOnboardingModal(true);
     }
   }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length]);
