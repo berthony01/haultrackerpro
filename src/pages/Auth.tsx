@@ -47,6 +47,13 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    // Preserve recruiter intent across email signup/login (and any email-confirm round-trip).
+    try {
+      const intent = new URLSearchParams(window.location.search).get('intent');
+      if (intent === 'recruiter') {
+        sessionStorage.setItem('htp_auth_intent', 'recruiter');
+      }
+    } catch {}
     try {
       if (mode === 'signup') {
         const { error } = await signUp(form.email, form.password, form.name);

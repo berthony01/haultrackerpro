@@ -75,6 +75,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       sessionStorage.removeItem('htp_opportunities_initial_view');
       if (v === 'recruiter') setShowRecruiter(true);
       else if (v === 'driver-profile') setShowProfile(true);
+      // 'list' is the default — no-op.
     } catch {}
   }, []);
 

@@ -62,7 +62,7 @@ export function useRecruiterBilling() {
   const plan = (billing?.plan ?? 'none') as RecruiterPlan;
   const limit = billing?.active_opportunity_limit ?? RECRUITER_PLAN_LIMITS[plan];
   const status = billing?.status ?? 'inactive';
-  const isBillingActive = status === 'active' || status === 'trialing';
+  const isBillingActive = status === 'active' || status === 'trialing'; // trial-allowlist
   const activeCount = activeCountQuery.data ?? 0;
   const canSubmitMore = isBillingActive && activeCount < limit;
 
