@@ -678,17 +678,19 @@ const Index = () => {
         onAddExpense={handleAddExpenseFromModal}
         onAddFuelLog={handleAddFuelFromModal}
       />
-      <FeedbackModal
-        totalLoads={allLoadsQuery.loads.length}
-        open={showFeedback}
-        onClose={() => setShowFeedback(false)}
-      />
-      <OnboardingModal
-        open={showOnboardingModal}
-        onComplete={handleOnboardingComplete}
-        onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
-      />
-      <WhatsNewModal open={showWhatsNew} onClose={handleCloseWhatsNew} />
+      <Suspense fallback={null}>
+        <FeedbackModal
+          totalLoads={allLoadsQuery.loads.length}
+          open={showFeedback}
+          onClose={() => setShowFeedback(false)}
+        />
+        <OnboardingModal
+          open={showOnboardingModal}
+          onComplete={handleOnboardingComplete}
+          onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
+        />
+        <WhatsNewModal open={showWhatsNew} onClose={handleCloseWhatsNew} />
+      </Suspense>
     </div>
   );
 };
