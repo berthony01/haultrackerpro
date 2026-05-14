@@ -2,6 +2,13 @@ import { format, parseISO } from 'date-fns';
 import type { Expense } from '@/hooks/useExpenses';
 import type { Load } from '@/hooks/useLoads';
 import { formatCurrency } from '@/lib/loadUtils';
+// Static imports of report modules so Vite no longer warns about mixed
+// static/dynamic imports (these same modules are statically imported by
+// ReportsView and MonthlySummary). All report-heavy code still ends up in
+// chunks that only load with the lazy ReportsView / Parking page.
+import { aggregateReport } from '@/lib/reportAggregator';
+import { buildReportCSV, downloadCSV } from '@/lib/reportCsv';
+import { buildReportPdf, downloadPdfBlob } from '@/lib/reportPdf';
 
 export interface ParkingExportRange {
   label: string;
@@ -60,10 +67,6 @@ export async function exportParkingCSV(
 
   // Route through the premium HaulTracker Pro CSV builder so parking exports
   // share the same branded header + executive summary as every other report.
-  const [{ aggregateReport }, { buildReportCSV, downloadCSV }] = await Promise.all([
-    import('@/lib/reportAggregator'),
-    import('@/lib/reportCsv'),
-  ]);
 
   const parkingExpenses = expenses.filter(
     (e) => e.category === 'Parking' && e.expense_date >= range.from && e.expense_date <= range.to,
@@ -94,10 +97,6 @@ export async function exportParkingPDF(
 
   // Route through the premium HaulTracker Pro PDF builder so parking exports
   // share the same navy/orange branded shell as every other report.
-  const [{ aggregateReport }, { buildReportPdf, downloadPdfBlob }] = await Promise.all([
-    import('@/lib/reportAggregator'),
-    import('@/lib/reportPdf'),
-  ]);
 
   const parkingExpenses = expenses.filter(
     (e) => e.category === 'Parking' && e.expense_date >= range.from && e.expense_date <= range.to,
