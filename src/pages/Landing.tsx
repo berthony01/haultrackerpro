@@ -93,7 +93,7 @@ export default function Landing() {
           <div className="hidden sm:flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
             <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing#for-recruiters')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
+            <Button variant="ghost" onClick={() => navigate('/recruiters')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
             <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
             <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
               Start Tracking Free
