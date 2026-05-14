@@ -166,6 +166,21 @@ export default function Pricing() {
             Choose the right HaulTrackerPro plan for how you use the platform — track your trucking profit as a driver or post approved opportunities as a recruiter.
           </p>
         </div>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <span className="text-sm font-semibold" style={{ color: 'hsl(220, 10%, 70%)' }}>Recruiter or carrier?</span>
+          <Button
+            onClick={() => {
+              const el = document.getElementById('for-recruiters');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              else window.location.hash = 'for-recruiters';
+            }}
+            variant="outline"
+            className="rounded-xl font-bold gap-2"
+            style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
+          >
+            View Recruiter Plans <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
       </section>
 
       {/* Plan Type Switch */}
