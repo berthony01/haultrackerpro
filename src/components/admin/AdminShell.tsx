@@ -19,7 +19,7 @@ export function AdminShell({ value, onChange, role, email, children, mobileNav }
   const navigate = useNavigate();
   return (
     <div
-      className="min-h-screen w-full text-white"
+      className="app-shell admin-dark min-h-screen w-full text-white"
       style={{
         background:
           'radial-gradient(1200px 600px at 0% -10%, rgba(255,140,40,0.08), transparent 60%), radial-gradient(900px 500px at 100% 0%, rgba(40,80,200,0.10), transparent 60%), #05070C',
