@@ -545,9 +545,6 @@ export default function Admin() {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-background">
-      <SEOHead title="Admin | HaulTrackerPro" description="Admin dashboard." path="/admin" noindex />
-  return (
     <>
       <SEOHead title="Admin | HaulTrackerPro" description="Admin dashboard." path="/admin" noindex />
       <AdminShell
