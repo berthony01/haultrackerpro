@@ -67,6 +67,17 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
 
   const matchEnabled = !!profile && profile.profile_completed;
 
+  // Honor deep-link routing from /dashboard?page=opportunities&view=...
+  useEffect(() => {
+    try {
+      const v = sessionStorage.getItem('htp_opportunities_initial_view');
+      if (!v) return;
+      sessionStorage.removeItem('htp_opportunities_initial_view');
+      if (v === 'recruiter') setShowRecruiter(true);
+      else if (v === 'driver-profile') setShowProfile(true);
+    } catch {}
+  }, []);
+
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 
   const driverTypes = useMemo(
