@@ -357,15 +357,24 @@ export default function Pricing() {
       {/* For Recruiters */}
       <section id="for-recruiters" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              For Recruiters &amp; Carriers
+          {/* Header Card */}
+          <div className="p-6 sm:p-8 rounded-2xl border text-center mb-10" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+                For Recruiters &amp; Carriers
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'hsl(220, 20%, 16%)', color: 'hsl(220, 10%, 55%)' }}>
+                Approval required before posting
+              </div>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Reach Profit-Focused Drivers
+              Recruiter &amp; Carrier Plans
             </h2>
             <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              Post opportunities to drivers who already track their numbers. Recruiter access requires approval. Listings go through admin review before going live.
+              Post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers.
+            </p>
+            <p className="text-[11px] mt-4 max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
+              Opportunity pay and match details are estimates based on recruiter-provided information. No job or income is guaranteed.
             </p>
           </div>
 
