@@ -153,31 +153,23 @@ serve(async (req) => {
         file_size,
         mime_type,
         parse_status: "pending",
+        upload_status: "pending_upload",
         uploaded_by: userId,
       });
     if (versionInsertErr) return json({ error: versionInsertErr.message }, 500);
 
-    // 8. Set as current version + reset status to uploaded for new uploads
-    const { error: updateErr } = await admin
-      .from("contracts")
-      .update({ current_version_id: versionId, status: "uploaded" })
-      .eq("id", contractId);
-    if (updateErr) {
-      // Status guard may reject moving back from later states — non-fatal:
-      // still set current_version_id even if the status didn't move.
-      await admin
-        .from("contracts")
-        .update({ current_version_id: versionId })
-        .eq("id", contractId);
-    }
+    // NOTE: current_version_id and contract status are NOT promoted here.
+    // The client must call confirm-contract-upload after the storage PUT
+    // succeeds. That keeps the driver from seeing a contract whose file
+    // never actually arrived in storage.
 
-    // 9. Audit log
+    // Audit: upload started (pending object PUT + confirm)
     await admin.from("contract_audit_log").insert({
       contract_id: contractId,
       version_id: versionId,
       actor_user_id: userId,
       actor_role: "recruiter",
-      action: "uploaded",
+      action: "upload_started",
       metadata: { file_name, mime_type, file_size, version_number: nextVersion },
     });
 
