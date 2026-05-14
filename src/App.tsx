@@ -91,10 +91,19 @@ function PageFallback() {
   );
 }
 
+function postAuthRedirect(search: string): string {
+  try {
+    const intent = new URLSearchParams(search).get('intent');
+    if (intent === 'recruiter') return '/dashboard?page=opportunities&view=recruiter';
+  } catch {}
+  return '/dashboard';
+}
+
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <PageFallback />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={postAuthRedirect(location.search)} replace />;
   return <>{children}</>;
 }
 
@@ -107,8 +116,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <PageFallback />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={postAuthRedirect(location.search)} replace />;
   return <>{children}</>;
 }
 
