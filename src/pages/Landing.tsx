@@ -164,7 +164,7 @@ export default function Landing() {
                 }}>
                   Start Tracking Free <ArrowRight className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => navigate('/pricing#for-recruiters')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
+                <Button variant="outline" size="lg" onClick={() => navigate('/recruiters')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
                   borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
                 }}>
                   Explore Recruiter Access
