@@ -75,6 +75,14 @@ export function useApplicationContract(applicationId?: string | null) {
         .uploadToSignedUrl(storage_path, token, file, { contentType: file.type, upsert: false });
       if (upErr) throw new Error(upErr.message || 'File upload failed');
 
+      // Confirm with the server so the version is marked uploaded and promoted.
+      const { data: confirmRes, error: confirmErr } = await supabase.functions.invoke(
+        'confirm-contract-upload',
+        { body: { version_id } },
+      );
+      if (confirmErr) throw new Error(confirmErr.message || 'Upload could not be confirmed');
+      if ((confirmRes as any)?.error) throw new Error((confirmRes as any).error);
+
       return { contract_id, version_id, storage_path };
     },
     onSuccess: () => {
