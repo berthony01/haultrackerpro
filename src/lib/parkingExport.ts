@@ -67,10 +67,6 @@ export async function exportParkingCSV(
 
   // Route through the premium HaulTracker Pro CSV builder so parking exports
   // share the same branded header + executive summary as every other report.
-  const [{ aggregateReport }, { buildReportCSV, downloadCSV }] = await Promise.all([
-    import('@/lib/reportAggregator'),
-    import('@/lib/reportCsv'),
-  ]);
 
   const parkingExpenses = expenses.filter(
     (e) => e.category === 'Parking' && e.expense_date >= range.from && e.expense_date <= range.to,
