@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Inbox, RefreshCw, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
+import { ContractAttachment } from '@/components/contracts/ContractAttachment';
 
 interface Props {
   onBack: () => void;
