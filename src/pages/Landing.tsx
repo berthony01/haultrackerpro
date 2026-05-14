@@ -114,7 +114,7 @@ export default function Landing() {
               {[
                 { label: 'Features', href: '/features' },
                 { label: 'Pricing', href: '/pricing' },
-                { label: 'For Recruiters', href: '/pricing#for-recruiters' },
+                { label: 'For Recruiters', href: '/recruiters' },
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Sign In', href: '/auth' },
               ].map(item => (
