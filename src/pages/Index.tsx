@@ -155,6 +155,11 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
+    // Route to Opportunities from external recruiter CTA
+    if (params.get('page') === 'opportunities') {
+      setPage('opportunities');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey]);
 
