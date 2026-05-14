@@ -1,83 +1,95 @@
-# Phase 10 Audit Report — Admin Dashboard + Opportunities/Recruiters Moderation
+# HaulTrackerPro — Strict Full Ecosystem Audit Plan
 
-**Overall verdict: PASS (with minor notes)**
+This is an audit-first pass. No new features. No redesigns. No schema changes unless a confirmed bug requires it. Fixes will be surgical and explained per file.
 
-No confirmed regressions or security issues. No code changes required. A handful of low‑severity observations below — flag for follow‑up only.
+## Scope of inspection (read-only)
 
----
+I will inspect the following without modifying anything until issues are confirmed:
 
-## 1. Build / type safety
-- `tsc --noEmit` → **0 errors, 0 warnings**.
-- Imports in `Admin.tsx`, `AdminOpportunitiesPanel`, `AdminRecruitersPanel`, `useAdminOpportunities`, `useAdminRecruiters` all resolve. Sheet/Dialog/Badge/Card/Button/Skeleton/Tabs/lucide icons all valid.
-- Supabase nested‑select casts (`as AdminOpportunity[]`, `Array.isArray(r.billing) ? r.billing[0] ...`) are type‑safe.
+### 1. Build / Type / Routing
+- Run TypeScript check (no manual `npm run build` — Lovable runs it automatically; I'll inspect the build/runtime errors knowledge file).
+- Verify all `App.tsx` routes resolve to existing pages.
+- Verify Opportunities components, admin components, recruiter components compile.
 
-## 2. Admin route protection
-- `Admin.tsx` still calls `useAdmin()` and runs `if (!adminLoading && !isAdmin) navigate('/', { replace: true })` plus `if (!isAdmin) return null`.
-- Both new hooks gate queries with `enabled: isAdmin`, so non‑admins never hit `opportunities`, `recruiter_profiles`, or `recruiter_billing_profiles`.
-- `useAdmin` platform‑owner fallback (`berthonyxyz@gmail.com`) preserved.
-- All sensitive mutations rely on existing RLS policies (`Admins update all opportunities`, `Admins view all billing`, etc.) — no service‑role key is shipped to the client.
+### 2. App navigation
+- `BottomNav.tsx`, `premium/AppSidebar.tsx`, `Index.tsx` tab wiring.
+- Confirm `app-shell` / `admin-dark` body class lifecycle in `AdminShell.tsx` (mount/unmount).
+- Confirm Opportunities is reachable from both desktop + mobile nav.
 
-## 3. Opportunities moderation
-- Filters Pending / Approved / Rejected / Flagged map to `admin_review_status`. **Removed** correctly maps to `status='removed'`. **All** drops both filters.
-- Action mutations:
-  - Approve → `admin_review_status='approved'`, `status='active'`, `published_at=now()`. `opportunities_guard` and `opportunities_billing_guard` both `RETURN NEW` for admins, so admin approve intentionally bypasses recruiter billing limits (acknowledged in audit prompt).
-  - Reject → `admin_review_status='rejected'` only.
-  - Flag → `admin_review_status='flagged'`.
-  - Remove → `status='removed'` + `admin_review_status='rejected'`.
-- Driver‑facing RLS (`Authenticated view approved active opportunities`) still requires `status='active' AND admin_review_status='approved'` — moderation pipeline intact.
-- FK `opportunities_recruiter_id_fkey` exists, so the `recruiter:recruiter_profiles!opportunities_recruiter_id_fkey(...)` embed resolves.
-- Detail drawer guards `o.recruiter ?` and uses `f.estimatedGross != null ? ... : '—'` for all numeric fields → no NaN/Infinity, no crash on null pay.
-- Deadhead display: shows `Unpaid deadhead` only when `deadhead_paid === false`; null/undefined falls through silently. ✅
+### 3. Driver Opportunities flow
+Files: `OpportunitiesPage.tsx`, `OpportunityCard.tsx`, `OpportunityDetail.tsx`, `DriverOpportunityProfile.tsx`, `DriverApplicationsPanel.tsx`, hooks `useOpportunities`, `useDriverOpportunityProfile`, `useSavedOpportunities`, `useOpportunityApplications`.
+Checks: filter is `status='active' AND admin_review_status='approved'`, NaN/Infinity guards, Pro gating on Profit Intelligence, match badge gated on driver profile, withdraw RPC.
 
-## 4. Recruiter moderation
-- Filters Pending / Approved / Rejected map to `verification_status`; **Suspended** correctly maps to `status='suspended'`.
-- Approve → `verification_status='approved'`, `status='active'`, `verified_at=now()`, `verified_by=user.id`. `recruiter_profile_guard` bypasses for admin → fields persist.
-- Reject → `verification_status='rejected'` only (preserves resubmit flow via `resubmit_recruiter_profile` RPC).
-- Suspend → both `status='suspended'` and `verification_status='suspended'`. Matches `is_recruiter_owner()` and the resubmit‑block check.
-- Active opportunity counts use a single `IN (...)` query → no N+1.
-- `useRecruiterBillingSummary` tolerates zero rows and unknown plan/status via lowercased fallbacks; counters default to 0 → no crash on empty billing.
+### 4. Recruiter flow
+Files: `RecruiterOnboarding`, `RecruiterOpportunityManager`, `RecruiterOpportunityForm`, `RecruiterApplicationsDashboard`, `RecruiterBillingPanel`, hooks `useRecruiterProfile`, `useRecruiterOpportunities`, `useRecruiterBilling`.
+Checks: gating states, plan/limit enforcement in UI, capacity guard before activation, status transitions (no backward, no withdrawn from recruiter), DB triggers `recruiter_profile_guard`, `opportunities_guard`, `opportunities_billing_guard`, `opportunity_applications_update_guard` (already verified at SQL level via context).
 
-## 5. Existing admin tabs regression
-- All 12 `TabsTrigger` values are unique: overview, activation, users, parking, drivers, leads, opportunities, recruiters, admins, billing, feedback, emails. Two new tabs added without renaming or removing existing ones.
-- `TabsList className="w-full flex flex-wrap h-auto justify-start gap-1"` wraps cleanly on mobile (434 px viewport: 2–3 rows of pills), no horizontal overflow.
-- `max-w-6xl` container (was narrower) does not break the existing wide tables (Users, Emails) — they already scroll horizontally inside their own wrappers.
+### 5. Recruiter Billing / Stripe
+Files: `create-recruiter-checkout/index.ts`, `recruiter-billing-portal/index.ts`, `stripe-webhook/index.ts`.
+Checks:
+- Customer lookup uses `recruiter_billing_profiles.stripe_customer_id` only — never email search.
+- Metadata includes `billing_type='recruiter'`.
+- Webhook routes recruiter vs driver subs by metadata.
+- Plan ↔ price ID mapping matches `recruiter_plan_limit` (starter=1, growth=5, fleet=25).
+- Cancel resets plan='none', status='canceled', limit=0.
+- Confirm pricing the user spec'd ($19/$49/$149) matches current Stripe price IDs (will require Stripe lookup if visible).
 
-## 6. UI / design
-- New panels reuse `bg-card/60`, `border-border/60`, semantic Badge variants → consistent with dark premium theme; no plain‑white card regressions.
-- Recruiter Billing Summary grid scales 2/4/8 columns; mini stat cards readable on dark.
-- Action button column wraps under cards on small screens (`lg:flex-col lg:w-40`).
-- Minor cosmetic: 12 tabs gets crowded on phones; not blocking.
+### 6. Profit Intelligence
+File: `lib/opportunities/opportunityProfit.ts`, `OpportunityProfitBreakdown.tsx`.
+Checks: deterministic only (no AI/network), gross fallback chain, no NaN, "estimated" wording, Pro gating.
 
-## 7. Security / RLS
-- No changes to: `opportunities_guard`, `opportunities_billing_guard`, `recruiter_profile_guard`, `opportunity_applications_update_guard`, `recruiter_billing_field_guard`, driver profile RLS, applications RLS.
-- No service‑role keys, Stripe secrets, or edge‑function secrets referenced in browser code (all admin actions go directly through RLS, not through a privileged endpoint).
-- Admin notes are only rendered inside the admin sheet (admin‑only RLS already gates the read).
+### 7. Match Engine
+File: `lib/opportunities/opportunityMatch.ts`, `OpportunityMatchBadge.tsx`.
+Checks: deterministic, gated on driver profile, no fit-badge data leak on recruiter side, NaN guards.
 
-## 8. Data safety / empty states
-- Both panels show empty‑state cards (`Briefcase` / `Building2`) when zero rows.
-- Loading skeletons render before data.
-- All numeric / date fields use `?? '—'` or `!= null ? ... : '—'`.
-- Mutations call `qc.invalidateQueries(...)` on success → list refreshes after action.
-- `confirm()` prompt before each destructive action (Approve/Reject/Flag/Remove/Suspend).
+### 8. Admin Dashboard
+Files: `Admin.tsx`, `AdminShell`, `AdminSidebar`, `AdminOverviewPremium`, `AdminOpportunitiesPanel`, `AdminRecruitersPanel`, hooks `useAdminOpportunities`, `useAdminRecruiters`, `index.css` `.admin-dark` block.
+Checks: route protection via `AdminRoute`, dark theme, body class cleanup, moderation actions wired correctly.
 
-## 9. Confirmed issues fixed
-- **None.** Audit found no defects requiring code changes.
+### 9. Public Landing
+File: `Landing.tsx`.
+Audit: Does it mention Opportunities ecosystem? (Quick scan suggests **no** — Landing is driver-only profit tracking copy.)
 
-## 10. Minor observations (non‑blocking, no fix applied)
-1. `src/components/admin/opportunities/RecruiterReviewCard.tsx` (123 lines) is not imported anywhere — leftover from an earlier iteration. Safe to delete in a future cleanup but harmless today.
-2. The "Rejected" opportunity filter will also surface rows that were *removed* (since Remove sets `admin_review_status='rejected'`). Consider excluding `status='removed'` from the Rejected view if reviewers report confusion.
-3. With 12 tabs, the tab strip becomes 2–3 rows on a 434 px viewport. Acceptable but a future redesign (sidebar) would help.
-4. Admin approve of a draft opportunity intentionally bypasses recruiter billing limits via the trigger admin bypass — acknowledged in the prompt as acceptable.
+### 10. Pricing page (likely gap)
+File: `Pricing.tsx`.
+Audit: Pricing page only shows driver Free vs Pro. **Confirmed gap from initial read: no recruiter pricing tier (Starter $19 / Growth $49 / Fleet $149) is shown publicly.** This will be flagged + fixed surgically with an additional "For Recruiters" pricing block.
 
-## 11. Manual QA checklist
-- [ ] Open `/admin` as admin → all 12 tabs render, no console errors.
-- [ ] Open `/admin` as non‑admin → redirected to `/`.
-- [ ] Opportunities tab → Pending list loads; Approve sets status `active` and the opportunity appears on the driver page.
-- [ ] Opportunities tab → Reject, Flag, Remove each move the row out of Pending into the right filter.
-- [ ] Opportunities detail drawer → opens for opportunity with no recruiter row → renders "No recruiter linked." instead of crashing.
-- [ ] Opportunities detail drawer → opportunity with no pay data shows "—" everywhere, no NaN.
-- [ ] Recruiters tab → Pending list loads; Approve flips to Approved view; verified_at and verified_by are set.
-- [ ] Recruiters tab → Suspend hides the recruiter from public posting; resubmission RPC still rejected for suspended recruiters.
-- [ ] Recruiter Billing Summary renders with zero billing rows (counters all 0) without throwing.
-- [ ] Existing tabs (Overview, Activation, Users, Parking, Drivers, Starter Kit, Admins, Billing, Feedback, Emails) still render and fetch data.
-- [ ] Mobile (≤ 434 px) → tab strip wraps; cards do not overflow horizontally.
+### 11. Terms / Privacy
+Files: `Terms.tsx`, `Privacy.tsx`.
+Audit: Confirm coverage for recruiter accounts, opportunity data, recruiter billing, contact-snapshot sharing, no guaranteed earnings/jobs language, admin moderation rights.
+
+### 12. SEO / Internal linking
+Files: `Landing`, `Pricing`, `FAQ`, `Features`, footer, `SEOHead`.
+Audit: Recruiter access discoverability, dead links, accurate metadata.
+
+### 13. Database / RLS
+- Run `supabase--linter`.
+- Spot-check RLS policies on `opportunities`, `recruiter_profiles`, `recruiter_billing_profiles`, `opportunity_applications`, `driver_opportunity_profiles`, `saved_opportunities`.
+- Verify guard triggers (already inspected via context — they look correct).
+
+## Fix policy
+
+For each confirmed issue I will:
+- Patch the smallest surface area (single file or single function when possible).
+- Preserve all unrelated code, routes, copy, and design tokens.
+- Re-state the file diff in the final report.
+
+For confirmed gaps that require a UI block (e.g. recruiter pricing tile on `/pricing`), I will add the minimum block needed without redesigning the rest of the page.
+
+For risky/large issues I will **report only**, not fix, and flag as "Remaining limitation" for explicit user approval.
+
+## Out of scope (will not touch)
+
+- `LoadForm.tsx`, `computeLoadPay.ts`
+- Reports (`ReportsView`, `reportPdf`, `reportCsv`, `reportTax`)
+- Parking logic
+- Driver Pro Stripe path (`create-checkout`, driver subscription rows)
+- AI / Lovable AI Gateway calls
+- Any database schema change unless a security finding requires it
+- Visual redesign of Landing, Pricing, Terms, Privacy beyond the recruiter-pricing addition
+
+## Deliverable
+
+A strict 18-section report (per the user's spec) covering: PASS/PARTIAL/FAIL, build, files inspected, files changed, every functional area, confirmed fixes, remaining limitations, and a manual QA checklist.
+
+After approval I will execute the audit + any surgical fixes in build mode and post the full report.
