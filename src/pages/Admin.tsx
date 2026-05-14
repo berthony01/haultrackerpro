@@ -238,6 +238,9 @@ export default function Admin() {
   const api = useAdminApi();
   const isSuperAdmin = role === 'super_admin';
 
+  // Active tab (controlled, driven by sidebar on desktop / TabsList on mobile)
+  const [tab, setTab] = useState('overview');
+
   // Overview
   const [overview, setOverview] = useState<OverviewData | null>(null);
 
