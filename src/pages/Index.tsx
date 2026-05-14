@@ -158,16 +158,32 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
-    // Route to Opportunities from external recruiter CTA
+    // Route to Opportunities from external recruiter CTA OR from auth intent (URL/sessionStorage)
+    let recruiterIntent = false;
+    try {
+      const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
+      if (storedAuthIntent === 'recruiter') {
+        recruiterIntent = true;
+        sessionStorage.removeItem('htp_auth_intent');
+      }
+    } catch {}
     if (params.get('page') === 'opportunities') {
       setPage('opportunities');
       const view = params.get('view');
       if (view === 'recruiter') {
         sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
+        recruiterIntent = true;
       } else if (view === 'driver-profile') {
         sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
       }
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (recruiterIntent) {
+      sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
+      setPage('opportunities');
+    }
+    if (recruiterIntent) {
+      // Suppress driver-first onboarding modal once for recruiter signups
+      try { sessionStorage.setItem('htp_recruiter_intent', '1'); } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey]);
