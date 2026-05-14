@@ -146,7 +146,7 @@ export function useRecruiterBillingSummary() {
       };
       for (const r of rows) {
         const s = (r.status ?? 'inactive').toLowerCase();
-        if (s === 'active' || s === 'trialing') summary.active++;
+        if (s === 'active' || s === 'trialing') summary.active++; // trial-allowlist
         else if (s === 'past_due') summary.past_due++;
         else if (s === 'canceled' || s === 'cancelled') summary.canceled++;
         else summary.inactive++;
@@ -154,7 +154,7 @@ export function useRecruiterBillingSummary() {
         if (p === 'starter') summary.starter++;
         else if (p === 'growth') summary.growth++;
         else if (p === 'fleet') summary.fleet++;
-        if (s === 'active' || s === 'trialing') {
+        if (s === 'active' || s === 'trialing') { // trial-allowlist
           summary.capacity += r.active_opportunity_limit ?? 0;
         }
       }

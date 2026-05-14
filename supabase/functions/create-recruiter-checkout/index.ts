@@ -121,8 +121,8 @@ serve(async (req) => {
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
-      success_url: `${origin}/?recruiter_checkout=success`,
-      cancel_url: `${origin}/?recruiter_checkout=cancel`,
+      success_url: `${origin}/dashboard?page=opportunities&view=recruiter&recruiter_checkout=success`,
+      cancel_url: `${origin}/dashboard?page=opportunities&view=recruiter&recruiter_checkout=cancel`,
       metadata: {
         user_id: user.id,
         recruiter_id: recruiter.id,

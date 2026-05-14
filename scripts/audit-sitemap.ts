@@ -17,6 +17,7 @@ const EXPECTED_PUBLIC_ROUTES: string[] = [
   '/',
   '/features',
   '/pricing',
+  '/recruiters',
   '/faq',
   '/starter-kit',
   '/terms',
