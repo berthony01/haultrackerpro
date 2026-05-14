@@ -158,6 +158,12 @@ const Index = () => {
     // Route to Opportunities from external recruiter CTA
     if (params.get('page') === 'opportunities') {
       setPage('opportunities');
+      const view = params.get('view');
+      if (view === 'recruiter') {
+        sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
+      } else if (view === 'driver-profile') {
+        sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
+      }
       window.history.replaceState({}, '', window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
