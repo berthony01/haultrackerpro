@@ -525,10 +525,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "contracts_application_fk"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_applications"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contracts_current_version_fk"
             columns: ["current_version_id"]
             isOneToOne: false
             referencedRelation: "contract_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_opportunity_fk"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_recruiter_fk"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
             referencedColumns: ["id"]
           },
         ]
