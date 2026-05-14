@@ -547,41 +547,47 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-background">
       <SEOHead title="Admin | HaulTrackerPro" description="Admin dashboard." path="/admin" noindex />
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
-        <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/10">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
-              <Truck className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                Admin Dashboard
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Real-time overview of your HaulTrackerPro platform.
-              </p>
-            </div>
-            <Badge variant="secondary" className="shrink-0 capitalize">{role}</Badge>
-          </div>
-        </Card>
-
-        <Tabs defaultValue="overview">
-          <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1">
-            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
-            <TabsTrigger value="activation"><TrendingUp className="h-4 w-4 mr-1" />Activation</TabsTrigger>
-            <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
-            <TabsTrigger value="parking"><ParkingCircle className="h-4 w-4 mr-1" />Parking</TabsTrigger>
-            <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
-            <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
-            <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
-            <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
-            <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
-            <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
-            <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
-            <TabsTrigger value="emails"><Mail className="h-4 w-4 mr-1" />Emails</TabsTrigger>
+  return (
+    <>
+      <SEOHead title="Admin | HaulTrackerPro" description="Admin dashboard." path="/admin" noindex />
+      <AdminShell
+        value={tab}
+        onChange={setTab}
+        role={role}
+        email={user?.email}
+        mobileNav={
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1 bg-white/[0.04] border border-white/10">
+              <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
+              <TabsTrigger value="activation"><TrendingUp className="h-4 w-4 mr-1" />Activation</TabsTrigger>
+              <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
+              <TabsTrigger value="parking"><ParkingCircle className="h-4 w-4 mr-1" />Parking</TabsTrigger>
+              <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
+              <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
+              <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
+              <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
+              <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
+              <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
+              <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
+              <TabsTrigger value="emails"><Mail className="h-4 w-4 mr-1" />Emails</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        }
+      >
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="sr-only">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="activation">Activation</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="parking">Parking</TabsTrigger>
+            <TabsTrigger value="drivers">Drivers</TabsTrigger>
+            <TabsTrigger value="leads">Starter Kit</TabsTrigger>
+            <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
+            <TabsTrigger value="recruiters">Recruiters</TabsTrigger>
+            <TabsTrigger value="admins">Admins</TabsTrigger>
+            <TabsTrigger value="billing">Billing</TabsTrigger>
+            <TabsTrigger value="feedback">Feedback</TabsTrigger>
+            <TabsTrigger value="emails">Emails</TabsTrigger>
           </TabsList>
 
           <TabsContent value="opportunities" className="space-y-3">
@@ -593,7 +599,9 @@ export default function Admin() {
 
           {/* OVERVIEW */}
           <TabsContent value="overview" className="space-y-4">
-            {overview ? (
+            <AdminOverviewPremium overview={overview} onGoToTab={setTab} />
+          </TabsContent>
+
               <>
                 <div>
                   <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Users & Subscriptions</p>
