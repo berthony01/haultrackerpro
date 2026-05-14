@@ -231,7 +231,7 @@ export default function Landing() {
           </div>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button
-              onClick={() => navigate('/pricing#for-recruiters')}
+              onClick={() => navigate('/recruiters')}
               size="lg"
               className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
               style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
