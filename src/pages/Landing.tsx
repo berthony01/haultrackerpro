@@ -154,7 +154,7 @@ export default function Landing() {
                   <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Most loads look profitable. Many aren't. HaulTrackerPro shows your <span className="font-semibold" style={{ color: 'hsl(0, 0%, 90%)' }}>real pay per mile</span> after fuel, deadhead, and expenses — so you stop losing money on bad loads.
+                  Track your real profit, compare trucking opportunities, and use recruiter-provided details to make better money decisions before you commit.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -162,14 +162,21 @@ export default function Landing() {
                   background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
                   boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)'
                 }}>
-                  Start Free — See Your Real Profit Today <ArrowRight className="h-5 w-5" />
+                  Start Tracking Free <ArrowRight className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} className="text-base font-semibold rounded-xl h-13 px-8" style={{
+                <Button variant="outline" size="lg" onClick={() => navigate('/pricing#for-recruiters')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
                   borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
                 }}>
-                  Watch How It Works
+                  Explore Recruiter Access
                 </Button>
               </div>
+              <button
+                onClick={() => document.getElementById('opportunities-ecosystem')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-sm font-semibold underline-offset-4 hover:underline"
+                style={{ color: 'hsl(25, 95%, 60%)' }}
+              >
+                See How Opportunities Work →
+              </button>
               <div className="flex items-center gap-6 pt-2">
                 {['No credit card', 'Free plan available', 'Pro from $19.99/mo'].map(t => (
                   <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
