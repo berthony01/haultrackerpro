@@ -478,6 +478,7 @@ const Index = () => {
         {showOnboarding ? (
           <Onboarding onGetStarted={() => { setEditingLoad(null); setPage('add'); }} />
         ) : (
+          <Suspense fallback={<ViewFallback />}>
           <>
             {page === 'dashboard' && (
               <>
