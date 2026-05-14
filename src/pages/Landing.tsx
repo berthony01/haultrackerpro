@@ -789,7 +789,7 @@ export default function Landing() {
                   <li key={b} className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />{b}</li>
                 ))}
               </ul>
-              <Button onClick={() => navigate('/pricing#for-recruiters')} variant="outline" className="w-full rounded-xl font-bold gap-2" style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
+              <Button onClick={() => navigate('/recruiters')} variant="outline" className="w-full rounded-xl font-bold gap-2" style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
                 Apply for Recruiter Access <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
