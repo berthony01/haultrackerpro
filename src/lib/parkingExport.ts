@@ -2,6 +2,13 @@ import { format, parseISO } from 'date-fns';
 import type { Expense } from '@/hooks/useExpenses';
 import type { Load } from '@/hooks/useLoads';
 import { formatCurrency } from '@/lib/loadUtils';
+// Static imports of report modules so Vite no longer warns about mixed
+// static/dynamic imports (these same modules are statically imported by
+// ReportsView and MonthlySummary). All report-heavy code still ends up in
+// chunks that only load with the lazy ReportsView / Parking page.
+import { aggregateReport } from '@/lib/reportAggregator';
+import { buildReportCSV, downloadCSV } from '@/lib/reportCsv';
+import { buildReportPdf, downloadPdfBlob } from '@/lib/reportPdf';
 
 export interface ParkingExportRange {
   label: string;
