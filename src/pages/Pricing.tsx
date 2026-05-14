@@ -130,7 +130,7 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Pricing | HaulTrackerPro" description="Start free with HaulTrackerPro. Upgrade to Pro for automation, insights, and advanced reporting." path="/pricing" />
+      <SEOHead title="Pricing | HaulTrackerPro" description="HaulTrackerPro pricing — driver plans for profit tracking and recruiter plans for approved trucking opportunity posting." path="/pricing" />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
