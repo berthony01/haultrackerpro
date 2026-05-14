@@ -81,7 +81,7 @@ export default function Privacy() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">8. Contact Information</h3>
-          <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.app.</p>
+          <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.com.</p>
         </section>
 
         <p className="text-xs text-muted-foreground/60 pt-4 border-t border-border">

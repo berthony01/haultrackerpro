@@ -542,6 +542,31 @@ const faqs: Faq[] = [
   { id: 'parking-points', question: 'How do I earn driver points?', answer: 'You earn 5 points every time you submit a verified parking report. Consecutive days of activity build a streak, and your total points place you on the community leaderboard alongside other HaulTrackerPro drivers. Points reward drivers who help the community by keeping parking data fresh.' },
   { id: 'parking-export', question: 'Can I export my parking stops?', answer: 'Yes — Pro users can export logged parking stops as CSV or PDF for any date range. Useful for paperwork, dispatcher reports, or HOS records. Export is available from the Parking page header.' },
   { id: 'starter-kit', question: 'What\'s in the Free Trucker Starter Kit?', answer: 'Six free PDFs for new and aspiring truckers: CDL study notes, test-day checklist, owner-operator paperwork basics, expense tracker template, profit cheat sheet, and a load-board quickstart. No credit card, no spam — just enter your email at /starter-kit and download instantly.' },
+  {
+    id: 'what-are-opportunities',
+    question: 'What are HaulTrackerPro Opportunities?',
+    answer: 'Opportunities are trucking opportunities submitted by approved recruiters and carriers. Drivers can review estimated pay, RPM, deadhead, deductions, and request more information.',
+  },
+  {
+    id: 'opportunity-earnings-guaranteed',
+    question: 'Are opportunity earnings guaranteed?',
+    answer: 'No. Pay, deductions, miles, and Profit Intelligence are estimates based on recruiter-provided information. Drivers should verify details directly with the recruiter or carrier.',
+  },
+  {
+    id: 'how-recruiters-post',
+    question: 'How do recruiters post opportunities?',
+    answer: 'Recruiters apply for access, submit company details, and must be approved before posting. Active recruiter billing is required to submit listings for review.',
+  },
+  {
+    id: 'recruiter-plans',
+    question: 'What are recruiter plans?',
+    answer: 'Starter is $19/month for 1 active opportunity, Growth is $49/month for 5 active opportunities, and Fleet is $149/month for 25 active opportunities.',
+  },
+  {
+    id: 'request-info-contact',
+    question: 'What happens when a driver requests info?',
+    answer: 'The driver\'s contact snapshot is shared only with the recruiter connected to that opportunity so they can follow up.',
+  },
 ];
 
 const nodeToText = (node: ReactNode): string => {

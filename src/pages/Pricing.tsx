@@ -325,7 +325,7 @@ export default function Pricing() {
                 price: '$19',
                 limit: '1 active opportunity',
                 bullets: [
-                  'Verified recruiter / company profile',
+                  'Approved recruiter / company profile',
                   'Applications dashboard',
                   'Profit Intelligence integration',
                   'Admin-reviewed listings',
@@ -389,7 +389,7 @@ export default function Pricing() {
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button
-              onClick={() => navigate(user ? '/dashboard' : '/auth')}
+              onClick={() => navigate(user ? '/dashboard?page=opportunities' : '/auth')}
               size="lg"
               className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
               style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}

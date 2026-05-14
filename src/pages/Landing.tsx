@@ -688,6 +688,62 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 6.7: OPPORTUNITIES ECOSYSTEM       */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+              <Users className="h-3.5 w-3.5" /> Opportunities
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Profit-First Trucking Opportunities
+            </h2>
+            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              HaulTrackerPro helps drivers compare opportunities using estimated pay, deadhead, deductions, RPM, and recruiter-provided details.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-5 max-w-4xl mx-auto">
+            {[
+              { icon: Truck, title: 'For Drivers', desc: 'Browse approved opportunities, create a Driver Opportunity Profile, request info, and compare opportunities using Profit Intelligence.' },
+              { icon: Users, title: 'For Recruiters', desc: 'Approved recruiters can post structured opportunities, manage applications, and connect with drivers who care about real numbers.' },
+              { icon: Zap, title: 'Smart Fit Matching', desc: 'Drivers see deterministic match scores based on profile preferences, route type, pay goals, deadhead, deductions, and equipment fit.' },
+            ].map((item) => (
+              <div key={item.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              onClick={() => navigate('/pricing#for-recruiters')}
+              size="lg"
+              className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
+              style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
+            >
+              Explore Pricing <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={goToAuth}
+              variant="outline"
+              size="lg"
+              className="text-sm font-bold rounded-xl h-12 px-6"
+              style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}
+            >
+              Start Free
+            </Button>
+          </div>
+          <p className="text-[11px] text-center mt-4" style={{ color: 'hsl(220, 10%, 40%)' }}>
+            All pay figures are estimates based on recruiter-provided data — not guaranteed income or guaranteed jobs.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
       {/* SECTION 7: FINAL CTA */}
       {/* ═══════════════════════════════════════════ */}
       <section className="py-20 sm:py-28 relative overflow-hidden">

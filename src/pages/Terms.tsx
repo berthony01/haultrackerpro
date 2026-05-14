@@ -29,7 +29,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">2. Description of Service</h3>
-          <p className="text-muted-foreground">HaulTrackerPro provides load tracking, expense tracking, and financial tracking tools for owner-operators and lease operators in the trucking industry. The service helps users log loads, track pay, manage expenses, and generate reports. HaulTrackerPro also offers an Opportunities marketplace where verified recruiters and carriers can post trucking opportunities and where drivers can browse and request more information.</p>
+          <p className="text-muted-foreground">HaulTrackerPro provides load tracking, expense tracking, and financial tracking tools for owner-operators and lease operators in the trucking industry. The service helps users log loads, track pay, manage expenses, and generate reports. HaulTrackerPro also offers an Opportunities marketplace where approved recruiters and carriers can post trucking opportunities and where drivers can browse and request more information.</p>
         </section>
 
         <section className="space-y-2">
@@ -84,7 +84,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">13. Contact Information</h3>
-          <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.app.</p>
+          <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.com.</p>
         </section>
 
         <p className="text-xs text-muted-foreground/60 pt-4 border-t border-border">
