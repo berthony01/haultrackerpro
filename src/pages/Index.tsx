@@ -33,6 +33,7 @@ import { FeedbackModal } from '@/components/FeedbackModal';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AlertsView } from '@/components/AlertsView';
 import { OpportunitiesPage } from '@/components/opportunities/OpportunitiesPage';
+import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 
 import { RecurringExpensesView } from '@/components/RecurringExpensesView';
 import { MilestoneNudges } from '@/components/MilestoneNudges';
@@ -93,6 +94,8 @@ const Index = () => {
   // Pro gating — canonical subscription hook (Free vs Pro plans only)
   const subscription = useSubscription();
   const isPro = subscription.isPro;
+  const { profile: driverOppProfile } = useDriverOpportunityProfile();
+  const hasCompletedDriverProfile = !!driverOppProfile?.profile_completed;
 
   const handleUpgrade = () => {
     setPage('settings');
@@ -107,6 +110,13 @@ const Index = () => {
       setPendingPurchaseTrack(true);
       subscription.refetch();
       window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (params.get('recruiter_checkout') === 'success') {
+      toast.success('Recruiter plan activated! You can now post opportunities.', { duration: 5000 });
+      queryClient.invalidateQueries({ queryKey: ['recruiter_billing'] });
+      queryClient.invalidateQueries({ queryKey: ['recruiter_active_opportunity_count'] });
+    } else if (params.get('recruiter_checkout') === 'cancel') {
+      toast.info('Checkout canceled. You can pick a plan whenever you’re ready.');
     }
     // Prefill from Landing Profit Intelligence demo
     if (params.get('prefill') === 'load') {
@@ -494,7 +504,7 @@ const Index = () => {
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
-                        { icon: Route, label: 'Find Opportunities', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile'); } catch {} ; handleNavigate('opportunities'); } },
+                        { icon: Route, label: 'Find Opportunities', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', hasCompletedDriverProfile ? 'list' : 'driver-profile'); } catch {} ; handleNavigate('opportunities'); } },
                         { icon: Users, label: 'Recruit Drivers', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter'); } catch {} ; handleNavigate('opportunities'); } },
                       ].map((item) => (
                         <button
