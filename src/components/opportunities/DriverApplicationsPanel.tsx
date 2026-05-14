@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Inbox, RefreshCw, Eye, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
+import { ContractAttachment } from '@/components/contracts/ContractAttachment';
 
 interface Props {
   onBack: () => void;
@@ -126,6 +127,10 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
                     {a.message}
                   </div>
                 )}
+
+                <div className="mb-3">
+                  <ContractAttachment applicationId={a.id} role="driver" />
+                </div>
 
                 <div className="flex flex-wrap gap-2">
                   {opp?.id && onViewOpportunity && (
