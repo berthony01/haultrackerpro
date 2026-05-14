@@ -303,6 +303,110 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* For Recruiters */}
+      <section id="for-recruiters" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+              For Recruiters &amp; Carriers
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Reach Profit-Focused Drivers
+            </h2>
+            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
+              Post opportunities to drivers who already track their numbers. Recruiter access requires approval. Listings go through admin review before going live.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-5">
+            {[
+              {
+                name: 'Starter',
+                price: '$19',
+                limit: '1 active opportunity',
+                bullets: [
+                  'Verified recruiter / company profile',
+                  'Applications dashboard',
+                  'Profit Intelligence integration',
+                  'Admin-reviewed listings',
+                ],
+              },
+              {
+                name: 'Growth',
+                price: '$49',
+                limit: '5 active opportunities',
+                highlight: true,
+                bullets: [
+                  'Everything in Starter',
+                  'Enhanced hiring visibility',
+                  'Application status workflow',
+                  'Priority moderation queue',
+                ],
+              },
+              {
+                name: 'Fleet',
+                price: '$149',
+                limit: '25 active opportunities',
+                bullets: [
+                  'Everything in Growth',
+                  'High-volume recruiting capacity',
+                  'Priority ecosystem access',
+                  'Best for carriers &amp; large fleets',
+                ],
+              },
+            ].map((p) => (
+              <div
+                key={p.name}
+                className="p-6 rounded-2xl border relative"
+                style={{
+                  background: 'hsl(220, 20%, 10%)',
+                  borderColor: p.highlight ? 'hsl(25, 95%, 53%)' : 'hsl(220, 16%, 16%)',
+                  boxShadow: p.highlight ? '0 0 30px -8px hsl(25, 95%, 53%, 0.2), 0 0 0 1px hsl(25, 95%, 53%, 0.15)' : undefined,
+                }}
+              >
+                {p.highlight && (
+                  <div className="absolute -top-3 right-6 px-3 py-1 rounded-full text-[10px] font-bold" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+                    MOST POPULAR
+                  </div>
+                )}
+                <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.name}</h3>
+                <p className="text-xs mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>{p.limit}</p>
+                <div className="mb-5">
+                  <span className="text-3xl font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.price}</span>
+                  <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                </div>
+                <ul className="space-y-2.5 mb-5">
+                  {p.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-2 text-xs" style={{ color: 'hsl(220, 10%, 70%)' }}>
+                      <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              onClick={() => navigate(user ? '/dashboard' : '/auth')}
+              size="lg"
+              className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
+              style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
+            >
+              {user ? 'Open Recruiter Onboarding' : 'Apply for Recruiter Access'} <ArrowRight className="h-4 w-4" />
+            </Button>
+            <span className="text-xs" style={{ color: 'hsl(220, 10%, 50%)' }}>
+              Approval required before posting. Active subscription required to submit listings.
+            </span>
+          </div>
+
+          <p className="text-[11px] text-center mt-6" style={{ color: 'hsl(220, 10%, 40%)' }}>
+            Pay figures and Profit Intelligence shown to drivers are estimates based on recruiter-provided data — never guaranteed earnings or guaranteed jobs.
+          </p>
+        </div>
+      </section>
+
       {/* Lead magnet CTA */}
       <section className="py-8" style={{ background: 'hsl(220, 20%, 8%)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
