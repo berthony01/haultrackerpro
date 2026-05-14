@@ -64,6 +64,9 @@ const Index = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [roleCardDismissed, setRoleCardDismissed] = useState(() => {
+    try { return localStorage.getItem('htp_role_card_dismissed') === '1'; } catch { return false; }
+  });
   const { ready: releaseReady, hasSeenLatest, markSeen } = useReleaseNotesSeen();
 
   // Auto-open the What's New modal once per user (after onboarding modal isn't blocking)
