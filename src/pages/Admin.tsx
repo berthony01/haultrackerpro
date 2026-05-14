@@ -17,6 +17,8 @@ import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Tras
 import { toast } from 'sonner';
 import { AdminOpportunitiesPanel } from '@/components/admin/opportunities/AdminOpportunitiesPanel';
 import { AdminRecruitersPanel } from '@/components/admin/opportunities/AdminRecruitersPanel';
+import { AdminShell } from '@/components/admin/AdminShell';
+import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 
 interface OverviewData {
   total_users: number;
