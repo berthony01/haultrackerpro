@@ -49,33 +49,37 @@ function escapeCsv(v: string): string {
   return v;
 }
 
-export function exportParkingCSV(
+export async function exportParkingCSV(
   expenses: Expense[],
   loads: Load[],
   range: ParkingExportRange,
-): { count: number; total: number } {
+  driverName?: string,
+): Promise<{ count: number; total: number }> {
   const rows = buildRows(expenses, loads, range);
   const total = rows.reduce((s, r) => s + r.amount, 0);
 
-  const header = ['Date', 'Category', 'Amount', 'Linked Load', 'Notes'];
-  const lines = [header.join(',')];
-  for (const r of rows) {
-    lines.push(
-      [
-        escapeCsv(r.date),
-        'Parking',
-        r.amount.toFixed(2),
-        escapeCsv(r.linkedLoad),
-        escapeCsv(r.notes),
-      ].join(','),
-    );
-  }
-  lines.push(['', '', total.toFixed(2), 'TOTAL', `${rows.length} entries`].join(','));
+  // Route through the premium HaulTracker Pro CSV builder so parking exports
+  // share the same branded header + executive summary as every other report.
+  const [{ aggregateReport }, { buildReportCSV, downloadCSV }] = await Promise.all([
+    import('@/lib/reportAggregator'),
+    import('@/lib/reportCsv'),
+  ]);
 
-  const csv = lines.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const parkingExpenses = expenses.filter(
+    (e) => e.category === 'Parking' && e.expense_date >= range.from && e.expense_date <= range.to,
+  );
+
+  const agg = aggregateReport({
+    loads: [],
+    expenses: parkingExpenses,
+    fuelLogs: [],
+    settings: null,
+    range: { from: range.from, to: range.to, label: range.label, key: 'custom' },
+    preparedFor: driverName || 'HaulTrackerPro Driver',
+  });
+
   const filename = `parking-expenses_${range.label.replace(/\s+/g, '-').toLowerCase()}_${range.from}_to_${range.to}.csv`;
-  triggerDownload(blob, filename);
+  downloadCSV(filename, buildReportCSV('expense', agg));
   return { count: rows.length, total };
 }
 

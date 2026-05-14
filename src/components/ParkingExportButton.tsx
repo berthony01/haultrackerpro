@@ -61,7 +61,7 @@ export function ParkingExportButton({ expenses, loads }: Props) {
       const driverName = settings?.company_name ?? undefined;
       const result =
         format === 'csv'
-          ? exportParkingCSV(expenses, loads, range)
+          ? await exportParkingCSV(expenses, loads, range, driverName)
           : await exportParkingPDF(expenses, loads, range, driverName);
       if (result.count === 0) {
         toast.info('No parking expenses in that range', {
