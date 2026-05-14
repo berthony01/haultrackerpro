@@ -355,7 +355,7 @@ export default function Pricing() {
       </section>
 
       {/* For Recruiters */}
-      <section id="for-recruiters" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
+      <section id="for-recruiters" className="py-16 sm:py-24 scroll-mt-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           {/* Header Card */}
           <div className="p-6 sm:p-8 rounded-2xl border text-center mb-10" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
