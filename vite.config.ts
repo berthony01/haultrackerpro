@@ -76,6 +76,24 @@ export default defineConfig(({ mode }) => ({
       injectRegister: false,
     }),
   ].filter(Boolean),
+  build: {
+    rollupOptions: {
+      output: {
+        // Conservative vendor split — keeps heavy third-party code out of the
+        // main app/Index chunk so first dashboard paint stays fast.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return 'vendor-react';
+          if (/[\\/]node_modules[\\/](@supabase|@tanstack)[\\/]/.test(id)) return 'vendor-data';
+          if (/[\\/]node_modules[\\/](@radix-ui|lucide-react|sonner|vaul|cmdk)[\\/]/.test(id)) return 'vendor-ui';
+          if (/[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/.test(id)) return 'vendor-charts';
+          if (/[\\/]node_modules[\\/](jspdf|jspdf-autotable|html2canvas|dompurify)[\\/]/.test(id)) return 'vendor-pdf';
+          if (/[\\/]node_modules[\\/]tesseract\.js/.test(id)) return 'vendor-ocr';
+          return undefined;
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
