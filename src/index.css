@@ -345,3 +345,81 @@ body.app-shell-active .btn-orange-glow:active { transform: translateY(1px); }
     animation: check-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 }
+
+/* ===== Admin Dark Scope =====
+   Inherits .app-shell dark tokens. Adds extra readability for outline
+   buttons, tables, inputs, dialogs rendered inside the admin dashboard. */
+.admin-dark [data-slot="card"],
+.admin-dark .bg-card {
+  background-color: hsl(220 46% 9% / 0.7);
+  border-color: hsl(0 0% 100% / 0.08);
+  backdrop-filter: blur(6px);
+}
+
+/* Outline buttons: visible BEFORE hover */
+.admin-dark button[class*="border-input"],
+.admin-dark .border-input {
+  border-color: hsl(0 0% 100% / 0.15) !important;
+  background-color: hsl(0 0% 100% / 0.03);
+  color: hsl(0 0% 96%);
+}
+.admin-dark button[class*="border-input"]:hover,
+.admin-dark .border-input:hover {
+  background-color: hsl(0 0% 100% / 0.10) !important;
+  color: #fff !important;
+  border-color: hsl(0 0% 100% / 0.25) !important;
+}
+
+/* Ghost buttons */
+.admin-dark button.hover\:bg-accent:not([class*="bg-primary"]):not([class*="bg-destructive"]) {
+  color: hsl(220 12% 88%);
+}
+
+/* Tables */
+.admin-dark table { color: hsl(0 0% 92%); }
+.admin-dark thead tr,
+.admin-dark th {
+  background-color: hsl(220 40% 12% / 0.6);
+  color: hsl(220 12% 75%);
+  border-color: hsl(0 0% 100% / 0.08) !important;
+}
+.admin-dark tbody tr {
+  border-color: hsl(0 0% 100% / 0.06) !important;
+}
+.admin-dark tbody tr:hover {
+  background-color: hsl(0 0% 100% / 0.04) !important;
+}
+
+/* Inputs / Selects / Textareas */
+.admin-dark input,
+.admin-dark textarea,
+.admin-dark [role="combobox"],
+.admin-dark select {
+  background-color: hsl(220 40% 8% / 0.7) !important;
+  border-color: hsl(0 0% 100% / 0.10) !important;
+  color: #fff;
+}
+.admin-dark input::placeholder,
+.admin-dark textarea::placeholder {
+  color: hsl(220 10% 50%);
+}
+
+/* Dialog / Sheet / Popover content */
+.admin-dark [role="dialog"],
+.admin-dark [data-radix-popper-content-wrapper] > * {
+  background-color: #0D111A !important;
+  border-color: hsl(0 0% 100% / 0.10) !important;
+  color: #fff;
+}
+
+/* Muted/secondary text legibility */
+.admin-dark .text-muted-foreground {
+  color: hsl(220 12% 65%);
+}
+
+/* Badge outline contrast */
+.admin-dark [data-slot="badge"][class*="border"],
+.admin-dark .badge-outline {
+  border-color: hsl(0 0% 100% / 0.18);
+  color: hsl(0 0% 92%);
+}
