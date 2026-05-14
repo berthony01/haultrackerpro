@@ -427,6 +427,8 @@ export type Database = {
           storage_bucket: string
           storage_path: string
           updated_at: string
+          upload_status: string
+          uploaded_at: string | null
           uploaded_by: string
           version_number: number
         }
@@ -444,6 +446,8 @@ export type Database = {
           storage_bucket?: string
           storage_path: string
           updated_at?: string
+          upload_status?: string
+          uploaded_at?: string | null
           uploaded_by: string
           version_number: number
         }
@@ -461,6 +465,8 @@ export type Database = {
           storage_bucket?: string
           storage_path?: string
           updated_at?: string
+          upload_status?: string
+          uploaded_at?: string | null
           uploaded_by?: string
           version_number?: number
         }
@@ -527,7 +533,7 @@ export type Database = {
           {
             foreignKeyName: "contracts_application_fk"
             columns: ["application_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "opportunity_applications"
             referencedColumns: ["id"]
           },
