@@ -17,6 +17,8 @@ import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Tras
 import { toast } from 'sonner';
 import { AdminOpportunitiesPanel } from '@/components/admin/opportunities/AdminOpportunitiesPanel';
 import { AdminRecruitersPanel } from '@/components/admin/opportunities/AdminRecruitersPanel';
+import { AdminShell } from '@/components/admin/AdminShell';
+import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 
 interface OverviewData {
   total_users: number;
@@ -235,6 +237,9 @@ export default function Admin() {
   const { user } = useAuth();
   const api = useAdminApi();
   const isSuperAdmin = role === 'super_admin';
+
+  // Active tab (controlled, driven by sidebar on desktop / TabsList on mobile)
+  const [tab, setTab] = useState('overview');
 
   // Overview
   const [overview, setOverview] = useState<OverviewData | null>(null);
@@ -540,43 +545,46 @@ export default function Admin() {
   if (!isAdmin) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-background">
+    <>
       <SEOHead title="Admin | HaulTrackerPro" description="Admin dashboard." path="/admin" noindex />
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
-        <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/10">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="shrink-0">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
-              <Truck className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                Admin Dashboard
-              </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Real-time overview of your HaulTrackerPro platform.
-              </p>
-            </div>
-            <Badge variant="secondary" className="shrink-0 capitalize">{role}</Badge>
-          </div>
-        </Card>
-
-        <Tabs defaultValue="overview">
-          <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1">
-            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
-            <TabsTrigger value="activation"><TrendingUp className="h-4 w-4 mr-1" />Activation</TabsTrigger>
-            <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
-            <TabsTrigger value="parking"><ParkingCircle className="h-4 w-4 mr-1" />Parking</TabsTrigger>
-            <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
-            <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
-            <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
-            <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
-            <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
-            <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
-            <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
-            <TabsTrigger value="emails"><Mail className="h-4 w-4 mr-1" />Emails</TabsTrigger>
+      <AdminShell
+        value={tab}
+        onChange={setTab}
+        role={role}
+        email={user?.email}
+        mobileNav={
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1 bg-white/[0.04] border border-white/10">
+              <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1" />Overview</TabsTrigger>
+              <TabsTrigger value="activation"><TrendingUp className="h-4 w-4 mr-1" />Activation</TabsTrigger>
+              <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
+              <TabsTrigger value="parking"><ParkingCircle className="h-4 w-4 mr-1" />Parking</TabsTrigger>
+              <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
+              <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
+              <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
+              <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
+              <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
+              <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
+              <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
+              <TabsTrigger value="emails"><Mail className="h-4 w-4 mr-1" />Emails</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        }
+      >
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="sr-only">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="activation">Activation</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="parking">Parking</TabsTrigger>
+            <TabsTrigger value="drivers">Drivers</TabsTrigger>
+            <TabsTrigger value="leads">Starter Kit</TabsTrigger>
+            <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
+            <TabsTrigger value="recruiters">Recruiters</TabsTrigger>
+            <TabsTrigger value="admins">Admins</TabsTrigger>
+            <TabsTrigger value="billing">Billing</TabsTrigger>
+            <TabsTrigger value="feedback">Feedback</TabsTrigger>
+            <TabsTrigger value="emails">Emails</TabsTrigger>
           </TabsList>
 
           <TabsContent value="opportunities" className="space-y-3">
@@ -588,123 +596,9 @@ export default function Admin() {
 
           {/* OVERVIEW */}
           <TabsContent value="overview" className="space-y-4">
-            {overview ? (
-              <>
-                <div>
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Users & Subscriptions</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {[
-                      { label: 'Total Users', value: overview.total_users, icon: Users },
-                      { label: 'Free Users', value: overview.subs_free, icon: Users },
-                      { label: 'Active Pro', value: overview.subs_active_pro, icon: Crown },
-                      { label: 'Canceled / Expired', value: overview.subs_canceled, icon: Users },
-                      { label: 'Pro Conversion', value: `${overview.pro_conversion_rate}%`, icon: TrendingUp },
-                    ].map((s) => (
-                      <Card key={s.label} className="shadow-card">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <s.icon className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs text-muted-foreground">{s.label}</p>
-                          </div>
-                          <p className="text-2xl font-bold">{s.value}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Activity (Last 7 Days)</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: 'Loads (7d)', value: overview.loads_7d, sub: `${overview.total_loads} total`, icon: BarChart3 },
-                      { label: 'Expenses (7d)', value: overview.expenses_7d, sub: `${overview.total_expenses} total`, icon: CreditCard },
-                      { label: 'Fuel Logs (7d)', value: overview.fuel_logs_7d, sub: `${overview.total_fuel_logs} total`, icon: BarChart3 },
-                      { label: 'Active Recurring', value: overview.recurring_templates_active, sub: 'templates', icon: RefreshCw },
-                    ].map((s) => (
-                      <Card key={s.label} className="shadow-card">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <s.icon className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs text-muted-foreground">{s.label}</p>
-                          </div>
-                          <p className="text-2xl font-bold">{s.value}</p>
-                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{s.sub}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Community / Parking</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: 'Parking Locations', value: overview.parking_locations_total, icon: ParkingCircle },
-                      { label: 'Reports (7d)', value: overview.parking_reports_7d, icon: ParkingCircle },
-                      { label: 'Verifications (7d)', value: overview.parking_verifications_7d, icon: Shield },
-                      { label: 'Active Drivers (week)', value: overview.driver_points_active_users, icon: Trophy },
-                    ].map((s) => (
-                      <Card key={s.label} className="shadow-card">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <s.icon className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs text-muted-foreground">{s.label}</p>
-                          </div>
-                          <p className="text-2xl font-bold">{s.value}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">Lead Magnet</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Total Signups', value: overview.lead_magnet_signups_total },
-                      { label: 'Last 7d', value: overview.lead_magnet_signups_7d },
-                      { label: 'Last 30d', value: overview.lead_magnet_signups_30d },
-                    ].map((s) => (
-                      <Card key={s.label} className="shadow-card">
-                        <CardContent className="p-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Gift className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs text-muted-foreground">{s.label}</p>
-                          </div>
-                          <p className="text-2xl font-bold">{s.value}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-2">AI / Automation (7d)</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Parse usage', value: overview.parse_usage_7d, sub: 'Paste · Voice · Scan' },
-                      { label: 'Auto-categorized', value: overview.expense_automation_7d, sub: 'expenses' },
-                      { label: 'AI insights', value: overview.ai_insights_7d, sub: 'generated' },
-                    ].map((s) => (
-                      <Card key={s.label} className="shadow-card">
-                        <CardContent className="p-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Sparkles className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-xs text-muted-foreground">{s.label}</p>
-                          </div>
-                          <p className="text-2xl font-bold">{s.value}</p>
-                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{s.sub}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">Loading...</p>
-            )}
+            <AdminOverviewPremium overview={overview} onGoToTab={setTab} />
           </TabsContent>
+
 
           {/* ACTIVATION */}
           <TabsContent value="activation" className="space-y-3">
@@ -1610,7 +1504,7 @@ export default function Admin() {
             </AlertDialog>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+      </AdminShell>
+    </>
   );
 }
