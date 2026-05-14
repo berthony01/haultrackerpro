@@ -2,7 +2,13 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
-import { formatCurrency, formatNumber, exportToCSV, exportToPDF, getEffectiveDate } from '@/lib/loadUtils';
+import { formatCurrency, formatNumber, exportToCSV, getEffectiveDate } from '@/lib/loadUtils';
+import { aggregateReport } from '@/lib/reportAggregator';
+import { buildReportPdf, downloadPdfBlob } from '@/lib/reportPdf';
+import { useFuelLogs } from '@/hooks/useFuelLogs';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 import {
   getLoadExpectedPay,
   sumExpectedPay,
@@ -53,13 +59,16 @@ export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryP
       </div>
 
       {months.map(month => (
-        <MonthCard key={month.label} label={month.label} loads={month.loads} expenses={month.expenses} allLoads={loads} allStops={stops} />
+        <MonthCard key={month.label} label={month.label} loads={month.loads} expenses={month.expenses} allLoads={loads} allStops={stops} monthStart={month.start} monthEnd={month.end} />
       ))}
     </div>
   );
 }
 
-function MonthCard({ label, loads, expenses = [], allStops = [] }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[] }) {
+function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, monthEnd }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[]; monthStart: Date; monthEnd: Date }) {
+  const { fuelLogs } = useFuelLogs();
+  const { settings } = useUserSettings();
+  const { user } = useAuth();
   const stats = useMemo(() => {
     const nonCancelled = loads.filter(l => l.status !== 'cancelled');
     const estimated = sumExpectedPay(nonCancelled);
@@ -194,7 +203,31 @@ function MonthCard({ label, loads, expenses = [], allStops = [] }: { label: stri
             variant="outline"
             size="sm"
             className="flex-1 gap-1.5 text-xs rounded-xl"
-            onClick={() => exportToPDF(loads, `month-${label.replace(/\s/g, '-')}`, allStops)}
+            onClick={() => {
+              try {
+                const from = format(monthStart, 'yyyy-MM-dd');
+                const to = format(monthEnd, 'yyyy-MM-dd');
+                const preparedFor =
+                  settings?.company_name ||
+                  (user?.user_metadata as any)?.display_name ||
+                  user?.email ||
+                  'HaulTrackerPro Driver';
+                const agg = aggregateReport({
+                  loads,
+                  expenses,
+                  fuelLogs,
+                  settings: settings ?? null,
+                  range: { from, to, label, key: 'custom' },
+                  preparedFor,
+                });
+                const filename = `haultrackerpro-weekly-performance-${from}-to-${to}.pdf`;
+                downloadPdfBlob(filename, buildReportPdf('weekly_performance', agg));
+                toast.success('PDF report downloaded.');
+              } catch (err) {
+                console.error(err);
+                toast.error('Failed to generate PDF.');
+              }
+            }}
           >
             <Download className="h-3.5 w-3.5" /> PDF
           </Button>
