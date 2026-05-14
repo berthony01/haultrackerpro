@@ -128,6 +128,10 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
                   </div>
                 )}
 
+                <div className="mb-3">
+                  <ContractAttachment applicationId={a.id} role="driver" />
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   {opp?.id && onViewOpportunity && (
                     <Button variant="outline" size="sm" onClick={() => onViewOpportunity(opp.id)}>
