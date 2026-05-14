@@ -22,6 +22,13 @@ export default function Auth() {
     if (googleLoading || loading) return;
     setGoogleLoading(true);
     try {
+      // Preserve recruiter intent across the OAuth round-trip.
+      try {
+        const intent = new URLSearchParams(window.location.search).get('intent');
+        if (intent === 'recruiter') {
+          sessionStorage.setItem('htp_auth_intent', 'recruiter');
+        }
+      } catch {}
       const result = await lovable.auth.signInWithOAuth('google', {
         redirect_uri: window.location.origin,
       });
