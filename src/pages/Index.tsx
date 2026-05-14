@@ -663,6 +663,7 @@ const Index = () => {
             {page === 'opportunities' && <OpportunitiesPage onUpgrade={handleUpgrade} />}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
+          </Suspense>
         )}
       </main>
       </div>
