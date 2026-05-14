@@ -93,6 +93,7 @@ export default function Landing() {
           <div className="hidden sm:flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
             <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
+            <Button variant="ghost" onClick={() => navigate('/pricing#for-recruiters')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
             <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
             <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
               Start Tracking Free
@@ -113,6 +114,7 @@ export default function Landing() {
               {[
                 { label: 'Features', href: '/features' },
                 { label: 'Pricing', href: '/pricing' },
+                { label: 'For Recruiters', href: '/pricing#for-recruiters' },
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Sign In', href: '/auth' },
               ].map(item => (
@@ -152,7 +154,7 @@ export default function Landing() {
                   <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Most loads look profitable. Many aren't. HaulTrackerPro shows your <span className="font-semibold" style={{ color: 'hsl(0, 0%, 90%)' }}>real pay per mile</span> after fuel, deadhead, and expenses — so you stop losing money on bad loads.
+                  Track your real profit, compare trucking opportunities, and use recruiter-provided details to make better money decisions before you commit.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -160,14 +162,21 @@ export default function Landing() {
                   background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
                   boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)'
                 }}>
-                  Start Free — See Your Real Profit Today <ArrowRight className="h-5 w-5" />
+                  Start Tracking Free <ArrowRight className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} className="text-base font-semibold rounded-xl h-13 px-8" style={{
+                <Button variant="outline" size="lg" onClick={() => navigate('/pricing#for-recruiters')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
                   borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
                 }}>
-                  Watch How It Works
+                  Explore Recruiter Access
                 </Button>
               </div>
+              <button
+                onClick={() => document.getElementById('opportunities-ecosystem')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-sm font-semibold underline-offset-4 hover:underline"
+                style={{ color: 'hsl(25, 95%, 60%)' }}
+              >
+                See How Opportunities Work →
+              </button>
               <div className="flex items-center gap-6 pt-2">
                 {['No credit card', 'Free plan available', 'Pro from $19.99/mo'].map(t => (
                   <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
@@ -190,7 +199,62 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 2: HOW IT WORKS */}
+      {/* SECTION 1.5: OPPORTUNITIES ECOSYSTEM       */}
+      {/* ═══════════════════════════════════════════ */}
+      <section id="opportunities-ecosystem" className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+              <Users className="h-3.5 w-3.5" /> Opportunities
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Profit-First Trucking Opportunities
+            </h2>
+            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              HaulTrackerPro helps drivers compare opportunities using estimated pay, deadhead, deductions, RPM, and recruiter-provided details.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-5 max-w-4xl mx-auto">
+            {[
+              { icon: Truck, title: 'For Drivers', desc: 'Browse approved opportunities, compare estimated gross/net/RPM, and request info without guessing.' },
+              { icon: Users, title: 'For Recruiters', desc: 'Apply for recruiter access, post structured opportunities, manage applications, and reach drivers who care about real numbers.' },
+              { icon: Zap, title: 'Smart Fit Matching', desc: 'Match scores are deterministic and based on driver preferences, pay goals, route type, deadhead, deductions, and equipment fit.' },
+            ].map((item) => (
+              <div key={item.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              onClick={() => navigate('/pricing#for-recruiters')}
+              size="lg"
+              className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
+              style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
+            >
+              For Recruiters <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={goToAuth}
+              variant="outline"
+              size="lg"
+              className="text-sm font-bold rounded-xl h-12 px-6"
+              style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}
+            >
+              Start as Driver
+            </Button>
+          </div>
+          <p className="text-[11px] text-center mt-4" style={{ color: 'hsl(220, 10%, 40%)' }}>
+            Pay and match details are estimates based on recruiter-provided data. No job or income is guaranteed.
+          </p>
+        </div>
+      </section>
+
+
       {/* ═══════════════════════════════════════════ */}
       <section id="how-it-works" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -688,57 +752,50 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 6.7: OPPORTUNITIES ECOSYSTEM       */}
+      {/* SECTION 6.7: CHOOSE YOUR PATH              */}
       {/* ═══════════════════════════════════════════ */}
-      <section className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
+      <section className="py-16 sm:py-20" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              <Users className="h-3.5 w-3.5" /> Opportunities
-            </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Profit-First Trucking Opportunities
+              Choose Your HaulTrackerPro Path
             </h2>
             <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              HaulTrackerPro helps drivers compare opportunities using estimated pay, deadhead, deductions, RPM, and recruiter-provided details.
+              Two ways into the ecosystem. Pick the one that fits.
             </p>
           </div>
-          <div className="grid sm:grid-cols-3 gap-5 max-w-4xl mx-auto">
-            {[
-              { icon: Truck, title: 'For Drivers', desc: 'Browse approved opportunities, create a Driver Opportunity Profile, request info, and compare opportunities using Profit Intelligence.' },
-              { icon: Users, title: 'For Recruiters', desc: 'Approved recruiters can post structured opportunities, manage applications, and connect with drivers who care about real numbers.' },
-              { icon: Zap, title: 'Smart Fit Matching', desc: 'Drivers see deterministic match scores based on profile preferences, route type, pay goals, deadhead, deductions, and equipment fit.' },
-            ].map((item) => (
-              <div key={item.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+          <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
+            <div className="p-6 rounded-2xl border flex flex-col" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+              <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                <Truck className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
               </div>
-            ))}
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>I'm a Driver</h3>
+              <ul className="space-y-2 text-sm flex-1 mb-5" style={{ color: 'hsl(220, 10%, 70%)' }}>
+                {['Track loads, expenses, and fuel', 'See real net profit and RPM', 'Build a Driver Opportunity Profile', 'Compare approved opportunities'].map(b => (
+                  <li key={b} className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />{b}</li>
+                ))}
+              </ul>
+              <Button onClick={goToAuth} className="w-full rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+                Start as Driver <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-6 rounded-2xl border flex flex-col" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+              <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                <Users className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+              </div>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>I'm a Recruiter or Carrier</h3>
+              <ul className="space-y-2 text-sm flex-1 mb-5" style={{ color: 'hsl(220, 10%, 70%)' }}>
+                {['Apply for recruiter access', 'Post structured opportunities', 'Manage driver requests', 'Choose Starter, Growth, or Fleet plan'].map(b => (
+                  <li key={b} className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />{b}</li>
+                ))}
+              </ul>
+              <Button onClick={() => navigate('/pricing#for-recruiters')} variant="outline" className="w-full rounded-xl font-bold gap-2" style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
+                Apply for Recruiter Access <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button
-              onClick={() => navigate('/pricing#for-recruiters')}
-              size="lg"
-              className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
-              style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
-            >
-              Explore Pricing <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={goToAuth}
-              variant="outline"
-              size="lg"
-              className="text-sm font-bold rounded-xl h-12 px-6"
-              style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}
-            >
-              Start Free
-            </Button>
-          </div>
-          <p className="text-[11px] text-center mt-4" style={{ color: 'hsl(220, 10%, 40%)' }}>
-            All pay figures are estimates based on recruiter-provided data — not guaranteed income or guaranteed jobs.
+          <p className="text-[11px] text-center mt-6" style={{ color: 'hsl(220, 10%, 40%)' }}>
+            Pay and match details are estimates based on recruiter-provided data. No job or income is guaranteed.
           </p>
         </div>
       </section>

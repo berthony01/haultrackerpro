@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +66,17 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const [matchTierFilter, setMatchTierFilter] = useState<string>(ANY);
 
   const matchEnabled = !!profile && profile.profile_completed;
+
+  // Honor deep-link routing from /dashboard?page=opportunities&view=...
+  useEffect(() => {
+    try {
+      const v = sessionStorage.getItem('htp_opportunities_initial_view');
+      if (!v) return;
+      sessionStorage.removeItem('htp_opportunities_initial_view');
+      if (v === 'recruiter') setShowRecruiter(true);
+      else if (v === 'driver-profile') setShowProfile(true);
+    } catch {}
+  }, []);
 
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 

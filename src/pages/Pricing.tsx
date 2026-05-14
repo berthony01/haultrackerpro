@@ -389,12 +389,12 @@ export default function Pricing() {
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button
-              onClick={() => navigate(user ? '/dashboard?page=opportunities' : '/auth')}
+              onClick={() => navigate(user ? '/dashboard?page=opportunities&view=recruiter' : '/auth?intent=recruiter')}
               size="lg"
               className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
               style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
             >
-              {user ? 'Open Recruiter Onboarding' : 'Apply for Recruiter Access'} <ArrowRight className="h-4 w-4" />
+              {user ? 'Open Recruiter Access' : 'Apply for Recruiter Access'} <ArrowRight className="h-4 w-4" />
             </Button>
             <span className="text-xs" style={{ color: 'hsl(220, 10%, 50%)' }}>
               Approval required before posting. Active subscription required to submit listings.
