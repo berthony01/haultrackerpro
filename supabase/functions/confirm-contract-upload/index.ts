@@ -53,7 +53,7 @@ serve(async (req) => {
     const { data: version, error: vErr } = await admin
       .from("contract_versions")
       .select(
-        "id, contract_id, storage_bucket, storage_path, file_name, upload_status, contracts:contract_id(id, recruiter_user_id, recruiter_id, application_id)"
+        "id, contract_id, storage_bucket, storage_path, file_name, upload_status, version_number, contracts:contract_id(id, recruiter_user_id, recruiter_id, application_id)"
       )
       .eq("id", version_id)
       .maybeSingle();
