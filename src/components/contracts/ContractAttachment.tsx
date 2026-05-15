@@ -551,7 +551,11 @@ export function ContractAttachment({ applicationId, role }: Props) {
                   className="mt-0.5"
                 />
                 <span>
-                  I understand this is a digital signature confirming I reviewed and approved this contract.
+                  By signing, I confirm I reviewed this contract version and want to record my
+                  approval in HaulTrackerPro. This signature record may include my typed name,
+                  consent, timestamp, IP address, browser/device information, and contract
+                  version. This is a platform record of consent, not a notarization or a
+                  DocuSign-equivalent qualified electronic signature.
                 </span>
               </label>
               <div className="flex gap-2">
@@ -574,7 +578,8 @@ export function ContractAttachment({ applicationId, role }: Props) {
                 </Button>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                This is a simple in-app signature record, not legal advice.
+                In-app signature record only — not legal advice and not a qualified electronic
+                signature.
               </p>
             </div>
           )}
