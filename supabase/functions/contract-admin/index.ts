@@ -69,15 +69,12 @@ Deno.serve(async (req) => {
       let q = adminDb
         .from("contracts")
         .select(
-          "id, status, risk_score, risk_tier, title, application_id, opportunity_id, recruiter_id, recruiter_user_id, driver_user_id, current_version_id, created_at, updated_at, metadata",
+          "id, status, title, application_id, opportunity_id, recruiter_id, recruiter_user_id, driver_user_id, current_version_id, created_at, updated_at, metadata",
           { count: "exact" },
         )
         .order("updated_at", { ascending: false });
 
       switch (filter) {
-        case "high_risk":
-          q = q.in("risk_tier", ["high", "severe"]);
-          break;
         case "rejected":
           q = q.eq("status", "rejected");
           break;
@@ -87,11 +84,10 @@ Deno.serve(async (req) => {
         case "approved":
           q = q.eq("status", "approved");
           break;
+        case "high_risk":
         case "missing_ai_review":
-          q = q.is("risk_tier", null);
-          break;
         case "failed_parse":
-          // We need a join; fall through and post-filter after fetching versions.
+          // Post-filtered after joining current-version AI review / version data.
           break;
       }
       if (recruiterId) q = q.eq("recruiter_id", recruiterId);
