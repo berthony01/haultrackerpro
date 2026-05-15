@@ -17,6 +17,7 @@ import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Tras
 import { toast } from 'sonner';
 import { AdminOpportunitiesPanel } from '@/components/admin/opportunities/AdminOpportunitiesPanel';
 import { AdminRecruitersPanel } from '@/components/admin/opportunities/AdminRecruitersPanel';
+import { AdminContractsPanel } from '@/components/admin/contracts/AdminContractsPanel';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 
@@ -563,6 +564,7 @@ export default function Admin() {
               <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
               <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
               <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
+              <TabsTrigger value="contracts"><Shield className="h-4 w-4 mr-1" />Contracts</TabsTrigger>
               <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
               <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
               <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
@@ -581,6 +583,7 @@ export default function Admin() {
             <TabsTrigger value="leads">Starter Kit</TabsTrigger>
             <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
             <TabsTrigger value="recruiters">Recruiters</TabsTrigger>
+            <TabsTrigger value="contracts">Contracts</TabsTrigger>
             <TabsTrigger value="admins">Admins</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
             <TabsTrigger value="feedback">Feedback</TabsTrigger>
@@ -592,6 +595,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="recruiters" className="space-y-3">
             <AdminRecruitersPanel />
+          </TabsContent>
+          <TabsContent value="contracts" className="space-y-3">
+            <AdminContractsPanel />
           </TabsContent>
 
           {/* OVERVIEW */}
