@@ -76,7 +76,8 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Basic AI contract risk flags', free: '✓', pro: '✓' },
   { feature: 'Approve, reject, or request changes', free: '✓', pro: '✓' },
   { feature: 'Record approval / in-app signature', free: '✓', pro: '✓' },
-  { feature: 'Advanced contract history & deeper review', free: '—', pro: 'Coming soon' },
+  { feature: 'Plain-English Clause Rewrite', free: '—', pro: '✓ Included' },
+  { feature: 'Contract history, downloads, version comparison, AI follow-ups', free: '—', pro: 'Planned Pro tools' },
 ];
 
 const whyProPoints = [
