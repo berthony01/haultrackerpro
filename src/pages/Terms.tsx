@@ -136,7 +136,7 @@ export default function Terms() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">13. Contact Information</h3>
+          <h3 className="text-base font-bold">22. Contact Information</h3>
           <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.com.</p>
         </section>
 
