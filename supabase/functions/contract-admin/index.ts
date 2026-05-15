@@ -297,15 +297,39 @@ Deno.serve(async (req) => {
           }
         : { id: c.driver_user_id, display_name: null, driver_handle: null, email: (app.data as any)?.driver_email_snapshot ?? null };
 
+      // Resolve current-version AI review (single source of truth for risk display)
+      const allReviews = (reviews.data ?? []) as any[];
+      const currentAi = c.current_version_id
+        ? allReviews.find((r) => r.reviewer_role === "ai" && r.version_id === c.current_version_id) ?? null
+        : null;
+      const currentAiFindings = (currentAi?.ai_findings as any) || {};
+      const currentAiTopFlags = Array.isArray(currentAiFindings.top_red_flags)
+        ? currentAiFindings.top_red_flags
+        : Array.isArray(currentAiFindings.top_flags)
+          ? currentAiFindings.top_flags
+          : [];
+      const current_ai_review = currentAi
+        ? {
+            id: currentAi.id,
+            version_id: currentAi.version_id,
+            summary: currentAi.ai_summary,
+            risk_tier: typeof currentAiFindings.risk_tier === "string" ? currentAiFindings.risk_tier : null,
+            risk_score: currentAiFindings.risk_score != null ? Number(currentAiFindings.risk_score) : null,
+            top_flags: currentAiTopFlags,
+            created_at: currentAi.created_at,
+          }
+        : null;
+
       return json({
         contract: c,
         versions: versions.data ?? [],
-        reviews: reviews.data ?? [],
+        reviews: allReviews,
         clauses: clauses.data ?? [],
         audit: audit.data ?? [],
         recruiter: recruiterShaped,
         driver: driverShaped,
         opportunity: opp.data ?? null,
+        current_ai_review,
       });
     }
 
