@@ -571,7 +571,30 @@ const faqs: Faq[] = [
     id: 'contract-protection-overview',
     question: 'What is Contract Protection?',
     answer: 'Contract Protection helps drivers review recruiter-sent contracts before approving, signing, or being marked hired. It uses AI-assisted summaries, risk flags, approval steps, and platform records to make the process clearer.',
-    keywords: 'contract protection ai review',
+  },
+  {
+    id: 'contract-free-tools',
+    question: 'What contract tools are free?',
+    answer: 'Free drivers can view recruiter-sent contracts, see basic AI-assisted risk flags or summaries when available, approve, reject, request changes, and record approval/signature when required.',
+    keywords: 'free contract tools driver',
+  },
+  {
+    id: 'contract-pro-tools',
+    question: 'What contract tools are included with Driver Pro?',
+    answer: 'Driver Pro includes the Plain-English Clause Rewrite tool, which lets drivers paste a confusing clause and receive a plain-English explanation, concern points, and questions to ask the recruiter. Additional tools such as saved history, downloadable records, and AI follow-up support may be added later.',
+    keywords: 'driver pro contract clause rewrite',
+  },
+  {
+    id: 'contract-recruiter-needs-pro',
+    question: 'Do recruiters need Driver Pro to upload contracts?',
+    answer: 'No. Recruiter contract upload and approval tracking belong to the recruiter-paid workflow. Driver Pro is separate and is meant for driver-side advanced review tools.',
+    keywords: 'recruiter pro upload contract',
+  },
+  {
+    id: 'contract-clause-rewrite-legal-advice',
+    question: 'Is the Plain-English Clause Rewrite legal advice?',
+    answer: 'No. It is informational only. HaulTrackerPro is not a law firm and does not provide legal advice. Drivers should read the full contract and consider speaking with a qualified attorney before signing important agreements.',
+    keywords: 'plain english clause rewrite legal advice',
   },
   {
     id: 'contract-legal-advice',

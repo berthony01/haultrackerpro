@@ -267,7 +267,7 @@ export default function Landing() {
               Don't get hired into a <span style={{ color: 'hsl(25, 95%, 53%)' }}>bad contract.</span>
             </h2>
             <p className="mt-4 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              HaulTrackerPro helps drivers review recruiter-sent contracts with AI-assisted risk flags, plain-English summaries, driver approval steps, and hired-status workflow protection.
+              HaulTrackerPro helps drivers review recruiter-sent contracts with AI-assisted risk flags, plain-English summaries, driver approval steps, and hired-status workflow protection. Driver Pro adds Plain-English Clause Rewrite for confusing contract language.
             </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
