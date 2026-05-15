@@ -202,25 +202,46 @@ serve(async (req) => {
       );
     }
 
-    // Promote + reset only when current status is in the replaceable set.
-    // Service-role bypasses contracts_status_guard, so backward transitions are allowed here.
-    const safeToReset =
-      !prevContract?.status || REPLACEABLE_STATUSES.has(prevContract.status);
+    // Guarded promotion: require contract status to still be in the replaceable set
+    // at write time. If it changed (e.g., became signed/expired/archived) between our
+    // read and write, the update affects 0 rows and we refuse to promote.
+    const REPLACEABLE_ARRAY = Array.from(REPLACEABLE_STATUSES);
+    const updatePayload: Record<string, unknown> = {
+      current_version_id: version_id,
+      status: "uploaded",
+    };
 
-    const updatePayload: Record<string, unknown> = { current_version_id: version_id };
-    if (safeToReset) updatePayload.status = "uploaded";
-
-    const { error: contractUpdErr } = await admin
+    const { data: updatedRows, error: contractUpdErr } = await admin
       .from("contracts")
       .update(updatePayload)
-      .eq("id", version.contract_id);
-    if (contractUpdErr) {
-      // Fall back to at least promoting the version pointer.
+      .eq("id", version.contract_id)
+      .in("status", REPLACEABLE_ARRAY)
+      .select("id");
+
+    if (contractUpdErr || !updatedRows || updatedRows.length === 0) {
       await admin
-        .from("contracts")
-        .update({ current_version_id: version_id })
-        .eq("id", version.contract_id);
+        .from("contract_versions")
+        .update({ upload_status: "failed" })
+        .eq("id", version_id);
+      await admin.from("contract_audit_log").insert({
+        contract_id: version.contract_id,
+        version_id,
+        actor_user_id: userId,
+        actor_role: "recruiter",
+        action: "upload_failed",
+        metadata: {
+          reason: contractUpdErr ? "promotion_update_error" : "status_changed_before_confirm",
+          previous_status: prevContract?.status ?? null,
+          previous_version_id: prevContract?.current_version_id ?? null,
+          error: contractUpdErr?.message ?? null,
+        },
+      });
+      return json(
+        { error: "Contract status changed before this version could be promoted." },
+        409,
+      );
     }
+    const safeToReset = true;
 
     await admin.from("contract_audit_log").insert({
       contract_id: version.contract_id,
