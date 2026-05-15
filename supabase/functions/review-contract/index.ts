@@ -161,6 +161,7 @@ serve(async (req) => {
       .from("contracts")
       .update({ status: targetStatus })
       .eq("id", version.contract_id)
+      .eq("current_version_id", version_id)
       .in("status", Array.from(DECIDABLE_FROM))
       .select("id");
     const transitioned = !stErr && Array.isArray(stRows) && stRows.length === 1;
