@@ -345,9 +345,12 @@ export default function Pricing() {
       {/* Comparison Table */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-10" style={{ color: 'hsl(0, 0%, 100%)' }}>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-3" style={{ color: 'hsl(0, 0%, 100%)' }}>
             Full Feature <span style={{ color: 'hsl(25, 95%, 53%)' }}>Comparison</span>
           </h2>
+          <p className="text-xs text-center mb-10 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 50%)' }}>
+            Contract Protection (view, AI risk flags, decisions, and signature record) is available on every driver plan. Advanced contract history and deeper review tools may be added to Pro in a future update.
+          </p>
           <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'hsl(220, 16%, 16%)' }}>
             {/* Header */}
             <div className="grid grid-cols-3 text-sm font-bold" style={{ background: 'hsl(220, 20%, 12%)' }}>
