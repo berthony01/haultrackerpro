@@ -15,6 +15,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { value: 'leads', label: 'Starter Kit', icon: Gift },
   { value: 'opportunities', label: 'Opportunities', icon: Briefcase },
   { value: 'recruiters', label: 'Recruiters', icon: Building2 },
+  { value: 'contracts', label: 'Contracts', icon: FileText },
   { value: 'admins', label: 'Admins', icon: Shield },
   { value: 'billing', label: 'Billing', icon: CreditCard },
   { value: 'feedback', label: 'Feedback', icon: MessageSquare },
