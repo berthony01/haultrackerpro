@@ -454,6 +454,10 @@ export function ContractAttachment({ applicationId, role }: Props) {
               </div>
               {showChangesBox && (
                 <div className="space-y-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    Use this if you want the recruiter to revise terms before you approve or sign.
+                    Include a clear reason so both sides have a record.
+                  </p>
                   <Textarea
                     value={changesNote}
                     onChange={(e) => setChangesNote(e.target.value.slice(0, 4000))}
