@@ -2,7 +2,9 @@ import { useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 
@@ -83,7 +85,10 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const [showChangesBox, setShowChangesBox] = useState(false);
   const [changesNote, setChangesNote] = useState('');
   const [pendingDecision, setPendingDecision] = useState<null | 'approve_contract' | 'reject_contract' | 'request_changes'>(null);
-  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract, reviewContract } =
+  const [showSignBox, setShowSignBox] = useState(false);
+  const [typedName, setTypedName] = useState('');
+  const [signConsent, setSignConsent] = useState(false);
+  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract, reviewContract, signContract } =
     useApplicationContract(applicationId);
 
   const handlePick = () => inputRef.current?.click();
@@ -169,6 +174,38 @@ export function ContractAttachment({ applicationId, role }: Props) {
     !!status &&
     ['uploaded', 'parsed', 'ai_reviewed', 'driver_reviewing', 'changes_requested'].includes(status);
 
+  // Phase 8 — signature (current version only).
+  const signatureRaw = contractWithVersion?.driver_signature ?? null;
+  const driverSignature = signatureRaw && signatureRaw.version_id === currentVersionId ? signatureRaw : null;
+  const isSigned = status === 'signed' || !!driverSignature;
+  const canDriverSign =
+    role === 'driver' &&
+    hasContract &&
+    !isSigned &&
+    status === 'approved' &&
+    decision === 'approved';
+
+  const submitSign = async () => {
+    const name = typedName.trim();
+    if (name.length < 2) {
+      toast.error('Please type your full legal name to sign.');
+      return;
+    }
+    if (!signConsent) {
+      toast.error('Please confirm you understand this is a digital signature.');
+      return;
+    }
+    try {
+      await signContract.mutateAsync({ typed_name: name, consent: true });
+      toast.success('Contract signed');
+      setShowSignBox(false);
+      setTypedName('');
+      setSignConsent(false);
+    } catch (e) {
+      toast.error((e as Error).message || 'Could not sign contract');
+    }
+  };
+
   const submitDecision = async (d: 'approve_contract' | 'reject_contract' | 'request_changes') => {
     if (d === 'request_changes' && !changesNote.trim()) {
       toast.error('Please describe the changes you need.');
@@ -220,6 +257,12 @@ export function ContractAttachment({ applicationId, role }: Props) {
             <Badge variant="outline" className={`gap-1 ${decisionStyle[decision].cls}`}>
               {(() => { const I = decisionStyle[decision].Icon; return <I className="h-3 w-3" />; })()}
               {decisionStyle[decision].label}
+            </Badge>
+          )}
+          {hasContract && isSigned && (
+            <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30 gap-1">
+              <PenLine className="h-3 w-3" />
+              {role === 'recruiter' ? 'Driver signed' : 'Signed'}
             </Badge>
           )}
         </div>
@@ -452,6 +495,80 @@ export function ContractAttachment({ applicationId, role }: Props) {
             <p className="text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
               Driver note: {driverReview.notes}
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Phase 8 — Driver signature panel */}
+      {role === 'driver' && hasContract && (canDriverSign || isSigned) && (
+        <div className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <PenLine className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Signature
+            </span>
+          </div>
+          {isSigned ? (
+            <div className="space-y-1">
+              <p className="text-xs text-foreground/90">
+                You signed this contract version.
+              </p>
+              {driverSignature?.signed_at && (
+                <p className="text-[11px] text-muted-foreground">
+                  Signed on {new Date(driverSignature.signed_at).toLocaleString()}
+                </p>
+              )}
+            </div>
+          ) : !showSignBox ? (
+            <div className="space-y-2">
+              <p className="text-[11px] text-muted-foreground">
+                You approved this contract. Add your typed signature to finalize.
+              </p>
+              <Button variant="default" size="sm" onClick={() => setShowSignBox(true)}>
+                <PenLine className="h-4 w-4" /> Sign Contract
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                value={typedName}
+                onChange={(e) => setTypedName(e.target.value.slice(0, 200))}
+                placeholder="Type your full legal name"
+                className="text-xs"
+              />
+              <label className="flex items-start gap-2 text-[11px] text-foreground/90">
+                <Checkbox
+                  checked={signConsent}
+                  onCheckedChange={(v) => setSignConsent(v === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I understand this is a digital signature confirming I reviewed and approved this contract.
+                </span>
+              </label>
+              <div className="flex gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={submitSign}
+                  disabled={signContract.isPending || !typedName.trim() || !signConsent}
+                >
+                  {signContract.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  Confirm Signature
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setShowSignBox(false); setTypedName(''); setSignConsent(false); }}
+                  disabled={signContract.isPending}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">
+                This is a simple in-app signature record, not legal advice.
+              </p>
+            </div>
           )}
         </div>
       )}

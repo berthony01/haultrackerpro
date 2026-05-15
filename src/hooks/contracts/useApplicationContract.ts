@@ -8,12 +8,14 @@ export type ContractVersion = Tables<'contract_versions'>;
 
 export type ContractClause = Tables<'contract_clauses'>;
 export type ContractReview = Tables<'contract_reviews'>;
+export type ContractSignature = Tables<'contract_signatures'>;
 
 export interface ContractWithVersion {
   contract: Contract;
   current_version: ContractVersion | null;
   ai_review: ContractReview | null;
   driver_review: ContractReview | null;
+  driver_signature: ContractSignature | null;
   clauses: ContractClause[];
 }
 
@@ -44,6 +46,7 @@ export function useApplicationContract(applicationId?: string | null) {
       let currentVersion: ContractVersion | null = null;
       let aiReview: ContractReview | null = null;
       let driverReview: ContractReview | null = null;
+      let driverSignature: ContractSignature | null = null;
       let clauses: ContractClause[] = [];
       if (contract.current_version_id) {
         const { data: v } = await supabase
@@ -54,7 +57,7 @@ export function useApplicationContract(applicationId?: string | null) {
           .maybeSingle();
         currentVersion = v ?? null;
         if (currentVersion) {
-          const [{ data: rev }, { data: drv }, { data: cls }] = await Promise.all([
+          const [{ data: rev }, { data: drv }, { data: cls }, { data: sig }] = await Promise.all([
             supabase
               .from('contract_reviews')
               .select('*')
@@ -78,13 +81,23 @@ export function useApplicationContract(applicationId?: string | null) {
               .select('*')
               .eq('version_id', currentVersion.id)
               .order('severity', { ascending: false }),
+            supabase
+              .from('contract_signatures')
+              .select('*')
+              .eq('contract_id', contract.id)
+              .eq('version_id', currentVersion.id)
+              .eq('signer_role', 'driver')
+              .order('signed_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
           ]);
           aiReview = rev ?? null;
           driverReview = drv ?? null;
           clauses = cls ?? [];
+          driverSignature = sig ?? null;
         }
       }
-      return { contract, current_version: currentVersion, ai_review: aiReview, driver_review: driverReview, clauses };
+      return { contract, current_version: currentVersion, ai_review: aiReview, driver_review: driverReview, driver_signature: driverSignature, clauses };
     },
   });
 
@@ -223,6 +236,32 @@ export function useApplicationContract(applicationId?: string | null) {
     },
   });
 
+  /**
+   * Phase 8: simple in-app driver signature. Server enforces:
+   *  - assigned driver only (recruiter/admin cannot sign for driver)
+   *  - current uploaded version, contract.status='approved', driver pre-approved version
+   *  - one signature per (contract, version, signer, role)
+   */
+  const signContract = useMutation({
+    mutationFn: async (input: { typed_name: string; consent: boolean }) => {
+      const c = query.data;
+      if (!c?.current_version) throw new Error('No contract version to sign');
+      const { data, error } = await supabase.functions.invoke('sign-contract', {
+        body: {
+          version_id: c.current_version.id,
+          typed_name: input.typed_name,
+          consent: input.consent,
+        },
+      });
+      if (error) throw new Error(error.message || 'Could not sign contract');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { ok: true; signature_id: string; status: 'signed'; signed_at: string };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['application-contract'] });
+    },
+  });
+
   return {
     contractWithVersion: query.data ?? null,
     isLoading: query.isLoading,
@@ -233,5 +272,6 @@ export function useApplicationContract(applicationId?: string | null) {
     parseContract,
     analyzeContract,
     reviewContract,
+    signContract,
   };
 }
