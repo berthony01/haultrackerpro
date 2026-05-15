@@ -324,13 +324,13 @@ export function AdminContractsPanel() {
                 <div>{detail.opportunity?.title || "—"}</div>
                 <div className="text-muted-foreground">Status</div>
                 <div><Badge variant={statusBadgeVariant(detail.contract.status)} className="text-xs">{detail.contract.status}</Badge></div>
-                <div className="text-muted-foreground">Risk</div>
+                <div className="text-muted-foreground">Risk (current version)</div>
                 <div>
-                  {detail.contract.risk_tier ? (
-                    <Badge variant={tierBadgeVariant(detail.contract.risk_tier)} className="text-xs">
-                      {detail.contract.risk_tier} · score {detail.contract.risk_score != null ? Number(detail.contract.risk_score).toFixed(0) : "—"}
+                  {detail.current_ai_review && detail.current_ai_review.risk_tier ? (
+                    <Badge variant={tierBadgeVariant(detail.current_ai_review.risk_tier)} className="text-xs">
+                      {detail.current_ai_review.risk_tier} · score {detail.current_ai_review.risk_score != null ? Number(detail.current_ai_review.risk_score).toFixed(0) : "—"}
                     </Badge>
-                  ) : <span className="text-muted-foreground">no AI review on current version</span>}
+                  ) : <span className="text-muted-foreground">No AI review on current version</span>}
                 </div>
                 <div className="text-muted-foreground">Created</div>
                 <div>{fmtDate(detail.contract.created_at)}</div>
