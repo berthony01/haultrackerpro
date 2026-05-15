@@ -75,6 +75,14 @@ function getAllowedTransitions(currentStatus: string): RecruiterApplicationStatu
   }).map((t) => t.value);
 }
 
+function formatHireError(e: Error, status: RecruiterApplicationStatus): string {
+  const msg = e?.message || '';
+  if (status === 'hired' && /contract/i.test(msg)) {
+    return 'Driver cannot be marked hired until the current contract is approved.';
+  }
+  return msg || 'Update failed';
+}
+
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_VARIANT[status] ?? { label: status, cls: 'bg-muted text-foreground border-border' };
   return <Badge variant="outline" className={cfg.cls}>{cfg.label}</Badge>;
