@@ -174,6 +174,38 @@ export function ContractAttachment({ applicationId, role }: Props) {
     !!status &&
     ['uploaded', 'parsed', 'ai_reviewed', 'driver_reviewing', 'changes_requested'].includes(status);
 
+  // Phase 8 — signature (current version only).
+  const signatureRaw = contractWithVersion?.driver_signature ?? null;
+  const driverSignature = signatureRaw && signatureRaw.version_id === currentVersionId ? signatureRaw : null;
+  const isSigned = status === 'signed' || !!driverSignature;
+  const canDriverSign =
+    role === 'driver' &&
+    hasContract &&
+    !isSigned &&
+    status === 'approved' &&
+    decision === 'approved';
+
+  const submitSign = async () => {
+    const name = typedName.trim();
+    if (name.length < 2) {
+      toast.error('Please type your full legal name to sign.');
+      return;
+    }
+    if (!signConsent) {
+      toast.error('Please confirm you understand this is a digital signature.');
+      return;
+    }
+    try {
+      await signContract.mutateAsync({ typed_name: name, consent: true });
+      toast.success('Contract signed');
+      setShowSignBox(false);
+      setTypedName('');
+      setSignConsent(false);
+    } catch (e) {
+      toast.error((e as Error).message || 'Could not sign contract');
+    }
+  };
+
   const submitDecision = async (d: 'approve_contract' | 'reject_contract' | 'request_changes') => {
     if (d === 'request_changes' && !changesNote.trim()) {
       toast.error('Please describe the changes you need.');
