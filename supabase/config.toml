@@ -13,6 +13,8 @@ project_id = "pngptztxwbtozwxrtbwo"
     verify_jwt = false
   [functions.review-contract]
     verify_jwt = false
+  [functions.sign-contract]
+    verify_jwt = false
   [functions.contract-admin]
     verify_jwt = false
   [functions.ai-insight]
