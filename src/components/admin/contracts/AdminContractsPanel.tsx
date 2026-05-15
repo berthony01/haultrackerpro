@@ -367,22 +367,21 @@ export function AdminContractsPanel() {
                 </div>
               </section>
 
-              {/* AI review */}
+              {/* AI review — current version only */}
               <section>
                 <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">AI review (current version)</h4>
                 {(() => {
-                  const ai = detail.reviews.find((r: any) => r.reviewer_role === "ai" && r.version_id === detail.contract.current_version_id);
+                  const ai = detail.current_ai_review;
                   if (!ai) return <p className="text-xs text-muted-foreground">No AI review on current version.</p>;
-                  const findings = (ai.ai_findings as any) || {};
                   return (
                     <div className="space-y-2 text-xs">
-                      {ai.ai_summary && <p className="rounded bg-muted/40 p-2">{ai.ai_summary}</p>}
-                      {Array.isArray(findings.top_flags) && findings.top_flags.length > 0 && (
+                      {ai.summary && <p className="rounded bg-muted/40 p-2">{ai.summary}</p>}
+                      {Array.isArray(ai.top_flags) && ai.top_flags.length > 0 && (
                         <ul className="space-y-1">
-                          {findings.top_flags.map((f: any, i: number) => (
+                          {ai.top_flags.slice(0, 10).map((f: any, i: number) => (
                             <li key={i} className="flex gap-2">
                               <Badge variant={tierBadgeVariant((f.severity || "medium") as RiskTier)} className="text-[10px]">{f.severity || "info"}</Badge>
-                              <span>{f.title || f.text || JSON.stringify(f)}</span>
+                              <span>{typeof f === "string" ? f : (f.title || f.text || f.summary || JSON.stringify(f))}</span>
                             </li>
                           ))}
                         </ul>
