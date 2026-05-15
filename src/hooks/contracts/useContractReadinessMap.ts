@@ -8,7 +8,9 @@ export type ContractReadiness =
   | 'awaiting_driver_decision'
   | 'changes_requested'
   | 'driver_rejected'
-  | 'driver_approved';
+  | 'driver_approved'
+  | 'contract_expired'
+  | 'contract_archived';
 
 export interface ReadinessInfo {
   readiness: ContractReadiness;
@@ -52,6 +54,16 @@ const READINESS_MAP: Record<ContractReadiness, ReadinessInfo> = {
     label: 'Driver approved',
     badgeClass: 'bg-green-500/15 text-green-400 border-green-500/30',
   },
+  contract_expired: {
+    readiness: 'contract_expired',
+    label: 'Contract expired',
+    badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  },
+  contract_archived: {
+    readiness: 'contract_archived',
+    label: 'Contract archived',
+    badgeClass: 'bg-muted text-muted-foreground border-border',
+  },
 };
 
 function statusToReadiness(status: string | null, hasVersion: boolean): ContractReadiness {
@@ -62,7 +74,8 @@ function statusToReadiness(status: string | null, hasVersion: boolean): Contract
   if (status === 'changes_requested') return 'changes_requested';
   if (status === 'rejected') return 'driver_rejected';
   if (status === 'approved' || status === 'signed') return 'driver_approved';
-  if (status === 'expired' || status === 'archived') return 'driver_approved';
+  if (status === 'expired') return 'contract_expired';
+  if (status === 'archived') return 'contract_archived';
   return 'no_contract';
 }
 
