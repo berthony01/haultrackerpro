@@ -164,15 +164,17 @@ export default function ContractSeoPage({
 
         {/* Free vs Pro */}
         <section className="rounded-xl border border-border bg-card p-6 shadow-card space-y-3">
-          <h2 className="text-2xl font-black font-heading">Start with basic protection. Upgrade for deeper review.</h2>
+          <h2 className="text-2xl font-black font-heading">Start with basic protection. Use Pro for deeper clause help.</h2>
           <p className="text-muted-foreground leading-relaxed">
-            HaulTrackerPro is designed to keep the first layer of driver protection simple and accessible. Basic
-            contract viewing, risk flags, and approval decisions can help drivers avoid moving forward blindly.
-            Advanced review tools, saved contract history, deeper clause explanations, exports, and AI follow-up
-            support may be part of Pro as the feature expands.
+            Basic contract viewing, AI-assisted risk flags, approval decisions, and required signature records
+            help drivers avoid moving forward blindly. Driver Pro now includes <strong>Plain-English Clause
+            Rewrite</strong>, which lets you paste a confusing clause and get a clearer explanation, concern
+            points, and questions to ask before approving. Additional tools like contract history, downloadable
+            records, AI follow-up support, and version comparison may be added later.
           </p>
           <p className="text-xs text-muted-foreground">
-            Some advanced tools may be planned or coming soon and are not guaranteed to be available today.
+            Plain-English Clause Rewrite and any other AI output is informational only — not legal advice.
+            HaulTrackerPro is not a law firm. Consider speaking with a qualified attorney before signing.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Button variant="outline" className="rounded-xl" onClick={() => navigate('/pricing')}>
