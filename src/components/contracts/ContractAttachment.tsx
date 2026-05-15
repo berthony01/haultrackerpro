@@ -80,7 +80,10 @@ const TIER_STYLES: Record<string, { label: string; cls: string; Icon: typeof Shi
 export function ContractAttachment({ applicationId, role }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
-  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract } =
+  const [showChangesBox, setShowChangesBox] = useState(false);
+  const [changesNote, setChangesNote] = useState('');
+  const [pendingDecision, setPendingDecision] = useState<null | 'approve_contract' | 'reject_contract' | 'request_changes'>(null);
+  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract, reviewContract } =
     useApplicationContract(applicationId);
 
   const handlePick = () => inputRef.current?.click();
