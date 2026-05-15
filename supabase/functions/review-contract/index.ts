@@ -117,17 +117,9 @@ serve(async (req) => {
     const auditAction = DECISION_TO_AUDIT[decision];
     const actorRole: "admin" | "driver" = isAdmin && !isDriver ? "admin" : "driver";
 
-    // Audit: driver started/recorded review
-    await admin.from("contract_audit_log").insert({
-      contract_id: version.contract_id,
-      version_id,
-      actor_user_id: userId,
-      actor_role: actorRole,
-      action: "driver_reviewed",
-      metadata: { decision: targetStatus, note_chars: note.length },
-    });
-
-    // Persist the driver review (history allowed; one row per submission).
+    // Atomic-as-possible: insert the review FIRST. No audit until it succeeds.
+    // The partial unique index (contract_reviews_driver_unique_per_version)
+    // prevents duplicate driver decisions on the same version.
     const { data: reviewRow, error: rvErr } = await admin
       .from("contract_reviews")
       .insert({
@@ -141,27 +133,68 @@ serve(async (req) => {
       .select("id")
       .single();
     if (rvErr || !reviewRow) {
+      const isDup =
+        (rvErr as any)?.code === "23505" ||
+        /duplicate key|unique/i.test(rvErr?.message || "");
       await admin.from("contract_audit_log").insert({
         contract_id: version.contract_id,
         version_id,
         actor_user_id: userId,
         actor_role: actorRole,
-        action: "ai_review_failed", // generic failure marker; reuse rather than introduce a new reserved action
-        metadata: { reason: rvErr?.message || "review insert failed", phase: "driver_decision" },
+        action: "driver_review_failed",
+        metadata: {
+          reason: rvErr?.message || "review insert failed",
+          phase: "driver_decision",
+          duplicate: isDup,
+        },
       });
+      if (isDup) {
+        return json({ error: "You have already submitted a decision for this contract version." }, 409);
+      }
       return json({ error: rvErr?.message || "Could not save your decision" }, 500);
     }
 
-    // Advance status only from a decidable state. Forward-only is also enforced by contracts_status_guard.
-    // We service-role bypass the guard but we still gate manually so we never overwrite TERMINAL_OR_LATER.
-    const { error: stErr } = await admin
+    // Advance status only from a decidable state. Service role bypasses the
+    // status guard, but we manually scope the UPDATE so we never overwrite
+    // a TERMINAL_OR_LATER state. Require exactly 1 row affected, or fail.
+    const { data: stRows, error: stErr } = await admin
       .from("contracts")
       .update({ status: targetStatus })
       .eq("id", version.contract_id)
-      .in("status", Array.from(DECIDABLE_FROM));
-    if (stErr) {
-      console.error("[review-contract] status update error", stErr);
+      .in("status", Array.from(DECIDABLE_FROM))
+      .select("id");
+    const transitioned = !stErr && Array.isArray(stRows) && stRows.length === 1;
+    if (!transitioned) {
+      // Status didn't move (race / concurrent decision / regression attempt).
+      // Roll back the review row to keep state consistent and audit the failure.
+      await admin.from("contract_reviews").delete().eq("id", reviewRow.id);
+      await admin.from("contract_audit_log").insert({
+        contract_id: version.contract_id,
+        version_id,
+        actor_user_id: userId,
+        actor_role: actorRole,
+        action: "driver_review_failed",
+        metadata: {
+          reason: stErr?.message || "status transition rejected",
+          phase: "status_update",
+          attempted_status: targetStatus,
+        },
+      });
+      return json(
+        { error: stErr?.message || "Contract status changed before your decision could be saved." },
+        409,
+      );
     }
+
+    // Audit: driver_reviewed (only after review insert + status update succeeded).
+    await admin.from("contract_audit_log").insert({
+      contract_id: version.contract_id,
+      version_id,
+      actor_user_id: userId,
+      actor_role: actorRole,
+      action: "driver_reviewed",
+      metadata: { decision: targetStatus, note_chars: note.length },
+    });
 
     // Audit: outcome
     await admin.from("contract_audit_log").insert({
