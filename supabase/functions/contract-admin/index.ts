@@ -161,9 +161,29 @@ Deno.serve(async (req) => {
         ]);
 
       const versionMap = new Map((versionsRes.data ?? []).map((v: any) => [v.id, v]));
-      const recruiterMap = new Map((recruitersRes.data ?? []).map((r: any) => [r.id, r]));
-      const driverMap = new Map((driversRes.data ?? []).map((d: any) => [d.id, d]));
+      const recruiterMap = new Map(
+        (recruitersRes.data ?? []).map((r: any) => [
+          r.id,
+          {
+            id: r.id,
+            company_name: r.company_name,
+            contact_email: r.recruiter_email,
+            contact_name: r.recruiter_name,
+            status: r.status,
+            verification_status: r.verification_status,
+          },
+        ]),
+      );
+      const driverMap = new Map(
+        (driversRes.data ?? []).map((d: any) => [
+          d.user_id,
+          { id: d.user_id, display_name: d.display_name, driver_handle: d.driver_handle },
+        ]),
+      );
       const oppMap = new Map((oppsRes.data ?? []).map((o: any) => [o.id, o]));
+      const appEmailMap = new Map(
+        (appsRes.data ?? []).map((a: any) => [a.id, a.driver_email_snapshot]),
+      );
       // Index reviews by `${contract_id}:${version_id}` for current-version match
       const aiByCv = new Map<string, any>();
       for (const r of (aiReviewsRes.data ?? []) as any[]) {
@@ -179,6 +199,10 @@ Deno.serve(async (req) => {
         const ai = c.current_version_id ? aiByCv.get(`${c.id}:${c.current_version_id}`) : null;
         const drv = c.current_version_id ? drvByCv.get(`${c.id}:${c.current_version_id}`) : null;
         const findings = (ai?.ai_findings as any) || {};
+        const driverBase = driverMap.get(c.driver_user_id) || null;
+        const driver = driverBase
+          ? { ...driverBase, email: appEmailMap.get(c.application_id) || null }
+          : { id: c.driver_user_id, display_name: null, driver_handle: null, email: appEmailMap.get(c.application_id) || null };
         return {
           id: c.id,
           status: c.status,
@@ -188,7 +212,7 @@ Deno.serve(async (req) => {
           created_at: c.created_at,
           updated_at: c.updated_at,
           recruiter: recruiterMap.get(c.recruiter_id) || null,
-          driver: driverMap.get(c.driver_user_id) || null,
+          driver,
           opportunity: oppMap.get(c.opportunity_id) || null,
           current_version: v
             ? {
