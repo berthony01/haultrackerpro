@@ -200,6 +200,29 @@ export function useApplicationContract(applicationId?: string | null) {
     },
   });
 
+  /**
+   * Driver decision (Phase 5). Server enforces:
+   *  - only assigned driver (or admin) may submit
+   *  - only on current uploaded version
+   *  - request_changes requires a note
+   *  - forward-only contract status (no regression from terminal states)
+   */
+  const reviewContract = useMutation({
+    mutationFn: async (input: { decision: 'approve_contract' | 'reject_contract' | 'request_changes'; note?: string }) => {
+      const c = query.data;
+      if (!c?.current_version) throw new Error('No contract version to review');
+      const { data, error } = await supabase.functions.invoke('review-contract', {
+        body: { version_id: c.current_version.id, decision: input.decision, note: input.note ?? '' },
+      });
+      if (error) throw new Error(error.message || 'Could not submit decision');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { ok: true; review_id: string; decision: 'approved' | 'rejected' | 'changes_requested' };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['application-contract'] });
+    },
+  });
+
   return {
     contractWithVersion: query.data ?? null,
     isLoading: query.isLoading,
@@ -209,5 +232,6 @@ export function useApplicationContract(applicationId?: string | null) {
     getSignedViewUrl,
     parseContract,
     analyzeContract,
+    reviewContract,
   };
 }
