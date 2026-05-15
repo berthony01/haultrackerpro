@@ -138,6 +138,28 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
   }, [recruiterApplications, statusFilter, opportunityFilter, search]);
 
   const handleUpdate = (id: string, status: RecruiterApplicationStatus) => {
+    if (status === 'hired') {
+      const readiness = readinessMap.get(id)?.readiness;
+      if (readiness !== 'driver_approved') {
+        setWarnHire({ id, status });
+        return;
+      }
+    }
+    setPendingId(id);
+    updateApplicationStatus.mutate(
+      { id, status },
+      {
+        onSuccess: () => toast.success(`Marked ${status}`),
+        onError: (e: Error) => toast.error(e.message || 'Update failed'),
+        onSettled: () => setPendingId(null),
+      }
+    );
+  };
+
+  const confirmWarnedHire = () => {
+    if (!warnHire) return;
+    const { id, status } = warnHire;
+    setWarnHire(null);
     setPendingId(id);
     updateApplicationStatus.mutate(
       { id, status },
