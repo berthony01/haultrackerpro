@@ -341,6 +341,120 @@ export function ContractAttachment({ applicationId, role }: Props) {
           The recruiter has not attached a contract for this application yet.
         </p>
       )}
+
+      {/* Driver decision panel */}
+      {role === 'driver' && hasContract && (
+        <div className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Your decision
+            </span>
+          </div>
+
+          {decision ? (
+            <div className="space-y-1">
+              <p className="text-xs text-foreground/90">
+                You {decision === 'approved' ? 'approved' : decision === 'rejected' ? 'rejected' : 'requested changes to'} this contract version.
+              </p>
+              {driverReview?.notes && (
+                <p className="text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
+                  Your note: {driverReview.notes}
+                </p>
+              )}
+              {!decisionTerminal && (
+                <p className="text-[10px] text-muted-foreground italic">
+                  You can submit a new decision for this version below.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Review the contract and AI risk summary above, then choose:
+            </p>
+          )}
+
+          {canDriverDecide && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => submitDecision('approve_contract')}
+                  disabled={reviewContract.isPending}
+                >
+                  {pendingDecision === 'approve_contract' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsUp className="h-4 w-4" />}
+                  Approve Contract
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowChangesBox((v) => !v)}
+                  disabled={reviewContract.isPending}
+                >
+                  <MessageSquareWarning className="h-4 w-4" />
+                  Request Changes
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => submitDecision('reject_contract')}
+                  disabled={reviewContract.isPending}
+                >
+                  {pendingDecision === 'reject_contract' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsDown className="h-4 w-4" />}
+                  Reject Contract
+                </Button>
+              </div>
+              {showChangesBox && (
+                <div className="space-y-2">
+                  <Textarea
+                    value={changesNote}
+                    onChange={(e) => setChangesNote(e.target.value.slice(0, 4000))}
+                    placeholder="Describe what needs to change (required)…"
+                    rows={3}
+                    className="text-xs"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => submitDecision('request_changes')}
+                      disabled={reviewContract.isPending || !changesNote.trim()}
+                    >
+                      {pendingDecision === 'request_changes' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquareWarning className="h-4 w-4" />}
+                      Submit Request
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setShowChangesBox(false); setChangesNote(''); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground italic">
+                Decisions are recorded for this contract version only. This is not legal advice.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recruiter view of driver decision */}
+      {role === 'recruiter' && hasContract && decision && (
+        <div className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-1">
+          <div className="flex items-center gap-2">
+            {(() => { const I = decisionStyle[decision].Icon; return <I className="h-3.5 w-3.5 text-primary" />; })()}
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Driver decision
+            </span>
+          </div>
+          <p className="text-xs text-foreground/90">{decisionStyle[decision].label} on v{versionNumber}.</p>
+          {driverReview?.notes && (
+            <p className="text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
+              Driver note: {driverReview.notes}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
