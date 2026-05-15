@@ -166,10 +166,15 @@ export function ContractAttachment({ applicationId, role }: Props) {
           </span>
           <StatusBadge status={hasContract ? status : null} />
           {hasContract && <ParseStatusBadge status={parseStatus} />}
-          {tierStyle && (
+          {hasContract && tierStyle && (
             <Badge variant="outline" className={`gap-1 ${tierStyle.cls}`}>
               <tierStyle.Icon className="h-3 w-3" /> {tierStyle.label}
               {typeof riskScore === 'number' ? ` · ${Math.round(Number(riskScore))}/100` : ''}
+            </Badge>
+          )}
+          {hasContract && !aiReview && parseStatus === 'parsed' && (
+            <Badge variant="outline" className="bg-muted text-muted-foreground border-border gap-1">
+              AI review not run yet
             </Badge>
           )}
         </div>
