@@ -48,6 +48,12 @@ const EXPECTED_PUBLIC_ROUTES: string[] = [
   '/trucking-load-profit-calculator',
   '/tools/load-profit-calculator',
   '/tools/fuel-cost-per-mile',
+  '/trucking-contract-review',
+  '/owner-operator-contract-review',
+  '/lease-purchase-contract-red-flags',
+  '/trucking-escrow-agreement-review',
+  '/1099-truck-driver-contract-protection',
+  '/ai-contract-review-for-truckers',
 ];
 
 // Routes that MUST NOT appear in the sitemap.
