@@ -119,6 +119,27 @@ export function useApplicationContract(applicationId?: string | null) {
     },
   });
 
+  /**
+   * Trigger server-side text extraction for the current version. Allowed for
+   * recruiter, driver, or admin (auth enforced inside the edge function).
+   * Clients cannot write extracted_text / parse_status directly.
+   */
+  const parseContract = useMutation({
+    mutationFn: async (): Promise<{ parse_status: string; characters?: number; truncated?: boolean }> => {
+      const c = query.data;
+      if (!c?.current_version) throw new Error('No contract version to parse');
+      const { data, error } = await supabase.functions.invoke('parse-contract', {
+        body: { version_id: c.current_version.id },
+      });
+      if (error) throw new Error(error.message || 'Parsing failed');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as any;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['application-contract'] });
+    },
+  });
+
   return {
     contractWithVersion: query.data ?? null,
     isLoading: query.isLoading,
@@ -126,5 +147,6 @@ export function useApplicationContract(applicationId?: string | null) {
     refetch: query.refetch,
     uploadContract,
     getSignedViewUrl,
+    parseContract,
   };
 }
