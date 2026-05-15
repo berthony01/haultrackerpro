@@ -679,7 +679,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
           ) : !showSignBox ? (
             <div className="space-y-2">
               <p className="text-[11px] text-muted-foreground">
-                You approved this contract. Add your typed signature to finalize.
+                You approved this contract. Type your full legal name to record your approval. This is an in-app record of consent — not a notarization or DocuSign-equivalent qualified electronic signature.
               </p>
               <Button variant="default" size="sm" onClick={() => setShowSignBox(true)}>
                 <PenLine className="h-4 w-4" /> Sign Contract
