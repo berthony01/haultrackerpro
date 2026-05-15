@@ -116,14 +116,24 @@ serve(async (req) => {
       .eq("id", version_id);
     if (updErr) return json({ error: updErr.message }, 500);
 
-    // Promote to current_version + set status (best-effort; status guard may
-    // refuse moving back from later states, in which case current_version_id
-    // is still updated).
+    // Phase 5 hardening: a newly uploaded+confirmed version becomes the current
+    // version and resets contract status back to 'uploaded' so the driver can
+    // re-review even if the prior version was approved/rejected/changes_requested.
+    // Service-role bypasses contracts_status_guard, so backward transitions are allowed here.
+    // Old contract_reviews/contract_clauses rows are kept intact (history preserved);
+    // the UI scopes display by current_version_id.
+    const { data: prevContract } = await admin
+      .from("contracts")
+      .select("status, current_version_id")
+      .eq("id", version.contract_id)
+      .maybeSingle();
+
     const { error: contractUpdErr } = await admin
       .from("contracts")
       .update({ current_version_id: version_id, status: "uploaded" })
       .eq("id", version.contract_id);
     if (contractUpdErr) {
+      // Should not happen with service role; fall back to at least promoting the version pointer.
       await admin
         .from("contracts")
         .update({ current_version_id: version_id })
@@ -136,7 +146,13 @@ serve(async (req) => {
       actor_user_id: userId,
       actor_role: "recruiter",
       action: "uploaded",
-      metadata: { file_name: version.file_name, storage_path: version.storage_path },
+      metadata: {
+        file_name: version.file_name,
+        storage_path: version.storage_path,
+        previous_status: prevContract?.status ?? null,
+        previous_version_id: prevContract?.current_version_id ?? null,
+        status_reset: true,
+      },
     });
 
     return json({ ok: true, version_id, contract_id: version.contract_id });
