@@ -485,6 +485,12 @@ export function ContractAttachment({ applicationId, role }: Props) {
           {parseError}
         </p>
       )}
+      {hasContract && !aiReview && isParsing && (
+        <ParsingSkeleton label="Preparing contract for AI review…" />
+      )}
+      {hasContract && !aiReview && !isParsing && isAnalyzing && (
+        <ParsingSkeleton label="Analyzing contract details…" />
+      )}
       {aiReview && (
         <div className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-2">
           <div className="flex items-center gap-2">
