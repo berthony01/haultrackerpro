@@ -254,6 +254,63 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 1.6: CONTRACT PROTECTION           */}
+      {/* ═══════════════════════════════════════════ */}
+      <section id="contract-protection" className="py-16 sm:py-20 scroll-mt-20" style={{ background: 'hsl(220, 20%, 8%)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+              <Shield className="h-3.5 w-3.5" /> Contract Protection
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Don't get hired into a <span style={{ color: 'hsl(25, 95%, 53%)' }}>bad contract.</span>
+            </h2>
+            <p className="mt-4 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
+              HaulTrackerPro helps drivers review recruiter-sent contracts with AI-assisted risk flags, plain-English summaries, driver approval steps, and hired-status workflow protection.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              { icon: FileText, title: 'AI-Assisted Contract Review', desc: 'Get a plain-English summary of key contract terms, possible red flags, escrow language, lease-purchase terms, and other details that deserve attention.' },
+              { icon: Shield, title: 'Driver Approval Before Hired', desc: 'Recruiters cannot move a driver forward as hired until the required contract approval or signature step is completed.' },
+              { icon: CheckCircle2, title: 'Approve, Reject, or Request Changes', desc: 'Drivers can review the contract, ask for revisions, reject risky terms, or record their approval inside the platform.' },
+              { icon: Users, title: 'Private Contract Records', desc: 'Contracts are handled as private records between the driver, the recruiter who sent them, and HaulTrackerPro admins when support or moderation is needed.' },
+            ].map((card) => (
+              <div key={card.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                  <card.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                </div>
+                <h3 className="text-sm font-bold mb-1.5" style={{ color: 'hsl(0, 0%, 100%)' }}>{card.title}</h3>
+                <p className="text-xs leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{card.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              onClick={goToAuth}
+              size="lg"
+              className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
+              style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
+            >
+              Start Tracking Smarter <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() => navigate('/features')}
+              variant="outline"
+              size="lg"
+              className="text-sm font-bold rounded-xl h-12 px-6"
+              style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}
+            >
+              See Contract Protection
+            </Button>
+          </div>
+          <p className="text-[11px] text-center mt-5 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
+            AI contract review is informational only and is not legal advice. Always read the full contract before signing.
+          </p>
+        </div>
+      </section>
+
 
       {/* ═══════════════════════════════════════════ */}
       <section id="how-it-works" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>

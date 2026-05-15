@@ -287,6 +287,35 @@ export default function HowToUseHaulTrackerPro() {
         </div>
       </section>
 
+      {/* CONTRACT PROTECTION */}
+      <section className="border-t border-border">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+          <h2 className="text-2xl sm:text-3xl font-black font-heading text-center mb-3">How Contract Protection Works</h2>
+          <p className="text-sm text-muted-foreground text-center mb-10 max-w-2xl mx-auto">
+            HaulTrackerPro helps drivers review recruiter-sent contracts before approving, signing, or being marked hired.
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {[
+              { num: '01', title: 'Recruiter uploads the contract', desc: 'The recruiter adds the contract document to the opportunity workflow so the driver can review it.' },
+              { num: '02', title: 'AI parses the document', desc: 'HaulTrackerPro extracts text and key details to make the contract easier to review at a glance.' },
+              { num: '03', title: 'AI creates a plain-English risk summary', desc: 'Drivers see possible red flags and key points in plain language. This is informational only — not legal advice.' },
+              { num: '04', title: 'Driver reviews and decides', desc: 'The driver can approve the contract, reject it, or request changes before moving forward.' },
+              { num: '05', title: 'Driver records approval / signature', desc: 'When the driver approves, HaulTrackerPro stores a platform record of consent tied to that contract version. It is not a DocuSign-equivalent or qualified electronic signature.' },
+              { num: '06', title: 'Hired status is protected', desc: 'Recruiters cannot move the driver to hired until the required contract approval/signature steps are completed.' },
+            ].map((s) => (
+              <div key={s.num} className="p-5 rounded-2xl border border-border bg-card shadow-card">
+                <span className="text-xs font-bold text-primary tracking-wider">STEP {s.num}</span>
+                <h3 className="text-base font-bold font-heading mt-1 mb-1.5">{s.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-8 max-w-2xl mx-auto">
+            AI summaries are informational only. Always read the full contract before approving or signing.
+          </p>
+        </div>
+      </section>
+
       {/* FINAL CTA */}
       <section className="border-t border-border">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">

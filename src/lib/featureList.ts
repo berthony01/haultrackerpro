@@ -1,4 +1,4 @@
-import { Truck, Receipt, Calculator, Route, ClipboardPaste, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2, AlertCircle, Trophy, Mic, Camera, ParkingCircle, Users } from 'lucide-react';
+import { Truck, Receipt, Calculator, Route, ClipboardPaste, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2, AlertCircle, Trophy, Mic, Camera, ParkingCircle, Users, FileCheck, FileSignature, ShieldCheck } from 'lucide-react';
 
 export interface Feature {
   icon: typeof Truck;
@@ -25,6 +25,18 @@ export const featureList: FeatureCategory[] = [
       { icon: Route, title: 'Deadhead Awareness', description: 'Track deadhead miles and percentage to understand how empty miles impact your earnings.' },
       { icon: Sparkles, title: 'Smart Multi-Stop Paste Detection', description: 'When you paste load details with numbered stops (1#:, 2#:), the system auto-detects them, toggles multi-stop mode, and pre-fills each stop location for you.' },
       { icon: DollarSign, title: 'Driver Pay Model Support', description: 'Built for every 1099 setup: owner-operators (loaded miles only), 1099 contractors (paid for total miles including empty), lease-purchase drivers (loaded + deadhead at separate rates), flat-rate loads, and manual overrides. Pick a per-load pay model or set a default in Settings — profit and effective RPM stay accurate either way.' },
+    ],
+  },
+  {
+    category: 'Contract Protection',
+    features: [
+      { icon: FileText, title: 'Recruiter Contract Upload', description: 'Recruiters can upload contract documents directly into the opportunity workflow.' },
+      { icon: Sparkles, title: 'AI Contract Parsing', description: 'HaulTrackerPro extracts key contract details so drivers can review the information in a clearer format.' },
+      { icon: AlertCircle, title: 'AI Risk Review', description: 'Drivers see plain-English risk flags and summaries for terms that may deserve closer attention. Informational only — not legal advice.' },
+      { icon: FileCheck, title: 'Driver Review & Decision', description: 'Drivers can approve, reject, or request changes before moving forward.' },
+      { icon: FileSignature, title: 'In-App Signature Record', description: 'Drivers can record approval with a platform signature record tied to the contract version. Not a DocuSign-equivalent or qualified electronic signature.' },
+      { icon: Shield, title: 'Hired-Status Protection', description: 'Recruiters cannot mark a driver hired until required contract approval/signature steps are completed.' },
+      { icon: ShieldCheck, title: 'Admin Moderation', description: 'HaulTrackerPro can review contract-related disputes, abuse reports, and moderation issues when needed.' },
     ],
   },
   {

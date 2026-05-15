@@ -72,6 +72,11 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Parking log export (CSV + PDF)', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
   { feature: 'PDF reports', free: '—', pro: '✓' },
+  { feature: 'View contracts sent by recruiters', free: '✓', pro: '✓' },
+  { feature: 'Basic AI contract risk flags', free: '✓', pro: '✓' },
+  { feature: 'Approve, reject, or request changes', free: '✓', pro: '✓' },
+  { feature: 'Record approval / in-app signature', free: '✓', pro: '✓' },
+  { feature: 'Advanced contract history & deeper review', free: '—', pro: 'Coming soon' },
 ];
 
 const whyProPoints = [
@@ -340,9 +345,12 @@ export default function Pricing() {
       {/* Comparison Table */}
       <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-10" style={{ color: 'hsl(0, 0%, 100%)' }}>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-3" style={{ color: 'hsl(0, 0%, 100%)' }}>
             Full Feature <span style={{ color: 'hsl(25, 95%, 53%)' }}>Comparison</span>
           </h2>
+          <p className="text-xs text-center mb-10 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 50%)' }}>
+            Contract Protection (view, AI risk flags, decisions, and signature record) is available on every driver plan. Advanced contract history and deeper review tools may be added to Pro in a future update.
+          </p>
           <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'hsl(220, 16%, 16%)' }}>
             {/* Header */}
             <div className="grid grid-cols-3 text-sm font-bold" style={{ background: 'hsl(220, 20%, 12%)' }}>
@@ -386,10 +394,10 @@ export default function Pricing() {
               Recruiter &amp; Carrier Plans
             </h2>
             <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              Post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers.
+              Post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers. Recruiter plans also include the Contract Protection workflow: upload contracts, send them to drivers, track approval/rejection status, and move candidates forward only after required contract steps are complete.
             </p>
             <p className="text-[11px] mt-4 max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
-              Opportunity pay and match details are estimates based on recruiter-provided information. No job or income is guaranteed.
+              Opportunity pay and match details are estimates based on recruiter-provided information. No job or income is guaranteed. Contract Protection is designed to help create a clearer workflow between drivers and recruiters — it is not legal advice.
             </p>
           </div>
 
