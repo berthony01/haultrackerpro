@@ -85,7 +85,10 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const [showChangesBox, setShowChangesBox] = useState(false);
   const [changesNote, setChangesNote] = useState('');
   const [pendingDecision, setPendingDecision] = useState<null | 'approve_contract' | 'reject_contract' | 'request_changes'>(null);
-  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract, reviewContract } =
+  const [showSignBox, setShowSignBox] = useState(false);
+  const [typedName, setTypedName] = useState('');
+  const [signConsent, setSignConsent] = useState(false);
+  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract, reviewContract, signContract } =
     useApplicationContract(applicationId);
 
   const handlePick = () => inputRef.current?.click();
