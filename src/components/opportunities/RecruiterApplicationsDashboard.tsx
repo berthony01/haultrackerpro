@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Inbox, RefreshCw, Search, Ban } from 'lucide-react';
+import { ArrowLeft, Inbox, RefreshCw, Search, Ban, AlertTriangle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOpportunityApplications, type RecruiterApplicationStatus } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
@@ -19,6 +19,17 @@ import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityP
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ContractAttachment } from '@/components/contracts/ContractAttachment';
+import { useContractReadinessMap } from '@/hooks/contracts/useContractReadinessMap';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Props {
   onBack: () => void;
@@ -92,6 +103,10 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
   const [opportunityFilter, setOpportunityFilter] = useState<string>(ANY);
   const [search, setSearch] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [warnHire, setWarnHire] = useState<{ id: string; status: RecruiterApplicationStatus } | null>(null);
+
+  const appIds = useMemo(() => recruiterApplications.map((a: any) => a.id), [recruiterApplications]);
+  const { readinessMap } = useContractReadinessMap(appIds);
 
   const opportunityOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -123,6 +138,28 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
   }, [recruiterApplications, statusFilter, opportunityFilter, search]);
 
   const handleUpdate = (id: string, status: RecruiterApplicationStatus) => {
+    if (status === 'hired') {
+      const readiness = readinessMap.get(id)?.readiness;
+      if (readiness !== 'driver_approved') {
+        setWarnHire({ id, status });
+        return;
+      }
+    }
+    setPendingId(id);
+    updateApplicationStatus.mutate(
+      { id, status },
+      {
+        onSuccess: () => toast.success(`Marked ${status}`),
+        onError: (e: Error) => toast.error(e.message || 'Update failed'),
+        onSettled: () => setPendingId(null),
+      }
+    );
+  };
+
+  const confirmWarnedHire = () => {
+    if (!warnHire) return;
+    const { id, status } = warnHire;
+    setWarnHire(null);
     setPendingId(id);
     updateApplicationStatus.mutate(
       { id, status },
@@ -294,6 +331,16 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                   <div className="flex flex-wrap items-center gap-2">
                     {match && <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />}
                     <StatusBadge status={a.status} />
+                    {(() => {
+                      const info = readinessMap.get(a.id);
+                      if (!info) return null;
+                      return (
+                        <Badge variant="outline" className={`gap-1 ${info.badgeClass}`}>
+                          <FileText className="h-3 w-3" />
+                          {info.label}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -345,6 +392,24 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           })}
         </div>
       )}
+
+      <AlertDialog open={!!warnHire} onOpenChange={(open) => { if (!open) setWarnHire(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-400" />
+              Contract Not Approved
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This driver has not approved the contract yet. Continue anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setWarnHire(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmWarnedHire}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
