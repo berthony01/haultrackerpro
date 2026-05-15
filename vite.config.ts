@@ -86,7 +86,10 @@ export default defineConfig(({ mode }) => ({
           if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return 'vendor-react';
           if (/[\\/]node_modules[\\/](@supabase|@tanstack)[\\/]/.test(id)) return 'vendor-data';
           if (/[\\/]node_modules[\\/](@radix-ui|lucide-react|sonner|vaul|cmdk)[\\/]/.test(id)) return 'vendor-ui';
-          if (/[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/.test(id)) return 'vendor-charts';
+          // NOTE: do NOT split recharts / d3-* / victory-vendor into a separate
+          // chunk. Doing so created a Rollup TDZ cycle (`Cannot access 'P' before
+          // initialization` in vendor-charts) that crashed app boot on every
+          // route. Let Rollup handle Recharts' transitive graph naturally.
           if (/[\\/]node_modules[\\/](jspdf|jspdf-autotable|html2canvas|dompurify)[\\/]/.test(id)) return 'vendor-pdf';
           if (/[\\/]node_modules[\\/]tesseract\.js/.test(id)) return 'vendor-ocr';
           return undefined;
