@@ -82,6 +82,14 @@ const TruckingLoadProfitCalculator = lazy(() => import("./pages/TruckingLoadProf
 const ToolsLoadProfitCalculator = lazy(() => import("./pages/tools/LoadProfitCalculator"));
 const ToolsFuelCostPerMile = lazy(() => import("./pages/tools/FuelCostPerMileCalculator"));
 
+// Contract Protection SEO pillar pages
+const TruckingContractReview = lazy(() => import("./pages/TruckingContractReview"));
+const OwnerOperatorContractReview = lazy(() => import("./pages/OwnerOperatorContractReview"));
+const LeasePurchaseContractRedFlags = lazy(() => import("./pages/LeasePurchaseContractRedFlags"));
+const TruckingEscrowAgreementReview = lazy(() => import("./pages/TruckingEscrowAgreementReview"));
+const TenNinetyNineTruckDriverContractProtection = lazy(() => import("./pages/TenNinetyNineTruckDriverContractProtection"));
+const AiContractReviewForTruckers = lazy(() => import("./pages/AiContractReviewForTruckers"));
+
 const queryClient = new QueryClient();
 
 function PageFallback() {
