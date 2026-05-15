@@ -662,7 +662,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
           <div className="flex items-center gap-2">
             <PenLine className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Signature
+              Record Your Approval
             </span>
           </div>
           {isSigned ? (
