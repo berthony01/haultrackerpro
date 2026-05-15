@@ -47,6 +47,15 @@ interface ContractDetail {
   recruiter: any;
   driver: any;
   opportunity: any;
+  current_ai_review: {
+    id: string;
+    version_id: string;
+    summary: string | null;
+    risk_tier: RiskTier;
+    risk_score: number | null;
+    top_flags: any[];
+    created_at: string;
+  } | null;
 }
 
 const FILTERS: Array<{ value: string; label: string }> = [
