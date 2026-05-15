@@ -149,9 +149,9 @@ serve(async (req) => {
         contract_id: version.contract_id,
         version_id,
         actor_user_id: userId,
-        actor_role: null,
+        actor_role: actorRole,
         action: "parse_failed",
-        metadata: { reason: msg },
+        metadata: { reason: msg, triggered_by: actorRole },
       });
       return json({ error: msg }, 500);
     }
@@ -193,22 +193,26 @@ serve(async (req) => {
         .eq("id", version_id);
       if (updErr) throw new Error(updErr.message);
 
-      // Move contract status forward to 'parsed' if not past it
+      // Forward-only: only advance contract.status parsing → parsed.
+      // Never regress from ai_reviewed / driver_reviewing / changes_requested
+      // / approved / rejected / signed / expired / archived.
       await admin
         .from("contracts")
         .update({ status: "parsed" })
-        .eq("id", version.contract_id);
+        .eq("id", version.contract_id)
+        .eq("status", "parsing");
 
       await admin.from("contract_audit_log").insert({
         contract_id: version.contract_id,
         version_id,
         actor_user_id: userId,
-        actor_role: null,
+        actor_role: actorRole,
         action: "parse_completed",
         metadata: {
           characters: finalText.length,
           truncated,
           page_count: pageCount,
+          triggered_by: actorRole,
         },
       });
 
@@ -229,9 +233,9 @@ serve(async (req) => {
         contract_id: version.contract_id,
         version_id,
         actor_user_id: userId,
-        actor_role: null,
+        actor_role: actorRole,
         action: "parse_failed",
-        metadata: { reason: msg },
+        metadata: { reason: msg, triggered_by: actorRole },
       });
       return json({ error: msg, parse_status: "failed" }, 422);
     }
