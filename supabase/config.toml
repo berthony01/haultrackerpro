@@ -7,6 +7,8 @@ project_id = "pngptztxwbtozwxrtbwo"
     verify_jwt = false
   [functions.confirm-contract-upload]
     verify_jwt = false
+  [functions.parse-contract]
+    verify_jwt = false
   [functions.ai-insight]
     verify_jwt = false
   [functions.auth-email-hook]

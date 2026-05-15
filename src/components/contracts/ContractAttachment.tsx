@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Upload, Eye, AlertCircle, Loader2 } from 'lucide-react';
+import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 
@@ -36,10 +36,42 @@ function StatusBadge({ status }: { status: string | null }) {
   );
 }
 
+function ParseStatusBadge({ status }: { status: string | null }) {
+  if (!status || status === 'pending') {
+    return (
+      <Badge variant="outline" className="bg-muted text-muted-foreground border-border gap-1">
+        Text not extracted
+      </Badge>
+    );
+  }
+  if (status === 'parsing') {
+    return (
+      <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30 gap-1">
+        <Loader2 className="h-3 w-3 animate-spin" /> Extracting text…
+      </Badge>
+    );
+  }
+  if (status === 'parsed') {
+    return (
+      <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30 gap-1">
+        <CheckCircle2 className="h-3 w-3" /> Text extracted
+      </Badge>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <Badge variant="outline" className="bg-red-500/15 text-red-400 border-red-500/30 gap-1">
+        <XCircle className="h-3 w-3" /> Extraction failed
+      </Badge>
+    );
+  }
+  return null;
+}
+
 export function ContractAttachment({ applicationId, role }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
-  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl } =
+  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract } =
     useApplicationContract(applicationId);
 
   const handlePick = () => inputRef.current?.click();
@@ -72,23 +104,41 @@ export function ContractAttachment({ applicationId, role }: Props) {
     }
   };
 
+  const handleParse = async () => {
+    try {
+      const res = await parseContract.mutateAsync();
+      if (res.parse_status === 'parsed') {
+        toast.success(
+          `Text extracted${typeof res.characters === 'number' ? ` (${res.characters.toLocaleString()} chars)` : ''}`,
+        );
+      } else {
+        toast.error('Text extraction did not complete');
+      }
+    } catch (e) {
+      toast.error((e as Error).message || 'Could not extract text');
+    }
+  };
+
   const hasContract = !!contractWithVersion?.current_version;
   const status = contractWithVersion?.contract.status ?? null;
+  const parseStatus = contractWithVersion?.current_version?.parse_status ?? null;
+  const parseError = contractWithVersion?.current_version?.parse_error ?? null;
   const fileName = contractWithVersion?.current_version?.file_name;
   const versionNumber = contractWithVersion?.current_version?.version_number;
 
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Contract
           </span>
           <StatusBadge status={hasContract ? status : null} />
+          {hasContract && <ParseStatusBadge status={parseStatus} />}
         </div>
         {role === 'recruiter' && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant={hasContract ? 'outline' : 'default'}
               size="sm"
@@ -106,6 +156,21 @@ export function ContractAttachment({ applicationId, role }: Props) {
               <Button variant="ghost" size="sm" onClick={handleView} disabled={isViewLoading}>
                 {isViewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                 View
+              </Button>
+            )}
+            {hasContract && parseStatus !== 'parsed' && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleParse}
+                disabled={parseContract.isPending || parseStatus === 'parsing'}
+              >
+                {parseContract.isPending || parseStatus === 'parsing' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {parseStatus === 'failed' ? 'Retry Extraction' : 'Prepare AI Review'}
               </Button>
             )}
             <input
@@ -129,6 +194,11 @@ export function ContractAttachment({ applicationId, role }: Props) {
           v{versionNumber} · {fileName}
         </p>
       )}
+      {parseStatus === 'failed' && parseError && role === 'recruiter' && (
+        <p className="text-[11px] text-red-400 break-words">
+          {parseError}
+        </p>
+      )}
       {role === 'driver' && !hasContract && !isLoading && (
         <p className="text-[11px] text-muted-foreground">
           The recruiter has not attached a contract for this application yet.
@@ -137,3 +207,4 @@ export function ContractAttachment({ applicationId, role }: Props) {
     </div>
   );
 }
+
