@@ -392,6 +392,24 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           })}
         </div>
       )}
+
+      <AlertDialog open={!!warnHire} onOpenChange={(open) => { if (!open) setWarnHire(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-400" />
+              Contract Not Approved
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This driver has not approved the contract yet. Continue anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setWarnHire(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmWarnedHire}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
