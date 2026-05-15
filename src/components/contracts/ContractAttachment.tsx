@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle } from 'lucide-react';
+import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 
@@ -68,10 +68,18 @@ function ParseStatusBadge({ status }: { status: string | null }) {
   return null;
 }
 
+const TIER_STYLES: Record<string, { label: string; cls: string; Icon: typeof ShieldAlert }> = {
+  low: { label: 'Low risk', cls: 'bg-green-500/15 text-green-400 border-green-500/30', Icon: ShieldCheck },
+  moderate: { label: 'Moderate risk', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30', Icon: ShieldAlert },
+  elevated: { label: 'Elevated risk', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30', Icon: ShieldAlert },
+  high: { label: 'High risk', cls: 'bg-red-500/15 text-red-400 border-red-500/30', Icon: ShieldAlert },
+  severe: { label: 'Severe risk', cls: 'bg-red-600/20 text-red-300 border-red-600/40', Icon: ShieldAlert },
+};
+
 export function ContractAttachment({ applicationId, role }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
-  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract } =
+  const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract } =
     useApplicationContract(applicationId);
 
   const handlePick = () => inputRef.current?.click();
