@@ -41,13 +41,9 @@ Deno.serve(async (req) => {
 
     const adminDb = createClient(supabaseUrl, serviceRoleKey);
 
-    // Admin check
-    const { data: adminRow } = await adminDb
-      .from("admin_users")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!adminRow) return json({ error: "Forbidden" }, 403);
+    // Admin check via trusted SECURITY DEFINER helper used elsewhere in app
+    const { data: isAdminData, error: isAdminErr } = await adminDb.rpc("is_admin", { _user_id: userId });
+    if (isAdminErr || isAdminData !== true) return json({ error: "Forbidden" }, 403);
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action") || "";
