@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Inbox, RefreshCw, Search, Ban } from 'lucide-react';
+import { ArrowLeft, Inbox, RefreshCw, Search, Ban, AlertTriangle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOpportunityApplications, type RecruiterApplicationStatus } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
@@ -19,6 +19,17 @@ import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityP
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ContractAttachment } from '@/components/contracts/ContractAttachment';
+import { useContractReadinessMap } from '@/hooks/contracts/useContractReadinessMap';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Props {
   onBack: () => void;
