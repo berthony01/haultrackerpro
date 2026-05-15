@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning, PenLine, Check, Lock } from 'lucide-react';
+import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning, PenLine, Check, Lock, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
+import { useSubscription } from '@/hooks/useSubscription';
 
 interface Props {
   applicationId: string;
@@ -186,6 +188,8 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const [signConsent, setSignConsent] = useState(false);
   const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract, reviewContract, signContract } =
     useApplicationContract(applicationId);
+  const navigate = useNavigate();
+  const { isPro, isLoading: isSubLoading } = useSubscription();
 
   const handlePick = () => inputRef.current?.click();
 
@@ -734,7 +738,40 @@ export function ContractAttachment({ applicationId, role }: Props) {
           )}
         </div>
       )}
+
+      {/* Phase 9E — Driver Pro upsell (informational, non-blocking) */}
+      {role === 'driver' && hasContract && !isSubLoading && isPro === false && (
+        <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Crown className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+              Advanced Contract Protection
+            </span>
+            <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px]">
+              Coming soon for Pro
+            </Badge>
+          </div>
+          <p className="text-[11px] text-foreground/90 leading-relaxed">
+            Want deeper contract protection? Pro tools may include clause-by-clause explanations,
+            saved contract history, downloadable records, and AI follow-up support as Contract
+            Protection expands.
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Basic contract viewing, risk flags, decisions, and required approval/signature steps
+            remain accessible on the Free plan.
+          </p>
+          <Button
+            variant="default"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => navigate('/pricing')}
+          >
+            <Crown className="h-4 w-4" /> Upgrade to Pro
+          </Button>
+        </div>
+      )}
     </div>
+
   );
 }
 
