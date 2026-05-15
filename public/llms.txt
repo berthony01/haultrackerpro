@@ -35,6 +35,15 @@ HaulTrackerPro replaces notebooks and spreadsheets with a mobile-first system de
 - [Owner-operator operating costs](/owner-operator-operating-costs): Annualized operating costs.
 - [Trucking finance guides](/trucking-finance-guides): Index of all finance guides.
 
+## Contract Protection
+
+- [AI Trucking Contract Review](/trucking-contract-review): AI-assisted review of trucking contracts for 1099 drivers.
+- [Owner-Operator Contract Review](/owner-operator-contract-review): Review owner-operator agreements before approving.
+- [Lease-Purchase Contract Red Flags](/lease-purchase-contract-red-flags): Red flags in lease-purchase trucking agreements.
+- [Trucking Escrow Agreement Review](/trucking-escrow-agreement-review): Understand escrow deductions and refund terms.
+- [1099 Truck Driver Contract Protection](/1099-truck-driver-contract-protection): Contract review for 1099 independent contractor drivers.
+- [AI Contract Review for Truckers](/ai-contract-review-for-truckers): AI-assisted contract summaries and risk flags.
+
 ## Tools
 
 - [Trucking profit calculator](/trucking-profit-calculator): Calculate net profit on a load.
