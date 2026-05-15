@@ -8,12 +8,14 @@ export type ContractVersion = Tables<'contract_versions'>;
 
 export type ContractClause = Tables<'contract_clauses'>;
 export type ContractReview = Tables<'contract_reviews'>;
+export type ContractSignature = Tables<'contract_signatures'>;
 
 export interface ContractWithVersion {
   contract: Contract;
   current_version: ContractVersion | null;
   ai_review: ContractReview | null;
   driver_review: ContractReview | null;
+  driver_signature: ContractSignature | null;
   clauses: ContractClause[];
 }
 
