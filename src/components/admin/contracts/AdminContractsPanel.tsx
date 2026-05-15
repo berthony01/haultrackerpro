@@ -283,12 +283,12 @@ export function AdminContractsPanel() {
                 <TableCell className="text-xs truncate max-w-[200px]">{r.opportunity?.title || "—"}</TableCell>
                 <TableCell><Badge variant={statusBadgeVariant(r.status)} className="text-xs whitespace-nowrap">{r.status}</Badge></TableCell>
                 <TableCell>
-                  {r.risk_tier ? (
-                    <Badge variant={tierBadgeVariant(r.risk_tier)} className="text-xs whitespace-nowrap">
-                      {r.risk_tier} {r.risk_score != null ? `· ${Number(r.risk_score).toFixed(0)}` : ""}
+                  {r.ai_review && r.ai_review.risk_tier ? (
+                    <Badge variant={tierBadgeVariant(r.ai_review.risk_tier)} className="text-xs whitespace-nowrap">
+                      {r.ai_review.risk_tier} {r.ai_review.risk_score != null ? `· ${Number(r.ai_review.risk_score).toFixed(0)}` : ""}
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-xs">no AI</Badge>
+                    <Badge variant="outline" className="text-xs whitespace-nowrap">No AI review</Badge>
                   )}
                 </TableCell>
                 <TableCell className="text-xs">
