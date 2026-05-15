@@ -9,6 +9,7 @@ import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XC
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 import { useSubscription } from '@/hooks/useSubscription';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   applicationId: string;
