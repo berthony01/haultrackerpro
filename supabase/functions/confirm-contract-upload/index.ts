@@ -116,24 +116,106 @@ serve(async (req) => {
       .eq("id", version_id);
     if (updErr) return json({ error: updErr.message }, 500);
 
-    // Phase 5 hardening: a newly uploaded+confirmed version becomes the current
-    // version and resets contract status back to 'uploaded' so the driver can
-    // re-review even if the prior version was approved/rejected/changes_requested.
-    // Service-role bypasses contracts_status_guard, so backward transitions are allowed here.
-    // Old contract_reviews/contract_clauses rows are kept intact (history preserved);
-    // the UI scopes display by current_version_id.
+    // Phase 5 final hardening:
+    // - A newly uploaded+confirmed version becomes the current version and resets
+    //   contract status back to 'uploaded' so the driver can re-review.
+    // - Only reset from REPLACEABLE statuses. Never overwrite terminal states.
+    // - If a newer version is already current, refuse to clobber it (stale confirm).
+    const REPLACEABLE_STATUSES = new Set([
+      "uploaded",
+      "parsing",
+      "parsed",
+      "ai_reviewed",
+      "driver_reviewing",
+      "changes_requested",
+      "approved",
+      "rejected",
+    ]);
+    const TERMINAL_BLOCKED = new Set(["signed", "expired", "archived"]);
+
     const { data: prevContract } = await admin
       .from("contracts")
       .select("status, current_version_id")
       .eq("id", version.contract_id)
       .maybeSingle();
 
+    // Look up the currently-promoted version's number (if any) to detect stale confirms.
+    let currentVersionNumber: number | null = null;
+    if (prevContract?.current_version_id && prevContract.current_version_id !== version_id) {
+      const { data: curV } = await admin
+        .from("contract_versions")
+        .select("version_number, upload_status")
+        .eq("id", prevContract.current_version_id)
+        .maybeSingle();
+      if (curV && curV.upload_status === "uploaded") {
+        currentVersionNumber = (curV as any).version_number ?? null;
+      }
+    }
+
+    // Block if a newer version is already current.
+    if (
+      currentVersionNumber !== null &&
+      typeof (version as any).version_number === "number" &&
+      currentVersionNumber > (version as any).version_number
+    ) {
+      await admin
+        .from("contract_versions")
+        .update({ upload_status: "failed" })
+        .eq("id", version_id);
+      await admin.from("contract_audit_log").insert({
+        contract_id: version.contract_id,
+        version_id,
+        actor_user_id: userId,
+        actor_role: "recruiter",
+        action: "upload_failed",
+        metadata: {
+          reason: "stale_version_confirm",
+          this_version_number: (version as any).version_number,
+          current_version_number: currentVersionNumber,
+          current_version_id: prevContract!.current_version_id,
+        },
+      });
+      return json({ error: "A newer contract version is already active." }, 409);
+    }
+
+    // Block if current contract status is terminal — never reset signed/expired/archived.
+    if (prevContract?.status && TERMINAL_BLOCKED.has(prevContract.status)) {
+      await admin
+        .from("contract_versions")
+        .update({ upload_status: "failed" })
+        .eq("id", version_id);
+      await admin.from("contract_audit_log").insert({
+        contract_id: version.contract_id,
+        version_id,
+        actor_user_id: userId,
+        actor_role: "recruiter",
+        action: "upload_failed",
+        metadata: {
+          reason: "terminal_status_blocked",
+          previous_status: prevContract.status,
+          previous_version_id: prevContract.current_version_id ?? null,
+        },
+      });
+      return json(
+        { error: `Contract status is "${prevContract.status}" and cannot accept a new version.` },
+        409,
+      );
+    }
+
+    // Promote + reset only when current status is in the replaceable set.
+    // Service-role bypasses contracts_status_guard, so backward transitions are allowed here.
+    const safeToReset =
+      !prevContract?.status || REPLACEABLE_STATUSES.has(prevContract.status);
+
+    const updatePayload: Record<string, unknown> = { current_version_id: version_id };
+    if (safeToReset) updatePayload.status = "uploaded";
+
     const { error: contractUpdErr } = await admin
       .from("contracts")
-      .update({ current_version_id: version_id, status: "uploaded" })
+      .update(updatePayload)
       .eq("id", version.contract_id);
     if (contractUpdErr) {
-      // Should not happen with service role; fall back to at least promoting the version pointer.
+      // Fall back to at least promoting the version pointer.
       await admin
         .from("contracts")
         .update({ current_version_id: version_id })
@@ -151,7 +233,7 @@ serve(async (req) => {
         storage_path: version.storage_path,
         previous_status: prevContract?.status ?? null,
         previous_version_id: prevContract?.current_version_id ?? null,
-        status_reset: true,
+        status_reset: safeToReset,
       },
     });
 
