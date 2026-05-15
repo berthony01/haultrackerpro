@@ -258,17 +258,37 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (cErr || !c) return json({ error: "Contract not found" }, 404);
 
-      const [versions, reviews, clauses, audit, recruiter, driver, opp] = await Promise.all([
+      const [versions, reviews, clauses, audit, recruiter, driver, opp, app] = await Promise.all([
         adminDb.from("contract_versions").select("*").eq("contract_id", contractId).order("version_number", { ascending: false }),
         adminDb.from("contract_reviews").select("*").eq("contract_id", contractId).order("created_at", { ascending: false }),
         c.current_version_id
           ? adminDb.from("contract_clauses").select("*").eq("version_id", c.current_version_id).order("severity", { ascending: false })
           : Promise.resolve({ data: [] }),
         adminDb.from("contract_audit_log").select("*").eq("contract_id", contractId).order("created_at", { ascending: false }).limit(200),
-        adminDb.from("recruiter_profiles").select("id, company_name, contact_email, contact_name, status, verification_status").eq("id", c.recruiter_id).maybeSingle(),
-        adminDb.from("profiles").select("id, email, display_name").eq("id", c.driver_user_id).maybeSingle(),
+        adminDb.from("recruiter_profiles").select("id, company_name, recruiter_email, recruiter_name, status, verification_status").eq("id", c.recruiter_id).maybeSingle(),
+        adminDb.from("profiles").select("user_id, display_name, driver_handle").eq("user_id", c.driver_user_id).maybeSingle(),
         adminDb.from("opportunities").select("id, title, company_name").eq("id", c.opportunity_id).maybeSingle(),
+        adminDb.from("opportunity_applications").select("id, driver_email_snapshot, driver_phone_snapshot").eq("id", c.application_id).maybeSingle(),
       ]);
+
+      const recruiterShaped = recruiter.data
+        ? {
+            id: (recruiter.data as any).id,
+            company_name: (recruiter.data as any).company_name,
+            contact_email: (recruiter.data as any).recruiter_email,
+            contact_name: (recruiter.data as any).recruiter_name,
+            status: (recruiter.data as any).status,
+            verification_status: (recruiter.data as any).verification_status,
+          }
+        : null;
+      const driverShaped = driver.data
+        ? {
+            id: (driver.data as any).user_id,
+            display_name: (driver.data as any).display_name,
+            driver_handle: (driver.data as any).driver_handle,
+            email: (app.data as any)?.driver_email_snapshot ?? null,
+          }
+        : { id: c.driver_user_id, display_name: null, driver_handle: null, email: (app.data as any)?.driver_email_snapshot ?? null };
 
       return json({
         contract: c,
@@ -276,8 +296,8 @@ Deno.serve(async (req) => {
         reviews: reviews.data ?? [],
         clauses: clauses.data ?? [],
         audit: audit.data ?? [],
-        recruiter: recruiter.data ?? null,
-        driver: driver.data ?? null,
+        recruiter: recruiterShaped,
+        driver: driverShaped,
         opportunity: opp.data ?? null,
       });
     }
