@@ -6,9 +6,14 @@ import type { Tables } from '@/integrations/supabase/types';
 export type Contract = Tables<'contracts'>;
 export type ContractVersion = Tables<'contract_versions'>;
 
+export type ContractClause = Tables<'contract_clauses'>;
+export type ContractReview = Tables<'contract_reviews'>;
+
 export interface ContractWithVersion {
   contract: Contract;
   current_version: ContractVersion | null;
+  ai_review: ContractReview | null;
+  clauses: ContractClause[];
 }
 
 const BUCKET = 'contract-documents';
@@ -36,6 +41,8 @@ export function useApplicationContract(applicationId?: string | null) {
       if (error) throw error;
       if (!contract) return null;
       let currentVersion: ContractVersion | null = null;
+      let aiReview: ContractReview | null = null;
+      let clauses: ContractClause[] = [];
       if (contract.current_version_id) {
         const { data: v } = await supabase
           .from('contract_versions')
@@ -44,8 +51,28 @@ export function useApplicationContract(applicationId?: string | null) {
           .eq('upload_status', 'uploaded')
           .maybeSingle();
         currentVersion = v ?? null;
+        if (currentVersion) {
+          const [{ data: rev }, { data: cls }] = await Promise.all([
+            supabase
+              .from('contract_reviews')
+              .select('*')
+              .eq('contract_id', contract.id)
+              .eq('version_id', currentVersion.id)
+              .eq('reviewer_role', 'ai')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from('contract_clauses')
+              .select('*')
+              .eq('version_id', currentVersion.id)
+              .order('severity', { ascending: false }),
+          ]);
+          aiReview = rev ?? null;
+          clauses = cls ?? [];
+        }
       }
-      return { contract, current_version: currentVersion };
+      return { contract, current_version: currentVersion, ai_review: aiReview, clauses };
     },
   });
 
