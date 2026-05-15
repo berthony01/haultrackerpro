@@ -82,6 +82,14 @@ const TruckingLoadProfitCalculator = lazy(() => import("./pages/TruckingLoadProf
 const ToolsLoadProfitCalculator = lazy(() => import("./pages/tools/LoadProfitCalculator"));
 const ToolsFuelCostPerMile = lazy(() => import("./pages/tools/FuelCostPerMileCalculator"));
 
+// Contract Protection SEO pillar pages
+const TruckingContractReview = lazy(() => import("./pages/TruckingContractReview"));
+const OwnerOperatorContractReview = lazy(() => import("./pages/OwnerOperatorContractReview"));
+const LeasePurchaseContractRedFlags = lazy(() => import("./pages/LeasePurchaseContractRedFlags"));
+const TruckingEscrowAgreementReview = lazy(() => import("./pages/TruckingEscrowAgreementReview"));
+const TenNinetyNineTruckDriverContractProtection = lazy(() => import("./pages/TenNinetyNineTruckDriverContractProtection"));
+const AiContractReviewForTruckers = lazy(() => import("./pages/AiContractReviewForTruckers"));
+
 const queryClient = new QueryClient();
 
 function PageFallback() {
@@ -191,6 +199,12 @@ const App = () => (
               <Route path="/trucking-load-profit-calculator" element={<TruckingLoadProfitCalculator />} />
               <Route path="/tools/load-profit-calculator" element={<ToolsLoadProfitCalculator />} />
               <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
+              <Route path="/trucking-contract-review" element={<TruckingContractReview />} />
+              <Route path="/owner-operator-contract-review" element={<OwnerOperatorContractReview />} />
+              <Route path="/lease-purchase-contract-red-flags" element={<LeasePurchaseContractRedFlags />} />
+              <Route path="/trucking-escrow-agreement-review" element={<TruckingEscrowAgreementReview />} />
+              <Route path="/1099-truck-driver-contract-protection" element={<TenNinetyNineTruckDriverContractProtection />} />
+              <Route path="/ai-contract-review-for-truckers" element={<AiContractReviewForTruckers />} />
               <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
               <Route path="/parking" element={<ProtectedRoute><Parking /></ProtectedRoute>} />
               <Route path="/starter-kit" element={<StarterKit />} />
