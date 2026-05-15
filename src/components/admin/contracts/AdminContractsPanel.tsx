@@ -34,7 +34,7 @@ interface ContractRow {
     file_name: string;
     page_count: number | null;
   } | null;
-  ai_review: { id: string; summary: string | null; top_flags: any[]; created_at: string } | null;
+  ai_review: { id: string; summary: string | null; risk_tier: RiskTier; risk_score: number | null; top_flags: any[]; created_at: string } | null;
   driver_review: { id: string; decision: string; note: string | null; created_at: string } | null;
 }
 
