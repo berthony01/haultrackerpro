@@ -216,6 +216,12 @@ export function ContractAttachment({ applicationId, role }: Props) {
               AI review not run yet
             </Badge>
           )}
+          {hasContract && decision && (
+            <Badge variant="outline" className={`gap-1 ${decisionStyle[decision].cls}`}>
+              {(() => { const I = decisionStyle[decision].Icon; return <I className="h-3 w-3" />; })()}
+              {decisionStyle[decision].label}
+            </Badge>
+          )}
         </div>
         {role === 'recruiter' && (
           <div className="flex flex-wrap gap-2">
