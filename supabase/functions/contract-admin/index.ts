@@ -383,11 +383,16 @@ Deno.serve(async (req) => {
       if (exErr || !existing) return json({ error: "Contract not found" }, 404);
 
       // Service role bypasses contracts_status_guard, so transition is allowed.
-      const { error: updErr } = await adminDb
+      // Confirm the row was actually updated; if 0 rows return error.
+      const { data: updated, error: updErr } = await adminDb
         .from("contracts")
         .update({ status: newStatus })
-        .eq("id", contractId);
+        .eq("id", contractId)
+        .select("id");
       if (updErr) return json({ error: updErr.message }, 500);
+      if (!updated || updated.length === 0) {
+        return json({ error: "Contract not updated" }, 409);
+      }
 
       await adminDb.from("contract_audit_log").insert({
         contract_id: contractId,
