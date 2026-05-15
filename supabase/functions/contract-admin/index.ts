@@ -191,6 +191,14 @@ Deno.serve(async (req) => {
         const ai = c.current_version_id ? aiByCv.get(`${c.id}:${c.current_version_id}`) : null;
         const drv = c.current_version_id ? drvByCv.get(`${c.id}:${c.current_version_id}`) : null;
         const findings = (ai?.ai_findings as any) || {};
+        // Risk MUST come from the current version's AI review only — never stale contracts.risk_*
+        const aiRiskTier = ai && typeof findings.risk_tier === "string" ? findings.risk_tier : null;
+        const aiRiskScore = ai && findings.risk_score != null ? Number(findings.risk_score) : null;
+        const topFlagsRaw = Array.isArray(findings.top_red_flags)
+          ? findings.top_red_flags
+          : Array.isArray(findings.top_flags)
+            ? findings.top_flags
+            : [];
         const driverBase = driverMap.get(c.driver_user_id) || null;
         const driver = driverBase
           ? { ...driverBase, email: appEmailMap.get(c.application_id) || null }
@@ -198,8 +206,9 @@ Deno.serve(async (req) => {
         return {
           id: c.id,
           status: c.status,
-          risk_score: c.risk_score,
-          risk_tier: c.risk_tier,
+          // risk_score/risk_tier are derived from current-version AI review only
+          risk_score: aiRiskScore,
+          risk_tier: aiRiskTier,
           title: c.title,
           created_at: c.created_at,
           updated_at: c.updated_at,
@@ -221,7 +230,9 @@ Deno.serve(async (req) => {
             ? {
                 id: ai.id,
                 summary: ai.ai_summary,
-                top_flags: Array.isArray(findings.top_flags) ? findings.top_flags.slice(0, 5) : [],
+                risk_tier: aiRiskTier,
+                risk_score: aiRiskScore,
+                top_flags: topFlagsRaw.slice(0, 5),
                 created_at: ai.created_at,
               }
             : null,
@@ -233,6 +244,10 @@ Deno.serve(async (req) => {
 
       if (filter === "failed_parse") {
         rows = rows.filter((r) => r.current_version?.parse_status === "failed");
+      } else if (filter === "missing_ai_review") {
+        rows = rows.filter((r) => !r.ai_review);
+      } else if (filter === "high_risk") {
+        rows = rows.filter((r) => r.ai_review && (r.ai_review.risk_tier === "high" || r.ai_review.risk_tier === "severe"));
       }
 
       return json({ contracts: rows, page, limit, total: count ?? rows.length });
