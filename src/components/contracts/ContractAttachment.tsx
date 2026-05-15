@@ -143,13 +143,18 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const parseError = contractWithVersion?.current_version?.parse_error ?? null;
   const fileName = contractWithVersion?.current_version?.file_name;
   const versionNumber = contractWithVersion?.current_version?.version_number;
-  const aiReview = contractWithVersion?.ai_review ?? null;
+  const currentVersionId = contractWithVersion?.current_version?.id ?? null;
+  const aiReviewRaw = contractWithVersion?.ai_review ?? null;
+  // Only trust AI review if it belongs to the CURRENT uploaded version.
+  const aiReview = aiReviewRaw && aiReviewRaw.version_id === currentVersionId ? aiReviewRaw : null;
   const findings = (aiReview?.ai_findings as { risk_score?: number; risk_tier?: string; top_red_flags?: string[]; truncated?: boolean } | null) ?? null;
-  const riskScore = typeof findings?.risk_score === 'number' ? findings.risk_score : (contractWithVersion?.contract.risk_score ?? null);
-  const riskTier = (findings?.risk_tier || contractWithVersion?.contract.risk_tier || '').toLowerCase();
+  const riskScore = typeof findings?.risk_score === 'number' ? findings.risk_score : null;
+  const riskTier = (findings?.risk_tier || '').toLowerCase();
   const tierStyle = riskTier && TIER_STYLES[riskTier] ? TIER_STYLES[riskTier] : null;
-  const canAnalyze = hasContract && parseStatus === 'parsed' && (role === 'recruiter');
-  const showAnalyzeBtn = canAnalyze && (!aiReview || role === 'recruiter');
+  const canAnalyze = hasContract && parseStatus === 'parsed' && role === 'recruiter';
+  // Recruiters: only show the run button when no AI review exists for the current version.
+  // Force re-analysis is admin-only (server-enforced); no Refresh button here.
+  const showAnalyzeBtn = canAnalyze && !aiReview;
 
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
