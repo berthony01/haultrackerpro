@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 
