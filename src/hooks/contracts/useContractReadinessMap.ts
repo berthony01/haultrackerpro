@@ -8,7 +8,9 @@ export type ContractReadiness =
   | 'awaiting_driver_decision'
   | 'changes_requested'
   | 'driver_rejected'
-  | 'driver_approved';
+  | 'driver_approved'
+  | 'contract_expired'
+  | 'contract_archived';
 
 export interface ReadinessInfo {
   readiness: ContractReadiness;
