@@ -259,6 +259,12 @@ export function ContractAttachment({ applicationId, role }: Props) {
               {decisionStyle[decision].label}
             </Badge>
           )}
+          {hasContract && isSigned && (
+            <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30 gap-1">
+              <PenLine className="h-3 w-3" />
+              {role === 'recruiter' ? 'Driver signed' : 'Signed'}
+            </Badge>
+          )}
         </div>
         {role === 'recruiter' && (
           <div className="flex flex-wrap gap-2">
