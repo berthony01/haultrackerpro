@@ -13,6 +13,7 @@ export interface ContractWithVersion {
   contract: Contract;
   current_version: ContractVersion | null;
   ai_review: ContractReview | null;
+  driver_review: ContractReview | null;
   clauses: ContractClause[];
 }
 
