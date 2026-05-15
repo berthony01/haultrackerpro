@@ -328,8 +328,54 @@ export function ContractAttachment({ applicationId, role }: Props) {
     changes_requested: { label: 'Changes requested', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30', Icon: MessageSquareWarning },
   };
 
+  // Driver step indicator state derivation (purely visual; no workflow change).
+  const signApplicable = role === 'driver' && hasContract;
+  const reviewState: StepState = !hasContract
+    ? 'idle'
+    : decision || isSigned
+      ? 'complete'
+      : 'active';
+  const decideState: StepState = !hasContract
+    ? 'idle'
+    : decision === 'approved' || isSigned
+      ? 'complete'
+      : decision === 'rejected'
+        ? 'complete'
+        : canDriverDecide
+          ? 'active'
+          : 'locked';
+  const signState: StepState = !signApplicable
+    ? 'idle'
+    : isSigned
+      ? 'complete'
+      : decision === 'rejected'
+        ? 'locked'
+        : canDriverSign
+          ? 'active'
+          : 'locked';
+
+  const isAnalyzing = analyzeContract.isPending;
+  const isParsing = parseContract.isPending || parseStatus === 'parsing';
+
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+      {role === 'driver' && hasContract && (
+        <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+          <DriverStepIndicator
+            reviewState={reviewState}
+            decideState={decideState}
+            signState={signState}
+            signApplicable={signApplicable}
+          />
+        </div>
+      )}
+      {role === 'recruiter' && (
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Upload an accurate, authorized contract. The driver sees an AI-assisted summary, risk
+          flags, and must approve and (when required) sign before this candidate can be moved to
+          hired status. AI review is informational and is shown to the driver, not legal advice.
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
