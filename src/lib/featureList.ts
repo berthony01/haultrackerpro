@@ -28,6 +28,18 @@ export const featureList: FeatureCategory[] = [
     ],
   },
   {
+    category: 'Contract Protection',
+    features: [
+      { icon: FileText, title: 'Recruiter Contract Upload', description: 'Recruiters can upload contract documents directly into the opportunity workflow.' },
+      { icon: Sparkles, title: 'AI Contract Parsing', description: 'HaulTrackerPro extracts key contract details so drivers can review the information in a clearer format.' },
+      { icon: AlertCircle, title: 'AI Risk Review', description: 'Drivers see plain-English risk flags and summaries for terms that may deserve closer attention. Informational only — not legal advice.' },
+      { icon: FileCheck, title: 'Driver Review & Decision', description: 'Drivers can approve, reject, or request changes before moving forward.' },
+      { icon: FileSignature, title: 'In-App Signature Record', description: 'Drivers can record approval with a platform signature record tied to the contract version. Not a DocuSign-equivalent or qualified electronic signature.' },
+      { icon: Shield, title: 'Hired-Status Protection', description: 'Recruiters cannot mark a driver hired until required contract approval/signature steps are completed.' },
+      { icon: ShieldCheck, title: 'Admin Moderation', description: 'HaulTrackerPro can review contract-related disputes, abuse reports, and moderation issues when needed.' },
+    ],
+  },
+  {
     category: 'Profit Intelligence — Built To Protect Your Money (Pro)',
     features: [
       { icon: Target, title: 'Score A Load Before You Take It', description: 'Paste a load and get a quick read on whether the rate, miles, deadhead, and broker actually pencil out — scored against your own lane and operating history, not a generic average. Available right inside the load form before you commit.', pro: true },
