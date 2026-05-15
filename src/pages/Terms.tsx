@@ -78,12 +78,65 @@ export default function Terms() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">12. Governing Law</h3>
+          <h3 className="text-base font-bold">12. Contract Protection — Uploads</h3>
+          <p className="text-muted-foreground">Recruiters and any other authorized users who upload contracts to HaulTrackerPro represent and warrant that they have the right to upload, share, and process those documents. Uploaded contracts must be accurate, lawful, and related to a legitimate trucking, recruiting, leasing, or contractor opportunity. You may not upload contracts that you do not own, control, or have explicit permission to share, and you may not upload documents containing material that is fraudulent, misleading, or in violation of third-party rights.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">13. AI Contract Analysis Disclaimer</h3>
+          <p className="text-muted-foreground">HaulTrackerPro provides AI-assisted contract summaries, plain-English explanations, and risk flags as an <span className="font-semibold text-foreground">informational tool only</span>. HaulTrackerPro is not a law firm, does not provide legal advice, and using the AI contract review feature does not create an attorney-client relationship. AI analysis may miss risks, misinterpret clauses, omit important terms, or produce incomplete or inaccurate output. Drivers and other users should always read the full contract themselves and consider consulting a qualified attorney before signing any meaningful agreement.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">14. Driver Responsibility</h3>
+          <p className="text-muted-foreground">Drivers are solely responsible for reading the full contract document and for deciding whether to approve, request changes to, reject, or sign any contract presented through HaulTrackerPro. AI summaries and risk flags are not a substitute for reviewing the original document or for getting independent legal advice.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">15. Recruiter Responsibility</h3>
+          <p className="text-muted-foreground">Recruiters are solely responsible for ensuring that uploaded contract terms are accurate, complete, and not misleading, and for complying with all applicable laws, including trucking, employment, leasing, independent contractor, FMCSA-related, and state-specific requirements. Recruiters may not use the platform to pressure, deceive, coerce, or bypass driver review, approval, or signature steps.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">16. In-App Signature Record</h3>
+          <p className="text-muted-foreground">When a driver signs a contract in HaulTrackerPro, the platform creates a <span className="font-semibold text-foreground">platform-generated record of consent and approval</span>. That record may include the typed name, the consent confirmation, a timestamp, IP address, browser/user-agent information, the contract version ID, and related audit metadata. This in-app signature is <span className="font-semibold text-foreground">not</span> represented as a qualified electronic signature, an advanced electronic signature, a DocuSign-equivalent signature, a notarization, or a guaranteed court-admissible signature. The legal effect and enforceability of any signature record may depend on the facts, jurisdiction, contract type, and applicable law.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">17. Hired-Status Workflow Protection</h3>
+          <p className="text-muted-foreground">Where a contract has been attached to an opportunity application, recruiters may be restricted from marking a driver as "hired" until required contract approval and/or signature steps have been completed. This is a <span className="font-semibold text-foreground">platform workflow protection</span> intended to support transparency between drivers and recruiters; it is not a guarantee of legal protection or enforceability.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">18. Prohibited Uses</h3>
+          <p className="text-muted-foreground">In connection with Contract Protection, you may not:</p>
+          <ul className="list-disc list-inside text-muted-foreground space-y-1">
+            <li>Upload fraudulent, misleading, illegal, or unauthorized contracts</li>
+            <li>Upload contracts you have no right to share or process</li>
+            <li>Misrepresent contract terms to drivers</li>
+            <li>Attempt to bypass or circumvent driver approval, review, or signature requirements</li>
+            <li>Harass, pressure, retaliate against, or penalize a driver for rejecting a contract or requesting changes</li>
+            <li>Rely on AI analysis as a substitute for professional legal review</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">19. Contract Records, Audit Logs &amp; Retention</h3>
+          <p className="text-muted-foreground">Contract files, extracted text, AI parsing and risk-review output, driver decisions, signature records, and related audit logs may be retained while your account is active and for a reasonable period afterward for security, compliance, dispute resolution, backup, and legal-hold purposes, as further described in our Privacy Policy. Records may be retained or removed in accordance with our retention practices unless deletion is required or restricted by law.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">20. Limitation of Liability — Contract Protection</h3>
+          <p className="text-muted-foreground">In addition to the general limitation of liability above, HaulTrackerPro is not liable for missed contract risks, inaccurate or incomplete AI analysis, decisions made by drivers or recruiters, recruiter misrepresentations, unsigned or rejected agreements, lost opportunities, business losses, or disputes arising from contract terms. Contract Protection features are workflow and informational tools, not legal protection or legal services.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">21. Governing Law</h3>
           <p className="text-muted-foreground">These terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">13. Contact Information</h3>
+          <h3 className="text-base font-bold">22. Contact Information</h3>
           <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.com.</p>
         </section>
 

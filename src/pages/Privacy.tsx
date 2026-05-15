@@ -80,7 +80,50 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">8. Contact Information</h3>
+          <h3 className="text-base font-bold">8. Contract Protection — Data We Collect &amp; Process</h3>
+          <p className="text-muted-foreground">When recruiters and drivers use the in-app Contract Protection workflow, HaulTrackerPro may collect and process the following additional categories of data:</p>
+          <ul className="list-disc list-inside text-muted-foreground space-y-1">
+            <li>Contract files uploaded by recruiters (PDF or image)</li>
+            <li>Text extracted from those contract files</li>
+            <li>AI parsing output (structured fields and clauses identified by AI)</li>
+            <li>AI risk-review output (summaries, risk scores, risk flags, plain-English explanations)</li>
+            <li>Driver decisions on a contract version (approve, reject, request changes) and any notes the driver provides</li>
+            <li>Signature records, including typed name, consent confirmation, timestamp, IP address, browser/user-agent and device metadata, and the contract version ID</li>
+            <li>Audit logs and moderation records related to contract uploads, status changes, AI runs, decisions, and signatures</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">9. Contract Storage &amp; Access</h3>
+          <p className="text-muted-foreground">Uploaded contract files are intended to be private and are not publicly listed. Access is limited to the assigned driver, the uploading recruiter, and HaulTrackerPro administrators or moderators where access is needed for support, moderation, security, abuse prevention, troubleshooting, or dispute review. Where private storage and short-lived access links are used, those mechanisms are designed to prevent unauthenticated public access to contract files.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">10. AI Processing of Contracts</h3>
+          <p className="text-muted-foreground">To generate contract summaries, risk flags, and plain-English explanations, contract text or extracted content may be sent to third-party AI providers or AI processing services through HaulTrackerPro's AI processing layer. Those providers process the content in order to return the requested output. AI contract analysis is informational only, is not legal advice, and may be incomplete or inaccurate. Drivers should always read the full contract themselves and consider consulting a qualified attorney before signing.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">11. Admin &amp; Moderator Access to Contract Records</h3>
+          <p className="text-muted-foreground">HaulTrackerPro administrators and moderators may access contract files, extracted text, AI output, driver decisions, signature records, and audit logs only for moderation, support, security, abuse prevention, troubleshooting, or dispute review. Admin access is logged and is not used to share contract content publicly or with unrelated third parties.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">12. Contract Data Retention</h3>
+          <p className="text-muted-foreground">Contract records, signature records, and audit logs may be retained while your account is active and for a reasonable period afterward to support account functionality, security, dispute resolution, regulatory compliance, backups, and legal-hold obligations. Users may request deletion of contract-related personal data subject to legal, security, backup, dispute, and retention limitations described in this policy.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">13. User Controls for Contract Data</h3>
+          <ul className="list-disc list-inside text-muted-foreground space-y-1">
+            <li>Drivers may request deletion of certain personal data, including contract-related personal data, where legally available</li>
+            <li>Recruiters may manage their uploaded contract records in accordance with platform rules and admin moderation</li>
+            <li>Deletion requests may not immediately remove copies stored in backups, audit logs, or records subject to legal hold</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">14. Contact Information</h3>
           <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.com.</p>
         </section>
 

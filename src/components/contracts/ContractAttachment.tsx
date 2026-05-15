@@ -351,6 +351,14 @@ export function ContractAttachment({ applicationId, role }: Props) {
               AI Risk Summary
             </span>
           </div>
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">
+            <p className="text-[11px] leading-relaxed text-amber-200/90">
+              AI contract review is for informational purposes only. It is not legal advice, does
+              not create an attorney-client relationship, and may miss or misunderstand contract
+              terms. Always read the full contract and consider speaking with a qualified attorney
+              before signing.
+            </p>
+          </div>
           {aiReview.ai_summary && (
             <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">
               {aiReview.ai_summary}
@@ -373,10 +381,6 @@ export function ContractAttachment({ applicationId, role }: Props) {
               Note: Contract was long; only the first portion was analyzed.
             </p>
           )}
-          <p className="text-[10px] text-muted-foreground italic">
-            AI review is educational only and not legal advice. Consider asking a qualified
-            professional to review this contract before signing.
-          </p>
         </div>
       )}
       {role === 'driver' && !hasContract && !isLoading && (
@@ -450,6 +454,10 @@ export function ContractAttachment({ applicationId, role }: Props) {
               </div>
               {showChangesBox && (
                 <div className="space-y-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    Use this if you want the recruiter to revise terms before you approve or sign.
+                    Include a clear reason so both sides have a record.
+                  </p>
                   <Textarea
                     value={changesNote}
                     onChange={(e) => setChangesNote(e.target.value.slice(0, 4000))}
@@ -543,7 +551,11 @@ export function ContractAttachment({ applicationId, role }: Props) {
                   className="mt-0.5"
                 />
                 <span>
-                  I understand this is a digital signature confirming I reviewed and approved this contract.
+                  By signing, I confirm I reviewed this contract version and want to record my
+                  approval in HaulTrackerPro. This signature record may include my typed name,
+                  consent, timestamp, IP address, browser/device information, and contract
+                  version. This is a platform record of consent, not a notarization or a
+                  DocuSign-equivalent qualified electronic signature.
                 </span>
               </label>
               <div className="flex gap-2">
@@ -566,7 +578,8 @@ export function ContractAttachment({ applicationId, role }: Props) {
                 </Button>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                This is a simple in-app signature record, not legal advice.
+                In-app signature record only — not legal advice and not a qualified electronic
+                signature.
               </p>
             </div>
           )}
