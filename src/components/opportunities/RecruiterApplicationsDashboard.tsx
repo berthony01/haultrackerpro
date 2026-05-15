@@ -331,6 +331,16 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                   <div className="flex flex-wrap items-center gap-2">
                     {match && <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />}
                     <StatusBadge status={a.status} />
+                    {(() => {
+                      const info = readinessMap.get(a.id);
+                      if (!info) return null;
+                      return (
+                        <Badge variant="outline" className={`gap-1 ${info.badgeClass}`}>
+                          <FileText className="h-3 w-3" />
+                          {info.label}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
 
