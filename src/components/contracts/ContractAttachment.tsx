@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning, PenLine, Check, Lock } from 'lucide-react';
+import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning, PenLine, Check, Lock, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
+import { useSubscription } from '@/hooks/useSubscription';
 
 interface Props {
   applicationId: string;
