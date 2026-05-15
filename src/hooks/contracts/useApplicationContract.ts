@@ -236,6 +236,32 @@ export function useApplicationContract(applicationId?: string | null) {
     },
   });
 
+  /**
+   * Phase 8: simple in-app driver signature. Server enforces:
+   *  - assigned driver only (recruiter/admin cannot sign for driver)
+   *  - current uploaded version, contract.status='approved', driver pre-approved version
+   *  - one signature per (contract, version, signer, role)
+   */
+  const signContract = useMutation({
+    mutationFn: async (input: { typed_name: string; consent: boolean }) => {
+      const c = query.data;
+      if (!c?.current_version) throw new Error('No contract version to sign');
+      const { data, error } = await supabase.functions.invoke('sign-contract', {
+        body: {
+          version_id: c.current_version.id,
+          typed_name: input.typed_name,
+          consent: input.consent,
+        },
+      });
+      if (error) throw new Error(error.message || 'Could not sign contract');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { ok: true; signature_id: string; status: 'signed'; signed_at: string };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['application-contract'] });
+    },
+  });
+
   return {
     contractWithVersion: query.data ?? null,
     isLoading: query.isLoading,
@@ -246,5 +272,6 @@ export function useApplicationContract(applicationId?: string | null) {
     parseContract,
     analyzeContract,
     reviewContract,
+    signContract,
   };
 }
