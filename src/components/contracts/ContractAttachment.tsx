@@ -188,6 +188,8 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const [signConsent, setSignConsent] = useState(false);
   const { contractWithVersion, isLoading, uploadContract, getSignedViewUrl, parseContract, analyzeContract, reviewContract, signContract } =
     useApplicationContract(applicationId);
+  const navigate = useNavigate();
+  const { isPro, isLoading: isSubLoading } = useSubscription();
 
   const handlePick = () => inputRef.current?.click();
 
