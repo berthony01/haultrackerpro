@@ -33,7 +33,8 @@ const DECISION_TO_AUDIT: Record<Decision, "approved" | "rejected" | "changes_req
 };
 
 // Statuses from which a driver decision is permitted.
-const DECIDABLE_FROM = new Set(["ai_reviewed", "driver_reviewing", "changes_requested", "parsed", "uploaded"]);
+// Phase 5 hardening: AI review is required before a decision.
+const DECIDABLE_FROM = new Set(["ai_reviewed", "driver_reviewing", "changes_requested"]);
 // Statuses we must never overwrite.
 const TERMINAL_OR_LATER = new Set(["approved", "rejected", "signed", "expired", "archived"]);
 
