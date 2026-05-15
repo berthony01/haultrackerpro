@@ -609,7 +609,8 @@ export function ContractAttachment({ applicationId, role }: Props) {
                   <Textarea
                     value={changesNote}
                     onChange={(e) => setChangesNote(e.target.value.slice(0, 4000))}
-                    placeholder="Describe what needs to change (required)…"
+                    placeholder="Example: Please clarify escrow refund terms, chargebacks, or maintenance responsibility before I approve."
+                    aria-label="Describe the changes you need (required)"
                     rows={3}
                     className="text-xs"
                   />
