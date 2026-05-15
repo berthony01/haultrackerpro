@@ -1,4 +1,4 @@
-import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, LucideIcon } from 'lucide-react';
+import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, FileText, LucideIcon } from 'lucide-react';
 
 export interface AdminNavItem {
   value: string;
