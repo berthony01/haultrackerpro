@@ -47,10 +47,15 @@ export default function Features() {
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 space-y-14">
         {featureList.map((cat) => (
           <div key={cat.category}>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight mb-6" style={{ color: 'hsl(0, 0%, 100%)' }}>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
               {cat.category}
             </h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cat.category === 'Contract Protection' && (
+              <p className="text-xs mb-5 max-w-3xl" style={{ color: 'hsl(220, 10%, 50%)' }}>
+                Review recruiter-sent contracts before you approve an opportunity, sign, or get marked hired. AI contract review is informational only and does not replace reading the full agreement or speaking with a qualified attorney.
+              </p>
+            )}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
               {cat.features.map((f) => (
                 <div key={f.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                   <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
