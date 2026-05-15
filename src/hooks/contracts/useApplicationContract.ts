@@ -13,6 +13,7 @@ export interface ContractWithVersion {
   contract: Contract;
   current_version: ContractVersion | null;
   ai_review: ContractReview | null;
+  driver_review: ContractReview | null;
   clauses: ContractClause[];
 }
 
@@ -42,6 +43,7 @@ export function useApplicationContract(applicationId?: string | null) {
       if (!contract) return null;
       let currentVersion: ContractVersion | null = null;
       let aiReview: ContractReview | null = null;
+      let driverReview: ContractReview | null = null;
       let clauses: ContractClause[] = [];
       if (contract.current_version_id) {
         const { data: v } = await supabase
@@ -52,7 +54,7 @@ export function useApplicationContract(applicationId?: string | null) {
           .maybeSingle();
         currentVersion = v ?? null;
         if (currentVersion) {
-          const [{ data: rev }, { data: cls }] = await Promise.all([
+          const [{ data: rev }, { data: drv }, { data: cls }] = await Promise.all([
             supabase
               .from('contract_reviews')
               .select('*')
@@ -63,16 +65,26 @@ export function useApplicationContract(applicationId?: string | null) {
               .limit(1)
               .maybeSingle(),
             supabase
+              .from('contract_reviews')
+              .select('*')
+              .eq('contract_id', contract.id)
+              .eq('version_id', currentVersion.id)
+              .eq('reviewer_role', 'driver')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            supabase
               .from('contract_clauses')
               .select('*')
               .eq('version_id', currentVersion.id)
               .order('severity', { ascending: false }),
           ]);
           aiReview = rev ?? null;
+          driverReview = drv ?? null;
           clauses = cls ?? [];
         }
       }
-      return { contract, current_version: currentVersion, ai_review: aiReview, clauses };
+      return { contract, current_version: currentVersion, ai_review: aiReview, driver_review: driverReview, clauses };
     },
   });
 
@@ -188,6 +200,29 @@ export function useApplicationContract(applicationId?: string | null) {
     },
   });
 
+  /**
+   * Driver decision (Phase 5). Server enforces:
+   *  - only assigned driver (or admin) may submit
+   *  - only on current uploaded version
+   *  - request_changes requires a note
+   *  - forward-only contract status (no regression from terminal states)
+   */
+  const reviewContract = useMutation({
+    mutationFn: async (input: { decision: 'approve_contract' | 'reject_contract' | 'request_changes'; note?: string }) => {
+      const c = query.data;
+      if (!c?.current_version) throw new Error('No contract version to review');
+      const { data, error } = await supabase.functions.invoke('review-contract', {
+        body: { version_id: c.current_version.id, decision: input.decision, note: input.note ?? '' },
+      });
+      if (error) throw new Error(error.message || 'Could not submit decision');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { ok: true; review_id: string; decision: 'approved' | 'rejected' | 'changes_requested' };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['application-contract'] });
+    },
+  });
+
   return {
     contractWithVersion: query.data ?? null,
     isLoading: query.isLoading,
@@ -197,5 +232,6 @@ export function useApplicationContract(applicationId?: string | null) {
     getSignedViewUrl,
     parseContract,
     analyzeContract,
+    reviewContract,
   };
 }
