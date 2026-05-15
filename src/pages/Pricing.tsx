@@ -350,7 +350,7 @@ export default function Pricing() {
             Full Feature <span style={{ color: 'hsl(25, 95%, 53%)' }}>Comparison</span>
           </h2>
           <p className="text-xs text-center mb-10 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 50%)' }}>
-            Contract Protection (view, AI risk flags, decisions, and signature record) is available on every driver plan. Advanced contract history and deeper review tools may be added to Pro in a future update.
+            Contract Protection (view, AI risk flags, decisions, and signature record) is available on every driver plan. Driver Pro adds the Plain-English Clause Rewrite tool. Additional tools like contract history, downloadable records, version comparison, and AI follow-ups are planned future Pro additions.
           </p>
           <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'hsl(220, 16%, 16%)' }}>
             {/* Header */}
