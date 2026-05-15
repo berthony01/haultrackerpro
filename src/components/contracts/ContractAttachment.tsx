@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning, PenLine } from 'lucide-react';
+import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, ThumbsUp, ThumbsDown, MessageSquareWarning, PenLine, Check, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 
@@ -78,6 +78,102 @@ const TIER_STYLES: Record<string, { label: string; cls: string; Icon: typeof Shi
   high: { label: 'High risk', cls: 'bg-red-500/15 text-red-400 border-red-500/30', Icon: ShieldAlert },
   severe: { label: 'Severe risk', cls: 'bg-red-600/20 text-red-300 border-red-600/40', Icon: ShieldAlert },
 };
+
+type StepState = 'active' | 'complete' | 'locked' | 'idle';
+
+function DriverStepIndicator({
+  reviewState,
+  decideState,
+  signState,
+  signApplicable,
+}: {
+  reviewState: StepState;
+  decideState: StepState;
+  signState: StepState;
+  signApplicable: boolean;
+}) {
+  const steps: { key: string; label: string; state: StepState }[] = [
+    { key: 'review', label: 'Review', state: reviewState },
+    { key: 'decide', label: 'Decide', state: decideState },
+  ];
+  if (signApplicable) steps.push({ key: 'sign', label: 'Sign', state: signState });
+
+  return (
+    <ol
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]"
+      aria-label="Contract review progress"
+    >
+      {steps.map((s, i) => {
+        const isComplete = s.state === 'complete';
+        const isActive = s.state === 'active';
+        const isLocked = s.state === 'locked';
+        const dot =
+          isComplete
+            ? 'bg-green-500/20 text-green-400 border-green-500/40'
+            : isActive
+              ? 'bg-primary/20 text-primary border-primary/40'
+              : isLocked
+                ? 'bg-muted text-muted-foreground border-border'
+                : 'bg-muted text-muted-foreground border-border';
+        const label =
+          isComplete
+            ? 'text-foreground/90'
+            : isActive
+              ? 'text-foreground font-semibold'
+              : 'text-muted-foreground';
+        const ariaCurrent = isActive ? ('step' as const) : undefined;
+        return (
+          <li key={s.key} className="flex items-center gap-2" aria-current={ariaCurrent}>
+            <span
+              className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${dot}`}
+              aria-hidden="true"
+            >
+              {isComplete ? (
+                <Check className="h-3 w-3" />
+              ) : isLocked ? (
+                <Lock className="h-2.5 w-2.5" />
+              ) : (
+                <span className="text-[10px] font-bold">{i + 1}</span>
+              )}
+            </span>
+            <span className={label}>
+              {s.label}
+              {isComplete && <span className="sr-only"> — completed</span>}
+              {isActive && <span className="sr-only"> — current step</span>}
+              {isLocked && <span className="sr-only"> — locked</span>}
+            </span>
+            {i < steps.length - 1 && (
+              <span className="mx-1 h-px w-4 bg-border" aria-hidden="true" />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ParsingSkeleton({ label }: { label: string }) {
+  return (
+    <div
+      className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-2"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+        <span className="text-xs font-semibold text-foreground/90">{label}</span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Looking for terms that may need attention…
+      </p>
+      <div className="space-y-1.5">
+        <div className="h-2 w-full rounded bg-muted animate-pulse" />
+        <div className="h-2 w-5/6 rounded bg-muted animate-pulse" />
+        <div className="h-2 w-2/3 rounded bg-muted animate-pulse" />
+      </div>
+    </div>
+  );
+}
 
 export function ContractAttachment({ applicationId, role }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -232,8 +328,54 @@ export function ContractAttachment({ applicationId, role }: Props) {
     changes_requested: { label: 'Changes requested', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30', Icon: MessageSquareWarning },
   };
 
+  // Driver step indicator state derivation (purely visual; no workflow change).
+  const signApplicable = role === 'driver' && hasContract;
+  const reviewState: StepState = !hasContract
+    ? 'idle'
+    : decision || isSigned
+      ? 'complete'
+      : 'active';
+  const decideState: StepState = !hasContract
+    ? 'idle'
+    : decision === 'approved' || isSigned
+      ? 'complete'
+      : decision === 'rejected'
+        ? 'complete'
+        : canDriverDecide
+          ? 'active'
+          : 'locked';
+  const signState: StepState = !signApplicable
+    ? 'idle'
+    : isSigned
+      ? 'complete'
+      : decision === 'rejected'
+        ? 'locked'
+        : canDriverSign
+          ? 'active'
+          : 'locked';
+
+  const isAnalyzing = analyzeContract.isPending;
+  const isParsing = parseContract.isPending || parseStatus === 'parsing';
+
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+      {role === 'driver' && hasContract && (
+        <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+          <DriverStepIndicator
+            reviewState={reviewState}
+            decideState={decideState}
+            signState={signState}
+            signApplicable={signApplicable}
+          />
+        </div>
+      )}
+      {role === 'recruiter' && (
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Upload an accurate, authorized contract. The driver sees an AI-assisted summary, risk
+          flags, and must approve and (when required) sign before this candidate can be moved to
+          hired status. AI review is informational and is shown to the driver, not legal advice.
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -342,6 +484,12 @@ export function ContractAttachment({ applicationId, role }: Props) {
         <p className="text-[11px] text-red-400 break-words">
           {parseError}
         </p>
+      )}
+      {hasContract && !aiReview && isParsing && (
+        <ParsingSkeleton label="Preparing contract for AI review…" />
+      )}
+      {hasContract && !aiReview && !isParsing && isAnalyzing && (
+        <ParsingSkeleton label="Analyzing contract details…" />
       )}
       {aiReview && (
         <div className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-2">
@@ -461,7 +609,8 @@ export function ContractAttachment({ applicationId, role }: Props) {
                   <Textarea
                     value={changesNote}
                     onChange={(e) => setChangesNote(e.target.value.slice(0, 4000))}
-                    placeholder="Describe what needs to change (required)…"
+                    placeholder="Example: Please clarify escrow refund terms, chargebacks, or maintenance responsibility before I approve."
+                    aria-label="Describe the changes you need (required)"
                     rows={3}
                     className="text-xs"
                   />
@@ -513,7 +662,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
           <div className="flex items-center gap-2">
             <PenLine className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Signature
+              Record Your Approval
             </span>
           </div>
           {isSigned ? (
@@ -530,7 +679,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
           ) : !showSignBox ? (
             <div className="space-y-2">
               <p className="text-[11px] text-muted-foreground">
-                You approved this contract. Add your typed signature to finalize.
+                You approved this contract. Type your full legal name to record your approval. This is an in-app record of consent — not a notarization or DocuSign-equivalent qualified electronic signature.
               </p>
               <Button variant="default" size="sm" onClick={() => setShowSignBox(true)}>
                 <PenLine className="h-4 w-4" /> Sign Contract
