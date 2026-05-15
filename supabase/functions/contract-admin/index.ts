@@ -112,9 +112,10 @@ Deno.serve(async (req) => {
       const recruiterIds = Array.from(new Set(list.map((c) => c.recruiter_id).filter(Boolean)));
       const driverIds = Array.from(new Set(list.map((c) => c.driver_user_id).filter(Boolean)));
       const oppIds = Array.from(new Set(list.map((c) => c.opportunity_id).filter(Boolean)));
+      const appIds = Array.from(new Set(list.map((c) => c.application_id).filter(Boolean)));
       const contractIds = list.map((c) => c.id);
 
-      const [versionsRes, recruitersRes, driversRes, oppsRes, aiReviewsRes, driverReviewsRes] =
+      const [versionsRes, recruitersRes, driversRes, oppsRes, appsRes, aiReviewsRes, driverReviewsRes] =
         await Promise.all([
           versionIds.length
             ? adminDb
@@ -125,17 +126,23 @@ Deno.serve(async (req) => {
           recruiterIds.length
             ? adminDb
                 .from("recruiter_profiles")
-                .select("id, company_name, contact_email, contact_name, status, verification_status")
+                .select("id, company_name, recruiter_email, recruiter_name, status, verification_status")
                 .in("id", recruiterIds)
             : Promise.resolve({ data: [], error: null }),
           driverIds.length
             ? adminDb
                 .from("profiles")
-                .select("id, email, display_name")
-                .in("id", driverIds)
+                .select("user_id, display_name, driver_handle")
+                .in("user_id", driverIds)
             : Promise.resolve({ data: [], error: null }),
           oppIds.length
             ? adminDb.from("opportunities").select("id, title, company_name").in("id", oppIds)
+            : Promise.resolve({ data: [], error: null }),
+          appIds.length
+            ? adminDb
+                .from("opportunity_applications")
+                .select("id, driver_email_snapshot")
+                .in("id", appIds)
             : Promise.resolve({ data: [], error: null }),
           contractIds.length
             ? adminDb
