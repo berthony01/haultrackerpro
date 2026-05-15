@@ -103,6 +103,10 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
   const [opportunityFilter, setOpportunityFilter] = useState<string>(ANY);
   const [search, setSearch] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [warnHire, setWarnHire] = useState<{ id: string; status: RecruiterApplicationStatus } | null>(null);
+
+  const appIds = useMemo(() => recruiterApplications.map((a: any) => a.id), [recruiterApplications]);
+  const { readinessMap } = useContractReadinessMap(appIds);
 
   const opportunityOptions = useMemo(() => {
     const map = new Map<string, string>();
