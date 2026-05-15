@@ -167,6 +167,27 @@ export function useApplicationContract(applicationId?: string | null) {
     },
   });
 
+  /**
+   * Trigger server-side AI risk review for the current parsed version. The
+   * edge function enforces auth and writes to AI-only fields via service role.
+   * Idempotent — returns existing review unless force=true (admin only).
+   */
+  const analyzeContract = useMutation({
+    mutationFn: async (opts?: { force?: boolean }) => {
+      const c = query.data;
+      if (!c?.current_version) throw new Error('No contract version to analyze');
+      const { data, error } = await supabase.functions.invoke('analyze-contract', {
+        body: { version_id: c.current_version.id, force: !!opts?.force },
+      });
+      if (error) throw new Error(error.message || 'AI review failed');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as any;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['application-contract'] });
+    },
+  });
+
   return {
     contractWithVersion: query.data ?? null,
     isLoading: query.isLoading,
@@ -175,5 +196,6 @@ export function useApplicationContract(applicationId?: string | null) {
     uploadContract,
     getSignedViewUrl,
     parseContract,
+    analyzeContract,
   };
 }
