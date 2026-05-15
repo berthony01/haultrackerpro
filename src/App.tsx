@@ -199,6 +199,12 @@ const App = () => (
               <Route path="/trucking-load-profit-calculator" element={<TruckingLoadProfitCalculator />} />
               <Route path="/tools/load-profit-calculator" element={<ToolsLoadProfitCalculator />} />
               <Route path="/tools/fuel-cost-per-mile" element={<ToolsFuelCostPerMile />} />
+              <Route path="/trucking-contract-review" element={<TruckingContractReview />} />
+              <Route path="/owner-operator-contract-review" element={<OwnerOperatorContractReview />} />
+              <Route path="/lease-purchase-contract-red-flags" element={<LeasePurchaseContractRedFlags />} />
+              <Route path="/trucking-escrow-agreement-review" element={<TruckingEscrowAgreementReview />} />
+              <Route path="/1099-truck-driver-contract-protection" element={<TenNinetyNineTruckDriverContractProtection />} />
+              <Route path="/ai-contract-review-for-truckers" element={<AiContractReviewForTruckers />} />
               <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
               <Route path="/parking" element={<ProtectedRoute><Parking /></ProtectedRoute>} />
               <Route path="/starter-kit" element={<StarterKit />} />
