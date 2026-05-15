@@ -316,7 +316,20 @@ serve(async (req) => {
       })
       .select("id")
       .single();
-    if (rvErr) console.error("[analyze-contract] review insert error", rvErr);
+    if (rvErr || !reviewRow) {
+      console.error("[analyze-contract] review insert error", rvErr);
+      // Best-effort: clear clauses we just inserted so UI doesn't show partial state
+      await admin.from("contract_clauses").delete().eq("version_id", version_id);
+      await admin.from("contract_audit_log").insert({
+        contract_id: version.contract_id,
+        version_id,
+        actor_user_id: userId,
+        actor_role: actorRole,
+        action: "ai_review_failed",
+        metadata: { reason: rvErr?.message || "review insert failed" },
+      });
+      return json({ error: rvErr?.message || "Could not save AI review" }, 500);
+    }
 
     // Update contract risk fields; only advance status from 'parsed' → 'ai_reviewed'.
     await admin
