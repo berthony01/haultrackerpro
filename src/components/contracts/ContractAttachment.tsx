@@ -174,6 +174,8 @@ function ParsingSkeleton({ label }: { label: string }) {
     </div>
   );
 }
+
+export function ContractAttachment({ applicationId, role }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [showChangesBox, setShowChangesBox] = useState(false);
