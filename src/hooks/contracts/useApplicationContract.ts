@@ -46,6 +46,7 @@ export function useApplicationContract(applicationId?: string | null) {
       let currentVersion: ContractVersion | null = null;
       let aiReview: ContractReview | null = null;
       let driverReview: ContractReview | null = null;
+      let driverSignature: ContractSignature | null = null;
       let clauses: ContractClause[] = [];
       if (contract.current_version_id) {
         const { data: v } = await supabase
@@ -56,7 +57,7 @@ export function useApplicationContract(applicationId?: string | null) {
           .maybeSingle();
         currentVersion = v ?? null;
         if (currentVersion) {
-          const [{ data: rev }, { data: drv }, { data: cls }] = await Promise.all([
+          const [{ data: rev }, { data: drv }, { data: cls }, { data: sig }] = await Promise.all([
             supabase
               .from('contract_reviews')
               .select('*')
@@ -80,13 +81,23 @@ export function useApplicationContract(applicationId?: string | null) {
               .select('*')
               .eq('version_id', currentVersion.id)
               .order('severity', { ascending: false }),
+            supabase
+              .from('contract_signatures')
+              .select('*')
+              .eq('contract_id', contract.id)
+              .eq('version_id', currentVersion.id)
+              .eq('signer_role', 'driver')
+              .order('signed_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
           ]);
           aiReview = rev ?? null;
           driverReview = drv ?? null;
           clauses = cls ?? [];
+          driverSignature = sig ?? null;
         }
       }
-      return { contract, current_version: currentVersion, ai_review: aiReview, driver_review: driverReview, clauses };
+      return { contract, current_version: currentVersion, ai_review: aiReview, driver_review: driverReview, driver_signature: driverSignature, clauses };
     },
   });
 
