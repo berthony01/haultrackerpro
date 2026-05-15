@@ -72,29 +72,41 @@ serve(async (req) => {
     const c = (version as any).contracts;
     if (!c) return json({ error: "Contract not found" }, 404);
 
-    // Authorization: driver, recruiter (owner), or admin
+    // Authorization: only owning recruiter or admin may trigger parsing.
+    // Drivers can VIEW the contract but cannot start parse jobs (Phase 3 hardening).
     const { data: adminRow } = await admin
       .from("admin_users")
       .select("user_id")
       .eq("user_id", userId)
       .maybeSingle();
     const isAdmin = !!adminRow;
-    const isDriver = c.driver_user_id === userId;
     const isRecruiter = c.recruiter_user_id === userId;
-    if (!isAdmin && !isDriver && !isRecruiter) {
+    if (!isAdmin && !isRecruiter) {
       return json({ error: "Forbidden" }, 403);
     }
+    const actorRole: "admin" | "recruiter" = isAdmin ? "admin" : "recruiter";
 
     if (version.upload_status !== "uploaded") {
       return json({ error: "Version is not uploaded yet" }, 409);
     }
 
-    // Idempotency: already parsed
+    // Idempotency: already parsed → no duplicate audit
     if (version.parse_status === "parsed") {
       return json({ ok: true, already: true, parse_status: "parsed" });
     }
 
-    // Mark parsing
+    // Race protection: another parse already in flight
+    if (version.parse_status === "parsing") {
+      return json({ ok: true, already: true, parse_status: "parsing", message: "Already parsing" }, 200);
+    }
+
+    // Forward-only contract status guard. Only move uploaded → parsing.
+    // Never regress from later states (ai_reviewed, driver_reviewing,
+    // changes_requested, rejected, approved, signed, expired, archived).
+    const PRE_PARSE_STATUSES = new Set(["uploaded"]);
+    const canAdvanceToParsing = PRE_PARSE_STATUSES.has(c.status);
+
+    // Mark version parsing
     await admin
       .from("contract_versions")
       .update({ parse_status: "parsing", parse_error: null })
@@ -104,19 +116,23 @@ serve(async (req) => {
       contract_id: version.contract_id,
       version_id,
       actor_user_id: userId,
-      actor_role: null,
+      actor_role: actorRole,
       action: "parse_started",
       metadata: {
         mime_type: version.mime_type,
-        triggered_by: isAdmin ? "admin" : isDriver ? "driver" : "recruiter",
+        triggered_by: actorRole,
+        contract_status_before: c.status,
+        advanced_contract_status: canAdvanceToParsing,
       },
     });
 
-    // Best-effort move contract status forward to 'parsing'
-    await admin
-      .from("contracts")
-      .update({ status: "parsing" })
-      .eq("id", version.contract_id);
+    if (canAdvanceToParsing) {
+      await admin
+        .from("contracts")
+        .update({ status: "parsing" })
+        .eq("id", version.contract_id);
+    }
+
 
     // Download file
     const bucket = version.storage_bucket || BUCKET_DEFAULT;
