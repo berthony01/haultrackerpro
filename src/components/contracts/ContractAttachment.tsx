@@ -226,7 +226,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
                 ) : (
                   <Sparkles className="h-4 w-4" />
                 )}
-                {aiReview ? 'Refresh AI Review' : 'Run AI Risk Review'}
+                Run AI Risk Review
               </Button>
             )}
             <input
