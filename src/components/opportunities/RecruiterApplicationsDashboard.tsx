@@ -150,7 +150,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
       { id, status },
       {
         onSuccess: () => toast.success(`Marked ${status}`),
-        onError: (e: Error) => toast.error(e.message || 'Update failed'),
+        onError: (e: Error) => toast.error(formatHireError(e, status)),
         onSettled: () => setPendingId(null),
       }
     );
@@ -165,7 +165,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
       { id, status },
       {
         onSuccess: () => toast.success(`Marked ${status}`),
-        onError: (e: Error) => toast.error(e.message || 'Update failed'),
+        onError: (e: Error) => toast.error(formatHireError(e, status)),
         onSettled: () => setPendingId(null),
       }
     );
