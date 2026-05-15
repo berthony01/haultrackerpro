@@ -34,7 +34,7 @@ interface ContractRow {
     file_name: string;
     page_count: number | null;
   } | null;
-  ai_review: { id: string; summary: string | null; top_flags: any[]; created_at: string } | null;
+  ai_review: { id: string; summary: string | null; risk_tier: RiskTier; risk_score: number | null; top_flags: any[]; created_at: string } | null;
   driver_review: { id: string; decision: string; note: string | null; created_at: string } | null;
 }
 
@@ -47,6 +47,15 @@ interface ContractDetail {
   recruiter: any;
   driver: any;
   opportunity: any;
+  current_ai_review: {
+    id: string;
+    version_id: string;
+    summary: string | null;
+    risk_tier: RiskTier;
+    risk_score: number | null;
+    top_flags: any[];
+    created_at: string;
+  } | null;
 }
 
 const FILTERS: Array<{ value: string; label: string }> = [
@@ -274,12 +283,12 @@ export function AdminContractsPanel() {
                 <TableCell className="text-xs truncate max-w-[200px]">{r.opportunity?.title || "—"}</TableCell>
                 <TableCell><Badge variant={statusBadgeVariant(r.status)} className="text-xs whitespace-nowrap">{r.status}</Badge></TableCell>
                 <TableCell>
-                  {r.risk_tier ? (
-                    <Badge variant={tierBadgeVariant(r.risk_tier)} className="text-xs whitespace-nowrap">
-                      {r.risk_tier} {r.risk_score != null ? `· ${Number(r.risk_score).toFixed(0)}` : ""}
+                  {r.ai_review && r.ai_review.risk_tier ? (
+                    <Badge variant={tierBadgeVariant(r.ai_review.risk_tier)} className="text-xs whitespace-nowrap">
+                      {r.ai_review.risk_tier} {r.ai_review.risk_score != null ? `· ${Number(r.ai_review.risk_score).toFixed(0)}` : ""}
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-xs">no AI</Badge>
+                    <Badge variant="outline" className="text-xs whitespace-nowrap">No AI review</Badge>
                   )}
                 </TableCell>
                 <TableCell className="text-xs">
@@ -315,13 +324,13 @@ export function AdminContractsPanel() {
                 <div>{detail.opportunity?.title || "—"}</div>
                 <div className="text-muted-foreground">Status</div>
                 <div><Badge variant={statusBadgeVariant(detail.contract.status)} className="text-xs">{detail.contract.status}</Badge></div>
-                <div className="text-muted-foreground">Risk</div>
+                <div className="text-muted-foreground">Risk (current version)</div>
                 <div>
-                  {detail.contract.risk_tier ? (
-                    <Badge variant={tierBadgeVariant(detail.contract.risk_tier)} className="text-xs">
-                      {detail.contract.risk_tier} · score {detail.contract.risk_score != null ? Number(detail.contract.risk_score).toFixed(0) : "—"}
+                  {detail.current_ai_review && detail.current_ai_review.risk_tier ? (
+                    <Badge variant={tierBadgeVariant(detail.current_ai_review.risk_tier)} className="text-xs">
+                      {detail.current_ai_review.risk_tier} · score {detail.current_ai_review.risk_score != null ? Number(detail.current_ai_review.risk_score).toFixed(0) : "—"}
                     </Badge>
-                  ) : <span className="text-muted-foreground">no AI review on current version</span>}
+                  ) : <span className="text-muted-foreground">No AI review on current version</span>}
                 </div>
                 <div className="text-muted-foreground">Created</div>
                 <div>{fmtDate(detail.contract.created_at)}</div>
@@ -358,22 +367,21 @@ export function AdminContractsPanel() {
                 </div>
               </section>
 
-              {/* AI review */}
+              {/* AI review — current version only */}
               <section>
                 <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">AI review (current version)</h4>
                 {(() => {
-                  const ai = detail.reviews.find((r: any) => r.reviewer_role === "ai" && r.version_id === detail.contract.current_version_id);
+                  const ai = detail.current_ai_review;
                   if (!ai) return <p className="text-xs text-muted-foreground">No AI review on current version.</p>;
-                  const findings = (ai.ai_findings as any) || {};
                   return (
                     <div className="space-y-2 text-xs">
-                      {ai.ai_summary && <p className="rounded bg-muted/40 p-2">{ai.ai_summary}</p>}
-                      {Array.isArray(findings.top_flags) && findings.top_flags.length > 0 && (
+                      {ai.summary && <p className="rounded bg-muted/40 p-2">{ai.summary}</p>}
+                      {Array.isArray(ai.top_flags) && ai.top_flags.length > 0 && (
                         <ul className="space-y-1">
-                          {findings.top_flags.map((f: any, i: number) => (
+                          {ai.top_flags.slice(0, 10).map((f: any, i: number) => (
                             <li key={i} className="flex gap-2">
                               <Badge variant={tierBadgeVariant((f.severity || "medium") as RiskTier)} className="text-[10px]">{f.severity || "info"}</Badge>
-                              <span>{f.title || f.text || JSON.stringify(f)}</span>
+                              <span>{typeof f === "string" ? f : (f.title || f.text || f.summary || JSON.stringify(f))}</span>
                             </li>
                           ))}
                         </ul>

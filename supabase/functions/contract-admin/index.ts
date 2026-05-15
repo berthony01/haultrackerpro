@@ -41,13 +41,9 @@ Deno.serve(async (req) => {
 
     const adminDb = createClient(supabaseUrl, serviceRoleKey);
 
-    // Admin check
-    const { data: adminRow } = await adminDb
-      .from("admin_users")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (!adminRow) return json({ error: "Forbidden" }, 403);
+    // Admin check via trusted SECURITY DEFINER helper used elsewhere in app
+    const { data: isAdminData, error: isAdminErr } = await adminDb.rpc("is_admin", { _user_id: userId });
+    if (isAdminErr || isAdminData !== true) return json({ error: "Forbidden" }, 403);
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action") || "";
@@ -73,15 +69,12 @@ Deno.serve(async (req) => {
       let q = adminDb
         .from("contracts")
         .select(
-          "id, status, risk_score, risk_tier, title, application_id, opportunity_id, recruiter_id, recruiter_user_id, driver_user_id, current_version_id, created_at, updated_at, metadata",
+          "id, status, title, application_id, opportunity_id, recruiter_id, recruiter_user_id, driver_user_id, current_version_id, created_at, updated_at, metadata",
           { count: "exact" },
         )
         .order("updated_at", { ascending: false });
 
       switch (filter) {
-        case "high_risk":
-          q = q.in("risk_tier", ["high", "severe"]);
-          break;
         case "rejected":
           q = q.eq("status", "rejected");
           break;
@@ -91,11 +84,10 @@ Deno.serve(async (req) => {
         case "approved":
           q = q.eq("status", "approved");
           break;
+        case "high_risk":
         case "missing_ai_review":
-          q = q.is("risk_tier", null);
-          break;
         case "failed_parse":
-          // We need a join; fall through and post-filter after fetching versions.
+          // Post-filtered after joining current-version AI review / version data.
           break;
       }
       if (recruiterId) q = q.eq("recruiter_id", recruiterId);
@@ -199,6 +191,14 @@ Deno.serve(async (req) => {
         const ai = c.current_version_id ? aiByCv.get(`${c.id}:${c.current_version_id}`) : null;
         const drv = c.current_version_id ? drvByCv.get(`${c.id}:${c.current_version_id}`) : null;
         const findings = (ai?.ai_findings as any) || {};
+        // Risk MUST come from the current version's AI review only — never stale contracts.risk_*
+        const aiRiskTier = ai && typeof findings.risk_tier === "string" ? findings.risk_tier : null;
+        const aiRiskScore = ai && findings.risk_score != null ? Number(findings.risk_score) : null;
+        const topFlagsRaw = Array.isArray(findings.top_red_flags)
+          ? findings.top_red_flags
+          : Array.isArray(findings.top_flags)
+            ? findings.top_flags
+            : [];
         const driverBase = driverMap.get(c.driver_user_id) || null;
         const driver = driverBase
           ? { ...driverBase, email: appEmailMap.get(c.application_id) || null }
@@ -206,8 +206,9 @@ Deno.serve(async (req) => {
         return {
           id: c.id,
           status: c.status,
-          risk_score: c.risk_score,
-          risk_tier: c.risk_tier,
+          // risk_score/risk_tier are derived from current-version AI review only
+          risk_score: aiRiskScore,
+          risk_tier: aiRiskTier,
           title: c.title,
           created_at: c.created_at,
           updated_at: c.updated_at,
@@ -229,7 +230,9 @@ Deno.serve(async (req) => {
             ? {
                 id: ai.id,
                 summary: ai.ai_summary,
-                top_flags: Array.isArray(findings.top_flags) ? findings.top_flags.slice(0, 5) : [],
+                risk_tier: aiRiskTier,
+                risk_score: aiRiskScore,
+                top_flags: topFlagsRaw.slice(0, 5),
                 created_at: ai.created_at,
               }
             : null,
@@ -241,6 +244,10 @@ Deno.serve(async (req) => {
 
       if (filter === "failed_parse") {
         rows = rows.filter((r) => r.current_version?.parse_status === "failed");
+      } else if (filter === "missing_ai_review") {
+        rows = rows.filter((r) => !r.ai_review);
+      } else if (filter === "high_risk") {
+        rows = rows.filter((r) => r.ai_review && (r.ai_review.risk_tier === "high" || r.ai_review.risk_tier === "severe"));
       }
 
       return json({ contracts: rows, page, limit, total: count ?? rows.length });
@@ -290,15 +297,39 @@ Deno.serve(async (req) => {
           }
         : { id: c.driver_user_id, display_name: null, driver_handle: null, email: (app.data as any)?.driver_email_snapshot ?? null };
 
+      // Resolve current-version AI review (single source of truth for risk display)
+      const allReviews = (reviews.data ?? []) as any[];
+      const currentAi = c.current_version_id
+        ? allReviews.find((r) => r.reviewer_role === "ai" && r.version_id === c.current_version_id) ?? null
+        : null;
+      const currentAiFindings = (currentAi?.ai_findings as any) || {};
+      const currentAiTopFlags = Array.isArray(currentAiFindings.top_red_flags)
+        ? currentAiFindings.top_red_flags
+        : Array.isArray(currentAiFindings.top_flags)
+          ? currentAiFindings.top_flags
+          : [];
+      const current_ai_review = currentAi
+        ? {
+            id: currentAi.id,
+            version_id: currentAi.version_id,
+            summary: currentAi.ai_summary,
+            risk_tier: typeof currentAiFindings.risk_tier === "string" ? currentAiFindings.risk_tier : null,
+            risk_score: currentAiFindings.risk_score != null ? Number(currentAiFindings.risk_score) : null,
+            top_flags: currentAiTopFlags,
+            created_at: currentAi.created_at,
+          }
+        : null;
+
       return json({
         contract: c,
         versions: versions.data ?? [],
-        reviews: reviews.data ?? [],
+        reviews: allReviews,
         clauses: clauses.data ?? [],
         audit: audit.data ?? [],
         recruiter: recruiterShaped,
         driver: driverShaped,
         opportunity: opp.data ?? null,
+        current_ai_review,
       });
     }
 
@@ -352,11 +383,16 @@ Deno.serve(async (req) => {
       if (exErr || !existing) return json({ error: "Contract not found" }, 404);
 
       // Service role bypasses contracts_status_guard, so transition is allowed.
-      const { error: updErr } = await adminDb
+      // Confirm the row was actually updated; if 0 rows return error.
+      const { data: updated, error: updErr } = await adminDb
         .from("contracts")
         .update({ status: newStatus })
-        .eq("id", contractId);
+        .eq("id", contractId)
+        .select("id");
       if (updErr) return json({ error: updErr.message }, 500);
+      if (!updated || updated.length === 0) {
+        return json({ error: "Contract not updated" }, 409);
+      }
 
       await adminDb.from("contract_audit_log").insert({
         contract_id: contractId,
