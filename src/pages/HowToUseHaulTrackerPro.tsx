@@ -299,6 +299,7 @@ export default function HowToUseHaulTrackerPro() {
               { num: '01', title: 'Recruiter uploads the contract', desc: 'The recruiter adds the contract document to the opportunity workflow so the driver can review it.' },
               { num: '02', title: 'AI parses the document', desc: 'HaulTrackerPro extracts text and key details to make the contract easier to review at a glance.' },
               { num: '03', title: 'AI creates a plain-English risk summary', desc: 'Drivers see possible red flags and key points in plain language. This is informational only — not legal advice.' },
+              { num: '03b', title: 'Optional: Plain-English Clause Rewrite (Driver Pro)', desc: 'Driver Pro users can paste a confusing clause into the Plain-English Clause Rewrite tool to get a clearer explanation, concern points, and questions to ask the recruiter. Informational only — not legal advice.' },
               { num: '04', title: 'Driver reviews and decides', desc: 'The driver can approve the contract, reject it, or request changes before moving forward.' },
               { num: '05', title: 'Driver records approval / signature', desc: 'When the driver approves, HaulTrackerPro stores a platform record of consent tied to that contract version. It is not a DocuSign-equivalent or qualified electronic signature.' },
               { num: '06', title: 'Hired status is protected', desc: 'Recruiters cannot move the driver to hired until the required contract approval/signature steps are completed.' },
