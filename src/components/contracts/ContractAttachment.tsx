@@ -351,6 +351,14 @@ export function ContractAttachment({ applicationId, role }: Props) {
               AI Risk Summary
             </span>
           </div>
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">
+            <p className="text-[11px] leading-relaxed text-amber-200/90">
+              AI contract review is for informational purposes only. It is not legal advice, does
+              not create an attorney-client relationship, and may miss or misunderstand contract
+              terms. Always read the full contract and consider speaking with a qualified attorney
+              before signing.
+            </p>
+          </div>
           {aiReview.ai_summary && (
             <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">
               {aiReview.ai_summary}
@@ -373,10 +381,6 @@ export function ContractAttachment({ applicationId, role }: Props) {
               Note: Contract was long; only the first portion was analyzed.
             </p>
           )}
-          <p className="text-[10px] text-muted-foreground italic">
-            AI review is educational only and not legal advice. Consider asking a qualified
-            professional to review this contract before signing.
-          </p>
         </div>
       )}
       {role === 'driver' && !hasContract && !isLoading && (
