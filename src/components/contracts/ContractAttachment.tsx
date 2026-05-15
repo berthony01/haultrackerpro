@@ -79,7 +79,101 @@ const TIER_STYLES: Record<string, { label: string; cls: string; Icon: typeof Shi
   severe: { label: 'Severe risk', cls: 'bg-red-600/20 text-red-300 border-red-600/40', Icon: ShieldAlert },
 };
 
-export function ContractAttachment({ applicationId, role }: Props) {
+type StepState = 'active' | 'complete' | 'locked' | 'idle';
+
+function DriverStepIndicator({
+  reviewState,
+  decideState,
+  signState,
+  signApplicable,
+}: {
+  reviewState: StepState;
+  decideState: StepState;
+  signState: StepState;
+  signApplicable: boolean;
+}) {
+  const steps: { key: string; label: string; state: StepState }[] = [
+    { key: 'review', label: 'Review', state: reviewState },
+    { key: 'decide', label: 'Decide', state: decideState },
+  ];
+  if (signApplicable) steps.push({ key: 'sign', label: 'Sign', state: signState });
+
+  return (
+    <ol
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]"
+      aria-label="Contract review progress"
+    >
+      {steps.map((s, i) => {
+        const isComplete = s.state === 'complete';
+        const isActive = s.state === 'active';
+        const isLocked = s.state === 'locked';
+        const dot =
+          isComplete
+            ? 'bg-green-500/20 text-green-400 border-green-500/40'
+            : isActive
+              ? 'bg-primary/20 text-primary border-primary/40'
+              : isLocked
+                ? 'bg-muted text-muted-foreground border-border'
+                : 'bg-muted text-muted-foreground border-border';
+        const label =
+          isComplete
+            ? 'text-foreground/90'
+            : isActive
+              ? 'text-foreground font-semibold'
+              : 'text-muted-foreground';
+        const ariaCurrent = isActive ? ('step' as const) : undefined;
+        return (
+          <li key={s.key} className="flex items-center gap-2" aria-current={ariaCurrent}>
+            <span
+              className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${dot}`}
+              aria-hidden="true"
+            >
+              {isComplete ? (
+                <Check className="h-3 w-3" />
+              ) : isLocked ? (
+                <Lock className="h-2.5 w-2.5" />
+              ) : (
+                <span className="text-[10px] font-bold">{i + 1}</span>
+              )}
+            </span>
+            <span className={label}>
+              {s.label}
+              {isComplete && <span className="sr-only"> — completed</span>}
+              {isActive && <span className="sr-only"> — current step</span>}
+              {isLocked && <span className="sr-only"> — locked</span>}
+            </span>
+            {i < steps.length - 1 && (
+              <span className="mx-1 h-px w-4 bg-border" aria-hidden="true" />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ParsingSkeleton({ label }: { label: string }) {
+  return (
+    <div
+      className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-2"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+        <span className="text-xs font-semibold text-foreground/90">{label}</span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Looking for terms that may need attention…
+      </p>
+      <div className="space-y-1.5">
+        <div className="h-2 w-full rounded bg-muted animate-pulse" />
+        <div className="h-2 w-5/6 rounded bg-muted animate-pulse" />
+        <div className="h-2 w-2/3 rounded bg-muted animate-pulse" />
+      </div>
+    </div>
+  );
+}
   const inputRef = useRef<HTMLInputElement>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [showChangesBox, setShowChangesBox] = useState(false);
