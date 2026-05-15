@@ -9,6 +9,7 @@ import { FileText, Upload, Eye, AlertCircle, Loader2, Sparkles, CheckCircle2, XC
 import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 import { useSubscription } from '@/hooks/useSubscription';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   applicationId: string;
@@ -739,39 +740,170 @@ export function ContractAttachment({ applicationId, role }: Props) {
         </div>
       )}
 
-      {/* Phase 9E — Driver Pro upsell (informational, non-blocking) */}
-      {role === 'driver' && hasContract && !isSubLoading && isPro === false && (
-        <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <Crown className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-              Advanced Contract Protection
-            </span>
-            <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px]">
-              Coming soon for Pro
-            </Badge>
+      {/* Phase 9F — Driver Pro: Plain-English Clause Rewrite (Free users see upsell) */}
+      {role === 'driver' && hasContract && !isSubLoading && (
+        isPro ? (
+          <ClauseRewriteCard applicationId={applicationId} />
+        ) : (
+          <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Crown className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                Plain-English Clause Rewrite
+              </span>
+              <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px]">
+                Driver Pro
+              </Badge>
+            </div>
+            <p className="text-[11px] text-foreground/90 leading-relaxed">
+              Paste a confusing clause and get a plain-English explanation, why it may matter,
+              and questions to ask before approving. Available on Driver Pro.
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Basic contract viewing, risk flags, decisions, and required approval/signature steps
+              remain accessible on the Free plan.
+            </p>
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate('/pricing')}
+            >
+              <Crown className="h-4 w-4" /> Upgrade to Pro
+            </Button>
           </div>
-          <p className="text-[11px] text-foreground/90 leading-relaxed">
-            Want deeper contract protection? Pro tools may include clause-by-clause explanations,
-            saved contract history, downloadable records, and AI follow-up support as Contract
-            Protection expands.
-          </p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Basic contract viewing, risk flags, decisions, and required approval/signature steps
-            remain accessible on the Free plan.
-          </p>
-          <Button
-            variant="default"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => navigate('/pricing')}
-          >
-            <Crown className="h-4 w-4" /> Upgrade to Pro
-          </Button>
-        </div>
+        )
       )}
     </div>
 
   );
 }
 
+
+interface RewriteResult {
+  plain_english: string;
+  why_it_matters: string;
+  questions_to_ask: string[];
+  reminder: string;
+}
+
+function ClauseRewriteCard({ applicationId }: { applicationId: string }) {
+  const [text, setText] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
+  const [result, setResult] = useState<RewriteResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const MIN = 20;
+  const MAX = 5000;
+  const len = text.trim().length;
+
+  const handleExplain = async () => {
+    setError(null);
+    setResult(null);
+    if (len < MIN) {
+      setError(`Please paste at least ${MIN} characters of clause text.`);
+      return;
+    }
+    if (len > MAX) {
+      setError(`Clause is too long (max ${MAX} characters).`);
+      return;
+    }
+    setIsRunning(true);
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke('rewrite-contract-clause', {
+        body: { application_id: applicationId, clause_text: text.trim() },
+      });
+      if (invokeErr) throw new Error(invokeErr.message || 'Could not get explanation');
+      if (!data?.ok || !data?.result) throw new Error(data?.error || 'No explanation returned');
+      setResult(data.result as RewriteResult);
+    } catch (e) {
+      const msg = (e as Error).message || 'Could not get explanation';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Sparkles className="h-3.5 w-3.5 text-primary" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+          Plain-English Clause Rewrite
+        </span>
+        <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px]">
+          Driver Pro
+        </Badge>
+      </div>
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        Paste a confusing clause from the contract and get a plain-English explanation, why it
+        may matter, and questions to ask before approving. Informational only — not legal advice.
+      </p>
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value.slice(0, MAX))}
+        placeholder="Paste the clause text here (e.g., escrow terms, chargebacks, termination penalty…)"
+        aria-label="Paste contract clause to explain"
+        rows={4}
+        className="text-xs"
+        disabled={isRunning}
+      />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[10px] text-muted-foreground">
+          {len}/{MAX} characters
+        </span>
+        <Button
+          variant="default"
+          size="sm"
+          className="gap-1.5"
+          onClick={handleExplain}
+          disabled={isRunning || len < MIN}
+        >
+          {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          Explain This Clause
+        </Button>
+      </div>
+      {error && (
+        <p className="text-[11px] text-red-400 break-words">{error}</p>
+      )}
+      {result && (
+        <div className="space-y-2 mt-1">
+          <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Plain-English meaning
+            </p>
+            <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">
+              {result.plain_english}
+            </p>
+          </div>
+          {result.why_it_matters && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-300 mb-1">
+                Why this may matter
+              </p>
+              <p className="text-xs text-amber-100/90 whitespace-pre-wrap break-words">
+                {result.why_it_matters}
+              </p>
+            </div>
+          )}
+          {result.questions_to_ask?.length > 0 && (
+            <div className="rounded-md border border-primary/30 bg-primary/10 p-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary mb-1">
+                Questions to ask before approving
+              </p>
+              <ul className="text-xs text-foreground/90 space-y-1 list-disc pl-4">
+                {result.questions_to_ask.map((q, i) => (
+                  <li key={i} className="break-words">{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+            {result.reminder}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
