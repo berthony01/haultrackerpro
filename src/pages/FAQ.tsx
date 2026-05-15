@@ -567,6 +567,66 @@ const faqs: Faq[] = [
     question: 'What happens when a driver requests info?',
     answer: 'The driver\'s contact snapshot is shared only with the recruiter connected to that opportunity so they can follow up.',
   },
+  {
+    id: 'contract-protection-overview',
+    question: 'What is Contract Protection?',
+    answer: 'Contract Protection helps drivers review recruiter-sent contracts before approving, signing, or being marked hired. It uses AI-assisted summaries, risk flags, approval steps, and platform records to make the process clearer.',
+    keywords: 'contract protection ai review',
+  },
+  {
+    id: 'contract-legal-advice',
+    question: 'Does HaulTrackerPro give legal advice?',
+    answer: 'No. AI contract review is informational only. HaulTrackerPro is not a law firm and does not create an attorney-client relationship. Drivers should read the full contract and speak with a qualified attorney for legal advice.',
+    keywords: 'contract legal advice attorney lawyer',
+  },
+  {
+    id: 'contract-recruiter-upload',
+    question: 'How do recruiters upload a contract?',
+    answer: 'Recruiters can upload a contract as part of the opportunity workflow. The driver can then review the contract, see the AI-assisted summary, and decide whether to approve, reject, or request changes.',
+    keywords: 'contract upload recruiter',
+  },
+  {
+    id: 'contract-hired-without-approval',
+    question: 'Can a recruiter mark me hired without my approval?',
+    answer: 'When a contract approval/signature is required, HaulTrackerPro\u2019s workflow is designed to block recruiters from marking a driver hired until the required contract step is completed.',
+    keywords: 'hired status protection contract approval',
+  },
+  {
+    id: 'contract-reject',
+    question: 'What happens if I reject a contract?',
+    answer: 'If a driver rejects a contract, the recruiter cannot move forward on that contract version. The recruiter may need to revise the terms or continue the conversation outside the platform.',
+    keywords: 'reject contract',
+  },
+  {
+    id: 'contract-request-changes',
+    question: 'What does "request changes" mean?',
+    answer: 'Request changes lets a driver ask the recruiter to revise contract terms before approval or signature. This creates a clearer record of what the driver wants changed.',
+    keywords: 'request changes contract revision',
+  },
+  {
+    id: 'contract-signature-vs-docusign',
+    question: 'Is the in-app signature the same as DocuSign?',
+    answer: 'No. HaulTrackerPro\u2019s in-app signature is a platform record of approval/consent. It is not a notarization, a qualified electronic signature, or a DocuSign-equivalent signature.',
+    keywords: 'signature docusign electronic signature',
+  },
+  {
+    id: 'contract-privacy',
+    question: 'Is my contract private?',
+    answer: 'Contract records are intended to be private between the assigned driver, the recruiter who uploaded the contract, and HaulTrackerPro admins when support, security, moderation, or dispute review is needed.',
+    keywords: 'contract privacy private',
+  },
+  {
+    id: 'contract-types-supported',
+    question: 'What types of contracts can this help with?',
+    answer: 'It is designed for trucking-related contracts such as 1099 independent contractor agreements, owner-operator agreements, lease-purchase terms, escrow language, and similar recruiter-driver documents.',
+    keywords: 'contract types 1099 owner-operator lease purchase escrow',
+  },
+  {
+    id: 'contract-ai-misses',
+    question: 'Can AI miss something important?',
+    answer: 'Yes. AI can misunderstand or miss contract terms. Drivers should always read the full document before signing and should consider legal help for important agreements.',
+    keywords: 'ai limitations contract miss',
+  },
 ];
 
 const nodeToText = (node: ReactNode): string => {
