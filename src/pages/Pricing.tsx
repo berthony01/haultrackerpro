@@ -72,6 +72,11 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Parking log export (CSV + PDF)', free: '—', pro: '✓' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
   { feature: 'PDF reports', free: '—', pro: '✓' },
+  { feature: 'View contracts sent by recruiters', free: '✓', pro: '✓' },
+  { feature: 'Basic AI contract risk flags', free: '✓', pro: '✓' },
+  { feature: 'Approve, reject, or request changes', free: '✓', pro: '✓' },
+  { feature: 'Record approval / in-app signature', free: '✓', pro: '✓' },
+  { feature: 'Advanced contract history & deeper review', free: '—', pro: 'Coming soon' },
 ];
 
 const whyProPoints = [
