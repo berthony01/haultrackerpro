@@ -165,11 +165,12 @@ export default function Terms() {
         </section>
 
         <section className="space-y-2">
+          <h3 className="text-base font-bold">27. Governing Law</h3>
           <p className="text-muted-foreground">These terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">27. Contact Information</h3>
+          <h3 className="text-base font-bold">28. Contact Information</h3>
           <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.com.</p>
         </section>
 
