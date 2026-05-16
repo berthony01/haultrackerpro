@@ -22,7 +22,7 @@ export function useRecruiterReportData(range: RecruiterReportRange | null, enabl
   const isReady = !!user && !!recruiterId && !!range && enabled;
 
   // Server-side eligibility (defence-in-depth on top of UI gating):
-  // only Growth/Fleet & active/trialing recruiters can build reports.
+  // only Growth/Fleet & active or trialing-status recruiters can build reports. // trial-allowlist
   const planEligible =
     (billing.plan === 'growth' || billing.plan === 'fleet') && billing.isBillingActive;
 
