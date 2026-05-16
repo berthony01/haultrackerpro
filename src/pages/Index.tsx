@@ -422,21 +422,24 @@ const Index = () => {
   const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
   const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
 
-  // Role-based access guard: redirect users away from pages outside their role.
-  // Admins keep full access for management/testing.
+  // Role-based access guard: redirect users away from pages outside their
+  // *effective* role. Admins obey their view-mode choice instead of bypassing.
   const driverOnlyPages = new Set([
     'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
     'opportunities','add','add_expense','add_fuel','closeout','recurring_expenses',
+    'opportunity-preferences',
   ]);
+  const isRecruiterPageId = (p: string) =>
+    p === 'recruiter-access' || p.startsWith('recruiter-access:');
   useEffect(() => {
-    if (roleLoading || isAdmin) return;
-    if (isRecruiter && driverOnlyPages.has(page)) {
+    if (roleLoading) return;
+    if (isRecruiterView && driverOnlyPages.has(page)) {
       setPage('recruiter-access');
-    } else if (!isRecruiter && page === 'recruiter-access') {
+    } else if (!isRecruiterView && isRecruiterPageId(page)) {
       setPage('dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleLoading, isRecruiter, isAdmin, page]);
+  }, [roleLoading, isRecruiterView, page]);
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
@@ -458,19 +461,19 @@ const Index = () => {
       navigate('/parking');
       return;
     }
-    // Defensive role gating BEFORE state changes so non-admins can never
-    // momentarily render a page outside their role (URL hacks, stale links).
-    const isRecruiterTarget = p === 'recruiter-access' || p.startsWith('recruiter-access:');
+    // Defensive role gating BEFORE state changes — uniform for all users,
+    // including admins (who control their own view via the switcher).
+    const isRecruiterTarget = isRecruiterPageId(p);
     const driverOnlyTargets = new Set([
       'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
       'opportunities','add_expense','add_fuel','closeout','recurring_expenses',
       'opportunity-preferences',
     ]);
-    if (isRecruiterTarget && !isAdmin && !isRecruiter) {
+    if (isRecruiterTarget && !isRecruiterView) {
       setPage('dashboard');
       return;
     }
-    if (!isRecruiterTarget && driverOnlyTargets.has(p) && !isAdmin && isRecruiter) {
+    if (!isRecruiterTarget && driverOnlyTargets.has(p) && isRecruiterView) {
       setPage('recruiter-access');
       return;
     }
