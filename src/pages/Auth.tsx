@@ -110,12 +110,12 @@ export default function Auth() {
     : (mode === 'login' ? 'Welcome Back, Driver' : 'Create Your Driver Account');
 
   const helper = isRecruiter
-    ? 'Apply for recruiter access, post structured opportunities, and manage driver requests.'
-    : 'Track your real profit, manage loads, and compare opportunities.';
+    ? 'Apply for recruiter access, post structured opportunities, and manage driver requests. Recruiter accounts require approval before posting opportunities.'
+    : 'Track your real profit, manage loads, compare opportunities, and get a guided setup after sign up.';
 
   const googleHelper = isRecruiter
-    ? "You'll continue into Recruiter Access after sign in."
-    : "You'll continue into the driver dashboard.";
+    ? "You'll continue into Recruiter Access. Posting unlocks after your account is approved."
+    : "You'll continue into the driver dashboard and a quick onboarding walkthrough.";
 
   const driverBullets = [
     'Real profit tracking',
