@@ -7,7 +7,7 @@ import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useFuelLogs, FuelLogInsert, FuelLog } from '@/hooks/useFuelLogs';
 import { useAuth } from '@/hooks/useAuth';
-import { useAdmin } from '@/hooks/useAdmin';
+
 import { useFeedback } from '@/hooks/useFeedback';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
