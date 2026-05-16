@@ -490,7 +490,13 @@ const Index = () => {
       setEditingFuelLog(null);
       setOpportunitiesView('list');
       const sub = p.split(':')[1];
-      setRecruiterView(sub === 'manager' ? 'manager' : sub === 'applications' ? 'applications' : sub === 'onboarding' ? 'onboarding' : 'hub');
+      setRecruiterView(
+        sub === 'manager' ? 'manager'
+        : sub === 'applications' ? 'applications'
+        : sub === 'reports' ? 'reports'
+        : sub === 'onboarding' ? 'onboarding'
+        : 'hub'
+      );
       setPage('recruiter-access');
       return;
     }
