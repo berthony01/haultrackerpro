@@ -435,7 +435,7 @@ const Index = () => {
     if (roleLoading) return;
     if (isRecruiterView && driverOnlyPages.has(page)) {
       setPage('recruiter-access');
-    } else if (!isRecruiterView && isRecruiterPageId(page)) {
+    } else if (!isRecruiterViewView && isRecruiterPageId(page)) {
       setPage('dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -469,11 +469,11 @@ const Index = () => {
       'opportunities','add_expense','add_fuel','closeout','recurring_expenses',
       'opportunity-preferences',
     ]);
-    if (isRecruiterTarget && !isRecruiterView) {
+    if (isRecruiterTarget && !isRecruiterViewView) {
       setPage('dashboard');
       return;
     }
-    if (!isRecruiterTarget && driverOnlyTargets.has(p) && isRecruiterView) {
+    if (!isRecruiterViewTarget && driverOnlyTargets.has(p) && isRecruiterView) {
       setPage('recruiter-access');
       return;
     }
@@ -588,7 +588,7 @@ const Index = () => {
 
         <main className="px-4 py-5 max-w-7xl mx-auto w-full">
         {/* Smart Reminders */}
-        {!showOnboarding && page === 'dashboard' && !isRecruiter && (
+        {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">
             <SmartReminders
               loads={allLoadsQuery.loads}
@@ -612,7 +612,7 @@ const Index = () => {
                     onDismiss={() => markSeen()}
                   />
                 )}
-                {!subscription.isLoading && !isRecruiter && (
+                {!subscription.isLoading && !isRecruiterView && (
                   <MilestoneNudges
                     loadsCount={allLoadsQuery.loads.length}
                     expensesCount={allExpensesQuery.expenses.length}
@@ -622,7 +622,7 @@ const Index = () => {
                   />
                 )}
                 {/* Role path card for new / low-activity drivers only */}
-                {!roleCardDismissed && !isRecruiter && allLoadsQuery.loads.length <= 3 && (
+                {!roleCardDismissed && !isRecruiterView && allLoadsQuery.loads.length <= 3 && (
                   <div className="mb-4 p-4 rounded-2xl border relative" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                     <button
                       onClick={() => {
@@ -784,7 +784,7 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
-            {page === 'recruiter-access' && (isRecruiter || isAdmin) && (
+            {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {
                   // Pure recruiters have no driver dashboard to go back to;
@@ -794,7 +794,7 @@ const Index = () => {
                 initialView={recruiterView}
               />
             )}
-            {page === 'settings' && (isRecruiter ? (
+            {page === 'settings' && (isRecruiterView ? (
               <RecruiterSettingsView
                 onBack={() => setPage('recruiter-access')}
                 onOpenOnboarding={() => { setRecruiterView('onboarding'); setPage('recruiter-access'); }}
