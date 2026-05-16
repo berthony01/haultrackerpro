@@ -14,6 +14,7 @@ import {
   Handshake,
   ClipboardList,
   LogOut,
+  FileSignature,
 } from 'lucide-react';
 import {
   Sheet,
