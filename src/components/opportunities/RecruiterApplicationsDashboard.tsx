@@ -1,4 +1,18 @@
 import { useMemo, useState } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { PhoneCall, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import {
+  useRecruiterContactRequests,
+  latestRequestForApp,
+} from '@/hooks/opportunities/useRecruiterContactRequests';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -113,6 +127,9 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
 
   const appIds = useMemo(() => recruiterApplications.map((a: any) => a.id), [recruiterApplications]);
   const { readinessMap } = useContractReadinessMap(appIds);
+  const { requests: contactRequests, requestContact } = useRecruiterContactRequests(appIds);
+  const [contactModalAppId, setContactModalAppId] = useState<string | null>(null);
+  const [contactNote, setContactNote] = useState('');
 
   const opportunityOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -290,26 +307,50 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
-          <Field label="Opportunity" value={opp?.title || '—'} />
-          <Field label="Submitted" value={fmtDate(a.created_at)} />
-          <Field label="Last Activity" value={fmtDate(a.updated_at)} />
-          <Field label="Contact" value={a.preferred_contact_method || '—'} />
-          {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
-          {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
-          {a.driver_phone_snapshot && <Field label="Phone" value={a.driver_phone_snapshot} />}
-          {a.driver_email_snapshot && <Field label="Email" value={a.driver_email_snapshot} />}
-        </div>
+        {(() => {
+          const contactReq = latestRequestForApp(contactRequests, a.id);
+          const contactApproved = contactReq?.status === 'approved';
+          const appClosed = ['hired', 'rejected', 'withdrawn'].includes(a.status);
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
+                <Field label="Opportunity" value={opp?.title || '—'} />
+                <Field label="Submitted" value={fmtDate(a.created_at)} />
+                <Field label="Last Activity" value={fmtDate(a.updated_at)} />
+                <Field label="Preferred Contact" value={a.preferred_contact_method || '—'} />
+                {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
+                {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
+                {contactApproved && a.driver_phone_snapshot && (
+                  <Field label="Phone" value={a.driver_phone_snapshot} />
+                )}
+                {contactApproved && a.driver_email_snapshot && (
+                  <Field label="Email" value={a.driver_email_snapshot} />
+                )}
+              </div>
 
-        {a.message && (
-          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-foreground/90 mb-3 whitespace-pre-wrap">
-            {a.message}
-          </div>
-        )}
+              {a.message && (
+                <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-foreground/90 mb-3 whitespace-pre-wrap">
+                  {a.message}
+                </div>
+              )}
 
-        <div className="mb-3">
-          <ContractAttachment applicationId={a.id} role="recruiter" />
-        </div>
+              <div className="mb-3">
+                <RecruiterContactRequestRow
+                  status={contactReq?.status ?? null}
+                  appClosed={appClosed}
+                  onRequest={() => {
+                    setContactNote('');
+                    setContactModalAppId(a.id);
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <ContractAttachment applicationId={a.id} role="recruiter" />
+              </div>
+            </>
+          );
+        })()}
 
         {allowed.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
@@ -489,7 +530,91 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={!!contactModalAppId}
+        onOpenChange={(o) => { if (!o) setContactModalAppId(null); }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PhoneCall className="h-5 w-5 text-primary" />
+              Request Driver Contact
+            </DialogTitle>
+            <DialogDescription>
+              The driver will be asked to approve contact for this opportunity. Add an optional short
+              note explaining why (max 300 chars).
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={contactNote}
+            onChange={(e) => setContactNote(e.target.value.slice(0, 300))}
+            maxLength={300}
+            placeholder="Optional note for the driver…"
+            className="min-h-[90px]"
+          />
+          <p className="text-[10px] text-muted-foreground text-right">{contactNote.length}/300</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setContactModalAppId(null)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!contactModalAppId) return;
+                const id = contactModalAppId;
+                setContactModalAppId(null);
+                requestContact.mutate(
+                  { applicationId: id, recruiterNote: contactNote.trim() || undefined },
+                  {
+                    onSuccess: () => toast.success('Contact request sent'),
+                    onError: (e: Error) => toast.error(e.message || 'Failed to send'),
+                  },
+                );
+              }}
+              disabled={requestContact.isPending}
+            >
+              Send Contact Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function RecruiterContactRequestRow({
+  status,
+  appClosed,
+  onRequest,
+}: {
+  status: 'pending' | 'approved' | 'declined' | 'expired' | null;
+  appClosed: boolean;
+  onRequest: () => void;
+}) {
+  if (status === 'approved') {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-xs font-semibold text-green-400">
+        <CheckCircle2 className="h-3.5 w-3.5" /> Contact Approved
+      </div>
+    );
+  }
+  if (status === 'pending') {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-400">
+        <Clock className="h-3.5 w-3.5" /> Contact Request Pending
+      </div>
+    );
+  }
+  if (status === 'declined') {
+    return (
+      <div className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">
+        <XCircle className="h-3.5 w-3.5" /> Contact Declined
+      </div>
+    );
+  }
+  if (appClosed) return null;
+  return (
+    <Button variant="outline" size="sm" onClick={onRequest}>
+      <PhoneCall className="h-4 w-4" /> Request Contact
+    </Button>
   );
 }
 

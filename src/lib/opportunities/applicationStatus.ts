@@ -144,4 +144,8 @@ export const EVENT_LABEL: Record<string, string> = {
   driver_request_callback: 'Driver requested callback',
   driver_need_more_info: 'Driver needs more info',
   driver_not_interested: 'Driver: not interested',
+  contact_request_created: 'Recruiter requested contact permission',
+  contact_request_approved: 'Driver approved contact',
+  contact_request_declined: 'Driver declined contact',
+  contact_request_expired: 'Contact request expired',
 };

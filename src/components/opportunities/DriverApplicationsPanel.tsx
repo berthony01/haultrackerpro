@@ -23,6 +23,11 @@ import {
   useOpportunityApplications,
   type DriverResponseType,
 } from '@/hooks/opportunities/useOpportunityApplications';
+import {
+  useRecruiterContactRequests,
+  latestRequestForApp,
+  type RecruiterContactRequest,
+} from '@/hooks/opportunities/useRecruiterContactRequests';
 import { ContractAttachment } from '@/components/contracts/ContractAttachment';
 import {
   STATUS_LABEL,
@@ -85,6 +90,13 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
     withdrawApplication,
     recordDriverResponse,
   } = useOpportunityApplications();
+
+  const appIds = useMemo(
+    () => (driverApplications as any[]).map((a) => a.id),
+    [driverApplications],
+  );
+  const { requests: contactRequests, respond: respondContact } =
+    useRecruiterContactRequests(appIds);
 
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -165,6 +177,26 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
             {a.message}
           </div>
         )}
+
+        <DriverContactRequestBlock
+          applicationId={a.id}
+          request={latestRequestForApp(contactRequests, a.id)}
+          isPending={pendingId === a.id}
+          onRespond={(decision) => {
+            const req = latestRequestForApp(contactRequests, a.id);
+            if (!req) return;
+            setPendingId(a.id);
+            respondContact.mutate(
+              { requestId: req.id, decision },
+              {
+                onSuccess: () =>
+                  toast.success(decision === 'approved' ? 'Contact approved' : 'Contact declined'),
+                onError: (e: Error) => toast.error(e.message || 'Failed'),
+                onSettled: () => setPendingId(null),
+              },
+            );
+          }}
+        />
 
         <div className="mb-3">
           <ContractAttachment applicationId={a.id} role="driver" />
@@ -330,3 +362,68 @@ function EmptyState({ title, body, action }: { title: string; body: string; acti
     </Card>
   );
 }
+
+function DriverContactRequestBlock({
+  applicationId,
+  request,
+  isPending,
+  onRespond,
+}: {
+  applicationId: string;
+  request: RecruiterContactRequest | null;
+  isPending: boolean;
+  onRespond: (decision: 'approved' | 'declined') => void;
+}) {
+  if (!request) return null;
+
+  if (request.status === 'pending') {
+    return (
+      <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 mb-3">
+        <p className="text-sm font-bold text-foreground flex items-center gap-2">
+          <PhoneCall className="h-4 w-4 text-primary" /> Recruiter Requested Contact
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          The recruiter would like permission to contact you about this opportunity.
+        </p>
+        {request.recruiter_note && (
+          <p className="mt-2 text-xs italic text-foreground/80">"{request.recruiter_note}"</p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => onRespond('approved')} disabled={isPending}>
+            <ThumbsUp className="h-4 w-4" /> Allow Contact
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onRespond('declined')} disabled={isPending}>
+            <XCircle className="h-4 w-4" /> Decline
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (request.status === 'approved') {
+    return (
+      <div className="rounded-lg border border-green-500/40 bg-green-500/5 p-3 mb-3 text-xs text-foreground/80">
+        Contact access approved. The recruiter can now reach you about this opportunity.
+      </div>
+    );
+  }
+
+  if (request.status === 'declined') {
+    return (
+      <div className="rounded-lg border border-border/60 bg-muted/30 p-3 mb-3 text-xs text-muted-foreground">
+        Contact request declined.
+      </div>
+    );
+  }
+
+  if (request.status === 'expired') {
+    return (
+      <div className="rounded-lg border border-border/60 bg-muted/30 p-3 mb-3 text-xs text-muted-foreground">
+        Contact request expired.
+      </div>
+    );
+  }
+
+  return null;
+}
+
