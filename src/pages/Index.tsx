@@ -681,7 +681,7 @@ const Index = () => {
                 isPro={isPro}
               />
             )}
-            {page === 'opportunities' && <OpportunitiesPage onUpgrade={handleUpgrade} />}
+            {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} />}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
           </Suspense>
