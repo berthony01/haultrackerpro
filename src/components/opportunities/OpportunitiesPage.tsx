@@ -539,6 +539,24 @@ function ProfileEntryCard({
               </Badge>
             </div>
           )}
+          {state === 'complete' ? (
+            <p className="text-xs text-muted-foreground/80 mb-3 flex items-start gap-1.5">
+              <Info className="h-3 w-3 mt-0.5 shrink-0" />
+              <span>Preferences only affect match quality and what approved recruiters see when you request info. Your HaulTrackerPro account is unchanged.</span>
+            </p>
+          ) : (
+            <div className="mb-3 rounded-lg border border-border/40 bg-muted/30 p-3">
+              <div className="flex items-start gap-2">
+                <Info className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground mb-0.5">Why Opportunity Preferences?</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Your main HaulTrackerPro account stays the same. These preferences only help improve match quality and show approved recruiters the information you choose to share when you request info.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <Button onClick={onClick} variant={state === 'complete' ? 'outline' : 'default'}>
             {cfg.cta} <ArrowRight className="h-4 w-4" />
           </Button>
