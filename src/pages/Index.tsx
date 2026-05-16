@@ -13,6 +13,7 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useUserRole } from '@/hooks/useUserRole';
 // Critical shell — keep eager so first paint never flickers.
 import { BottomNav } from '@/components/BottomNav';
 import { AppSidebar } from '@/components/premium/AppSidebar';
@@ -60,6 +61,7 @@ const Index = () => {
   const { signOut, user } = useAuth();
   const queryClient = useQueryClient();
   const { isAdmin } = useAdmin();
+  const { role, isRecruiter, isLoading: roleLoading } = useUserRole();
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
