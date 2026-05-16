@@ -1898,6 +1898,53 @@ export type Database = {
           },
         ]
       }
+      recruiter_contact_requests: {
+        Row: {
+          application_id: string
+          created_at: string
+          driver_note: string | null
+          driver_user_id: string
+          id: string
+          recruiter_note: string | null
+          recruiter_user_id: string
+          responded_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          driver_note?: string | null
+          driver_user_id: string
+          id?: string
+          recruiter_note?: string | null
+          recruiter_user_id: string
+          responded_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          driver_note?: string | null
+          driver_user_id?: string
+          id?: string
+          recruiter_note?: string | null
+          recruiter_user_id?: string
+          responded_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_contact_requests_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruiter_profiles: {
         Row: {
           admin_notes: string | null
@@ -2368,6 +2415,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      expire_stale_contact_requests: { Args: never; Returns: number }
       get_weekly_driver_leaderboard: {
         Args: { _limit?: number }
         Returns: {
@@ -2424,6 +2472,14 @@ export type Database = {
         Returns: string
       }
       recruiter_plan_limit: { Args: { _plan: string }; Returns: number }
+      request_driver_contact: {
+        Args: { application_id: string; recruiter_note?: string }
+        Returns: string
+      }
+      respond_to_contact_request: {
+        Args: { decision: string; driver_note?: string; request_id: string }
+        Returns: undefined
+      }
       resubmit_recruiter_profile: {
         Args: { profile_id: string }
         Returns: undefined
