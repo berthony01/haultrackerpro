@@ -15,6 +15,7 @@ import {
   ClipboardList,
   LogOut,
   FileSignature,
+  BarChart3,
 } from 'lucide-react';
 import {
   Sheet,
