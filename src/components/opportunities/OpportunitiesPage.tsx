@@ -53,7 +53,8 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-  const [showRecruiter, setShowRecruiter] = useState(false);
+  const [showRecruiterHub, setShowRecruiterHub] = useState(false);
+  const [showRecruiterOnboarding, setShowRecruiterOnboarding] = useState(false);
   const [showRecruiterManager, setShowRecruiterManager] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
   const [showRecruiterApps, setShowRecruiterApps] = useState(false);
@@ -73,7 +74,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       const v = sessionStorage.getItem('htp_opportunities_initial_view');
       if (!v) return;
       sessionStorage.removeItem('htp_opportunities_initial_view');
-      if (v === 'recruiter') setShowRecruiter(true);
+      if (v === 'recruiter') setShowRecruiterHub(true);
       else if (v === 'driver-profile') setShowProfile(true);
       // 'list' is the default — no-op.
     } catch {}
@@ -212,8 +213,21 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
-  if (showRecruiter) {
-    return <RecruiterOnboarding onBack={() => setShowRecruiter(false)} />;
+  if (showRecruiterOnboarding) {
+    return <RecruiterOnboarding onBack={() => setShowRecruiterOnboarding(false)} />;
+  }
+
+  if (showRecruiterHub) {
+    return (
+      <RecruiterAccessHub
+        profile={recruiterProfile}
+        loading={recruiterLoading}
+        onBack={() => setShowRecruiterHub(false)}
+        onOpenOnboarding={() => setShowRecruiterOnboarding(true)}
+        onManage={() => setShowRecruiterManager(true)}
+        onApplications={() => setShowRecruiterApps(true)}
+      />
+    );
   }
 
   if (showProfile) {
@@ -249,17 +263,6 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
             </p>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Users className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-xs sm:text-sm text-muted-foreground truncate">
-              Recruiting drivers?
-            </span>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => setShowRecruiter(true)} className="shrink-0">
-            Open Recruiter Access
-          </Button>
-        </div>
       </Card>
 
       {/* Opportunity Preferences entry card */}
@@ -278,16 +281,6 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
           state={!profile ? 'none' : profile.profile_completed ? 'complete' : 'incomplete'}
           profile={profile}
           onClick={() => setShowProfile(true)}
-        />
-      )}
-
-      {/* Recruiter access CTA */}
-      {!recruiterLoading && (
-        <RecruiterEntryCard
-          profile={recruiterProfile}
-          onClick={() => setShowRecruiter(true)}
-          onManage={() => setShowRecruiterManager(true)}
-          onApplications={() => setShowRecruiterApps(true)}
         />
       )}
 
@@ -657,3 +650,53 @@ function RecruiterEntryCard({
   );
 }
 
+
+function RecruiterAccessHub({
+  profile,
+  loading,
+  onBack,
+  onOpenOnboarding,
+  onManage,
+  onApplications,
+}: {
+  profile: ReturnType<typeof useRecruiterProfile>['profile'];
+  loading: boolean;
+  onBack: () => void;
+  onOpenOnboarding: () => void;
+  onManage: () => void;
+  onApplications: () => void;
+}) {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
+        ← Back to Opportunities
+      </Button>
+      <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
+            <Building2 className="h-6 w-6 text-primary-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
+              Recruiter Access
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Apply to post structured opportunities and manage driver requests.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {loading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : (
+        <RecruiterEntryCard
+          profile={profile}
+          onClick={onOpenOnboarding}
+          onManage={onManage}
+          onApplications={onApplications}
+        />
+      )}
+    </div>
+  );
+}
