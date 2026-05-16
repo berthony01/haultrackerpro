@@ -447,12 +447,19 @@ const Index = () => {
       navigate('/parking');
       return;
     }
-    if (p === 'recruiter-access') {
+    if (p === 'recruiter-access' || p.startsWith('recruiter-access:')) {
+      // Block drivers from recruiter routes (admins keep access).
+      if (!isAdmin && !isRecruiter) {
+        setPage('dashboard');
+        return;
+      }
       setEditingLoad(null);
       setEditingStops([]);
       setEditingExpense(null);
       setEditingFuelLog(null);
       setOpportunitiesView('list');
+      const sub = p.split(':')[1];
+      setRecruiterView(sub === 'manager' ? 'manager' : sub === 'applications' ? 'applications' : sub === 'onboarding' ? 'onboarding' : 'hub');
       setPage('recruiter-access');
       return;
     }
