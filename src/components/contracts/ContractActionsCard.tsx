@@ -5,6 +5,7 @@ import { FileSignature, ArrowRight } from 'lucide-react';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useContractsPipeline, matchesRecruiterFilter, matchesDriverFilter } from '@/hooks/contracts/useContractsPipeline';
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 
 interface Props {
   role: 'driver' | 'recruiter';
