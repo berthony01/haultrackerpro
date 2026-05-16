@@ -767,7 +767,11 @@ const Index = () => {
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
             {page === 'recruiter-access' && (isRecruiter || isAdmin) && (
               <RecruiterAccessRoute
-                onBack={() => setPage(isRecruiter && !isAdmin ? 'recruiter-access' : 'dashboard')}
+                onBack={() => {
+                  // Pure recruiters have no driver dashboard to go back to;
+                  // keep them on the recruiter hub. Admins jump back to driver.
+                  if (isAdmin) setPage('dashboard');
+                }}
                 initialView={recruiterView}
               />
             )}
