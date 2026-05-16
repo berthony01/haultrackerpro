@@ -1,144 +1,125 @@
-This plan is approved, but apply these safeguards:
+This plan is approved. Please run it as a surgical cleanup only.
 
-1. Recruiter reports must never include driver loads, fuel, expenses, profit, RPM, tax, or driver financial report fields.
+Add these safeguards:
 
-2. For report numbers, verify that application_events are reliable. If event rows are incomplete, use opportunity_applications.status as the source of truth for status breakdowns, and use application_events only for timeline/event counts where reliable.
+1. For the priority trigger verification, do not touch a random production opportunity. Use a known test opportunity or run the manual trigger test in preview/staging first. Confirm the no-op update does not create unwanted updated_at changes, audit logs, notifications, or analytics events.
 
-3. For top-performing opportunities, handle missing or null view_count safely. If view_count is unavailable, rank by application count first.
+2. Before revoking EXECUTE on the three recruiter priority SQL functions, confirm they are only used by triggers and are not called directly from frontend code, RPC calls, or edge functions under authenticated user context.
 
-4. Recruiter report access must be gated server-side or at least data-query guarded, not only hidden in the UI. Free/Starter should not be able to generate reports by manually navigating to the component.
+3. Keep this pass strictly scoped:
 
-5. ContractSummaryPanel must respect role-based privacy:
+- no billing flow changes
 
-- Driver view must not expose recruiter admin-only notes or internal billing details.
+- no Stripe edge function changes
 
-- Recruiter view must not expose unrelated driver financial/profit data.
+- no driver report changes
 
-- Only show fields allowed by existing RLS.
+- no role switcher changes
 
-6. The contract summary panel must clearly say it does not modify the uploaded contract PDF.
+- no contract signing changes
 
-7. Keep this phase scoped:
+- no unrelated Supabase linter cleanup
 
-- no signed PDF generation
+4. After implementation, verify:
 
-- no contract template builder
+- recruiter Reports sidebar item opens the recruiter report panel
 
-- no recruiter countersignature
+- driver Reports still opens the driver report
 
-- no driver financial exports for recruiters
+- Growth/Fleet pricing copy matches recruiter landing copy
 
-- no role-switcher changes
+- empty report ranges disable Generate
 
-## Part 1 — Recruiter Reports (Growth/Fleet, premium)
+- Priority placement badge still only appears when the opportunity is truly priority
 
-Brand-new recruiter report module. Does NOT reuse `reportAggregator` / `reportCsv` / `reportPdf` (those are driver profit reports and must not leak into recruiter exports).
+- Verified Recruiter badge still only appears for approved and non-suspended recruiters
 
-### New files
+- featured values match Growth/Fleet plan eligibility
 
-- `src/lib/recruiterReports/aggregator.ts` — pure aggregator (no driver financials)
-- `src/lib/recruiterReports/csv.ts` — CSV builder
-- `src/lib/recruiterReports/pdf.ts` — jsPDF builder (Activity + Pipeline layouts)
-- `src/hooks/recruiter/useRecruiterReportData.ts` — pulls all rows for date range
-- `src/components/recruiter/RecruiterReportsPanel.tsx` — UI (date range, report type, format, generate button)
+- build passes with no TypeScript errors
 
-### Data sources (read-only, RLS-scoped to recruiter)
+## Scope
 
-- `recruiter_profiles` → company_name, recruiter_name, mc/dot, city/state, verification_status
-- `recruiter_billing_profiles` → plan, active_opportunity_limit, status
-- `opportunities` (filter `recruiter_id`) → active count, top performers (by view_count + application count)
-- `opportunity_applications` (filter `recruiter_id`, created_at in range) → totals, status breakdown
-- `application_events` (in range) → interviews scheduled, offers_sent counts
-- `recruiter_contact_requests` (in range) → total + by status
-- `contracts` joined to applications → contract status summary, opportunities blocked (status NOT IN ('approved','signed') for hired-pending apps)
-
-### Report types
-
-1. **Recruiter Activity Report** (PDF + CSV) — header + summary KPIs + status breakdown + contact request stats + contract status summary + plan usage.
-2. **Recruiter Pipeline Report** (PDF + CSV) — per-opportunity rows: title, status, applications, interviews, offers, hired, contract block flag, view count.
-
-### Report sections (both)
-
-- Header: HaulTrackerPro — {report name}; Company Name; Recruiter Name; Date Range; Generated timestamp
-- KPIs: Active Opportunities, Total Applications (in range), Applications by Status table, Contact Requests (pending/approved/declined/expired), Interviews (call_scheduled+interviewing event counts), Offers Sent, Hired, Rejected, Withdrawn
-- Contract status summary: counts per `contracts.status` for in-range applications
-- Opportunities blocked by contract: list apps where `status='offer_sent'` or hire attempt blocked because contract not approved/signed
-- Top-performing opportunities (top 5 by applications)
-- Plan usage: `{active_count} / {active_opportunity_limit} slots used` and current plan name
-- Footer: "Generated by HaulTrackerPro.com"
-- **Explicitly excludes** any driver loads/expenses/fuel/profit data
-
-### Gating
-
-- Available only when `recruiter_billing_profiles.plan IN ('growth','fleet')` AND `status IN ('active','trialing')`. Free/Starter sees locked preview card with upgrade CTA.
-- Surface in `RecruiterContractsView` sibling area (new "Reports" tab/section inside `Recruiters.tsx`).
-
-### Marketing copy
-
-- Add "Recruiter Activity & Pipeline reports (PDF + CSV)" to Growth/Fleet bullets in `RecruiterLanding.tsx`, `Pricing.tsx`, `recruiterFeatureList.ts`. Do NOT claim driver financial data.
+Six surgical changes, no unrelated areas touched. Behavior stays the same; UX and copy get sharper and the migration cleans up linter noise.
 
 ---
 
-## Part 2 — Contract Company Info Auto-Fill (platform record only)
+### 1. Recruiter Reports panel — loading / empty / error states
 
-No PDF generation. No edits to uploaded files. Auto-fill only the platform contract record/summary panel.
+File: `src/components/recruiter/RecruiterReportsPanel.tsx`
 
-### New component
+- Add an `aggregateRecruiterReport(data)` `useMemo` in the eligible branch and derive `isEmpty = aggregate.totals.applications === 0 && aggregate.totals.opportunities === 0 && aggregate.totals.contactRequests === 0 && aggregate.totals.contracts === 0` for the selected range.
+- Replace the current `isError`-only banner with a stacked status area:
+  - `isLoading` → skeleton (3 muted bars) under the date controls.
+  - `isError` → existing destructive banner with a "Retry" button that calls `refetch`.
+  - `!isLoading && !isError && isEmpty` → neutral muted banner: "No recruiter activity in this range. Pick a wider range or post your first opportunity," with a "Last 30 days" preset shortcut.
+- Disable Generate when `isLoading || isError || isEmpty || busy`.
+- Show the date range echo ("Showing data for MM/DD/YYYY – MM/DD/YYYY") under the CardDescription so the user always sees what was queried.
+- Pull `refetch` from `useRecruiterReportData` (already returned) for the Retry button.
 
-- `src/components/contracts/ContractSummaryPanel.tsx` — read-only details card rendered at the top of `ContractAttachment.tsx` for both driver and recruiter roles.
+### 2. Pricing & recruiter landing bullets
 
-### Data
+Files: `src/pages/Pricing.tsx`, `src/components/landing/RecruiterLanding.tsx`
 
-Extend `useApplicationContract` (or a small new hook `useContractContext(applicationId)`) to join:
+- Growth bullets → add `"Recruiter Activity & Pipeline reports (PDF + CSV)"` after the priority placement line.
+- Fleet bullets → replace `"Recruiting snapshot dashboard"` with `"Recruiter Activity & Pipeline reports (PDF + CSV)"` (and keep Priority placement + Priority support).
+- Starter bullets unchanged. No promise of seats, multi-user, or chat.
+- Mirror the same wording in `RecruiterLanding.tsx` `plans` array for Growth and Fleet.
 
-- `opportunity_applications` → status, created_at
-- `opportunities` → title, company_name, pay_rate/pay_structure summary, city/state
-- `recruiter_profiles` → recruiter_name, company_name, mc_number, dot_number, company_city/state, verification_status, status
-- `driver_profiles` → driver full_name (recruiter view only)
-- `contracts` → status, current_version_id, updated_at
-- `contract_versions` → version_number, uploaded_at
-- `contract_signatures` → driver signed_at (existence)
+### 3. Recruiter sidebar + route wiring for Reports
 
-### Driver view shows
+Files: `src/components/premium/AppSidebar.tsx`, `src/pages/Index.tsx`, `src/components/opportunities/recruiter/RecruiterAccessRoute.tsx`
 
-- Company name + Verified Recruiter badge (when `verification_status='approved'` AND `status<>'suspended'`)
-- Recruiter name
-- Opportunity title + pay summary (if present)
-- Company location (City, ST)
-- MC/DOT (only if present)
-- Contract uploaded date + version number (`v{n}`)
-- Application status pill
-- Contract status pill
+- Sidebar: add `{ id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 }` to `recruiterItems` just above `contracts`.
+- `RecruiterAccessRoute`: extend `RecruiterView` to include `'reports'`. Lazy-import `RecruiterReportsPanel`. When `view === 'reports'` render it with `onBack={() => setView('hub')}` and an `onUpgrade` that calls `onBack` then navigates `/pricing`.
+- `Index.tsx`:
+  - Widen `recruiterView` state type to include `'reports'`.
+  - In `handleNavigate`, map `sub === 'reports'` → `setRecruiterView('reports')`.
+  - In `navKey` / `navLabel` derivation, add a `recruiter-access:reports` → `"Reports"` case with subtitle "Activity and Pipeline reports for your recruiting".
+- No changes to driver navigation; driver `Reports` stays untouched.
 
-### Recruiter view shows
+### 4. OpportunityCard polish (presentation only)
 
-- Driver name
-- Opportunity title
-- Application status pill
-- Contract status pill
-- Driver decision status (approved / rejected / changes_requested / pending)
-- Signature status (signed at {date} / not signed)
+File: `src/components/opportunities/OpportunityCard.tsx`
 
-### Copy rules
+- Rename existing `"Priority"` badge label to `"Priority placement"` (clearer and matches pricing copy). Keep tone/colors.
+- Add a subtle `title`/`aria-label` on the Priority badge: "Priority placement — Growth or Fleet plan".
+- Guard the recruiter join shape so a missing `recruiter` object renders no badge instead of crashing (defensive only — feature stays gated to `verification_status === 'approved' && status !== 'suspended'`).
+- No data-fetching changes. The opportunities list hook already handles loading/error; this card stays purely presentational.
 
-- No string anywhere may claim the PDF was auto-filled, generated, or edited.
-- Panel headed: "Contract details" with subtitle "Auto-filled from this application — does not modify the uploaded contract."
-- Audit existing copy in `ContractAttachment.tsx`, `DriverContractsView.tsx`, `RecruiterContractsView.tsx`, `ContractSeoPage.tsx`, `featureList.ts`, `recruiterFeatureList.ts` to remove any conflicting language (currently none expected).
+### 5. Supabase linter pass
 
-### Out of scope
+New migration. Two issue classes are in scope (the linter currently shows 87 warnings, most pre-existing). We target the ones introduced/owned by recent recruiter work, leaving unrelated tables alone:
 
-- Driver financial data in recruiter reports
-- Editing or generating contract PDFs
-- Contract templates
-- New backend tables, RLS changes, edge functions, billing logic
-- Auth, role switcher, landing redesign
+- Functions added in `20260516155235_*` and `20260516155254_*` (`recruiter_has_priority_plan`, `opportunities_set_featured_from_plan`, `recruiter_billing_sync_featured`):
+  - Re-declare with `SET search_path = public, pg_temp` (covers the "Function Search Path Mutable" warnings for these three).
+  - `REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated;` and `GRANT EXECUTE ... TO service_role;` so they only run from triggers / service contexts. Triggers continue to run because trigger execution is not gated by EXECUTE on the function for `SECURITY DEFINER` invoked from a trigger.
+- Storage / RLS / older functions outside this feature are explicitly out of scope; we note remaining warnings in the migration description so the user knows they exist.
 
-### QA checklist
+### 6. Verify Priority = active Growth/Fleet plan
 
-1. Recruiter on Growth/Fleet sees Reports section; generates Activity PDF — header shows company + recruiter + date range; no driver profit fields present.
-2. CSV export downloads with same fields; opens cleanly in Excel.
-3. Free/Starter recruiter sees locked preview, not the generator.
-4. Driver opens a contract → summary panel shows company, recruiter, Verified badge, opportunity title, location, MC/DOT, upload date, version.
-5. Recruiter opens same contract → summary panel shows driver name, opportunity, application status, contract status, decision, signature status.
-6. No UI string claims the uploaded PDF is auto-filled.
-7. Build passes; no TS errors.
+Read-only verification step (no schema change beyond #5):
+
+- Run `supabase--read_query` to confirm:
+  - All `opportunities.featured = true` rows belong to a recruiter whose `recruiter_billing_profiles` has `plan IN ('growth','fleet') AND status IN ('active','trialing')`.
+  - All `opportunities.featured = false` rows do NOT meet that condition.
+- Run a manual touch (`UPDATE opportunities SET recruiter_id = recruiter_id WHERE id = <sample>`) to confirm the BEFORE trigger recomputes `featured`. If the verify shows drift, re-run the existing backfill statement from migration `20260516155235`.
+
+---
+
+## QA checklist
+
+1. Recruiter Reports panel: pick a range with zero data → empty banner appears, Generate is disabled, Retry only appears on error.
+2. Loading state shows skeleton, not a blank card.
+3. Pricing page Growth + Fleet rows show the new "Recruiter Activity & Pipeline reports (PDF + CSV)" bullet.
+4. Recruiter landing page Growth + Fleet plan cards show the same bullet.
+5. Recruiter sidebar shows a Reports item; clicking it opens `RecruiterReportsPanel` with the proper back button.
+6. Driver sidebar Reports item still routes to the driver report.
+7. Opportunity card badge reads "Priority placement"; "Verified Recruiter" badge still only shows for approved + non-suspended recruiters.
+8. SQL verification confirms `featured` matches plan eligibility for every row.
+9. Supabase linter shows fewer warnings (the three new functions are gone from the list).
+10. Build passes, no TypeScript or console errors.
+
+## Out of scope
+
+Billing flows, Stripe edge functions, driver pages, landing redesign, role switcher, contract signing logic, and any storage bucket changes unrelated to the three new functions.
