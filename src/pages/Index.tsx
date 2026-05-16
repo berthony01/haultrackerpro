@@ -515,24 +515,36 @@ const Index = () => {
   // Derive sidebar/header key so Recruiter Access has its own label & highlight.
   const navKey =
     page === 'recruiter-access'
-      ? 'recruiter-access'
+      ? (recruiterView === 'manager'
+          ? 'recruiter-access:manager'
+          : recruiterView === 'applications'
+            ? 'recruiter-access:applications'
+            : 'recruiter-access')
       : page === 'opportunities' && opportunitiesView === 'driver-profile'
         ? 'opportunity-preferences'
         : page;
   const navLabel =
     navKey === 'recruiter-access'
       ? 'Recruiter Access'
-      : navKey === 'opportunity-preferences'
-        ? 'Opportunity Preferences'
-        : navKey === 'dashboard'
-          ? 'Dashboard'
-          : navKey.charAt(0).toUpperCase() + navKey.slice(1).replace(/[_-]/g, ' ');
+      : navKey === 'recruiter-access:manager'
+        ? 'Manage Opportunities'
+        : navKey === 'recruiter-access:applications'
+          ? 'Applications'
+          : navKey === 'opportunity-preferences'
+            ? 'Opportunity Preferences'
+            : navKey === 'dashboard'
+              ? 'Dashboard'
+              : navKey.charAt(0).toUpperCase() + navKey.slice(1).replace(/[_-]/g, ' ');
   const navSubtitle =
     navKey === 'recruiter-access'
       ? 'Manage your recruiter command center'
-      : navKey === 'opportunity-preferences'
-        ? 'Tune what recruiters see and how you match'
-        : 'Your hauling overview';
+      : navKey === 'recruiter-access:manager'
+        ? 'Post and manage your opportunities'
+        : navKey === 'recruiter-access:applications'
+          ? 'Review driver applications'
+          : navKey === 'opportunity-preferences'
+            ? 'Tune what recruiters see and how you match'
+            : 'Your hauling overview';
 
   const handleAddLoadFromModal = () => {
     setEditingLoad(null);
