@@ -29,7 +29,7 @@ export default function Privacy() {
             <li>Email address and optional first name submitted via free resource downloads (e.g., the Free Trucker Starter Kit) — used only to deliver the requested resource and occasional related updates. You can unsubscribe at any time.</li>
             <li>Load data (pickup/dropoff locations, miles, rates, fees)</li>
             <li>Expense data (categories, amounts, dates)</li>
-            <li>Driver Opportunity Profile (preferences, experience, trailer types) — only used for matching opportunities and only visible to recruiters after you request information on their listing</li>
+            <li>Opportunity Preferences (preferences, experience, trailer types) — only used for matching opportunities and only visible to recruiters after you request information on their listing</li>
             <li>Recruiter / company profile data (company name, contact info, verification documents) for users with recruiter access</li>
             <li>Billing data — handled and stored by Stripe; we store only customer and subscription identifiers, never card numbers</li>
             <li>Usage data (app interactions for product improvement)</li>
