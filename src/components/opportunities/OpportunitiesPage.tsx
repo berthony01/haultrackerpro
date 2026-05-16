@@ -26,7 +26,6 @@ import { useOpportunities } from '@/hooks/opportunities/useOpportunities';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
-import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
@@ -35,7 +34,7 @@ import { RecruiterOpportunityManager } from './RecruiterOpportunityManager';
 import { DriverApplicationsPanel } from './DriverApplicationsPanel';
 import { RecruiterApplicationsDashboard } from './RecruiterApplicationsDashboard';
 import { RecruiterAccessPage } from './recruiter/RecruiterAccessPage';
-import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase, Mailbox, Users, Info } from 'lucide-react';
+import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
 
@@ -50,7 +49,6 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
   const { profile, isLoading: profileLoading, isError: profileIsError, refetch: refetchProfile } = useDriverOpportunityProfile();
-  const { profile: recruiterProfile, isLoading: recruiterLoading } = useRecruiterProfile();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
