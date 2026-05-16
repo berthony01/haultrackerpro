@@ -219,9 +219,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
 
   if (showRecruiterHub) {
     return (
-      <RecruiterAccessHub
-        profile={recruiterProfile}
-        loading={recruiterLoading}
+      <RecruiterAccessPage
         onBack={() => setShowRecruiterHub(false)}
         onOpenOnboarding={() => setShowRecruiterOnboarding(true)}
         onManage={() => setShowRecruiterManager(true)}
