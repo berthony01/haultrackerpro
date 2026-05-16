@@ -91,7 +91,7 @@ export function BottomNav({ active, onNavigate, role, isAdmin, roleLoading }: Bo
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">
       <div className="flex items-center justify-around h-[72px] max-w-lg mx-auto px-2">
-        {navItems.map(item => {
+        {(roleLoading ? [{ id: 'add', label: 'Add', icon: Plus }, { id: 'more', label: 'More', icon: MoreHorizontal }] : navItems).map(item => {
           const isActive = active === item.id;
           const isAdd = item.id === 'add';
           const isMore = item.id === 'more';
