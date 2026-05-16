@@ -5,14 +5,24 @@ import { useAdmin } from '@/hooks/useAdmin';
 
 export type UserRole = 'driver' | 'recruiter';
 
+/** Read sticky recruiter intent set during signup/OAuth round-trip. */
+function readRecruiterIntent(): boolean {
+  try {
+    if (sessionStorage.getItem('htp_auth_intent') === 'recruiter') return true;
+    if (sessionStorage.getItem('htp_recruiter_intent') === '1') return true;
+  } catch {}
+  return false;
+}
+
 /**
  * Derives the user's primary role from existing data:
- * - recruiter = has a row in `recruiter_profiles`
+ * - recruiter = has a row in `recruiter_profiles` OR has fresh recruiter signup intent
+ *   (so a brand-new recruiter isn't bounced out of /recruiter-access before
+ *   they complete onboarding and the profile row gets written)
  * - driver    = everyone else
  *
  * Admin / owner accounts are tracked separately via `useAdmin()` and keep
- * cross-role access for management/testing. This hook intentionally does NOT
- * create a new role system — it just reads what already exists.
+ * cross-role access for management/testing.
  */
 export function useUserRole() {
   const { user, loading: authLoading } = useAuth();
@@ -34,9 +44,19 @@ export function useUserRole() {
     staleTime: 60_000,
   });
 
-  const isRecruiter = !!recruiterQuery.data;
+  const hasRecruiterProfile = !!recruiterQuery.data;
+  const intentRecruiter = readRecruiterIntent();
+  const isRecruiter = hasRecruiterProfile || intentRecruiter;
   const role: UserRole = isRecruiter ? 'recruiter' : 'driver';
   const isLoading = authLoading || adminLoading || recruiterQuery.isLoading;
 
-  return { role, isRecruiter, isDriver: !isRecruiter, isAdmin, isLoading };
+  return {
+    role,
+    isRecruiter,
+    isDriver: !isRecruiter,
+    isAdmin,
+    isLoading,
+    hasRecruiterProfile,
+    intentRecruiter,
+  };
 }

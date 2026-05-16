@@ -35,7 +35,10 @@ export function useRecruiterProfile() {
         .upsert({ ...data, user_id: user.id }, { onConflict: 'user_id' });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['recruiter_profile'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recruiter_profile'] });
+      qc.invalidateQueries({ queryKey: ['user-role-recruiter-check'] });
+    },
   });
 
   // ----- Admin-only helpers -----
