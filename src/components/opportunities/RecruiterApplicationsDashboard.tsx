@@ -11,15 +11,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Inbox, RefreshCw, Search, Ban, AlertTriangle, FileText } from 'lucide-react';
+import {
+  ArrowLeft,
+  Inbox,
+  RefreshCw,
+  Search,
+  Ban,
+  AlertTriangle,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { useOpportunityApplications, type RecruiterApplicationStatus } from '@/hooks/opportunities/useOpportunityApplications';
+import {
+  useOpportunityApplications,
+  type RecruiterApplicationStatus,
+} from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ContractAttachment } from '@/components/contracts/ContractAttachment';
 import { useContractReadinessMap } from '@/hooks/contracts/useContractReadinessMap';
+import {
+  STATUS_LABEL,
+  STATUS_BADGE_CLASS,
+  RECRUITER_ACTION_LABEL,
+  RECRUITER_PIPELINE_GROUPS,
+  getAllowedRecruiterTransitions,
+} from '@/lib/opportunities/applicationStatus';
+import { ApplicationTimeline } from './ApplicationTimeline';
+import {
+  pipelineCounts,
+  hireConversionRate,
+} from '@/lib/opportunities/pipelineAnalytics';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,44 +62,6 @@ interface Props {
 
 const ANY = 'any';
 
-const STATUS_VARIANT: Record<string, { label: string; cls: string }> = {
-  new: { label: 'New', cls: 'bg-primary/15 text-primary border-primary/30' },
-  viewed: { label: 'Viewed', cls: 'bg-muted text-foreground border-border' },
-  contacted: { label: 'Contacted', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-  interviewing: { label: 'Interviewing', cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-  hired: { label: 'Hired', cls: 'bg-green-500/15 text-green-400 border-green-500/30' },
-  rejected: { label: 'Rejected', cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
-  withdrawn: { label: 'Withdrawn', cls: 'bg-muted text-muted-foreground border-border' },
-};
-
-const RECRUITER_TRANSITIONS: { value: RecruiterApplicationStatus; label: string }[] = [
-  { value: 'viewed', label: 'Mark Viewed' },
-  { value: 'contacted', label: 'Mark Contacted' },
-  { value: 'interviewing', label: 'Mark Interviewing' },
-  { value: 'hired', label: 'Mark Hired' },
-  { value: 'rejected', label: 'Mark Rejected' },
-];
-
-const STATUS_RANK: Record<string, number> = {
-  new: 1,
-  viewed: 2,
-  contacted: 3,
-  interviewing: 4,
-  hired: 5,
-  rejected: 5,
-  withdrawn: 5,
-};
-
-function getAllowedTransitions(currentStatus: string): RecruiterApplicationStatus[] {
-  const currentRank = STATUS_RANK[currentStatus] ?? 0;
-  // Terminal statuses get no recruiter actions
-  if (['hired', 'rejected', 'withdrawn'].includes(currentStatus)) return [];
-  return RECRUITER_TRANSITIONS.filter((t) => {
-    const targetRank = STATUS_RANK[t.value] ?? 0;
-    return targetRank > currentRank;
-  }).map((t) => t.value);
-}
-
 function formatHireError(e: Error, status: RecruiterApplicationStatus): string {
   const msg = e?.message || '';
   if (status === 'hired' && /contract/i.test(msg)) {
@@ -84,14 +71,24 @@ function formatHireError(e: Error, status: RecruiterApplicationStatus): string {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_VARIANT[status] ?? { label: status, cls: 'bg-muted text-foreground border-border' };
-  return <Badge variant="outline" className={cfg.cls}>{cfg.label}</Badge>;
+  return (
+    <Badge
+      variant="outline"
+      className={STATUS_BADGE_CLASS[status] ?? 'bg-muted text-foreground border-border'}
+    >
+      {STATUS_LABEL[status] ?? status}
+    </Badge>
+  );
 }
 
 function fmtDate(d?: string | null) {
   if (!d) return '—';
   try {
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(d).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   } catch {
     return '—';
   }
@@ -112,6 +109,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
   const [search, setSearch] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [warnHire, setWarnHire] = useState<{ id: string; status: RecruiterApplicationStatus } | null>(null);
+  const [expandedTimeline, setExpandedTimeline] = useState<Record<string, boolean>>({});
 
   const appIds = useMemo(() => recruiterApplications.map((a: any) => a.id), [recruiterApplications]);
   const { readinessMap } = useContractReadinessMap(appIds);
@@ -145,6 +143,28 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     });
   }, [recruiterApplications, statusFilter, opportunityFilter, search]);
 
+  const grouped = useMemo(() => {
+    const m = new Map<string, any[]>();
+    RECRUITER_PIPELINE_GROUPS.forEach((g) => m.set(g.key, []));
+    filtered.forEach((a) => {
+      const group = RECRUITER_PIPELINE_GROUPS.find((g) => g.statuses.includes(a.status));
+      if (group) m.get(group.key)!.push(a);
+    });
+    return m;
+  }, [filtered]);
+
+  const analytics = useMemo(() => {
+    const counts = pipelineCounts(recruiterApplications as any[]);
+    return {
+      total: recruiterApplications.length,
+      open: (recruiterApplications as any[]).filter(
+        (a) => !['hired', 'rejected', 'withdrawn'].includes(a.status),
+      ).length,
+      hired: counts['hired'] ?? 0,
+      conversion: Math.round(hireConversionRate(recruiterApplications as any[]) * 100),
+    };
+  }, [recruiterApplications]);
+
   const handleUpdate = (id: string, status: RecruiterApplicationStatus) => {
     if (status === 'hired') {
       const readiness = readinessMap.get(id)?.readiness;
@@ -157,10 +177,10 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     updateApplicationStatus.mutate(
       { id, status },
       {
-        onSuccess: () => toast.success(`Marked ${status}`),
+        onSuccess: () => toast.success(`Marked ${STATUS_LABEL[status] ?? status}`),
         onError: (e: Error) => toast.error(formatHireError(e, status)),
         onSettled: () => setPendingId(null),
-      }
+      },
     );
   };
 
@@ -172,10 +192,10 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     updateApplicationStatus.mutate(
       { id, status },
       {
-        onSuccess: () => toast.success(`Marked ${status}`),
+        onSuccess: () => toast.success(`Marked ${STATUS_LABEL[status] ?? status}`),
         onError: (e: Error) => toast.error(formatHireError(e, status)),
         onSettled: () => setPendingId(null),
-      }
+      },
     );
   };
 
@@ -228,15 +248,117 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     );
   }
 
+  const renderCard = (a: any) => {
+    const dp = a.driver_profile;
+    const opp = a.opportunities;
+    const match =
+      dp && opp
+        ? calculateOpportunityMatch({
+            opportunity: opp,
+            driverProfile: dp,
+            opportunityFinancials: calculateOpportunityFinancials(opp),
+          })
+        : null;
+    const allowed = getAllowedRecruiterTransitions(a.status);
+    const isOpen = !!expandedTimeline[a.id];
+    return (
+      <Card key={a.id} className="p-5 border-border/60">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-foreground">
+              {dp?.full_name || 'Driver'}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {[dp?.city, dp?.state].filter(Boolean).join(', ') || '—'}
+              {dp?.cdl_class ? <> · CDL {dp.cdl_class}</> : null}
+              {dp?.years_experience != null ? <> · {dp.years_experience} yrs</> : null}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {match && <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />}
+            <StatusBadge status={a.status} />
+            {(() => {
+              const info = readinessMap.get(a.id);
+              if (!info) return null;
+              return (
+                <Badge variant="outline" className={`gap-1 ${info.badgeClass}`}>
+                  <FileText className="h-3 w-3" />
+                  {info.label}
+                </Badge>
+              );
+            })()}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
+          <Field label="Opportunity" value={opp?.title || '—'} />
+          <Field label="Submitted" value={fmtDate(a.created_at)} />
+          <Field label="Last Activity" value={fmtDate(a.updated_at)} />
+          <Field label="Contact" value={a.preferred_contact_method || '—'} />
+          {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
+          {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
+          {a.driver_phone_snapshot && <Field label="Phone" value={a.driver_phone_snapshot} />}
+          {a.driver_email_snapshot && <Field label="Email" value={a.driver_email_snapshot} />}
+        </div>
+
+        {a.message && (
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-foreground/90 mb-3 whitespace-pre-wrap">
+            {a.message}
+          </div>
+        )}
+
+        <div className="mb-3">
+          <ContractAttachment applicationId={a.id} role="recruiter" />
+        </div>
+
+        {allowed.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {allowed.map((status) => (
+              <Button
+                key={status}
+                variant={status === 'hired' ? 'default' : status === 'rejected' ? 'ghost' : 'outline'}
+                size="sm"
+                onClick={() => handleUpdate(a.id, status)}
+                disabled={pendingId === a.id || updateApplicationStatus.isPending}
+              >
+                {RECRUITER_ACTION_LABEL[status]}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          onClick={() => setExpandedTimeline((m) => ({ ...m, [a.id]: !m[a.id] }))}
+        >
+          {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          {isOpen ? 'Hide activity' : 'Show activity'}
+        </button>
+        {isOpen && (
+          <div className="mt-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+            <ApplicationTimeline applicationId={a.id} />
+          </div>
+        )}
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
       {renderHeader}
 
       <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
-        <h1 className="text-2xl font-black tracking-tight text-foreground mb-1">Applications</h1>
-        <p className="text-sm text-muted-foreground">
-          Review drivers who requested information about your opportunities.
+        <h1 className="text-2xl font-black tracking-tight text-foreground mb-1">Recruiting Pipeline</h1>
+        <p className="text-sm text-muted-foreground mb-4">
+          Move drivers through your hiring workflow.
         </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Stat label="Total Applicants" value={analytics.total} />
+          <Stat label="Open" value={analytics.open} />
+          <Stat label="Hired" value={analytics.hired} />
+          <Stat label="Hire Rate" value={`${analytics.conversion}%`} />
+        </div>
       </Card>
 
       <Card className="p-4 border-border/60 space-y-3">
@@ -251,25 +373,39 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</label>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Status
+            </label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ANY}>Any</SelectItem>
-                {Object.keys(STATUS_VARIANT).map((s) => (
-                  <SelectItem key={s} value={s}>{STATUS_VARIANT[s].label}</SelectItem>
-                ))}
+                {Object.keys(STATUS_LABEL)
+                  .filter((s) => s !== 'contacted')
+                  .map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {STATUS_LABEL[s]}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Opportunity</label>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Opportunity
+            </label>
             <Select value={opportunityFilter} onValueChange={setOpportunityFilter}>
-              <SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ANY}>Any</SelectItem>
                 {opportunityOptions.map(([id, title]) => (
-                  <SelectItem key={id} value={id}>{title}</SelectItem>
+                  <SelectItem key={id} value={id}>
+                    {title}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -289,7 +425,9 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
         />
       ) : isLoadingRecruiter ? (
         <div className="space-y-3">
-          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-40 w-full" />)}
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-40 w-full" />
+          ))}
         </div>
       ) : recruiterApplications.length === 0 ? (
         <EmptyState
@@ -304,7 +442,9 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
             <Button
               variant="outline"
               onClick={() => {
-                setSearch(''); setStatusFilter(ANY); setOpportunityFilter(ANY);
+                setSearch('');
+                setStatusFilter(ANY);
+                setOpportunityFilter(ANY);
               }}
             >
               Clear filters
@@ -312,90 +452,22 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           }
         />
       ) : (
-        <div className="space-y-3">
-          {filtered.map((a: any) => {
-            const dp = a.driver_profile;
-            const opp = a.opportunities;
-            const match = dp && opp
-              ? calculateOpportunityMatch({
-                  opportunity: opp,
-                  driverProfile: dp,
-                  opportunityFinancials: calculateOpportunityFinancials(opp),
-                })
-              : null;
+        <div className="space-y-6">
+          {RECRUITER_PIPELINE_GROUPS.map((g) => {
+            const apps = grouped.get(g.key) ?? [];
+            if (apps.length === 0) return null;
             return (
-              <Card key={a.id} className="p-5 border-border/60">
-                <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold text-foreground">
-                      {dp?.full_name || 'Driver'}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {[dp?.city, dp?.state].filter(Boolean).join(', ') || '—'}
-                      {dp?.cdl_class ? <> · CDL {dp.cdl_class}</> : null}
-                      {dp?.years_experience != null ? <> · {dp.years_experience} yrs</> : null}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {match && <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />}
-                    <StatusBadge status={a.status} />
-                    {(() => {
-                      const info = readinessMap.get(a.id);
-                      if (!info) return null;
-                      return (
-                        <Badge variant="outline" className={`gap-1 ${info.badgeClass}`}>
-                          <FileText className="h-3 w-3" />
-                          {info.label}
-                        </Badge>
-                      );
-                    })()}
-                  </div>
+              <section key={g.key} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                    {g.label}
+                  </h2>
+                  <Badge variant="outline" className="bg-muted/50">
+                    {apps.length}
+                  </Badge>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
-                  <Field label="Opportunity" value={opp?.title || '—'} />
-                  <Field label="Application" value={a.application_type?.replace('_', ' ') || '—'} />
-                  <Field label="Contact" value={a.preferred_contact_method || '—'} />
-                  <Field label="Submitted" value={fmtDate(a.created_at)} />
-                  {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
-                  {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
-                  {a.driver_phone_snapshot && <Field label="Phone" value={a.driver_phone_snapshot} />}
-                  {a.driver_email_snapshot && <Field label="Email" value={a.driver_email_snapshot} />}
-                </div>
-
-                {a.message && (
-                  <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-foreground/90 mb-3 whitespace-pre-wrap">
-                    {a.message}
-                  </div>
-                )}
-
-                <div className="mb-3">
-                  <ContractAttachment applicationId={a.id} role="recruiter" />
-                </div>
-
-                {(() => {
-                  const allowed = getAllowedTransitions(a.status);
-                  if (allowed.length === 0) return null;
-                  return (
-                    <div className="flex flex-wrap gap-2">
-                      {allowed.map((status) => {
-                        const t = RECRUITER_TRANSITIONS.find((x) => x.value === status)!;
-                        return (
-                          <Button
-                            key={t.value}
-                            variant={t.value === 'hired' ? 'default' : t.value === 'rejected' ? 'ghost' : 'outline'}
-                            size="sm"
-                            onClick={() => handleUpdate(a.id, t.value)}
-                            disabled={pendingId === a.id || updateApplicationStatus.isPending}
-                          >
-                            {t.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </Card>
+                <div className="space-y-3">{apps.map(renderCard)}</div>
+              </section>
             );
           })}
         </div>
@@ -427,6 +499,15 @@ function Field({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="text-sm text-foreground capitalize">{value}</p>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-card/40 p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-xl font-black text-foreground">{value}</p>
     </div>
   );
 }
