@@ -378,7 +378,7 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         <Button variant="outline" onClick={onBack} className="flex-1">Cancel</Button>
         <Button onClick={handleSave} disabled={upsertProfile.isPending} className="flex-1">
           <Save className="h-4 w-4" />
-          {upsertProfile.isPending ? 'Saving…' : 'Save Profile'}
+          {upsertProfile.isPending ? 'Saving…' : 'Save Preferences'}
         </Button>
       </div>
     </div>
