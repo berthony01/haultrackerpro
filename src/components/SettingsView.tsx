@@ -680,6 +680,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </div>
       </div>
 
+      <NotificationPreferencesPanel />
+
       {/* Modals */}
       <DeleteAccountModal open={showDeleteModal} onOpenChange={setShowDeleteModal} />
       <SendFeedbackModal open={showFeedbackModal} onOpenChange={setShowFeedbackModal} />
