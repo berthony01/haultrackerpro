@@ -144,15 +144,17 @@ export default function Pricing() {
             <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </button>
-          <div className="flex items-center gap-1 sm:gap-3">
-            <Button variant="ghost" onClick={() => { trackPricingProfitIntelClick(); navigate('/#profit-intelligence'); }} className="text-xs sm:text-sm px-2 sm:px-4" style={{ color: 'hsl(25, 95%, 60%)' }}>
-              Profit Intelligence
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+            <Button variant="ghost" onClick={() => { trackPricingProfitIntelClick(); navigate('/#profit-intelligence'); }} className="text-xs sm:text-sm px-2 sm:px-4 hidden xs:inline-flex" style={{ color: 'hsl(25, 95%, 60%)' }}>
+              <span className="hidden sm:inline">Profit Intelligence</span>
+              <span className="sm:hidden">Intel</span>
             </Button>
             <Button variant="ghost" onClick={() => navigate('/auth')} className="text-sm hidden sm:inline-flex" style={{ color: 'hsl(220, 10%, 70%)' }}>
               Sign In
             </Button>
-            <Button onClick={() => navigate('/auth')} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Tracking Free
+            <Button onClick={() => navigate('/auth')} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5 whitespace-nowrap" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+              <span className="hidden sm:inline">Start Tracking Free</span>
+              <span className="sm:hidden">Start Free</span>
             </Button>
           </div>
         </div>
