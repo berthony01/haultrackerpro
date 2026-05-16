@@ -30,6 +30,10 @@ const ICON_BY_TYPE: Record<string, any> = {
   driver_request_callback: PhoneCall,
   driver_need_more_info: MessageSquare,
   driver_not_interested: XCircle,
+  contact_request_created: PhoneCall,
+  contact_request_approved: CheckCircle2,
+  contact_request_declined: XCircle,
+  contact_request_expired: Clock,
 };
 
 function fmt(d: string) {
