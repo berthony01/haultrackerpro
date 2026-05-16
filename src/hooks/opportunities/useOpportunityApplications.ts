@@ -84,7 +84,10 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['opportunity_applications'] });
+      qc.invalidateQueries({ queryKey: ['application_events'] });
+    },
   });
 
   // Recruiter updates only the status field; trigger blocks anything else.
@@ -112,7 +115,10 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['application_events'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['application_events'] });
+      qc.invalidateQueries({ queryKey: ['opportunity_applications'] });
+    },
   });
 
   return {
