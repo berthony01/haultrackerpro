@@ -96,7 +96,10 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['opportunity_applications'] });
+      qc.invalidateQueries({ queryKey: ['application_events'] });
+    },
   });
 
   // Driver records a structured response (does not change application status)
