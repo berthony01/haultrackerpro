@@ -414,6 +414,15 @@ const Index = () => {
     setPage(p);
   };
 
+  const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
+    try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
+    setEditingLoad(null);
+    setEditingStops([]);
+    setEditingExpense(null);
+    setEditingFuelLog(null);
+    setPage('opportunities');
+  };
+
   const handleAddLoadFromModal = () => {
     setEditingLoad(null);
     setEditingStops([]);
@@ -515,8 +524,8 @@ const Index = () => {
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
-                        { icon: Route, label: hasCompletedDriverProfile ? 'Find Opportunities' : 'Set Opportunity Preferences', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', hasCompletedDriverProfile ? 'list' : 'driver-profile'); } catch {} ; handleNavigate('opportunities'); } },
-                        { icon: Users, label: 'Recruit Drivers', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter'); } catch {} ; handleNavigate('opportunities'); } },
+                        { icon: Route, label: hasCompletedDriverProfile ? 'Find Opportunities' : 'Set Opportunity Preferences', action: () => openOpportunitiesView(hasCompletedDriverProfile ? 'list' : 'driver-profile') },
+                        { icon: Users, label: 'Recruit Drivers', action: () => openOpportunitiesView('recruiter') },
                       ].map((item) => (
                         <button
                           key={item.label}

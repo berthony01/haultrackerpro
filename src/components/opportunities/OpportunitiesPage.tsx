@@ -240,7 +240,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
           <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
             <BriefcaseBusiness className="h-6 w-6 text-primary-foreground" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
               Opportunities
             </h1>
@@ -248,6 +248,17 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
               Profit-first trucking opportunities with real pay clarity.
             </p>
           </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Users className="h-4 w-4 text-primary shrink-0" />
+            <span className="text-xs sm:text-sm text-muted-foreground truncate">
+              Recruiting drivers?
+            </span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setShowRecruiter(true)} className="shrink-0">
+            Open Recruiter Access
+          </Button>
         </div>
       </Card>
 
