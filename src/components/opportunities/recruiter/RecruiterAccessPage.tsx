@@ -106,15 +106,14 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const recentPosts = useMemo(() => opportunities.slice(0, 5), [opportunities]);
 
   const canPost = state === 'approved_active';
+  const postDisabled = state !== 'approved_active' && state !== 'approved_no_billing';
 
   const handlePost = () => {
-    if (state === 'none') {
+    if (state === 'none' || state === 'rejected') {
+      // Don't silently open the recruiter-application form from a "Post" button —
+      // it looks like the post-opportunity form. Scroll to the explicit
+      // "Apply for Recruiter Access" card instead.
       onboardingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      onOpenOnboarding();
-      return;
-    }
-    if (state === 'rejected') {
-      onOpenOnboarding();
       return;
     }
     if (state === 'pending' || state === 'suspended') return;
@@ -152,7 +151,8 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
           <Button
             size="sm"
             onClick={handlePost}
-            disabled={state === 'pending' || state === 'suspended'}
+            disabled={postDisabled}
+            title={postDisabled ? 'Get approved as a recruiter to post opportunities.' : undefined}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <PlusCircle className="h-4 w-4" /> Post an Opportunity

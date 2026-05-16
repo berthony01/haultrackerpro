@@ -40,11 +40,12 @@ import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/o
 
 interface Props {
   onUpgrade: () => void;
+  onViewChange?: (view: 'list' | 'recruiter' | 'driver-profile') => void;
 }
 
 const ANY = 'any';
 
-export function OpportunitiesPage({ onUpgrade }: Props) {
+export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
@@ -78,6 +79,18 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       // 'list' is the default — no-op.
     } catch {}
   }, []);
+
+  // Notify parent of current top-level view so sidebar/header stay in sync.
+  useEffect(() => {
+    if (!onViewChange) return;
+    if (showRecruiterHub || showRecruiterOnboarding || showRecruiterManager || showRecruiterApps) {
+      onViewChange('recruiter');
+    } else if (showProfile) {
+      onViewChange('driver-profile');
+    } else {
+      onViewChange('list');
+    }
+  }, [showRecruiterHub, showRecruiterOnboarding, showRecruiterManager, showRecruiterApps, showProfile, onViewChange]);
 
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 
