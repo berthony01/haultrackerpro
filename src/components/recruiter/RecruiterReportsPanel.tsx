@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Loader2, Lock, Crown, AlertCircle, ArrowLeft } from 'lucide-react';
+import { FileText, Download, Loader2, Lock, Crown, AlertCircle, ArrowLeft, Inbox, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { useRecruiterReportData } from '@/hooks/recruiter/useRecruiterReportData';
@@ -43,6 +43,12 @@ const presets: { label: string; from: string; to: string }[] = [
   { label: 'This month', from: format(startOfMonth(new Date()), 'yyyy-MM-dd'), to: format(endOfMonth(new Date()), 'yyyy-MM-dd') },
 ];
 
+const fmtDisplay = (iso: string) => {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return y && m && d ? `${m}/${d}/${y}` : iso;
+};
+
 export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
   const [from, setFrom] = useState<string>(presets[1].from);
   const [to, setTo] = useState<string>(presets[1].to);
@@ -55,8 +61,15 @@ export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
     [from, to]
   );
 
-  const { data, isLoading, isError, planEligible, planLabel, billingPlan } =
+  const { data, isLoading, isError, refetch, planEligible, planLabel, billingPlan } =
     useRecruiterReportData(range, true);
+
+  const aggregate = useMemo(
+    () => (data ? aggregateRecruiterReport(data) : null),
+    [data]
+  );
+  const isEmpty = !!aggregate && aggregate.isEmpty;
+  const invalidRange = !from || !to || from > to;
 
   // Free / Starter recruiters see a locked preview, never the generator.
   if (!isLoading && !planEligible) {
@@ -98,17 +111,20 @@ export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
   }
 
   const generate = async () => {
-    if (!data) {
+    if (!aggregate) {
       toast.error('Report data not loaded yet');
       return;
     }
-    if (!from || !to || from > to) {
+    if (invalidRange) {
       toast.error('Pick a valid date range');
+      return;
+    }
+    if (isEmpty) {
+      toast.error('No recruiter activity in this range');
       return;
     }
     setBusy(true);
     try {
-      const aggregate = aggregateRecruiterReport(data);
       const stamp = format(new Date(), 'yyyyMMdd-HHmm');
       const baseName = `haultrackerpro-recruiter-${type}-${stamp}`;
       if (fmt === 'csv') {
@@ -125,6 +141,8 @@ export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
       setBusy(false);
     }
   };
+
+  const generateDisabled = busy || isLoading || isError || isEmpty || invalidRange || !aggregate;
 
   return (
     <div className="space-y-4">
@@ -147,15 +165,11 @@ export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
             Build Activity or Pipeline reports for any date range. Includes recruiter-owned data only —
             no driver financial, load, expense, fuel, or profit data is ever included.
           </CardDescription>
+          <p className="text-xs text-muted-foreground pt-1">
+            Showing data for <span className="font-medium text-foreground">{fmtDisplay(from)} – {fmtDisplay(to)}</span>
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isError && (
-            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
-              <AlertCircle className="h-4 w-4 mt-0.5 text-destructive" />
-              <span>Could not load report data. Try again in a moment.</span>
-            </div>
-          )}
-
           <div className="flex flex-wrap gap-2">
             {presets.map(p => (
               <Button
@@ -179,6 +193,54 @@ export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
               <Input id="rep-to" type="date" value={to} onChange={e => setTo(e.target.value)} />
             </div>
           </div>
+
+          {invalidRange && (
+            <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+              <AlertCircle className="h-4 w-4 mt-0.5 text-warning" />
+              <span>Pick a valid date range — "From" must be on or before "To".</span>
+            </div>
+          )}
+
+          {isLoading && !invalidRange && (
+            <div className="space-y-2" aria-live="polite" aria-busy="true">
+              <div className="h-3 rounded bg-muted/40 animate-pulse w-2/3" />
+              <div className="h-3 rounded bg-muted/40 animate-pulse w-1/2" />
+              <div className="h-3 rounded bg-muted/40 animate-pulse w-3/4" />
+            </div>
+          )}
+
+          {isError && !isLoading && (
+            <div className="flex items-start justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 text-destructive" />
+                <span>Could not load report data. Try again in a moment.</span>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1.5 shrink-0">
+                <RefreshCw className="h-3.5 w-3.5" /> Retry
+              </Button>
+            </div>
+          )}
+
+          {!isLoading && !isError && isEmpty && !invalidRange && (
+            <div className="rounded-md border border-border/60 bg-muted/30 p-4 text-sm space-y-2">
+              <div className="flex items-start gap-2">
+                <Inbox className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">No recruiter activity in this range</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">
+                    Pick a wider date range or post your first opportunity to start collecting applications.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setFrom(presets[1].from); setTo(presets[1].to); }}
+              >
+                Try Last 30 days
+              </Button>
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -205,7 +267,7 @@ export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
 
           <Button
             onClick={generate}
-            disabled={busy || isLoading || !data}
+            disabled={generateDisabled}
             className="gap-2 w-full sm:w-auto"
           >
             {busy || isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
