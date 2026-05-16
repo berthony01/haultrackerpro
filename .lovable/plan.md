@@ -1,101 +1,120 @@
+# Recruiter Parity + Dual-Audience Landing — Phased Plan
 
-# Recruiter Role-Separation — End-to-End Audit
+Goal: give recruiters a fully separate experience (settings, help/docs, what's new) that mirrors the driver side without leaking driver-only features, refresh the legal pages to match, and rebuild the landing page so it converts both audiences clearly.
 
-I traced the recruiter flow from sign up → auth redirect → role detection → navigation → route guards → recruiter pages. Below is what's wired correctly and what's still broken.
-
----
-
-## ✅ What IS set up correctly
-
-**1. Auth page (`src/pages/Auth.tsx`)**
-- Driver / Recruiter role selector is present, accessible, and persisted to both URL (`?intent=recruiter`) and `sessionStorage` (`htp_auth_intent`).
-- Title, helper copy, bullets, Google helper text, and switch-role footer all update with the selected role.
-- Google OAuth round-trip preserves recruiter intent via `redirect_uri=…/?intent=recruiter`.
-
-**2. Post-auth redirect (`src/App.tsx`)**
-- `postAuthRedirect()` reads `?intent=recruiter` and sends the user to `/dashboard?page=recruiter-access`.
-
-**3. Role detection (`src/hooks/useUserRole.ts`)**
-- Single source of truth: a row in `recruiter_profiles` → `recruiter`, otherwise `driver`. Admins flagged separately via `useAdmin`.
-
-**4. Sidebar (`src/components/premium/AppSidebar.tsx`)**
-- Drivers see driver-only menu, recruiters see recruiter-only menu, with skeleton during `roleLoading` to avoid flash.
-- Admin cross-role jump is isolated under a labeled "Admin Tools" section.
-
-**5. Bottom nav (`src/components/BottomNav.tsx`)**
-- Same role-split logic for mobile tabs and the "More" sheet. Admin Tools section is also visually isolated.
-
-**6. Index route guards (`src/pages/Index.tsx`)**
-- `handleNavigate` blocks non-admin drivers from `recruiter-access*` and blocks non-admin recruiters from driver-only pages **before** state changes.
-- A secondary `useEffect` guard re-checks `page` whenever role resolves, catching URL hacks.
-- `?page=recruiter-access` and legacy `?page=opportunities&view=recruiter` both deep-link to the new top-level route.
-- Recruiter Access render gate: `page === 'recruiter-access' && (isRecruiter || isAdmin)`.
+We'll ship in 5 phases so each piece is verifiable before the next starts. Nothing on the driver side changes behaviorally — driver routes, Settings, FAQ, Features, How-To, What's New, and BottomNav stay exactly as they are today.
 
 ---
 
-## 🛑 What is BROKEN / incomplete
+## Phase 1 — Recruiter Settings page
 
-### 🔴 BUG 1 — Brand new recruiter signups are immediately bounced to the driver dashboard
-**Severity: high — this breaks the primary recruiter signup happy path.**
+A dedicated settings surface for recruiter accounts. Driver `SettingsView.tsx` is untouched.
 
-`useUserRole` decides `recruiter` ONLY when a row exists in `recruiter_profiles`. That row is created later, inside the recruiter onboarding form (`useRecruiterProfile.upsertProfile`).
+New: `src/components/opportunities/recruiter/RecruiterSettingsView.tsx`, routed via `Index.tsx` as `page === 'recruiter-settings'` and reached from the recruiter sidebar/bottom nav "Settings" entry (driver settings stays at its current page key).
 
-Sequence for a fresh recruiter:
-1. Sign up with role=recruiter → `htp_auth_intent='recruiter'`.
-2. `App.tsx` redirects to `/dashboard?page=recruiter-access`.
-3. `Index.tsx` sets `page='recruiter-access'`.
-4. `useUserRole` resolves → `role='driver'` (no profile row yet).
-5. The `useEffect` role guard (lines 420–428) sees `!isRecruiter && page==='recruiter-access'` → **forces `setPage('dashboard')`**.
-6. Recruiter lands on the driver dashboard, with the driver sidebar, and never reaches the onboarding form.
+Sections (all backed by existing tables — no schema changes):
+- **Company profile** — company name, DOT, MC, address, hiring states, equipment types, contact phones (edits `recruiter_profiles`, reuses validation from `RecruiterOnboarding`).
+- **Recruiter contact** — display name, recruiter phone, public-facing email.
+- **Verification status** — read-only badge (pending / approved / rejected) + admin notes.
+- **Billing & plan** — current plan, period end, active opportunity limit, "Manage billing" → `recruiter-billing-portal` edge function, "Upgrade/Change plan" → `create-recruiter-checkout`. Reuses `useRecruiterBilling`.
+- **Notifications** — toggles for new-application emails and weekly recruiter digest (stored on `recruiter_profiles` as nullable bool columns added later if needed; Phase 1 ships UI + local state stubs only if columns don't exist yet — confirm before adding columns).
+- **Account** — change password, sign out, delete account (reuses existing modals).
 
-**Fix:** treat "recruiter intent" or "recruiter signup in progress" as a recruiter for routing purposes until they either complete or abandon onboarding. Options:
-- Make `useUserRole` also return `isRecruiter=true` when `sessionStorage.htp_recruiter_intent==='1'` or when `htp_auth_intent==='recruiter'` is still set, OR
-- In Index.tsx guards, allow `page==='recruiter-access'` when the user has recruiter intent flagged, even if no profile row exists yet (so they can reach `RecruiterOnboarding`).
-- Cleanest: when a recruiter signup completes, write a stub `recruiter_profiles` row (verification_status='pending') so role detection is correct from minute one. This also matches the existing `resolveState()` 'pending' branch in `RecruiterAccessPage`.
+Hide every driver-only setting (pay model, CPM, week start, tax planner, fuel/expense defaults, home-time, lifecycle emails about loads).
 
-### 🟠 BUG 2 — Header brand strip always says "Load & Pay Manager"
-`src/pages/Index.tsx` line 551: the mobile header subtitle is hard-coded to `Load & Pay Manager` even for recruiters. The sidebar already swaps to "Recruiter Console"; the mobile header should too.
+## Phase 2 — Recruiter Help Center (FAQ + Features + User Guide + What's New)
 
-### 🟠 BUG 3 — Driver-only dashboard widgets still mount for recruiters (admin path)
-For an admin viewing `page='dashboard'`, the `<DashboardView>` and the "Role path card" (lines 600–631) render with driver semantics ("Track Profit", "Find Opportunities"). For a normal recruiter the guards redirect, so this is mostly an admin-UX issue, but the role-path card explicitly nudges into driver flows even when `role==='recruiter'`. It should be gated to `role==='driver'`.
+Four new routes, recruiter-scoped, with the same visual system as the driver pages.
 
-### 🟠 BUG 4 — `onBack` from Recruiter Access for a pure recruiter loops back to itself
-Line 764: `onBack={() => setPage(isRecruiter && !isAdmin ? 'recruiter-access' : 'dashboard')}`. For a non-admin recruiter the back button is a no-op (already on recruiter-access). It should either be hidden for pure recruiters or route to a sensible recruiter sub-view.
+| New route | Mirrors | Content focus |
+|---|---|---|
+| `/recruiter/faq` | `src/pages/FAQ.tsx` | Posting opportunities, verification, billing/Stripe, applicant contact, moderation, refunds, contract protection from recruiter POV |
+| `/recruiter/features` | `src/pages/Features.tsx` | Driven from a new `recruiterFeatureList.ts` (mirrors `featureList.ts`): opportunity posting, applicant pipeline, contract protection, verified badge, billing portal, analytics |
+| `/recruiter/guide` | `src/pages/HowToUseHaulTrackerPro.tsx` | Step-by-step: get approved → set up billing → post first opportunity → manage applicants → use contract protection |
+| `/recruiter/updates` | `src/pages/Updates.tsx` | New `recruiterReleaseNotes.ts` with recruiter-relevant entries only |
 
-### 🟡 BUG 5 — `MilestoneNudges` and `SmartReminders` shown on recruiter dashboard (admin only, but visually wrong)
-Same dashboard render block doesn't check role. Low priority because non-admin recruiters never reach `page='dashboard'`, but worth gating for admins acting as recruiters.
+Wiring:
+- Add the 4 routes in `App.tsx`.
+- Add a "Help & resources" group in recruiter sidebar / settings linking to all four.
+- `WhatsNewModal` / `useReleaseNotesSeen` get a role-aware source: drivers see `releaseNotes.ts`, recruiters see `recruiterReleaseNotes.ts`.
+- SEO: each page gets its own `SEOHead` (title, description, canonical, noindex off so they're crawlable for recruiter acquisition).
 
-### 🟡 BUG 6 — `?page=opportunities` is still reachable by recruiters who type the URL
-`handleNavigate` blocks it, but the initial-mount `useEffect` (lines 184–217) directly calls `setPage('opportunities')` from the query string without consulting role. Then the role-guard `useEffect` catches it and redirects, so the user sees a brief flash of the driver Opportunities page. Move the role check into the URL-parsing effect, or defer URL routing until `roleLoading===false`.
+## Phase 3 — Terms of Service & Privacy Policy refresh
 
-### 🟡 BUG 7 — Settings "back" assumes binary role
-Line 768: `onBack={() => setPage(isRecruiter ? 'recruiter-access' : 'dashboard')}`. An admin viewing as driver who opens Settings should go back to `dashboard`. Current logic is fine for pure roles but quietly wrong for admins. Not blocking.
+Edit `src/pages/Terms.tsx` and `src/pages/Privacy.tsx` only (no new routes). Add explicit recruiter-side clauses that match what we actually do today:
 
-### 🟢 Minor — Auth role selector doesn't surface the "you'll need approval" reality
-A recruiter who signs up expects to "start posting." They actually need: profile onboarding → admin approval → billing. The auth helper text could set that expectation, otherwise the first-run experience feels broken even when wired correctly.
+Terms additions:
+- Recruiter eligibility (must be authorized to hire for a registered carrier; DOT/MC required).
+- Truthfulness of opportunity postings; prohibited content.
+- Verification, suspension, and removal rights.
+- Billing terms (Stripe, plan limits, proration, cancellation, refund policy).
+- Contact-sharing model (driver consent → recruiter receives snapshot).
+- Contract Protection responsibilities (recruiter is the contract author; AI output is informational).
+- Acceptable use & anti-scam clauses.
+
+Privacy additions (extend existing sections, don't duplicate):
+- Recruiter data we collect (company, DOT/MC, verification docs, billing IDs).
+- Public visibility of approved recruiter profiles vs private fields.
+- How driver contact snapshots flow to recruiters and retention rules.
+- Stripe data handling for recruiter billing.
+
+Both pages get a bumped "Last updated" date driven by a constant (not `new Date()` — current code uses today's date which is misleading).
+
+## Phase 4 — Dual-audience landing page
+
+Rebuild `src/pages/Landing.tsx` so a first-time visitor of either type can self-identify and see a value prop within one scroll.
+
+Structure:
+```text
+[ Nav: Logo | Drivers | Recruiters | Pricing | Sign in | Get started ]
+[ Hero ]
+  Headline: "The trucking platform that protects drivers and connects recruiters."
+  Sub: one sentence per audience.
+  Dual CTA: "I'm a driver" → /auth?intent=driver
+            "I'm a recruiter" → /auth?intent=recruiter
+[ Audience tabs / toggle ] (sticky, switches the next 3 sections in place)
+  ── Drivers view ──            ── Recruiters view ──
+  Problem → Solution            Problem → Solution
+  3-up feature grid             3-up feature grid
+  Screenshot/mockup             Screenshot/mockup
+  Driver testimonial slot       Recruiter testimonial slot
+[ Shared trust strip ] verified carriers, contract protection, secure billing
+[ How it works ] two parallel columns (Driver 1-2-3 / Recruiter 1-2-3)
+[ Pricing teaser ] driver tiers + recruiter tiers side-by-side → /pricing
+[ FAQ teaser ] 3 driver + 3 recruiter Qs, links to respective FAQs
+[ Final CTA ] dual buttons again
+[ Footer ] split into Drivers / Recruiters / Company / Legal columns
+```
+
+Implementation notes:
+- Audience toggle is client-state only (no route change); persists choice in `localStorage` so returning visitors land on their last view.
+- Pre-select audience from `?for=driver|recruiter` query param (used by ads).
+- Reuse existing landing components where they map cleanly; add `RecruiterValueSection`, `RecruiterHowItWorks`, `RecruiterPricingTeaser`.
+- Keep all existing driver SEO copy — recruiter copy lives in new sections so we don't lose driver keyword coverage.
+- Analytics: fire `landing_audience_selected` + `landing_cta_clicked` with the audience label.
+
+## Phase 5 — QA, polish, publish
+
+- Manual QA matrix (driver-only account, recruiter-only account, owner/admin with both):
+  - Driver account sees no recruiter settings / help / updates entries.
+  - Recruiter account sees no driver settings, no driver FAQ/Features/Guide/Updates in nav.
+  - Owner (`berthonyxyz@gmail.com`) can toggle via "Open Recruiter Console" and switch back cleanly.
+- Add 3 vitest smoke tests: role-gated routing for `/recruiter/*` pages, recruiter release-notes source selection, landing audience toggle default from query param.
+- Update `docs/MANUAL_QA_CHECKLIST.md` with the new flows.
+- Sitemap: add the 4 recruiter help routes; landing canonical stays `/`.
+- Save a memory entry summarizing recruiter parity surfaces so future agents don't accidentally bolt recruiter UI onto driver pages.
 
 ---
 
-## Recommended fix order
+## Out of scope (call out so we don't scope-creep)
 
-1. **Bug 1** (recruiter signup redirect loop) — blocks the entire recruiter onboarding funnel. Fix first.
-2. **Bug 2** (mobile header subtitle) — 1-line fix, eliminates the "I'm in the wrong app" feeling.
-3. **Bugs 4 & 6** (back-button no-op + brief Opportunities flash) — small polish on routing edges.
-4. **Bugs 3, 5, 7** (admin-as-recruiter UX) — only impacts admin testing, low urgency.
-5. **Minor** — add a one-line "Requires approval before posting" note to the recruiter auth helper.
+- No changes to driver Settings / FAQ / Features / How-To / Updates content.
+- No DB schema changes beyond optional notification toggles in Phase 1 (will confirm before adding columns).
+- No new edge functions; reuses `create-recruiter-checkout` and `recruiter-billing-portal`.
+- Pricing page redesign is a separate task — Phase 4 only links to it.
 
----
+## Open questions before I start building
 
-## Technical scope (for implementation)
-
-- `src/hooks/useUserRole.ts`: extend with `intentRecruiter` derived from sessionStorage so guards don't trap fresh signups.
-- `src/pages/Index.tsx`:
-  - Update `driverOnlyPages` / `handleNavigate` to honor `intentRecruiter`.
-  - Gate URL-parsing effect on `!roleLoading`.
-  - Make header subtitle role-aware.
-  - Gate role-path card + MilestoneNudges + SmartReminders to `role==='driver'`.
-  - Fix Recruiter Access `onBack` for pure recruiters.
-- `src/pages/Auth.tsx`: optional one-line helper update for recruiter expectations.
-- No DB schema, RLS, billing, Stripe, or recruiter feature logic changes.
-
-Would you like me to proceed with these fixes in priority order (1 → 7), or only the high-severity ones (Bugs 1, 2, 4, 6)?
+1. For Phase 1 notification toggles, OK to add two nullable bool columns to `recruiter_profiles` (`notify_new_applications`, `notify_weekly_digest`) or hold them out of v1?
+2. For Phase 4, do you want a hard audience toggle (Drivers | Recruiters tabs) or a soft "smart default" where the page detects intent and shows both inline?
+3. Any specific recruiter testimonials/logos you want featured, or should I leave placeholder slots?
