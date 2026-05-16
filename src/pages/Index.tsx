@@ -63,7 +63,7 @@ const ViewFallback = () => (
 const Index = () => {
   const { signOut, user } = useAuth();
   const queryClient = useQueryClient();
-  const { isAdmin } = useAdmin();
+  
   const { role, isLoading: roleLoading } = useUserRole();
   const { effectiveRole, setViewMode, canSwitch } = useViewMode();
   const isRecruiterView = effectiveRole === 'recruiter';
