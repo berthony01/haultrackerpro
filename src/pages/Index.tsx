@@ -48,6 +48,9 @@ const RecruiterSettingsView = lazy(() => import('@/components/opportunities/recr
 const RecurringExpensesView = lazy(() => import('@/components/RecurringExpensesView').then(m => ({ default: m.RecurringExpensesView })));
 const DriverScorecard = lazy(() => import('@/components/DriverScorecard').then(m => ({ default: m.DriverScorecard })));
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
+const DriverContractsView = lazy(() => import('@/components/contracts/DriverContractsView').then(m => ({ default: m.DriverContractsView })));
+const RecruiterContractsView = lazy(() => import('@/components/contracts/RecruiterContractsView').then(m => ({ default: m.RecruiterContractsView })));
+import { ContractActionsCard } from '@/components/contracts/ContractActionsCard';
 
 import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
