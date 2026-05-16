@@ -1,147 +1,155 @@
-This hardening plan is approved. Please proceed, but include these two safeguards:
+This plan is approved, but apply these safeguards before deployment.
 
-1. Before adding the CHECK constraint on contract_signatures.signer_role, run a verification query to confirm there are no existing non-driver signature rows:
+1. Verify real recruiter_billing_profiles values before writing the priority migration.
 
-select signer_role, count(*)
+Confirm the actual plan values and status values used in production.
 
-from contract_signatures
+The helper function should only use values that really exist in the database.
 
-group by signer_role;
+Expected logic:
 
-If any non-driver rows exist, stop and report before adding the migration.
+- Growth and Fleet plans get priority
 
-2. For the truthful-copy cleanup, do a full project-wide search, not only the listed files. Search for:
+- Starter does not
 
-- signed PDF
+- Active or trialing gets priority
 
-- signed copy
+- canceled, past_due, inactive, or unpaid should not
 
-- send it back
+2. Confirm the Supabase relationship join works.
 
-- sent back
+The useOpportunities query:
 
-- sent to recruiter
+recruiter:recruiter_profiles!inner(verification_status, status)
 
-- legally sign
+must be tested against the real schema.
 
-- return contract
+If the relationship alias or FK name is different, fix the select before shipping.
 
-- DocuSign
+3. Confirm the business rule for featured.
 
-Remove or rewrite any copy that implies signed PDF generation, automatic delivery, or DocuSign-equivalent signing.
+This plan makes featured fully plan-derived.
 
-Keep the scope exactly as written:
+That means admin manual featured toggles will be overwritten.
 
-- no signed PDF generation
+That is acceptable only if we want Priority Placement to be strictly tied to Growth/Fleet.
 
-- no email delivery
+If we need admin promotional overrides later, add a separate admin_featured_override field in a future phase. Do not add it in this phase unless required.
 
-- no recruiter countersignature
+4. Keep the Starter copy truthful.
 
-- no signature-required hiring
+Replace "In-app messaging" with "Driver contact requests" everywhere recruiter pricing appears.
 
-- no billing, landing redesign, reports, or role-switcher changes
+5. Keep Fleet copy truthful.
 
-After implementation, run the full 18-item QA checklist and confirm build passes.
-
-## Contract Signature Workflow — Hardening Plan
-
-Scope: contract review + signature only. No changes to billing, landing, reports, or role-switcher.
-
-### A. Driver decision UI gating (ContractAttachment.tsx)
-
-Currently `canDriverDecide` allows decisions when status is `uploaded` or `parsed`, but the `review-contract` edge function rejects those. Tighten to match backend.
-
-- Change the gating set from `['uploaded','parsed','ai_reviewed','driver_reviewing','changes_requested']` to `['ai_reviewed','driver_reviewing']` (see B for `changes_requested`).
-- When `hasContract && role === 'driver' && !decision && status ∈ {uploaded, parsing, parsed}`, render an inline info panel instead of the decision buttons:
-  > "Waiting for AI review. The recruiter must run AI review before you can approve, reject, or request changes."
-- Keep recruiter-side Analyze button behavior as-is.
-
-### B. Request Changes — lock the version
-
-DB already enforces one driver decision per version (`contract_reviews_driver_unique_per_version`). Make the UI match.
-
-- Treat `decision === 'changes_requested'` as terminal for that version: do not render Approve / Reject / Request Changes again.
-- Replace with a locked notice (driver side):
-  > "You requested changes for this contract version. The recruiter must upload a revised version before you can approve or sign."
-- Recruiter side (`RecruiterContractsView` + `ContractAttachment` recruiter panel): when latest driver decision is `changes_requested` on the current version, show a clear "Revised version required — upload a new version to continue" banner and surface the driver's note (already available via `driver_review.notes`).
-- Effectively: `decisionTerminal` becomes `decision === 'approved' || decision === 'rejected' || decision === 'changes_requested'`.
-
-### C. Truthful signature copy
-
-Audit and update strings in `ContractAttachment.tsx` (signature panel + helper text), `DriverContractsView.tsx`, `RecruiterContractsView.tsx`, `ContractActionsCard.tsx`, and the contract SEO/feature pages we own (`ContractSeoPage.tsx`, `featureList.ts`, `recruiterFeatureList.ts`, landing/recruiter contract sections).
+Do not claim multi-seat team access or advanced analytics dashboard until those features are truly built.
 
 Use:
 
-- "Record your in-app approval/signature"
-- "Platform record of consent"
-- "Not a DocuSign-equivalent or qualified electronic signature"
+- 25 active opportunities
 
-Remove/avoid anywhere it currently appears:
+- Priority placement
 
-- "Send signed contract back", "Legally sign and return contract", "Signed PDF", "signed copy sent to recruiter".
+- Recruiting snapshot dashboard
 
-(We are explicitly NOT adding PDF generation or recruiter delivery in this pass.)
+- Priority support
 
-### D. Hire rule — keep Option 1 (approval-required, signature optional)
+6. QA must verify:
 
-No DB trigger change. The existing `opportunity_applications_require_contract_for_hire` already requires `contracts.status ∈ {approved, signed}` + current version uploaded, which matches Option 1.
+- Starter opportunity = featured false
 
-Copy updates (recruiter contract panels + `RecruiterContractsView` "Blocked from Hire" tooltip):
+- Growth opportunity = featured true
 
-> "Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record."
+- Fleet opportunity = featured true
 
-### E. Admin override separation
+- Downgrading Growth to Starter flips featured back to false
 
-Goal: admin acting in the driver review flow must not unlock driver signing.
+- Canceling or inactive billing removes priority
 
-- `sign-contract` already requires the latest driver review to be authored by the assigned driver (`drv.reviewer_user_id !== userId` → 409). No edge function change.
-- Edit `review-contract/index.ts`: remove the admin bypass in the driver-decision authorization. Replace
-  ```
-  if (!isAdmin && !isDriver) return 403
-  ```
-  with strict
-  ```
-  if (c.driver_user_id !== userId) return 403 "Only the assigned driver can submit a decision."
-  ```
-  Admins continue to use the separate `contract-admin` function for overrides; that path is unchanged and never inserts a `contract_reviews(reviewer_role='driver', reviewer_user_id=<driver>)` row, so it cannot fake driver consent for signing.
-- No UI change needed; admin tools live elsewhere.
+- Driver listings show Growth/Fleet above Starter
 
-### F. Tighten signature insert policy
+- Verified Recruiter badge only appears for approved and non-suspended recruiters
 
-Current state (verified): `contract_signatures` has no client INSERT policy — only `Admins manage signatures` (ALL) and `Parties view signatures` (SELECT). All driver signing already flows through `sign-contract` using service role, and the `contract_signatures_validate` trigger already rejects `signer_role='recruiter'`.
+- Pricing and recruiter landing copy match
 
-Action: add a defensive migration that explicitly documents driver-only signatures, in case a future policy is added:
+- Build passes with no TypeScript errors
 
-- Add `CHECK (signer_role = 'driver')` on `contract_signatures` (drop later if/when recruiter signing ships).
-- No new RLS policy added (keeps all writes service-role only).
+# Recruiter Pricing Truth Audit & Feature Hardening
 
-### G. QA checklist (manual, post-deploy)
+Make every recruiter marketing claim match real platform behavior, and turn Priority Placement into a deterministic plan-driven feature.
 
-Run the 18-item checklist from the request. Specifically verify:
+## A. Driver-facing badge: "Approved" → "Verified Recruiter"
 
-1. Driver sees the "Waiting for AI review" panel while status is `uploaded`/`parsing`/`parsed`.
-2. After `ai_reviewed`, all three decision buttons appear.
-3. After `request_changes`, version is locked with the new copy; recruiter sees the "Revised version required" banner.
-4. Admin calling `review-contract` as a non-driver gets 403.
-5. Driver can sign only after their own approval; status moves to `signed`.
-6. Hire is blocked until `approved` or `signed`; copy reflects approval-required, signature-optional.
-7. No remaining "signed PDF" / "sent back" copy in driver, recruiter, or marketing surfaces we control.
-8. `bun run build` passes; no console errors in preview.
+**File:** `src/components/opportunities/OpportunityCard.tsx`
 
-### Files to change
+- Change badge text from `Approved` to `Verified Recruiter`.
+- Today the listing already filters opportunities to `status='active' AND admin_review_status='approved'`, but recruiter verification is a separate field. Extend `useOpportunities` to also join recruiter verification so we only render the badge when the recruiter profile itself is approved/active (not pending/rejected/suspended).
+- If join shows the recruiter is not verified, hide the badge entirely (the opportunity already shouldn't be live, but this is a defensive UI guard).
 
-- `src/components/contracts/ContractAttachment.tsx` — gating (A), Request Changes lock (B), copy (C), recruiter banner (B).
-- `src/components/contracts/DriverContractsView.tsx` — copy (C), surface "changes requested → waiting on recruiter".
-- `src/components/contracts/RecruiterContractsView.tsx` — "Revised version required" filter/banner (B), hire-rule copy (D), signature copy (C).
-- `src/components/contracts/ContractActionsCard.tsx` — copy (C/D).
-- `src/components/contracts/ContractSeoPage.tsx`, `src/lib/featureList.ts`, `src/lib/recruiterFeatureList.ts`, and any contract landing sections that mention "signed PDF / sent back" — copy (C).
-- `supabase/functions/review-contract/index.ts` — drop admin bypass (E).
-- New migration — add `signer_role='driver'` CHECK on `contract_signatures` (F).
+**File:** `src/hooks/opportunities/useOpportunities.ts`
 
-### Out of scope
+- Change `.select('*')` to `.select('*, recruiter:recruiter_profiles!inner(verification_status, status)')` and filter `verification_status='approved'` and `status<>'suspended'`. Pass `recruiter` down to the card so it can decide whether to render the verified badge.
 
-- Generating signed PDFs.
-- Emailing/uploading a signed copy to the recruiter.
-- Switching to signature-required hiring (Option 2).
-- Recruiter countersignature flow.
+## B. Starter copy truth fix
+
+**File:** `src/components/landing/RecruiterLanding.tsx` (line 48)
+
+- Replace `'In-app messaging'` with `'Driver contact requests'`.
+- Keep `'Applicant pipeline'` and `'Verified badge'`.
+
+**File:** `src/pages/recruiter/RecruiterFAQ.tsx` — keep the existing honest note ("In-app messaging is on the roadmap"); no change required.
+
+## C. Priority Placement — make it real and deterministic
+
+**Approach:** server-side sync (option 2 from the audit). Keep `opportunities.featured` as the single sort key the listing already uses, but stop relying on manual toggling. A DB trigger and a billing-change trigger will set it automatically from the recruiter's active plan.
+
+**Migration:**
+
+1. Add helper SQL function `recruiter_has_priority_plan(recruiter_id uuid) returns boolean` — true if the recruiter's `recruiter_billing_profiles.plan IN ('growth','fleet')` AND `status IN ('active','trialing')`.
+2. Add trigger on `opportunities` (BEFORE INSERT OR UPDATE): set `NEW.featured = recruiter_has_priority_plan(NEW.recruiter_id)`. This locks `featured` to the plan — recruiters can't manually mark themselves featured.
+3. Add trigger on `recruiter_billing_profiles` (AFTER INSERT OR UPDATE OF plan, status): UPDATE all `opportunities` for that recruiter to recompute `featured` from `recruiter_has_priority_plan`.
+4. One-time backfill: `UPDATE opportunities SET featured = recruiter_has_priority_plan(recruiter_id)`.
+
+**Sort rule** (already in `useOpportunities`): `featured DESC, published_at DESC NULLS LAST`. Match-score is computed client-side per card and does **not** reorder the list, so paid priority is never buried. Keep it that way (no change).
+
+## D. Featured/Priority badge
+
+**File:** `src/components/opportunities/OpportunityCard.tsx`
+
+- Existing "Featured" badge stays, gated on `o.featured === true` (which is now always plan-driven). Rename label from `Featured` to `Priority` for clarity. Already hidden when `featured=false`.
+
+## E. Fleet claims cleanup
+
+**File:** `src/components/landing/RecruiterLanding.tsx` (line 50)
+
+- Replace `['Everything in Growth', 'Multi-seat team access', 'Analytics dashboard']` with `['Everything in Growth', '25 active opportunities', 'Recruiting snapshot dashboard', 'Priority support']`.
+
+**File:** `src/pages/Pricing.tsx` — current Fleet bullets are already vague ("High-volume recruiting capacity", "Priority ecosystem access"). Tighten to: `'25 active opportunities'`, `'Priority placement'`, `'Recruiting snapshot dashboard'`, `'Priority support'`. Also update Growth bullets to explicitly include `'Priority placement'`.
+
+**File:** `src/lib/recruiterFeatureList.ts` — audit for "multi-seat", "team", "analytics dashboard". Current file has none (verified by search). No change required.
+
+**Files:** `src/pages/recruiter/RecruiterFAQ.tsx`, `src/pages/recruiter/RecruiterGuide.tsx` — no offending claims found; no change.
+
+## F. Out of scope
+
+- No new chat/messaging system.
+- No multi-seat / team management implementation.
+- No new analytics page.
+- No changes to RLS, auth, contracts workflow, or billing edge functions.
+
+## Technical notes
+
+- Migration is the only DB change. `featured` becomes derived; existing admin tooling that flips `featured` manually will be overridden by the trigger — this is intentional (deterministic + auditable).
+- `useOpportunities` query key stays the same; the embedded recruiter join is filtered with `!inner` so unverified recruiters' rows drop out as a second safety net.
+- `OpportunityCard` props extend with optional `verifiedRecruiter: boolean` (default false) so the badge is opt-in and won't appear on stale/cached data.
+
+## QA checklist
+
+1. Seed a Starter recruiter → opportunity row has `featured=false` after insert.
+2. Upgrade same recruiter to Growth → all their opportunities flip to `featured=true` via billing trigger.
+3. Driver listing shows Growth/Fleet opportunities above Starter; refresh preserves order.
+4. Verified Recruiter badge renders only for approved + non-suspended recruiters.
+5. Pricing page Starter shows "Driver contact requests" (no "In-app messaging").
+6. Pricing page Fleet shows no "Multi-seat" or "Analytics dashboard" claims.
+7. RecruiterLanding tier table matches Pricing page.
+8. Build passes with no TS errors.
