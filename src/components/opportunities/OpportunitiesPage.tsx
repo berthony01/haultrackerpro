@@ -263,17 +263,6 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
             </p>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Users className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-xs sm:text-sm text-muted-foreground truncate">
-              Recruiting drivers?
-            </span>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => setShowRecruiter(true)} className="shrink-0">
-            Open Recruiter Access
-          </Button>
-        </div>
       </Card>
 
       {/* Opportunity Preferences entry card */}
@@ -292,16 +281,6 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
           state={!profile ? 'none' : profile.profile_completed ? 'complete' : 'incomplete'}
           profile={profile}
           onClick={() => setShowProfile(true)}
-        />
-      )}
-
-      {/* Recruiter access CTA */}
-      {!recruiterLoading && (
-        <RecruiterEntryCard
-          profile={recruiterProfile}
-          onClick={() => setShowRecruiter(true)}
-          onManage={() => setShowRecruiterManager(true)}
-          onApplications={() => setShowRecruiterApps(true)}
         />
       )}
 
