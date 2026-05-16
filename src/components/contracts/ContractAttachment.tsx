@@ -267,13 +267,26 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const driverReviewRaw = contractWithVersion?.driver_review ?? null;
   const driverReview = driverReviewRaw && driverReviewRaw.version_id === currentVersionId ? driverReviewRaw : null;
   const decision = (driverReview?.decision ?? null) as null | 'approved' | 'rejected' | 'changes_requested';
-  const decisionTerminal = decision === 'approved' || decision === 'rejected';
+  // DB enforces one driver decision per version. Treat all three outcomes as terminal for THIS version.
+  // A new decision is only possible after the recruiter uploads a revised version.
+  const decisionTerminal =
+    decision === 'approved' || decision === 'rejected' || decision === 'changes_requested';
+  // Backend (review-contract) only accepts decisions from ai_reviewed | driver_reviewing | changes_requested.
+  // changes_requested is included for safety, but decisionTerminal will hide buttons once that decision was made.
   const canDriverDecide =
     role === 'driver' &&
     hasContract &&
     !decisionTerminal &&
     !!status &&
-    ['uploaded', 'parsed', 'ai_reviewed', 'driver_reviewing', 'changes_requested'].includes(status);
+    ['ai_reviewed', 'driver_reviewing', 'changes_requested'].includes(status);
+  // True when the driver is looking at a not-yet-reviewable contract (uploaded/parsing/parsed)
+  // and hasn't submitted any decision yet — show "Waiting for AI review" panel instead of buttons.
+  const driverWaitingForAi =
+    role === 'driver' &&
+    hasContract &&
+    !decision &&
+    !!status &&
+    ['uploaded', 'parsing', 'parsed'].includes(status);
 
   // Phase 8 — signature (current version only).
   const signatureRaw = contractWithVersion?.driver_signature ?? null;
@@ -376,9 +389,10 @@ export function ContractAttachment({ applicationId, role }: Props) {
       )}
       {role === 'recruiter' && (
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Upload an accurate, authorized contract. The driver sees an AI-assisted summary, risk
-          flags, and must approve and (when required) sign before this candidate can be moved to
-          hired status. AI review is informational and is shown to the driver, not legal advice.
+          Upload an accurate, authorized contract. You can't mark a driver hired until they approve
+          the current contract. If they also sign, HaulTrackerPro stores an in-app signature record
+          (platform record of consent — not a DocuSign-equivalent or qualified electronic signature).
+          AI review is informational, not legal advice.
         </p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -562,12 +576,16 @@ export function ContractAttachment({ applicationId, role }: Props) {
                   Your note: {driverReview.notes}
                 </p>
               )}
-              {!decisionTerminal && (
-                <p className="text-[10px] text-muted-foreground italic">
-                  You can submit a new decision for this version below.
+              {decision === 'changes_requested' && (
+                <p className="text-[11px] text-amber-400/90 italic">
+                  You requested changes for this contract version. The recruiter must upload a revised version before you can approve or sign.
                 </p>
               )}
             </div>
+          ) : driverWaitingForAi ? (
+            <p className="text-[11px] text-muted-foreground">
+              Waiting for AI review. The recruiter must run AI review before you can approve, reject, or request changes.
+            </p>
           ) : (
             <p className="text-[11px] text-muted-foreground">
               Review the contract and AI risk summary above, then choose:
@@ -656,6 +674,11 @@ export function ContractAttachment({ applicationId, role }: Props) {
           {driverReview?.notes && (
             <p className="text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
               Driver note: {driverReview.notes}
+            </p>
+          )}
+          {decision === 'changes_requested' && (
+            <p className="text-[11px] text-amber-400/90 italic">
+              Revised version required — upload a new version to continue. The driver cannot approve or sign this version again.
             </p>
           )}
         </div>

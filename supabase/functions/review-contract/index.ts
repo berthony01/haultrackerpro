@@ -92,11 +92,13 @@ serve(async (req) => {
     const c: any = (version as any).contracts;
     if (!c) return json({ error: "Contract not found" }, 404);
 
-    const { data: adminRow } = await admin
-      .from("admin_users").select("user_id").eq("user_id", userId).maybeSingle();
-    const isAdmin = !!adminRow;
+    // Strict: only the assigned driver may submit approve/reject/request_changes.
+    // Admin overrides go through the separate contract-admin function and never insert
+    // a contract_reviews row attributed to the driver (which would unlock signing).
     const isDriver = c.driver_user_id === userId;
-    if (!isAdmin && !isDriver) return json({ error: "Only the assigned driver can submit a decision." }, 403);
+    if (!isDriver) {
+      return json({ error: "Only the assigned driver can submit a decision." }, 403);
+    }
 
     if (version.upload_status !== "uploaded") {
       return json({ error: "Contract version is not ready for review." }, 409);
@@ -115,7 +117,7 @@ serve(async (req) => {
 
     const targetStatus = DECISION_TO_STATUS[decision];
     const auditAction = DECISION_TO_AUDIT[decision];
-    const actorRole: "admin" | "driver" = isAdmin && !isDriver ? "admin" : "driver";
+    const actorRole: "driver" = "driver";
 
     // Atomic-as-possible: insert the review FIRST. No audit until it succeeds.
     // The partial unique index (contract_reviews_driver_unique_per_version)
