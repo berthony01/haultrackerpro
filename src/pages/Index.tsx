@@ -64,7 +64,7 @@ const Index = () => {
   const { signOut, user } = useAuth();
   const queryClient = useQueryClient();
   const { isAdmin } = useAdmin();
-  const { role, isRecruiter, isLoading: roleLoading } = useUserRole();
+  const { role, isLoading: roleLoading } = useUserRole();
   const { effectiveRole, setViewMode, canSwitch } = useViewMode();
   const isRecruiterView = effectiveRole === 'recruiter';
   const { responses: feedbackResponses } = useFeedback();
