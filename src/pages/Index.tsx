@@ -554,7 +554,7 @@ const Index = () => {
                 <h1 className="text-base font-black font-heading tracking-tight text-foreground">
                   Haul<span className="text-primary">TrackerPro</span>
                 </h1>
-                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em]">Load &amp; Pay Manager</p>
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em]">{roleLoading ? 'Loading…' : isRecruiter ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
               </div>
             </div>
             <div className="hidden lg:block">
