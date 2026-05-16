@@ -251,11 +251,11 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
         </div>
       </Card>
 
-      {/* Driver Profile entry card */}
+      {/* Opportunity Preferences entry card */}
       {profileIsError ? (
         <EmptyState
-          title="Unable to load driver profile"
-          body="Something went wrong while loading your Driver Opportunity Profile."
+          title="Unable to load your preferences"
+          body="Something went wrong while loading your Opportunity Preferences."
           action={
             <Button variant="outline" onClick={() => refetchProfile()}>
               <RefreshCw className="h-4 w-4" /> Retry
