@@ -16,6 +16,7 @@ import {
   PhoneCall,
   HelpCircle,
   ThumbsUp,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
