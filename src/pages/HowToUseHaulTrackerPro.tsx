@@ -302,7 +302,7 @@ export default function HowToUseHaulTrackerPro() {
               { num: '03b', title: 'Optional: Plain-English Clause Rewrite (Driver Pro)', desc: 'Driver Pro users can paste a confusing clause into the Plain-English Clause Rewrite tool to get a clearer explanation, concern points, and questions to ask the recruiter. Informational only — not legal advice.' },
               { num: '04', title: 'Driver reviews and decides', desc: 'The driver can approve the contract, reject it, or request changes before moving forward.' },
               { num: '05', title: 'Driver records approval / signature', desc: 'When the driver approves, HaulTrackerPro stores a platform record of consent tied to that contract version. It is not a DocuSign-equivalent or qualified electronic signature.' },
-              { num: '06', title: 'Hired status is protected', desc: 'Recruiters cannot move the driver to hired until the required contract approval/signature steps are completed.' },
+              { num: '06', title: 'Hired status is protected', desc: 'Recruiters cannot mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record.' },
             ].map((s) => (
               <div key={s.num} className="p-5 rounded-2xl border border-border bg-card shadow-card">
                 <span className="text-xs font-bold text-primary tracking-wider">STEP {s.num}</span>
