@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Sparkles, Check, ArrowRight } from 'lucide-react';
 import { BottomNav } from '@/components/BottomNav';
+import { useUserRole } from '@/hooks/useUserRole';
 import { RELEASE_NOTES } from '@/lib/releaseNotes';
 
 function formatDate(iso: string): string {
@@ -20,6 +21,7 @@ function formatDate(iso: string): string {
 
 export default function Updates() {
   const navigate = useNavigate();
+  const { role, isAdmin } = useUserRole();
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -96,7 +98,7 @@ export default function Updates() {
         ))}
       </div>
 
-      <BottomNav active="dashboard" onNavigate={() => navigate('/dashboard')} />
+      <BottomNav active="dashboard" onNavigate={() => navigate('/dashboard')} role={role} isAdmin={isAdmin} />
     </div>
   );
 }
