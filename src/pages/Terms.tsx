@@ -108,7 +108,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">17. Hired-Status Workflow Protection</h3>
-          <p className="text-muted-foreground">Where a contract has been attached to an opportunity application, recruiters may be restricted from marking a driver as "hired" until required contract approval and/or signature steps have been completed. This is a <span className="font-semibold text-foreground">platform workflow protection</span> intended to support transparency between drivers and recruiters; it is not a guarantee of legal protection or enforceability.</p>
+          <p className="text-muted-foreground">Where a contract has been attached to an opportunity application, recruiters cannot mark a driver as "hired" until the driver approves the current contract. Driver signature is optional; if the driver also signs, HaulTrackerPro stores an in-app signature record. This is a <span className="font-semibold text-foreground">platform workflow protection</span> intended to support transparency between drivers and recruiters; it is not a guarantee of legal protection or enforceability, is not a DocuSign-equivalent service, and is not a qualified electronic signature.</p>
         </section>
 
         <section className="space-y-2">

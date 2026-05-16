@@ -19,7 +19,7 @@ export default function TenNinetyNineTruckDriverContractProtection() {
         'Chargebacks and damage liability',
         'Termination notice and walk-away terms',
         'Non-compete or restriction language',
-        'Required contract approval and signature steps',
+        'Driver approval required before hire; optional signature recorded in-app',
       ]}
       extraSections={[
         {

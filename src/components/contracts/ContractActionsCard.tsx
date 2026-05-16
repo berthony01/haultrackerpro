@@ -5,6 +5,7 @@ import { FileSignature, ArrowRight } from 'lucide-react';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useContractsPipeline, matchesRecruiterFilter, matchesDriverFilter } from '@/hooks/contracts/useContractsPipeline';
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 
 interface Props {
   role: 'driver' | 'recruiter';
@@ -69,8 +70,10 @@ function DriverCard({ onOpen }: { onOpen: () => void }) {
 
 function RecruiterCard({ onOpen }: { onOpen: () => void }) {
   const { profile } = useRecruiterProfile();
-  const { recruiterApplications } = useOpportunityApplications({ recruiterId: profile?.id });
-  const apps = recruiterApplications as any[];
+  const { plan, isBillingActive } = useRecruiterBilling();
+  const hasContractAccess = isBillingActive && (plan === 'growth' || plan === 'fleet');
+  const { recruiterApplications } = useOpportunityApplications({ recruiterId: hasContractAccess ? profile?.id : undefined });
+  const apps = (hasContractAccess ? recruiterApplications : []) as any[];
   const appIds = useMemo(() => apps.map((a) => a.id), [apps]);
   const { pipeline, isLoading } = useContractsPipeline(appIds);
 
@@ -88,6 +91,7 @@ function RecruiterCard({ onOpen }: { onOpen: () => void }) {
     return { awaitingUpload, awaitingDriver, blocked };
   }, [apps, pipeline]);
 
+  if (!hasContractAccess) return null;
   if (isLoading) return null;
   const total = counts.awaitingUpload + counts.awaitingDriver + counts.blocked;
   if (total === 0) return null;

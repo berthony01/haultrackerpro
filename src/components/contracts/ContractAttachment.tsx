@@ -785,8 +785,8 @@ export function ContractAttachment({ applicationId, role }: Props) {
               and questions to ask before approving. Available on Driver Pro.
             </p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Basic contract viewing, risk flags, decisions, and required approval/signature steps
-              remain accessible on the Free plan.
+              Basic contract viewing, risk flags, and driver approval decisions remain accessible
+              on the Free plan. If the driver also signs, an in-app signature record is stored.
             </p>
             <Button
               variant="default"
