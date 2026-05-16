@@ -1,148 +1,219 @@
-Phase 2 verification failed. The uploaded code does not show the Phase 2 plan fully implemented.
+Phase 3 plan approved.
 
-Please complete Phase 2 exactly as scoped. Do not touch unrelated features.
+Please execute Phase 3 exactly as scoped:
 
-Missing/failing items:
+- audit-first
 
-1. Deep-link sub-route support is not implemented.
+- no new features
 
-In src/pages/Index.tsx, the pageParam parser still only checks:
+- no redesigns
 
-pageParam === 'recruiter-access'
+- no billing/Stripe rewrites
 
-Update it to support:
+- no RLS/contracts/reports/routing rewrites unless a launch-blocking issue is found
 
-- recruiter-access
+- surgical fixes only
 
-- recruiter-access:reports
+Add these small requirements to the final deliverable:
 
-- recruiter-access:manager
+1. Include proof screenshots for key passing areas, not only issues:
 
-- recruiter-access:applications
+- mobile driver dashboard
 
-Use a safe allowlist or pageParam.startsWith('recruiter-access') plus validation.
+- mobile recruiter dashboard
 
-Expected behavior:
+- recruiter Reports panel
 
-- /dashboard?page=recruiter-access:reports as recruiter opens Reports panel.
+- contract page
 
-- /dashboard?page=recruiter-access:manager as recruiter opens Manage Opportunities.
+- pricing page
 
-- /dashboard?page=recruiter-access:applications as recruiter opens Applications.
+2. Include a claim-to-feature truth table:
 
-- /dashboard?page=recruiter-access:reports as driver redirects to driver dashboard.
+For each major public claim, list:
 
-2. Driver direct-URL guard must work with all recruiter-access subroutes.
+- claim
 
-The existing isRecruiterPageId helper is good, but it must work after the parser supports subroutes.
+- where it appears
 
-Confirm non-recruiter/non-admin users cannot land on any recruiter-access* page.
+- feature backing it
 
-3. Clean stale internal trial doc.
+- plan gating
 
-In docs/MANUAL_QA_[CHECKLIST.md](http://CHECKLIST.md), remove:
+- pass/fail
 
-"14-day auto-trial countdown banner shows for new users"
+Include at minimum:
 
-Replace with:
+- Verified Recruiter badge
 
-"Auto-trial system retired; verify billing pages do not reference trial language."
+- Driver contact requests
 
-4. Add Supabase linter search_path sweep migration.
+- Contract Protection
 
-Create one migration that applies:
+- Priority Placement
 
-ALTER FUNCTION ... SET search_path = public
+- Recruiter Activity & Pipeline reports
 
-for every SECURITY DEFINER / volatile function currently flagged by the Supabase linter, except pgmq wrappers that must remain schema-agnostic.
+- Driver premium reports
 
-Do not change function logic or signatures.
+- In-app approval/signature record
 
-After migration, report the remaining Supabase linter warning count and list any warnings intentionally deferred.
+- No DocuSign/signed PDF claim
 
-5. Add featured sync regression coverage.
+- No in-app chat claim
 
-Add src/test/featuredSync.test.ts or an equivalent test/spec file.
+- No multi-seat claim
 
-It must document the expected matrix:
+3. Include a final go/no-go checklist:
 
-- Starter active/trialing = no priority
+- launch now
 
-- Growth active/trialing = priority
+- launch after fixes
 
-- Fleet active/trialing = priority
+- do not launch
 
-- canceled/past_due/inactive = no priority
+4. For remaining Supabase warnings, clearly separate:
 
-- upgrade Starter to Growth flips existing opportunities to featured=true
+- must fix before launch
 
-- downgrade Growth to Starter flips existing opportunities to featured=false
+- safe to defer
 
-- normal recruiter/client updates cannot manually set featured
+- needs owner/manual review
 
-If the DB behavior cannot be unit-tested directly, create a clear test/spec around shared constants or a documented SQL assertion block and add a Vitest test that protects the matrix from being silently removed.
+5. If any fix touches more than 30 lines or could affect billing, auth, RLS, contracts, reports, or routing, stop and report it instead of implementing automatically.
 
-6. Verification required:
+Proceed with Phase 3 in order and return the final launch-readiness report.
 
-- Visit /dashboard?page=recruiter-access:reports as recruiter and confirm it opens Reports.
+# Phase 3 — Final Launch Readiness
 
-- Visit /dashboard?page=recruiter-access:reports as driver and confirm redirect to driver dashboard.
+Scope: audit-first, surgical fixes only. No new features, no redesigns, no billing/RLS/contracts/reports/routing rewrites. Target ≥ 9.5/10.
 
-- Confirm docs no longer mention 14-day auto-trial.
+## 1. Performance pass
 
-- Confirm new featured sync test exists and passes.
+- Run production `vite build` and inventory chunk sizes. Compare against `vendor-react / vendor-data / vendor-ui / vendor-pdf / vendor-ocr` splits already in `vite.config.ts`.
+- Identify chunks > 200 KB gz still loading on first paint of: `/`, `/pricing`, `/dashboard` (driver), `/dashboard` (recruiter), reports, contracts, opportunities.
+- Verify already-deferred heavy modules stay deferred:
+  - `jspdf` + `jspdf-autotable` (recruiter + driver report PDFs)
+  - `tesseract.js` (receipt OCR)
+  - `recharts` (only on dashboard / reports)
+  - `html2canvas` / `dompurify` (contracts)
+- Safe optimizations only:
+  - Convert any top-level import of `recharts`, `jspdf`, `tesseract.js`, `html2canvas`, `dompurify` found outside their feature surface into a dynamic `import()`.
+  - Add `loading="lazy"` + explicit `width`/`height` to any below-the-fold landing images missing them.
+  - Confirm `<link rel="preload" as="image">` on the LCP image of `/` (skip if no clear LCP image).
+- Out of scope: route-level code splitting refactors, new lazy boundaries, Suspense rework.
 
-- Confirm Supabase linter warning count is reduced.
+## 2. Final manual QA walkthrough
 
-- Run build and tests.
+Use `browser--navigate_to_sandbox` and the existing `ViewModeSwitch` (admin-only) to exercise five personas. Capture screenshots only when an issue is found.
 
-Do not proceed to Phase 3 until this is complete.
+Personas:
 
-## Phase 2 — Polish & Hardening
+1. Driver (no admin)
+2. Recruiter Starter
+3. Recruiter Growth/Fleet
+4. Admin in Driver View
+5. Admin in Recruiter View
 
-Surgical, no behavior changes outside the listed items. Targets 9.4/10.
+For each, verify: login, role switcher (admin only), correct bottom nav, correct sidebar nav, mobile nav, direct-URL guards on `/dashboard?page=recruiter-access*`, driver Reports, recruiter Reports panel, contract workflow surface loads, opportunity post form gating, priority placement reflects plan, pricing CTA gating.
 
-### 1. Deep-link sub-route support (`src/pages/Index.tsx`)
+Record results in a Markdown table; only fix issues that are launch-blockers and < 30 LOC.
 
-Extend the `pageParam` parser (~line 203-216) to accept `recruiter-access:reports`, `recruiter-access:manager`, `recruiter-access:applications`. Today only the bare `recruiter-access` matches, so `?page=recruiter-access:reports` lands on the hub. Use `pageParam.startsWith('recruiter-access')` and forward the full string to `setPage`. Recruiter gating is unchanged.
+## 3. Supabase linter triage
 
-### 2. Driver→recruiter direct-URL guard (`src/pages/Index.tsx`)
+Run `supabase--linter`, then classify each remaining warning into one of:
 
-If a non-recruiter, non-admin user navigates to any `recruiter-access*` page (URL or `setPage`), redirect to `/dashboard` once `roleLoading === false`. Mirrors the redirect already shipped for recruiters bouncing off driver-only pages. No RLS change — purely a UX/route guard.
 
-### 3. Stale internal doc (`docs/MANUAL_QA_CHECKLIST.md`)
+| Bucket                 | Action                                                     |
+| ---------------------- | ---------------------------------------------------------- |
+| Must fix before launch | Apply migration this phase                                 |
+| Safe to defer          | Document in `docs/MANUAL_QA_CHECKLIST.md` post-launch list |
+| Needs manual review    | Note + owner                                               |
 
-Remove the line referencing the "14-day auto-trial countdown banner" (line 65) and any sibling lines in that QA section that assume the removed trial flow. Replace with a one-line note that the auto-trial system is retired. Keeps `noTrialLanguage` test green and prevents QA confusion.
 
-### 4. Supabase linter `search_path` sweep
+Specifically review:
 
-Single migration: `ALTER FUNCTION ... SET search_path = public` for every `SECURITY DEFINER` / volatile function flagged by the linter that doesn't already pin it. No logic changes, no signature changes. After migration, re-run `supabase--linter` and confirm count drops to ~0 (excluding non-actionable infra warnings). Functions to skip: `pgmq.*` wrappers that must stay schema-agnostic.
+- `rls_disabled_in_public` / always-true `USING (true)` policies → confirm each is intentional (public lookup tables, marketing surfaces) or fix.
+- `policy_exists_rls_disabled`
+- Public storage buckets — verify only `avatars` / marketing assets are public.
+- `security_definer_function` warnings — confirm each is callable only via RPC with internal authz checks (e.g. `withdraw_opportunity_application`, `respond_to_contact_request`). If any is overly broad, restrict `GRANT EXECUTE`.
 
-### 5. Featured-sync regression test
+Fix only launch-blockers via a single migration if needed.
 
-Add `src/test/featuredSync.test.ts` (Vitest) that documents the matrix as assertions against a mock or, simpler, a markdown spec table embedded in the test file's comments + a pure-function unit test of `recruiter_has_priority_plan`'s JS mirror if one exists. If no JS mirror exists, instead add a SQL assertion block as a comment in the migration and a Vitest stub that imports the matrix from a shared constants file. Goal: prevent silent regression of the Starter↔Growth flip behavior.
+## 4. SEO + stale-claim sweep
 
-### Out of scope (deferred to Phase 3)
+Audit pages: Landing, Pricing, RecruiterLanding, RecruiterFAQ, RecruiterGuide, RecruiterFeatures, Privacy, Terms, Features, FAQ, all contract SEO pages (`AiContractReviewForTruckers`, `OwnerOperatorContractReview`, `TruckingContractReview`, `LeasePurchaseContractRedFlags`, `TenNinetyNineTruckDriverContractProtection`, `TruckingEscrowAgreementReview`), driver SEO/long-tail pages.
 
-- Bundle splitting beyond pdf.ts
-- Lighthouse pass
-- Final manual QA walkthrough
-- Publish dry-run
+For each page check:
 
-### Files touched
+- `<title>` < 60 chars, unique, keyword-led
+- `<meta description>` < 160 chars, unique
+- Single `<h1>`
+- `<link rel="canonical">` set to `https://haultrackerpro.com{path}`
+- JSON-LD (Article / FAQPage / Product) where applicable, valid JSON
+- OG/Twitter tags present
 
-- `src/pages/Index.tsx` (items 1 + 2)
-- `docs/MANUAL_QA_CHECKLIST.md` (item 3)
-- One new Supabase migration (item 4)
-- `src/test/featuredSync.test.ts` new (item 5)
+Stale-claim grep against full source tree (case-insensitive):
 
-### Verification after implementation
+- `free trial`, `14[- ]day`, `trialing` (already covered by `noTrialLanguage.test.ts` — re-run)
+- `in[- ]app chat`, `chat with drivers`, `message drivers directly`
+- `DocuSign`, `e[- ]signature platform`, `legally binding signature`
+- `signed PDF`, `download signed contract`
+- `multi[- ]seat`, `team seats`, `invite teammates`
+- `advanced analytics`, `analytics dashboard` (unless backed by real feature)
+- `AI[- ]assisted` claims → confirm matches actual contract review surface
 
-- Manual: visit `/dashboard?page=recruiter-access:reports` as a recruiter → lands on Reports panel.
-- Manual: visit same URL as a driver → redirected to driver dashboard.
-- `supabase--linter` → warning count near zero.
-- `bunx vitest run` → all green, including no-trial guard and new featured-sync test.
+Update wording in-place where stale. Update `public/sitemap.xml` if any indexable route is missing or any listed route 404s. Re-verify `public/robots.txt` disallow list still matches private routes.
 
-### Expected score after Phase 2
+## 5. Legal / copy final pass
 
-**9.4 / 10**. Remaining gap closed by Phase 3 (perf + final QA + publish dry-run).
+Read `src/pages/Terms.tsx` and `src/pages/Privacy.tsx` end-to-end and confirm sections explicitly cover:
+
+- Driver data (loads, expenses, fuel, profit, tax)
+- Recruiter data (opportunities, applications, contact requests)
+- Contract uploads (storage, retention, deletion)
+- AI-assisted contract review (not legal advice disclaimer)
+- In-app signature record (electronic record, not e-sign certification)
+- Recruiter reports (scope, recruiter-owned data only)
+- Report exports (PDF/CSV, user responsibility)
+- "No legal/tax/accounting advice" boilerplate present and visible
+
+Add minimal targeted paragraphs only if a gap is found.
+
+## 6. Mobile QA (375×812)
+
+`browser--set_viewport_size 375 812`, then walk: Landing, Pricing, Driver Dashboard, Driver Reports, Driver Contracts, Driver Opportunities, Recruiter Dashboard, Recruiter Reports, Recruiter Contracts, Recruiter Applications, Settings.
+
+Per page confirm: no horizontal scroll, tap targets ≥ 40px, bottom nav visible + functional, "More" sheet opens, report range/date controls usable, contract panels scroll cleanly, modals don't clip viewport.
+
+Fix only `whitespace-nowrap`, overflow-x, or `clamp()` regressions surgically.
+
+## 7. Publish dry-run
+
+Sequence:
+
+1. `bunx vitest run` — all green (including `noTrialLanguage`, `featuredSync`)
+2. Production `vite build` — no errors, chunk sizes captured
+3. Re-run `supabase--linter` post-migration → confirm warning count
+4. `bunx tsx scripts/audit-sitemap.ts` if it exists and is wired
+5. Visual smoke on preview URL: landing, pricing, /dashboard logged out → /auth, /dashboard logged in
+
+## 8. Phase 3 launch report (final deliverable)
+
+Markdown report with:
+
+- Per-section findings + severity
+- Files changed (expected ≤ 6)
+- Final score
+- Launch / no-launch recommendation
+- Remaining post-launch backlog
+
+## Technical notes
+
+- Files likely touched (surgical only): possibly 1 Supabase migration, possibly 1–3 SEO/copy tweaks in marketing pages, possibly 1 mobile-overflow fix. If everything passes audit, **zero files change** and the deliverable is the report.
+- All Phase 3 work runs read-only first; any change is gated on a specific finding.
+- Risk: Lighthouse-style perf in-browser is approximate; we will rely on real bundle sizes + dev tools profile rather than synthetic scores.
+
+## Approval
+
+On approval I will execute Phase 3 in order 1 → 7, then deliver the Phase 3 launch report (§8). No billing / Stripe / RLS contract / routing rewrites.
