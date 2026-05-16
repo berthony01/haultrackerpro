@@ -98,7 +98,7 @@ export default function Updates() {
         ))}
       </div>
 
-      <BottomNav active="dashboard" onNavigate={() => navigate('/dashboard')} role={role} isAdmin={isAdmin} />
+      <BottomNav active="dashboard" onNavigate={() => navigate('/dashboard')} role={role} />
     </div>
   );
 }
