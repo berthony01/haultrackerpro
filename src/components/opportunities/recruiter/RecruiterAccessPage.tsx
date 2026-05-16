@@ -68,7 +68,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const onboardingRef = useRef<HTMLDivElement | null>(null);
 
   const state = resolveState(profile, isBillingActive);
-  const apps = recruiter.data ?? [];
+  const apps = recruiterApplications;
 
   const snapshot = useMemo(() => {
     const newReq = apps.filter((a) => a.status === 'new').length;
@@ -208,11 +208,11 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 <SnapshotStat label="Active Opportunities" value={snapshot.activeOpps} loading={oppsLoading} />
-                <SnapshotStat label="New Driver Requests" value={snapshot.newReq} loading={recruiter.isLoading} />
-                <SnapshotStat label="Drivers Contacted" value={snapshot.contacted} loading={recruiter.isLoading} />
-                <SnapshotStat label="Interviews Scheduled" value={snapshot.interviews} loading={recruiter.isLoading} />
-                <SnapshotStat label="Drivers Hired" value={snapshot.hired} loading={recruiter.isLoading} />
-                <SnapshotStat label="Response Rate" value={`${snapshot.responseRate}%`} loading={recruiter.isLoading} />
+                <SnapshotStat label="New Driver Requests" value={snapshot.newReq} loading={isLoadingRecruiter} />
+                <SnapshotStat label="Drivers Contacted" value={snapshot.contacted} loading={isLoadingRecruiter} />
+                <SnapshotStat label="Interviews Scheduled" value={snapshot.interviews} loading={isLoadingRecruiter} />
+                <SnapshotStat label="Drivers Hired" value={snapshot.hired} loading={isLoadingRecruiter} />
+                <SnapshotStat label="Response Rate" value={`${snapshot.responseRate}%`} loading={isLoadingRecruiter} />
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed pt-1">
                 Driver interest and hiring outcomes are not guaranteed.
@@ -559,7 +559,7 @@ function RecentPosts({
                 </div>
                 <p className="text-xs text-muted-foreground truncate">
                   {[o.hiring_city, o.hiring_state].filter(Boolean).join(', ') || 'Location TBD'}
-                  {o.weekly_gross_min ? ` · ~$${Number(o.weekly_gross_min).toLocaleString()}/wk` : ''}
+                  {o.estimated_weekly_gross ? ` · ~$${Number(o.estimated_weekly_gross).toLocaleString()}/wk` : ''}
                   {o.published_at ? ` · ${new Date(o.published_at).toLocaleDateString()}` : ''}
                 </p>
               </div>
