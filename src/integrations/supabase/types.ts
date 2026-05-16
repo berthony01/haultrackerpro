@@ -2471,6 +2471,10 @@ export type Database = {
         Args: { application_id: string; note?: string; response_type: string }
         Returns: string
       }
+      recruiter_has_priority_plan: {
+        Args: { _recruiter_id: string }
+        Returns: boolean
+      }
       recruiter_plan_limit: { Args: { _plan: string }; Returns: number }
       request_driver_contact: {
         Args: { application_id: string; recruiter_note?: string }

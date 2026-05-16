@@ -19,9 +19,11 @@ export function useOpportunities(filters: OpportunityFilters = {}) {
     queryFn: async () => {
       let q = supabase
         .from('opportunities')
-        .select('*')
+        .select('*, recruiter:recruiter_profiles!inner(verification_status, status)')
         .eq('status', 'active')
         .eq('admin_review_status', 'approved')
+        .eq('recruiter.verification_status', 'approved')
+        .neq('recruiter.status', 'suspended')
         .order('featured', { ascending: false })
         .order('published_at', { ascending: false, nullsFirst: false });
 

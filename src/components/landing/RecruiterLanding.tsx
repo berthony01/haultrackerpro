@@ -45,9 +45,9 @@ const steps = [
 ];
 
 const plans = [
-  { name: 'Starter', price: '$19', limit: '1 active opportunity', features: ['Applicant pipeline', 'In-app messaging', 'Verified badge'] },
+  { name: 'Starter', price: '$19', limit: '1 active opportunity', features: ['Applicant pipeline', 'Driver contact requests', 'Verified Recruiter badge'] },
   { name: 'Growth', price: '$49', limit: '5 active opportunities', features: ['Everything in Starter', 'Contract Protection', 'Priority placement'], highlight: true },
-  { name: 'Fleet', price: '$149', limit: '25 active opportunities', features: ['Everything in Growth', 'Multi-seat team access', 'Analytics dashboard'] },
+  { name: 'Fleet', price: '$149', limit: '25 active opportunities', features: ['Everything in Growth', 'Higher posting capacity', 'Recruiting snapshot dashboard', 'Priority support'] },
 ];
 
 const testimonials = [

@@ -56,6 +56,14 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
     ? calculateOpportunityMatch({ opportunity: o, driverProfile, opportunityFinancials: f })
     : null;
 
+  const recruiter = (o as Opportunity & {
+    recruiter?: { verification_status?: string | null; status?: string | null } | null;
+  }).recruiter;
+  const isVerifiedRecruiter =
+    !!recruiter &&
+    recruiter.verification_status === 'approved' &&
+    recruiter.status !== 'suspended';
+
   return (
     <Card className="p-5 border-border/60 hover:border-primary/40 transition-colors flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
@@ -64,12 +72,14 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
             <h3 className="text-base font-bold text-foreground truncate">{o.title}</h3>
             {o.featured && (
               <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/20">
-                Featured
+                Priority
               </Badge>
             )}
-            <Badge variant="outline" className="border-success/40 text-success gap-1">
-              <ShieldCheck className="h-3 w-3" /> Approved
-            </Badge>
+            {isVerifiedRecruiter && (
+              <Badge variant="outline" className="border-success/40 text-success gap-1">
+                <ShieldCheck className="h-3 w-3" /> Verified Recruiter
+              </Badge>
+            )}
             {isPro && (
               <Badge variant="outline" className={`gap-1 ${scoreClass}`}>
                 <TrendingUp className="h-3 w-3" /> {f.profitScore}
