@@ -429,7 +429,12 @@ const Index = () => {
       return;
     }
     if (p === 'recruiter-access') {
-      openOpportunitiesView('recruiter');
+      setEditingLoad(null);
+      setEditingStops([]);
+      setEditingExpense(null);
+      setEditingFuelLog(null);
+      setOpportunitiesView('list');
+      setPage('recruiter-access');
       return;
     }
     if (p === 'opportunity-preferences') {
@@ -452,7 +457,7 @@ const Index = () => {
 
   // Derive sidebar/header key so Recruiter Access has its own label & highlight.
   const navKey =
-    page === 'opportunities' && opportunitiesView === 'recruiter'
+    page === 'recruiter-access'
       ? 'recruiter-access'
       : page === 'opportunities' && opportunitiesView === 'driver-profile'
         ? 'opportunity-preferences'
