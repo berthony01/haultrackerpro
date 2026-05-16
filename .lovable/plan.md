@@ -1,198 +1,257 @@
-# Fix Role Confusion + Add Owner View Switcher
+# Add Contracts as a first-class navigation item
 
-## Root cause (audit)
-
-Your `berthonyxyz@gmail.com` account is **admin + has a `recruiter_profiles` row + has driver data** all at once. Three pieces of code interact badly:
-
-1. `useUserRole.ts` returns `role='recruiter'` (because the seeded recruiter profile exists).
-2. `Index.tsx` line 428 role-guard says `if (roleLoading || isAdmin) return;` — admins are exempt from being redirected to their role's home page, so the page stays on the default `'dashboard'` (driver content).
-3. Sidebar/BottomNav render based on `role` — so they show the **recruiter menu**.
-
-Result: **driver dashboard content + recruiter menu items + an "Admin Tools" jump**. That's what you're seeing.
-
-For non-admin accounts the same code path *should* work strictly (driver-only or recruiter-only), but it has not been verified end-to-end.
-
----
+Make Contract Protection discoverable as its own page on both the driver and recruiter sides, without changing the underlying schema, edge functions, or `ContractAttachment` behavior. All access is gated through `effectiveRole` from `useViewMode`, so admins follow the Driver | Recruiter switcher and non-admins stay locked to their real role.
 
 ## What gets built
 
-### 1. Add a Driver | Recruiter view switcher (admin / dual-role only)
+### 1. New route key: `contracts`
 
-New hook `src/hooks/useViewMode.ts`:
+In `src/pages/Index.tsx`:
 
-- Returns `{ viewMode, setViewMode, canSwitch, effectiveRole }`.
-- `canSwitch = isAdmin || (hasRecruiterProfile && hasDriverData)` — non-admins with only one role never see the switcher.
-- `viewMode` persisted in `localStorage` under `htp_view_mode` (`'driver' | 'recruiter'`). Default for admins = `'driver'`; for dual-role non-admin = their primary `role`.
-- `effectiveRole = canSwitch ? viewMode : role`.
+- Add `'contracts'` to `driverOnlyPages` is **not** correct — we need it visible to BOTH roles. Instead, treat `contracts` as a *shared* key whose body component is chosen by `isRecruiterView`.
+- Add `contracts` to the page-state union and render either `<DriverContractsView />` or `<RecruiterContractsView />` based on `isRecruiterView`.
+- Add a defensive branch in `handleNavigate` so `contracts` is always allowed regardless of view, but the rendered body comes from the active role.
+- Route guard `useEffect`: do not redirect away from `contracts`; it's role-agnostic at the route level, role-specific at the body level.
 
-New component `src/components/ViewModeSwitch.tsx`:
+### 2. Driver navigation
 
-- Compact segmented control (Driver | Recruiter) in the header.
-- Only renders when `canSwitch === true`.
-- On change: updates localStorage, then navigates to that role's home (`dashboard` or `recruiter-access`).
+`src/components/premium/AppSidebar.tsx` — `driverItems`: insert `{ id: 'contracts', label: 'Contracts', icon: FileSignature }` between `Opportunities` and `Expenses`.
 
-### 2. Replace `isRecruiter` gating with `effectiveRole` in `Index.tsx`
+`src/components/BottomNav.tsx`:
 
-- `const { effectiveRole, canSwitch } = useViewMode(); const isRecruiterView = effectiveRole === 'recruiter';`
-- Replace **every** `isRecruiter` reference in `Index.tsx` (~10 spots) with `isRecruiterView` for UI gating — including:
-  - Sidebar/BottomNav `role={effectiveRole}` prop
-  - Header subtitle ("Recruiter Console" vs "Load & Pay Manager")
-  - Smart reminders / milestone nudges / role card visibility
-  - Settings page selector (RecruiterSettingsView vs SettingsView)
-- Update the role-guard `useEffect` (line 427):
-  - Remove `isAdmin` bypass.
-  - Rule: if `isRecruiterView && page ∈ driverOnlyPages` → setPage('recruiter-access'). If `!isRecruiterView && page === 'recruiter-access'` → setPage('dashboard').
-  - This now applies uniformly — admin obeys their chosen viewMode, non-admins are locked to their `role`.
-- Same swap in `handleNavigate` defensive gating (line 459+): use `effectiveRole`, drop `isAdmin` short-circuits.
+- `driverNav` stays 2+FAB+2 (per memory). Don't add Contracts to the 5-slot strip; add it to the driver **More** sheet (`driverMoreItems`) instead so the bottom bar density rule is respected.
 
-### 3. Remove now-redundant "Admin Tools" cross-role link
+### 3. Recruiter navigation
 
-- Delete the `adminCrossRoleItem` block in `AppSidebar.tsx` (lines 31–39, 81–95).
-- Delete the equivalent admin cross-role block in `BottomNav.tsx` (~lines 82+).
-- The header switcher replaces it cleanly.
+`AppSidebar.tsx` — `recruiterItems`: insert `{ id: 'contracts', label: 'Contracts', icon: FileSignature }` between `Applications` and `Settings`.
 
-### 4. Verify non-admin role isolation
+`BottomNav.tsx` — `recruiterNav` keeps 4 slots; add `Contracts` to `recruiterMoreItems` for parity with driver-side.
 
-Walk through the four non-admin cases and confirm `effectiveRole` and gating behave correctly:
+### 4. New component: `src/components/contracts/DriverContractsView.tsx`
 
+Data: `useOpportunityApplications()` (driver applications) + `useContractReadinessMap(applicationIds)`. No new queries needed — reuse what `DriverApplicationsPanel` already uses.
 
-| Account                                  | role      | canSwitch | Expected dashboard  | Expected menu  |
-| ---------------------------------------- | --------- | --------- | ------------------- | -------------- |
-| Plain driver (no recruiter_profiles row) | driver    | false     | Driver dashboard    | Driver menu    |
-| Plain recruiter (profile, no loads)      | recruiter | false     | Recruiter dashboard | Recruiter menu |
-| Dual-role non-admin                      | recruiter | true      | Last-used / driver  | Switcher shown |
-| Admin (berthonyxyz)                      | recruiter | true      | Last-used / driver  | Switcher shown |
+Tabs/filters (in-memory filter on `readiness`):
 
+- Needs Review (`awaiting_driver_decision`)
+- Approved (`driver_approved`)
+- Changes Requested (`changes_requested`)
+- Rejected (`driver_rejected`)
+- Signed (derived from `ContractWithVersion.driver_signature` via per-card hook, or fall back to `driver_approved` + status `signed`)
+- All
 
-For the first two: switcher hidden, role-guard forces them home if they URL-hack into the other side. Confirmed by tracing the new `useEffect` with `isAdmin` removed.
+Each card shows: opportunity title, company name, application status badge, readiness badge, last updated, "Open application" deep-link to `opportunities` → My Requests for that app, and the existing `<ContractAttachment applicationId={a.id} role="driver" />` mounted inline (which already exposes view / AI review / approve / reject / request-changes / sign / clause explainer — all driver-only actions). No upload/replace/parse UI because `ContractAttachment` already hides those for `role="driver"`.
 
-### 5. Quick QA after implementation
+Empty state (no driver contracts at all): educational card explaining recruiters will attach contracts here and listing the four driver actions (review, approve/reject, request changes, sign).
 
-- Manual: log in as `berthonyxyz`, toggle switch, confirm menu + main pane swap together and last choice persists across reload.
-- Manual: create a temp plain-driver account, log in, confirm no switcher, dashboard = driver, `/?page=recruiter-access` redirects to dashboard.
-- Console: no React key/role-loading warnings during the toggle.
+### 5. New component: `src/components/contracts/RecruiterContractsView.tsx`
 
----
+Data: `useRecruiterProfile()` → `useOpportunityApplications({ recruiterId })` + `useContractReadinessMap(applicationIds)`.
+
+Tabs/filters:
+
+- Awaiting Upload (`awaiting_upload` or `no_contract` where application is active)
+- Uploaded (`needs_ai_review` pre-AI)
+- AI Reviewed (`awaiting_driver_decision` post-AI)
+- Needs Driver Review (`awaiting_driver_decision`)
+- Approved (`driver_approved`)
+- Changes Requested
+- Rejected
+- Signed (driver_signature present)
+- Blocked from Hire (application status `pending_hire` AND readiness ≠ `driver_approved`/signed — derived in component)
+- All
+
+Each card shows: driver name (using existing snapshot fields/RLS-allowed view), opportunity title, application status, readiness badge, AI risk tier if present (read from `ContractWithVersion` via lightweight per-card hook OR just rely on what ContractAttachment displays), last updated, "Open application" link to `recruiter-access:applications`, and `<ContractAttachment applicationId={a.id} role="recruiter" />` inline (which already provides upload / replace / parse / analyze / view driver decision — recruiter-only actions; never exposes sign/driver-review submission).
+
+Empty state: educational card explaining recruiters can attach contracts, run AI review, and track driver approval before finalizing a hire.
+
+### 6. Dashboard cards
+
+`src/components/contracts/ContractActionsCard.tsx` (new, single component that switches copy by role):
+
+- Driver mode: counts applications where readiness ∈ {`awaiting_driver_decision`, signed-eligible}. Renders only if count > 0. CTA navigates to `contracts`.
+- Recruiter mode: counts {awaiting_upload, needs_ai_review, awaiting_driver_decision, hire-blocked}. Renders only if count > 0. CTA navigates to `contracts`.
+
+Mount in `Index.tsx`:
+
+- Driver dashboard block (`page === 'dashboard' && !isRecruiterView`): add near the top alongside other actionable cards.
+- Recruiter hub (`page === 'recruiter-access' && isRecruiterView` when `recruiterView === 'hub'`): add near top of `RecruiterAccessPage`'s hub view, OR mount in `Index.tsx` above the recruiter content area. Prefer the latter to avoid touching `RecruiterAccessPage` if it complicates routing.
+
+### 7. Access rules (no schema changes)
+
+- RLS on `contracts`, `contract_versions`, `contract_reviews`, `contract_signatures`, `contract_audit_log`, `opportunity_applications` already enforces driver-sees-own / recruiter-sees-own-via-`is_recruiter_owner` / admin-sees-all. The new pages add zero privileged surface.
+- UI separation is enforced by `effectiveRole`. `ContractAttachment`'s `role` prop is fed from `effectiveRole`, never from the user's database role, so an admin in Driver view sees driver controls only.
+- Non-admin non-recruiter users: `useRecruiterProfile()` returns null → `RecruiterContractsView` shows a "not available" state; route guard already prevents them from landing in recruiter view.
+- Direct URL deep-link to `?page=contracts` works for both views; body picks via `isRecruiterView`. No way to bypass — recruiter-only data is fetched with `recruiterId`, and driver-only data is fetched with the caller's `auth.uid()`, both subject to RLS.
+
+## Files
+
+**New**
+
+- `src/components/contracts/DriverContractsView.tsx`
+- `src/components/contracts/RecruiterContractsView.tsx`
+- `src/components/contracts/ContractActionsCard.tsx`
+
+**Edited**
+
+- `src/pages/Index.tsx` — add `contracts` page, render switcher, dashboard card mounts, navigate gating.
+- `src/components/premium/AppSidebar.tsx` — add Contracts to both driver and recruiter item lists.
+- `src/components/BottomNav.tsx` — add Contracts to driver and recruiter More sheets.
+
+**Untouched (explicitly preserved)**
+
+- `src/components/contracts/ContractAttachment.tsx`
+- All `supabase/functions/*-contract/` edge functions
+- All `contracts*` tables / RLS
+- `useApplicationContract`, `useContractReadinessMap`
+- `DriverApplicationsPanel`, `RecruiterApplicationsDashboard` (their inline contract blocks stay)
 
 ## Out of scope
 
-- No DB / RLS / edge function changes.
-- No changes to `useUserRole.ts` itself (still source of truth for "does this user *have* the role"). Only consumers change.
-- No landing-page / Phase 4 changes.
-- No removal of admin privileges — `useAdmin()` still grants RLS bypass etc., it just no longer auto-bypasses the *UI* role guard.
+- No DB migrations.
+- No edits to edge functions or `ContractAttachment`.
+- No new top-level slot in the mobile bottom bar — Contracts lives in the More sheet to respect the existing 2+FAB+2 rule.
+- No changes to landing-page or marketing copy.
+- No admin contracts panel changes — `AdminContractsPanel` keeps its existing admin-only top-level entry.
 
-## Files touched
+This plan is approved, but please implement it with the following safeguards.
 
-- `src/hooks/useViewMode.ts` (new)
-- `src/components/ViewModeSwitch.tsx` (new)
-- `src/pages/Index.tsx` (edit: swap `isRecruiter`→`isRecruiterView`, fix role-guard, mount switcher in header)
-- `src/components/premium/AppSidebar.tsx` (edit: remove admin cross-role item)
-- `src/components/BottomNav.tsx` (edit: remove admin cross-role item)
+1. Keep `contracts` as a shared page key.
 
-This plan is approved, but please apply these safeguards while implementing it.
+Do not add it to driverOnlyPages or recruiterOnlyPages. The route key should be shared, and the rendered body should be chosen by effectiveRole:
 
-The architecture is correct:
+- effectiveRole === 'driver' -> DriverContractsView
 
-- Keep useUserRole as the source of what roles/access the account has.
+- effectiveRole === 'recruiter' -> RecruiterContractsView
 
-- Add viewMode as the active UI view.
+2. Verify the data hooks before building.
 
-- Use effectiveRole to control the dashboard, sidebar, mobile nav, settings view, redirects, and route guards.
+Before using useOpportunityApplications() for DriverContractsView, confirm it returns only the logged-in driver's own applications and includes the opportunity/company fields needed for the contract cards.
 
-- Admin/owner should no longer bypass UI role guards.
+Before using useOpportunityApplications({ recruiterId }) for RecruiterContractsView, confirm it returns only applications tied to that recruiter's opportunities and includes driver/applicant fields allowed by RLS.
 
-- Admin/owner should use the Driver | Recruiter switcher instead.
+If the existing hook does not support this cleanly, create a small contracts-specific hook that reuses existing tables and respects existing RLS. Do not change schema.
 
-Required safeguards:
+3. Do not confuse approved with signed.
 
-1. Do not define driver eligibility only by existing load/driver data.
+Signed should only mean an actual driver signature exists, such as a contract signature record or confirmed driver_signature field.
 
-A new driver may not have loads yet. If there is no dedicated driver_profiles table, default non-recruiter users to driver. For canSwitch, admin can always switch. Non-admin dual-role switching should only be allowed if the account truly has both confirmed roles.
+Do not label a contract as Signed just because readiness is driver_approved.
 
-2. localStorage must never create access.
+4. Keep ContractAttachment unchanged.
 
-If canSwitch is false, ignore htp_view_mode completely and force effectiveRole to the real role from useUserRole.
+Reuse the existing ContractAttachment component exactly as planned:
 
-Example:
+- DriverContractsView passes role="driver"
 
-- normal driver with htp_view_mode='recruiter' must still be driver
+- RecruiterContractsView passes role="recruiter"
 
-- normal recruiter with htp_view_mode='driver' must still be recruiter
+Admin/owner should receive the role based on effectiveRole, not the raw database role.
 
-3. Guard all recruiter pages, including deep links.
+5. Add Contracts to desktop navigation for both sides.
 
-Do not only check page === 'recruiter-access'.
+Driver sidebar:
 
-Also block:
+- Dashboard
 
-- recruiter-access:manage
+- Loads
 
-- recruiter-access:applications
+- Opportunities
 
-- any page that starts with recruiter-access:
+- Contracts
 
-Use a helper like:
+- Expenses
 
-const isRecruiterPage = page === 'recruiter-access' || page.startsWith('recruiter-access:');
+- Fuel
 
-4. Guard all driver-only pages consistently.
+- Reports
 
-When effectiveRole === 'recruiter', redirect away from driver-only pages to recruiter-access.
+- Settings
 
-When effectiveRole === 'driver', redirect away from recruiter pages to dashboard.
+Recruiter sidebar:
 
-5. The view switcher must control both content and menu.
+- Recruiter Dashboard
 
-When owner/admin selects Driver:
+- Manage Opportunities
 
-- driver dashboard
+- Applications
 
-- driver sidebar
+- Contracts
 
-- driver mobile nav
+- Settings
 
-- driver settings view
+6. Keep mobile bottom nav clean.
 
-- no recruiter menu
+Do not add Contracts as a main bottom-nav slot.
 
-When owner/admin selects Recruiter:
+Put Contracts in the driver More sheet and recruiter More sheet as planned.
 
-- recruiter dashboard
+7. Add dashboard action cards carefully.
 
-- recruiter sidebar
+Driver dashboard card:
 
-- recruiter mobile nav
+Show only if the driver has contracts needing review, signature, or action.
 
-- recruiter settings view
+CTA: Review Contracts
 
-- no driver dashboard
+Recruiter dashboard card:
 
-6. Remove all admin cross-role menu links from the normal sidebar and bottom nav.
+Show only if recruiter has contracts needing upload, AI review, driver approval, or hire-blocked action.
 
-The switcher replaces those links.
+CTA: Manage Contracts
 
-7. Add role-loading protection.
+Do not show the card when count is zero.
 
-Do not render role-sensitive menus while roleLoading/viewMode is still resolving. Avoid any flash where the wrong menu appears.
+8. Add educational empty states.
 
-8. QA must include:
+Driver empty state should explain that contracts from recruiters will appear here and drivers can review, approve, reject, request changes, and sign.
 
-- owner/admin Driver View
+Recruiter empty state should explain that recruiters can attach contracts, run AI-assisted review, track driver approval, and prevent final hiring before contract readiness is complete.
 
-- owner/admin Recruiter View
+9. Keep strict role separation.
 
-- normal driver
+Driver View:
 
-- normal recruiter
+- show DriverContractsView only
 
-- mobile bottom nav
+- show driver contract actions only
 
-- desktop sidebar
+- no upload/replace/parse recruiter tools
 
-- direct URL attempts
+Recruiter View:
 
-- reload persistence
+- show RecruiterContractsView only
 
-- localStorage tampering test
+- show recruiter contract tools only
 
-No database, RLS, Stripe, landing page, or unrelated feature changes.
+- no driver signing or driver decision actions
+
+10. QA checklist:
+
+- Driver desktop sidebar shows Contracts.
+
+- Driver mobile More sheet shows Contracts.
+
+- Driver Contracts page shows only driver-owned application contracts.
+
+- Driver cannot upload or replace contracts.
+
+- Recruiter desktop sidebar shows Contracts.
+
+- Recruiter mobile More sheet shows Contracts.
+
+- Recruiter Contracts page shows only recruiter-owned application contracts.
+
+- Recruiter cannot sign as driver or submit driver decisions.
+
+- Owner/admin in Driver View sees driver contracts only.
+
+- Owner/admin in Recruiter View sees recruiter contracts only.
+
+- ?page=contracts works in both views and renders the correct page body.
+
+- Dashboard card appears only when there are real pending contract actions.
+
+- Empty state appears when there are no contracts.
+
+- Build passes with no TypeScript errors and no console errors.
