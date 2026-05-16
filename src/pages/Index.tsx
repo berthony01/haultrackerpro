@@ -810,7 +810,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} roleLoading={roleLoading} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
       </div>
       <AddActionModal
         open={showAddModal}
