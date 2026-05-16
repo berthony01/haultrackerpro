@@ -522,7 +522,7 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
