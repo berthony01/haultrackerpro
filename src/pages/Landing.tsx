@@ -7,6 +7,9 @@ import reportsMockup from '@/assets/reports-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
 import { trackLandingFaqDeepLink, trackStarterKitCTAClicked } from '@/lib/analytics';
+import { useLandingAudience } from '@/hooks/useLandingAudience';
+import AudienceToggle from '@/components/landing/AudienceToggle';
+import RecruiterLanding from '@/components/landing/RecruiterLanding';
 
 type LandingFaq = { q: string; a: string; deepLink?: string };
 
