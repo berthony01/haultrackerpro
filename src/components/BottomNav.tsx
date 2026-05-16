@@ -22,7 +22,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { ShieldCheck } from 'lucide-react';
 import type { UserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -30,7 +29,6 @@ interface BottomNavProps {
   active: string;
   onNavigate: (page: string) => void;
   role: UserRole;
-  isAdmin?: boolean;
   roleLoading?: boolean;
 }
 
