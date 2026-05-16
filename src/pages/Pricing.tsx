@@ -409,9 +409,10 @@ export default function Pricing() {
                 price: '$19',
                 limit: '1 active opportunity',
                 bullets: [
-                  'Approved recruiter / company profile',
-                  'Applications dashboard',
-                  'Profit Intelligence integration',
+                  '1 active opportunity',
+                  'Verified Recruiter badge on driver listings',
+                  'Applicant pipeline',
+                  'Driver contact requests',
                   'Admin-reviewed listings',
                 ],
               },
