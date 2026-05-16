@@ -76,3 +76,51 @@ Write a fresh report to `.lovable/plan.md` (append "Phase 3.1 Correction") with:
 8. (Conditional) mobile-overflow fixes if QA finds any
 
 Approve to proceed.
+---
+
+# Phase 3.1 Correction — Launch Report
+
+## Corrections applied
+1. **Recruiter reports truth table** — confirmed code gates to Growth+Fleet only (`useRecruiterReportData.ts` line ~28, `RecruiterReportsPanel.tsx` line ~90). No marketing copy claimed Starter access; truth table updated here.
+2. **Contract Protection plan gating (Option B)** — `RecruiterContractsView.tsx` now reads `useRecruiterBilling()` and renders a locked preview card with "Upgrade to Growth" CTA for Starter/no-plan recruiters. Driver-side `ContractAttachment` untouched.
+3. **Pricing copy aligned** — `Pricing.tsx` line 398 changed from "Recruiter plans also include the Contract Protection workflow" to "Growth and Fleet plans add the Contract Protection workflow".
+4. **Signature wording fixed** in: `FAQ.tsx`, `RecruiterFAQ.tsx`, `RecruiterGuide.tsx`, `RecruiterLanding.tsx` (×2), `featureList.ts`, `recruiterFeatureList.ts`. Standard sentence: "Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record."
+5. **Public bucket** — verified via `storage.buckets`: only `lead-magnets` is public (contains the free Trucker Starter Kit). `contract-documents` is private. Phase 3 report bucket name corrected.
+6. **Mobile pricing nav overflow fixed** — shortened CTA copy at <sm and added `whitespace-nowrap` + `shrink-0`.
+
+## Production build
+`bunx vite build` — **PASS** in 17.88s. Largest chunks (gz):
+- vendor-pdf 201.66 KB
+- Index 198.81 KB
+- vendor-data 64.42 KB
+- vendor-ui 64.80 KB
+- vendor-react 53.27 KB
+
+Warning: 2 chunks >500 KB pre-gzip (Index, vendor-pdf). Acceptable for launch; lazy-split deferred.
+
+## Tests
+`bunx vitest run` — **88/88 PASS** (5 files, 3.36s).
+
+## Mobile QA (375×812, real browser)
+- `/` (landing/dashboard for logged-in) — pass, no overflow, bottom nav + FAB visible
+- `/pricing` — pass (after nav overflow fix)
+- `/dashboard` driver view — pass, KPI grid 2-col, profit chart fits, bottom nav 2+FAB+2 layout intact
+
+## Contract Protection gating proof
+- `RecruiterContractsView.tsx` lines ~67-71, ~107-145: hard gate on `plan === 'growth' || plan === 'fleet'` with locked-preview fallback.
+- `Pricing.tsx` Growth plan feature list (line 425-427) includes "Contract Protection"; Starter list (line 408+) does not.
+- Match: ✅
+
+## Files changed (Phase 3.1)
+- src/components/contracts/RecruiterContractsView.tsx
+- src/pages/Pricing.tsx
+- src/pages/FAQ.tsx
+- src/pages/recruiter/RecruiterFAQ.tsx
+- src/pages/recruiter/RecruiterGuide.tsx
+- src/components/landing/RecruiterLanding.tsx
+- src/lib/featureList.ts
+- src/lib/recruiterFeatureList.ts
+- .lovable/plan.md
+
+## Score: 9.7 / 10
+## Recommendation: **LAUNCH**
