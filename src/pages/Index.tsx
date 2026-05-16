@@ -599,11 +599,10 @@ const Index = () => {
                       <X className="h-4 w-4" />
                     </button>
                     <h3 className="text-sm font-bold mb-3" style={{ color: 'hsl(0, 0%, 100%)' }}>What do you want to do next?</h3>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
                         { icon: Route, label: hasCompletedDriverProfile ? 'Find Opportunities' : 'Set Opportunity Preferences', action: () => openOpportunitiesView(hasCompletedDriverProfile ? 'list' : 'driver-profile') },
-                        { icon: Users, label: 'Recruit Drivers', action: () => handleNavigate('recruiter-access') },
                       ].map((item) => (
                         <button
                           key={item.label}
