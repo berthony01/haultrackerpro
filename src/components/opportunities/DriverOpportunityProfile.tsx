@@ -232,14 +232,20 @@ export function DriverOpportunityProfile({ onBack }: Props) {
 
       <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
-          Driver Opportunity Profile
+          Opportunity Preferences
         </h1>
         <p className="text-sm text-muted-foreground">
-          Tell HaulTrackerPro what kind of trucking opportunities actually make sense for you.
+          Help HaulTrackerPro match you with opportunities that fit your pay goals, route style, experience, and home-time needs.
+        </p>
+        <p className="text-xs text-muted-foreground/80 mt-2">
+          Your main HaulTrackerPro account stays the same. These preferences only improve opportunity matches and show approved recruiters the information you choose to share when you request info.
         </p>
       </Card>
 
-      <Section icon={User} title="Basic Info">
+      <Section icon={User} title="Basic Contact Info">
+        <p className="text-xs text-muted-foreground -mt-1">
+          Pulled from your HaulTrackerPro account when available.
+        </p>
         <Grid>
           <Field label="Full name">
             <Input value={form.full_name} onChange={(e) => set('full_name', e.target.value)} placeholder="John Doe" />
