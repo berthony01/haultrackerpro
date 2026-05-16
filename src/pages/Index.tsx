@@ -593,7 +593,7 @@ const Index = () => {
                     onDismiss={() => markSeen()}
                   />
                 )}
-                {!subscription.isLoading && (
+                {!subscription.isLoading && !isRecruiter && (
                   <MilestoneNudges
                     loadsCount={allLoadsQuery.loads.length}
                     expensesCount={allExpensesQuery.expenses.length}
@@ -602,8 +602,8 @@ const Index = () => {
                     onNavigate={handleNavigate}
                   />
                 )}
-                {/* Role path card for new / low-activity users */}
-                {!roleCardDismissed && allLoadsQuery.loads.length <= 3 && (
+                {/* Role path card for new / low-activity drivers only */}
+                {!roleCardDismissed && !isRecruiter && allLoadsQuery.loads.length <= 3 && (
                   <div className="mb-4 p-4 rounded-2xl border relative" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                     <button
                       onClick={() => {
