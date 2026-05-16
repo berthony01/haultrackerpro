@@ -68,14 +68,14 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
 
   const matchEnabled = !!profile && profile.profile_completed;
 
-  // Honor deep-link routing from /dashboard?page=opportunities&view=...
+  // Honor deep-link routing for driver-profile from /dashboard?page=opportunities&view=driver-profile.
+  // Recruiter view is now its own top-level route (page=recruiter-access) handled by Index.
   useEffect(() => {
     try {
       const v = sessionStorage.getItem('htp_opportunities_initial_view');
       if (!v) return;
       sessionStorage.removeItem('htp_opportunities_initial_view');
-      if (v === 'recruiter') setShowRecruiterHub(true);
-      else if (v === 'driver-profile') setShowProfile(true);
+      if (v === 'driver-profile') setShowProfile(true);
       // 'list' is the default — no-op.
     } catch {}
   }, []);
@@ -83,14 +83,12 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   // Notify parent of current top-level view so sidebar/header stay in sync.
   useEffect(() => {
     if (!onViewChange) return;
-    if (showRecruiterHub || showRecruiterOnboarding || showRecruiterManager || showRecruiterApps) {
-      onViewChange('recruiter');
-    } else if (showProfile) {
+    if (showProfile) {
       onViewChange('driver-profile');
     } else {
       onViewChange('list');
     }
-  }, [showRecruiterHub, showRecruiterOnboarding, showRecruiterManager, showRecruiterApps, showProfile, onViewChange]);
+  }, [showProfile, onViewChange]);
 
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 
