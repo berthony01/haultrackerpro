@@ -1,5 +1,4 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import type { jsPDF as JsPDFType } from 'jspdf';
 import type { RecruiterReportData, RecruiterReportType } from './aggregator';
 import { REPORT_TYPE_LABEL } from './aggregator';
 
