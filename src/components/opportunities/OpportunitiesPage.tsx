@@ -650,3 +650,53 @@ function RecruiterEntryCard({
   );
 }
 
+
+function RecruiterAccessHub({
+  profile,
+  loading,
+  onBack,
+  onOpenOnboarding,
+  onManage,
+  onApplications,
+}: {
+  profile: ReturnType<typeof useRecruiterProfile>['profile'];
+  loading: boolean;
+  onBack: () => void;
+  onOpenOnboarding: () => void;
+  onManage: () => void;
+  onApplications: () => void;
+}) {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
+        ← Back to Opportunities
+      </Button>
+      <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
+            <Building2 className="h-6 w-6 text-primary-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
+              Recruiter Access
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Apply to post structured opportunities and manage driver requests.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {loading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : (
+        <RecruiterEntryCard
+          profile={profile}
+          onClick={onOpenOnboarding}
+          onManage={onManage}
+          onApplications={onApplications}
+        />
+      )}
+    </div>
+  );
+}
