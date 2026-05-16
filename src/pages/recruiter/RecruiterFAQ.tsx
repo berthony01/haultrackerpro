@@ -23,7 +23,7 @@ const faqs = [
   },
   {
     q: 'What plans are available and what do they include?',
-    a: 'Starter (1 active opportunity), Growth (5), and Fleet (25). All plans include the applicant pipeline, contract protection, contact-snapshot delivery, and analytics. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
+    a: 'Starter ($19/mo) includes 1 active opportunity, the Verified Recruiter badge on driver listings, the applicant pipeline, and driver contact requests. Growth ($49/mo) adds Contract Protection, Priority Placement in driver listings, Recruiter Activity & Pipeline reports (PDF + CSV), and raises the limit to 5 active opportunities. Fleet ($149/mo) keeps everything in Growth and raises the limit to 25 active opportunities with priority support. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
   },
   {
     q: 'How are payments processed and is my card data safe?',
