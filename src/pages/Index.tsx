@@ -397,6 +397,18 @@ const Index = () => {
 
   const navigate = useNavigate();
 
+  const [opportunitiesViewKey, setOpportunitiesViewKey] = useState(0);
+
+  const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
+    try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
+    setEditingLoad(null);
+    setEditingStops([]);
+    setEditingExpense(null);
+    setEditingFuelLog(null);
+    setOpportunitiesViewKey((k) => k + 1);
+    setPage('opportunities');
+  };
+
   const handleNavigate = (p: string, options?: { filter?: string }) => {
     if (p === 'add') {
       setShowAddModal(true);
@@ -406,21 +418,21 @@ const Index = () => {
       navigate('/parking');
       return;
     }
+    if (p === 'recruiter-access') {
+      openOpportunitiesView('recruiter');
+      return;
+    }
+    if (p === 'opportunity-preferences') {
+      openOpportunitiesView('driver-profile');
+      return;
+    }
     setEditingLoad(null);
     setEditingStops([]);
     setEditingExpense(null);
     setEditingFuelLog(null);
     setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
+    if (p === 'opportunities') setOpportunitiesViewKey((k) => k + 1);
     setPage(p);
-  };
-
-  const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
-    try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
-    setEditingLoad(null);
-    setEditingStops([]);
-    setEditingExpense(null);
-    setEditingFuelLog(null);
-    setPage('opportunities');
   };
 
   const handleAddLoadFromModal = () => {
