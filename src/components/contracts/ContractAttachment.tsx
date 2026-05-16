@@ -389,9 +389,10 @@ export function ContractAttachment({ applicationId, role }: Props) {
       )}
       {role === 'recruiter' && (
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Upload an accurate, authorized contract. The driver sees an AI-assisted summary, risk
-          flags, and must approve and (when required) sign before this candidate can be moved to
-          hired status. AI review is informational and is shown to the driver, not legal advice.
+          Upload an accurate, authorized contract. You can't mark a driver hired until they approve
+          the current contract. If they also sign, HaulTrackerPro stores an in-app signature record
+          (platform record of consent — not a DocuSign-equivalent or qualified electronic signature).
+          AI review is informational, not legal advice.
         </p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
