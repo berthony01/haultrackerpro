@@ -62,7 +62,7 @@ const faqs = [
   { q: 'What is your refund policy?', a: 'We refund pro-rated billing periods only when caused by a platform fault. Standard cancellations stop renewal at the end of the current period.' },
   { q: 'Can I post multiple lanes in one opportunity?', a: 'Yes. Each opportunity supports multiple hiring states and equipment types. Use separate postings when pay or deductions differ significantly.' },
   { q: 'Do drivers see my direct contact info?', a: 'Only after a driver opts in by requesting more information on your opportunity. Driver-initiated contact only — no scraping or off-platform solicitation is allowed.' },
-  { q: 'Can I run a free trial?', a: 'Yes. You can apply for recruiter access, post a draft opportunity for review, and only start billing when you publish your first live listing.' },
+  { q: 'Can I post before paying?', a: 'You can apply for recruiter access and prepare a draft opportunity at no cost. Publishing a live opportunity requires an active recruiter subscription (Starter, Growth, or Fleet) and admin approval of your recruiter profile. You can cancel anytime from Recruiter Settings → Billing.' },
 ];
 
 export default function RecruiterLanding() {
