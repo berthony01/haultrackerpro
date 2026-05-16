@@ -675,6 +675,11 @@ export function ContractAttachment({ applicationId, role }: Props) {
               Driver note: {driverReview.notes}
             </p>
           )}
+          {decision === 'changes_requested' && (
+            <p className="text-[11px] text-amber-400/90 italic">
+              Revised version required — upload a new version to continue. The driver cannot approve or sign this version again.
+            </p>
+          )}
         </div>
       )}
 
