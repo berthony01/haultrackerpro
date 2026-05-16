@@ -1,148 +1,101 @@
 
-# Structured Hiring Workflow — Phase A + B
+# Recruiter Role-Separation — End-to-End Audit
 
-Transforms the existing Opportunities application system into a structured, pipeline-style hiring workflow with timeline/activity events. No chat, no uploads, no realtime infra.
-
-## Scope checkpoint
-
-In scope: extended statuses + guard, driver pipeline view, recruiter pipeline view, structured driver responses, `application_events` table + RLS + auto-event creation, timeline UIs on both sides, small analytics helpers.
-
-Out of scope (untouched): Stripe, recruiter billing, LoadForm, reports, parking, admin auth, Match Engine, Profit Intelligence, RLS architecture beyond the new table + guard updates.
+I traced the recruiter flow from sign up → auth redirect → role detection → navigation → route guards → recruiter pages. Below is what's wired correctly and what's still broken.
 
 ---
 
-## Phase A — Pipeline
+## ✅ What IS set up correctly
 
-### 1. Status expansion (DB migration)
+**1. Auth page (`src/pages/Auth.tsx`)**
+- Driver / Recruiter role selector is present, accessible, and persisted to both URL (`?intent=recruiter`) and `sessionStorage` (`htp_auth_intent`).
+- Title, helper copy, bullets, Google helper text, and switch-role footer all update with the selected role.
+- Google OAuth round-trip preserves recruiter intent via `redirect_uri=…/?intent=recruiter`.
 
-New canonical statuses on `opportunity_applications.status`:
-`new, viewed, contact_requested, call_scheduled, waiting_documents, interviewing, offer_sent, hired, rejected, withdrawn`.
+**2. Post-auth redirect (`src/App.tsx`)**
+- `postAuthRedirect()` reads `?intent=recruiter` and sends the user to `/dashboard?page=recruiter-access`.
 
-- Backward compat: existing rows with `status = 'contacted'` get migrated to `'contact_requested'` in the same migration. Rank function treats them as equivalent.
-- Update `opportunity_applications_update_guard()`:
-  - Replace the old rank ladder with the new 8-stage forward-only ladder.
-  - Driver-only `withdrawn` (still gated by `app.allow_driver_withdraw`).
-  - Terminal states (`hired`, `rejected`, `withdrawn`) remain locked.
-  - Admin bypass preserved.
-  - `opportunity_applications_require_contract_for_hire` unchanged.
+**3. Role detection (`src/hooks/useUserRole.ts`)**
+- Single source of truth: a row in `recruiter_profiles` → `recruiter`, otherwise `driver`. Admins flagged separately via `useAdmin`.
 
-### 2. Driver structured responses
+**4. Sidebar (`src/components/premium/AppSidebar.tsx`)**
+- Drivers see driver-only menu, recruiters see recruiter-only menu, with skeleton during `roleLoading` to avoid flash.
+- Admin cross-role jump is isolated under a labeled "Admin Tools" section.
 
-No chat. Driver can trigger:
-- `still_interested`, `request_callback`, `need_more_info`, `not_interested`
+**5. Bottom nav (`src/components/BottomNav.tsx`)**
+- Same role-split logic for mobile tabs and the "More" sheet. Admin Tools section is also visually isolated.
 
-These do NOT change the application status (recruiter owns status). They emit `application_events` rows only, with optional 200-char note.
-
-A SECURITY DEFINER RPC `record_driver_application_response(application_id, response_type, note)` writes the event after validating ownership + non-terminal status.
-
-### 3. Recruiter actions
-
-Pipeline buttons map 1:1 to status transitions allowed by the guard. UI exposes only the legal next steps for each card.
+**6. Index route guards (`src/pages/Index.tsx`)**
+- `handleNavigate` blocks non-admin drivers from `recruiter-access*` and blocks non-admin recruiters from driver-only pages **before** state changes.
+- A secondary `useEffect` guard re-checks `page` whenever role resolves, catching URL hacks.
+- `?page=recruiter-access` and legacy `?page=opportunities&view=recruiter` both deep-link to the new top-level route.
+- Recruiter Access render gate: `page === 'recruiter-access' && (isRecruiter || isAdmin)`.
 
 ---
 
-## Phase B — Activity timeline
+## 🛑 What is BROKEN / incomplete
 
-### 4. `application_events` table (migration)
+### 🔴 BUG 1 — Brand new recruiter signups are immediately bounced to the driver dashboard
+**Severity: high — this breaks the primary recruiter signup happy path.**
 
-```
-application_events
-  id uuid pk
-  application_id uuid not null  (refs opportunity_applications.id, FK on delete cascade)
-  actor_type text not null check in ('driver','recruiter','system','admin')
-  actor_user_id uuid null
-  event_type text not null
-  metadata jsonb not null default '{}'
-  created_at timestamptz default now()
-index (application_id, created_at desc)
-```
+`useUserRole` decides `recruiter` ONLY when a row exists in `recruiter_profiles`. That row is created later, inside the recruiter onboarding form (`useRecruiterProfile.upsertProfile`).
 
-Event types: `application_created, recruiter_viewed, contact_requested, call_scheduled, waiting_documents, interviewing, offer_sent, hired, rejected, withdrawn, driver_still_interested, driver_request_callback, driver_need_more_info, driver_not_interested`.
+Sequence for a fresh recruiter:
+1. Sign up with role=recruiter → `htp_auth_intent='recruiter'`.
+2. `App.tsx` redirects to `/dashboard?page=recruiter-access`.
+3. `Index.tsx` sets `page='recruiter-access'`.
+4. `useUserRole` resolves → `role='driver'` (no profile row yet).
+5. The `useEffect` role guard (lines 420–428) sees `!isRecruiter && page==='recruiter-access'` → **forces `setPage('dashboard')`**.
+6. Recruiter lands on the driver dashboard, with the driver sidebar, and never reaches the onboarding form.
 
-### 5. RLS
+**Fix:** treat "recruiter intent" or "recruiter signup in progress" as a recruiter for routing purposes until they either complete or abandon onboarding. Options:
+- Make `useUserRole` also return `isRecruiter=true` when `sessionStorage.htp_recruiter_intent==='1'` or when `htp_auth_intent==='recruiter'` is still set, OR
+- In Index.tsx guards, allow `page==='recruiter-access'` when the user has recruiter intent flagged, even if no profile row exists yet (so they can reach `RecruiterOnboarding`).
+- Cleanest: when a recruiter signup completes, write a stub `recruiter_profiles` row (verification_status='pending') so role detection is correct from minute one. This also matches the existing `resolveState()` 'pending' branch in `RecruiterAccessPage`.
 
-- Drivers: SELECT where `application_id` belongs to them.
-- Recruiters: SELECT where `application_id`'s recruiter_id is owned by them (via `is_recruiter_owner`).
-- Admins: full SELECT.
-- INSERT: blocked for regular roles. Only the SECURITY DEFINER trigger + driver-response RPC write.
+### 🟠 BUG 2 — Header brand strip always says "Load & Pay Manager"
+`src/pages/Index.tsx` line 551: the mobile header subtitle is hard-coded to `Load & Pay Manager` even for recruiters. The sidebar already swaps to "Recruiter Console"; the mobile header should too.
 
-### 6. Auto-event creation
+### 🟠 BUG 3 — Driver-only dashboard widgets still mount for recruiters (admin path)
+For an admin viewing `page='dashboard'`, the `<DashboardView>` and the "Role path card" (lines 600–631) render with driver semantics ("Track Profit", "Find Opportunities"). For a normal recruiter the guards redirect, so this is mostly an admin-UX issue, but the role-path card explicitly nudges into driver flows even when `role==='recruiter'`. It should be gated to `role==='driver'`.
 
-DB trigger `application_events_emit()` on `opportunity_applications`:
-- AFTER INSERT → `application_created`.
-- AFTER UPDATE OF status → event named after the new status (`recruiter_viewed`, etc.), actor inferred from `auth.uid()` matching driver vs recruiter, else `system`/`admin`.
+### 🟠 BUG 4 — `onBack` from Recruiter Access for a pure recruiter loops back to itself
+Line 764: `onBack={() => setPage(isRecruiter && !isAdmin ? 'recruiter-access' : 'dashboard')}`. For a non-admin recruiter the back button is a no-op (already on recruiter-access). It should either be hidden for pure recruiters or route to a sensible recruiter sub-view.
 
-Driver structured responses are emitted by the RPC above.
+### 🟡 BUG 5 — `MilestoneNudges` and `SmartReminders` shown on recruiter dashboard (admin only, but visually wrong)
+Same dashboard render block doesn't check role. Low priority because non-admin recruiters never reach `page='dashboard'`, but worth gating for admins acting as recruiters.
 
----
+### 🟡 BUG 6 — `?page=opportunities` is still reachable by recruiters who type the URL
+`handleNavigate` blocks it, but the initial-mount `useEffect` (lines 184–217) directly calls `setPage('opportunities')` from the query string without consulting role. Then the role-guard `useEffect` catches it and redirects, so the user sees a brief flash of the driver Opportunities page. Move the role check into the URL-parsing effect, or defer URL routing until `roleLoading===false`.
 
-## UI
+### 🟡 BUG 7 — Settings "back" assumes binary role
+Line 768: `onBack={() => setPage(isRecruiter ? 'recruiter-access' : 'dashboard')}`. An admin viewing as driver who opens Settings should go back to `dashboard`. Current logic is fine for pure roles but quietly wrong for admins. Not blocking.
 
-### 7. `DriverApplicationsPanel.tsx` (rewrite the card section)
-
-Group cards into sections: **New Requests, Recruiter Viewed, In Discussion** (contact_requested + call_scheduled + waiting_documents), **Interviewing & Offers** (interviewing + offer_sent), **Closed** (hired/rejected/withdrawn).
-
-Each card:
-- Company + opportunity title + city/state
-- Current status badge (new labels)
-- Last activity timestamp
-- Driver actions: Still Interested · Request Callback · Need More Info · Withdraw
-- Collapsible **Activity Timeline** (vertical, dark, small icons, timestamps)
-
-### 8. `RecruiterApplicationsDashboard.tsx`
-
-Pipeline view with column groups (desktop = horizontal scroll; mobile = stacked):
-`New · Viewed · Contact Requested · Call Scheduled · Waiting Docs · Interviewing · Offer Sent · Closed`.
-
-Each applicant card:
-- Driver name, location, experience, preferences snapshot, match score
-- Status + last activity
-- Quick actions = only legal forward transitions
-- Expandable timeline
-
-### 9. Timeline component
-
-New shared `ApplicationTimeline.tsx` consuming `useApplicationEvents(applicationId)` (react-query).
-
-### 10. Analytics helpers (local utility)
-
-`src/lib/opportunities/pipelineAnalytics.ts` — pure functions:
-- `pipelineCounts(apps)` — count per stage
-- `avgRecruiterResponseHours(events)` — time from `application_created` → first recruiter event
-- `hireConversionRate(apps)`
-
-Wired into recruiter dashboard header only (no overhaul).
+### 🟢 Minor — Auth role selector doesn't surface the "you'll need approval" reality
+A recruiter who signs up expects to "start posting." They actually need: profile onboarding → admin approval → billing. The auth helper text could set that expectation, otherwise the first-run experience feels broken even when wired correctly.
 
 ---
 
-## Files
+## Recommended fix order
 
-**Migrations** (single migration, two logical blocks):
-- Status expansion + guard update + data backfill
-- `application_events` table + RLS + trigger + driver response RPC
-
-**New files**
-- `src/hooks/opportunities/useApplicationEvents.ts`
-- `src/components/opportunities/ApplicationTimeline.tsx`
-- `src/lib/opportunities/applicationStatus.ts` (status labels, allowed transitions, grouping)
-- `src/lib/opportunities/pipelineAnalytics.ts`
-
-**Edited**
-- `src/hooks/opportunities/useOpportunityApplications.ts` (add `recordDriverResponse`)
-- `src/components/opportunities/DriverApplicationsPanel.tsx`
-- `src/components/opportunities/RecruiterApplicationsDashboard.tsx`
-- Any place that renders a status badge needs the new label map.
+1. **Bug 1** (recruiter signup redirect loop) — blocks the entire recruiter onboarding funnel. Fix first.
+2. **Bug 2** (mobile header subtitle) — 1-line fix, eliminates the "I'm in the wrong app" feeling.
+3. **Bugs 4 & 6** (back-button no-op + brief Opportunities flash) — small polish on routing edges.
+4. **Bugs 3, 5, 7** (admin-as-recruiter UX) — only impacts admin testing, low urgency.
+5. **Minor** — add a one-line "Requires approval before posting" note to the recruiter auth helper.
 
 ---
 
-## Verification
+## Technical scope (for implementation)
 
-- `npx tsc --noEmit` clean
-- `bunx vitest run` passes
-- Manual: backward transition blocked, recruiter cannot set withdrawn, driver withdraw still works via RPC, timeline visible to both sides, no chat surfaces anywhere.
+- `src/hooks/useUserRole.ts`: extend with `intentRecruiter` derived from sessionStorage so guards don't trap fresh signups.
+- `src/pages/Index.tsx`:
+  - Update `driverOnlyPages` / `handleNavigate` to honor `intentRecruiter`.
+  - Gate URL-parsing effect on `!roleLoading`.
+  - Make header subtitle role-aware.
+  - Gate role-path card + MilestoneNudges + SmartReminders to `role==='driver'`.
+  - Fix Recruiter Access `onBack` for pure recruiters.
+- `src/pages/Auth.tsx`: optional one-line helper update for recruiter expectations.
+- No DB schema, RLS, billing, Stripe, or recruiter feature logic changes.
 
----
-
-## Confirmation needed
-
-This is a large multi-step patch. Approving this plan will run the migration (status backfill + new table + trigger + RPC) and then edit the UI files. OK to proceed?
+Would you like me to proceed with these fixes in priority order (1 → 7), or only the high-severity ones (Bugs 1, 2, 4, 6)?
