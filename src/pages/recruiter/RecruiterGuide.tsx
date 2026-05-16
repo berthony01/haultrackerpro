@@ -13,7 +13,7 @@ const steps = [
   { num: '03', icon: CreditCard, title: 'Activate a plan', desc: 'Choose Starter (1 active), Growth (5), or Fleet (25 active opportunities). Billing is handled by Stripe — change or cancel anytime in Recruiter Settings.' },
   { num: '04', icon: ClipboardList, title: 'Post a structured opportunity', desc: 'Pay model, CPM/percentage/flat, deductions, deadhead, escrow, home time, equipment, sign-on. Clear structure means drivers can compare you on real numbers.' },
   { num: '05', icon: Users, title: 'Manage your applicant pipeline', desc: 'Each driver request lands in your dashboard with contact info and preferences. Move them through new → contacted → interview → offer → hired.' },
-  { num: '06', icon: FileSignature, title: 'Use Contract Protection (optional)', desc: 'Attach a contract to an application. Drivers see AI-assisted risk flags, approve / request changes / reject / sign. You cannot mark hired until required steps complete.' },
+  { num: '06', icon: FileSignature, title: 'Use Contract Protection (Growth & Fleet)', desc: "Attach a contract to an application. Drivers see AI-assisted risk flags and can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
   { num: '07', icon: BarChart3, title: 'Track what works', desc: 'Recruiting Snapshot on the dashboard shows active opportunities, new requests, contacted, interviews, hires, and response rate.' },
 ];
 

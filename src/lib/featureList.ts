@@ -35,7 +35,7 @@ export const featureList: FeatureCategory[] = [
       { icon: AlertCircle, title: 'AI Risk Review', description: 'Drivers see plain-English risk flags and summaries for terms that may deserve closer attention. Informational only — not legal advice.' },
       { icon: FileCheck, title: 'Driver Review & Decision', description: 'Drivers can approve, reject, or request changes before moving forward.' },
       { icon: FileSignature, title: 'In-App Signature Record', description: 'Drivers can record approval with a platform signature record tied to the contract version. Not a DocuSign-equivalent or qualified electronic signature.' },
-      { icon: Shield, title: 'Hired-Status Protection', description: 'Recruiters cannot mark a driver hired until required contract approval/signature steps are completed.' },
+      { icon: Shield, title: 'Hired-Status Protection', description: "Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
       { icon: Sparkles, title: 'Plain-English Clause Rewrite (Pro)', description: 'Driver Pro users can paste a confusing clause and get a plain-English explanation, concern points, and questions to ask the recruiter before approving. Informational only — not legal advice.', pro: true },
       { icon: ShieldCheck, title: 'Admin Moderation', description: 'HaulTrackerPro can review contract-related disputes, abuse reports, and moderation issues when needed.' },
     ],

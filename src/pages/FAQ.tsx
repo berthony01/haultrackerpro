@@ -570,7 +570,7 @@ const faqs: Faq[] = [
   {
     id: 'contract-protection-overview',
     question: 'What is Contract Protection?',
-    answer: 'Contract Protection helps drivers review recruiter-sent contracts before approving, signing, or being marked hired. It uses AI-assisted summaries, risk flags, approval steps, and platform records to make the process clearer.',
+    answer: "Contract Protection helps drivers review recruiter-sent contracts using AI-assisted summaries and risk flags. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record. The recruiter-side workflow is included with the Growth and Fleet recruiter plans.",
   },
   {
     id: 'contract-free-tools',

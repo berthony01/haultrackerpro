@@ -34,14 +34,14 @@ const features = [
   { icon: Users, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions. They evaluate opportunities by the numbers.' },
   { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, manage driver contact requests, and track status from one dashboard — no spreadsheets.' },
   { icon: BarChart3, title: 'Transparent, flat-rate pricing', desc: 'Pay by active-opportunity slot, not per click or per lead. Predictable monthly cost.' },
-  { icon: Search, title: 'Contract Protection workflow', desc: 'Upload contracts, get AI risk flags, and require driver in-app approval before a hire is finalized.' },
+  { icon: Search, title: 'Contract Protection workflow (Growth & Fleet)', desc: "Upload contracts and get AI risk flags. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
 ];
 
 const steps = [
   { n: '1', title: 'Verify your DOT', desc: 'Submit company details and USDOT/MC for approval — usually within 1 business day.' },
   { n: '2', title: 'Post your opportunity', desc: 'Fill in lanes, pay structure, equipment, and deductions in a structured form.' },
   { n: '3', title: 'Review verified applicants', desc: 'Drivers who request info show up in your pipeline with their preferences and contact info.' },
-  { n: '4', title: 'Hire with contract protection', desc: 'Attach a contract, get AI risk review, and require driver approval before marking hired.' },
+  { n: '4', title: 'Hire with Contract Protection (Growth & Fleet)', desc: "Attach a contract and get AI risk review. You can't mark a driver hired until the driver approves the current contract." },
 ];
 
 const plans = [

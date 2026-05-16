@@ -47,7 +47,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: FileText, title: 'Recruiter Contract Upload', description: 'Attach the contract you want a driver to sign directly to an application — PDF or image.' },
       { icon: Sparkles, title: 'AI Parsing & Risk Review', description: 'HaulTrackerPro extracts key contract details and surfaces plain-English risk flags for the driver. Informational only, not legal advice.' },
       { icon: FileSignature, title: 'Driver Approval & Signature', description: 'Drivers can approve, request changes to, reject, or sign the contract in-app. You get an audit log of every step.' },
-      { icon: ShieldCheck, title: 'Hired-Status Workflow Protection', description: 'You cannot mark a driver hired until the required contract approval and signature steps are complete — a transparency safeguard for both sides.' },
+      { icon: ShieldCheck, title: 'Hired-Status Workflow Protection (Growth & Fleet)', description: "You can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
     ],
   },
   {
