@@ -423,6 +423,7 @@ export default function Pricing() {
                 bullets: [
                   'Everything in Starter',
                   'Priority placement in driver listings',
+                  'Recruiter Activity & Pipeline reports (PDF + CSV)',
                   'Application status workflow',
                   'Priority moderation queue',
                 ],
@@ -434,7 +435,7 @@ export default function Pricing() {
                 bullets: [
                   'Everything in Growth',
                   'Priority placement in driver listings',
-                  'Recruiting snapshot dashboard',
+                  'Recruiter Activity & Pipeline reports (PDF + CSV)',
                   'Priority support',
                 ],
               },

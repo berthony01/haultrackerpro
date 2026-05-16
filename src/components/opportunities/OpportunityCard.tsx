@@ -58,7 +58,7 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
 
   const recruiter = (o as Opportunity & {
     recruiter?: { verification_status?: string | null; status?: string | null } | null;
-  }).recruiter;
+  }).recruiter ?? null;
   const isVerifiedRecruiter =
     !!recruiter &&
     recruiter.verification_status === 'approved' &&
@@ -71,8 +71,13 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <h3 className="text-base font-bold text-foreground truncate">{o.title}</h3>
             {o.featured && (
-              <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/20">
-                Priority
+              <Badge
+                variant="secondary"
+                className="bg-primary/15 text-primary border-primary/20"
+                title="Priority placement — Growth or Fleet plan"
+                aria-label="Priority placement — Growth or Fleet plan"
+              >
+                Priority placement
               </Badge>
             )}
             {isVerifiedRecruiter && (

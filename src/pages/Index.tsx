@@ -423,7 +423,7 @@ const Index = () => {
 
   const [opportunitiesViewKey, setOpportunitiesViewKey] = useState(0);
   const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
-  const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
+  const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications' | 'reports'>('hub');
 
   // Role-based access guard: redirect users away from pages outside their
   // *effective* role. `contracts` is a shared key (body picks by role), so it
@@ -490,7 +490,13 @@ const Index = () => {
       setEditingFuelLog(null);
       setOpportunitiesView('list');
       const sub = p.split(':')[1];
-      setRecruiterView(sub === 'manager' ? 'manager' : sub === 'applications' ? 'applications' : sub === 'onboarding' ? 'onboarding' : 'hub');
+      setRecruiterView(
+        sub === 'manager' ? 'manager'
+        : sub === 'applications' ? 'applications'
+        : sub === 'reports' ? 'reports'
+        : sub === 'onboarding' ? 'onboarding'
+        : 'hub'
+      );
       setPage('recruiter-access');
       return;
     }
@@ -519,7 +525,9 @@ const Index = () => {
           ? 'recruiter-access:manager'
           : recruiterView === 'applications'
             ? 'recruiter-access:applications'
-            : 'recruiter-access')
+            : recruiterView === 'reports'
+              ? 'recruiter-access:reports'
+              : 'recruiter-access')
       : page === 'opportunities' && opportunitiesView === 'driver-profile'
         ? 'opportunity-preferences'
         : page;
@@ -530,11 +538,13 @@ const Index = () => {
         ? 'Manage Opportunities'
         : navKey === 'recruiter-access:applications'
           ? 'Applications'
-          : navKey === 'opportunity-preferences'
-            ? 'Opportunity Preferences'
-            : navKey === 'dashboard'
-              ? 'Dashboard'
-              : navKey.charAt(0).toUpperCase() + navKey.slice(1).replace(/[_-]/g, ' ');
+          : navKey === 'recruiter-access:reports'
+            ? 'Reports'
+            : navKey === 'opportunity-preferences'
+              ? 'Opportunity Preferences'
+              : navKey === 'dashboard'
+                ? 'Dashboard'
+                : navKey.charAt(0).toUpperCase() + navKey.slice(1).replace(/[_-]/g, ' ');
   const navSubtitle =
     navKey === 'recruiter-access'
       ? 'Manage your recruiter command center'
@@ -542,9 +552,11 @@ const Index = () => {
         ? 'Post and manage your opportunities'
         : navKey === 'recruiter-access:applications'
           ? 'Review driver applications'
-          : navKey === 'opportunity-preferences'
-            ? 'Tune what recruiters see and how you match'
-            : 'Your hauling overview';
+          : navKey === 'recruiter-access:reports'
+            ? 'Activity and Pipeline reports for your recruiting'
+            : navKey === 'opportunity-preferences'
+              ? 'Tune what recruiters see and how you match'
+              : 'Your hauling overview';
 
   const handleAddLoadFromModal = () => {
     setEditingLoad(null);
