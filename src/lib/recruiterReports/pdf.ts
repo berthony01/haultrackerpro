@@ -2,13 +2,19 @@ import type { jsPDF as JsPDFType } from 'jspdf';
 import type { RecruiterReportData, RecruiterReportType } from './aggregator';
 import { REPORT_TYPE_LABEL } from './aggregator';
 
+// jsPDF + jspdf-autotable are heavy (~300KB combined). Keep them out of the
+// Recruiter Reports panel chunk and only load them when the user actually
+// generates a PDF.
+
 const PRIMARY: [number, number, number] = [217, 119, 6]; // amber
 const INK: [number, number, number] = [17, 24, 39];
 const MUTED: [number, number, number] = [107, 114, 128];
 
+type AutoTableFn = (doc: JsPDFType, options: any) => void;
+
 const labelStatus = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-function drawHeader(doc: jsPDF, type: RecruiterReportType, data: RecruiterReportData) {
+function drawHeader(doc: JsPDFType, type: RecruiterReportType, data: RecruiterReportData) {
   doc.setFillColor(PRIMARY[0], PRIMARY[1], PRIMARY[2]);
   doc.rect(0, 0, doc.internal.pageSize.getWidth(), 22, 'F');
   doc.setTextColor(255, 255, 255);
@@ -21,7 +27,7 @@ function drawHeader(doc: jsPDF, type: RecruiterReportType, data: RecruiterReport
 
   doc.setTextColor(INK[0], INK[1], INK[2]);
   doc.setFontSize(10);
-  let y = 30;
+  const y = 30;
   doc.setFont('helvetica', 'bold');
   doc.text(data.header.companyName, 14, y);
   doc.setFont('helvetica', 'normal');
@@ -36,7 +42,7 @@ function drawHeader(doc: jsPDF, type: RecruiterReportType, data: RecruiterReport
   return y + 28;
 }
 
-function drawFooter(doc: jsPDF) {
+function drawFooter(doc: JsPDFType) {
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -52,7 +58,7 @@ function drawFooter(doc: jsPDF) {
   }
 }
 
-function section(doc: jsPDF, y: number, title: string): number {
+function section(doc: JsPDFType, y: number, title: string): number {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(INK[0], INK[1], INK[2]);
@@ -60,12 +66,21 @@ function section(doc: jsPDF, y: number, title: string): number {
   return y + 4;
 }
 
-export function buildRecruiterReportPDF(type: RecruiterReportType, data: RecruiterReportData): Blob {
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' });
+export async function buildRecruiterReportPDF(
+  type: RecruiterReportType,
+  data: RecruiterReportData,
+): Promise<Blob> {
+  // Dynamic imports — only loaded the first time a recruiter generates a PDF.
+  const [{ default: JsPDF }, autoTableMod] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+  const autoTable = (autoTableMod as any).default as AutoTableFn;
+
+  const doc = new JsPDF({ unit: 'mm', format: 'letter' });
 
   let y = drawHeader(doc, type, data);
 
-  // Executive summary
   y = section(doc, y, 'Executive Summary');
   autoTable(doc, {
     startY: y,
@@ -86,7 +101,6 @@ export function buildRecruiterReportPDF(type: RecruiterReportType, data: Recruit
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // Applications by status
   if (data.applicationsByStatus.length > 0) {
     y = section(doc, y, 'Applications by Status');
     autoTable(doc, {
@@ -100,7 +114,6 @@ export function buildRecruiterReportPDF(type: RecruiterReportType, data: Recruit
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // Contact requests
   if (data.contactRequests.byStatus.length > 0) {
     y = section(doc, y, 'Contact Requests by Status');
     autoTable(doc, {
@@ -114,7 +127,6 @@ export function buildRecruiterReportPDF(type: RecruiterReportType, data: Recruit
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // Contract status
   if (data.contractStatusSummary.length > 0) {
     y = section(doc, y, 'Contract Status Summary');
     autoTable(doc, {
@@ -128,7 +140,6 @@ export function buildRecruiterReportPDF(type: RecruiterReportType, data: Recruit
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // Blocked
   if (data.opportunitiesBlockedByContract.length > 0) {
     y = section(doc, y, 'Opportunities Blocked by Contract Approval');
     autoTable(doc, {
@@ -176,7 +187,6 @@ export function buildRecruiterReportPDF(type: RecruiterReportType, data: Recruit
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // Disclaimer
   if (y > 250) { doc.addPage(); y = 20; }
   doc.setFontSize(8);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
