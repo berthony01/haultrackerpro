@@ -115,6 +115,7 @@ const isValidEmail = (e: string) => !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 export function DriverOpportunityProfile({ onBack }: Props) {
   const { profile, isLoading, upsertProfile } = useDriverOpportunityProfile();
+  const { user } = useAuth();
   const [form, setForm] = useState<FormState>(EMPTY);
 
   useEffect(() => {
@@ -142,8 +143,20 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         allow_verified_recruiter_contact: !!profile.allow_verified_recruiter_contact,
         contact_preference: (profile.contact_preference as FormState['contact_preference']) ?? 'in_app',
       });
+    } else if (user) {
+      // No saved row yet — prefill blank fields from the HaulTrackerPro account
+      // so the form feels like an extension of the driver's existing identity.
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      const pickStr = (k: string) => (typeof meta[k] === 'string' ? (meta[k] as string) : '');
+      const displayName = pickStr('display_name') || pickStr('full_name') || pickStr('name');
+      setForm((p) => ({
+        ...p,
+        full_name: p.full_name || displayName,
+        email: p.email || user.email || '',
+        phone: p.phone || pickStr('phone'),
+      }));
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((p) => ({ ...p, [k]: v }));
