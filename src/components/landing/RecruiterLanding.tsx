@@ -32,7 +32,7 @@ const features = [
   { icon: ShieldCheck, title: 'Verified-only recruiter access', desc: 'Every recruiter is DOT/MC-checked before posting. Drivers see a verified badge — and so do you.' },
   { icon: ClipboardList, title: 'Structured opportunity postings', desc: 'Required fields for pay, lanes, equipment, deductions, and home-time create clear, comparable listings.' },
   { icon: Users, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions. They evaluate opportunities by the numbers.' },
-  { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, message drivers, and track status from one dashboard — no spreadsheets.' },
+  { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, manage driver contact requests, and track status from one dashboard — no spreadsheets.' },
   { icon: BarChart3, title: 'Transparent, flat-rate pricing', desc: 'Pay by active-opportunity slot, not per click or per lead. Predictable monthly cost.' },
   { icon: Search, title: 'Contract Protection workflow', desc: 'Upload contracts, get AI risk flags, and require driver in-app approval before a hire is finalized.' },
 ];
@@ -62,7 +62,7 @@ const faqs = [
   { q: 'What is your refund policy?', a: 'We refund pro-rated billing periods only when caused by a platform fault. Standard cancellations stop renewal at the end of the current period.' },
   { q: 'Can I post multiple lanes in one opportunity?', a: 'Yes. Each opportunity supports multiple hiring states and equipment types. Use separate postings when pay or deductions differ significantly.' },
   { q: 'Do drivers see my direct contact info?', a: 'Only after a driver opts in by requesting more information on your opportunity. Driver-initiated contact only — no scraping or off-platform solicitation is allowed.' },
-  { q: 'Can I run a free trial?', a: 'Yes. You can apply for recruiter access, post a draft opportunity for review, and only start billing when you publish your first live listing.' },
+  { q: 'Can I post before paying?', a: 'You can apply for recruiter access and prepare a draft opportunity at no cost. Publishing a live opportunity requires an active recruiter subscription (Starter, Growth, or Fleet) and admin approval of your recruiter profile. You can cancel anytime from Recruiter Settings → Billing.' },
 ];
 
 export default function RecruiterLanding() {

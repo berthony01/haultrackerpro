@@ -134,7 +134,12 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">15. Contact Information</h3>
+          <h3 className="text-base font-bold">15. Recruiter Reports &amp; Exports</h3>
+          <p className="text-muted-foreground">Recruiter Activity and Pipeline reports (PDF and CSV) are generated on demand from <span className="font-semibold text-foreground">recruiter-owned workflow data only</span>: the recruiter's own opportunities, applications, application status events, driver contact requests, and contract workflow status. These exports <span className="font-semibold text-foreground">do not include</span> any driver loads, fuel, expenses, profit, tax estimates, or other private driver financial data. After download, the recruiter is solely responsible for storing, sharing, and protecting the exported file outside of HaulTrackerPro.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">16. Contact Information</h3>
           <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.com.</p>
         </section>
 
