@@ -201,13 +201,26 @@ const Index = () => {
       }
     } catch {}
     const pageParam = params.get('page');
-    if (roleLoading && (pageParam === 'recruiter-access' || pageParam === 'opportunities' || recruiterIntent)) {
+    const isRecruiterAccessParam =
+      pageParam === 'recruiter-access' || (pageParam?.startsWith('recruiter-access:') ?? false);
+    if (roleLoading && (isRecruiterAccessParam || pageParam === 'opportunities' || recruiterIntent)) {
       // Re-run once role resolves.
       return;
     }
-    if (pageParam === 'recruiter-access') {
-      setPage('recruiter-access');
-      recruiterIntent = true;
+    if (isRecruiterAccessParam && pageParam) {
+      // Allowlist sub-routes so a recruiter deep-link lands on the right panel.
+      const sub = pageParam.split(':')[1];
+      const allowedSubs = new Set(['manager', 'applications', 'reports', 'onboarding']);
+      if (isRecruiterView) {
+        setRecruiterView(
+          sub && allowedSubs.has(sub) ? (sub as typeof recruiterView) : 'hub'
+        );
+        setPage('recruiter-access');
+        recruiterIntent = true;
+      } else {
+        // Non-recruiters never land on recruiter pages — guard will redirect.
+        setPage('dashboard');
+      }
       window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'opportunities') {
       const view = params.get('view');
