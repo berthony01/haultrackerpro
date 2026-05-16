@@ -27,6 +27,7 @@ import {
   useDriverOpportunityProfile,
   type DriverOpportunityProfileUpsert,
 } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Props {
   onBack: () => void;
