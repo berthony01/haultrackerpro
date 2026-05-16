@@ -1,120 +1,109 @@
-# Recruiter Parity + Dual-Audience Landing — Phased Plan
 
-Goal: give recruiters a fully separate experience (settings, help/docs, what's new) that mirrors the driver side without leaking driver-only features, refresh the legal pages to match, and rebuild the landing page so it converts both audiences clearly.
+# Phase 3 & 4 Plan — Recruiter Legal + Dual-Audience Landing
 
-We'll ship in 5 phases so each piece is verifiable before the next starts. Nothing on the driver side changes behaviorally — driver routes, Settings, FAQ, Features, How-To, What's New, and BottomNav stay exactly as they are today.
+## Phase 3 — Terms of Service & Privacy Policy Refresh
 
----
+### Files touched
+- `src/pages/Terms.tsx` (edit only)
+- `src/pages/Privacy.tsx` (edit only)
 
-## Phase 1 — Recruiter Settings page
+No DB, routing, or component-structure changes. Same `SEOHead`, same layout shell — content sections only.
 
-A dedicated settings surface for recruiter accounts. Driver `SettingsView.tsx` is untouched.
+### Terms.tsx additions
+Insert a new top-level section **"Recruiter & Carrier Accounts"** after the existing driver/user terms, plus minor edits to the Eligibility and Account sections to acknowledge the second audience.
 
-New: `src/components/opportunities/recruiter/RecruiterSettingsView.tsx`, routed via `Index.tsx` as `page === 'recruiter-settings'` and reached from the recruiter sidebar/bottom nav "Settings" entry (driver settings stays at its current page key).
+New subsections:
+1. **Eligibility & Verification** — Must hold an active USDOT/MC, provide truthful company info, and consent to verification. HaulTrackerPro may reject, suspend, or revoke recruiter access at its discretion.
+2. **Truthful Postings** — All opportunity details (pay, lanes, equipment, home-time, benefits) must be accurate at time of posting. Misleading or bait-and-switch postings are grounds for immediate termination.
+3. **Driver Contact & Anti-Harassment** — Recruiters may only contact drivers who opt in via the platform. No scraping, no off-platform solicitation of platform-sourced leads, no SMS/calls outside stated hours.
+4. **Billing & Subscription** — Plan tiers, monthly/annual billing through Stripe, auto-renewal, refund policy (pro-rated only for platform fault), failed-payment grace period, and downgrade behavior (active posts above new limit are paused, not deleted).
+5. **Contract Protection / Direct-Hire Window** — If a driver is hired within 90 days of a verified platform introduction, the recruiter agrees the hire is attributable to HaulTrackerPro and subject to the plan's terms.
+6. **Anti-Scam & Fraud** — Prohibition on fake DOT numbers, shell carriers, advance-fee schemes, and impersonation. Right to share fraud signals with industry partners.
+7. **Termination** — Grounds and effect on active posts, applicants, and billing.
 
-Sections (all backed by existing tables — no schema changes):
-- **Company profile** — company name, DOT, MC, address, hiring states, equipment types, contact phones (edits `recruiter_profiles`, reuses validation from `RecruiterOnboarding`).
-- **Recruiter contact** — display name, recruiter phone, public-facing email.
-- **Verification status** — read-only badge (pending / approved / rejected) + admin notes.
-- **Billing & plan** — current plan, period end, active opportunity limit, "Manage billing" → `recruiter-billing-portal` edge function, "Upgrade/Change plan" → `create-recruiter-checkout`. Reuses `useRecruiterBilling`.
-- **Notifications** — toggles for new-application emails and weekly recruiter digest (stored on `recruiter_profiles` as nullable bool columns added later if needed; Phase 1 ships UI + local state stubs only if columns don't exist yet — confirm before adding columns).
-- **Account** — change password, sign out, delete account (reuses existing modals).
+Bump the **Last Updated** date and add a one-line callout at the top: "Updated to cover recruiter and carrier accounts."
 
-Hide every driver-only setting (pay model, CPM, week start, tax planner, fuel/expense defaults, home-time, lifecycle emails about loads).
+### Privacy.tsx additions
+New section **"Recruiter & Carrier Data"** plus extensions to existing sections:
 
-## Phase 2 — Recruiter Help Center (FAQ + Features + User Guide + What's New)
+1. **What we collect from recruiters** — Company legal name, DOT/MC, company + recruiter phone, business address, hiring states, equipment types, billing details (handled by Stripe; we store only customer ID + last4/brand).
+2. **How we use it** — Verification, fraud prevention, displaying opportunities to drivers, billing, support, and aggregate analytics.
+3. **What drivers see** — Public recruiter fields (company name, verified badge, hiring states, equipment, contact via platform). Internal fields (admin notes, raw verification docs) are never shown.
+4. **Stripe / payment processors** — Subprocessor disclosure; we don't store full card data.
+5. **Driver ↔ recruiter data sharing** — Only opt-in driver profile fields are shared when a driver applies; we never sell driver data.
+6. **Retention** — Recruiter accounts retained while active + 24 months for tax/audit; deletion request flow.
 
-Four new routes, recruiter-scoped, with the same visual system as the driver pages.
+Bump **Last Updated** and add the same one-line callout.
 
-| New route | Mirrors | Content focus |
-|---|---|---|
-| `/recruiter/faq` | `src/pages/FAQ.tsx` | Posting opportunities, verification, billing/Stripe, applicant contact, moderation, refunds, contract protection from recruiter POV |
-| `/recruiter/features` | `src/pages/Features.tsx` | Driven from a new `recruiterFeatureList.ts` (mirrors `featureList.ts`): opportunity posting, applicant pipeline, contract protection, verified badge, billing portal, analytics |
-| `/recruiter/guide` | `src/pages/HowToUseHaulTrackerPro.tsx` | Step-by-step: get approved → set up billing → post first opportunity → manage applicants → use contract protection |
-| `/recruiter/updates` | `src/pages/Updates.tsx` | New `recruiterReleaseNotes.ts` with recruiter-relevant entries only |
-
-Wiring:
-- Add the 4 routes in `App.tsx`.
-- Add a "Help & resources" group in recruiter sidebar / settings linking to all four.
-- `WhatsNewModal` / `useReleaseNotesSeen` get a role-aware source: drivers see `releaseNotes.ts`, recruiters see `recruiterReleaseNotes.ts`.
-- SEO: each page gets its own `SEOHead` (title, description, canonical, noindex off so they're crawlable for recruiter acquisition).
-
-## Phase 3 — Terms of Service & Privacy Policy refresh
-
-Edit `src/pages/Terms.tsx` and `src/pages/Privacy.tsx` only (no new routes). Add explicit recruiter-side clauses that match what we actually do today:
-
-Terms additions:
-- Recruiter eligibility (must be authorized to hire for a registered carrier; DOT/MC required).
-- Truthfulness of opportunity postings; prohibited content.
-- Verification, suspension, and removal rights.
-- Billing terms (Stripe, plan limits, proration, cancellation, refund policy).
-- Contact-sharing model (driver consent → recruiter receives snapshot).
-- Contract Protection responsibilities (recruiter is the contract author; AI output is informational).
-- Acceptable use & anti-scam clauses.
-
-Privacy additions (extend existing sections, don't duplicate):
-- Recruiter data we collect (company, DOT/MC, verification docs, billing IDs).
-- Public visibility of approved recruiter profiles vs private fields.
-- How driver contact snapshots flow to recruiters and retention rules.
-- Stripe data handling for recruiter billing.
-
-Both pages get a bumped "Last updated" date driven by a constant (not `new Date()` — current code uses today's date which is misleading).
-
-## Phase 4 — Dual-audience landing page
-
-Rebuild `src/pages/Landing.tsx` so a first-time visitor of either type can self-identify and see a value prop within one scroll.
-
-Structure:
-```text
-[ Nav: Logo | Drivers | Recruiters | Pricing | Sign in | Get started ]
-[ Hero ]
-  Headline: "The trucking platform that protects drivers and connects recruiters."
-  Sub: one sentence per audience.
-  Dual CTA: "I'm a driver" → /auth?intent=driver
-            "I'm a recruiter" → /auth?intent=recruiter
-[ Audience tabs / toggle ] (sticky, switches the next 3 sections in place)
-  ── Drivers view ──            ── Recruiters view ──
-  Problem → Solution            Problem → Solution
-  3-up feature grid             3-up feature grid
-  Screenshot/mockup             Screenshot/mockup
-  Driver testimonial slot       Recruiter testimonial slot
-[ Shared trust strip ] verified carriers, contract protection, secure billing
-[ How it works ] two parallel columns (Driver 1-2-3 / Recruiter 1-2-3)
-[ Pricing teaser ] driver tiers + recruiter tiers side-by-side → /pricing
-[ FAQ teaser ] 3 driver + 3 recruiter Qs, links to respective FAQs
-[ Final CTA ] dual buttons again
-[ Footer ] split into Drivers / Recruiters / Company / Legal columns
-```
-
-Implementation notes:
-- Audience toggle is client-state only (no route change); persists choice in `localStorage` so returning visitors land on their last view.
-- Pre-select audience from `?for=driver|recruiter` query param (used by ads).
-- Reuse existing landing components where they map cleanly; add `RecruiterValueSection`, `RecruiterHowItWorks`, `RecruiterPricingTeaser`.
-- Keep all existing driver SEO copy — recruiter copy lives in new sections so we don't lose driver keyword coverage.
-- Analytics: fire `landing_audience_selected` + `landing_cta_clicked` with the audience label.
-
-## Phase 5 — QA, polish, publish
-
-- Manual QA matrix (driver-only account, recruiter-only account, owner/admin with both):
-  - Driver account sees no recruiter settings / help / updates entries.
-  - Recruiter account sees no driver settings, no driver FAQ/Features/Guide/Updates in nav.
-  - Owner (`berthonyxyz@gmail.com`) can toggle via "Open Recruiter Console" and switch back cleanly.
-- Add 3 vitest smoke tests: role-gated routing for `/recruiter/*` pages, recruiter release-notes source selection, landing audience toggle default from query param.
-- Update `docs/MANUAL_QA_CHECKLIST.md` with the new flows.
-- Sitemap: add the 4 recruiter help routes; landing canonical stays `/`.
-- Save a memory entry summarizing recruiter parity surfaces so future agents don't accidentally bolt recruiter UI onto driver pages.
+### Acceptance
+- Both pages render with the new sections in the existing TOC/anchor pattern (if present).
+- No driver-facing terms regressed.
+- Last-updated dates match.
 
 ---
 
-## Out of scope (call out so we don't scope-creep)
+## Phase 4 — Dual-Audience Landing Page
 
-- No changes to driver Settings / FAQ / Features / How-To / Updates content.
-- No DB schema changes beyond optional notification toggles in Phase 1 (will confirm before adding columns).
-- No new edge functions; reuses `create-recruiter-checkout` and `recruiter-billing-portal`.
-- Pricing page redesign is a separate task — Phase 4 only links to it.
+### Goal
+One landing page at `/` that clearly serves **two audiences** — owner-operators/drivers and recruiters/carriers — without diluting either message.
 
-## Open questions before I start building
+### Approach: hard audience toggle
+A sticky segmented control at the top of the hero: **For Drivers | For Recruiters**. Selecting one swaps the in-page content (hero copy, feature grid, how-it-works, pricing, testimonials, CTAs). Shared chrome (nav, footer, trust band, FAQ accordion) stays mounted.
 
-1. For Phase 1 notification toggles, OK to add two nullable bool columns to `recruiter_profiles` (`notify_new_applications`, `notify_weekly_digest`) or hold them out of v1?
-2. For Phase 4, do you want a hard audience toggle (Drivers | Recruiters tabs) or a soft "smart default" where the page detects intent and shows both inline?
-3. Any specific recruiter testimonials/logos you want featured, or should I leave placeholder slots?
+- Persist selection in `localStorage` (`landing.audience`).
+- Pre-select from `?for=driver` or `?for=recruiter` query param (overrides storage).
+- Default = `driver` (existing primary audience).
+- Update `<title>` and meta description per audience via `react-helmet-async` (`SEOHead` already in use).
+
+### File plan
+- `src/pages/Landing.tsx` — refactor into a shell that renders `<AudienceToggle/>` + `<DriverLanding/>` or `<RecruiterLanding/>`.
+- `src/components/landing/AudienceToggle.tsx` — new sticky segmented control.
+- `src/components/landing/DriverLanding.tsx` — extract current driver landing sections here (no copy changes beyond minor headline tightening).
+- `src/components/landing/RecruiterLanding.tsx` — new, mirrors driver structure with recruiter copy.
+- `src/hooks/useLandingAudience.ts` — new hook (query param → state → localStorage sync).
+
+Existing landing subcomponents (hero, feature card, pricing card, testimonial, FAQ, footer CTA) are reused where possible; recruiter variants are thin wrappers passing different props/content.
+
+### Recruiter landing sections (parallel to driver)
+1. **Hero** — "Hire qualified, verified drivers — faster." Dual CTAs: *Post an Opportunity* (→ `/auth?role=recruiter`) and *See How It Works*. Trust badges: verified carriers, DOT-checked, contract protection.
+2. **The problem we solve** — Empty trucks, ghost applicants, fake leads, no-shows, paying for clicks. Three short pain cards.
+3. **How HaulTrackerPro solves it** — Verified driver profiles, in-app pipeline, contract-protection window, transparent pricing, anti-scam screening. 4–6 feature cards using existing card style.
+4. **How it works** — 4 steps: Verify your DOT → Post opportunity → Review verified applicants → Hire with contract protection.
+5. **Pricing** — Reuse pricing card primitive; show recruiter plans (Starter / Growth / Scale) with active-opportunity limits, applicant access, and contract-protection terms. Link to full pricing.
+6. **Social proof / placeholder testimonials** — 2–3 recruiter quotes (placeholder copy, marked as such in code comment so the user can swap).
+7. **FAQ** — 5–6 recruiter-specific Qs (verification time, refund policy, what counts as a hire, can we post multiple lanes, do drivers see our contact info, etc.).
+8. **Final CTA band** — "Start posting verified opportunities" → `/auth?role=recruiter`.
+
+### Driver landing
+Preserved as-is, extracted into `DriverLanding.tsx`. Only change: hero subhead gets one sentence acknowledging recruiters exist on the other tab ("Recruiters welcome too — switch tabs above.").
+
+### SEO
+- Single canonical `https://haultrackerpro.com/`.
+- `SEOHead` title/description switch by audience:
+  - driver: existing copy
+  - recruiter: "Hire verified truck drivers faster | HaulTrackerPro"
+- Both audience views render in the same DOM tree so crawlers see all content (recruiter section hidden via CSS when driver tab active, not unmounted) — improves SEO without hurting UX.
+  - Implementation: render both, toggle `hidden` attr + `aria-hidden`. Confirm performance cost is negligible (static markup, no heavy effects).
+
+### Out of scope
+- No changes to `/auth` flow beyond honoring `?role=recruiter` (already supported per prior work).
+- No new images generated; reuse existing assets. Hero illustration for recruiter side = existing brand mark + text-only layout.
+- No DB or edge-function work.
+
+### Acceptance
+- `/` defaults to driver view, identical to today's landing visually.
+- `/?for=recruiter` loads with recruiter tab active.
+- Toggle swaps content without route change, persists across reloads.
+- Both views pass mobile (375px) and desktop (1280px) visual check.
+- Lighthouse SEO ≥ existing score.
+
+---
+
+## Sequencing
+1. Phase 3 first (small, isolated text edits — low risk).
+2. Phase 4 second (landing refactor — bigger blast radius, easier to QA on a stable legal base).
+
+Phase 5 (QA matrix, smoke tests, memory entry, sitemap) remains queued for after Phase 4 lands.
+
+## Open question
+For the recruiter pricing section in Phase 4 — should I show the **same Starter/Growth/Scale tiers** that the seeded billing profile implies (`growth` plan, 5 active opportunities), or do you want different tier names/limits? If unsure, I'll use Starter (2 active) / Growth (5 active) / Scale (15 active) as placeholders clearly marked for your review.

@@ -7,6 +7,9 @@ import reportsMockup from '@/assets/reports-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import ProfitIntelDemo from '@/components/ProfitIntelDemo';
 import { trackLandingFaqDeepLink, trackStarterKitCTAClicked } from '@/lib/analytics';
+import { useLandingAudience } from '@/hooks/useLandingAudience';
+import AudienceToggle from '@/components/landing/AudienceToggle';
+import RecruiterLanding from '@/components/landing/RecruiterLanding';
 
 type LandingFaq = { q: string; a: string; deepLink?: string };
 
@@ -37,6 +40,8 @@ export default function Landing() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { audience, setAudience } = useLandingAudience();
+  const isRecruiterAudience = audience === 'recruiter';
 
   const goToAuth = () => navigate('/auth');
 
@@ -60,8 +65,16 @@ export default function Landing() {
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
-        title="HaulTrackerPro | Know Your Real Profit Per Load"
-        description="HaulTrackerPro: trucking profit tracking for drivers, profit-first Opportunities, and approved recruiter access — all in one platform."
+        title={
+          isRecruiterAudience
+            ? 'Hire Verified Truck Drivers Faster | HaulTrackerPro'
+            : 'HaulTrackerPro | Know Your Real Profit Per Load'
+        }
+        description={
+          isRecruiterAudience
+            ? 'HaulTrackerPro connects verified recruiters with financially serious owner-operators. Structured postings, applicant pipeline, contract protection — flat-rate pricing.'
+            : 'HaulTrackerPro: trucking profit tracking for drivers, profit-first Opportunities, and approved recruiter access — all in one platform.'
+        }
         path="/"
         jsonLd={[
           {
@@ -132,7 +145,17 @@ export default function Landing() {
         )}
       </nav>
 
+      {/* Audience toggle — dual-audience landing */}
+      <div className="border-b" style={{ background: 'hsl(220, 20%, 9%)', borderColor: 'hsl(220, 16%, 14%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex justify-center">
+          <AudienceToggle audience={audience} onChange={setAudience} />
+        </div>
+      </div>
+
       <main>
+      {isRecruiterAudience ? <RecruiterLanding /> : (
+      <>
+
       {/* ═══════════════════════════════════════════ */}
       {/* SECTION 1: HERO */}
       {/* ═══════════════════════════════════════════ */}
@@ -883,6 +906,8 @@ export default function Landing() {
           </p>
         </div>
       </section>
+      </>
+      )}
       </main>
 
       {/* ═══════════════════════════════════════════ */}

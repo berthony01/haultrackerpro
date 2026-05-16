@@ -22,6 +22,10 @@ export default function Privacy() {
       <main className="px-4 py-6 max-w-2xl mx-auto space-y-6 text-sm leading-relaxed text-foreground">
         <h2 className="text-2xl font-black font-heading">HaulTrackerPro Privacy Policy</h2>
 
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-foreground/90">
+          <span className="font-semibold text-primary">Updated:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data.
+        </div>
+
         <section className="space-y-2">
           <h3 className="text-base font-bold">1. Information We Collect</h3>
           <ul className="list-disc list-inside text-muted-foreground space-y-1">
@@ -123,7 +127,14 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">14. Contact Information</h3>
+          <h3 className="text-base font-bold">14. Recruiter &amp; Carrier Data</h3>
+          <p className="text-muted-foreground">For users with recruiter access, we additionally collect company legal name, USDOT/MC numbers, company and recruiter phone numbers, business address, hiring states, equipment types, and verification metadata. Billing details are handled by Stripe; we store only the Stripe customer/subscription identifiers, plan tier, status, and (where surfaced by Stripe) the last four digits and brand of the payment method. We never store full card numbers.</p>
+          <p className="text-muted-foreground"><span className="font-semibold text-foreground">What drivers see:</span> only public recruiter fields — company name, verified badge, hiring states, equipment types, and the contact channel for the specific opportunity a driver inquires on. Internal verification documents, admin notes, billing data, and unapproved listings are never shown to drivers.</p>
+          <p className="text-muted-foreground"><span className="font-semibold text-foreground">Retention:</span> recruiter accounts and their billing records are retained while active and for up to 24 months after closure for tax, audit, fraud-prevention, and dispute-resolution purposes. Recruiters may request deletion of personal contact data subject to those retention limits.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">15. Contact Information</h3>
           <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.com.</p>
         </section>
 
