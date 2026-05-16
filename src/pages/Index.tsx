@@ -40,6 +40,7 @@ const FeedbackModal = lazy(() => import('@/components/FeedbackModal').then(m => 
 const OnboardingModal = lazy(() => import('@/components/OnboardingModal').then(m => ({ default: m.OnboardingModal })));
 const AlertsView = lazy(() => import('@/components/AlertsView').then(m => ({ default: m.AlertsView })));
 const OpportunitiesPage = lazy(() => import('@/components/opportunities/OpportunitiesPage').then(m => ({ default: m.OpportunitiesPage })));
+const RecruiterAccessRoute = lazy(() => import('@/components/opportunities/recruiter/RecruiterAccessRoute').then(m => ({ default: m.RecruiterAccessRoute })));
 const RecurringExpensesView = lazy(() => import('@/components/RecurringExpensesView').then(m => ({ default: m.RecurringExpensesView })));
 const DriverScorecard = lazy(() => import('@/components/DriverScorecard').then(m => ({ default: m.DriverScorecard })));
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
@@ -178,7 +179,7 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
-    // Route to Opportunities from external recruiter CTA OR from auth intent (URL/sessionStorage)
+    // Route to Opportunities / Recruiter Access from external CTA OR auth intent.
     let recruiterIntent = false;
     try {
       const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
@@ -187,19 +188,26 @@ const Index = () => {
         sessionStorage.removeItem('htp_auth_intent');
       }
     } catch {}
-    if (params.get('page') === 'opportunities') {
-      setPage('opportunities');
+    const pageParam = params.get('page');
+    if (pageParam === 'recruiter-access') {
+      setPage('recruiter-access');
+      recruiterIntent = true;
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (pageParam === 'opportunities') {
       const view = params.get('view');
       if (view === 'recruiter') {
-        sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
+        // Backward compat: old recruiter deep link → new top-level route.
+        setPage('recruiter-access');
         recruiterIntent = true;
-      } else if (view === 'driver-profile') {
-        sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
+      } else {
+        setPage('opportunities');
+        if (view === 'driver-profile') {
+          sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
+        }
       }
       window.history.replaceState({}, '', window.location.pathname);
     } else if (recruiterIntent) {
-      sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
-      setPage('opportunities');
+      setPage('recruiter-access');
     }
     if (recruiterIntent) {
       // Suppress driver-first onboarding modal once for recruiter signups
@@ -421,7 +429,12 @@ const Index = () => {
       return;
     }
     if (p === 'recruiter-access') {
-      openOpportunitiesView('recruiter');
+      setEditingLoad(null);
+      setEditingStops([]);
+      setEditingExpense(null);
+      setEditingFuelLog(null);
+      setOpportunitiesView('list');
+      setPage('recruiter-access');
       return;
     }
     if (p === 'opportunity-preferences') {
@@ -444,7 +457,7 @@ const Index = () => {
 
   // Derive sidebar/header key so Recruiter Access has its own label & highlight.
   const navKey =
-    page === 'opportunities' && opportunitiesView === 'recruiter'
+    page === 'recruiter-access'
       ? 'recruiter-access'
       : page === 'opportunities' && opportunitiesView === 'driver-profile'
         ? 'opportunity-preferences'
@@ -564,7 +577,7 @@ const Index = () => {
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
                         { icon: Route, label: hasCompletedDriverProfile ? 'Find Opportunities' : 'Set Opportunity Preferences', action: () => openOpportunitiesView(hasCompletedDriverProfile ? 'list' : 'driver-profile') },
-                        { icon: Users, label: 'Recruit Drivers', action: () => openOpportunitiesView('recruiter') },
+                        { icon: Users, label: 'Recruit Drivers', action: () => handleNavigate('recruiter-access') },
                       ].map((item) => (
                         <button
                           key={item.label}
@@ -709,6 +722,7 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
+            {page === 'recruiter-access' && <RecruiterAccessRoute onBack={() => setPage('dashboard')} />}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
           </Suspense>

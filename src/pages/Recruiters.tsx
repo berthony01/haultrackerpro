@@ -9,7 +9,7 @@ export default function Recruiters() {
   const { user } = useAuth();
 
   const goRecruiterAccess = () => {
-    if (user) navigate('/dashboard?page=opportunities&view=recruiter');
+    if (user) navigate('/dashboard?page=recruiter-access');
     else navigate('/auth?intent=recruiter');
   };
 

@@ -29,11 +29,7 @@ import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOppo
 import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
-import { RecruiterOnboarding } from './RecruiterOnboarding';
-import { RecruiterOpportunityManager } from './RecruiterOpportunityManager';
 import { DriverApplicationsPanel } from './DriverApplicationsPanel';
-import { RecruiterApplicationsDashboard } from './RecruiterApplicationsDashboard';
-import { RecruiterAccessPage } from './recruiter/RecruiterAccessPage';
 import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
@@ -53,11 +49,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-  const [showRecruiterHub, setShowRecruiterHub] = useState(false);
-  const [showRecruiterOnboarding, setShowRecruiterOnboarding] = useState(false);
-  const [showRecruiterManager, setShowRecruiterManager] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
-  const [showRecruiterApps, setShowRecruiterApps] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
@@ -68,14 +60,14 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
 
   const matchEnabled = !!profile && profile.profile_completed;
 
-  // Honor deep-link routing from /dashboard?page=opportunities&view=...
+  // Honor deep-link routing for driver-profile from /dashboard?page=opportunities&view=driver-profile.
+  // Recruiter view is now its own top-level route (page=recruiter-access) handled by Index.
   useEffect(() => {
     try {
       const v = sessionStorage.getItem('htp_opportunities_initial_view');
       if (!v) return;
       sessionStorage.removeItem('htp_opportunities_initial_view');
-      if (v === 'recruiter') setShowRecruiterHub(true);
-      else if (v === 'driver-profile') setShowProfile(true);
+      if (v === 'driver-profile') setShowProfile(true);
       // 'list' is the default — no-op.
     } catch {}
   }, []);
@@ -83,14 +75,12 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   // Notify parent of current top-level view so sidebar/header stay in sync.
   useEffect(() => {
     if (!onViewChange) return;
-    if (showRecruiterHub || showRecruiterOnboarding || showRecruiterManager || showRecruiterApps) {
-      onViewChange('recruiter');
-    } else if (showProfile) {
+    if (showProfile) {
       onViewChange('driver-profile');
     } else {
       onViewChange('list');
     }
-  }, [showRecruiterHub, showRecruiterOnboarding, showRecruiterManager, showRecruiterApps, showProfile, onViewChange]);
+  }, [showProfile, onViewChange]);
 
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 
@@ -208,34 +198,11 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     );
   }
 
-  if (showRecruiterApps) {
-    return <RecruiterApplicationsDashboard onBack={() => setShowRecruiterApps(false)} />;
-  }
-
-  if (showRecruiterManager) {
-    return <RecruiterOpportunityManager onBack={() => setShowRecruiterManager(false)} />;
-  }
-
   if (showDriverApps) {
     return (
       <DriverApplicationsPanel
         onBack={() => setShowDriverApps(false)}
         onViewOpportunity={(id) => { setShowDriverApps(false); setSelectedId(id); }}
-      />
-    );
-  }
-
-  if (showRecruiterOnboarding) {
-    return <RecruiterOnboarding onBack={() => setShowRecruiterOnboarding(false)} />;
-  }
-
-  if (showRecruiterHub) {
-    return (
-      <RecruiterAccessPage
-        onBack={() => setShowRecruiterHub(false)}
-        onOpenOnboarding={() => setShowRecruiterOnboarding(true)}
-        onManage={() => setShowRecruiterManager(true)}
-        onApplications={() => setShowRecruiterApps(true)}
       />
     );
   }

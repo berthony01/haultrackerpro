@@ -103,7 +103,7 @@ function PageFallback() {
 function postAuthRedirect(search: string): string {
   try {
     const intent = new URLSearchParams(search).get('intent');
-    if (intent === 'recruiter') return '/dashboard?page=opportunities&view=recruiter';
+    if (intent === 'recruiter') return '/dashboard?page=recruiter-access';
   } catch {}
   return '/dashboard';
 }
