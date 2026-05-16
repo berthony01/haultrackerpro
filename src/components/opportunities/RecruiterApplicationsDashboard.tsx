@@ -478,15 +478,14 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-400" />
-              Contract Not Approved
+              Contract Approval Required
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This driver has not approved the contract yet. Continue anyway?
+              This driver cannot be marked hired until the current contract is approved.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setWarnHire(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmWarnedHire}>Continue</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setWarnHire(null)}>Close</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
