@@ -54,6 +54,10 @@ const Parking = lazy(() => import("./pages/Parking"));
 const StarterKit = lazy(() => import("./pages/StarterKit"));
 const StarterKitThanks = lazy(() => import("./pages/StarterKitThanks"));
 const Updates = lazy(() => import("./pages/Updates"));
+const RecruiterFAQ = lazy(() => import("./pages/recruiter/RecruiterFAQ"));
+const RecruiterFeatures = lazy(() => import("./pages/recruiter/RecruiterFeatures"));
+const RecruiterGuide = lazy(() => import("./pages/recruiter/RecruiterGuide"));
+const RecruiterUpdates = lazy(() => import("./pages/recruiter/RecruiterUpdates"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -210,6 +214,10 @@ const App = () => (
               <Route path="/starter-kit" element={<StarterKit />} />
               <Route path="/starter-kit/thanks" element={<StarterKitThanks />} />
               <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
+              <Route path="/recruiter/faq" element={<RecruiterFAQ />} />
+              <Route path="/recruiter/features" element={<RecruiterFeatures />} />
+              <Route path="/recruiter/guide" element={<RecruiterGuide />} />
+              <Route path="/recruiter/updates" element={<RecruiterUpdates />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
