@@ -307,26 +307,50 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
-          <Field label="Opportunity" value={opp?.title || '—'} />
-          <Field label="Submitted" value={fmtDate(a.created_at)} />
-          <Field label="Last Activity" value={fmtDate(a.updated_at)} />
-          <Field label="Contact" value={a.preferred_contact_method || '—'} />
-          {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
-          {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
-          {a.driver_phone_snapshot && <Field label="Phone" value={a.driver_phone_snapshot} />}
-          {a.driver_email_snapshot && <Field label="Email" value={a.driver_email_snapshot} />}
-        </div>
+        {(() => {
+          const contactReq = latestRequestForApp(contactRequests, a.id);
+          const contactApproved = contactReq?.status === 'approved';
+          const appClosed = ['hired', 'rejected', 'withdrawn'].includes(a.status);
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
+                <Field label="Opportunity" value={opp?.title || '—'} />
+                <Field label="Submitted" value={fmtDate(a.created_at)} />
+                <Field label="Last Activity" value={fmtDate(a.updated_at)} />
+                <Field label="Preferred Contact" value={a.preferred_contact_method || '—'} />
+                {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
+                {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
+                {contactApproved && a.driver_phone_snapshot && (
+                  <Field label="Phone" value={a.driver_phone_snapshot} />
+                )}
+                {contactApproved && a.driver_email_snapshot && (
+                  <Field label="Email" value={a.driver_email_snapshot} />
+                )}
+              </div>
 
-        {a.message && (
-          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-foreground/90 mb-3 whitespace-pre-wrap">
-            {a.message}
-          </div>
-        )}
+              {a.message && (
+                <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-foreground/90 mb-3 whitespace-pre-wrap">
+                  {a.message}
+                </div>
+              )}
 
-        <div className="mb-3">
-          <ContractAttachment applicationId={a.id} role="recruiter" />
-        </div>
+              <div className="mb-3">
+                <RecruiterContactRequestRow
+                  status={contactReq?.status ?? null}
+                  appClosed={appClosed}
+                  onRequest={() => {
+                    setContactNote('');
+                    setContactModalAppId(a.id);
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <ContractAttachment applicationId={a.id} role="recruiter" />
+              </div>
+            </>
+          );
+        })()}
 
         {allowed.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
