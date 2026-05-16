@@ -206,9 +206,9 @@ export function DriverOpportunityProfile({ onBack }: Props) {
 
     upsertProfile.mutate(payload, {
       onSuccess: () => {
-        if (completed) toast.success('Profile saved');
+        if (completed) toast.success('Your Opportunity Preferences are ready.');
         else
-          toast.success('Profile saved, but some fields are missing. Complete your profile to get better opportunity matches.');
+          toast.success('Preferences saved. Add a few more details later to improve your match quality.');
       },
       onError: (e: Error) => toast.error(e.message),
     });
