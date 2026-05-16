@@ -575,12 +575,16 @@ export function ContractAttachment({ applicationId, role }: Props) {
                   Your note: {driverReview.notes}
                 </p>
               )}
-              {!decisionTerminal && (
-                <p className="text-[10px] text-muted-foreground italic">
-                  You can submit a new decision for this version below.
+              {decision === 'changes_requested' && (
+                <p className="text-[11px] text-amber-400/90 italic">
+                  You requested changes for this contract version. The recruiter must upload a revised version before you can approve or sign.
                 </p>
               )}
             </div>
+          ) : driverWaitingForAi ? (
+            <p className="text-[11px] text-muted-foreground">
+              Waiting for AI review. The recruiter must run AI review before you can approve, reject, or request changes.
+            </p>
           ) : (
             <p className="text-[11px] text-muted-foreground">
               Review the contract and AI risk summary above, then choose:
