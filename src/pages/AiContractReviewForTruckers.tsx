@@ -20,7 +20,7 @@ export default function AiContractReviewForTruckers() {
         'Non-compete or restriction language',
         'Equipment return terms',
         'Recruiter promises vs written contract language',
-        'Required driver approval and signature steps',
+        'Driver approval required before hire; optional signature recorded in-app',
       ]}
       extraSections={[
         {
