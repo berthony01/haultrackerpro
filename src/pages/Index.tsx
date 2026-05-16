@@ -14,6 +14,8 @@ import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useViewMode } from '@/hooks/useViewMode';
+import { ViewModeSwitch } from '@/components/ViewModeSwitch';
 // Critical shell — keep eager so first paint never flickers.
 import { BottomNav } from '@/components/BottomNav';
 import { AppSidebar } from '@/components/premium/AppSidebar';
