@@ -422,7 +422,7 @@ export default function Pricing() {
                 highlight: true,
                 bullets: [
                   'Everything in Starter',
-                  'Enhanced hiring visibility',
+                  'Priority placement in driver listings',
                   'Application status workflow',
                   'Priority moderation queue',
                 ],
@@ -433,9 +433,9 @@ export default function Pricing() {
                 limit: '25 active opportunities',
                 bullets: [
                   'Everything in Growth',
-                  'High-volume recruiting capacity',
-                  'Priority ecosystem access',
-                  'Best for carriers &amp; large fleets',
+                  'Priority placement in driver listings',
+                  'Recruiting snapshot dashboard',
+                  'Priority support',
                 ],
               },
             ].map((p) => (
