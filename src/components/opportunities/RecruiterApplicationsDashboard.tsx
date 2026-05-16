@@ -127,6 +127,9 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
 
   const appIds = useMemo(() => recruiterApplications.map((a: any) => a.id), [recruiterApplications]);
   const { readinessMap } = useContractReadinessMap(appIds);
+  const { requests: contactRequests, requestContact } = useRecruiterContactRequests(appIds);
+  const [contactModalAppId, setContactModalAppId] = useState<string | null>(null);
+  const [contactNote, setContactNote] = useState('');
 
   const opportunityOptions = useMemo(() => {
     const map = new Map<string, string>();
