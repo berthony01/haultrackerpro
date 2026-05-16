@@ -202,34 +202,11 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     );
   }
 
-  if (showRecruiterApps) {
-    return <RecruiterApplicationsDashboard onBack={() => setShowRecruiterApps(false)} />;
-  }
-
-  if (showRecruiterManager) {
-    return <RecruiterOpportunityManager onBack={() => setShowRecruiterManager(false)} />;
-  }
-
   if (showDriverApps) {
     return (
       <DriverApplicationsPanel
         onBack={() => setShowDriverApps(false)}
         onViewOpportunity={(id) => { setShowDriverApps(false); setSelectedId(id); }}
-      />
-    );
-  }
-
-  if (showRecruiterOnboarding) {
-    return <RecruiterOnboarding onBack={() => setShowRecruiterOnboarding(false)} />;
-  }
-
-  if (showRecruiterHub) {
-    return (
-      <RecruiterAccessPage
-        onBack={() => setShowRecruiterHub(false)}
-        onOpenOnboarding={() => setShowRecruiterOnboarding(true)}
-        onManage={() => setShowRecruiterManager(true)}
-        onApplications={() => setShowRecruiterApps(true)}
       />
     );
   }
