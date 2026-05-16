@@ -617,6 +617,9 @@ const Index = () => {
                     onDismiss={() => markSeen()}
                   />
                 )}
+                {!isRecruiterView && (
+                  <ContractActionsCard role="driver" onOpen={() => handleNavigate('contracts')} />
+                )}
                 {!subscription.isLoading && !isRecruiterView && (
                   <MilestoneNudges
                     loadsCount={allLoadsQuery.loads.length}
