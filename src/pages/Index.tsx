@@ -409,6 +409,23 @@ const Index = () => {
 
   const [opportunitiesViewKey, setOpportunitiesViewKey] = useState(0);
   const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
+  const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
+
+  // Role-based access guard: redirect users away from pages outside their role.
+  // Admins keep full access for management/testing.
+  const driverOnlyPages = new Set([
+    'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
+    'opportunities','add','add_expense','add_fuel','closeout','recurring_expenses',
+  ]);
+  useEffect(() => {
+    if (roleLoading || isAdmin) return;
+    if (isRecruiter && driverOnlyPages.has(page)) {
+      setPage('recruiter-access');
+    } else if (!isRecruiter && page === 'recruiter-access') {
+      setPage('dashboard');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleLoading, isRecruiter, isAdmin, page]);
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
