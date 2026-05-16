@@ -222,7 +222,7 @@ const Index = () => {
       try { sessionStorage.setItem('htp_recruiter_intent', '1'); } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey]);
+  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey, roleLoading, isRecruiter, isAdmin]);
 
   // Fire purchase analytics once the resolved plan is available (avoids stale closure)
   useEffect(() => {
