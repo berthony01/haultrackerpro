@@ -22,6 +22,10 @@ export default function Terms() {
       <main className="px-4 py-6 max-w-2xl mx-auto space-y-6 text-sm leading-relaxed text-foreground">
         <h2 className="text-2xl font-black font-heading">HaulTrackerPro Terms of Service</h2>
 
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-foreground/90">
+          <span className="font-semibold text-primary">Updated:</span> These terms now cover both driver/owner-operator accounts and recruiter/carrier accounts, including verification, anti-harassment, anti-scam, and billing terms.
+        </div>
+
         <section className="space-y-2">
           <h3 className="text-base font-bold">1. Acceptance of Terms</h3>
           <p className="text-muted-foreground">By accessing or using HaulTrackerPro, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the service.</p>
