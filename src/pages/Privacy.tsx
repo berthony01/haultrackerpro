@@ -22,6 +22,10 @@ export default function Privacy() {
       <main className="px-4 py-6 max-w-2xl mx-auto space-y-6 text-sm leading-relaxed text-foreground">
         <h2 className="text-2xl font-black font-heading">HaulTrackerPro Privacy Policy</h2>
 
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-foreground/90">
+          <span className="font-semibold text-primary">Updated:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data.
+        </div>
+
         <section className="space-y-2">
           <h3 className="text-base font-bold">1. Information We Collect</h3>
           <ul className="list-disc list-inside text-muted-foreground space-y-1">
