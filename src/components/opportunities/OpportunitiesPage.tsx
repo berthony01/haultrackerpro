@@ -213,8 +213,21 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
     );
   }
 
-  if (showRecruiter) {
-    return <RecruiterOnboarding onBack={() => setShowRecruiter(false)} />;
+  if (showRecruiterOnboarding) {
+    return <RecruiterOnboarding onBack={() => setShowRecruiterOnboarding(false)} />;
+  }
+
+  if (showRecruiterHub) {
+    return (
+      <RecruiterAccessHub
+        profile={recruiterProfile}
+        loading={recruiterLoading}
+        onBack={() => setShowRecruiterHub(false)}
+        onOpenOnboarding={() => setShowRecruiterOnboarding(true)}
+        onManage={() => setShowRecruiterManager(true)}
+        onApplications={() => setShowRecruiterApps(true)}
+      />
+    );
   }
 
   if (showProfile) {
