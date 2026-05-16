@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useApplicationContract } from '@/hooks/contracts/useApplicationContract';
 import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/integrations/supabase/client';
+import { ContractSummaryPanel } from './ContractSummaryPanel';
 
 interface Props {
   applicationId: string;
