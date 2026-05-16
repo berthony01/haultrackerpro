@@ -748,8 +748,13 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
-            {page === 'recruiter-access' && <RecruiterAccessRoute onBack={() => setPage('dashboard')} />}
-            {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
+            {page === 'recruiter-access' && (isRecruiter || isAdmin) && (
+              <RecruiterAccessRoute
+                onBack={() => setPage(isRecruiter && !isAdmin ? 'recruiter-access' : 'dashboard')}
+                initialView={recruiterView}
+              />
+            )}
+            {page === 'settings' && <SettingsView onBack={() => setPage(isRecruiter ? 'recruiter-access' : 'dashboard')} />}
           </>
           </Suspense>
         )}
@@ -757,7 +762,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} />
       </div>
       <AddActionModal
         open={showAddModal}
