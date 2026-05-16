@@ -7,13 +7,15 @@ import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
 import { useFuelLogs, FuelLogInsert, FuelLog } from '@/hooks/useFuelLogs';
 import { useAuth } from '@/hooks/useAuth';
-import { useAdmin } from '@/hooks/useAdmin';
+
 import { useFeedback } from '@/hooks/useFeedback';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useViewMode } from '@/hooks/useViewMode';
+import { ViewModeSwitch } from '@/components/ViewModeSwitch';
 // Critical shell — keep eager so first paint never flickers.
 import { BottomNav } from '@/components/BottomNav';
 import { AppSidebar } from '@/components/premium/AppSidebar';
@@ -61,8 +63,10 @@ const ViewFallback = () => (
 const Index = () => {
   const { signOut, user } = useAuth();
   const queryClient = useQueryClient();
-  const { isAdmin } = useAdmin();
-  const { role, isRecruiter, isLoading: roleLoading } = useUserRole();
+  
+  const { role, isLoading: roleLoading } = useUserRole();
+  const { effectiveRole, setViewMode, canSwitch } = useViewMode();
+  const isRecruiterView = effectiveRole === 'recruiter';
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
@@ -204,7 +208,7 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'opportunities') {
       const view = params.get('view');
-      if (view === 'recruiter' || (isRecruiter && !isAdmin)) {
+      if (view === 'recruiter' || isRecruiterView) {
         // Backward compat + role guard: recruiters never see the driver Opportunities page.
         setPage('recruiter-access');
         recruiterIntent = true;
@@ -223,7 +227,7 @@ const Index = () => {
       try { sessionStorage.setItem('htp_recruiter_intent', '1'); } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey, roleLoading, isRecruiter, isAdmin]);
+  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey, roleLoading, isRecruiterView]);
 
   // Fire purchase analytics once the resolved plan is available (avoids stale closure)
   useEffect(() => {
@@ -418,21 +422,24 @@ const Index = () => {
   const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
   const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
 
-  // Role-based access guard: redirect users away from pages outside their role.
-  // Admins keep full access for management/testing.
+  // Role-based access guard: redirect users away from pages outside their
+  // *effective* role. Admins obey their view-mode choice instead of bypassing.
   const driverOnlyPages = new Set([
     'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
     'opportunities','add','add_expense','add_fuel','closeout','recurring_expenses',
+    'opportunity-preferences',
   ]);
+  const isRecruiterPageId = (p: string) =>
+    p === 'recruiter-access' || p.startsWith('recruiter-access:');
   useEffect(() => {
-    if (roleLoading || isAdmin) return;
-    if (isRecruiter && driverOnlyPages.has(page)) {
+    if (roleLoading) return;
+    if (isRecruiterView && driverOnlyPages.has(page)) {
       setPage('recruiter-access');
-    } else if (!isRecruiter && page === 'recruiter-access') {
+    } else if (!isRecruiterView && isRecruiterPageId(page)) {
       setPage('dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleLoading, isRecruiter, isAdmin, page]);
+  }, [roleLoading, isRecruiterView, page]);
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
@@ -454,19 +461,19 @@ const Index = () => {
       navigate('/parking');
       return;
     }
-    // Defensive role gating BEFORE state changes so non-admins can never
-    // momentarily render a page outside their role (URL hacks, stale links).
-    const isRecruiterTarget = p === 'recruiter-access' || p.startsWith('recruiter-access:');
+    // Defensive role gating BEFORE state changes — uniform for all users,
+    // including admins (who control their own view via the switcher).
+    const isRecruiterTarget = isRecruiterPageId(p);
     const driverOnlyTargets = new Set([
       'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
       'opportunities','add_expense','add_fuel','closeout','recurring_expenses',
       'opportunity-preferences',
     ]);
-    if (isRecruiterTarget && !isAdmin && !isRecruiter) {
+    if (isRecruiterTarget && !isRecruiterView) {
       setPage('dashboard');
       return;
     }
-    if (!isRecruiterTarget && driverOnlyTargets.has(p) && !isAdmin && isRecruiter) {
+    if (!isRecruiterTarget && driverOnlyTargets.has(p) && isRecruiterView) {
       setPage('recruiter-access');
       return;
     }
@@ -541,36 +548,47 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} roleLoading={roleLoading} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
         <header className="sticky top-0 z-40 bg-card/70 backdrop-blur-md border-b border-border/60 lg:bg-transparent lg:border-b-0">
-          <div className="flex items-center justify-between px-4 py-3.5 max-w-7xl mx-auto w-full">
-            <div className="flex items-center gap-3 lg:hidden">
-              <div className="rounded-xl bg-primary p-2 shadow-primary">
+          <div className="flex items-center justify-between px-4 py-3.5 max-w-7xl mx-auto w-full gap-3">
+            <div className="flex items-center gap-3 lg:hidden min-w-0">
+              <div className="rounded-xl bg-primary p-2 shadow-primary shrink-0">
                 <Truck className="h-5 w-5 text-primary-foreground" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-base font-black font-heading tracking-tight text-foreground">
                   Haul<span className="text-primary">TrackerPro</span>
                 </h1>
-                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em]">{roleLoading ? 'Loading…' : isRecruiter ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em] truncate">{roleLoading ? 'Loading…' : isRecruiterView ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
               </div>
             </div>
-            <div className="hidden lg:block">
-              <h2 className="text-lg font-black tracking-tight text-foreground">{navLabel}</h2>
-              <p className="text-xs text-muted-foreground">{navSubtitle}</p>
+            <div className="hidden lg:block min-w-0">
+              <h2 className="text-lg font-black tracking-tight text-foreground truncate">{navLabel}</h2>
+              <p className="text-xs text-muted-foreground truncate">{navSubtitle}</p>
             </div>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl h-10 w-10" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              {canSwitch && !roleLoading && (
+                <ViewModeSwitch
+                  value={effectiveRole}
+                  onChange={(next) => {
+                    setViewMode(next);
+                    handleNavigate(next === 'recruiter' ? 'recruiter-access' : 'dashboard');
+                  }}
+                />
+              )}
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl h-10 w-10" onClick={signOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </header>
 
         <main className="px-4 py-5 max-w-7xl mx-auto w-full">
         {/* Smart Reminders */}
-        {!showOnboarding && page === 'dashboard' && !isRecruiter && (
+        {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">
             <SmartReminders
               loads={allLoadsQuery.loads}
@@ -594,7 +612,7 @@ const Index = () => {
                     onDismiss={() => markSeen()}
                   />
                 )}
-                {!subscription.isLoading && !isRecruiter && (
+                {!subscription.isLoading && !isRecruiterView && (
                   <MilestoneNudges
                     loadsCount={allLoadsQuery.loads.length}
                     expensesCount={allExpensesQuery.expenses.length}
@@ -604,7 +622,7 @@ const Index = () => {
                   />
                 )}
                 {/* Role path card for new / low-activity drivers only */}
-                {!roleCardDismissed && !isRecruiter && allLoadsQuery.loads.length <= 3 && (
+                {!roleCardDismissed && !isRecruiterView && allLoadsQuery.loads.length <= 3 && (
                   <div className="mb-4 p-4 rounded-2xl border relative" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                     <button
                       onClick={() => {
@@ -766,17 +784,20 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
-            {page === 'recruiter-access' && (isRecruiter || isAdmin) && (
+            {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {
-                  // Pure recruiters have no driver dashboard to go back to;
-                  // keep them on the recruiter hub. Admins jump back to driver.
-                  if (isAdmin) setPage('dashboard');
+                  // Only users who can switch views have a driver dashboard to go back to.
+                  // Pure recruiters stay on the recruiter hub.
+                  if (canSwitch) {
+                    setViewMode('driver');
+                    setPage('dashboard');
+                  }
                 }}
                 initialView={recruiterView}
               />
             )}
-            {page === 'settings' && (isRecruiter ? (
+            {page === 'settings' && (isRecruiterView ? (
               <RecruiterSettingsView
                 onBack={() => setPage('recruiter-access')}
                 onOpenOnboarding={() => { setRecruiterView('onboarding'); setPage('recruiter-access'); }}
@@ -792,7 +813,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} roleLoading={roleLoading} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
       </div>
       <AddActionModal
         open={showAddModal}

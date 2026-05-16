@@ -22,7 +22,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { ShieldCheck } from 'lucide-react';
 import type { UserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -30,7 +29,6 @@ interface BottomNavProps {
   active: string;
   onNavigate: (page: string) => void;
   role: UserRole;
-  isAdmin?: boolean;
   roleLoading?: boolean;
 }
 
@@ -49,7 +47,7 @@ const recruiterNav = [
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
 
-export function BottomNav({ active, onNavigate, role, isAdmin, roleLoading }: BottomNavProps) {
+export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
   const navItems = role === 'recruiter' ? recruiterNav : driverNav;
@@ -78,15 +76,6 @@ export function BottomNav({ active, onNavigate, role, isAdmin, roleLoading }: Bo
   ];
 
   const moreItems: MoreItem[] = role === 'recruiter' ? recruiterMoreItems : driverMoreItems;
-
-  // Admin-only cross-role jump, kept in a separate section so it never looks
-  // like a normal driver/recruiter feature.
-  const adminCrossRoleItem: MoreItem | null =
-    isAdmin && !roleLoading
-      ? role === 'recruiter'
-        ? { label: 'Open Driver Dashboard', icon: LayoutDashboard, onClick: () => go('dashboard'), description: 'Admin: jump to driver view.' }
-        : { label: 'Open Recruiter Console', icon: Handshake, onClick: () => go('recruiter-access'), description: 'Admin: open recruiter tools.' }
-      : null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">
@@ -149,26 +138,6 @@ export function BottomNav({ active, onNavigate, role, isAdmin, roleLoading }: Bo
                       </button>
                     ))}
                   </div>
-                  {adminCrossRoleItem && (
-                    <div className="mt-5 pt-4 border-t border-border/60">
-                      <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70 flex items-center gap-1.5">
-                        <ShieldCheck className="h-3 w-3" />
-                        Admin Tools
-                      </p>
-                      <button
-                        onClick={adminCrossRoleItem.onClick}
-                        className="w-full flex items-start gap-3 p-3 rounded-xl border border-dashed border-border/60 hover:bg-muted/40 active:scale-[0.99] transition-all text-left"
-                      >
-                        <adminCrossRoleItem.icon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{adminCrossRoleItem.label}</p>
-                          {adminCrossRoleItem.description && (
-                            <p className="text-xs text-muted-foreground leading-snug">{adminCrossRoleItem.description}</p>
-                          )}
-                        </div>
-                      </button>
-                    </div>
-                  )}
                 </SheetContent>
               </Sheet>
             );
