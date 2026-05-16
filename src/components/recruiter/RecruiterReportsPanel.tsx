@@ -131,7 +131,7 @@ export function RecruiterReportsPanel({ onBack, onUpgrade }: Props) {
         const csv = buildRecruiterReportCSV(type, aggregate);
         downloadCSV(`${baseName}.csv`, csv);
       } else {
-        const blob = buildRecruiterReportPDF(type, aggregate);
+        const blob = await buildRecruiterReportPDF(type, aggregate);
         downloadBlob(`${baseName}.pdf`, blob);
       }
       toast.success(`${REPORT_TYPE_LABEL[type]} ready`);
