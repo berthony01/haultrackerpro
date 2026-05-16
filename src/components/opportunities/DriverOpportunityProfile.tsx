@@ -346,8 +346,8 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         </Grid>
       </Section>
 
-      <Section icon={ShieldCheck} title="Privacy & Contact">
-        <Field label="Profile visibility">
+      <Section icon={ShieldCheck} title="Privacy & Recruiter Contact">
+        <Field label="Preferences visibility">
           <Select value={form.visibility} onValueChange={(v) => set('visibility', v as FormState['visibility'])}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
