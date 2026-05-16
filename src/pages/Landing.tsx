@@ -906,6 +906,8 @@ export default function Landing() {
           </p>
         </div>
       </section>
+      </>
+      )}
       </main>
 
       {/* ═══════════════════════════════════════════ */}
