@@ -577,7 +577,7 @@ const Index = () => {
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
                         { icon: Route, label: hasCompletedDriverProfile ? 'Find Opportunities' : 'Set Opportunity Preferences', action: () => openOpportunitiesView(hasCompletedDriverProfile ? 'list' : 'driver-profile') },
-                        { icon: Users, label: 'Recruit Drivers', action: () => openOpportunitiesView('recruiter') },
+                        { icon: Users, label: 'Recruit Drivers', action: () => handleNavigate('recruiter-access') },
                       ].map((item) => (
                         <button
                           key={item.label}
