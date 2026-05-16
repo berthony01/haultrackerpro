@@ -1,155 +1,144 @@
-This plan is approved, but apply these safeguards before deployment.
+This plan is approved, but apply these safeguards:
 
-1. Verify real recruiter_billing_profiles values before writing the priority migration.
+1. Recruiter reports must never include driver loads, fuel, expenses, profit, RPM, tax, or driver financial report fields.
 
-Confirm the actual plan values and status values used in production.
+2. For report numbers, verify that application_events are reliable. If event rows are incomplete, use opportunity_applications.status as the source of truth for status breakdowns, and use application_events only for timeline/event counts where reliable.
 
-The helper function should only use values that really exist in the database.
+3. For top-performing opportunities, handle missing or null view_count safely. If view_count is unavailable, rank by application count first.
 
-Expected logic:
+4. Recruiter report access must be gated server-side or at least data-query guarded, not only hidden in the UI. Free/Starter should not be able to generate reports by manually navigating to the component.
 
-- Growth and Fleet plans get priority
+5. ContractSummaryPanel must respect role-based privacy:
 
-- Starter does not
+- Driver view must not expose recruiter admin-only notes or internal billing details.
 
-- Active or trialing gets priority
+- Recruiter view must not expose unrelated driver financial/profit data.
 
-- canceled, past_due, inactive, or unpaid should not
+- Only show fields allowed by existing RLS.
 
-2. Confirm the Supabase relationship join works.
+6. The contract summary panel must clearly say it does not modify the uploaded contract PDF.
 
-The useOpportunities query:
+7. Keep this phase scoped:
 
-recruiter:recruiter_profiles!inner(verification_status, status)
+- no signed PDF generation
 
-must be tested against the real schema.
+- no contract template builder
 
-If the relationship alias or FK name is different, fix the select before shipping.
+- no recruiter countersignature
 
-3. Confirm the business rule for featured.
+- no driver financial exports for recruiters
 
-This plan makes featured fully plan-derived.
+- no role-switcher changes
 
-That means admin manual featured toggles will be overwritten.
+## Part 1 — Recruiter Reports (Growth/Fleet, premium)
 
-That is acceptable only if we want Priority Placement to be strictly tied to Growth/Fleet.
+Brand-new recruiter report module. Does NOT reuse `reportAggregator` / `reportCsv` / `reportPdf` (those are driver profit reports and must not leak into recruiter exports).
 
-If we need admin promotional overrides later, add a separate admin_featured_override field in a future phase. Do not add it in this phase unless required.
+### New files
 
-4. Keep the Starter copy truthful.
+- `src/lib/recruiterReports/aggregator.ts` — pure aggregator (no driver financials)
+- `src/lib/recruiterReports/csv.ts` — CSV builder
+- `src/lib/recruiterReports/pdf.ts` — jsPDF builder (Activity + Pipeline layouts)
+- `src/hooks/recruiter/useRecruiterReportData.ts` — pulls all rows for date range
+- `src/components/recruiter/RecruiterReportsPanel.tsx` — UI (date range, report type, format, generate button)
 
-Replace "In-app messaging" with "Driver contact requests" everywhere recruiter pricing appears.
+### Data sources (read-only, RLS-scoped to recruiter)
 
-5. Keep Fleet copy truthful.
+- `recruiter_profiles` → company_name, recruiter_name, mc/dot, city/state, verification_status
+- `recruiter_billing_profiles` → plan, active_opportunity_limit, status
+- `opportunities` (filter `recruiter_id`) → active count, top performers (by view_count + application count)
+- `opportunity_applications` (filter `recruiter_id`, created_at in range) → totals, status breakdown
+- `application_events` (in range) → interviews scheduled, offers_sent counts
+- `recruiter_contact_requests` (in range) → total + by status
+- `contracts` joined to applications → contract status summary, opportunities blocked (status NOT IN ('approved','signed') for hired-pending apps)
 
-Do not claim multi-seat team access or advanced analytics dashboard until those features are truly built.
+### Report types
 
-Use:
+1. **Recruiter Activity Report** (PDF + CSV) — header + summary KPIs + status breakdown + contact request stats + contract status summary + plan usage.
+2. **Recruiter Pipeline Report** (PDF + CSV) — per-opportunity rows: title, status, applications, interviews, offers, hired, contract block flag, view count.
 
-- 25 active opportunities
+### Report sections (both)
 
-- Priority placement
+- Header: HaulTrackerPro — {report name}; Company Name; Recruiter Name; Date Range; Generated timestamp
+- KPIs: Active Opportunities, Total Applications (in range), Applications by Status table, Contact Requests (pending/approved/declined/expired), Interviews (call_scheduled+interviewing event counts), Offers Sent, Hired, Rejected, Withdrawn
+- Contract status summary: counts per `contracts.status` for in-range applications
+- Opportunities blocked by contract: list apps where `status='offer_sent'` or hire attempt blocked because contract not approved/signed
+- Top-performing opportunities (top 5 by applications)
+- Plan usage: `{active_count} / {active_opportunity_limit} slots used` and current plan name
+- Footer: "Generated by HaulTrackerPro.com"
+- **Explicitly excludes** any driver loads/expenses/fuel/profit data
 
-- Recruiting snapshot dashboard
+### Gating
 
-- Priority support
+- Available only when `recruiter_billing_profiles.plan IN ('growth','fleet')` AND `status IN ('active','trialing')`. Free/Starter sees locked preview card with upgrade CTA.
+- Surface in `RecruiterContractsView` sibling area (new "Reports" tab/section inside `Recruiters.tsx`).
 
-6. QA must verify:
+### Marketing copy
 
-- Starter opportunity = featured false
+- Add "Recruiter Activity & Pipeline reports (PDF + CSV)" to Growth/Fleet bullets in `RecruiterLanding.tsx`, `Pricing.tsx`, `recruiterFeatureList.ts`. Do NOT claim driver financial data.
 
-- Growth opportunity = featured true
+---
 
-- Fleet opportunity = featured true
+## Part 2 — Contract Company Info Auto-Fill (platform record only)
 
-- Downgrading Growth to Starter flips featured back to false
+No PDF generation. No edits to uploaded files. Auto-fill only the platform contract record/summary panel.
 
-- Canceling or inactive billing removes priority
+### New component
 
-- Driver listings show Growth/Fleet above Starter
+- `src/components/contracts/ContractSummaryPanel.tsx` — read-only details card rendered at the top of `ContractAttachment.tsx` for both driver and recruiter roles.
 
-- Verified Recruiter badge only appears for approved and non-suspended recruiters
+### Data
 
-- Pricing and recruiter landing copy match
+Extend `useApplicationContract` (or a small new hook `useContractContext(applicationId)`) to join:
 
-- Build passes with no TypeScript errors
+- `opportunity_applications` → status, created_at
+- `opportunities` → title, company_name, pay_rate/pay_structure summary, city/state
+- `recruiter_profiles` → recruiter_name, company_name, mc_number, dot_number, company_city/state, verification_status, status
+- `driver_profiles` → driver full_name (recruiter view only)
+- `contracts` → status, current_version_id, updated_at
+- `contract_versions` → version_number, uploaded_at
+- `contract_signatures` → driver signed_at (existence)
 
-# Recruiter Pricing Truth Audit & Feature Hardening
-
-Make every recruiter marketing claim match real platform behavior, and turn Priority Placement into a deterministic plan-driven feature.
-
-## A. Driver-facing badge: "Approved" → "Verified Recruiter"
-
-**File:** `src/components/opportunities/OpportunityCard.tsx`
-
-- Change badge text from `Approved` to `Verified Recruiter`.
-- Today the listing already filters opportunities to `status='active' AND admin_review_status='approved'`, but recruiter verification is a separate field. Extend `useOpportunities` to also join recruiter verification so we only render the badge when the recruiter profile itself is approved/active (not pending/rejected/suspended).
-- If join shows the recruiter is not verified, hide the badge entirely (the opportunity already shouldn't be live, but this is a defensive UI guard).
-
-**File:** `src/hooks/opportunities/useOpportunities.ts`
-
-- Change `.select('*')` to `.select('*, recruiter:recruiter_profiles!inner(verification_status, status)')` and filter `verification_status='approved'` and `status<>'suspended'`. Pass `recruiter` down to the card so it can decide whether to render the verified badge.
-
-## B. Starter copy truth fix
-
-**File:** `src/components/landing/RecruiterLanding.tsx` (line 48)
-
-- Replace `'In-app messaging'` with `'Driver contact requests'`.
-- Keep `'Applicant pipeline'` and `'Verified badge'`.
-
-**File:** `src/pages/recruiter/RecruiterFAQ.tsx` — keep the existing honest note ("In-app messaging is on the roadmap"); no change required.
-
-## C. Priority Placement — make it real and deterministic
-
-**Approach:** server-side sync (option 2 from the audit). Keep `opportunities.featured` as the single sort key the listing already uses, but stop relying on manual toggling. A DB trigger and a billing-change trigger will set it automatically from the recruiter's active plan.
-
-**Migration:**
-
-1. Add helper SQL function `recruiter_has_priority_plan(recruiter_id uuid) returns boolean` — true if the recruiter's `recruiter_billing_profiles.plan IN ('growth','fleet')` AND `status IN ('active','trialing')`.
-2. Add trigger on `opportunities` (BEFORE INSERT OR UPDATE): set `NEW.featured = recruiter_has_priority_plan(NEW.recruiter_id)`. This locks `featured` to the plan — recruiters can't manually mark themselves featured.
-3. Add trigger on `recruiter_billing_profiles` (AFTER INSERT OR UPDATE OF plan, status): UPDATE all `opportunities` for that recruiter to recompute `featured` from `recruiter_has_priority_plan`.
-4. One-time backfill: `UPDATE opportunities SET featured = recruiter_has_priority_plan(recruiter_id)`.
-
-**Sort rule** (already in `useOpportunities`): `featured DESC, published_at DESC NULLS LAST`. Match-score is computed client-side per card and does **not** reorder the list, so paid priority is never buried. Keep it that way (no change).
-
-## D. Featured/Priority badge
-
-**File:** `src/components/opportunities/OpportunityCard.tsx`
-
-- Existing "Featured" badge stays, gated on `o.featured === true` (which is now always plan-driven). Rename label from `Featured` to `Priority` for clarity. Already hidden when `featured=false`.
-
-## E. Fleet claims cleanup
-
-**File:** `src/components/landing/RecruiterLanding.tsx` (line 50)
-
-- Replace `['Everything in Growth', 'Multi-seat team access', 'Analytics dashboard']` with `['Everything in Growth', '25 active opportunities', 'Recruiting snapshot dashboard', 'Priority support']`.
-
-**File:** `src/pages/Pricing.tsx` — current Fleet bullets are already vague ("High-volume recruiting capacity", "Priority ecosystem access"). Tighten to: `'25 active opportunities'`, `'Priority placement'`, `'Recruiting snapshot dashboard'`, `'Priority support'`. Also update Growth bullets to explicitly include `'Priority placement'`.
-
-**File:** `src/lib/recruiterFeatureList.ts` — audit for "multi-seat", "team", "analytics dashboard". Current file has none (verified by search). No change required.
-
-**Files:** `src/pages/recruiter/RecruiterFAQ.tsx`, `src/pages/recruiter/RecruiterGuide.tsx` — no offending claims found; no change.
-
-## F. Out of scope
-
-- No new chat/messaging system.
-- No multi-seat / team management implementation.
-- No new analytics page.
-- No changes to RLS, auth, contracts workflow, or billing edge functions.
-
-## Technical notes
-
-- Migration is the only DB change. `featured` becomes derived; existing admin tooling that flips `featured` manually will be overridden by the trigger — this is intentional (deterministic + auditable).
-- `useOpportunities` query key stays the same; the embedded recruiter join is filtered with `!inner` so unverified recruiters' rows drop out as a second safety net.
-- `OpportunityCard` props extend with optional `verifiedRecruiter: boolean` (default false) so the badge is opt-in and won't appear on stale/cached data.
-
-## QA checklist
-
-1. Seed a Starter recruiter → opportunity row has `featured=false` after insert.
-2. Upgrade same recruiter to Growth → all their opportunities flip to `featured=true` via billing trigger.
-3. Driver listing shows Growth/Fleet opportunities above Starter; refresh preserves order.
-4. Verified Recruiter badge renders only for approved + non-suspended recruiters.
-5. Pricing page Starter shows "Driver contact requests" (no "In-app messaging").
-6. Pricing page Fleet shows no "Multi-seat" or "Analytics dashboard" claims.
-7. RecruiterLanding tier table matches Pricing page.
-8. Build passes with no TS errors.
+### Driver view shows
+
+- Company name + Verified Recruiter badge (when `verification_status='approved'` AND `status<>'suspended'`)
+- Recruiter name
+- Opportunity title + pay summary (if present)
+- Company location (City, ST)
+- MC/DOT (only if present)
+- Contract uploaded date + version number (`v{n}`)
+- Application status pill
+- Contract status pill
+
+### Recruiter view shows
+
+- Driver name
+- Opportunity title
+- Application status pill
+- Contract status pill
+- Driver decision status (approved / rejected / changes_requested / pending)
+- Signature status (signed at {date} / not signed)
+
+### Copy rules
+
+- No string anywhere may claim the PDF was auto-filled, generated, or edited.
+- Panel headed: "Contract details" with subtitle "Auto-filled from this application — does not modify the uploaded contract."
+- Audit existing copy in `ContractAttachment.tsx`, `DriverContractsView.tsx`, `RecruiterContractsView.tsx`, `ContractSeoPage.tsx`, `featureList.ts`, `recruiterFeatureList.ts` to remove any conflicting language (currently none expected).
+
+### Out of scope
+
+- Driver financial data in recruiter reports
+- Editing or generating contract PDFs
+- Contract templates
+- New backend tables, RLS changes, edge functions, billing logic
+- Auth, role switcher, landing redesign
+
+### QA checklist
+
+1. Recruiter on Growth/Fleet sees Reports section; generates Activity PDF — header shows company + recruiter + date range; no driver profit fields present.
+2. CSV export downloads with same fields; opens cleanly in Excel.
+3. Free/Starter recruiter sees locked preview, not the generator.
+4. Driver opens a contract → summary panel shows company, recruiter, Verified badge, opportunity title, location, MC/DOT, upload date, version.
+5. Recruiter opens same contract → summary panel shows driver name, opportunity, application status, contract status, decision, signature status.
+6. No UI string claims the uploaded PDF is auto-filled.
+7. Build passes; no TS errors.
