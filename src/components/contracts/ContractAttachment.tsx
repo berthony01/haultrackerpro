@@ -267,13 +267,26 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const driverReviewRaw = contractWithVersion?.driver_review ?? null;
   const driverReview = driverReviewRaw && driverReviewRaw.version_id === currentVersionId ? driverReviewRaw : null;
   const decision = (driverReview?.decision ?? null) as null | 'approved' | 'rejected' | 'changes_requested';
-  const decisionTerminal = decision === 'approved' || decision === 'rejected';
+  // DB enforces one driver decision per version. Treat all three outcomes as terminal for THIS version.
+  // A new decision is only possible after the recruiter uploads a revised version.
+  const decisionTerminal =
+    decision === 'approved' || decision === 'rejected' || decision === 'changes_requested';
+  // Backend (review-contract) only accepts decisions from ai_reviewed | driver_reviewing | changes_requested.
+  // changes_requested is included for safety, but decisionTerminal will hide buttons once that decision was made.
   const canDriverDecide =
     role === 'driver' &&
     hasContract &&
     !decisionTerminal &&
     !!status &&
-    ['uploaded', 'parsed', 'ai_reviewed', 'driver_reviewing', 'changes_requested'].includes(status);
+    ['ai_reviewed', 'driver_reviewing', 'changes_requested'].includes(status);
+  // True when the driver is looking at a not-yet-reviewable contract (uploaded/parsing/parsed)
+  // and hasn't submitted any decision yet — show "Waiting for AI review" panel instead of buttons.
+  const driverWaitingForAi =
+    role === 'driver' &&
+    hasContract &&
+    !decision &&
+    !!status &&
+    ['uploaded', 'parsing', 'parsed'].includes(status);
 
   // Phase 8 — signature (current version only).
   const signatureRaw = contractWithVersion?.driver_signature ?? null;
