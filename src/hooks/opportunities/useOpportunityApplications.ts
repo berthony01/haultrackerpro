@@ -99,6 +99,19 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
   });
 
+  // Driver records a structured response (does not change application status)
+  const recordDriverResponse = useMutation({
+    mutationFn: async (args: { applicationId: string; responseType: DriverResponseType; note?: string }) => {
+      const { error } = await supabase.rpc('record_driver_application_response' as any, {
+        application_id: args.applicationId,
+        response_type: args.responseType,
+        note: args.note ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['application_events'] }),
+  });
+
   return {
     // Driver
     driverApplications: driverQuery.data ?? [],
