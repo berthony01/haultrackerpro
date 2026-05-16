@@ -12,6 +12,7 @@ const driverItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
+  { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'fuel', label: 'Fuel', icon: Fuel },
   { id: 'reports', label: 'Reports', icon: FileText },
@@ -22,6 +23,7 @@ const recruiterItems = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
+  { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
