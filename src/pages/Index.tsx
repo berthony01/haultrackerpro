@@ -414,6 +414,15 @@ const Index = () => {
     setPage(p);
   };
 
+  const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
+    try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
+    setEditingLoad(null);
+    setEditingStops([]);
+    setEditingExpense(null);
+    setEditingFuelLog(null);
+    setPage('opportunities');
+  };
+
   const handleAddLoadFromModal = () => {
     setEditingLoad(null);
     setEditingStops([]);
