@@ -42,6 +42,7 @@ const OnboardingModal = lazy(() => import('@/components/OnboardingModal').then(m
 const AlertsView = lazy(() => import('@/components/AlertsView').then(m => ({ default: m.AlertsView })));
 const OpportunitiesPage = lazy(() => import('@/components/opportunities/OpportunitiesPage').then(m => ({ default: m.OpportunitiesPage })));
 const RecruiterAccessRoute = lazy(() => import('@/components/opportunities/recruiter/RecruiterAccessRoute').then(m => ({ default: m.RecruiterAccessRoute })));
+const RecruiterSettingsView = lazy(() => import('@/components/opportunities/recruiter/RecruiterSettingsView').then(m => ({ default: m.RecruiterSettingsView })));
 const RecurringExpensesView = lazy(() => import('@/components/RecurringExpensesView').then(m => ({ default: m.RecurringExpensesView })));
 const DriverScorecard = lazy(() => import('@/components/DriverScorecard').then(m => ({ default: m.DriverScorecard })));
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
@@ -775,7 +776,15 @@ const Index = () => {
                 initialView={recruiterView}
               />
             )}
-            {page === 'settings' && <SettingsView onBack={() => setPage(isRecruiter ? 'recruiter-access' : 'dashboard')} />}
+            {page === 'settings' && (isRecruiter ? (
+              <RecruiterSettingsView
+                onBack={() => setPage('recruiter-access')}
+                onOpenOnboarding={() => { setRecruiterView('onboarding'); setPage('recruiter-access'); }}
+                onOpenBilling={() => { setRecruiterView('hub'); setPage('recruiter-access'); }}
+              />
+            ) : (
+              <SettingsView onBack={() => setPage('dashboard')} />
+            ))}
           </>
           </Suspense>
         )}
