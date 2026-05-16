@@ -398,6 +398,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   const [opportunitiesViewKey, setOpportunitiesViewKey] = useState(0);
+  const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
@@ -405,6 +406,7 @@ const Index = () => {
     setEditingStops([]);
     setEditingExpense(null);
     setEditingFuelLog(null);
+    setOpportunitiesView(view);
     setOpportunitiesViewKey((k) => k + 1);
     setPage('opportunities');
   };
@@ -431,9 +433,36 @@ const Index = () => {
     setEditingExpense(null);
     setEditingFuelLog(null);
     setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
-    if (p === 'opportunities') setOpportunitiesViewKey((k) => k + 1);
+    if (p === 'opportunities') {
+      setOpportunitiesView('list');
+      setOpportunitiesViewKey((k) => k + 1);
+    } else {
+      setOpportunitiesView('list');
+    }
     setPage(p);
   };
+
+  // Derive sidebar/header key so Recruiter Access has its own label & highlight.
+  const navKey =
+    page === 'opportunities' && opportunitiesView === 'recruiter'
+      ? 'recruiter-access'
+      : page === 'opportunities' && opportunitiesView === 'driver-profile'
+        ? 'opportunity-preferences'
+        : page;
+  const navLabel =
+    navKey === 'recruiter-access'
+      ? 'Recruiter Access'
+      : navKey === 'opportunity-preferences'
+        ? 'Opportunity Preferences'
+        : navKey === 'dashboard'
+          ? 'Dashboard'
+          : navKey.charAt(0).toUpperCase() + navKey.slice(1).replace(/[_-]/g, ' ');
+  const navSubtitle =
+    navKey === 'recruiter-access'
+      ? 'Manage your recruiter command center'
+      : navKey === 'opportunity-preferences'
+        ? 'Tune what recruiters see and how you match'
+        : 'Your hauling overview';
 
   const handleAddLoadFromModal = () => {
     setEditingLoad(null);
@@ -454,7 +483,7 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={page} onNavigate={handleNavigate} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
@@ -472,10 +501,8 @@ const Index = () => {
               </div>
             </div>
             <div className="hidden lg:block">
-              <h2 className="text-lg font-black tracking-tight text-foreground">
-                {page === 'dashboard' ? 'Dashboard' : page.charAt(0).toUpperCase() + page.slice(1).replace('_', ' ')}
-              </h2>
-              <p className="text-xs text-muted-foreground">Your hauling overview</p>
+              <h2 className="text-lg font-black tracking-tight text-foreground">{navLabel}</h2>
+              <p className="text-xs text-muted-foreground">{navSubtitle}</p>
             </div>
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl h-10 w-10" onClick={signOut}>
               <LogOut className="h-4 w-4" />
