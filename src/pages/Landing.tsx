@@ -65,8 +65,16 @@ export default function Landing() {
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
-        title="HaulTrackerPro | Know Your Real Profit Per Load"
-        description="HaulTrackerPro: trucking profit tracking for drivers, profit-first Opportunities, and approved recruiter access — all in one platform."
+        title={
+          isRecruiterAudience
+            ? 'Hire Verified Truck Drivers Faster | HaulTrackerPro'
+            : 'HaulTrackerPro | Know Your Real Profit Per Load'
+        }
+        description={
+          isRecruiterAudience
+            ? 'HaulTrackerPro connects verified recruiters with financially serious owner-operators. Structured postings, applicant pipeline, contract protection — flat-rate pricing.'
+            : 'HaulTrackerPro: trucking profit tracking for drivers, profit-first Opportunities, and approved recruiter access — all in one platform.'
+        }
         path="/"
         jsonLd={[
           {
