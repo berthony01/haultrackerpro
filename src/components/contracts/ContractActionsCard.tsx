@@ -91,6 +91,7 @@ function RecruiterCard({ onOpen }: { onOpen: () => void }) {
     return { awaitingUpload, awaitingDriver, blocked };
   }, [apps, pipeline]);
 
+  if (!hasContractAccess) return null;
   if (isLoading) return null;
   const total = counts.awaitingUpload + counts.awaitingDriver + counts.blocked;
   if (total === 0) return null;
