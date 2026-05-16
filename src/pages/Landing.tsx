@@ -145,7 +145,17 @@ export default function Landing() {
         )}
       </nav>
 
+      {/* Audience toggle — dual-audience landing */}
+      <div className="border-b" style={{ background: 'hsl(220, 20%, 9%)', borderColor: 'hsl(220, 16%, 14%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex justify-center">
+          <AudienceToggle audience={audience} onChange={setAudience} />
+        </div>
+      </div>
+
       <main>
+      {isRecruiterAudience ? <RecruiterLanding /> : (
+      <>
+
       {/* ═══════════════════════════════════════════ */}
       {/* SECTION 1: HERO */}
       {/* ═══════════════════════════════════════════ */}
