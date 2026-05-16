@@ -1,109 +1,198 @@
+# Fix Role Confusion + Add Owner View Switcher
 
-# Phase 3 & 4 Plan — Recruiter Legal + Dual-Audience Landing
+## Root cause (audit)
 
-## Phase 3 — Terms of Service & Privacy Policy Refresh
+Your `berthonyxyz@gmail.com` account is **admin + has a `recruiter_profiles` row + has driver data** all at once. Three pieces of code interact badly:
 
-### Files touched
-- `src/pages/Terms.tsx` (edit only)
-- `src/pages/Privacy.tsx` (edit only)
+1. `useUserRole.ts` returns `role='recruiter'` (because the seeded recruiter profile exists).
+2. `Index.tsx` line 428 role-guard says `if (roleLoading || isAdmin) return;` — admins are exempt from being redirected to their role's home page, so the page stays on the default `'dashboard'` (driver content).
+3. Sidebar/BottomNav render based on `role` — so they show the **recruiter menu**.
 
-No DB, routing, or component-structure changes. Same `SEOHead`, same layout shell — content sections only.
+Result: **driver dashboard content + recruiter menu items + an "Admin Tools" jump**. That's what you're seeing.
 
-### Terms.tsx additions
-Insert a new top-level section **"Recruiter & Carrier Accounts"** after the existing driver/user terms, plus minor edits to the Eligibility and Account sections to acknowledge the second audience.
-
-New subsections:
-1. **Eligibility & Verification** — Must hold an active USDOT/MC, provide truthful company info, and consent to verification. HaulTrackerPro may reject, suspend, or revoke recruiter access at its discretion.
-2. **Truthful Postings** — All opportunity details (pay, lanes, equipment, home-time, benefits) must be accurate at time of posting. Misleading or bait-and-switch postings are grounds for immediate termination.
-3. **Driver Contact & Anti-Harassment** — Recruiters may only contact drivers who opt in via the platform. No scraping, no off-platform solicitation of platform-sourced leads, no SMS/calls outside stated hours.
-4. **Billing & Subscription** — Plan tiers, monthly/annual billing through Stripe, auto-renewal, refund policy (pro-rated only for platform fault), failed-payment grace period, and downgrade behavior (active posts above new limit are paused, not deleted).
-5. **Contract Protection / Direct-Hire Window** — If a driver is hired within 90 days of a verified platform introduction, the recruiter agrees the hire is attributable to HaulTrackerPro and subject to the plan's terms.
-6. **Anti-Scam & Fraud** — Prohibition on fake DOT numbers, shell carriers, advance-fee schemes, and impersonation. Right to share fraud signals with industry partners.
-7. **Termination** — Grounds and effect on active posts, applicants, and billing.
-
-Bump the **Last Updated** date and add a one-line callout at the top: "Updated to cover recruiter and carrier accounts."
-
-### Privacy.tsx additions
-New section **"Recruiter & Carrier Data"** plus extensions to existing sections:
-
-1. **What we collect from recruiters** — Company legal name, DOT/MC, company + recruiter phone, business address, hiring states, equipment types, billing details (handled by Stripe; we store only customer ID + last4/brand).
-2. **How we use it** — Verification, fraud prevention, displaying opportunities to drivers, billing, support, and aggregate analytics.
-3. **What drivers see** — Public recruiter fields (company name, verified badge, hiring states, equipment, contact via platform). Internal fields (admin notes, raw verification docs) are never shown.
-4. **Stripe / payment processors** — Subprocessor disclosure; we don't store full card data.
-5. **Driver ↔ recruiter data sharing** — Only opt-in driver profile fields are shared when a driver applies; we never sell driver data.
-6. **Retention** — Recruiter accounts retained while active + 24 months for tax/audit; deletion request flow.
-
-Bump **Last Updated** and add the same one-line callout.
-
-### Acceptance
-- Both pages render with the new sections in the existing TOC/anchor pattern (if present).
-- No driver-facing terms regressed.
-- Last-updated dates match.
+For non-admin accounts the same code path *should* work strictly (driver-only or recruiter-only), but it has not been verified end-to-end.
 
 ---
 
-## Phase 4 — Dual-Audience Landing Page
+## What gets built
 
-### Goal
-One landing page at `/` that clearly serves **two audiences** — owner-operators/drivers and recruiters/carriers — without diluting either message.
+### 1. Add a Driver | Recruiter view switcher (admin / dual-role only)
 
-### Approach: hard audience toggle
-A sticky segmented control at the top of the hero: **For Drivers | For Recruiters**. Selecting one swaps the in-page content (hero copy, feature grid, how-it-works, pricing, testimonials, CTAs). Shared chrome (nav, footer, trust band, FAQ accordion) stays mounted.
+New hook `src/hooks/useViewMode.ts`:
 
-- Persist selection in `localStorage` (`landing.audience`).
-- Pre-select from `?for=driver` or `?for=recruiter` query param (overrides storage).
-- Default = `driver` (existing primary audience).
-- Update `<title>` and meta description per audience via `react-helmet-async` (`SEOHead` already in use).
+- Returns `{ viewMode, setViewMode, canSwitch, effectiveRole }`.
+- `canSwitch = isAdmin || (hasRecruiterProfile && hasDriverData)` — non-admins with only one role never see the switcher.
+- `viewMode` persisted in `localStorage` under `htp_view_mode` (`'driver' | 'recruiter'`). Default for admins = `'driver'`; for dual-role non-admin = their primary `role`.
+- `effectiveRole = canSwitch ? viewMode : role`.
 
-### File plan
-- `src/pages/Landing.tsx` — refactor into a shell that renders `<AudienceToggle/>` + `<DriverLanding/>` or `<RecruiterLanding/>`.
-- `src/components/landing/AudienceToggle.tsx` — new sticky segmented control.
-- `src/components/landing/DriverLanding.tsx` — extract current driver landing sections here (no copy changes beyond minor headline tightening).
-- `src/components/landing/RecruiterLanding.tsx` — new, mirrors driver structure with recruiter copy.
-- `src/hooks/useLandingAudience.ts` — new hook (query param → state → localStorage sync).
+New component `src/components/ViewModeSwitch.tsx`:
 
-Existing landing subcomponents (hero, feature card, pricing card, testimonial, FAQ, footer CTA) are reused where possible; recruiter variants are thin wrappers passing different props/content.
+- Compact segmented control (Driver | Recruiter) in the header.
+- Only renders when `canSwitch === true`.
+- On change: updates localStorage, then navigates to that role's home (`dashboard` or `recruiter-access`).
 
-### Recruiter landing sections (parallel to driver)
-1. **Hero** — "Hire qualified, verified drivers — faster." Dual CTAs: *Post an Opportunity* (→ `/auth?role=recruiter`) and *See How It Works*. Trust badges: verified carriers, DOT-checked, contract protection.
-2. **The problem we solve** — Empty trucks, ghost applicants, fake leads, no-shows, paying for clicks. Three short pain cards.
-3. **How HaulTrackerPro solves it** — Verified driver profiles, in-app pipeline, contract-protection window, transparent pricing, anti-scam screening. 4–6 feature cards using existing card style.
-4. **How it works** — 4 steps: Verify your DOT → Post opportunity → Review verified applicants → Hire with contract protection.
-5. **Pricing** — Reuse pricing card primitive; show recruiter plans (Starter / Growth / Scale) with active-opportunity limits, applicant access, and contract-protection terms. Link to full pricing.
-6. **Social proof / placeholder testimonials** — 2–3 recruiter quotes (placeholder copy, marked as such in code comment so the user can swap).
-7. **FAQ** — 5–6 recruiter-specific Qs (verification time, refund policy, what counts as a hire, can we post multiple lanes, do drivers see our contact info, etc.).
-8. **Final CTA band** — "Start posting verified opportunities" → `/auth?role=recruiter`.
+### 2. Replace `isRecruiter` gating with `effectiveRole` in `Index.tsx`
 
-### Driver landing
-Preserved as-is, extracted into `DriverLanding.tsx`. Only change: hero subhead gets one sentence acknowledging recruiters exist on the other tab ("Recruiters welcome too — switch tabs above.").
+- `const { effectiveRole, canSwitch } = useViewMode(); const isRecruiterView = effectiveRole === 'recruiter';`
+- Replace **every** `isRecruiter` reference in `Index.tsx` (~10 spots) with `isRecruiterView` for UI gating — including:
+  - Sidebar/BottomNav `role={effectiveRole}` prop
+  - Header subtitle ("Recruiter Console" vs "Load & Pay Manager")
+  - Smart reminders / milestone nudges / role card visibility
+  - Settings page selector (RecruiterSettingsView vs SettingsView)
+- Update the role-guard `useEffect` (line 427):
+  - Remove `isAdmin` bypass.
+  - Rule: if `isRecruiterView && page ∈ driverOnlyPages` → setPage('recruiter-access'). If `!isRecruiterView && page === 'recruiter-access'` → setPage('dashboard').
+  - This now applies uniformly — admin obeys their chosen viewMode, non-admins are locked to their `role`.
+- Same swap in `handleNavigate` defensive gating (line 459+): use `effectiveRole`, drop `isAdmin` short-circuits.
 
-### SEO
-- Single canonical `https://haultrackerpro.com/`.
-- `SEOHead` title/description switch by audience:
-  - driver: existing copy
-  - recruiter: "Hire verified truck drivers faster | HaulTrackerPro"
-- Both audience views render in the same DOM tree so crawlers see all content (recruiter section hidden via CSS when driver tab active, not unmounted) — improves SEO without hurting UX.
-  - Implementation: render both, toggle `hidden` attr + `aria-hidden`. Confirm performance cost is negligible (static markup, no heavy effects).
+### 3. Remove now-redundant "Admin Tools" cross-role link
 
-### Out of scope
-- No changes to `/auth` flow beyond honoring `?role=recruiter` (already supported per prior work).
-- No new images generated; reuse existing assets. Hero illustration for recruiter side = existing brand mark + text-only layout.
-- No DB or edge-function work.
+- Delete the `adminCrossRoleItem` block in `AppSidebar.tsx` (lines 31–39, 81–95).
+- Delete the equivalent admin cross-role block in `BottomNav.tsx` (~lines 82+).
+- The header switcher replaces it cleanly.
 
-### Acceptance
-- `/` defaults to driver view, identical to today's landing visually.
-- `/?for=recruiter` loads with recruiter tab active.
-- Toggle swaps content without route change, persists across reloads.
-- Both views pass mobile (375px) and desktop (1280px) visual check.
-- Lighthouse SEO ≥ existing score.
+### 4. Verify non-admin role isolation
+
+Walk through the four non-admin cases and confirm `effectiveRole` and gating behave correctly:
+
+
+| Account                                  | role      | canSwitch | Expected dashboard  | Expected menu  |
+| ---------------------------------------- | --------- | --------- | ------------------- | -------------- |
+| Plain driver (no recruiter_profiles row) | driver    | false     | Driver dashboard    | Driver menu    |
+| Plain recruiter (profile, no loads)      | recruiter | false     | Recruiter dashboard | Recruiter menu |
+| Dual-role non-admin                      | recruiter | true      | Last-used / driver  | Switcher shown |
+| Admin (berthonyxyz)                      | recruiter | true      | Last-used / driver  | Switcher shown |
+
+
+For the first two: switcher hidden, role-guard forces them home if they URL-hack into the other side. Confirmed by tracing the new `useEffect` with `isAdmin` removed.
+
+### 5. Quick QA after implementation
+
+- Manual: log in as `berthonyxyz`, toggle switch, confirm menu + main pane swap together and last choice persists across reload.
+- Manual: create a temp plain-driver account, log in, confirm no switcher, dashboard = driver, `/?page=recruiter-access` redirects to dashboard.
+- Console: no React key/role-loading warnings during the toggle.
 
 ---
 
-## Sequencing
-1. Phase 3 first (small, isolated text edits — low risk).
-2. Phase 4 second (landing refactor — bigger blast radius, easier to QA on a stable legal base).
+## Out of scope
 
-Phase 5 (QA matrix, smoke tests, memory entry, sitemap) remains queued for after Phase 4 lands.
+- No DB / RLS / edge function changes.
+- No changes to `useUserRole.ts` itself (still source of truth for "does this user *have* the role"). Only consumers change.
+- No landing-page / Phase 4 changes.
+- No removal of admin privileges — `useAdmin()` still grants RLS bypass etc., it just no longer auto-bypasses the *UI* role guard.
 
-## Open question
-For the recruiter pricing section in Phase 4 — should I show the **same Starter/Growth/Scale tiers** that the seeded billing profile implies (`growth` plan, 5 active opportunities), or do you want different tier names/limits? If unsure, I'll use Starter (2 active) / Growth (5 active) / Scale (15 active) as placeholders clearly marked for your review.
+## Files touched
+
+- `src/hooks/useViewMode.ts` (new)
+- `src/components/ViewModeSwitch.tsx` (new)
+- `src/pages/Index.tsx` (edit: swap `isRecruiter`→`isRecruiterView`, fix role-guard, mount switcher in header)
+- `src/components/premium/AppSidebar.tsx` (edit: remove admin cross-role item)
+- `src/components/BottomNav.tsx` (edit: remove admin cross-role item)
+
+This plan is approved, but please apply these safeguards while implementing it.
+
+The architecture is correct:
+
+- Keep useUserRole as the source of what roles/access the account has.
+
+- Add viewMode as the active UI view.
+
+- Use effectiveRole to control the dashboard, sidebar, mobile nav, settings view, redirects, and route guards.
+
+- Admin/owner should no longer bypass UI role guards.
+
+- Admin/owner should use the Driver | Recruiter switcher instead.
+
+Required safeguards:
+
+1. Do not define driver eligibility only by existing load/driver data.
+
+A new driver may not have loads yet. If there is no dedicated driver_profiles table, default non-recruiter users to driver. For canSwitch, admin can always switch. Non-admin dual-role switching should only be allowed if the account truly has both confirmed roles.
+
+2. localStorage must never create access.
+
+If canSwitch is false, ignore htp_view_mode completely and force effectiveRole to the real role from useUserRole.
+
+Example:
+
+- normal driver with htp_view_mode='recruiter' must still be driver
+
+- normal recruiter with htp_view_mode='driver' must still be recruiter
+
+3. Guard all recruiter pages, including deep links.
+
+Do not only check page === 'recruiter-access'.
+
+Also block:
+
+- recruiter-access:manage
+
+- recruiter-access:applications
+
+- any page that starts with recruiter-access:
+
+Use a helper like:
+
+const isRecruiterPage = page === 'recruiter-access' || page.startsWith('recruiter-access:');
+
+4. Guard all driver-only pages consistently.
+
+When effectiveRole === 'recruiter', redirect away from driver-only pages to recruiter-access.
+
+When effectiveRole === 'driver', redirect away from recruiter pages to dashboard.
+
+5. The view switcher must control both content and menu.
+
+When owner/admin selects Driver:
+
+- driver dashboard
+
+- driver sidebar
+
+- driver mobile nav
+
+- driver settings view
+
+- no recruiter menu
+
+When owner/admin selects Recruiter:
+
+- recruiter dashboard
+
+- recruiter sidebar
+
+- recruiter mobile nav
+
+- recruiter settings view
+
+- no driver dashboard
+
+6. Remove all admin cross-role menu links from the normal sidebar and bottom nav.
+
+The switcher replaces those links.
+
+7. Add role-loading protection.
+
+Do not render role-sensitive menus while roleLoading/viewMode is still resolving. Avoid any flash where the wrong menu appears.
+
+8. QA must include:
+
+- owner/admin Driver View
+
+- owner/admin Recruiter View
+
+- normal driver
+
+- normal recruiter
+
+- mobile bottom nav
+
+- desktop sidebar
+
+- direct URL attempts
+
+- reload persistence
+
+- localStorage tampering test
+
+No database, RLS, Stripe, landing page, or unrelated feature changes.
