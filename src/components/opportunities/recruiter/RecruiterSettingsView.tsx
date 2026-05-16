@@ -252,8 +252,8 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
         </CardContent>
       </Card>
 
-      <DeleteAccountModal open={showDelete} onClose={() => setShowDelete(false)} />
-      <SendFeedbackModal open={showFeedback} onClose={() => setShowFeedback(false)} />
+      <DeleteAccountModal open={showDelete} onOpenChange={setShowDelete} />
+      <SendFeedbackModal open={showFeedback} onOpenChange={setShowFeedback} />
     </div>
   );
 }
