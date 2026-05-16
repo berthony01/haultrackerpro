@@ -160,7 +160,11 @@ export default function Terms() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">26. Governing Law</h3>
+          <h3 className="text-base font-bold">26. Recruiter Reports (Activity &amp; Pipeline)</h3>
+          <p className="text-muted-foreground">Recruiter Activity and Pipeline reports (PDF and CSV exports) contain only <span className="font-semibold text-foreground">recruiter-owned workflow data</span> — the recruiter's own opportunities, applications, application status events, driver contact requests, and contract workflow status. These reports <span className="font-semibold text-foreground">do not include</span> any driver loads, fuel, expenses, profit, tax estimates, or other private driver financial data. Once a recruiter downloads a PDF or CSV export, the recruiter is solely responsible for storing, sharing, and protecting that exported file outside HaulTrackerPro.</p>
+        </section>
+
+        <section className="space-y-2">
           <p className="text-muted-foreground">These terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
         </section>
 
