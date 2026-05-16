@@ -828,7 +828,7 @@ export default function Landing() {
               </div>
               <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>I'm a Driver</h3>
               <ul className="space-y-2 text-sm flex-1 mb-5" style={{ color: 'hsl(220, 10%, 70%)' }}>
-                {['Track loads, expenses, and fuel', 'See real net profit and RPM', 'Build a Driver Opportunity Profile', 'Compare approved opportunities'].map(b => (
+                {['Track loads, expenses, and fuel', 'See real net profit and RPM', 'Set Opportunity Preferences', 'Compare approved opportunities'].map(b => (
                   <li key={b} className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />{b}</li>
                 ))}
               </ul>
