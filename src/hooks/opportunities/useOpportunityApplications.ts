@@ -127,5 +127,6 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     createApplication,
     withdrawApplication,
     updateApplicationStatus,
+    recordDriverResponse,
   };
 }
