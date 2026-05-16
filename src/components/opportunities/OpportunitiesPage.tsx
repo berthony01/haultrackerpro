@@ -53,7 +53,8 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-  const [showRecruiter, setShowRecruiter] = useState(false);
+  const [showRecruiterHub, setShowRecruiterHub] = useState(false);
+  const [showRecruiterOnboarding, setShowRecruiterOnboarding] = useState(false);
   const [showRecruiterManager, setShowRecruiterManager] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
   const [showRecruiterApps, setShowRecruiterApps] = useState(false);
@@ -73,7 +74,7 @@ export function OpportunitiesPage({ onUpgrade }: Props) {
       const v = sessionStorage.getItem('htp_opportunities_initial_view');
       if (!v) return;
       sessionStorage.removeItem('htp_opportunities_initial_view');
-      if (v === 'recruiter') setShowRecruiter(true);
+      if (v === 'recruiter') setShowRecruiterHub(true);
       else if (v === 'driver-profile') setShowProfile(true);
       // 'list' is the default — no-op.
     } catch {}
