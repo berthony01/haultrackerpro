@@ -1320,6 +1320,78 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          application_events: boolean
+          contact_request_events: boolean
+          contract_events: boolean
+          created_at: string
+          email_enabled: boolean
+          id: string
+          in_app_enabled: boolean
+          recruiter_status_events: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          application_events?: boolean
+          contact_request_events?: boolean
+          contract_events?: boolean
+          created_at?: string
+          email_enabled?: boolean
+          id?: string
+          in_app_enabled?: boolean
+          recruiter_status_events?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          application_events?: boolean
+          contact_request_events?: boolean
+          contract_events?: boolean
+          created_at?: string
+          email_enabled?: boolean
+          id?: string
+          in_app_enabled?: boolean
+          recruiter_status_events?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          payload: Json
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       operating_metrics: {
         Row: {
           created_at: string
@@ -2407,6 +2479,16 @@ export type Database = {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
       }
+      create_notification: {
+        Args: {
+          _body: string
+          _payload?: Json
+          _title: string
+          _type: string
+          _user_id: string
+        }
+        Returns: string
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -2440,6 +2522,11 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      mark_all_notifications_read: { Args: never; Returns: number }
+      mark_notification_read: {
+        Args: { notification_id: string }
+        Returns: undefined
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -2449,6 +2536,7 @@ export type Database = {
         }
         Returns: number
       }
+      notification_category: { Args: { _type: string }; Returns: string }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
