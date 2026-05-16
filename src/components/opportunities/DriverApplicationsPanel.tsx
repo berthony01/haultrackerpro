@@ -16,6 +16,7 @@ import {
   PhoneCall,
   HelpCircle,
   ThumbsUp,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -72,6 +73,7 @@ const RESPONSE_OPTIONS: { value: DriverResponseType; label: string; icon: any }[
   { value: 'still_interested', label: 'Still Interested', icon: ThumbsUp },
   { value: 'request_callback', label: 'Request Callback', icon: PhoneCall },
   { value: 'need_more_info', label: 'Need More Info', icon: HelpCircle },
+  { value: 'not_interested', label: 'Not Interested', icon: XCircle },
 ];
 
 export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
