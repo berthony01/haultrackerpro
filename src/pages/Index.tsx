@@ -40,6 +40,7 @@ const FeedbackModal = lazy(() => import('@/components/FeedbackModal').then(m => 
 const OnboardingModal = lazy(() => import('@/components/OnboardingModal').then(m => ({ default: m.OnboardingModal })));
 const AlertsView = lazy(() => import('@/components/AlertsView').then(m => ({ default: m.AlertsView })));
 const OpportunitiesPage = lazy(() => import('@/components/opportunities/OpportunitiesPage').then(m => ({ default: m.OpportunitiesPage })));
+const RecruiterAccessRoute = lazy(() => import('@/components/opportunities/recruiter/RecruiterAccessRoute').then(m => ({ default: m.RecruiterAccessRoute })));
 const RecurringExpensesView = lazy(() => import('@/components/RecurringExpensesView').then(m => ({ default: m.RecurringExpensesView })));
 const DriverScorecard = lazy(() => import('@/components/DriverScorecard').then(m => ({ default: m.DriverScorecard })));
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
