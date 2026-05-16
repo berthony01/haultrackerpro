@@ -117,7 +117,7 @@ serve(async (req) => {
 
     const targetStatus = DECISION_TO_STATUS[decision];
     const auditAction = DECISION_TO_AUDIT[decision];
-    const actorRole: "admin" | "driver" = isAdmin && !isDriver ? "admin" : "driver";
+    const actorRole: "driver" = "driver";
 
     // Atomic-as-possible: insert the review FIRST. No audit until it succeeds.
     // The partial unique index (contract_reviews_driver_unique_per_version)
