@@ -48,6 +48,9 @@ const RecruiterSettingsView = lazy(() => import('@/components/opportunities/recr
 const RecurringExpensesView = lazy(() => import('@/components/RecurringExpensesView').then(m => ({ default: m.RecurringExpensesView })));
 const DriverScorecard = lazy(() => import('@/components/DriverScorecard').then(m => ({ default: m.DriverScorecard })));
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
+const DriverContractsView = lazy(() => import('@/components/contracts/DriverContractsView').then(m => ({ default: m.DriverContractsView })));
+const RecruiterContractsView = lazy(() => import('@/components/contracts/RecruiterContractsView').then(m => ({ default: m.RecruiterContractsView })));
+import { ContractActionsCard } from '@/components/contracts/ContractActionsCard';
 
 import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -423,7 +426,8 @@ const Index = () => {
   const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
 
   // Role-based access guard: redirect users away from pages outside their
-  // *effective* role. Admins obey their view-mode choice instead of bypassing.
+  // *effective* role. `contracts` is a shared key (body picks by role), so it
+  // is NOT listed in driverOnlyPages and is allowed in both views.
   const driverOnlyPages = new Set([
     'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
     'opportunities','add','add_expense','add_fuel','closeout','recurring_expenses',
@@ -433,6 +437,7 @@ const Index = () => {
     p === 'recruiter-access' || p.startsWith('recruiter-access:');
   useEffect(() => {
     if (roleLoading) return;
+    if (page === 'contracts') return; // shared route, never redirect
     if (isRecruiterView && driverOnlyPages.has(page)) {
       setPage('recruiter-access');
     } else if (!isRecruiterView && isRecruiterPageId(page)) {
@@ -612,6 +617,9 @@ const Index = () => {
                     onDismiss={() => markSeen()}
                   />
                 )}
+                {!isRecruiterView && (
+                  <ContractActionsCard role="driver" onOpen={() => handleNavigate('contracts')} />
+                )}
                 {!subscription.isLoading && !isRecruiterView && (
                   <MilestoneNudges
                     loadsCount={allLoadsQuery.loads.length}
@@ -784,6 +792,16 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
+            {page === 'contracts' && (isRecruiterView ? (
+              <RecruiterContractsView onOpenApplications={() => handleNavigate('recruiter-access:applications')} />
+            ) : (
+              <DriverContractsView onOpenApplications={() => handleNavigate('opportunities')} />
+            ))}
+            {page === 'recruiter-access' && isRecruiterView && (
+              <>
+                <ContractActionsCard role="recruiter" onOpen={() => handleNavigate('contracts')} />
+              </>
+            )}
             {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {

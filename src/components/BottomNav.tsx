@@ -14,6 +14,7 @@ import {
   Handshake,
   ClipboardList,
   LogOut,
+  FileSignature,
 } from 'lucide-react';
 import {
   Sheet,
@@ -61,6 +62,7 @@ export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavPr
 
   const driverMoreItems: MoreItem[] = [
     { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
+    { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Review, approve, request changes, sign.' },
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
     { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') },
     { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') },
@@ -71,6 +73,7 @@ export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavPr
     { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },
+    { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Upload, AI review, track approvals.' },
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
