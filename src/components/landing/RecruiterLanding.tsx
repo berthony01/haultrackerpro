@@ -32,7 +32,7 @@ const features = [
   { icon: ShieldCheck, title: 'Verified-only recruiter access', desc: 'Every recruiter is DOT/MC-checked before posting. Drivers see a verified badge — and so do you.' },
   { icon: ClipboardList, title: 'Structured opportunity postings', desc: 'Required fields for pay, lanes, equipment, deductions, and home-time create clear, comparable listings.' },
   { icon: Users, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions. They evaluate opportunities by the numbers.' },
-  { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, message drivers, and track status from one dashboard — no spreadsheets.' },
+  { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, manage driver contact requests, and track status from one dashboard — no spreadsheets.' },
   { icon: BarChart3, title: 'Transparent, flat-rate pricing', desc: 'Pay by active-opportunity slot, not per click or per lead. Predictable monthly cost.' },
   { icon: Search, title: 'Contract Protection workflow', desc: 'Upload contracts, get AI risk flags, and require driver in-app approval before a hire is finalized.' },
 ];
