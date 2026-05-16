@@ -34,6 +34,7 @@ import { RecruiterOnboarding } from './RecruiterOnboarding';
 import { RecruiterOpportunityManager } from './RecruiterOpportunityManager';
 import { DriverApplicationsPanel } from './DriverApplicationsPanel';
 import { RecruiterApplicationsDashboard } from './RecruiterApplicationsDashboard';
+import { RecruiterAccessPage } from './recruiter/RecruiterAccessPage';
 import { UserCog, ArrowRight, CheckCircle2, Building2, Clock, AlertTriangle, Ban, Briefcase, Mailbox, Users, Info } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
