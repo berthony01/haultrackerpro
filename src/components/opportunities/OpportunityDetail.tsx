@@ -178,9 +178,9 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
           <div className="flex items-start gap-3">
             <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" />
             <div>
-              <h3 className="text-sm font-bold text-foreground mb-1">Unlock Match Insights</h3>
+              <h3 className="text-sm font-bold text-foreground mb-1">Improve Your Match Insights</h3>
               <p className="text-sm text-muted-foreground">
-                Complete your Driver Opportunity Profile to see how well this opportunity fits your pay goals, route preference, and equipment.
+                Add a few Opportunity Preferences to see how well this opportunity fits your pay goals, route preference, and equipment.
               </p>
             </div>
           </div>
