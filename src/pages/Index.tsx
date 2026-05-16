@@ -787,9 +787,12 @@ const Index = () => {
             {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {
-                  // Pure recruiters have no driver dashboard to go back to;
-                  // keep them on the recruiter hub. Admins jump back to driver.
-                  if (isAdmin) setPage('dashboard');
+                  // Only users who can switch views have a driver dashboard to go back to.
+                  // Pure recruiters stay on the recruiter hub.
+                  if (canSwitch) {
+                    setViewMode('driver');
+                    setPage('dashboard');
+                  }
                 }}
                 initialView={recruiterView}
               />
