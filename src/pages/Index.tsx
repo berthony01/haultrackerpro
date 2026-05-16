@@ -208,7 +208,7 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'opportunities') {
       const view = params.get('view');
-      if (view === 'recruiter' || (isRecruiter && !isAdmin)) {
+      if (view === 'recruiter' || isRecruiterView) {
         // Backward compat + role guard: recruiters never see the driver Opportunities page.
         setPage('recruiter-access');
         recruiterIntent = true;
