@@ -1,4 +1,18 @@
 import { useMemo, useState } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { PhoneCall, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import {
+  useRecruiterContactRequests,
+  latestRequestForApp,
+} from '@/hooks/opportunities/useRecruiterContactRequests';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
