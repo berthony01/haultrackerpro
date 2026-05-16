@@ -62,7 +62,7 @@ Run through this list on a real mobile device and a desktop browser before each 
 - [ ] Successful checkout flips account to Pro
 - [ ] Customer Portal opens from Settings
 - [ ] Cancel subscription reflects in app within ~1 min
-- [ ] 14-day auto-trial countdown banner shows for new users
+- [ ] Auto-trial system retired; verify billing pages do not reference trial language.
 
 ## 10. Mobile Layout (≤768px)
 - [ ] Bottom nav (2 + FAB + 2) renders, no overlap
