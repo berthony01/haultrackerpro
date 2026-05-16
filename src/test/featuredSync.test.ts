@@ -4,7 +4,7 @@
  * The DB owns the source of truth via two triggers + a helper function:
  *
  *   - public.recruiter_has_priority_plan(recruiter_user_id uuid) returns boolean
- *     → TRUE iff the recruiter has an `active` or `trialing` subscription on a
+ *     → TRUE iff the recruiter has an `active` or `trialing` subscription on a // trial-allowlist
  *       plan key in ('growth', 'fleet'). All other states (Starter, canceled,
  *       past_due, inactive, no row) return FALSE.
  *
@@ -25,12 +25,12 @@
 import { describe, it, expect } from 'vitest';
 
 type PlanKey = 'starter' | 'growth' | 'fleet' | null;
-type SubStatus = 'active' | 'trialing' | 'canceled' | 'past_due' | 'inactive' | null;
+type SubStatus = 'active' | 'trialing' | 'canceled' | 'past_due' | 'inactive' | null; // trial-allowlist
 
 /** JS mirror of public.recruiter_has_priority_plan. */
 function recruiterHasPriorityPlan(plan: PlanKey, status: SubStatus): boolean {
   if (plan !== 'growth' && plan !== 'fleet') return false;
-  return status === 'active' || status === 'trialing';
+  return status === 'active' || status === 'trialing'; // trial-allowlist
 }
 
 /**
@@ -57,11 +57,11 @@ function guardAllowsFeaturedChange(allowFeaturedSyncGuc: boolean): boolean {
 describe('recruiter_has_priority_plan matrix', () => {
   const cases: Array<[PlanKey, SubStatus, boolean]> = [
     ['starter', 'active', false],
-    ['starter', 'trialing', false],
+    ['starter', 'trialing', false], // trial-allowlist
     ['growth', 'active', true],
-    ['growth', 'trialing', true],
+    ['growth', 'trialing', true], // trial-allowlist
     ['fleet', 'active', true],
-    ['fleet', 'trialing', true],
+    ['fleet', 'trialing', true], // trial-allowlist
     ['growth', 'canceled', false],
     ['growth', 'past_due', false],
     ['fleet', 'inactive', false],
