@@ -29,11 +29,7 @@ import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOppo
 import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
-import { RecruiterOnboarding } from './RecruiterOnboarding';
-import { RecruiterOpportunityManager } from './RecruiterOpportunityManager';
 import { DriverApplicationsPanel } from './DriverApplicationsPanel';
-import { RecruiterApplicationsDashboard } from './RecruiterApplicationsDashboard';
-import { RecruiterAccessPage } from './recruiter/RecruiterAccessPage';
 import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
