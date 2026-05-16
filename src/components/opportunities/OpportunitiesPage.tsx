@@ -490,22 +490,22 @@ function ProfileEntryCard({
   const cfg =
     state === 'none'
       ? {
-          title: 'Set Up Your Driver Opportunity Profile',
-          body: 'Create a profile so HaulTrackerPro can help match you with opportunities that fit your pay goals, experience, home time, and equipment preferences.',
-          cta: 'Create Profile',
+          title: 'Complete Your Opportunity Preferences',
+          body: 'Your HaulTrackerPro account is already your driver identity. Add a few preferences so we can show better matches and help approved recruiters understand what you’re looking for.',
+          cta: 'Set Preferences',
           icon: UserCog,
         }
       : state === 'incomplete'
       ? {
-          title: 'Finish Your Driver Profile',
+          title: 'Complete Your Opportunity Preferences',
           body: 'A few more details unlock better-matched opportunities and richer recruiter context.',
-          cta: 'Complete Profile',
+          cta: 'Set Preferences',
           icon: UserCog,
         }
       : {
-          title: 'Your Driver Profile Is Ready',
-          body: 'Recruiters will see this context when you request info on an opportunity.',
-          cta: 'Edit Profile',
+          title: 'Your Opportunity Preferences Are Ready',
+          body: 'Approved recruiters will see this context when you request info on an opportunity.',
+          cta: 'Edit Preferences',
           icon: CheckCircle2,
         };
 
