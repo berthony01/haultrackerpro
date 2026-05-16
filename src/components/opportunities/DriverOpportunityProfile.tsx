@@ -265,26 +265,7 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         </Grid>
       </Section>
 
-      <Section icon={IdCard} title="CDL & Experience">
-        <Grid>
-          <Field label="CDL Class">
-            <SelectField value={form.cdl_class} onChange={(v) => set('cdl_class', v)} options={CDL_CLASSES} placeholder="Select" />
-          </Field>
-          <Field label="Years of experience">
-            <Input
-              type="number"
-              min={0}
-              value={form.years_experience}
-              onChange={(e) => set('years_experience', e.target.value)}
-              placeholder="0"
-            />
-          </Field>
-        </Grid>
-        <ChipGroup label="Endorsements" options={ENDORSEMENTS} selected={form.endorsements} onToggle={(v) => toggleArr('endorsements', v)} />
-        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} />
-      </Section>
-
-      <Section icon={Compass} title="Opportunity Preferences">
+      <Section icon={Compass} title="What You’re Looking For">
         <Grid>
           <Field label="Preferred driver type">
             <SelectField value={form.preferred_driver_type} onChange={(v) => set('preferred_driver_type', v)} options={DRIVER_TYPES} placeholder="Select" />
@@ -311,6 +292,25 @@ export function DriverOpportunityProfile({ onBack }: Props) {
           checked={form.willing_to_relocate}
           onChange={(v) => set('willing_to_relocate', v)}
         />
+      </Section>
+
+      <Section icon={IdCard} title="Experience & Equipment">
+        <Grid>
+          <Field label="CDL Class">
+            <SelectField value={form.cdl_class} onChange={(v) => set('cdl_class', v)} options={CDL_CLASSES} placeholder="Select" />
+          </Field>
+          <Field label="Years of experience">
+            <Input
+              type="number"
+              min={0}
+              value={form.years_experience}
+              onChange={(e) => set('years_experience', e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+        </Grid>
+        <ChipGroup label="Endorsements" options={ENDORSEMENTS} selected={form.endorsements} onToggle={(v) => toggleArr('endorsements', v)} />
+        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} />
       </Section>
 
       <Section icon={DollarSign} title="Pay Goals">
