@@ -86,7 +86,7 @@ export default function Features() {
           </p>
           <div className="grid sm:grid-cols-2 gap-3 mb-6">
             {[
-              'Driver Opportunity Profiles for accurate matching',
+              'Opportunity Preferences for accurate matching',
               'Profit Intelligence applied to every opportunity',
               'Deterministic match scores (no black-box AI claims)',
               'Approved recruiter access only',

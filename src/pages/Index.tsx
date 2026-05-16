@@ -515,7 +515,7 @@ const Index = () => {
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
-                        { icon: Route, label: 'Find Opportunities', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', hasCompletedDriverProfile ? 'list' : 'driver-profile'); } catch {} ; handleNavigate('opportunities'); } },
+                        { icon: Route, label: hasCompletedDriverProfile ? 'Find Opportunities' : 'Set Opportunity Preferences', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', hasCompletedDriverProfile ? 'list' : 'driver-profile'); } catch {} ; handleNavigate('opportunities'); } },
                         { icon: Users, label: 'Recruit Drivers', action: () => { try { sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter'); } catch {} ; handleNavigate('opportunities'); } },
                       ].map((item) => (
                         <button

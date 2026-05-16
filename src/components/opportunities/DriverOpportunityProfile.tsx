@@ -27,6 +27,7 @@ import {
   useDriverOpportunityProfile,
   type DriverOpportunityProfileUpsert,
 } from '@/hooks/opportunities/useDriverOpportunityProfile';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Props {
   onBack: () => void;
@@ -114,6 +115,7 @@ const isValidEmail = (e: string) => !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 export function DriverOpportunityProfile({ onBack }: Props) {
   const { profile, isLoading, upsertProfile } = useDriverOpportunityProfile();
+  const { user } = useAuth();
   const [form, setForm] = useState<FormState>(EMPTY);
 
   useEffect(() => {
@@ -141,8 +143,20 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         allow_verified_recruiter_contact: !!profile.allow_verified_recruiter_contact,
         contact_preference: (profile.contact_preference as FormState['contact_preference']) ?? 'in_app',
       });
+    } else if (user) {
+      // No saved row yet — prefill blank fields from the HaulTrackerPro account
+      // so the form feels like an extension of the driver's existing identity.
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      const pickStr = (k: string) => (typeof meta[k] === 'string' ? (meta[k] as string) : '');
+      const displayName = pickStr('display_name') || pickStr('full_name') || pickStr('name');
+      setForm((p) => ({
+        ...p,
+        full_name: p.full_name || displayName,
+        email: p.email || user.email || '',
+        phone: p.phone || pickStr('phone'),
+      }));
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((p) => ({ ...p, [k]: v }));
@@ -192,9 +206,9 @@ export function DriverOpportunityProfile({ onBack }: Props) {
 
     upsertProfile.mutate(payload, {
       onSuccess: () => {
-        if (completed) toast.success('Profile saved');
+        if (completed) toast.success('Your Opportunity Preferences are ready.');
         else
-          toast.success('Profile saved, but some fields are missing. Complete your profile to get better opportunity matches.');
+          toast.success('Preferences saved. Add a few more details later to improve your match quality.');
       },
       onError: (e: Error) => toast.error(e.message),
     });
@@ -218,14 +232,20 @@ export function DriverOpportunityProfile({ onBack }: Props) {
 
       <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
-          Driver Opportunity Profile
+          Opportunity Preferences
         </h1>
         <p className="text-sm text-muted-foreground">
-          Tell HaulTrackerPro what kind of trucking opportunities actually make sense for you.
+          Help HaulTrackerPro match you with opportunities that fit your pay goals, route style, experience, and home-time needs.
+        </p>
+        <p className="text-xs text-muted-foreground/80 mt-2">
+          Your main HaulTrackerPro account stays the same. These preferences only improve opportunity matches and show approved recruiters the information you choose to share when you request info.
         </p>
       </Card>
 
-      <Section icon={User} title="Basic Info">
+      <Section icon={User} title="Basic Contact Info">
+        <p className="text-xs text-muted-foreground -mt-1">
+          Pulled from your HaulTrackerPro account when available.
+        </p>
         <Grid>
           <Field label="Full name">
             <Input value={form.full_name} onChange={(e) => set('full_name', e.target.value)} placeholder="John Doe" />
@@ -245,26 +265,7 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         </Grid>
       </Section>
 
-      <Section icon={IdCard} title="CDL & Experience">
-        <Grid>
-          <Field label="CDL Class">
-            <SelectField value={form.cdl_class} onChange={(v) => set('cdl_class', v)} options={CDL_CLASSES} placeholder="Select" />
-          </Field>
-          <Field label="Years of experience">
-            <Input
-              type="number"
-              min={0}
-              value={form.years_experience}
-              onChange={(e) => set('years_experience', e.target.value)}
-              placeholder="0"
-            />
-          </Field>
-        </Grid>
-        <ChipGroup label="Endorsements" options={ENDORSEMENTS} selected={form.endorsements} onToggle={(v) => toggleArr('endorsements', v)} />
-        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} />
-      </Section>
-
-      <Section icon={Compass} title="Opportunity Preferences">
+      <Section icon={Compass} title="What You’re Looking For">
         <Grid>
           <Field label="Preferred driver type">
             <SelectField value={form.preferred_driver_type} onChange={(v) => set('preferred_driver_type', v)} options={DRIVER_TYPES} placeholder="Select" />
@@ -291,6 +292,25 @@ export function DriverOpportunityProfile({ onBack }: Props) {
           checked={form.willing_to_relocate}
           onChange={(v) => set('willing_to_relocate', v)}
         />
+      </Section>
+
+      <Section icon={IdCard} title="Experience & Equipment">
+        <Grid>
+          <Field label="CDL Class">
+            <SelectField value={form.cdl_class} onChange={(v) => set('cdl_class', v)} options={CDL_CLASSES} placeholder="Select" />
+          </Field>
+          <Field label="Years of experience">
+            <Input
+              type="number"
+              min={0}
+              value={form.years_experience}
+              onChange={(e) => set('years_experience', e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+        </Grid>
+        <ChipGroup label="Endorsements" options={ENDORSEMENTS} selected={form.endorsements} onToggle={(v) => toggleArr('endorsements', v)} />
+        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} />
       </Section>
 
       <Section icon={DollarSign} title="Pay Goals">
@@ -326,8 +346,8 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         </Grid>
       </Section>
 
-      <Section icon={ShieldCheck} title="Privacy & Contact">
-        <Field label="Profile visibility">
+      <Section icon={ShieldCheck} title="Privacy & Recruiter Contact">
+        <Field label="Preferences visibility">
           <Select value={form.visibility} onValueChange={(v) => set('visibility', v as FormState['visibility'])}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -358,7 +378,7 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         <Button variant="outline" onClick={onBack} className="flex-1">Cancel</Button>
         <Button onClick={handleSave} disabled={upsertProfile.isPending} className="flex-1">
           <Save className="h-4 w-4" />
-          {upsertProfile.isPending ? 'Saving…' : 'Save Profile'}
+          {upsertProfile.isPending ? 'Saving…' : 'Save Preferences'}
         </Button>
       </div>
     </div>
