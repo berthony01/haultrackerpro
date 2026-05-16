@@ -182,6 +182,8 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     }
     // Route to Opportunities / Recruiter Access from external CTA OR auth intent.
+    // Wait for role resolution so recruiters don't briefly land on the driver
+    // Opportunities page before the role guard redirects them.
     let recruiterIntent = false;
     try {
       const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
@@ -191,14 +193,18 @@ const Index = () => {
       }
     } catch {}
     const pageParam = params.get('page');
+    if (roleLoading && (pageParam === 'recruiter-access' || pageParam === 'opportunities' || recruiterIntent)) {
+      // Re-run once role resolves.
+      return;
+    }
     if (pageParam === 'recruiter-access') {
       setPage('recruiter-access');
       recruiterIntent = true;
       window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'opportunities') {
       const view = params.get('view');
-      if (view === 'recruiter') {
-        // Backward compat: old recruiter deep link → new top-level route.
+      if (view === 'recruiter' || (isRecruiter && !isAdmin)) {
+        // Backward compat + role guard: recruiters never see the driver Opportunities page.
         setPage('recruiter-access');
         recruiterIntent = true;
       } else {
