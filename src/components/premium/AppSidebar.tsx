@@ -23,6 +23,7 @@ const recruiterItems = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
+  { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
