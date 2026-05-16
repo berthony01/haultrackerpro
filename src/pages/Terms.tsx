@@ -135,12 +135,37 @@ export default function Terms() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">21. Governing Law</h3>
+          <h3 className="text-base font-bold">21. Recruiter Eligibility &amp; Verification</h3>
+          <p className="text-muted-foreground">To create a recruiter account, you must represent a legitimate motor carrier or authorized recruiting partner with an active USDOT/MC number, provide truthful company information, and consent to verification. HaulTrackerPro may reject, suspend, or revoke recruiter access at any time, in its sole discretion, including for failed verification, fraud signals, or violations of these terms.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">22. Truthful Postings &amp; Anti-Bait-and-Switch</h3>
+          <p className="text-muted-foreground">All opportunity details — pay, lanes, equipment, home-time, benefits, hiring areas — must be accurate at the time of posting. Bait-and-switch, undisclosed deductions, fake job postings, and material misrepresentations are grounds for immediate removal of the listing and termination of recruiter access.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">23. Driver Contact &amp; Anti-Harassment</h3>
+          <p className="text-muted-foreground">Recruiters may only contact drivers who have requested information through the platform, and only for the opportunity that driver inquired on. Recruiters may not scrape or off-platform-solicit drivers sourced through HaulTrackerPro, may not contact drivers outside reasonable hours, and may not harass, threaten, retaliate against, or repeatedly contact a driver who has declined. Reported violations may result in immediate suspension.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">24. Anti-Scam &amp; Fraud Prevention</h3>
+          <p className="text-muted-foreground">The following are strictly prohibited: fake or borrowed DOT/MC numbers, shell carriers, advance-fee or pay-to-apply schemes, impersonation of carriers or drivers, training-contract traps not disclosed up front, and any attempt to collect payment, sensitive personal data, or banking information from drivers off-platform under false pretenses. HaulTrackerPro reserves the right to share fraud signals with industry partners and law enforcement.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">25. Recruiter Account Termination</h3>
+          <p className="text-muted-foreground">Recruiter accounts may be terminated by HaulTrackerPro for verification failure, fraud, repeated complaints, violations of these terms, or non-payment. Upon termination, active opportunities are unpublished, pending applicant data is retained per the Privacy Policy, and billing stops at the end of the current period (no refund except where required by law).</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">26. Governing Law</h3>
           <p className="text-muted-foreground">These terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">22. Contact Information</h3>
+          <h3 className="text-base font-bold">27. Contact Information</h3>
           <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.com.</p>
         </section>
 
