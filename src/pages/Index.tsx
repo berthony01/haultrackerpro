@@ -179,7 +179,7 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
-    // Route to Opportunities from external recruiter CTA OR from auth intent (URL/sessionStorage)
+    // Route to Opportunities / Recruiter Access from external CTA OR auth intent.
     let recruiterIntent = false;
     try {
       const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
@@ -188,19 +188,26 @@ const Index = () => {
         sessionStorage.removeItem('htp_auth_intent');
       }
     } catch {}
-    if (params.get('page') === 'opportunities') {
-      setPage('opportunities');
+    const pageParam = params.get('page');
+    if (pageParam === 'recruiter-access') {
+      setPage('recruiter-access');
+      recruiterIntent = true;
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (pageParam === 'opportunities') {
       const view = params.get('view');
       if (view === 'recruiter') {
-        sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
+        // Backward compat: old recruiter deep link → new top-level route.
+        setPage('recruiter-access');
         recruiterIntent = true;
-      } else if (view === 'driver-profile') {
-        sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
+      } else {
+        setPage('opportunities');
+        if (view === 'driver-profile') {
+          sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
+        }
       }
       window.history.replaceState({}, '', window.location.pathname);
     } else if (recruiterIntent) {
-      sessionStorage.setItem('htp_opportunities_initial_view', 'recruiter');
-      setPage('opportunities');
+      setPage('recruiter-access');
     }
     if (recruiterIntent) {
       // Suppress driver-first onboarding modal once for recruiter signups
