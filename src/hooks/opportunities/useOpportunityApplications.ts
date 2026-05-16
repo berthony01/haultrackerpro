@@ -8,10 +8,19 @@ export type OpportunityApplicationInsert = Omit<TablesInsert<'opportunity_applic
 
 export type RecruiterApplicationStatus =
   | 'viewed'
-  | 'contacted'
+  | 'contact_requested'
+  | 'call_scheduled'
+  | 'waiting_documents'
   | 'interviewing'
+  | 'offer_sent'
   | 'hired'
   | 'rejected';
+
+export type DriverResponseType =
+  | 'still_interested'
+  | 'request_callback'
+  | 'need_more_info'
+  | 'not_interested';
 
 const APPLICATION_SELECT_DRIVER = '*, opportunities:opportunity_id(id,title,company_name,hiring_city,hiring_state,status,admin_review_status)';
 const APPLICATION_SELECT_RECRUITER = '*, opportunities:opportunity_id(id,title,company_name,hiring_city,hiring_state,status,admin_review_status,route_type,driver_type,trailer_type,deadhead_paid,lease_payment,insurance_deductions,maintenance_deductions,other_deductions,escrow_amount,escrow_required,estimated_weekly_gross,flat_weekly_pay,cpm,percentage_pay,estimated_weekly_miles,estimated_loaded_miles,estimated_deadhead_miles), driver_profile:driver_profile_id(id,full_name,city,state,cdl_class,years_experience,preferred_driver_type,preferred_route_type,endorsements,trailer_experience,min_weekly_gross,min_weekly_net,min_effective_rpm)';
