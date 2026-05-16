@@ -53,11 +53,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-  const [showRecruiterHub, setShowRecruiterHub] = useState(false);
-  const [showRecruiterOnboarding, setShowRecruiterOnboarding] = useState(false);
-  const [showRecruiterManager, setShowRecruiterManager] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
-  const [showRecruiterApps, setShowRecruiterApps] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
