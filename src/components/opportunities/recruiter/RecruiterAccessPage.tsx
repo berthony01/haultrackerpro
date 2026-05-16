@@ -61,7 +61,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
   const { isBillingActive, plan, status, limit, activeCount, isLoading: billingLoading } = useRecruiterBilling();
   const { opportunities, isLoading: oppsLoading } = useRecruiterOpportunities();
-  const { recruiter } = useOpportunityApplications({ recruiterId: profile?.id ?? undefined });
+  const { recruiterApplications, isLoadingRecruiter } = useOpportunityApplications({ recruiterId: profile?.id ?? undefined });
 
   const billingRef = useRef<HTMLDivElement | null>(null);
   const howRef = useRef<HTMLDivElement | null>(null);
