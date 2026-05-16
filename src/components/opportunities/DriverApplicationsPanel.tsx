@@ -178,6 +178,26 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
           </div>
         )}
 
+        <DriverContactRequestBlock
+          applicationId={a.id}
+          request={latestRequestForApp(contactRequests, a.id)}
+          isPending={pendingId === a.id}
+          onRespond={(decision) => {
+            const req = latestRequestForApp(contactRequests, a.id);
+            if (!req) return;
+            setPendingId(a.id);
+            respondContact.mutate(
+              { requestId: req.id, decision },
+              {
+                onSuccess: () =>
+                  toast.success(decision === 'approved' ? 'Contact approved' : 'Contact declined'),
+                onError: (e: Error) => toast.error(e.message || 'Failed'),
+                onSettled: () => setPendingId(null),
+              },
+            );
+          }}
+        />
+
         <div className="mb-3">
           <ContractAttachment applicationId={a.id} role="driver" />
         </div>
