@@ -426,7 +426,8 @@ const Index = () => {
   const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
 
   // Role-based access guard: redirect users away from pages outside their
-  // *effective* role. Admins obey their view-mode choice instead of bypassing.
+  // *effective* role. `contracts` is a shared key (body picks by role), so it
+  // is NOT listed in driverOnlyPages and is allowed in both views.
   const driverOnlyPages = new Set([
     'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
     'opportunities','add','add_expense','add_fuel','closeout','recurring_expenses',
@@ -436,6 +437,7 @@ const Index = () => {
     p === 'recruiter-access' || p.startsWith('recruiter-access:');
   useEffect(() => {
     if (roleLoading) return;
+    if (page === 'contracts') return; // shared route, never redirect
     if (isRecruiterView && driverOnlyPages.has(page)) {
       setPage('recruiter-access');
     } else if (!isRecruiterView && isRecruiterPageId(page)) {
