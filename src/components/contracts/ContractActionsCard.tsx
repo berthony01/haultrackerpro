@@ -70,8 +70,10 @@ function DriverCard({ onOpen }: { onOpen: () => void }) {
 
 function RecruiterCard({ onOpen }: { onOpen: () => void }) {
   const { profile } = useRecruiterProfile();
-  const { recruiterApplications } = useOpportunityApplications({ recruiterId: profile?.id });
-  const apps = recruiterApplications as any[];
+  const { plan, isBillingActive } = useRecruiterBilling();
+  const hasContractAccess = isBillingActive && (plan === 'growth' || plan === 'fleet');
+  const { recruiterApplications } = useOpportunityApplications({ recruiterId: hasContractAccess ? profile?.id : undefined });
+  const apps = (hasContractAccess ? recruiterApplications : []) as any[];
   const appIds = useMemo(() => apps.map((a) => a.id), [apps]);
   const { pipeline, isLoading } = useContractsPipeline(appIds);
 
