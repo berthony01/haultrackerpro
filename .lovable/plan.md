@@ -1,266 +1,148 @@
-Run a corrected Phase 1 launch-readiness fix pass.
+Phase 2 verification failed. The uploaded code does not show the Phase 2 plan fully implemented.
 
-Do not make unrelated changes. Fix only the items below.
+Please complete Phase 2 exactly as scoped. Do not touch unrelated features.
 
-1. Fix recruiter Starter pricing card in src/pages/Pricing.tsx.
+Missing/failing items:
 
-Starter must clearly include:
+1. Deep-link sub-route support is not implemented.
 
-- 1 active opportunity
+In src/pages/Index.tsx, the pageParam parser still only checks:
 
-- Verified Recruiter badge
+pageParam === 'recruiter-access'
 
-- Applicant pipeline
+Update it to support:
 
-- Driver contact requests
+- recruiter-access
 
-- Admin-reviewed listings
+- recruiter-access:reports
 
-Do not list Growth/Fleet features under Starter.
+- recruiter-access:manager
 
-2. Fix recruiter FAQ overclaims in src/pages/recruiter/RecruiterFAQ.tsx.
+- recruiter-access:applications
 
-Replace:
+Use a safe allowlist or pageParam.startsWith('recruiter-access') plus validation.
 
-"All plans include the applicant pipeline, contract protection, contact-snapshot delivery, and analytics."
+Expected behavior:
 
-With accurate plan-based language:
+- /dashboard?page=recruiter-access:reports as recruiter opens Reports panel.
 
-- Starter includes applicant pipeline, verified recruiter badge, driver contact requests, and 1 active opportunity.
+- /dashboard?page=recruiter-access:manager as recruiter opens Manage Opportunities.
 
-- Growth adds Contract Protection, Priority Placement, Recruiter Activity & Pipeline reports, and 5 active opportunities.
+- /dashboard?page=recruiter-access:applications as recruiter opens Applications.
 
-- Fleet adds 25 active opportunities and priority support.
+- /dashboard?page=recruiter-access:reports as driver redirects to driver dashboard.
 
-Do not claim analytics dashboard unless it is a real analytics feature.
+2. Driver direct-URL guard must work with all recruiter-access subroutes.
 
-Do not claim Contract Protection is included in Starter unless that is the intended product decision.
+The existing isRecruiterPageId helper is good, but it must work after the parser supports subroutes.
 
-3. Remove or rewrite “free trial” recruiter copy.
+Confirm non-recruiter/non-admin users cannot land on any recruiter-access* page.
 
-In src/components/landing/RecruiterLanding.tsx, remove:
+3. Clean stale internal trial doc.
 
-"Can I run a free trial?"
+In docs/MANUAL_QA_[CHECKLIST.md](http://CHECKLIST.md), remove:
 
-Replace with something like:
+"14-day auto-trial countdown banner shows for new users"
 
-"Can I post before paying?"
+Replace with:
 
-Answer truthfully based on the actual billing workflow.
+"Auto-trial system retired; verify billing pages do not reference trial language."
 
-Also run the no-trial language guard and ensure it passes.
+4. Add Supabase linter search_path sweep migration.
 
-4. Fix recruiter landing messaging overclaim.
+Create one migration that applies:
 
-In src/components/landing/RecruiterLanding.tsx, replace:
+ALTER FUNCTION ... SET search_path = public
 
-"message drivers"
+for every SECURITY DEFINER / volatile function currently flagged by the Supabase linter, except pgmq wrappers that must remain schema-agnostic.
 
-With:
+Do not change function logic or signatures.
 
-"manage driver contact requests"
+After migration, report the remaining Supabase linter warning count and list any warnings intentionally deferred.
 
-or
+5. Add featured sync regression coverage.
 
-"track driver requests"
+Add src/test/featuredSync.test.ts or an equivalent test/spec file.
 
-Do not imply full in-app messaging exists.
+It must document the expected matrix:
 
-5. Add recruiter Reports to mobile navigation.
+- Starter active/trialing = no priority
 
-In src/components/BottomNav.tsx, add Reports to recruiterMoreItems:
+- Growth active/trialing = priority
 
-- Reports
+- Fleet active/trialing = priority
 
-- icon: BarChart3 or FileText
+- canceled/past_due/inactive = no priority
 
-- route: recruiter-access:reports
+- upgrade Starter to Growth flips existing opportunities to featured=true
 
-- description: Activity & Pipeline reports
+- downgrade Growth to Starter flips existing opportunities to featured=false
 
-Driver Reports must remain unchanged.
+- normal recruiter/client updates cannot manually set featured
 
-6. Fix or verify Priority Placement billing sync.
+If the DB behavior cannot be unit-tested directly, create a clear test/spec around shared constants or a documented SQL assertion block and add a Vitest test that protects the matrix from being silently removed.
 
-Audit the interaction between:
+6. Verification required:
 
-- recruiter_billing_sync_featured()
+- Visit /dashboard?page=recruiter-access:reports as recruiter and confirm it opens Reports.
 
-- opportunities_guard()
+- Visit /dashboard?page=recruiter-access:reports as driver and confirm redirect to driver dashboard.
 
-- opportunities.featured
+- Confirm docs no longer mention 14-day auto-trial.
 
-Confirm that when a recruiter upgrades Starter → Growth, existing opportunities actually change featured=false to featured=true.
+- Confirm new featured sync test exists and passes.
 
-If opportunities_guard blocks the billing trigger update, fix it safely.
+- Confirm Supabase linter warning count is reduced.
 
-Recommended fix:
+- Run build and tests.
 
-Update opportunities_guard so system-triggered priority sync can update featured, while normal recruiter/client updates still cannot manually set featured.
+Do not proceed to Phase 3 until this is complete.
 
-Do not rely only on one-time backfill.
+## Phase 2 — Polish & Hardening
 
-QA must prove:
+Surgical, no behavior changes outside the listed items. Targets 9.4/10.
 
-- Starter insert = featured false
+### 1. Deep-link sub-route support (`src/pages/Index.tsx`)
 
-- Growth insert = featured true
+Extend the `pageParam` parser (~line 203-216) to accept `recruiter-access:reports`, `recruiter-access:manager`, `recruiter-access:applications`. Today only the bare `recruiter-access` matches, so `?page=recruiter-access:reports` lands on the hub. Use `pageParam.startsWith('recruiter-access')` and forward the full string to `setPage`. Recruiter gating is unchanged.
 
-- Starter → Growth flips existing opportunities true
+### 2. Driver→recruiter direct-URL guard (`src/pages/Index.tsx`)
 
-- Growth → Starter flips existing opportunities false
+If a non-recruiter, non-admin user navigates to any `recruiter-access*` page (URL or `setPage`), redirect to `/dashboard` once `roleLoading === false`. Mirrors the redirect already shipped for recruiters bouncing off driver-only pages. No RLS change — purely a UX/route guard.
 
-- canceled/past_due/inactive removes priority
+### 3. Stale internal doc (`docs/MANUAL_QA_CHECKLIST.md`)
 
-7. Add legal/privacy language for recruiter reports.
+Remove the line referencing the "14-day auto-trial countdown banner" (line 65) and any sibling lines in that QA section that assume the removed trial flow. Replace with a one-line note that the auto-trial system is retired. Keeps `noTrialLanguage` test green and prevents QA confusion.
 
-Terms and Privacy already cover contract data well. Add only the missing recruiter report/export scope:
+### 4. Supabase linter `search_path` sweep
 
-- Recruiter reports contain recruiter-owned opportunity/application/contact/contract workflow data.
+Single migration: `ALTER FUNCTION ... SET search_path = public` for every `SECURITY DEFINER` / volatile function flagged by the linter that doesn't already pin it. No logic changes, no signature changes. After migration, re-run `supabase--linter` and confirm count drops to ~0 (excluding non-actionable infra warnings). Functions to skip: `pgmq.*` wrappers that must stay schema-agnostic.
 
-- Recruiter reports do not include driver loads, fuel, expenses, profit, tax reports, or private driver financial data.
+### 5. Featured-sync regression test
 
-- PDF/CSV exports are the recruiter’s responsibility to store/share securely after download.
+Add `src/test/featuredSync.test.ts` (Vitest) that documents the matrix as assertions against a mock or, simpler, a markdown spec table embedded in the test file's comments + a pure-function unit test of `recruiter_has_priority_plan`'s JS mirror if one exists. If no JS mirror exists, instead add a SQL assertion block as a comment in the migration and a Vitest stub that imports the matrix from a shared constants file. Goal: prevent silent regression of the Starter↔Growth flip behavior.
 
-8. Fix recruiter reports PDF loading.
+### Out of scope (deferred to Phase 3)
 
-Move jsPDF and jspdf-autotable to dynamic imports inside the PDF generation action so opening the recruiter Reports panel does not load PDF libraries until the user actually generates a PDF.
+- Bundle splitting beyond pdf.ts
+- Lighthouse pass
+- Final manual QA walkthrough
+- Publish dry-run
 
-9. Re-run verification:
+### Files touched
 
-- Build
+- `src/pages/Index.tsx` (items 1 + 2)
+- `docs/MANUAL_QA_CHECKLIST.md` (item 3)
+- One new Supabase migration (item 4)
+- `src/test/featuredSync.test.ts` new (item 5)
 
-- TypeScript
+### Verification after implementation
 
-- no-trial language test
+- Manual: visit `/dashboard?page=recruiter-access:reports` as a recruiter → lands on Reports panel.
+- Manual: visit same URL as a driver → redirected to driver dashboard.
+- `supabase--linter` → warning count near zero.
+- `bunx vitest run` → all green, including no-trial guard and new featured-sync test.
 
-- recruiter mobile navigation
+### Expected score after Phase 2
 
-- recruiter pricing copy
-
-- Growth/Fleet priority placement
-
-- driver/recruiter role separation
-
-- legal report copy
-
-# HaulTrackerPro — Launch-Readiness Audit
-
-**Audit type:** Read-only review. No code changed.
-**Verdict:** **Launch ready after Phase 1 fixes** — current overall score **8.2 / 10**, reaches **9.2 / 10** after the Phase 1 list below.
-
----
-
-## A. Overall score: 8.2 / 10
-
-## B. Category scores
-
-
-| Category                  | Score | Notes                                                                                                                                 |
-| ------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| App loading / performance | 8     | Index.tsx is 884 lines but heavy views are already lazy. A few extras can be split.                                                   |
-| Role separation           | 8.5   | Sidebar split by role works; admin view-switcher in place. One direct-URL hardening gap (see F2).                                     |
-| Driver features           | 9     | Core load/expense/fuel/reports/contracts all wired with the documented formulas.                                                      |
-| Recruiter features        | 8.5   | Pipeline, opportunities, reports, contracts, priority placement all real. Starter card copy is incomplete (see F3).                   |
-| Contract workflow         | 9     | Upload → parse → AI review → driver decision → in-app signature is end-to-end. Disclaimers are correctly worded.                      |
-| Pricing truthfulness      | 8     | No DocuSign/multi-seat/chat over-claims. Starter bullets are weaker than the actual product (under-promise, not over-promise).        |
-| Landing page              | 8     | Long single-page; copy aligns with product. Audit pass on outdated trial language already in place.                                   |
-| Legal pages               | 8     | Terms/Privacy present; need a fresh pass to mention Contract Protection consent record + Recruiter Reports data scope.                |
-| SEO                       | 8.5   | react-helmet-async wired; sitemap/robots present. A handful of SEO landing pages should be re-checked for stale claims.               |
-| Copy consistency          | 8.5   | "HaulTrackerPro" used consistently. Minor "Verified Recruiter" vs "Approved" follow-ups still possible.                               |
-| Mobile responsiveness     | 8.5   | BottomNav + sidebar split confirmed. Pricing recruiter card grid validated.                                                           |
-| Security / access         | 8     | RLS + trigger guards strong. 87 Supabase linter warnings outstanding (mostly pre-existing `search_path` + SECURITY DEFINER exposure). |
-| Database / Supabase       | 8     | Recent priority-placement + contract triggers are tight; older functions still need search_path hardening.                            |
-| Code quality              | 8.5   | Lazy splits, typed hooks, RQ everywhere. Some dead/legacy imports remain (see F7).                                                    |
-
-
----
-
-## C. Critical blockers (must fix before launch)
-
-**C1. Recruiter Starter plan card under-lists real features**
-File: `src/pages/Pricing.tsx` lines 408–417. Starter currently lists only "Approved recruiter / company profile, Applications dashboard, Profit Intelligence integration, Admin-reviewed listings." Real Starter behavior also includes **Verified Recruiter badge** and **Driver contact requests**. Either drivers/buyers will think these are Growth-only, or recruiters will churn after paying because the card doesn't match what they actually get.
-
-**C2. Supabase security linter — 87 outstanding warnings**
-Tool: `supabase--linter`. Mix of `function_search_path_mutable`, anon-executable SECURITY DEFINER functions, one always-true RLS policy, and one public-listing storage bucket. Most are pre-existing but at least the **always-true RLS policy (WARN 5)**, the **public bucket listing (WARN 6)**, and any newly created SECURITY DEFINER functions still callable by `anon` must be reviewed before public launch.
-
-**C3. Legal pages have not been refreshed for the new contract + reports surface area**
-Files: `src/pages/Terms.tsx`, `src/pages/Privacy.tsx`. Must explicitly cover (a) Contract Protection consent record is not a qualified e-signature, (b) Recruiter Reports contain only recruiter-owned data, (c) uploaded contract file handling and retention.
-
----
-
-## D. High-priority issues
-
-**D1. Recruiter pricing FAQ partially-true "in-app messaging" answer**
-File: `src/pages/recruiter/RecruiterFAQ.tsx` line ~38 — says "In-app messaging is on the roadmap." Acceptable, but landing/pricing cards must not imply it exists. Currently they don't, but worth re-reading after Phase 1 copy pass.
-
-**D2. Pricing comparison row "Contract history, downloads, version comparison, AI follow-ups: Planned Pro tools"**
-File: `src/pages/Pricing.tsx` line 80. Correct label, but mixing "Planned" entries inside a yes/no feature grid is confusing. Move to a clearly separated "Coming soon" subsection.
-
-**D3. `RecruiterAccessRoute` lazy chunk is fine, but `RecruiterReportsPanel` pulls `jsPDF` + `autoTable` which is heavy**
-Files: `src/lib/recruiterReports/pdf.ts`, `src/components/recruiter/RecruiterReportsPanel.tsx`. Already lazy-imported via `RecruiterAccessRoute`, but confirm the PDF lib itself is dynamic-imported inside `pdf.ts` so the Reports panel skeleton renders fast.
-
-**D4. Direct-URL role hardening**
-`Index.tsx` switches views by `page` state but I did not see an explicit redirect when a driver opens `?page=recruiter-access:reports`. Add a guard: if `role==='driver' && !canSwitch`, force `page` back to `dashboard`.
-
----
-
-## E. Medium-priority issues
-
-- **E1.** Starter recruiter card should display the `1 active opportunity` count alongside the existing limit string for visual parity with Growth/Fleet (already present — verify on mobile).
-- **E2.** Pricing Driver "Recurring expenses" feature not surfaced in the free or pro bullet lists.
-- **E3.** `ViewModeSwitch` should expose an explicit `aria-label` and persist last view in `localStorage` (already partially memoryized — verify).
-- **E4.** Landing page (`src/pages/Landing.tsx`, 983 lines) — split hero/sections into lazy chunks; currently top-of-funnel page ships everything.
-- **E5.** SEO landing pages (`OwnerOperator*`, `Trucking*`, `TruckDriver*`) — sweep for any "free trial" or outdated feature names; titles/descriptions vary in length.
-- **E6.** Recruiter Reports empty/error states landed but the **date-range echo** under the description should also appear when `isEmpty` (helps users tell whether they typed the wrong range).
-
-## F. Low-priority issues
-
-- **F1.** `src/components/premium/AppSidebar.tsx` driver vs recruiter items duplicated `contracts` and `settings` rows — refactor to a single `commonTail` array.
-- **F2.** Consolidate `BarChart3`, `FileSignature`, `Handshake` icon imports.
-- **F3.** `Pricing.tsx` uses inline `style={{ ... }}` everywhere instead of design tokens — long-term, move to semantic tokens.
-- **F4.** `Index.tsx` should be code-split per role (driver shell vs recruiter shell) — currently both render paths live in one 884-line file.
-- **F5.** `useUserRole` checks `sessionStorage` `htp_recruiter_intent` — confirm it is cleared after recruiter profile is created to avoid stale recruiter UI for users that change their mind.
-- **F6.** Dead-import sweep: `Users`, `Route`, `TrendingUp` in `Index.tsx` line 55 — confirm all are used in the JSX.
-
-## G. Files / routes involved
-
-- Pricing copy: `src/pages/Pricing.tsx`, `src/components/landing/RecruiterLanding.tsx`, `src/lib/recruiterFeatureList.ts`, `src/lib/featureList.ts`
-- Role + routing: `src/pages/Index.tsx`, `src/hooks/useUserRole.ts`, `src/hooks/useViewMode.ts`, `src/components/premium/AppSidebar.tsx`, `src/components/opportunities/recruiter/RecruiterAccessRoute.tsx`
-- Recruiter reports: `src/components/recruiter/RecruiterReportsPanel.tsx`, `src/lib/recruiterReports/{aggregator,csv,pdf}.ts`, `src/hooks/recruiter/useRecruiterReportData.ts`
-- Contracts: `src/components/contracts/*`, `src/hooks/contracts/*`, contract edge functions
-- Legal: `src/pages/Terms.tsx`, `src/pages/Privacy.tsx`
-- Database: outstanding linter findings (87) — full list via `supabase--linter`
-
-## H. Recommended fix phases
-
-**Phase 1 (launch blockers — ~1 work session)**
-
-1. C1 — rewrite Starter bullets in `Pricing.tsx` to include Verified Recruiter badge + Driver contact requests.
-2. C3 — refresh `Terms.tsx` + `Privacy.tsx` for Contract Protection + Recruiter Reports.
-3. C2 partial — fix only the new SECURITY DEFINER + the always-true RLS policy + the public bucket listing. Defer the long tail of pre-existing `search_path` warnings to Phase 4.
-4. D4 — direct-URL recruiter route guard for driver accounts.
-
-**Phase 2 (high-priority — ~½ session)**
-
-- D1, D2, D3 (dynamic-import jsPDF inside `pdf.ts`).
-
-**Phase 3 (polish + SEO — ~1 session)**
-
-- E1–E6, sweep all marketing landing pages for stale claims.
-
-**Phase 4 (post-launch)**
-
-- F1–F6, full Supabase linter cleanup, `Index.tsx` split.
-
-## I. Truthfulness check
-
-No found over-claims. Specifically verified absent: DocuSign-equivalent signing, signed PDF generation, in-app chat, multi-seat / team seats, advanced analytics dashboard. All contract-signature copy correctly disclaims as "platform record of consent." Only material truthfulness gap is **under-claim on Starter** (C1).
-
-## J. Final recommendation
-
-**Launch ready after Phase 1 fixes.** After the 4 Phase-1 items, projected score is **9.2 / 10**, comfortably above the 9.0 launch bar.
-
----
-
-If you approve this plan, I'll implement Phase 1 (C1, C3, C2-subset, D4) in the next message — no other changes will be touched.
+**9.4 / 10**. Remaining gap closed by Phase 3 (perf + final QA + publish dry-run).
