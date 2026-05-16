@@ -722,6 +722,7 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
+            {page === 'recruiter-access' && <RecruiterAccessRoute onBack={() => setPage('dashboard')} />}
             {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
           </>
           </Suspense>
