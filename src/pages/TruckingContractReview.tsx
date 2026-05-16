@@ -21,7 +21,7 @@ export default function TruckingContractReview() {
         'Non-compete or restriction language',
         'Equipment return terms',
         'Recruiter promises vs written contract language',
-        'Driver approval and signature requirements',
+        'Driver approval required before hire; signature optional but recorded if provided',
       ]}
       extraSections={[
         {
