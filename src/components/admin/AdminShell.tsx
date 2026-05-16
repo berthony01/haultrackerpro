@@ -1,9 +1,10 @@
 import { ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bell, Search } from 'lucide-react';
+import { ArrowLeft, Search } from 'lucide-react';
 import { AdminSidebar } from './AdminSidebar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface AdminShellProps {
   value: string;
@@ -63,14 +64,7 @@ export function AdminShell({ value, onChange, role, email, children, mobileNav }
                 />
               </div>
 
-              <button
-                type="button"
-                className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/70 hover:text-white"
-                aria-label="Notifications"
-              >
-                <Bell className="h-4 w-4" />
-                <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
-              </button>
+              <NotificationBell />
 
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary ring-1 ring-primary/30">
                 {role || 'admin'}

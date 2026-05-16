@@ -15,6 +15,7 @@ import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunities/useRecruiterBilling';
 import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { SendFeedbackModal } from '@/components/SendFeedbackModal';
+import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
 
 interface Props {
   onBack: () => void;
@@ -251,6 +252,8 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
           </p>
         </CardContent>
       </Card>
+
+      <NotificationPreferencesPanel />
 
       <DeleteAccountModal open={showDelete} onOpenChange={setShowDelete} />
       <SendFeedbackModal open={showFeedback} onOpenChange={setShowFeedback} />

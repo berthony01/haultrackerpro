@@ -51,6 +51,7 @@ const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => 
 const DriverContractsView = lazy(() => import('@/components/contracts/DriverContractsView').then(m => ({ default: m.DriverContractsView })));
 const RecruiterContractsView = lazy(() => import('@/components/contracts/RecruiterContractsView').then(m => ({ default: m.RecruiterContractsView })));
 import { ContractActionsCard } from '@/components/contracts/ContractActionsCard';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -621,6 +622,7 @@ const Index = () => {
                   }}
                 />
               )}
+              <NotificationBell onNavigate={handleNavigate} />
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl h-10 w-10" onClick={signOut}>
                 <LogOut className="h-4 w-4" />
               </Button>
