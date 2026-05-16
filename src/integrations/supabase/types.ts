@@ -98,6 +98,44 @@ export type Database = {
         }
         Relationships: []
       }
+      application_events: {
+        Row: {
+          actor_type: string
+          actor_user_id: string | null
+          application_id: string
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          actor_type: string
+          actor_user_id?: string | null
+          application_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          actor_type?: string
+          actor_user_id?: string | null
+          application_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broker_stats: {
         Row: {
           avg_actual_pay: number
@@ -2380,6 +2418,10 @@ export type Database = {
       recompute_personal_intelligence: {
         Args: { _user_id: string }
         Returns: undefined
+      }
+      record_driver_application_response: {
+        Args: { application_id: string; note?: string; response_type: string }
+        Returns: string
       }
       recruiter_plan_limit: { Args: { _plan: string }; Returns: number }
       resubmit_recruiter_profile: {
