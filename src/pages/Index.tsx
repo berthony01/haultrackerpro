@@ -548,30 +548,41 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} roleLoading={roleLoading} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
         <header className="sticky top-0 z-40 bg-card/70 backdrop-blur-md border-b border-border/60 lg:bg-transparent lg:border-b-0">
-          <div className="flex items-center justify-between px-4 py-3.5 max-w-7xl mx-auto w-full">
-            <div className="flex items-center gap-3 lg:hidden">
-              <div className="rounded-xl bg-primary p-2 shadow-primary">
+          <div className="flex items-center justify-between px-4 py-3.5 max-w-7xl mx-auto w-full gap-3">
+            <div className="flex items-center gap-3 lg:hidden min-w-0">
+              <div className="rounded-xl bg-primary p-2 shadow-primary shrink-0">
                 <Truck className="h-5 w-5 text-primary-foreground" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-base font-black font-heading tracking-tight text-foreground">
                   Haul<span className="text-primary">TrackerPro</span>
                 </h1>
-                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em]">{roleLoading ? 'Loading…' : isRecruiter ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em] truncate">{roleLoading ? 'Loading…' : isRecruiterView ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
               </div>
             </div>
-            <div className="hidden lg:block">
-              <h2 className="text-lg font-black tracking-tight text-foreground">{navLabel}</h2>
-              <p className="text-xs text-muted-foreground">{navSubtitle}</p>
+            <div className="hidden lg:block min-w-0">
+              <h2 className="text-lg font-black tracking-tight text-foreground truncate">{navLabel}</h2>
+              <p className="text-xs text-muted-foreground truncate">{navSubtitle}</p>
             </div>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl h-10 w-10" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              {canSwitch && !roleLoading && (
+                <ViewModeSwitch
+                  value={effectiveRole}
+                  onChange={(next) => {
+                    setViewMode(next);
+                    handleNavigate(next === 'recruiter' ? 'recruiter-access' : 'dashboard');
+                  }}
+                />
+              )}
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl h-10 w-10" onClick={signOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </header>
 
