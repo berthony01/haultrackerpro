@@ -263,7 +263,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         {profileIncomplete && !alreadyApplied && (
           <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground">
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-            <span>Complete your Driver Opportunity Profile to give recruiters better context.</span>
+            <span>Add a few Opportunity Preferences to improve your match score and give recruiters better context.</span>
           </div>
         )}
         <div className="flex flex-col sm:flex-row gap-3 bg-card/80 backdrop-blur-md p-3 rounded-xl border border-border/60">
