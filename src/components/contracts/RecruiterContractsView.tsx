@@ -3,9 +3,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileSignature, Inbox, RefreshCw, ArrowRight, ShieldCheck, Upload, Sparkles, AlertTriangle, Search } from 'lucide-react';
+import { FileSignature, Inbox, RefreshCw, ArrowRight, ShieldCheck, Upload, Sparkles, AlertTriangle, Search, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 import {
   useContractsPipeline,
   matchesRecruiterFilter,
@@ -64,8 +66,11 @@ function readinessFromStatus(status: string | null, hasVersion: boolean) {
 
 export function RecruiterContractsView({ onOpenApplications }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
+  const billing = useRecruiterBilling();
+  const planAllowsContracts =
+    (billing.plan === 'growth' || billing.plan === 'fleet') && billing.isBillingActive;
   const { recruiterApplications, isLoadingRecruiter, isErrorRecruiter, refetchRecruiter } =
-    useOpportunityApplications({ recruiterId: profile?.id });
+    useOpportunityApplications({ recruiterId: planAllowsContracts ? profile?.id : undefined });
   const [filter, setFilter] = useState<RecruiterContractsFilter>('awaiting_upload');
   const [search, setSearch] = useState('');
 
@@ -97,6 +102,48 @@ export function RecruiterContractsView({ onOpenApplications }: Props) {
         <p className="text-sm text-muted-foreground">
           Set up your recruiter profile to manage contracts for your opportunities.
         </p>
+      </Card>
+    );
+  }
+
+  if (!billing.isLoading && !planAllowsContracts) {
+    return (
+      <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/10 animate-fade-in">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+            <Lock className="h-6 w-6 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h3 className="text-base font-bold text-foreground">Contract Protection — Growth &amp; Fleet</h3>
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                Upgrade required
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Contract Protection is included with the Growth and Fleet recruiter plans. Upgrade to
+              attach contracts to applications, run AI-assisted risk review, and require driver
+              approval before marking a hire.
+            </p>
+            <ul className="text-sm text-muted-foreground space-y-1 mb-4">
+              <li className="flex items-center gap-2"><Upload className="h-4 w-4 text-primary" /> Upload contracts to any application</li>
+              <li className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> AI-assisted risk review &amp; plain-English flags</li>
+              <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-green-400" /> Driver approval gate before hire</li>
+            </ul>
+            <Button
+              size="sm"
+              disabled={billing.startCheckout.isPending}
+              onClick={() =>
+                billing.startCheckout.mutate('growth', {
+                  onSuccess: () => toast.success('Opening checkout in a new tab…'),
+                  onError: (e: Error) => toast.error(e.message),
+                })
+              }
+            >
+              Upgrade to Growth <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </Card>
     );
   }

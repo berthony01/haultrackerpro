@@ -395,7 +395,7 @@ export default function Pricing() {
               Recruiter &amp; Carrier Plans
             </h2>
             <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              Post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers. Recruiter plans also include the Contract Protection workflow: upload contracts, send them to drivers, track approval/rejection status, and move candidates forward only after required contract steps are complete.
+              Post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers. Growth and Fleet plans add the Contract Protection workflow: upload contracts, send them to drivers, track approval status, and only mark a driver hired after the driver approves the current contract.
             </p>
             <p className="text-[11px] mt-4 max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
               Opportunity pay and match details are estimates based on recruiter-provided information. No job or income is guaranteed. Contract Protection is designed to help create a clearer workflow between drivers and recruiters — it is not legal advice.

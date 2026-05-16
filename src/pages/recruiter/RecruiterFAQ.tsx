@@ -39,7 +39,7 @@ const faqs = [
   },
   {
     q: 'How does Contract Protection work?',
-    a: 'Attach a contract (PDF or image) to any application. HaulTrackerPro parses it and surfaces plain-English risk flags to the driver. The driver can approve, request changes, reject, or sign. You cannot mark a driver "hired" until the required approval/signature step completes — a transparency safeguard for both sides.',
+    a: "Contract Protection is included with the Growth and Fleet recruiter plans. Attach a contract (PDF or image) to any application. HaulTrackerPro parses it and surfaces plain-English risk flags to the driver. The driver can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record.",
   },
   {
     q: 'Is the in-app signature legally binding?',
