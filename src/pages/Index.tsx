@@ -798,6 +798,11 @@ const Index = () => {
               <DriverContractsView onOpenApplications={() => handleNavigate('opportunities')} />
             ))}
             {page === 'recruiter-access' && isRecruiterView && (
+              <>
+                <ContractActionsCard role="recruiter" onOpen={() => handleNavigate('contracts')} />
+              </>
+            )}
+            {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {
                   // Only users who can switch views have a driver dashboard to go back to.
