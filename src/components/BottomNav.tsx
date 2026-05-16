@@ -41,17 +41,14 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
     onNavigate(page);
   };
 
-  const goOpportunities = (view: 'recruiter' | 'driver-profile' | 'list') => {
-    try {
-      sessionStorage.setItem('htp_opportunities_initial_view', view);
-    } catch {}
+  const goNav = (page: string) => {
     setMoreOpen(false);
-    onNavigate('opportunities');
+    onNavigate(page);
   };
 
   const moreItems: { label: string; icon: typeof Settings; onClick: () => void; description?: string }[] = [
-    { label: 'Recruiter Access', icon: Users, onClick: () => goOpportunities('recruiter'), description: 'Recruiting drivers? Open recruiter tools.' },
-    { label: 'Opportunity Preferences', icon: UserCog, onClick: () => goOpportunities('driver-profile'), description: 'Tell recruiters what fits you.' },
+    { label: 'Recruiter Access', icon: Users, onClick: () => goNav('recruiter-access'), description: 'Recruiting drivers? Open recruiter tools.' },
+    { label: 'Opportunity Preferences', icon: UserCog, onClick: () => goNav('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
     { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') },
     { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') },
