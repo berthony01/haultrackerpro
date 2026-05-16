@@ -74,6 +74,7 @@ export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavPr
     { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },
+    { label: 'Reports', icon: BarChart3, onClick: () => go('recruiter-access:reports'), description: 'Activity & Pipeline reports (PDF + CSV).' },
     { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Upload, AI review, track approvals.' },
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
