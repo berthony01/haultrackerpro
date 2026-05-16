@@ -569,7 +569,7 @@ const Index = () => {
 
         <main className="px-4 py-5 max-w-7xl mx-auto w-full">
         {/* Smart Reminders */}
-        {!showOnboarding && page === 'dashboard' && (
+        {!showOnboarding && page === 'dashboard' && !isRecruiter && (
           <div className="mb-4">
             <SmartReminders
               loads={allLoadsQuery.loads}
