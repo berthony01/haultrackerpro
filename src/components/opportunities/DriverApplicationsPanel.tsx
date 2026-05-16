@@ -91,6 +91,13 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
     recordDriverResponse,
   } = useOpportunityApplications();
 
+  const appIds = useMemo(
+    () => (driverApplications as any[]).map((a) => a.id),
+    [driverApplications],
+  );
+  const { requests: contactRequests, respond: respondContact } =
+    useRecruiterContactRequests(appIds);
+
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [respondModal, setRespondModal] = useState<{
