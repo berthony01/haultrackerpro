@@ -789,6 +789,11 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
+            {page === 'contracts' && (isRecruiterView ? (
+              <RecruiterContractsView onOpenApplications={() => handleNavigate('recruiter-access:applications')} />
+            ) : (
+              <DriverContractsView onOpenApplications={() => handleNavigate('opportunities')} />
+            ))}
             {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {
