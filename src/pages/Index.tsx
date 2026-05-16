@@ -435,7 +435,7 @@ const Index = () => {
     if (roleLoading) return;
     if (isRecruiterView && driverOnlyPages.has(page)) {
       setPage('recruiter-access');
-    } else if (!isRecruiterViewView && isRecruiterPageId(page)) {
+    } else if (!isRecruiterView && isRecruiterPageId(page)) {
       setPage('dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -469,11 +469,11 @@ const Index = () => {
       'opportunities','add_expense','add_fuel','closeout','recurring_expenses',
       'opportunity-preferences',
     ]);
-    if (isRecruiterTarget && !isRecruiterViewView) {
+    if (isRecruiterTarget && !isRecruiterView) {
       setPage('dashboard');
       return;
     }
-    if (!isRecruiterViewTarget && driverOnlyTargets.has(p) && isRecruiterView) {
+    if (!isRecruiterTarget && driverOnlyTargets.has(p) && isRecruiterView) {
       setPage('recruiter-access');
       return;
     }
