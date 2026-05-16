@@ -378,6 +378,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
 
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+      <ContractSummaryPanel applicationId={applicationId} role={role} />
       {role === 'driver' && hasContract && (
         <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
           <DriverStepIndicator
