@@ -23,6 +23,11 @@ import {
   useOpportunityApplications,
   type DriverResponseType,
 } from '@/hooks/opportunities/useOpportunityApplications';
+import {
+  useRecruiterContactRequests,
+  latestRequestForApp,
+  type RecruiterContactRequest,
+} from '@/hooks/opportunities/useRecruiterContactRequests';
 import { ContractAttachment } from '@/components/contracts/ContractAttachment';
 import {
   STATUS_LABEL,
