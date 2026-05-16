@@ -447,12 +447,24 @@ const Index = () => {
       navigate('/parking');
       return;
     }
-    if (p === 'recruiter-access' || p.startsWith('recruiter-access:')) {
-      // Block drivers from recruiter routes (admins keep access).
-      if (!isAdmin && !isRecruiter) {
-        setPage('dashboard');
-        return;
-      }
+    // Defensive role gating BEFORE state changes so non-admins can never
+    // momentarily render a page outside their role (URL hacks, stale links).
+    const isRecruiterTarget = p === 'recruiter-access' || p.startsWith('recruiter-access:');
+    const driverOnlyTargets = new Set([
+      'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
+      'opportunities','add_expense','add_fuel','closeout','recurring_expenses',
+      'opportunity-preferences',
+    ]);
+    if (isRecruiterTarget && !isAdmin && !isRecruiter) {
+      setPage('dashboard');
+      return;
+    }
+    if (!isRecruiterTarget && driverOnlyTargets.has(p) && !isAdmin && isRecruiter) {
+      setPage('recruiter-access');
+      return;
+    }
+
+    if (isRecruiterTarget) {
       setEditingLoad(null);
       setEditingStops([]);
       setEditingExpense(null);
@@ -522,7 +534,7 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} roleLoading={roleLoading} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
@@ -761,7 +773,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} roleLoading={roleLoading} />
       </div>
       <AddActionModal
         open={showAddModal}

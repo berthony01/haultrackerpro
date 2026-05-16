@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, ShieldCheck } from 'lucide-react';
 import type { UserRole } from '@/hooks/useUserRole';
 
 interface AppSidebarProps {
@@ -6,6 +6,7 @@ interface AppSidebarProps {
   onNavigate: (page: string) => void;
   role: UserRole;
   isAdmin?: boolean;
+  roleLoading?: boolean;
 }
 
 const driverItems = [
@@ -25,16 +26,17 @@ const recruiterItems = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-// Admins see everything for management/testing.
-const adminExtraItems = [{ id: 'recruiter-access', label: 'Recruiter Access', icon: Handshake }];
-
-export function AppSidebar({ active, onNavigate, role, isAdmin }: AppSidebarProps) {
-  const items =
-    role === 'recruiter'
-      ? recruiterItems
-      : isAdmin
-        ? [...driverItems.slice(0, -1), ...adminExtraItems, driverItems[driverItems.length - 1]]
-        : driverItems;
+export function AppSidebar({ active, onNavigate, role, isAdmin, roleLoading }: AppSidebarProps) {
+  const items = role === 'recruiter' ? recruiterItems : driverItems;
+  // Admins get a separated "Admin Tools" section at the bottom for cross-role testing,
+  // never mixed into the normal driver/recruiter menu. When already in the recruiter
+  // role we surface the opposite jump (driver dashboard) instead.
+  const adminCrossRoleItem =
+    isAdmin && !roleLoading
+      ? role === 'recruiter'
+        ? { id: 'dashboard', label: 'Open Driver Dashboard', icon: LayoutDashboard }
+        : { id: 'recruiter-access', label: 'Open Recruiter Console', icon: Handshake }
+      : null;
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 bg-card/40 backdrop-blur-md sticky top-0 h-screen">
@@ -47,26 +49,50 @@ export function AppSidebar({ active, onNavigate, role, isAdmin }: AppSidebarProp
             Haul<span className="text-primary">TrackerPro</span>
           </h1>
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.18em]">
-            {role === 'recruiter' ? 'Recruiter Console' : 'Load & Pay Manager'}
+            {roleLoading ? 'Loading…' : role === 'recruiter' ? 'Recruiter Console' : 'Load & Pay Manager'}
           </p>
         </div>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Primary">
-        {items.map(item => {
-          const isActive = active === item.id;
-          const Icon = item.icon;
-          return (
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Primary">
+        {roleLoading ? (
+          <div className="px-2 py-3 space-y-2">
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i} className="h-8 rounded-lg bg-muted/30 animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          items.map(item => {
+            const isActive = active === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`sidebar-link w-full text-left ${isActive ? 'active' : ''}`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })
+        )}
+
+        {adminCrossRoleItem && (
+          <div className="pt-4 mt-4 border-t border-border/60">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70 flex items-center gap-1.5">
+              <ShieldCheck className="h-3 w-3" />
+              Admin Tools
+            </p>
             <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              aria-current={isActive ? 'page' : undefined}
-              className={`sidebar-link w-full text-left ${isActive ? 'active' : ''}`}
+              onClick={() => onNavigate(adminCrossRoleItem.id)}
+              className="sidebar-link w-full text-left"
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span>{item.label}</span>
+              <adminCrossRoleItem.icon className="h-4 w-4 shrink-0" />
+              <span>{adminCrossRoleItem.label}</span>
             </button>
-          );
-        })}
+          </div>
+        )}
       </nav>
       <div className="p-4 border-t border-border/60">
         <p className="text-[10px] text-muted-foreground/60 leading-snug">
