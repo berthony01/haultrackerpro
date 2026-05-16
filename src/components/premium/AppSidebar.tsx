@@ -1,11 +1,10 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList } from 'lucide-react';
 import type { UserRole } from '@/hooks/useUserRole';
 
 interface AppSidebarProps {
   active: string;
   onNavigate: (page: string) => void;
   role: UserRole;
-  isAdmin?: boolean;
   roleLoading?: boolean;
 }
 
