@@ -49,7 +49,7 @@ const recruiterNav = [
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
 
-export function BottomNav({ active, onNavigate, role, isAdmin }: BottomNavProps) {
+export function BottomNav({ active, onNavigate, role, isAdmin, roleLoading }: BottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
   const navItems = role === 'recruiter' ? recruiterNav : driverNav;
@@ -77,13 +77,16 @@ export function BottomNav({ active, onNavigate, role, isAdmin }: BottomNavProps)
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
-  let moreItems: MoreItem[] = role === 'recruiter' ? recruiterMoreItems : driverMoreItems;
-  if (isAdmin && role !== 'recruiter') {
-    moreItems = [
-      { label: 'Recruiter Access', icon: Handshake, onClick: () => go('recruiter-access'), description: 'Admin: open recruiter tools.' },
-      ...moreItems,
-    ];
-  }
+  const moreItems: MoreItem[] = role === 'recruiter' ? recruiterMoreItems : driverMoreItems;
+
+  // Admin-only cross-role jump, kept in a separate section so it never looks
+  // like a normal driver/recruiter feature.
+  const adminCrossRoleItem: MoreItem | null =
+    isAdmin && !roleLoading
+      ? role === 'recruiter'
+        ? { label: 'Open Driver Dashboard', icon: LayoutDashboard, onClick: () => go('dashboard'), description: 'Admin: jump to driver view.' }
+        : { label: 'Open Recruiter Console', icon: Handshake, onClick: () => go('recruiter-access'), description: 'Admin: open recruiter tools.' }
+      : null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">
