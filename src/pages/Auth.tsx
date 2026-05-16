@@ -247,9 +247,13 @@ export default function Auth() {
                       onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                       required
                     />
-                    {isRecruiter && (
+                    {isRecruiter ? (
                       <p className="text-[11px] text-muted-foreground mt-1">
-                        You'll add company details after account creation.
+                        You'll add company details after account creation. Recruiter accounts require approval before posting opportunities.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        We'll walk you through a quick setup (cost profile, pay model, first load) right after sign up.
                       </p>
                     )}
                   </div>
