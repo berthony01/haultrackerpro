@@ -25,17 +25,8 @@ const recruiterItems = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-export function AppSidebar({ active, onNavigate, role, isAdmin, roleLoading }: AppSidebarProps) {
+export function AppSidebar({ active, onNavigate, role, roleLoading }: AppSidebarProps) {
   const items = role === 'recruiter' ? recruiterItems : driverItems;
-  // Admins get a separated "Admin Tools" section at the bottom for cross-role testing,
-  // never mixed into the normal driver/recruiter menu. When already in the recruiter
-  // role we surface the opposite jump (driver dashboard) instead.
-  const adminCrossRoleItem =
-    isAdmin && !roleLoading
-      ? role === 'recruiter'
-        ? { id: 'dashboard', label: 'Open Driver Dashboard', icon: LayoutDashboard }
-        : { id: 'recruiter-access', label: 'Open Recruiter Console', icon: Handshake }
-      : null;
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 bg-card/40 backdrop-blur-md sticky top-0 h-screen">
@@ -75,22 +66,6 @@ export function AppSidebar({ active, onNavigate, role, isAdmin, roleLoading }: A
               </button>
             );
           })
-        )}
-
-        {adminCrossRoleItem && (
-          <div className="pt-4 mt-4 border-t border-border/60">
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70 flex items-center gap-1.5">
-              <ShieldCheck className="h-3 w-3" />
-              Admin Tools
-            </p>
-            <button
-              onClick={() => onNavigate(adminCrossRoleItem.id)}
-              className="sidebar-link w-full text-left"
-            >
-              <adminCrossRoleItem.icon className="h-4 w-4 shrink-0" />
-              <span>{adminCrossRoleItem.label}</span>
-            </button>
-          </div>
         )}
       </nav>
       <div className="p-4 border-t border-border/60">
