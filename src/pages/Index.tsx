@@ -213,7 +213,7 @@ const Index = () => {
       const allowedSubs = new Set(['manager', 'applications', 'reports', 'onboarding']);
       if (isRecruiterView) {
         setRecruiterView(
-          sub && allowedSubs.has(sub) ? (sub as typeof recruiterView) : 'hub'
+          sub && allowedSubs.has(sub) ? (sub as 'manager' | 'applications' | 'reports' | 'onboarding') : 'hub'
         );
         setPage('recruiter-access');
         recruiterIntent = true;
