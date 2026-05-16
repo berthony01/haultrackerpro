@@ -423,7 +423,7 @@ const Index = () => {
 
   const [opportunitiesViewKey, setOpportunitiesViewKey] = useState(0);
   const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
-  const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
+  const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications' | 'reports'>('hub');
 
   // Role-based access guard: redirect users away from pages outside their
   // *effective* role. `contracts` is a shared key (body picks by role), so it
