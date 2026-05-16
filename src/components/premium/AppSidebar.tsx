@@ -1,22 +1,41 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList } from 'lucide-react';
+import type { UserRole } from '@/hooks/useUserRole';
 
 interface AppSidebarProps {
   active: string;
   onNavigate: (page: string) => void;
+  role: UserRole;
+  isAdmin?: boolean;
 }
 
-const items = [
+const driverItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
-  { id: 'recruiter-access', label: 'Recruiter Access', icon: Handshake },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'fuel', label: 'Fuel', icon: Fuel },
   { id: 'reports', label: 'Reports', icon: FileText },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-export function AppSidebar({ active, onNavigate }: AppSidebarProps) {
+const recruiterItems = [
+  { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+  { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
+  { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
+];
+
+// Admins see everything for management/testing.
+const adminExtraItems = [{ id: 'recruiter-access', label: 'Recruiter Access', icon: Handshake }];
+
+export function AppSidebar({ active, onNavigate, role, isAdmin }: AppSidebarProps) {
+  const items =
+    role === 'recruiter'
+      ? recruiterItems
+      : isAdmin
+        ? [...driverItems.slice(0, -1), ...adminExtraItems, driverItems[driverItems.length - 1]]
+        : driverItems;
+
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 bg-card/40 backdrop-blur-md sticky top-0 h-screen">
       <div className="flex items-center gap-3 px-5 py-5 border-b border-border/60">
@@ -27,7 +46,9 @@ export function AppSidebar({ active, onNavigate }: AppSidebarProps) {
           <h1 className="text-base font-black tracking-tight text-foreground">
             Haul<span className="text-primary">TrackerPro</span>
           </h1>
-          <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.18em]">Load &amp; Pay Manager</p>
+          <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.18em]">
+            {role === 'recruiter' ? 'Recruiter Console' : 'Load & Pay Manager'}
+          </p>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Primary">
@@ -49,7 +70,9 @@ export function AppSidebar({ active, onNavigate }: AppSidebarProps) {
       </nav>
       <div className="p-4 border-t border-border/60">
         <p className="text-[10px] text-muted-foreground/60 leading-snug">
-          Track every mile. Every dollar. Every decision.
+          {role === 'recruiter'
+            ? 'Post opportunities. Review drivers. Hire smarter.'
+            : 'Track every mile. Every dollar. Every decision.'}
         </p>
       </div>
     </aside>

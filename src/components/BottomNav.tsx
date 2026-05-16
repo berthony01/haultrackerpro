@@ -11,6 +11,9 @@ import {
   Fuel,
   Users,
   UserCog,
+  Handshake,
+  ClipboardList,
+  LogOut,
 } from 'lucide-react';
 import {
   Sheet,
@@ -19,13 +22,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import type { UserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/hooks/useAuth';
 
 interface BottomNavProps {
   active: string;
   onNavigate: (page: string) => void;
+  role: UserRole;
+  isAdmin?: boolean;
 }
 
-const navItems = [
+const driverNav = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
   { id: 'add', label: 'Add', icon: Plus },
@@ -33,27 +40,48 @@ const navItems = [
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
 
-export function BottomNav({ active, onNavigate }: BottomNavProps) {
+const recruiterNav = [
+  { id: 'recruiter-access', label: 'Home', icon: Handshake },
+  { id: 'recruiter-access:manager', label: 'Opps', icon: ClipboardList },
+  { id: 'recruiter-access:applications', label: 'Apps', icon: Users },
+  { id: 'more', label: 'More', icon: MoreHorizontal },
+];
+
+export function BottomNav({ active, onNavigate, role, isAdmin }: BottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const { signOut } = useAuth();
+  const navItems = role === 'recruiter' ? recruiterNav : driverNav;
 
   const go = (page: string) => {
     setMoreOpen(false);
     onNavigate(page);
   };
 
-  const goNav = (page: string) => {
-    setMoreOpen(false);
-    onNavigate(page);
-  };
+  type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
 
-  const moreItems: { label: string; icon: typeof Settings; onClick: () => void; description?: string }[] = [
-    { label: 'Recruiter Access', icon: Users, onClick: () => goNav('recruiter-access'), description: 'Recruiting drivers? Open recruiter tools.' },
-    { label: 'Opportunity Preferences', icon: UserCog, onClick: () => goNav('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
+  const driverMoreItems: MoreItem[] = [
+    { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
     { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') },
     { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') },
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
   ];
+
+  const recruiterMoreItems: MoreItem[] = [
+    { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
+    { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
+    { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },
+    { label: 'Settings', icon: Settings, onClick: () => go('settings') },
+    { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
+  ];
+
+  let moreItems: MoreItem[] = role === 'recruiter' ? recruiterMoreItems : driverMoreItems;
+  if (isAdmin && role !== 'recruiter') {
+    moreItems = [
+      { label: 'Recruiter Access', icon: Handshake, onClick: () => go('recruiter-access'), description: 'Admin: open recruiter tools.' },
+      ...moreItems,
+    ];
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">

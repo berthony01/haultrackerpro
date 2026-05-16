@@ -13,6 +13,7 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useUserRole } from '@/hooks/useUserRole';
 // Critical shell — keep eager so first paint never flickers.
 import { BottomNav } from '@/components/BottomNav';
 import { AppSidebar } from '@/components/premium/AppSidebar';
@@ -60,6 +61,7 @@ const Index = () => {
   const { signOut, user } = useAuth();
   const queryClient = useQueryClient();
   const { isAdmin } = useAdmin();
+  const { role, isRecruiter, isLoading: roleLoading } = useUserRole();
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
@@ -407,6 +409,23 @@ const Index = () => {
 
   const [opportunitiesViewKey, setOpportunitiesViewKey] = useState(0);
   const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
+  const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications'>('hub');
+
+  // Role-based access guard: redirect users away from pages outside their role.
+  // Admins keep full access for management/testing.
+  const driverOnlyPages = new Set([
+    'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
+    'opportunities','add','add_expense','add_fuel','closeout','recurring_expenses',
+  ]);
+  useEffect(() => {
+    if (roleLoading || isAdmin) return;
+    if (isRecruiter && driverOnlyPages.has(page)) {
+      setPage('recruiter-access');
+    } else if (!isRecruiter && page === 'recruiter-access') {
+      setPage('dashboard');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleLoading, isRecruiter, isAdmin, page]);
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
@@ -428,12 +447,19 @@ const Index = () => {
       navigate('/parking');
       return;
     }
-    if (p === 'recruiter-access') {
+    if (p === 'recruiter-access' || p.startsWith('recruiter-access:')) {
+      // Block drivers from recruiter routes (admins keep access).
+      if (!isAdmin && !isRecruiter) {
+        setPage('dashboard');
+        return;
+      }
       setEditingLoad(null);
       setEditingStops([]);
       setEditingExpense(null);
       setEditingFuelLog(null);
       setOpportunitiesView('list');
+      const sub = p.split(':')[1];
+      setRecruiterView(sub === 'manager' ? 'manager' : sub === 'applications' ? 'applications' : sub === 'onboarding' ? 'onboarding' : 'hub');
       setPage('recruiter-access');
       return;
     }
@@ -496,7 +522,7 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
@@ -573,11 +599,10 @@ const Index = () => {
                       <X className="h-4 w-4" />
                     </button>
                     <h3 className="text-sm font-bold mb-3" style={{ color: 'hsl(0, 0%, 100%)' }}>What do you want to do next?</h3>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
                         { icon: TrendingUp, label: 'Track Profit', action: () => { setEditingLoad(null); setPage('add'); } },
                         { icon: Route, label: hasCompletedDriverProfile ? 'Find Opportunities' : 'Set Opportunity Preferences', action: () => openOpportunitiesView(hasCompletedDriverProfile ? 'list' : 'driver-profile') },
-                        { icon: Users, label: 'Recruit Drivers', action: () => handleNavigate('recruiter-access') },
                       ].map((item) => (
                         <button
                           key={item.label}
@@ -722,8 +747,13 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
-            {page === 'recruiter-access' && <RecruiterAccessRoute onBack={() => setPage('dashboard')} />}
-            {page === 'settings' && <SettingsView onBack={() => setPage('dashboard')} />}
+            {page === 'recruiter-access' && (isRecruiter || isAdmin) && (
+              <RecruiterAccessRoute
+                onBack={() => setPage(isRecruiter && !isAdmin ? 'recruiter-access' : 'dashboard')}
+                initialView={recruiterView}
+              />
+            )}
+            {page === 'settings' && <SettingsView onBack={() => setPage(isRecruiter ? 'recruiter-access' : 'dashboard')} />}
           </>
           </Suspense>
         )}
@@ -731,7 +761,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={role} isAdmin={isAdmin} />
       </div>
       <AddActionModal
         open={showAddModal}
