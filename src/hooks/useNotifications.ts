@@ -92,7 +92,10 @@ export function useNotifications() {
       const { error } = await supabase.rpc('mark_notification_read' as any, { notification_id: id });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications', user?.id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      qc.invalidateQueries({ queryKey: ['notifications_unread_count', user?.id] });
+    },
   });
 
   const markAllRead = useMutation({
@@ -100,7 +103,10 @@ export function useNotifications() {
       const { error } = await supabase.rpc('mark_all_notifications_read' as any);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications', user?.id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      qc.invalidateQueries({ queryKey: ['notifications_unread_count', user?.id] });
+    },
   });
 
   return {
