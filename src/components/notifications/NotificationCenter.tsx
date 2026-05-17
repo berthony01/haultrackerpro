@@ -38,7 +38,9 @@ function routeForNotification(n: NotificationRow): string | null {
 }
 
 export function NotificationCenter({ onClose, onNavigate }: Props) {
-  const { notifications, isLoading, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, isLoading } = useNotificationList();
+  const { markRead, markAllRead } = useNotificationActions();
+  const unreadCount = notifications.reduce((n, x) => (x.read_at ? n : n + 1), 0);
 
   const handleClick = (n: NotificationRow) => {
     if (!n.read_at) markRead.mutate(n.id);
