@@ -49,7 +49,24 @@ export function useNotifications() {
   });
 
   const notifications = listQuery.data ?? [];
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
+
+  // Accurate unread count — counts ALL unread, not just the 30 in the list.
+  const unreadQuery = useQuery({
+    queryKey: ['notifications_unread_count', user?.id],
+    enabled: !!user,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<number> => {
+      if (!user) return 0;
+      const { count, error } = await supabase
+        .from('notifications' as any)
+        .select('id', { count: 'exact', head: true })
+        .is('read_at', null);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+  const unreadCount = unreadQuery.data ?? 0;
 
   // Realtime: subscribe to inserts/updates for this user
   useEffect(() => {
@@ -61,6 +78,7 @@ export function useNotifications() {
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
         () => {
           qc.invalidateQueries({ queryKey: ['notifications', user.id] });
+          qc.invalidateQueries({ queryKey: ['notifications_unread_count', user.id] });
         }
       )
       .subscribe();
