@@ -10,14 +10,27 @@ interface Props {
 }
 
 function routeForNotification(n: NotificationRow): string | null {
-  const t = n.type;
-  if (t.startsWith('application_') || t.startsWith('contact_request_')) {
-    return 'recruiter-access:applications'; // recruiter side — driver side will be intercepted below
+  switch (n.type) {
+    // Recruiter inbox
+    case 'application_submitted':
+    case 'contact_request_approved':
+    case 'contact_request_declined':
+      return 'recruiter-access:applications';
+    // Driver-facing
+    case 'contact_request_created':
+    case 'application_status_updated':
+      return 'opportunities';
+    // Recruiter profile review
+    case 'recruiter_profile_approved':
+    case 'recruiter_profile_rejected':
+      return 'recruiter-access';
+    // Opportunity admin review (recruiter)
+    case 'opportunity_reviewed':
+      return 'recruiter-access:manager';
+    default:
+      if (n.type.startsWith('contract_')) return 'contracts';
+      return null;
   }
-  if (t.startsWith('contract_')) return 'contracts';
-  if (t === 'recruiter_profile_approved' || t === 'recruiter_profile_rejected') return 'recruiter-access';
-  if (t === 'opportunity_reviewed') return 'recruiter-access:manager';
-  return null;
 }
 
 export function NotificationCenter({ onClose, onNavigate }: Props) {
@@ -27,15 +40,7 @@ export function NotificationCenter({ onClose, onNavigate }: Props) {
     if (!n.read_at) markRead.mutate(n.id);
     const route = routeForNotification(n);
     if (route && onNavigate) {
-      // For driver-facing application/contact events, route to opportunities instead
-      if (
-        (n.type.startsWith('application_') || n.type.startsWith('contact_request_')) &&
-        route === 'recruiter-access:applications'
-      ) {
-        onNavigate('opportunities');
-      } else {
-        onNavigate(route);
-      }
+      onNavigate(route);
       onClose?.();
     }
   };
