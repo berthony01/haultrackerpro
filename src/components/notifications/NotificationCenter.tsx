@@ -2,7 +2,11 @@ import { CheckCheck, Inbox, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNotifications, type NotificationRow } from '@/hooks/useNotifications';
+import {
+  useNotificationList,
+  useNotificationActions,
+  type NotificationRow,
+} from '@/hooks/useNotifications';
 
 interface Props {
   onClose?: () => void;
