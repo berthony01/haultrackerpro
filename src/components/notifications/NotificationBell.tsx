@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationUnreadCount } from '@/hooks/useNotifications';
 import { NotificationCenter } from './NotificationCenter';
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
 
 export function NotificationBell({ onNavigate }: Props) {
   const [open, setOpen] = useState(false);
-  const { unreadCount } = useNotifications();
+  const unreadCount = useNotificationUnreadCount();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

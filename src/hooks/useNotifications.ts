@@ -27,32 +27,20 @@ export interface NotificationPreferences {
 
 const LIST_LIMIT = 30;
 
-export function useNotifications() {
+const listKey = (userId?: string) => ['notifications', userId] as const;
+const countKey = (userId?: string) => ['notifications_unread_count', userId] as const;
+
+/**
+ * Realtime + accurate unread count. Owns the single realtime channel
+ * for the current user so the bell stays live without the dropdown
+ * needing its own subscription.
+ */
+export function useNotificationUnreadCount() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const listQuery = useQuery({
-    queryKey: ['notifications', user?.id],
-    enabled: !!user,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-    queryFn: async (): Promise<NotificationRow[]> => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from('notifications' as any)
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(LIST_LIMIT);
-      if (error) throw error;
-      return (data ?? []) as unknown as NotificationRow[];
-    },
-  });
-
-  const notifications = listQuery.data ?? [];
-
-  // Accurate unread count — counts ALL unread, not just the 30 in the list.
-  const unreadQuery = useQuery({
-    queryKey: ['notifications_unread_count', user?.id],
+  const query = useQuery({
+    queryKey: countKey(user?.id),
     enabled: !!user,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
@@ -61,14 +49,13 @@ export function useNotifications() {
       const { count, error } = await supabase
         .from('notifications' as any)
         .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
         .is('read_at', null);
       if (error) throw error;
       return count ?? 0;
     },
   });
-  const unreadCount = unreadQuery.data ?? 0;
 
-  // Realtime: subscribe to inserts/updates for this user
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -77,8 +64,8 @@ export function useNotifications() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
         () => {
-          qc.invalidateQueries({ queryKey: ['notifications', user.id] });
-          qc.invalidateQueries({ queryKey: ['notifications_unread_count', user.id] });
+          qc.invalidateQueries({ queryKey: listKey(user.id) });
+          qc.invalidateQueries({ queryKey: countKey(user.id) });
         }
       )
       .subscribe();
@@ -87,15 +74,57 @@ export function useNotifications() {
     };
   }, [user, qc]);
 
+  return query.data ?? 0;
+}
+
+/**
+ * List of latest notifications. No realtime subscription — relies on
+ * `useNotificationUnreadCount` (mounted on the bell) to invalidate
+ * this query when new rows arrive.
+ */
+export function useNotificationList() {
+  const { user } = useAuth();
+
+  const query = useQuery({
+    queryKey: listKey(user?.id),
+    enabled: !!user,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<NotificationRow[]> => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('notifications' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(LIST_LIMIT);
+      if (error) throw error;
+      return (data ?? []) as unknown as NotificationRow[];
+    },
+  });
+
+  return {
+    notifications: query.data ?? [],
+    isLoading: query.isLoading,
+    refetch: query.refetch,
+  };
+}
+
+export function useNotificationActions() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: listKey(user?.id) });
+    qc.invalidateQueries({ queryKey: countKey(user?.id) });
+  };
+
   const markRead = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.rpc('mark_notification_read' as any, { notification_id: id });
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', user?.id] });
-      qc.invalidateQueries({ queryKey: ['notifications_unread_count', user?.id] });
-    },
+    onSuccess: invalidate,
   });
 
   const markAllRead = useMutation({
@@ -103,20 +132,21 @@ export function useNotifications() {
       const { error } = await supabase.rpc('mark_all_notifications_read' as any);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notifications', user?.id] });
-      qc.invalidateQueries({ queryKey: ['notifications_unread_count', user?.id] });
-    },
+    onSuccess: invalidate,
   });
 
-  return {
-    notifications,
-    unreadCount,
-    isLoading: listQuery.isLoading,
-    refetch: listQuery.refetch,
-    markRead,
-    markAllRead,
-  };
+  return { markRead, markAllRead };
+}
+
+/**
+ * Back-compat wrapper. Prefer the focused hooks above.
+ * Composes count + list + actions; only use where you genuinely need all three.
+ */
+export function useNotifications() {
+  const unreadCount = useNotificationUnreadCount();
+  const { notifications, isLoading, refetch } = useNotificationList();
+  const { markRead, markAllRead } = useNotificationActions();
+  return { notifications, unreadCount, isLoading, refetch, markRead, markAllRead };
 }
 
 export function useNotificationPreferences() {
