@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useCostProfile, CostProfileUpdate, computeCostProfileCPM } from '@/hooks/useCostProfile';
+import { useCostProfile, CostProfileUpdate, computeCostProfileCPM, CPM_BREAKDOWN_LABELS } from '@/hooks/useCostProfile';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calculator, ChevronDown, Fuel, Wrench, Building2, Target, Info } from 'lucide-react';
+import { Calculator, ChevronDown, Fuel, Wrench, Building2, Target, Info, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/loadUtils';
 
