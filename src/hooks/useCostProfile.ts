@@ -67,13 +67,42 @@ export function profileHasUsableData(p: CostProfile | null | undefined): boolean
  *
  * where days_for_load = total_miles / 1000 * days_per_1000_miles (default 2.5)
  */
+export type CPMBreakdownKey =
+  | 'fuel'
+  | 'maintenance'
+  | 'tires'
+  | 'tolls'
+  | 'truck'
+  | 'trailer'
+  | 'insurance'
+  | 'permits'
+  | 'eld'
+  | 'otherFixed'
+  | 'perDay';
+
+/** Display label for each breakdown bucket. */
+export const CPM_BREAKDOWN_LABELS: Record<CPMBreakdownKey, string> = {
+  fuel: 'fuel',
+  maintenance: 'maintenance',
+  tires: 'tires',
+  tolls: 'tolls',
+  truck: 'truck',
+  trailer: 'trailer',
+  insurance: 'insurance',
+  permits: 'permits',
+  eld: 'eld',
+  otherFixed: 'other fixed',
+  perDay: 'per-day',
+};
+
 export function computeCostProfileCPM(
   p: CostProfile | null | undefined,
   totalMiles: number,
-): { cpm: number; breakdown: Record<string, number> } {
-  if (!p || totalMiles <= 0) return { cpm: 0, breakdown: {} };
+): { cpm: number; breakdown: Record<string, number>; warnings: string[] } {
+  if (!p || totalMiles <= 0) return { cpm: 0, breakdown: {}, warnings: [] };
 
   const breakdown: Record<string, number> = {};
+  const warnings: string[] = [];
 
   // Fuel
   const mpg = Number(p.avg_mpg ?? 0);
@@ -87,17 +116,23 @@ export function computeCostProfileCPM(
   if ((p.tires_per_mile ?? 0) > 0) breakdown.tires = Number(p.tires_per_mile);
   if ((p.tolls_per_mile ?? 0) > 0) breakdown.tolls = Number(p.tolls_per_mile);
 
-  // Fixed share (only if monthly miles known)
+  // Fixed share — itemized per line so drivers can see what each monthly bill costs per mile.
   const monthlyMiles = Number(p.estimated_monthly_miles ?? 0);
+  const fixedItems: Array<[CPMBreakdownKey, number]> = [
+    ['truck', Number(p.truck_payment ?? 0)],
+    ['trailer', Number(p.trailer_payment ?? 0)],
+    ['insurance', Number(p.insurance_monthly ?? 0)],
+    ['permits', Number(p.permits_licensing_monthly ?? 0)],
+    ['eld', Number(p.eld_software_monthly ?? 0)],
+    ['otherFixed', Number(p.other_fixed_monthly ?? 0)],
+  ];
+  const fixedTotal = fixedItems.reduce((s, [, v]) => s + v, 0);
   if (monthlyMiles > 0) {
-    const fixed =
-      Number(p.truck_payment ?? 0) +
-      Number(p.trailer_payment ?? 0) +
-      Number(p.insurance_monthly ?? 0) +
-      Number(p.permits_licensing_monthly ?? 0) +
-      Number(p.eld_software_monthly ?? 0) +
-      Number(p.other_fixed_monthly ?? 0);
-    if (fixed > 0) breakdown.fixed = fixed / monthlyMiles;
+    for (const [key, amount] of fixedItems) {
+      if (amount > 0) breakdown[key] = amount / monthlyMiles;
+    }
+  } else if (fixedTotal > 0) {
+    warnings.push('fixed_missing_monthly_miles');
   }
 
   // Per-day share
@@ -109,7 +144,7 @@ export function computeCostProfileCPM(
   }
 
   const cpm = Object.values(breakdown).reduce((s, v) => s + v, 0);
-  return { cpm, breakdown };
+  return { cpm, breakdown, warnings };
 }
 
 export function useCostProfile() {
