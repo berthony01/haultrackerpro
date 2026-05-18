@@ -50,7 +50,9 @@ export function profileHasUsableData(p: CostProfile | null | undefined): boolean
     (p.permits_licensing_monthly ?? 0) > 0 ||
     (p.eld_software_monthly ?? 0) > 0 ||
     (p.other_fixed_monthly ?? 0) > 0;
-  return fuelOk || anyVariable || (anyFixed && (p.estimated_monthly_miles ?? 0) > 0);
+  // Fixed-only profiles count as usable even when monthly miles is missing — so the
+  // missing-miles warning can surface downstream instead of silently falling back to history.
+  return fuelOk || anyVariable || anyFixed;
 }
 
 /**
