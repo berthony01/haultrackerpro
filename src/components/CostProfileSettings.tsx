@@ -65,7 +65,15 @@ export function CostProfileSettings() {
   const sampleMiles = 500;
   const previewProfile: any = {};
   for (const f of FIELDS) previewProfile[f] = form[f] === '' ? null : Number(form[f]);
-  const { cpm, breakdown } = computeCostProfileCPM(previewProfile, sampleMiles);
+  const { cpm, breakdown, warnings } = computeCostProfileCPM(previewProfile, sampleMiles);
+  const fixedMissingMiles = warnings.includes('fixed_missing_monthly_miles');
+
+  // Inputs that look like per-mile entries instead of monthly bills
+  const FIXED_KEYS = ['truck_payment', 'trailer_payment', 'insurance_monthly', 'permits_licensing_monthly', 'eld_software_monthly', 'other_fixed_monthly'] as const;
+  const lowMonthlyHint = (key: string): boolean => {
+    const v = Number(form[key]);
+    return Number.isFinite(v) && v > 0 && v < 20;
+  };
 
   return (
     <div className="premium-card p-5 space-y-4">
@@ -87,8 +95,20 @@ export function CostProfileSettings() {
               <p className="text-lg font-mono font-black text-primary">{formatCurrency(cpm)}/mi</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {Object.entries(breakdown)
-                  .map(([k, v]) => `${k}: ${formatCurrency(v)}`)
+                  .map(([k, v]) => `${CPM_BREAKDOWN_LABELS[k as keyof typeof CPM_BREAKDOWN_LABELS] ?? k}: ${formatCurrency(v)}`)
                   .join(' · ')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {fixedMissingMiles && (
+          <div className="rounded-xl bg-warning/10 border border-warning/30 p-3 flex items-start gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
+            <div className="flex-1 text-xs leading-relaxed">
+              <p className="font-bold text-warning">Your fixed monthly costs aren't being applied.</p>
+              <p className="text-muted-foreground mt-0.5">
+                Enter your <span className="font-semibold text-foreground">Estimated monthly miles</span> below so we can spread truck, trailer, insurance, etc. across each trip.
               </p>
             </div>
           </div>
