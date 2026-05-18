@@ -1,4 +1,5 @@
 import { ProfitCheckResult } from '@/hooks/useProfitCheck';
+import { CPM_BREAKDOWN_LABELS } from '@/hooks/useCostProfile';
 import { formatCurrency } from '@/lib/loadUtils';
 import { TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, Info } from 'lucide-react';
 
