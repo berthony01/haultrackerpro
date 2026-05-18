@@ -897,7 +897,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             const gross = isCancelled ? 0 : estimated;
             const effRPM = totalMi > 0 ? gross / totalMi : 0;
             const loadedRPM = loaded > 0 ? gross / loaded : 0;
-            const cpm = computeCostProfileCPM(costProfile, totalMi).cpm;
+            const costProfileResult = computeCostProfileCPM(costProfile, totalMi);
+            const cpm = costProfileResult.cpm;
+            const fixedMissingMiles = costProfileResult.warnings.includes('fixed_missing_monthly_miles');
             const estExpenses = cpm * totalMi;
             const netProfit = gross - estExpenses;
             const netRPM = totalMi > 0 ? netProfit / totalMi : 0;
