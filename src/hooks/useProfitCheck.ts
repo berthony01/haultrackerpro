@@ -37,6 +37,10 @@ export interface ProfitCheckResult {
   laneLoadCount?: number;
   brokerReliability?: number;
   brokerDaysToPay?: number;
+  /** Per-bucket CPM breakdown (only present when costSource === 'profile'). */
+  costBreakdown?: Record<string, number>;
+  /** Warnings from the cost profile computation (e.g. 'fixed_missing_monthly_miles'). */
+  costWarnings?: string[];
 }
 
 /**
@@ -120,9 +124,10 @@ export function useProfitCheck(input: ProfitCheckInput | null) {
   const op = opMetricsQuery.data;
 
   // Layered CPM: prefer driver-defined Cost Profile, fall back to rolling 60-day actuals.
-  const profileCPM = profileHasUsableData(costProfile)
-    ? computeCostProfileCPM(costProfile, totalMiles).cpm
-    : 0;
+  const profileResult = profileHasUsableData(costProfile)
+    ? computeCostProfileCPM(costProfile, totalMiles)
+    : { cpm: 0, breakdown: {}, warnings: [] as string[] };
+  const profileCPM = profileResult.cpm;
   const historyCPM = op?.rolling_cost_per_mile ? Number(op.rolling_cost_per_mile) : 0;
   const cpm = profileCPM > 0 ? profileCPM : historyCPM;
   const costSource: 'profile' | 'history' | 'none' =
@@ -240,6 +245,8 @@ export function useProfitCheck(input: ProfitCheckInput | null) {
       laneLoadCount: lane?.load_count,
       brokerReliability: broker?.reliability_score != null ? Number(broker.reliability_score) : undefined,
       brokerDaysToPay: broker?.days_to_pay_avg != null ? Number(broker.days_to_pay_avg) : undefined,
+      costBreakdown: costSource === 'profile' ? profileResult.breakdown : undefined,
+      costWarnings: costSource === 'profile' ? profileResult.warnings : undefined,
     },
   };
 }

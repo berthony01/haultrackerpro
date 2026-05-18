@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useCostProfile, CostProfileUpdate, computeCostProfileCPM } from '@/hooks/useCostProfile';
+import { useCostProfile, CostProfileUpdate, computeCostProfileCPM, CPM_BREAKDOWN_LABELS } from '@/hooks/useCostProfile';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calculator, ChevronDown, Fuel, Wrench, Building2, Target, Info } from 'lucide-react';
+import { Calculator, ChevronDown, Fuel, Wrench, Building2, Target, Info, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/loadUtils';
 
@@ -65,7 +65,15 @@ export function CostProfileSettings() {
   const sampleMiles = 500;
   const previewProfile: any = {};
   for (const f of FIELDS) previewProfile[f] = form[f] === '' ? null : Number(form[f]);
-  const { cpm, breakdown } = computeCostProfileCPM(previewProfile, sampleMiles);
+  const { cpm, breakdown, warnings } = computeCostProfileCPM(previewProfile, sampleMiles);
+  const fixedMissingMiles = warnings.includes('fixed_missing_monthly_miles');
+
+  // Inputs that look like per-mile entries instead of monthly bills
+  const FIXED_KEYS = ['truck_payment', 'trailer_payment', 'insurance_monthly', 'permits_licensing_monthly', 'eld_software_monthly', 'other_fixed_monthly'] as const;
+  const lowMonthlyHint = (key: string): boolean => {
+    const v = Number(form[key]);
+    return Number.isFinite(v) && v > 0 && v < 20;
+  };
 
   return (
     <div className="premium-card p-5 space-y-4">
@@ -87,8 +95,20 @@ export function CostProfileSettings() {
               <p className="text-lg font-mono font-black text-primary">{formatCurrency(cpm)}/mi</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {Object.entries(breakdown)
-                  .map(([k, v]) => `${k}: ${formatCurrency(v)}`)
+                  .map(([k, v]) => `${CPM_BREAKDOWN_LABELS[k as keyof typeof CPM_BREAKDOWN_LABELS] ?? k}: ${formatCurrency(v)}`)
                   .join(' · ')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {fixedMissingMiles && (
+          <div className="rounded-xl bg-warning/10 border border-warning/30 p-3 flex items-start gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
+            <div className="flex-1 text-xs leading-relaxed">
+              <p className="font-bold text-warning">Your fixed monthly costs aren't being applied.</p>
+              <p className="text-muted-foreground mt-0.5">
+                Enter your <span className="font-semibold text-foreground">Estimated monthly miles</span> below so we can spread truck, trailer, insurance, etc. across each trip.
               </p>
             </div>
           </div>
@@ -161,36 +181,55 @@ export function CostProfileSettings() {
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 pt-1">
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Enter the dollar amount you pay <span className="font-semibold text-foreground">every month</span>.
+              We divide by your monthly miles to spread it across each trip — e.g. $1,800 truck ÷ 10,000 mi = $0.18/mi.
+            </p>
+
+            {/* Monthly miles promoted to top — required for fixed costs to apply */}
+            <div className={`rounded-lg p-3 border ${fixedMissingMiles ? 'border-warning/40 bg-warning/5' : 'border-border bg-muted/30'}`}>
+              <Label className="text-xs font-semibold flex items-center gap-1">
+                Estimated monthly miles
+                <span className="text-warning">*</span>
+              </Label>
+              <Input inputMode="decimal" placeholder="10000" value={form.estimated_monthly_miles} onChange={(e) => set('estimated_monthly_miles', e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-1">Required — used to spread fixed costs across miles you actually drive.</p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold">Truck payment</Label>
+                <Label className="text-xs font-semibold">Truck payment ($/month)</Label>
                 <Input inputMode="decimal" placeholder="1800" value={form.truck_payment} onChange={(e) => set('truck_payment', e.target.value)} />
+                {lowMonthlyHint('truck_payment') && (
+                  <p className="text-[10px] text-warning mt-1">Looks low for a monthly bill. Enter the full $/month (e.g. 1800).</p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold">Trailer payment</Label>
+                <Label className="text-xs font-semibold">Trailer payment ($/month)</Label>
                 <Input inputMode="decimal" placeholder="0" value={form.trailer_payment} onChange={(e) => set('trailer_payment', e.target.value)} />
+                {lowMonthlyHint('trailer_payment') && (
+                  <p className="text-[10px] text-warning mt-1">Looks low for a monthly bill. Enter the full $/month.</p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold">Insurance</Label>
+                <Label className="text-xs font-semibold">Insurance ($/month)</Label>
                 <Input inputMode="decimal" placeholder="600" value={form.insurance_monthly} onChange={(e) => set('insurance_monthly', e.target.value)} />
+                {lowMonthlyHint('insurance_monthly') && (
+                  <p className="text-[10px] text-warning mt-1">Looks low for a monthly bill. Enter the full $/month.</p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold">Permits/licensing</Label>
+                <Label className="text-xs font-semibold">Permits/licensing ($/month)</Label>
                 <Input inputMode="decimal" placeholder="100" value={form.permits_licensing_monthly} onChange={(e) => set('permits_licensing_monthly', e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs font-semibold">ELD/software/phone</Label>
+                <Label className="text-xs font-semibold">ELD / software / phone ($/month)</Label>
                 <Input inputMode="decimal" placeholder="80" value={form.eld_software_monthly} onChange={(e) => set('eld_software_monthly', e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs font-semibold">Other fixed</Label>
+                <Label className="text-xs font-semibold">Other fixed ($/month)</Label>
                 <Input inputMode="decimal" placeholder="0" value={form.other_fixed_monthly} onChange={(e) => set('other_fixed_monthly', e.target.value)} />
               </div>
-            </div>
-            <div>
-              <Label className="text-xs font-semibold">Estimated monthly miles</Label>
-              <Input inputMode="decimal" placeholder="10000" value={form.estimated_monthly_miles} onChange={(e) => set('estimated_monthly_miles', e.target.value)} />
-              <p className="text-[10px] text-muted-foreground mt-1">Used to spread fixed costs across miles you actually drive.</p>
             </div>
           </CollapsibleContent>
         </Collapsible>

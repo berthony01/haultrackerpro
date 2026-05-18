@@ -1,4 +1,5 @@
 import { ProfitCheckResult } from '@/hooks/useProfitCheck';
+import { CPM_BREAKDOWN_LABELS } from '@/hooks/useCostProfile';
 import { formatCurrency } from '@/lib/loadUtils';
 import { TrendingUp, TrendingDown, AlertTriangle, ShieldCheck, Sparkles, Info } from 'lucide-react';
 
@@ -115,6 +116,40 @@ export function ProfitCheckCard({ result }: ProfitCheckCardProps) {
           <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground pt-1 border-t border-border/40">
             <Info className="h-3 w-3 shrink-0 mt-0.5" />
             <span>{sourceLabel}</span>
+          </div>
+        )}
+
+        {/* Per-bucket CPM breakdown — shows the driver where every cent of cost is going */}
+        {result.costSource === 'profile' && result.costBreakdown && Object.keys(result.costBreakdown).length > 0 && (
+          <div className="pt-2 border-t border-border/40 space-y-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Cost breakdown on this load</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              {Object.entries(result.costBreakdown).map(([k, v]) => {
+                const label = CPM_BREAKDOWN_LABELS[k as keyof typeof CPM_BREAKDOWN_LABELS] ?? k;
+                const totalMiles = result.estimatedVariableCost > 0 && result.effectiveRpm > 0
+                  ? result.estimatedGross / result.effectiveRpm
+                  : 0;
+                const tripCost = v * totalMiles;
+                return (
+                  <div key={k} className="flex items-baseline justify-between text-[11px]">
+                    <span className="capitalize text-muted-foreground">{label}</span>
+                    <span className="font-mono font-semibold">
+                      ${v.toFixed(2)}<span className="text-muted-foreground">/mi</span>
+                      <span className="text-muted-foreground"> · {formatCurrency(tripCost)}</span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {result.costWarnings?.includes('fixed_missing_monthly_miles') && (
+          <div className="flex items-start gap-1.5 text-[11px] pt-1 border-t border-border/40 rounded-md bg-warning/5 px-2 py-1.5">
+            <AlertTriangle className="h-3 w-3 text-warning shrink-0 mt-0.5" />
+            <span className="text-warning leading-relaxed">
+              Fixed monthly costs aren't applied — set <span className="font-bold">Estimated monthly miles</span> in Settings → My Cost Profile.
+            </span>
           </div>
         )}
 
