@@ -245,6 +245,8 @@ export function useProfitCheck(input: ProfitCheckInput | null) {
       laneLoadCount: lane?.load_count,
       brokerReliability: broker?.reliability_score != null ? Number(broker.reliability_score) : undefined,
       brokerDaysToPay: broker?.days_to_pay_avg != null ? Number(broker.days_to_pay_avg) : undefined,
+      costBreakdown: costSource === 'profile' ? profileResult.breakdown : undefined,
+      costWarnings: costSource === 'profile' ? profileResult.warnings : undefined,
     },
   };
 }
