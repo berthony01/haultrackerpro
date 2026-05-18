@@ -37,6 +37,10 @@ export interface ProfitCheckResult {
   laneLoadCount?: number;
   brokerReliability?: number;
   brokerDaysToPay?: number;
+  /** Per-bucket CPM breakdown (only present when costSource === 'profile'). */
+  costBreakdown?: Record<string, number>;
+  /** Warnings from the cost profile computation (e.g. 'fixed_missing_monthly_miles'). */
+  costWarnings?: string[];
 }
 
 /**
