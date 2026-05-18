@@ -346,6 +346,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           {(() => {
             // Cost Profile projection (only when user has set up a usable profile)
             let projectedNet: number | null = null;
+            let projectedWarnings: string[] = [];
             if (profileHasUsableData(costProfile) && totalMiles > 0) {
               const grossForProj = (() => {
                 const paid = filteredLoads.filter(l => l.actual_pay_received != null);
@@ -355,14 +356,14 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                 }
                 return estimated;
               })();
-              const { cpm } = computeCostProfileCPM(costProfile, totalMiles);
+              const { cpm, warnings } = computeCostProfileCPM(costProfile, totalMiles);
+              projectedWarnings = warnings;
+              // cpm already includes the per-day share (meals + lodging amortized over miles),
+              // so do NOT subtract a separate dailyCost — that would double-count it.
               const variableCost = cpm * totalMiles;
-              const daysPer1k = Number(costProfile?.days_per_1000_miles ?? 2.5) || 2.5;
-              const days = (totalMiles / 1000) * daysPer1k;
-              const perDay = Number(costProfile?.meals_per_day ?? 0) + Number(costProfile?.lodging_per_day ?? 0);
-              const dailyCost = days * perDay;
-              projectedNet = grossForProj - variableCost - dailyCost;
+              projectedNet = cpm > 0 ? grossForProj - variableCost : null;
             }
+            const missingMiles = projectedWarnings.includes('fixed_missing_monthly_miles');
 
             return (
               <div className="grid grid-cols-2 gap-2.5">
@@ -397,9 +398,22 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                     label="Projected Net"
                     value={formatCurrency(projectedNet)}
                     icon={projectedNet >= 0 ? TrendingUp : TrendingDown}
-                    subtitle="Based on Cost Profile"
-                    variant={projectedNet >= 0 ? 'success' : 'danger'}
+                    subtitle={missingMiles ? 'Fixed costs not applied — set monthly miles' : 'Based on Cost Profile'}
+                    variant={missingMiles ? 'warning' : (projectedNet >= 0 ? 'success' : 'danger')}
                   />
+                ) : missingMiles ? (
+                  <div
+                    className="cursor-pointer active:scale-95 transition-transform"
+                    onClick={() => onNavigate?.('settings')}
+                  >
+                    <StatCard
+                      label="Projected Net"
+                      value="Set miles"
+                      icon={AlertTriangle}
+                      subtitle="Fixed costs not applied"
+                      variant="warning"
+                    />
+                  </div>
                 ) : (
                   <div
                     className="cursor-pointer active:scale-95 transition-transform"

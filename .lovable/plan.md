@@ -1,97 +1,270 @@
-## Strict analysis: does Cost Profile fold fixed monthly costs into each trip?
+Run a surgical Cost Profile reflection fix pass. Do not change styling, routes, database schema, pricing, Stripe, auth, reports, recruiter logic, parking logic, or unrelated files.
 
-### What the math actually does (and does correctly)
+Scope:
 
-In `src/hooks/useCostProfile.ts → computeCostProfileCPM`, the formula already does the right thing:
+- src/components/DashboardView.tsx
 
-```
-fixed share per mile =
-  (truck_payment + trailer_payment + insurance_monthly
-   + permits_licensing_monthly + eld_software_monthly + other_fixed_monthly)
-  / estimated_monthly_miles
-```
+- src/components/LoadForm.tsx
 
-That `fixed` number is then added into the total CPM, and `useProfitCheck.ts` multiplies that CPM by the load's total miles to estimate variable cost and net pay on every trip. So the engine is wired correctly.
+- src/hooks/useCostProfile.ts
 
-Example with your numbers: $1,000 truck + $200 trailer + $600 insurance + $100 permits + $80 ELD = $1,980/mo. With 10,000 mi/mo → **$0.198/mi** of fixed cost baked into every trip.
+- src/hooks/useProfitCheck.ts
 
-### Where it actually breaks (the real bugs)
+- src/components/ProfitCheckCard.tsx only if needed for totalMiles polish
 
-These are why your screenshot shows CPM = $0.08/mi with only `maintenance · tires · tolls` — and no `fixed` line, even though Truck/Trailer/Insurance/Permits/ELD are all filled in.
+- src/test/costProfileCPM.test.ts or a new focused test file
 
-1. **Silent drop when `Estimated monthly miles` is missing or 0.**
-   `computeCostProfileCPM` skips the entire fixed bucket if `monthly_miles <= 0`. No warning, no toast, no badge. Your monthly fixed costs are simply ignored. The field is also buried at the bottom of the "Fixed monthly costs" section, so most drivers never set it.
+Fix 1: Dashboard Projected Net double-counting bug
 
-2. **Field labels are ambiguous — drivers enter per-mile values into monthly fields.**
-   In the screenshot you have **Truck payment = 0.06** and **Trailer payment = 0.02**. Those are per-mile numbers, not monthly payments. The label says "Truck payment" with no `$/month` suffix and no helper text, and it sits in a section called "Fixed monthly costs (per mile)"-adjacent to the variable section. With 0.06 + 0.02 + 600 + 100 + 80 = $780.08/mo, the fixed share *should* be $0.078/mi — but because the form lets numbers like 0.06 through, drivers under-report by 1,000×.
+In DashboardView.tsx, Projected Net currently does:
 
-3. **No per-input "this adds $X/mi" feedback.**
-   Drivers can't intuit that "$1,800 truck payment ÷ 10,000 mi = $0.18/mi". The live preview rolls everything into a single `fixed` bucket — drivers can't see that the truck payment alone is most of their cost-per-mile.
+- computeCostProfileCPM(costProfile, totalMiles)
 
-4. **Profit Check on each trip doesn't show the breakdown either.**
-   `useProfitCheck` consumes the total CPM but the UI in `ProfitCheckCard` does not display the per-bucket CPM (fuel / maintenance / tires / tolls / **fixed**) for the load, so a driver can't see "of the $0.18/mi cost on this trip, $0.10 is your truck payment."
+- variableCost = cpm * totalMiles
 
-5. **`days_per_1000_miles` defaults to 2.5 inside the function** but the form leaves it blank for most drivers — fine for per-day costs (meals/lodging), but worth surfacing.
+- separately calculates dailyCost from meals/lodging
 
-### Conclusion
+- projectedNet = grossForProj - variableCost - dailyCost
 
-The calculation engine is correct. The system *does* spread fixed monthly costs across miles. The failure is in the **form UX + missing guardrails + missing breakdown** — which is exactly what makes it look like "it doesn't calculate."
+This is wrong because computeCostProfileCPM already includes per-day costs inside cpm. Remove the manual dailyCost calculation and set:
+
+projectedNet = grossForProj - variableCost;
+
+Do not remove per-day logic from computeCostProfileCPM. Only remove the duplicate Dashboard subtraction.
+
+Fix 2: Dashboard warning visibility
+
+In DashboardView.tsx, destructure warnings from computeCostProfileCPM:
+
+const { cpm, warnings } = computeCostProfileCPM(costProfile, totalMiles);
+
+If warnings includes fixed_missing_monthly_miles, show a small warning state/chip/subtitle on the Projected Net tile saying:
+
+“Fixed costs not applied — set monthly miles”
+
+Make the tile clickable to Settings if possible, consistent with the existing “Set up” behavior.
+
+Fix 3: LoadForm live preview warning
+
+In LoadForm.tsx, stop discarding warnings:
+
+const costProfileResult = computeCostProfileCPM(costProfile, totalMi);
+
+const cpm = costProfileResult.cpm;
+
+If costProfileResult.warnings includes fixed_missing_monthly_miles, show a small inline amber note inside the live financial preview:
+
+“Fixed monthly costs are not included yet. Add estimated monthly miles in Settings.”
+
+Do not change the live preview math except for reading warnings.
+
+Fix 4: Fixed-only profile warning flow
+
+In src/hooks/useCostProfile.ts, update profileHasUsableData so fixed costs count as usable data even when estimated_monthly_miles is missing. The goal is not to apply fixed costs without miles. The goal is to allow computeCostProfileCPM() to run so it can return fixed_missing_monthly_miles.
+
+Current behavior blocks the warning. New behavior should allow:
+
+- fuel profile
+
+- variable per-mile profile
+
+- fixed-only profile with monthly miles
+
+- fixed-only profile without monthly miles, but warning must surface
+
+Fix 5: useProfitCheck warning preservation
+
+In useProfitCheck.ts, ensure fixed-only profiles with missing miles use costSource “profile” or otherwise preserve costWarnings so ProfitCheckCard can show the fixed_missing_monthly_miles warning.
+
+Do not allow history fallback to hide the fixed cost warning when the user has entered fixed costs but forgot monthly miles.
+
+Fix 6: Optional polish
+
+If low-risk, pass totalMiles through ProfitCheckResult instead of reverse-deriving it in ProfitCheckCard. If this adds risk, skip it.
+
+Tests:
+
+Add focused tests covering:
+
+1. computeCostProfileCPM includes per-day cost once.
+
+2. Dashboard-style projected net should not subtract per-day costs twice.
+
+3. fixed-only profile with missing estimated_monthly_miles still surfaces fixed_missing_monthly_miles.
+
+4. useProfitCheck should not silently hide the fixed_missing_monthly_miles warning by falling back to history.
+
+Acceptance criteria:
+
+- Projected Net no longer subtracts meals/lodging twice.
+
+- Settings, LoadForm, ProfitCheckCard, and Dashboard all communicate when fixed monthly costs are not applied because estimated monthly miles is missing.
+
+- Existing Cost Profile math remains unchanged.
+
+- TypeScript/build/test must pass.
+
+- No unrelated files changed.
+
+# Cost Profile — Strict Calculation & Reflection Audit
+
+Scope reviewed:
+
+- `src/hooks/useCostProfile.ts` — `computeCostProfileCPM`, `profileHasUsableData`
+- `src/hooks/useProfitCheck.ts` — load-level cost application
+- `src/components/CostProfileSettings.tsx` — settings UI + live CPM preview
+- `src/components/ProfitCheckCard.tsx` — per-load breakdown UI
+- `src/components/LoadForm.tsx` (lines ~890–905) — live financial preview
+- `src/components/DashboardView.tsx` (lines ~346–415) — "Projected Net" tile
+
+Test coverage: `src/test/costProfileCPM.test.ts`
 
 ---
 
-## Plan
+## Verdict
 
-Scope: Settings → Cost Profile form, the CPM preview, and the per-trip Profit Check card. No DB schema changes, no new tables, no business-logic rewrites. Only labels, validation, breakdown rendering, and one small math guardrail.
+The core CPM math in `computeCostProfileCPM` is **correct** — fixed monthly costs are spread per mile, variable per-mile costs are added, and per-day costs are amortized over miles. Unit tests confirm fixed-cost spreading and the missing-miles warning.
 
-### 1. `src/components/CostProfileSettings.tsx`
+However, the **Dashboard "Projected Net" tile contains a real double-counting bug**, and several places where Cost Profile data is consumed do not surface the same warnings the Profit Check card does. Result: a driver who "fills everything out" will see a correct number on the Profit Check card, but a **wrong (more pessimistic) number** on the Dashboard's Projected Net.
 
-- Rename labels to make units explicit:
-  - "Truck payment" → "Truck payment ($/month)"
-  - "Trailer payment" → "Trailer payment ($/month)"
-  - "Insurance" → "Insurance ($/month)"
-  - "Permits/licensing" → "Permits/licensing ($/month)"
-  - "ELD/software/phone" → "ELD / software / phone ($/month)"
-  - "Other fixed" → "Other fixed ($/month)"
-- Add a one-line helper under the Fixed section: "Enter the dollar amount you pay every month. We divide by your monthly miles below to spread it across each trip."
-- Promote **Estimated monthly miles** to the top of the Fixed section (not the bottom) and mark it required-for-fixed-costs.
-- Add a soft validator: if any fixed field is > 0 and `estimated_monthly_miles` is empty/0, show an inline warning badge in the preview card: "Your fixed monthly costs aren't being applied — set Estimated monthly miles to spread them across each trip."
-- Add a soft validator: if any fixed field is between 0 and 20 (looks like a per-mile entry, not a monthly bill), show a small hint under that input: "Looks low for a monthly bill. Enter the full $/month (e.g. 1800)."
-- In the live CPM preview, expand the breakdown line so fixed is itemized:
-  `fuel: $X · maintenance: $X · tires: $X · tolls: $X · truck: $X · trailer: $X · insurance: $X · permits: $X · eld: $X · other fixed: $X · per-day: $X`
-  Only show buckets > 0.
+---
 
-### 2. `src/hooks/useCostProfile.ts → computeCostProfileCPM`
+## Findings
 
-- Split the single `fixed` breakdown entry into per-line entries (`truck`, `trailer`, `insurance`, `permits`, `eld`, `otherFixed`) using the same `/ monthly_miles` formula. Keep total CPM identical.
-- Add an optional return field `warnings: string[]` so the preview and Profit Check card can surface "Fixed costs ignored — set monthly miles" when applicable.
-- Function signature stays backwards compatible (`cpm`, `breakdown` keep working; `warnings` is additive).
+### 1. BUG — Per-day costs double-counted in Dashboard "Projected Net"
 
-### 3. `src/components/ProfitCheckCard.tsx` (per-trip card)
+`DashboardView.tsx` (~lines 358–364):
 
-- Already consumes `useProfitCheck`. Extend the card to render the per-bucket CPM breakdown for the load, using the same itemized list as the Settings preview, plus the **total $ cost on this trip per bucket** (CPM × total miles).
-- If `warnings` includes "fixed share missing," show an amber notice with a "Fix in Settings → My Cost Profile" link.
+```text
+const { cpm } = computeCostProfileCPM(costProfile, totalMiles);
+const variableCost = cpm * totalMiles;                  // already includes perDay share
+const daysPer1k    = Number(costProfile?.days_per_1000_miles ?? 2.5) || 2.5;
+const days         = (totalMiles / 1000) * daysPer1k;
+const perDay       = Number(costProfile?.meals_per_day ?? 0) + Number(costProfile?.lodging_per_day ?? 0);
+const dailyCost    = days * perDay;
+projectedNet = grossForProj - variableCost - dailyCost; // ← per-day subtracted TWICE
+```
 
-### 4. `src/hooks/useProfitCheck.ts`
+`computeCostProfileCPM` already includes a `perDay` bucket in `breakdown` and in `cpm`:
 
-- Forward `breakdown` and `warnings` from `computeCostProfileCPM` into the `ProfitCheckResult` so `ProfitCheckCard` can render them. No formula changes.
+```
+breakdown.perDay = (perDay * days) / totalMiles
+```
 
-### 5. Smoke test additions (optional, light)
+Multiplying that `cpm` by `totalMiles` already reintroduces `perDay * days`. Subtracting `dailyCost` again is wrong.
 
-- Add a unit test in `src/test/` for `computeCostProfileCPM` covering:
-  - fixed share applied correctly when monthly_miles is set
-  - fixed share dropped + warning emitted when monthly_miles is 0
-  - per-bucket breakdown sums to total CPM
+Concrete example — driver with $50/day meals, $0 lodging, 2.5 days/1000 mi, totalMiles=10,000:
 
-### Out of scope
+- Per-day contribution to CPM: (50 × 25) / 10,000 = $0.125/mi
+- `variableCost` includes $1,250 of per-day already.
+- Dashboard then subtracts another `dailyCost = 25 × 50 = $1,250`.
+- Projected Net is **$1,250 low** in this period for that single driver setting.
 
-- No schema changes.
-- No changes to recurring expenses, fuel logs, or actual expense classification.
-- No changes to user_settings, lane stats, broker stats, or alerts.
-- No notification, email, or pricing changes.
+Fix direction: use only `variableCost = cpm * totalMiles` (and drop the manual `dailyCost`). This makes Dashboard consistent with `useProfitCheck` and `LoadForm` live preview, which already do it correctly.
 
-### Verification
+---
 
-- Enter Truck = 1800, Trailer = 200, Insurance = 600, Permits = 100, ELD = 80, Monthly miles = 10000 → preview shows total ≈ $0.28/mi with itemized buckets including `truck: $0.18`.
-- Clear Monthly miles → preview shows variable buckets only AND an amber "fixed not applied" warning.
-- Open Profit Check on a load → card shows per-bucket CPM and per-bucket trip cost, fixed line included.
-- Build passes. Existing Profit Check tests still pass.
+### 2. UX gap — Dashboard silently drops fixed costs when monthly miles missing
+
+`computeCostProfileCPM` returns `warnings: ['fixed_missing_monthly_miles']` when fixed costs are set but `estimated_monthly_miles` is empty. The Dashboard discards the warnings array entirely. So a driver who entered $1,800 truck + $600 insurance but forgot monthly miles sees:
+
+- Settings preview: amber warning (good).
+- Profit Check card on a load: amber warning (good).
+- **Dashboard Projected Net: no warning, fixed costs simply disappear** → number looks falsely high.
+
+Fix direction: when `warnings.includes('fixed_missing_monthly_miles')`, either show a small amber chip on the Projected Net tile ("Fixed costs not applied — set monthly miles") or substitute the "Set up" state.
+
+---
+
+### 3. UX gap — LoadForm live preview hides the same warning
+
+`LoadForm.tsx` ~line 900:
+
+```text
+const cpm = computeCostProfileCPM(costProfile, totalMi).cpm;
+const estExpenses = cpm * totalMi;
+```
+
+Same pattern: the `warnings` field from the destructured result is discarded. The user sees a "Net Profit" inside the form that excludes fixed costs without telling them, even though the Profit Check card immediately below it does warn. Two numbers, two truths.
+
+Fix direction: surface a small inline note in the live preview when `warnings.includes('fixed_missing_monthly_miles')`.
+
+---
+
+### 4. Behavior — `profileHasUsableData` blocks fixed-only profiles
+
+`profileHasUsableData`:
+
+```text
+return fuelOk || anyVariable || (anyFixed && estimated_monthly_miles > 0);
+```
+
+A driver who enters only fixed costs (truck/insurance/permits) but forgets monthly miles is considered to have **no usable profile** → `useProfitCheck` falls back to history (likely 0), and the Profit Check card shows "Estimate only" instead of the missing-miles warning. The hook's own warning never fires because `profileHasUsableData` short-circuits before `computeCostProfileCPM` runs.
+
+Fix direction: treat "fixed entered but no monthly miles" as usable-but-warn — call `computeCostProfileCPM` anyway so the warning surfaces in the Profit Check card with a clear CTA, instead of silently degrading to history.
+
+---
+
+### 5. Fragile — ProfitCheckCard reverse-derives total miles
+
+`ProfitCheckCard.tsx` ~line 129:
+
+```text
+const totalMiles = result.estimatedVariableCost > 0 && result.effectiveRpm > 0
+  ? result.estimatedGross / result.effectiveRpm
+  : 0;
+```
+
+This works arithmetically (`effectiveRpm = gross / totalMiles` ⇒ `totalMiles = gross / effectiveRpm`) but is fragile and floating-point-noisy. The hook already knows `totalMiles` — it should pass it through on `ProfitCheckResult` so the per-bucket trip cost line is exact.
+
+Not a correctness bug today, just brittle.
+
+---
+
+### 6. Minor — "Looks low for monthly bill" hint may false-positive
+
+`CostProfileSettings.tsx` `lowMonthlyHint` flags any monthly value `< 20` as suspicious. That correctly catches a driver typing `0.18` thinking it's `$/mi`, but also flags legitimate small monthly fees (e.g., a $10/mo add-on rider, $15 phone line share). Low-impact; consider tightening to `< 5` or wording it as a soft suggestion only.
+
+---
+
+### 7. Minor — `min_margin_pct` check requires `cpm > 0`
+
+`useProfitCheck.ts` line 150:
+
+```text
+const meetsMinMargin = profileMinMargin != null && cpm > 0 ? estimatedMarginPct >= profileMinMargin : null;
+```
+
+If a driver has set a `min_margin_pct` target but `cpm === 0` (e.g., fixed-only profile + missing miles, see finding #4), the verdict is rendered as "no opinion" instead of warning that we couldn't evaluate it. Same root cause as #4; fixing #4 fixes this naturally.
+
+---
+
+## What is verified correct
+
+- `computeCostProfileCPM` math: fuel (`diesel / mpg`), per-mile variables, fixed share (`bill / monthlyMiles`), per-day share (`(meals+lodging) * days / totalMiles`) — all dimensionally correct and unit-tested.
+- `useProfitCheck` cost-source priority: profile > 60-day history > none. Correct.
+- `useProfitCheck` per-load math: `variableCost = cpm * totalMiles`, `net = gross - variableCost`, `marginPct = net/gross*100`. Correct, no double counting.
+- `LoadForm` live preview cost math itself (only the warning surfacing is missing).
+- `ProfitCheckCard` per-bucket breakdown ordering and sum equality to `cpm` (covered by test).
+- Settings live preview: itemized buckets, warning banner, required-field styling on Estimated monthly miles — all correct.
+
+---
+
+## Recommended fix order (no code changes yet — awaiting approval)
+
+1. **Critical — DashboardView Projected Net**: drop the manual `dailyCost` subtraction; use `variableCost = cpm * totalMiles` only.
+2. **Critical — Dashboard warning surfacing**: when `computeCostProfileCPM(...).warnings` contains `fixed_missing_monthly_miles`, show an amber chip on the Projected Net tile linking to Settings → Cost Profile.
+3. **High — LoadForm live preview**: surface the same warning inline so the form and the Profit Check card never disagree.
+4. **High — `profileHasUsableData` / `useProfitCheck**`: allow fixed-only profiles to flow through so the missing-miles warning reaches the driver instead of falling back to history.
+5. **Low — pass `totalMiles` through `ProfitCheckResult**` to remove the gross/rpm reverse-derivation in the breakdown row.
+6. **Optional polish — tighten the `< 20` "looks low" threshold or reword it.
+
+No database, schema, or business-logic changes are required. All fixes are localized to:
+
+- `src/components/DashboardView.tsx`
+- `src/components/LoadForm.tsx`
+- `src/hooks/useProfitCheck.ts` (small)
+- `src/hooks/useCostProfile.ts` (small — `profileHasUsableData`)
+- `src/components/ProfitCheckCard.tsx` (polish only)
+
+Existing tests in `src/test/costProfileCPM.test.ts` continue to pass; one new test should cover the Dashboard scenario (per-day not double-counted) and the fixed-only-no-miles path.
