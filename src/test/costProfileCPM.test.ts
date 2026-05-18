@@ -54,4 +54,35 @@ describe('computeCostProfileCPM', () => {
     const sum = Object.values(breakdown).reduce((s, v) => s + v, 0);
     expect(sum).toBeCloseTo(cpm, 6);
   });
+
+  it('includes per-day costs in CPM exactly once (no double-counting)', () => {
+    // Using only per-day costs so we can isolate that bucket.
+    const profile: CostProfile = {
+      ...base,
+      truck_payment: null, trailer_payment: null, insurance_monthly: null,
+      permits_licensing_monthly: null, eld_software_monthly: null, other_fixed_monthly: null,
+      estimated_monthly_miles: null,
+      meals_per_day: 50, lodging_per_day: 0, days_per_1000_miles: 2.5,
+    };
+    const totalMiles = 1000;
+    const { cpm, breakdown } = computeCostProfileCPM(profile, totalMiles);
+    // (50 * 2.5 days) / 1000 mi = 0.125/mi
+    expect(breakdown.perDay).toBeCloseTo(0.125, 6);
+    expect(cpm).toBeCloseTo(0.125, 6);
+    // Dashboard math: variableCost = cpm * totalMiles already includes per-day.
+    // Subtracting an extra dailyCost would double-count it. Guard against regression.
+    const variableCost = cpm * totalMiles;
+    expect(variableCost).toBeCloseTo(125, 6); // = 50 * 2.5 days, NOT 250
+  });
+
+  it('fixed-only profile with missing monthly miles still emits warning', () => {
+    const profile: CostProfile = {
+      ...base,
+      estimated_monthly_miles: null,
+      avg_mpg: null, diesel_price_per_gallon: null,
+    };
+    const { cpm, warnings } = computeCostProfileCPM(profile, 500);
+    expect(cpm).toBe(0);
+    expect(warnings).toContain('fixed_missing_monthly_miles');
+  });
 });
