@@ -124,9 +124,10 @@ export function useProfitCheck(input: ProfitCheckInput | null) {
   const op = opMetricsQuery.data;
 
   // Layered CPM: prefer driver-defined Cost Profile, fall back to rolling 60-day actuals.
-  const profileCPM = profileHasUsableData(costProfile)
-    ? computeCostProfileCPM(costProfile, totalMiles).cpm
-    : 0;
+  const profileResult = profileHasUsableData(costProfile)
+    ? computeCostProfileCPM(costProfile, totalMiles)
+    : { cpm: 0, breakdown: {}, warnings: [] as string[] };
+  const profileCPM = profileResult.cpm;
   const historyCPM = op?.rolling_cost_per_mile ? Number(op.rolling_cost_per_mile) : 0;
   const cpm = profileCPM > 0 ? profileCPM : historyCPM;
   const costSource: 'profile' | 'history' | 'none' =
