@@ -181,36 +181,55 @@ export function CostProfileSettings() {
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 pt-1">
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Enter the dollar amount you pay <span className="font-semibold text-foreground">every month</span>.
+              We divide by your monthly miles to spread it across each trip — e.g. $1,800 truck ÷ 10,000 mi = $0.18/mi.
+            </p>
+
+            {/* Monthly miles promoted to top — required for fixed costs to apply */}
+            <div className={`rounded-lg p-3 border ${fixedMissingMiles ? 'border-warning/40 bg-warning/5' : 'border-border bg-muted/30'}`}>
+              <Label className="text-xs font-semibold flex items-center gap-1">
+                Estimated monthly miles
+                <span className="text-warning">*</span>
+              </Label>
+              <Input inputMode="decimal" placeholder="10000" value={form.estimated_monthly_miles} onChange={(e) => set('estimated_monthly_miles', e.target.value)} />
+              <p className="text-[10px] text-muted-foreground mt-1">Required — used to spread fixed costs across miles you actually drive.</p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold">Truck payment</Label>
+                <Label className="text-xs font-semibold">Truck payment ($/month)</Label>
                 <Input inputMode="decimal" placeholder="1800" value={form.truck_payment} onChange={(e) => set('truck_payment', e.target.value)} />
+                {lowMonthlyHint('truck_payment') && (
+                  <p className="text-[10px] text-warning mt-1">Looks low for a monthly bill. Enter the full $/month (e.g. 1800).</p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold">Trailer payment</Label>
+                <Label className="text-xs font-semibold">Trailer payment ($/month)</Label>
                 <Input inputMode="decimal" placeholder="0" value={form.trailer_payment} onChange={(e) => set('trailer_payment', e.target.value)} />
+                {lowMonthlyHint('trailer_payment') && (
+                  <p className="text-[10px] text-warning mt-1">Looks low for a monthly bill. Enter the full $/month.</p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold">Insurance</Label>
+                <Label className="text-xs font-semibold">Insurance ($/month)</Label>
                 <Input inputMode="decimal" placeholder="600" value={form.insurance_monthly} onChange={(e) => set('insurance_monthly', e.target.value)} />
+                {lowMonthlyHint('insurance_monthly') && (
+                  <p className="text-[10px] text-warning mt-1">Looks low for a monthly bill. Enter the full $/month.</p>
+                )}
               </div>
               <div>
-                <Label className="text-xs font-semibold">Permits/licensing</Label>
+                <Label className="text-xs font-semibold">Permits/licensing ($/month)</Label>
                 <Input inputMode="decimal" placeholder="100" value={form.permits_licensing_monthly} onChange={(e) => set('permits_licensing_monthly', e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs font-semibold">ELD/software/phone</Label>
+                <Label className="text-xs font-semibold">ELD / software / phone ($/month)</Label>
                 <Input inputMode="decimal" placeholder="80" value={form.eld_software_monthly} onChange={(e) => set('eld_software_monthly', e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs font-semibold">Other fixed</Label>
+                <Label className="text-xs font-semibold">Other fixed ($/month)</Label>
                 <Input inputMode="decimal" placeholder="0" value={form.other_fixed_monthly} onChange={(e) => set('other_fixed_monthly', e.target.value)} />
               </div>
-            </div>
-            <div>
-              <Label className="text-xs font-semibold">Estimated monthly miles</Label>
-              <Input inputMode="decimal" placeholder="10000" value={form.estimated_monthly_miles} onChange={(e) => set('estimated_monthly_miles', e.target.value)} />
-              <p className="text-[10px] text-muted-foreground mt-1">Used to spread fixed costs across miles you actually drive.</p>
             </div>
           </CollapsibleContent>
         </Collapsible>
