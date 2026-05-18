@@ -991,8 +991,16 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                     <p className="text-[11px] text-muted-foreground leading-snug pt-1 border-t border-border/30">
                       <Info className="inline h-3 w-3 mr-1 -mt-0.5" />
                       Your broker rate has not changed. "Real Pay Per Mile" spreads your pay across all miles you drove, loaded + empty, so you can see what your truck actually earns.
-                      {cpm <= 0 && ' Add a Cost Profile in Settings to see Take-Home & Take-Home Per Mile.'}
+                      {cpm <= 0 && !fixedMissingMiles && ' Add a Cost Profile in Settings to see Take-Home & Take-Home Per Mile.'}
                     </p>
+                    {fixedMissingMiles && (
+                      <div className="flex items-start gap-1.5 text-[11px] rounded-md bg-warning/10 border border-warning/30 px-2 py-1.5 mt-1">
+                        <AlertCircle className="h-3 w-3 text-warning shrink-0 mt-0.5" />
+                        <span className="text-warning leading-relaxed">
+                          Fixed monthly costs aren't included — add <span className="font-bold">Estimated monthly miles</span> in Settings → My Cost Profile.
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
