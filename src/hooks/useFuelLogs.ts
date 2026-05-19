@@ -39,18 +39,32 @@ export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
     queryKey: ['fuel_logs', user?.id, dateRange?.from, dateRange?.to],
     queryFn: async () => {
       if (!user) return [];
-      let q = supabase
-        .from('fuel_logs' as any)
-        .select('*')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false });
-      
-      if (dateRange?.from) q = q.gte('date', dateRange.from);
-      if (dateRange?.to) q = q.lte('date', dateRange.to);
-      
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as unknown as FuelLog[];
+      const buildQuery = () => {
+        let q = supabase
+          .from('fuel_logs' as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false });
+        if (dateRange?.from) q = q.gte('date', dateRange.from);
+        if (dateRange?.to) q = q.lte('date', dateRange.to);
+        return q;
+      };
+
+      // Fetch ALL rows in batches to bypass Supabase's default 1000-row cap.
+      // Matches the useExpenses pattern so fuel analytics/reports never silently
+      // undercount past 1k logs. Safety cap: 50 pages = 50k rows.
+      const FETCH_SIZE = 1000;
+      const all: FuelLog[] = [];
+      let offset = 0;
+      for (let i = 0; i < 50; i++) {
+        const { data, error } = await buildQuery().range(offset, offset + FETCH_SIZE - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as unknown as FuelLog[];
+        all.push(...batch);
+        if (batch.length < FETCH_SIZE) break;
+        offset += FETCH_SIZE;
+      }
+      return all;
     },
     enabled: !!user,
   });
