@@ -169,7 +169,7 @@ export function aggregateReport(args: {
   // expense representing the Fuel Log total so tax math deducts fuel
   // exactly once. The synthetic row is never persisted, never surfaced in
   // detail tables, byCategory, or monthly buckets.
-  const fuelTotalCost = filteredFuel.reduce((s, f) => s + num(f.total_cost), 0);
+  // fuelTotalCost already computed above for fuel stats.
   const syntheticFuelExpenseForTax: Expense | null =
     fuelLogsExist && fuelTotalCost > 0
       ? ({
