@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeCostProfileCPM, type CostProfile } from '@/hooks/useCostProfile';
+import { computeCostProfileCPM, type CostProfile } from '@/lib/costProfileMath';
 
 const base: CostProfile = {
   id: 'x',

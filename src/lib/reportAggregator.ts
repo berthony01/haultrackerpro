@@ -132,7 +132,19 @@ export function aggregateReport(args: {
   const filteredExpenses = expenses.filter(e => inRange(e.expense_date, range));
   const filteredFuel = fuelLogs.filter(f => inRange(f.date, range));
 
-  const summary = summarizeLoads(filteredLoads, filteredExpenses);
+  // Fuel double-count policy:
+  // If at least one Fuel Log exists in the report range, Fuel Logs are the
+  // canonical fuel source. Expense rows with category === 'Fuel' are removed
+  // from all report math (net profit, expense totals, by-category, deductible)
+  // to avoid double-counting. They still exist in the raw `expenses` array
+  // for detail tables, but every aggregate number derives from
+  // `expensesForMath`.
+  const fuelLogsExist = filteredFuel.length > 0;
+  const expensesForMath = fuelLogsExist
+    ? filteredExpenses.filter(e => e.category !== 'Fuel')
+    : filteredExpenses;
+
+  const summary = summarizeLoads(filteredLoads, expensesForMath);
   const cancelledLoads = onlyCancelled(filteredLoads);
   const activeLoads = excludeCancelled(filteredLoads);
 
@@ -151,10 +163,12 @@ export function aggregateReport(args: {
     avgFuelCostPerLoad: summary.loadCount > 0 ? fuelTotalCost / summary.loadCount : 0,
   };
 
-  // Tax (in-range)
-  const tax = computeTaxEstimate(activeLoads, filteredExpenses, settings);
+  // Tax (in-range) — pass the math-eligible expenses so fuel-category rows
+  // are not double-counted when Fuel Logs already supply the fuel cost.
+  const tax = computeTaxEstimate(activeLoads, expensesForMath, settings);
 
-  // Profit
+  // Profit — `expensesTotal` here is the non-fuel total when logs exist,
+  // and `fuel.totalCost` provides the canonical fuel line.
   const actualPay = activeLoads.reduce(
     (s, l) => s + (l.actual_pay_received != null ? num(l.actual_pay_received) : 0), 0);
   const expectedPay = activeLoads.reduce((s, l) => s + getLoadExpectedPay(l), 0);
@@ -177,10 +191,11 @@ export function aggregateReport(args: {
     avgRatePerMile: summary.totalMiles > 0 ? grossRevenue / summary.totalMiles : 0,
   };
 
-  // Expense stats
+  // Expense stats — built from `expensesForMath` so byCategory / totals do
+  // not duplicate fuel-category rows already counted via Fuel Logs.
   const catMap = new Map<string, { total: number; count: number }>();
   let largest = 0;
-  for (const e of filteredExpenses) {
+  for (const e of expensesForMath) {
     const amt = num(e.amount);
     if (amt > largest) largest = amt;
     const cur = catMap.get(e.category) ?? { total: 0, count: 0 };
@@ -193,18 +208,23 @@ export function aggregateReport(args: {
   const catTotal = (name: string) => catMap.get(name)?.total ?? 0;
   const knownCats = new Set(['Fuel', 'Maintenance', 'Repairs', 'Tires', 'Tolls', 'Parking']);
   const otherTotal = byCategory.filter(c => !knownCats.has(c.category)).reduce((s, c) => s + c.total, 0);
+  // Fuel line: prefer Fuel Logs when present, else the Fuel expense category.
+  // Never sum both — that was the source of the double-count.
+  const fuelStat = fuelLogsExist ? fuel.totalCost : catTotal('Fuel');
   const expenseStats = {
-    totalEntries: filteredExpenses.length,
+    totalEntries: expensesForMath.length,
     largest,
-    average: filteredExpenses.length > 0 ? expensesTotal / filteredExpenses.length : 0,
+    average: expensesForMath.length > 0 ? expensesTotal / expensesForMath.length : 0,
     byCategory,
-    fuel: catTotal('Fuel') + fuel.totalCost,
+    fuel: fuelStat,
     maintenance: catTotal('Maintenance') + catTotal('Repairs') + catTotal('Tires'),
     tolls: catTotal('Tolls'),
     parking: catTotal('Parking'),
     other: otherTotal,
+    // Deductible = non-fuel expenses + canonical fuel cost (single-counted).
     deductibleEstimate: expensesTotal + fuel.totalCost,
   };
+
 
   // Load stats
   let bestPaying: { label: string; amount: number } | null = null;
@@ -245,7 +265,7 @@ export function aggregateReport(args: {
     cur.loads += 1;
     monthMap.set(key, cur);
   }
-  for (const e of filteredExpenses) {
+  for (const e of expensesForMath) {
     const key = format(startOfMonth(parseISO(e.expense_date)), 'yyyy-MM');
     const cur = monthMap.get(key) ?? { month: key, gross: 0, expenses: 0, fuel: 0, net: 0, loads: 0 };
     cur.expenses += num(e.amount);
