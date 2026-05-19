@@ -38,7 +38,7 @@ export function computeTaxEstimate(
   const empty: TaxEstimateResult = {
     enabled: false, seTax: 0, federalTax: 0, stateTax: 0, bufferTax: 0,
     totalTax: 0, netProfit: 0, grossRevenue: 0, totalExpenses: 0,
-    profitAfterTax: 0, baseLabel: 'net', totalPercent: 0,
+    profitAfterTax: 0, baseLabel: 'net', totalPercent: 0, effectivePercent: 0,
   };
   if (!settings?.tax_estimator_enabled) return empty;
 
@@ -64,7 +64,7 @@ export function computeTaxEstimate(
     return {
       ...empty, enabled: true,
       grossRevenue, totalExpenses, netProfit, profitAfterTax: netProfit,
-      baseLabel, totalPercent: totalRate * 100,
+      baseLabel, totalPercent: totalRate * 100, effectivePercent: 0,
     };
   }
 
@@ -76,6 +76,7 @@ export function computeTaxEstimate(
   const stateTax = incomeForIncomeTax * stateRate;
   const bufferTax = taxBase * bufferRate;
   const totalTax = seTax + federalTax + stateTax + bufferTax;
+  const effectivePercent = taxBase > 0 ? (totalTax / taxBase) * 100 : 0;
 
   return {
     enabled: true,
@@ -84,6 +85,7 @@ export function computeTaxEstimate(
     profitAfterTax: netProfit - totalTax,
     baseLabel,
     totalPercent: totalRate * 100,
+    effectivePercent,
   };
 }
 
