@@ -265,7 +265,7 @@ export function aggregateReport(args: {
     cur.loads += 1;
     monthMap.set(key, cur);
   }
-  for (const e of filteredExpenses) {
+  for (const e of expensesForMath) {
     const key = format(startOfMonth(parseISO(e.expense_date)), 'yyyy-MM');
     const cur = monthMap.get(key) ?? { month: key, gross: 0, expenses: 0, fuel: 0, net: 0, loads: 0 };
     cur.expenses += num(e.amount);
