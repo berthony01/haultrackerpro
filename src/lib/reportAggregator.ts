@@ -165,7 +165,31 @@ export function aggregateReport(args: {
 
   // Tax (in-range) — pass the math-eligible expenses so fuel-category rows
   // are not double-counted when Fuel Logs already supply the fuel cost.
-  const tax = computeTaxEstimate(activeLoads, expensesForMath, settings);
+  // When Fuel Logs are canonical, synthesize a single report-only Fuel
+  // expense representing the Fuel Log total so tax math deducts fuel
+  // exactly once. The synthetic row is never persisted, never surfaced in
+  // detail tables, byCategory, or monthly buckets.
+  // fuelTotalCost already computed above for fuel stats.
+  const syntheticFuelExpenseForTax: Expense | null =
+    fuelLogsExist && fuelTotalCost > 0
+      ? ({
+          id: '__report_only_fuel_logs__',
+          user_id: '__report_only__',
+          expense_date: range.from,
+          category: 'Fuel',
+          amount: fuelTotalCost,
+          gallons: null,
+          linked_load_id: null,
+          notes: null,
+          expense_type: 'variable',
+          created_at: range.from,
+          updated_at: range.from,
+        } as unknown as Expense)
+      : null;
+  const taxExpenses = syntheticFuelExpenseForTax
+    ? [...expensesForMath, syntheticFuelExpenseForTax]
+    : expensesForMath;
+  const tax = computeTaxEstimate(activeLoads, taxExpenses, settings);
 
   // Profit — `expensesTotal` here is the non-fuel total when logs exist,
   // and `fuel.totalCost` provides the canonical fuel line.
