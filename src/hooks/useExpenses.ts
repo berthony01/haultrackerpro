@@ -143,7 +143,12 @@ export function useExpenses(dateRange?: DateRange, page?: number) {
 
   const deleteExpense = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expenses').delete().eq('id', id);
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses'] }),
