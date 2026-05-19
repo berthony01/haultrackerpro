@@ -267,6 +267,7 @@ export function aggregateReport(args: {
   return {
     range,
     loads: filteredLoads,
+    activeLoads,
     cancelledLoads,
     expenses: filteredExpenses,
     fuelLogs: filteredFuel,
