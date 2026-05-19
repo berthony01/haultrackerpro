@@ -4,7 +4,9 @@ import type { Load } from '@/hooks/useLoads';
 import type { Expense } from '@/hooks/useExpenses';
 import type { FuelLog } from '@/hooks/useFuelLogs';
 
-const range = { from: '2025-01-01', to: '2025-01-31', label: 'Jan 2025', key: 'jan_2025' } as const;
+import type { DateRange } from '@/lib/reportRanges';
+
+const range: DateRange = { from: '2025-01-01', to: '2025-01-31', label: 'Jan 2025', key: 'this_month' };
 
 const baseLoad: Load = {
   id: 'L1',
