@@ -583,10 +583,10 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
   }
 
   // 9. Mileage breakdown (mileage report)
-  if (type === 'mileage' && agg.loads.length > 0) {
+  if (type === 'mileage' && agg.activeLoads.length > 0) {
     y = ensureSpace(doc, y, 80, agg, type);
     y = sectionTitle(doc, y, 'Mileage Breakdown');
-    const body = agg.loads.map(l => {
+    const body = agg.activeLoads.map(l => {
       const op = getLoadOperatingMiles(l);
       const dh = Number(l.deadhead_miles);
       const dhPct = op > 0 ? (dh / op) * 100 : 0;
