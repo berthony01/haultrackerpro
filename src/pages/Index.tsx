@@ -74,7 +74,6 @@ const Index = () => {
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
-  const { loads, isLoading, addLoad, updateLoad, deleteLoad } = useLoads(dateRange);
   const [page, setPage] = useState('dashboard');
   const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
