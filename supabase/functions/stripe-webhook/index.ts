@@ -252,8 +252,14 @@ serve(async (req) => {
         }
 
         const priceId = subscription.items.data[0]?.price?.id || "";
-        const planKey = resolvePlanKey(priceId);
+        const resolvedPlan = resolvePlanKey(priceId);
         const isActive = subscription.status === "active";
+
+        if (isActive && !resolvedPlan) {
+          logStep("Skipping Pro upsert — unknown price ID on active sub", { priceId, subId: subscription.id });
+          break;
+        }
+        const planKey = resolvedPlan ?? "free";
         const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
         const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
         const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
