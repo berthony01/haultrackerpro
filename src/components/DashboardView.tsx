@@ -394,13 +394,28 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   </Tooltip>
                 </TooltipProvider>
                 {projectedNet != null ? (
-                  <StatCard
-                    label="Projected Net"
-                    value={formatCurrency(projectedNet)}
-                    icon={projectedNet >= 0 ? TrendingUp : TrendingDown}
-                    subtitle={missingMiles ? 'Fixed costs not applied — set monthly miles' : 'Based on Cost Profile'}
-                    variant={missingMiles ? 'warning' : (projectedNet >= 0 ? 'success' : 'danger')}
-                  />
+                  missingMiles ? (
+                    <div
+                      className="cursor-pointer active:scale-95 transition-transform"
+                      onClick={() => onNavigate?.('settings')}
+                    >
+                      <StatCard
+                        label="Projected Net"
+                        value={formatCurrency(projectedNet)}
+                        icon={projectedNet >= 0 ? TrendingUp : TrendingDown}
+                        subtitle="Fixed costs not applied — set monthly miles"
+                        variant="warning"
+                      />
+                    </div>
+                  ) : (
+                    <StatCard
+                      label="Projected Net"
+                      value={formatCurrency(projectedNet)}
+                      icon={projectedNet >= 0 ? TrendingUp : TrendingDown}
+                      subtitle="Based on Cost Profile"
+                      variant={projectedNet >= 0 ? 'success' : 'danger'}
+                    />
+                  )
                 ) : missingMiles ? (
                   <div
                     className="cursor-pointer active:scale-95 transition-transform"

@@ -34,7 +34,9 @@ export type CostProfileUpdate = Partial<Omit<CostProfile, 'id' | 'user_id' | 'cr
 
 /**
  * Determines whether the cost profile has enough data to drive a per-load CPM.
- * Treats "any per-mile or fuel input" as the minimum viable profile.
+ * Treats any per-mile, fuel, OR fixed-monthly input as usable. Fixed-only
+ * profiles are intentionally included so the downstream `fixed_missing_monthly_miles`
+ * warning can surface in the UI instead of silently falling back to history.
  */
 export function profileHasUsableData(p: CostProfile | null | undefined): boolean {
   if (!p) return false;

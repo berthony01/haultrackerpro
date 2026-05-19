@@ -11,14 +11,15 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
   console.log(`[STRIPE-WEBHOOK] ${step}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
-/** Resolve plan_key from a Stripe price ID */
-function resolvePlanKey(priceId: string): string {
+/** Resolve plan_key from a Stripe price ID. Returns null for unknown prices —
+ *  callers MUST NOT grant Pro for an unknown price.
+ */
+function resolvePlanKey(priceId: string): string | null {
   const monthlyPriceId = Deno.env.get("STRIPE_PRO_MONTHLY_PRICE_ID");
   const yearlyPriceId = Deno.env.get("STRIPE_PRO_YEARLY_PRICE_ID");
-  if (priceId === monthlyPriceId) return "pro_monthly";
-  if (priceId === yearlyPriceId) return "pro_yearly";
-  // Fallback for legacy or unknown price IDs — treat as pro
-  return "pro_monthly";
+  if (priceId && priceId === monthlyPriceId) return "pro_monthly";
+  if (priceId && priceId === yearlyPriceId) return "pro_yearly";
+  return null;
 }
 
 const RECRUITER_PLAN_LIMITS: Record<string, number> = {
@@ -168,7 +169,12 @@ serve(async (req) => {
         if (userId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const priceId = subscription.items.data[0]?.price?.id || "";
-          const planKey = session.metadata?.plan_key || resolvePlanKey(priceId);
+          const resolved = resolvePlanKey(priceId);
+          const planKey = session.metadata?.plan_key || resolved;
+          if (!planKey) {
+            logStep("Skipping Pro upsert — unknown price ID and no plan_key metadata", { priceId, userId });
+            break;
+          }
           const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
           const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
           const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
@@ -246,8 +252,14 @@ serve(async (req) => {
         }
 
         const priceId = subscription.items.data[0]?.price?.id || "";
-        const planKey = resolvePlanKey(priceId);
+        const resolvedPlan = resolvePlanKey(priceId);
         const isActive = subscription.status === "active";
+
+        if (isActive && !resolvedPlan) {
+          logStep("Skipping Pro upsert — unknown price ID on active sub", { priceId, subId: subscription.id });
+          break;
+        }
+        const planKey = resolvedPlan ?? "free";
         const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
         const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
         const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing

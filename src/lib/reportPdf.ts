@@ -470,11 +470,11 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
   }
 
   // 3. Loads Table
-  if (wantsLoadsTable(type) && agg.loads.length > 0) {
+  if (wantsLoadsTable(type) && agg.activeLoads.length > 0) {
     y = ensureSpace(doc, y, 80, agg, type);
     y = sectionTitle(doc, y, 'Load Breakdown');
     const head = [['Date', 'Pickup', 'Dropoff', 'Pay Model', 'Loaded Mi', 'DH Mi', 'Est. Pay', 'Actual Pay', 'Status']];
-    const body = agg.loads.map(l => {
+    const body = agg.activeLoads.map(l => {
       const status = (l.status ?? 'completed') === 'cancelled' ? 'Cancelled' : 'Completed';
       return [
         fmtDate(getEffectiveDate(l)),
@@ -583,10 +583,10 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
   }
 
   // 9. Mileage breakdown (mileage report)
-  if (type === 'mileage' && agg.loads.length > 0) {
+  if (type === 'mileage' && agg.activeLoads.length > 0) {
     y = ensureSpace(doc, y, 80, agg, type);
     y = sectionTitle(doc, y, 'Mileage Breakdown');
-    const body = agg.loads.map(l => {
+    const body = agg.activeLoads.map(l => {
       const op = getLoadOperatingMiles(l);
       const dh = Number(l.deadhead_miles);
       const dhPct = op > 0 ? (dh / op) * 100 : 0;
@@ -607,7 +607,9 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
 
   // 10. Settlement: missing pay table
   if (type === 'settlement_dispute') {
-    const issues = agg.loads.filter(l => {
+    // Cancelled loads must NEVER appear as disputed/unpaid — they have no
+    // expected pay in the dispute sense.
+    const issues = agg.activeLoads.filter(l => {
       const expected = getLoadExpectedPay(l);
       const actual = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
       return actual == null || Math.abs((actual ?? 0) - expected) > 0.01;

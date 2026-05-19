@@ -108,10 +108,10 @@ export function buildReportCSV(type: ReportType, agg: ReportAggregation): string
     lines.push(blank());
   }
 
-  if (wantsLoads && agg.loads.length > 0) {
+  if (wantsLoads && agg.activeLoads.length > 0) {
     lines.push(row('LOAD BREAKDOWN'));
     lines.push(row('Date', 'Pickup', 'Dropoff', 'Loaded Mi', 'Deadhead Mi', 'Total Mi', 'Pay Model', 'Estimated Pay', 'Actual Pay', 'Status', 'Notes'));
-    for (const l of agg.loads) {
+    for (const l of agg.activeLoads) {
       lines.push(row(
         safeDate(getEffectiveDate(l)),
         l.pickup_location,

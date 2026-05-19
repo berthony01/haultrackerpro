@@ -226,6 +226,36 @@ serve(async (req) => {
       });
     }
 
+    // ── Server-side Pro gating ───────────────────────────────────────
+    // Free types: parse_expense, parse_ratecon. Pro types require an active
+    // subscription (or admin override). Never trust client-side isPro.
+    const PRO_TYPES = new Set(["lane_advice", "weekly_report", "tax_tips"]);
+    if (PRO_TYPES.has(type)) {
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("status")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .maybeSingle();
+      let isPro = !!sub;
+      if (!isPro) {
+        const { data: admin } = await supabase
+          .from("admin_users")
+          .select("user_id")
+          .eq("user_id", userId)
+          .maybeSingle();
+        isPro = !!admin;
+      }
+      if (!isPro) {
+        log("Pro gate blocked", { userId, type });
+        return new Response(JSON.stringify({ error: "Pro required" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+
     const model = MODEL_MAP[type] || "google/gemini-3-flash-preview";
     const contextStr = JSON.stringify(context);
     const contextHash = simpleHash(contextStr);
