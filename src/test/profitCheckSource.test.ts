@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectCostSource } from '@/hooks/useProfitCheck';
+import { selectCostSource } from '@/lib/profitCheckMath';
 
 describe('selectCostSource', () => {
   it('uses profile CPM when profile produces a positive number', () => {
