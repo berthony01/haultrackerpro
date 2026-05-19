@@ -102,6 +102,22 @@ const Index = () => {
   };
 
   const allLoadsQuery = useLoads();
+  const { addLoad, updateLoad, deleteLoad } = allLoadsQuery;
+
+  // Client-side effective-date filter for the Loads list view.
+  // Effective date = dropoff_date ?? load_date (matches useLoads contract).
+  // from/to are inclusive ISO yyyy-mm-dd strings; invalid/missing dates are skipped.
+  const filteredLoadsForList = useMemo(() => {
+    const { from, to } = dateRange;
+    if (!from && !to) return allLoadsQuery.loads;
+    return allLoadsQuery.loads.filter((l) => {
+      const eff = l.dropoff_date ?? l.load_date;
+      if (!eff) return false;
+      if (from && eff < from) return false;
+      if (to && eff > to) return false;
+      return true;
+    });
+  }, [allLoadsQuery.loads, dateRange]);
   const allExpensesQuery = useExpenses();
   const allFuelLogsQuery = useFuelLogs();
   const loadStopsHook = useLoadStops();
