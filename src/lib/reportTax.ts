@@ -16,7 +16,18 @@ export interface TaxEstimateResult {
   totalExpenses: number;
   profitAfterTax: number;
   baseLabel: 'gross' | 'net';
+  /**
+   * Configured nominal reserve rate (federal + state + SE + buffer) as a percentage.
+   * This is what the user set — NOT the actual effective tax rate. Use
+   * `effectivePercent` for the realized rate against the tax base.
+   */
   totalPercent: number;
+  /**
+   * Actual effective tax rate: totalTax / taxBase * 100. Zero when taxBase <= 0.
+   * Always <= totalPercent for a normal SE-tax case because of the 92.35%
+   * SE adjustment and the half-SE income-tax deduction.
+   */
+  effectivePercent: number;
 }
 
 export function computeTaxEstimate(
