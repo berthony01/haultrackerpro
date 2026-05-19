@@ -607,7 +607,9 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
 
   // 10. Settlement: missing pay table
   if (type === 'settlement_dispute') {
-    const issues = agg.loads.filter(l => {
+    // Cancelled loads must NEVER appear as disputed/unpaid — they have no
+    // expected pay in the dispute sense.
+    const issues = agg.activeLoads.filter(l => {
       const expected = getLoadExpectedPay(l);
       const actual = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
       return actual == null || Math.abs((actual ?? 0) - expected) > 0.01;
