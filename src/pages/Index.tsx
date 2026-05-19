@@ -803,14 +803,14 @@ const Index = () => {
             )}
             {page === 'loads' && (
               <LoadsListView
-                loads={loads}
+                loads={filteredLoadsForList}
                 expenses={allExpensesQuery.expenses}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onUpdate={handleQuickUpdate}
                 onDuplicate={handleDuplicate}
                 onDateRangeChange={(from, to) => setDateRange({ from, to })}
-                isLoading={isLoading}
+                isLoading={allLoadsQuery.isLoading}
                 initialPayFilter={loadsPayFilter}
               />
             )}
