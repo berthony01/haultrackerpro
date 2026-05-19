@@ -4,6 +4,10 @@
 export interface ScheduleCLine {
   line: string;
   description: string;
+  /** Optional cautionary note for categories where the Schedule C treatment is
+   * not straightforward (e.g. truck loan payments mixing principal, interest,
+   * and depreciation). Consumers may surface this in tooltips/disclaimers. */
+  note?: string;
 }
 
 // Map each expense category to its Schedule C line
@@ -17,8 +21,13 @@ export const SCHEDULE_C_MAP: Record<string, ScheduleCLine> = {
   'Insurance': { line: '15', description: 'Insurance (other than health)' },
   'Permits': { line: '22', description: 'Taxes and licenses' },
   'Licensing': { line: '22', description: 'Taxes and licenses' },
-  'Truck Payment': { line: '13', description: 'Depreciation / Section 179' },
+  'Truck Payment': {
+    line: '13',
+    description: 'Truck loan payment — review (principal not deductible; interest and depreciation/Section 179 handled separately)',
+    note: 'A truck loan payment is not automatically fully deductible. Loan principal is generally not directly deductible. Interest may be deductible separately. Depreciation / Section 179 is calculated separately on the truck\'s basis and may belong on Line 13 / Form 4562. True operating lease payments are different and map to Lease Payment / Line 20a. Verify with a tax professional.',
+  },
   'Lease Payment': { line: '20a', description: 'Rent or lease (vehicles, machinery, equipment)' },
+
   'Phone': { line: '25', description: 'Utilities' },
   'ELD/Software': { line: '18', description: 'Office expense' },
   'Scale/Weigh': { line: '27a', description: 'Other expenses' },
