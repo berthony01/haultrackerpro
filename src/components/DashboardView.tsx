@@ -38,7 +38,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, parseISO, isWithinInterval, format } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, subYears, differenceInCalendarDays, addDays, parseISO, isWithinInterval, isValid, format } from 'date-fns';
 import { Shield } from 'lucide-react';
 import { PremiumKpiCard } from '@/components/premium/PremiumKpiCard';
 import { ProfitOverviewChart } from '@/components/premium/ProfitOverviewChart';
