@@ -163,11 +163,16 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No link</SelectItem>
-                  {recentLoads.map((load) => (
-                    <SelectItem key={load.id} value={load.id}>
-                      {format(new Date(load.dropoff_date ?? load.load_date), 'MMM d')} — {load.pickup_location.split(',')[0]} → {load.dropoff_location.split(',')[0]}
-                    </SelectItem>
-                  ))}
+                  {recentLoads.map((load) => {
+                    const raw = load.dropoff_date ?? load.load_date;
+                    const parsed = raw ? parseISO(raw) : null;
+                    const dateLabel = parsed && isValid(parsed) ? format(parsed, 'MMM d') : 'Unknown date';
+                    return (
+                      <SelectItem key={load.id} value={load.id}>
+                        {dateLabel} — {load.pickup_location.split(',')[0]} → {load.dropoff_location.split(',')[0]}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
