@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Fuel, DollarSign, Gauge, Calendar, MapPin, FileText, ArrowLeft, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 
 interface FuelLogFormProps {
   onSubmit: (data: FuelLogInsert) => void;
@@ -163,11 +163,16 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No link</SelectItem>
-                  {recentLoads.map((load) => (
-                    <SelectItem key={load.id} value={load.id}>
-                      {format(new Date(load.dropoff_date ?? load.load_date), 'MMM d')} — {load.pickup_location.split(',')[0]} → {load.dropoff_location.split(',')[0]}
-                    </SelectItem>
-                  ))}
+                  {recentLoads.map((load) => {
+                    const raw = load.dropoff_date ?? load.load_date;
+                    const parsed = raw ? parseISO(raw) : null;
+                    const dateLabel = parsed && isValid(parsed) ? format(parsed, 'MMM d') : 'Unknown date';
+                    return (
+                      <SelectItem key={load.id} value={load.id}>
+                        {dateLabel} — {load.pickup_location.split(',')[0]} → {load.dropoff_location.split(',')[0]}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
