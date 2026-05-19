@@ -23,6 +23,29 @@ interface DateRange {
 
 const PAGE_SIZE = 50;
 
+/**
+ * Build a Supabase `.or()` filter so the server returns any load whose
+ * load_date OR dropoff_date falls inside the requested window. Previously
+ * we filtered only on load_date, which silently dropped loads picked up
+ * before the window but delivered inside it.
+ */
+function buildEffectiveDateOr(from?: string, to?: string): string | null {
+  const loadParts: string[] = [];
+  const dropParts: string[] = [];
+  if (from) {
+    loadParts.push(`load_date.gte.${from}`);
+    dropParts.push(`dropoff_date.gte.${from}`);
+  }
+  if (to) {
+    loadParts.push(`load_date.lte.${to}`);
+    dropParts.push(`dropoff_date.lte.${to}`);
+  }
+  if (loadParts.length === 0) return null;
+  const loadClause = loadParts.length > 1 ? `and(${loadParts.join(',')})` : loadParts[0];
+  const dropClause = dropParts.length > 1 ? `and(${dropParts.join(',')})` : dropParts[0];
+  return `${loadClause},${dropClause}`;
+}
+
 export function useLoads(dateRange?: DateRange, page?: number) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -38,9 +61,11 @@ export function useLoads(dateRange?: DateRange, page?: number) {
         .eq('user_id', user.id)
         .order('load_date', { ascending: false });
 
-      // Server-side date filtering
-      if (dateRange?.from) query = query.gte('load_date', dateRange.from);
-      if (dateRange?.to) query = query.lte('load_date', dateRange.to);
+      // Server-side effective-date filtering (load_date OR dropoff_date).
+      // NOTE: totalCount reflects this OR-prefilter which is a superset of the
+      // client-filtered list below — it never underfetches.
+      const orFilter = buildEffectiveDateOr(dateRange?.from, dateRange?.to);
+      if (orFilter) query = query.or(orFilter);
 
       // Apply pagination range if page is provided
       if (page !== undefined) {
@@ -54,7 +79,7 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
       let filtered = data ?? [];
 
-      // Additional client-side effective-date filtering for precision
+      // Client-side refinement on effective date for precision
       if (dateRange?.from) {
         filtered = filtered.filter(l => getEffectiveDate(l) >= dateRange.from!);
       }
@@ -90,10 +115,12 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
   const updateLoad = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: LoadUpdate }) => {
+      if (!user) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('loads')
         .update(data)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loads'] }),
@@ -101,7 +128,12 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
   const deleteLoad = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('loads').delete().eq('id', id);
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('loads')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loads'] }),
