@@ -64,15 +64,21 @@ serve(async (req) => {
       }
       logStep("Resolved plan key to price ID", { planKey, priceId });
     } else if (body.priceId) {
-      // Legacy support — validate against known price IDs
-      priceId = body.priceId as string;
-      const knownPriceIds = Object.values(PLAN_KEY_TO_ENV)
+      // Legacy support — STRICT allowlist. Unknown price IDs are rejected
+      // (previous behavior allowed them through with only a warning, which
+      // let any Stripe price ID create a Pro checkout).
+      const candidate = body.priceId as string;
+      const allowedPriceIds = Object.values(PLAN_KEY_TO_ENV)
         .map((env) => Deno.env.get(env))
-        .filter(Boolean);
-      if (!knownPriceIds.includes(priceId)) {
-        logStep("Warning: legacy priceId not in known list", { priceId });
-        // Still allow — backward compat
+        .filter((v): v is string => !!v);
+      if (!allowedPriceIds.includes(candidate)) {
+        logStep("Rejected unknown legacy priceId", { priceId: candidate });
+        return new Response(JSON.stringify({ error: "Invalid price ID" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
       }
+      priceId = candidate;
     }
 
     if (!priceId) {
