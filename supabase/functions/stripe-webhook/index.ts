@@ -169,7 +169,12 @@ serve(async (req) => {
         if (userId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           const priceId = subscription.items.data[0]?.price?.id || "";
-          const planKey = session.metadata?.plan_key || resolvePlanKey(priceId);
+          const resolved = resolvePlanKey(priceId);
+          const planKey = session.metadata?.plan_key || resolved;
+          if (!planKey) {
+            logStep("Skipping Pro upsert — unknown price ID and no plan_key metadata", { priceId, userId });
+            break;
+          }
           const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
           const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
           const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
