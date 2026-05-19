@@ -118,3 +118,44 @@ describe('reportAggregator — fuel double-count policy', () => {
     expect(agg.profit.grossRevenue).toBe(2000);
   });
 });
+
+describe('reportAggregator — fuel inclusion in tax estimate', () => {
+  const taxSettings = {
+    tax_estimator_enabled: true,
+    federal_tax_percent: 10,
+    state_tax_percent: 0,
+    include_se_tax: false,
+    se_tax_percent: 0,
+    buffer_percent: 0,
+    tax_base_type: 'net',
+  } as any;
+
+  function runTax(expenses: Expense[], fuelLogs: FuelLog[]) {
+    return aggregateReport({
+      loads: [baseLoad],
+      expenses,
+      fuelLogs,
+      settings: taxSettings,
+      range,
+      preparedFor: 'Test',
+    });
+  }
+
+  it('Fuel expense only: tax totalExpenses includes Fuel expense', () => {
+    const agg = runTax([fuelExpense], []);
+    expect(agg.tax.totalExpenses).toBe(500);
+    expect(agg.tax.netProfit).toBe(1500);
+  });
+
+  it('Fuel Logs only: tax totalExpenses includes Fuel Log total', () => {
+    const agg = runTax([], [fuelLog]);
+    expect(agg.tax.totalExpenses).toBe(500);
+    expect(agg.tax.netProfit).toBe(1500);
+  });
+
+  it('Fuel Logs + Fuel expense: tax counts fuel once', () => {
+    const agg = runTax([fuelExpense, nonFuelExpense], [fuelLog]);
+    expect(agg.tax.totalExpenses).toBe(700);
+    expect(agg.tax.netProfit).toBe(1300);
+  });
+});
