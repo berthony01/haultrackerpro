@@ -470,11 +470,11 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
   }
 
   // 3. Loads Table
-  if (wantsLoadsTable(type) && agg.loads.length > 0) {
+  if (wantsLoadsTable(type) && agg.activeLoads.length > 0) {
     y = ensureSpace(doc, y, 80, agg, type);
     y = sectionTitle(doc, y, 'Load Breakdown');
     const head = [['Date', 'Pickup', 'Dropoff', 'Pay Model', 'Loaded Mi', 'DH Mi', 'Est. Pay', 'Actual Pay', 'Status']];
-    const body = agg.loads.map(l => {
+    const body = agg.activeLoads.map(l => {
       const status = (l.status ?? 'completed') === 'cancelled' ? 'Cancelled' : 'Completed';
       return [
         fmtDate(getEffectiveDate(l)),
