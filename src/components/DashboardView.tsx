@@ -165,20 +165,64 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const netProfit = summary.netProfit;
   const netRPM = summary.netRPM;
 
-  // last-week comparison (same date type as the active filter)
-  const prevRange = useMemo(() => {
+  // Previous comparison range — matches the selected preset (not always last week).
+  // - this_week → previous calendar week
+  // - last_week → week before last
+  // - this_month → previous calendar month
+  // - last_month → month before last
+  // - this_year → previous calendar year
+  // - custom → equal-length prior period immediately before customFrom (null if range invalid)
+  const prevRange = useMemo<{ start: Date; end: Date } | null>(() => {
     const now = new Date();
-    const lw = subWeeks(now, 1);
-    return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) };
-  }, [weekStartsOn]);
-  const prevLoads = useMemo(() => loads.filter(l => {
-    const d = parseISO(getEffectiveDate(l));
-    return isWithinInterval(d, prevRange);
-  }), [loads, prevRange]);
-  const prevExpenses = useMemo(() => expenses.filter(e => {
-    const d = parseISO(e.expense_date);
-    return isWithinInterval(d, prevRange);
-  }), [expenses, prevRange]);
+    switch (activePreset) {
+      case 'this_week': {
+        const lw = subWeeks(now, 1);
+        return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) };
+      }
+      case 'last_week': {
+        const llw = subWeeks(now, 2);
+        return { start: startOfWeek(llw, { weekStartsOn }), end: endOfWeek(llw, { weekStartsOn }) };
+      }
+      case 'this_month': {
+        const lm = subMonths(now, 1);
+        return { start: startOfMonth(lm), end: endOfMonth(lm) };
+      }
+      case 'last_month': {
+        const llm = subMonths(now, 2);
+        return { start: startOfMonth(llm), end: endOfMonth(llm) };
+      }
+      case 'this_year': {
+        const ly = subYears(now, 1);
+        return { start: startOfYear(ly), end: endOfYear(ly) };
+      }
+      case 'custom': {
+        if (!customFrom || !customTo) return null;
+        const start = parseISO(customFrom);
+        const end = parseISO(customTo);
+        if (!isValid(start) || !isValid(end) || end < start) return null;
+        const lenDays = differenceInCalendarDays(end, start);
+        const prevEnd = addDays(start, -1);
+        const prevStart = addDays(prevEnd, -lenDays);
+        return { start: prevStart, end: prevEnd };
+      }
+      default:
+        return null;
+    }
+  }, [activePreset, weekStartsOn, customFrom, customTo]);
+  const prevLoads = useMemo(() => {
+    if (!prevRange) return [] as Load[];
+    return loads.filter(l => {
+      const d = parseISO(getEffectiveDate(l));
+      return isWithinInterval(d, prevRange);
+    });
+  }, [loads, prevRange]);
+  const prevExpenses = useMemo(() => {
+    if (!prevRange) return [] as Expense[];
+    return expenses.filter(e => {
+      const d = parseISO(e.expense_date);
+      return isWithinInterval(d, prevRange);
+    });
+  }, [expenses, prevRange]);
   const prevSummary = useMemo(() => summarizeLoads(prevLoads, prevExpenses), [prevLoads, prevExpenses]);
   const prevGross = prevSummary.grossRevenue;
   const prevNet = prevSummary.netProfit;
