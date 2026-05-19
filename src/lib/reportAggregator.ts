@@ -49,7 +49,10 @@ export interface MonthlyBucket { month: string; gross: number; expenses: number;
 
 export interface ReportAggregation {
   range: DateRange;
+  /** All in-range loads (active + cancelled). Kept for backward compat. */
   loads: Load[];
+  /** In-range loads with `status !== 'cancelled'`. Use for revenue/lane/broker breakdowns. */
+  activeLoads: Load[];
   cancelledLoads: Load[];
   expenses: Expense[];
   fuelLogs: FuelLog[];
