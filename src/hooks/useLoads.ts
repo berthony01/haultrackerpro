@@ -55,29 +55,48 @@ export function useLoads(dateRange?: DateRange, page?: number) {
     queryFn: async () => {
       if (!user) return { loads: [], totalCount: 0 };
 
-      let query = supabase
-        .from('loads')
-        .select('*', { count: 'exact' })
-        .eq('user_id', user.id)
-        .order('load_date', { ascending: false });
+      const buildQuery = () => {
+        let q = supabase
+          .from('loads')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .order('load_date', { ascending: false });
+        // Server-side effective-date filtering (load_date OR dropoff_date).
+        // NOTE: totalCount reflects this OR-prefilter which is a superset of the
+        // client-filtered list below — it never underfetches.
+        const orFilter = buildEffectiveDateOr(dateRange?.from, dateRange?.to);
+        if (orFilter) q = q.or(orFilter);
+        return q;
+      };
 
-      // Server-side effective-date filtering (load_date OR dropoff_date).
-      // NOTE: totalCount reflects this OR-prefilter which is a superset of the
-      // client-filtered list below — it never underfetches.
-      const orFilter = buildEffectiveDateOr(dateRange?.from, dateRange?.to);
-      if (orFilter) query = query.or(orFilter);
+      let rawData: Load[] = [];
+      let count: number | null = null;
 
-      // Apply pagination range if page is provided
       if (page !== undefined) {
-        const from = page * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
-        query = query.range(from, to);
+        // Paged mode: return just the requested page
+        const fromIdx = page * PAGE_SIZE;
+        const toIdx = fromIdx + PAGE_SIZE - 1;
+        const { data, error, count: c } = await buildQuery().range(fromIdx, toIdx);
+        if (error) throw error;
+        rawData = (data ?? []) as Load[];
+        count = c;
+      } else {
+        // Unpaged mode: fetch ALL rows in 1k batches to bypass Supabase's
+        // default 1000-row response cap. Safety cap: 50 pages = 50k rows.
+        const FETCH_SIZE = 1000;
+        let offset = 0;
+        for (let i = 0; i < 50; i++) {
+          const { data, error, count: c } = await buildQuery().range(offset, offset + FETCH_SIZE - 1);
+          if (error) throw error;
+          const batch = (data ?? []) as Load[];
+          rawData.push(...batch);
+          if (typeof c === 'number') count = c;
+          if (batch.length < FETCH_SIZE) break;
+          offset += FETCH_SIZE;
+        }
       }
 
-      const { data, error, count } = await query;
-      if (error) throw error;
-
-      let filtered = data ?? [];
+      let filtered = rawData;
 
       // Client-side refinement on effective date for precision
       if (dateRange?.from) {
