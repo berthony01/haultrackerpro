@@ -128,17 +128,12 @@ export function useProfitCheck(input: ProfitCheckInput | null) {
   const profileResult = hasProfile
     ? computeCostProfileCPM(costProfile, totalMiles)
     : { cpm: 0, breakdown: {}, warnings: [] as string[] };
-  const profileCPM = profileResult.cpm;
   const historyCPM = op?.rolling_cost_per_mile ? Number(op.rolling_cost_per_mile) : 0;
-  // If the profile produced a warning (e.g. fixed costs but no monthly miles), keep the
-  // source as 'profile' so the warning reaches the UI instead of being hidden by history.
-  const profileHasWarning = profileResult.warnings.length > 0;
-  const cpm = profileCPM > 0 ? profileCPM : (profileHasWarning ? 0 : historyCPM);
-  const costSource: 'profile' | 'history' | 'none' =
-    profileCPM > 0 ? 'profile'
-    : profileHasWarning ? 'profile'
-    : historyCPM > 0 ? 'history'
-    : 'none';
+  const { cpm, source: costSource } = selectCostSource({
+    profileCpm: profileResult.cpm,
+    profileWarnings: profileResult.warnings,
+    historyCpm: historyCPM,
+  });
 
   const estimatedVariableCost = cpm > 0 ? cpm * totalMiles : 0;
   const effectiveRpm = input.estimated_pay / totalMiles;
