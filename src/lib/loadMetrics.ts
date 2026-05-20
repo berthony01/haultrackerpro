@@ -23,6 +23,7 @@
 import type { Load } from '@/hooks/useLoads';
 import { computeLoadPay } from '@/lib/computeLoadPay';
 import { resolvePayModel, type PayModel } from '@/lib/payModels';
+import { resolveDeadheadPay } from '@/lib/deadheadPay';
 
 const num = (v: unknown): number => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
@@ -93,7 +94,18 @@ export function getLoadExpectedPay(load: Load): number {
     manualGross: 0,
     fees: fees(load),
   });
-  return r.expectedGrossPay;
+  let base = r.expectedGrossPay;
+  // Phase 6C: when estimated_pay is null, honor structured/legacy deadhead pay
+  // signals that computeLoadPay's model path does NOT already account for.
+  // - 'pay_model_rate' is skipped: loaded_plus_deadhead already included it above.
+  // - 'structured' / 'legacy_notes' are added on top so legacy notes-tag loads
+  //   no longer underreport gross pay. Historical loads with estimated_pay set
+  //   are protected by the early-return above.
+  const dh = resolveDeadheadPay(load as any);
+  if (dh.source === 'structured' || dh.source === 'legacy_notes') {
+    base += dh.amount;
+  }
+  return base;
 }
 
 /** Canonical RPM: gross pay / total operating miles. Use this everywhere. */

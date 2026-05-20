@@ -1,0 +1,182 @@
+import { describe, it, expect } from 'vitest';
+import {
+  resolveDeadheadPay,
+  parseLegacyDeadheadPayFromNotes,
+  getResolvedDeadheadPayAmount,
+} from '@/lib/deadheadPay';
+import { getLoadExpectedPay } from '@/lib/loadMetrics';
+
+const base = {
+  loaded_miles: 100,
+  deadhead_miles: 50,
+  rate_per_mile: 2,
+  deadhead_rate_per_mile: 0,
+  pay_model: 'loaded_miles_only',
+  notes: null,
+  deadhead_pay_status: null,
+  deadhead_pay_amount: null,
+} as any;
+
+describe('deadheadPay — structured fields (precedence #1-3)', () => {
+  it('unpaid → 0, source structured', () => {
+    const r = resolveDeadheadPay({ ...base, deadhead_pay_status: 'unpaid' });
+    expect(r.amount).toBe(0);
+    expect(r.source).toBe('structured');
+    expect(r.status).toBe('unpaid');
+    expect(r.warning).toBeUndefined();
+  });
+
+  it('per_mile → dhMiles × dhRate', () => {
+    const r = resolveDeadheadPay({
+      ...base,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 0.9,
+    });
+    expect(r.amount).toBeCloseTo(50 * 0.9);
+    expect(r.source).toBe('structured');
+  });
+
+  it('flat → deadhead_pay_amount', () => {
+    const r = resolveDeadheadPay({
+      ...base,
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 75,
+    });
+    expect(r.amount).toBe(75);
+    expect(r.source).toBe('structured');
+  });
+
+  it('per_mile missing rate → 0 + missing_rate warning', () => {
+    const r = resolveDeadheadPay({
+      ...base,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: null,
+    });
+    expect(r.amount).toBe(0);
+    expect(r.warning).toBe('missing_rate');
+  });
+
+  it('flat missing amount → 0 + missing_amount warning', () => {
+    const r = resolveDeadheadPay({
+      ...base,
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: null,
+    });
+    expect(r.amount).toBe(0);
+    expect(r.warning).toBe('missing_amount');
+  });
+});
+
+describe('deadheadPay — legacy notes fallback', () => {
+  it('[dh_pay:unpaid] → 0', () => {
+    const r = resolveDeadheadPay({ ...base, notes: 'foo [dh_pay:unpaid] bar' });
+    expect(r.amount).toBe(0);
+    expect(r.source).toBe('legacy_notes');
+  });
+
+  it('[dh_pay:same] → dhMiles × loadedRate', () => {
+    const r = resolveDeadheadPay({ ...base, notes: '[dh_pay:same]' });
+    expect(r.amount).toBe(50 * 2);
+    expect(r.source).toBe('legacy_notes');
+  });
+
+  it('[dh_pay:custom:0.85] → dhMiles × 0.85', () => {
+    const r = resolveDeadheadPay({ ...base, notes: '[dh_pay:custom:0.85]' });
+    expect(r.amount).toBeCloseTo(50 * 0.85);
+    expect(r.source).toBe('legacy_notes');
+  });
+
+  it('malformed tag → source none, amount 0', () => {
+    const r = resolveDeadheadPay({ ...base, notes: 'random text no tag' });
+    expect(r.source).toBe('none');
+    expect(r.amount).toBe(0);
+  });
+
+  it('parser returns null for missing or unrelated notes', () => {
+    expect(parseLegacyDeadheadPayFromNotes(null)).toBeNull();
+    expect(parseLegacyDeadheadPayFromNotes('hello')).toBeNull();
+  });
+});
+
+describe('deadheadPay — conflict: structured wins over notes', () => {
+  it('structured unpaid beats [dh_pay:custom:1.00]', () => {
+    const r = resolveDeadheadPay({
+      ...base,
+      deadhead_pay_status: 'unpaid',
+      notes: '[dh_pay:custom:1.00]',
+    });
+    expect(r.amount).toBe(0);
+    expect(r.source).toBe('structured');
+  });
+});
+
+describe('deadheadPay — pay_model_rate path', () => {
+  it('loaded_plus_deadhead with dh rate uses pay_model_rate source', () => {
+    const r = resolveDeadheadPay({
+      ...base,
+      pay_model: 'loaded_plus_deadhead',
+      deadhead_rate_per_mile: 1,
+    });
+    expect(r.source).toBe('pay_model_rate');
+    expect(r.amount).toBe(50);
+  });
+});
+
+describe('getLoadExpectedPay — historical protection + integration', () => {
+  it('uses estimated_pay when present (never recalculates)', () => {
+    const load = {
+      ...base,
+      estimated_pay: 999,
+      notes: '[dh_pay:custom:5.00]', // would otherwise add 250
+    };
+    expect(getLoadExpectedPay(load as any)).toBe(999);
+  });
+
+  it('null estimated_pay + legacy [dh_pay:same] adds deadhead pay on top', () => {
+    // loaded_miles_only: model gross = 100 * 2 = 200; +legacy same: 50 * 2 = 100
+    const load = { ...base, estimated_pay: null, notes: '[dh_pay:same]' };
+    expect(getLoadExpectedPay(load as any)).toBe(300);
+  });
+
+  it('null estimated_pay + legacy [dh_pay:custom:0.85]', () => {
+    const load = { ...base, estimated_pay: null, notes: '[dh_pay:custom:0.85]' };
+    expect(getLoadExpectedPay(load as any)).toBeCloseTo(200 + 50 * 0.85);
+  });
+
+  it('loaded_plus_deadhead path is unchanged (no double counting)', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      pay_model: 'loaded_plus_deadhead',
+      deadhead_rate_per_mile: 1,
+    };
+    // computeLoadPay already includes 100*2 + 50*1 = 250; resolver source is
+    // pay_model_rate which we intentionally skip in the additive integration.
+    expect(getLoadExpectedPay(load as any)).toBe(250);
+  });
+
+  it('loaded_miles_only with no deadhead signal is unchanged', () => {
+    const load = { ...base, estimated_pay: null };
+    expect(getLoadExpectedPay(load as any)).toBe(200);
+  });
+
+  it('structured unpaid + null estimated_pay does not add anything', () => {
+    const load = { ...base, estimated_pay: null, deadhead_pay_status: 'unpaid' };
+    expect(getLoadExpectedPay(load as any)).toBe(200);
+  });
+
+  it('structured per_mile adds dhMiles × dhRate', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 0.9,
+    };
+    expect(getLoadExpectedPay(load as any)).toBeCloseTo(200 + 50 * 0.9);
+  });
+
+  it('getResolvedDeadheadPayAmount mirrors resolveDeadheadPay.amount', () => {
+    const load = { ...base, deadhead_pay_status: 'flat', deadhead_pay_amount: 42 };
+    expect(getResolvedDeadheadPayAmount(load as any)).toBe(42);
+  });
+});
