@@ -180,3 +180,93 @@ describe('getLoadExpectedPay — historical protection + integration', () => {
     expect(getResolvedDeadheadPayAmount(load as any)).toBe(42);
   });
 });
+
+describe('getLoadExpectedPay — Phase 6C.1 no double-count guard', () => {
+  it('loaded_plus_deadhead + structured per_mile + null est_pay does NOT double-count', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      pay_model: 'loaded_plus_deadhead',
+      deadhead_rate_per_mile: 1,
+      deadhead_pay_status: 'per_mile',
+    };
+    // computeLoadPay: 100*2 + 50*1 = 250. Resolver must NOT add another 50.
+    expect(getLoadExpectedPay(load as any)).toBe(250);
+  });
+
+  it('loaded_plus_deadhead + structured flat + null est_pay does NOT double-count', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      pay_model: 'loaded_plus_deadhead',
+      deadhead_rate_per_mile: 1,
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 999,
+    };
+    expect(getLoadExpectedPay(load as any)).toBe(250);
+  });
+
+  it('total_miles + structured per_mile does NOT add extra deadhead pay', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      pay_model: 'total_miles',
+      total_miles: 150,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 0.9,
+    };
+    // total_miles: 150 * 2 = 300. No add-on.
+    expect(getLoadExpectedPay(load as any)).toBe(300);
+  });
+
+  it('flat_rate + structured flat does NOT add extra deadhead pay', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      pay_model: 'flat_rate',
+      flat_rate_amount: 500,
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 75,
+    };
+    expect(getLoadExpectedPay(load as any)).toBe(500);
+  });
+
+  it('manual + structured flat does NOT add extra deadhead pay (manual gross treated as 0 in fallback)', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      pay_model: 'manual',
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 75,
+    };
+    // computeLoadPay fallback uses manualGross: 0 → base 0; resolver skipped.
+    expect(getLoadExpectedPay(load as any)).toBe(0);
+  });
+
+  it('loaded_miles_only + structured per_mile still adds deadhead pay', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 0.9,
+    };
+    expect(getLoadExpectedPay(load as any)).toBeCloseTo(200 + 50 * 0.9);
+  });
+
+  it('loaded_miles_only + legacy notes still adds deadhead pay', () => {
+    const load = { ...base, estimated_pay: null, notes: '[dh_pay:same]' };
+    expect(getLoadExpectedPay(load as any)).toBe(300);
+  });
+
+  it('estimated_pay-present still authoritative regardless of structured/legacy', () => {
+    const load = {
+      ...base,
+      estimated_pay: 777,
+      pay_model: 'loaded_plus_deadhead',
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 999,
+      notes: '[dh_pay:custom:5.00]',
+    };
+    expect(getLoadExpectedPay(load as any)).toBe(777);
+  });
+});
