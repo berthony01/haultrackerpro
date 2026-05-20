@@ -101,9 +101,15 @@ export function getLoadExpectedPay(load: Load): number {
   // - 'structured' / 'legacy_notes' are added on top so legacy notes-tag loads
   //   no longer underreport gross pay. Historical loads with estimated_pay set
   //   are protected by the early-return above.
-  const dh = resolveDeadheadPay(load as any);
-  if (dh.source === 'structured' || dh.source === 'legacy_notes') {
-    base += dh.amount;
+  // Phase 6C.1: Only add resolved deadhead pay for loaded_miles_only, the one
+  // model where computeLoadPay does NOT already include deadhead revenue.
+  // Other models (loaded_plus_deadhead, total_miles, flat_rate, manual) would
+  // double-count if we added the resolver amount on top.
+  if (model === 'loaded_miles_only') {
+    const dh = resolveDeadheadPay(load as any);
+    if (dh.source === 'structured' || dh.source === 'legacy_notes') {
+      base += dh.amount;
+    }
   }
   return base;
 }
