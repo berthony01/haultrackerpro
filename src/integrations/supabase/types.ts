@@ -1214,6 +1214,8 @@ export type Database = {
           broker_name_raw: string | null
           created_at: string
           deadhead_miles: number
+          deadhead_pay_amount: number | null
+          deadhead_pay_status: string | null
           deadhead_rate_per_mile: number | null
           detention_fee: number
           dropoff_date: string | null
@@ -1248,6 +1250,8 @@ export type Database = {
           broker_name_raw?: string | null
           created_at?: string
           deadhead_miles?: number
+          deadhead_pay_amount?: number | null
+          deadhead_pay_status?: string | null
           deadhead_rate_per_mile?: number | null
           detention_fee?: number
           dropoff_date?: string | null
@@ -1282,6 +1286,8 @@ export type Database = {
           broker_name_raw?: string | null
           created_at?: string
           deadhead_miles?: number
+          deadhead_pay_amount?: number | null
+          deadhead_pay_status?: string | null
           deadhead_rate_per_mile?: number | null
           detention_fee?: number
           dropoff_date?: string | null
