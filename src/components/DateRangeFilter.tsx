@@ -112,6 +112,9 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
           )}
         </div>
       )}
+      {rangeLabel && (
+        <p className="text-[11px] text-muted-foreground font-medium pl-0.5">{rangeLabel}</p>
+      )}
     </div>
   );
 }
