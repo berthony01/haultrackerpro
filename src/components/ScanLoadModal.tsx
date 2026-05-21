@@ -27,6 +27,7 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
         pickup_location: parsed.pickup_location || undefined,
         dropoff_location: parsed.dropoff_location || undefined,
         load_date: parsed.load_date || undefined,
+        dropoff_date: parsed.dropoff_date || undefined,
         loaded_miles: parsed.loaded_miles?.toString() || undefined,
         deadhead_miles: parsed.deadhead_miles != null ? parsed.deadhead_miles.toString() : undefined,
         total_miles: parsed.total_miles != null ? parsed.total_miles.toString() : undefined,

@@ -24,6 +24,7 @@ import { PasteLoadParser } from '@/components/PasteLoadParser';
 import { ScanLoadModal } from '@/components/ScanLoadModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
+import { applySourceLoadDate, applySourceDropoffDate } from '@/lib/sourceDate';
 import { useProfitCheck } from '@/hooks/useProfitCheck';
 import { ProfitCheckCard } from '@/components/ProfitCheckCard';
 
@@ -463,7 +464,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   deadhead_miles: data.deadhead_miles ?? '',
                   rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
                   gross_revenue: data.gross_revenue ?? prev.gross_revenue,
-                  load_date: data.load_date ?? prev.load_date,
+                  // Phase 6C.6: source-date authority — apply only when valid
+                  // ISO date so today's default never blocks a real source date,
+                  // and invalid parser output never corrupts the form value.
+                  load_date: applySourceLoadDate(prev.load_date, data.load_date),
+                  dropoff_date: applySourceDropoffDate(prev.dropoff_date, data.dropoff_date),
                   // Phase 6C.4: reset total_miles like loaded/deadhead so a
                   // stale total from a previous paste can't leak into the new load.
                   total_miles: data.total_miles ?? '',
@@ -1040,7 +1045,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             deadhead_miles: fillIfEmpty(prev.deadhead_miles, data.deadhead_miles),
             rate_per_mile: fillIfEmpty(prev.rate_per_mile, data.rate_per_mile),
             gross_revenue: fillIfEmpty(prev.gross_revenue, data.gross_revenue),
-            load_date: fillIfEmpty(prev.load_date, data.load_date),
+            // Phase 6C.6: source-date authority. OCR/AI extracted dates must
+            // be able to override today's default (which makes load_date
+            // non-empty so fillIfEmpty would drop them). Apply only when valid.
+            load_date: applySourceLoadDate(prev.load_date, data.load_date),
+            dropoff_date: applySourceDropoffDate(prev.dropoff_date, data.dropoff_date),
             total_miles: fillIfEmpty(prev.total_miles, data.total_miles),
             flat_rate_amount: fillIfEmpty(prev.flat_rate_amount, data.flat_rate),
             dh_rate_per_mile: fillIfEmpty(prev.dh_rate_per_mile, data.deadhead_rate_per_mile),
