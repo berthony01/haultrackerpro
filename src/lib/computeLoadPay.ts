@@ -89,7 +89,10 @@ export function computeLoadPay(input: ComputeLoadPayInput): ComputeLoadPayResult
     }
     case 'total_miles': {
       const rate = num(input.loadedRpm); // rate field reused for "rate per mile"
-      const miles = totalRaw > 0 ? totalRaw : totalOperatingMiles;
+      // Phase 6C.4: use sanity-resolved operating miles so a corrupted
+      // totalMiles (e.g. stale "1") can't underprice the load when valid
+      // loaded+deadhead components prove the real distance.
+      const miles = totalOperatingMiles;
       if (miles === 0) warnings.push('Total Miles Paid: enter total miles (or loaded + deadhead) to estimate pay.');
       paidMiles = miles;
       expectedGrossPay = miles * rate + fees;
