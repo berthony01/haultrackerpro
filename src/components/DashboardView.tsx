@@ -95,6 +95,25 @@ export function getTrendSuffix(key: PresetKey): string {
 }
 
 /**
+ * Null-safe / divide-by-zero-safe trend percentage for KPI chips.
+ * Returns null (chip hidden) when:
+ *  - curr or prev is null/undefined/non-finite
+ *  - prev === 0 (cannot compute % from a zero baseline)
+ * Otherwise returns (curr - prev) / |prev| * 100.
+ */
+export function computeTrendPct(
+  curr: number | null | undefined,
+  prev: number | null | undefined,
+): number | null {
+  if (curr == null || prev == null) return null;
+  if (!Number.isFinite(curr) || !Number.isFinite(prev)) return null;
+  if (prev === 0) return null;
+  const result = ((curr - prev) / Math.abs(prev)) * 100;
+  if (!Number.isFinite(result)) return null;
+  return result;
+}
+
+/**
  * Build the "Showing: …" label for the Dashboard date-range pills.
  * Mirrors the Loads-page wording (`MMM d, yyyy` start/end via date-fns `format`).
  * Returns null for Custom when both dates are blank.
