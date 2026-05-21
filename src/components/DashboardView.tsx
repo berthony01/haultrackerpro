@@ -83,6 +83,18 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
   }
 }
 
+export function getTrendSuffix(key: PresetKey): string {
+  switch (key) {
+    case 'this_week':
+    case 'last_week': return 'vs previous week';
+    case 'this_month':
+    case 'last_month': return 'vs previous month';
+    case 'this_year': return 'vs previous year';
+    case 'custom': return 'vs previous period';
+  }
+}
+
+
 export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
   const { profile: costProfile } = useCostProfile();
