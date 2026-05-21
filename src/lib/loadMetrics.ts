@@ -24,6 +24,7 @@ import type { Load } from '@/hooks/useLoads';
 import { computeLoadPay } from '@/lib/computeLoadPay';
 import { resolvePayModel, type PayModel } from '@/lib/payModels';
 import { resolveDeadheadPay } from '@/lib/deadheadPay';
+import { resolveOperatingMiles } from '@/lib/mileageMath';
 
 const num = (v: unknown): number => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
@@ -46,25 +47,13 @@ export function getLoadPayModel(load: Load): PayModel {
  * totals don't get poisoned. We never mutate the load or write back.
  */
 export function getLoadOperatingMiles(load: Load): number {
-  const stored = num((load as any).total_miles);
-  const loaded = num(load.loaded_miles);
-  const dh = num(load.deadhead_miles);
-  const componentTotal = loaded + dh;
-
-  if (componentTotal > 0) {
-    // Stored missing/non-positive → trust components.
-    if (stored <= 0) return componentTotal;
-    // Stored clearly less than loaded alone → invalid summary, trust components.
-    if (loaded > 0 && stored < loaded) return componentTotal;
-    // Stored materially less than component total (>2mi tolerance) → invalid.
-    if (stored < componentTotal - 2) return componentTotal;
-    // Stored is plausible (>= component total, or within tolerance) → trust it.
-    return stored;
-  }
-
-  // No component miles — fall back to stored summary if present.
-  if (stored > 0) return stored;
-  return 0;
+  // Phase 6C.4: delegates to the shared pure helper so this matches
+  // computeLoadPay's operating-mile sanity behavior exactly.
+  return resolveOperatingMiles({
+    loadedMiles: num(load.loaded_miles),
+    deadheadMiles: num(load.deadhead_miles),
+    totalMiles: num((load as any).total_miles),
+  });
 }
 
 /**

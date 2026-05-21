@@ -115,3 +115,112 @@ describe('computeLoadPay — pay models', () => {
     expect(r.warnings.some(w => /deadhead/i.test(w))).toBe(true);
   });
 });
+
+describe('computeLoadPay — Phase 6C.4 operating-mile sanity', () => {
+  it('corrupted totalMiles=1 with valid components uses componentTotal', () => {
+    const r = computeLoadPay({
+      payModel: 'loaded_miles_only',
+      loadedMiles: 994.79,
+      deadheadMiles: 45,
+      totalMiles: 1,
+      loadedRpm: 2,
+    });
+    expect(r.totalOperatingMiles).toBeCloseTo(1039.79, 5);
+  });
+
+  it('total_miles model with corrupted totalMiles uses corrected miles for gross', () => {
+    const r = computeLoadPay({
+      payModel: 'total_miles',
+      loadedMiles: 500,
+      deadheadMiles: 50,
+      totalMiles: 1,
+      loadedRpm: 2,
+    });
+    expect(r.expectedGrossPay).toBe(550 * 2);
+    expect(r.paidMiles).toBe(550);
+  });
+
+  it('loaded_miles_only: corrupted totalMiles → gross unchanged, effectiveRpm corrected', () => {
+    const r = computeLoadPay({
+      payModel: 'loaded_miles_only',
+      loadedMiles: 500,
+      deadheadMiles: 50,
+      totalMiles: 1,
+      loadedRpm: 2,
+    });
+    expect(r.expectedGrossPay).toBe(1000);
+    expect(r.effectiveRpm).toBeCloseTo(1000 / 550, 5);
+  });
+
+  it('loaded_plus_deadhead: corrupted totalMiles → gross unchanged, effectiveRpm corrected', () => {
+    const r = computeLoadPay({
+      payModel: 'loaded_plus_deadhead',
+      loadedMiles: 500,
+      deadheadMiles: 50,
+      totalMiles: 1,
+      loadedRpm: 2,
+      dhRpm: 1,
+    });
+    expect(r.expectedGrossPay).toBe(500 * 2 + 50);
+    expect(r.effectiveRpm).toBeCloseTo(1050 / 550, 5);
+  });
+
+  it('flat_rate: corrupted totalMiles → flat gross, effectiveRpm corrected', () => {
+    const r = computeLoadPay({
+      payModel: 'flat_rate',
+      loadedMiles: 500,
+      deadheadMiles: 50,
+      totalMiles: 1,
+      flatRate: 1100,
+    });
+    expect(r.expectedGrossPay).toBe(1100);
+    expect(r.totalOperatingMiles).toBe(550);
+    expect(r.effectiveRpm).toBeCloseTo(2, 5);
+  });
+
+  it('manual: corrupted totalMiles → manual gross, effectiveRpm corrected', () => {
+    const r = computeLoadPay({
+      payModel: 'manual',
+      loadedMiles: 500,
+      deadheadMiles: 50,
+      totalMiles: 1,
+      manualGross: 1100,
+    });
+    expect(r.expectedGrossPay).toBe(1100);
+    expect(r.totalOperatingMiles).toBe(550);
+    expect(r.effectiveRpm).toBeCloseTo(2, 5);
+  });
+
+  it('totalMiles greater than loaded+deadhead remains trusted', () => {
+    const r = computeLoadPay({
+      payModel: 'total_miles',
+      loadedMiles: 500,
+      deadheadMiles: 50,
+      totalMiles: 600,
+      loadedRpm: 1,
+    });
+    expect(r.totalOperatingMiles).toBe(600);
+    expect(r.expectedGrossPay).toBe(600);
+  });
+
+  it('totalMiles within 2mi tolerance remains trusted', () => {
+    const r = computeLoadPay({
+      payModel: 'total_miles',
+      loadedMiles: 500,
+      deadheadMiles: 50,
+      totalMiles: 549,
+      loadedRpm: 1,
+    });
+    expect(r.totalOperatingMiles).toBe(549);
+  });
+
+  it('only totalMiles exists remains trusted', () => {
+    const r = computeLoadPay({
+      payModel: 'total_miles',
+      totalMiles: 300,
+      loadedRpm: 1,
+    });
+    expect(r.totalOperatingMiles).toBe(300);
+    expect(r.expectedGrossPay).toBe(300);
+  });
+});

@@ -464,7 +464,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
                   gross_revenue: data.gross_revenue ?? prev.gross_revenue,
                   load_date: data.load_date ?? prev.load_date,
-                  total_miles: data.total_miles ?? prev.total_miles,
+                  // Phase 6C.4: reset total_miles like loaded/deadhead so a
+                  // stale total from a previous paste can't leak into the new load.
+                  total_miles: data.total_miles ?? '',
                   flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
                   dh_rate_per_mile: data.deadhead_rate_per_mile ?? prev.dh_rate_per_mile,
                   pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
