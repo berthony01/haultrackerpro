@@ -83,6 +83,18 @@ function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 
   }
 }
 
+export function getTrendSuffix(key: PresetKey): string {
+  switch (key) {
+    case 'this_week':
+    case 'last_week': return 'vs previous week';
+    case 'this_month':
+    case 'last_month': return 'vs previous month';
+    case 'this_year': return 'vs previous year';
+    case 'custom': return 'vs previous period';
+  }
+}
+
+
 export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
   const { profile: costProfile } = useCostProfile();
@@ -92,6 +104,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const trendSuffix = getTrendSuffix(activePreset);
+
   const showCustom = activePreset === 'custom';
 
   const filteredLoads = useMemo(() => {
@@ -274,12 +288,13 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <TooltipProvider>
-              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Gross Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} delay={0} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.grossRevenue}</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} delay={0.05} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netProfit}</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Net RPM" value={formatCurrency(netRPM)} icon={Route} trendPct={trendPpm} delay={0.1} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netRPM}</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Loads Completed" value={summary.loadCount.toString()} icon={Truck} trendPct={trendLoads} delay={0.15} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">Active loads in this period (cancelled excluded).{summary.cancelledCount > 0 ? ` ${summary.cancelledCount} cancelled load${summary.cancelledCount === 1 ? '' : 's'} not counted.` : ''}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Gross Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} trendLabel={trendSuffix} delay={0} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.grossRevenue}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} trendLabel={trendSuffix} delay={0.05} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netProfit}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Net RPM" value={formatCurrency(netRPM)} icon={Route} trendPct={trendPpm} trendLabel={trendSuffix} delay={0.1} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netRPM}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Loads Completed" value={summary.loadCount.toString()} icon={Truck} trendPct={trendLoads} trendLabel={trendSuffix} delay={0.15} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">Active loads in this period (cancelled excluded).{summary.cancelledCount > 0 ? ` ${summary.cancelledCount} cancelled load${summary.cancelledCount === 1 ? '' : 's'} not counted.` : ''}</TooltipContent></Tooltip>
             </TooltipProvider>
           </div>
+
           {summary.cancelledCount > 0 && (
             <p className="text-[11px] text-muted-foreground -mt-2">
               {summary.cancelledCount} cancelled load{summary.cancelledCount === 1 ? '' : 's'} excluded from totals.
