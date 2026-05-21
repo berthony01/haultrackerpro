@@ -172,6 +172,7 @@ export function ExpensesListView({ expenses, loads, onEdit, onDelete, isLoading,
               <button
                 key={p.key}
                 type="button"
+                aria-pressed={active}
                 onClick={() => setActivePreset(p.key)}
                 className={[
                   'h-8 px-3 rounded-full text-xs font-semibold transition-all duration-200',
