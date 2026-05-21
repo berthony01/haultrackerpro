@@ -104,6 +104,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const trendSuffix = getTrendSuffix(activePreset);
+
   const showCustom = activePreset === 'custom';
 
   const filteredLoads = useMemo(() => {
