@@ -77,14 +77,30 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Header */}
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">My Loads</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {filtered.length} load{filtered.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-      </div>
+      {(() => {
+        const totalCount = filtered.length;
+        const countedCount = filtered.filter(l => l.status !== 'cancelled').length;
+        const mismatch = totalCount !== countedCount;
+        return (
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">My Loads</h1>
+              {mismatch ? (
+                <>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {totalCount} total · {countedCount} counted
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">excludes cancelled</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {totalCount} load{totalCount !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Date range */}
       <DateRangeFilter onRangeChange={onDateRangeChange} currentRange={currentDateRange} />
