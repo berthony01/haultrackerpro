@@ -30,6 +30,7 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
   ];
 
   const [active, setActive] = useState('All Time');
+  const [activeRange, setActiveRange] = useState<{ from?: Date; to?: Date }>({});
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [showCustom, setShowCustom] = useState(false);
@@ -37,6 +38,7 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
 
   const handlePreset = (label: string, from?: Date, to?: Date) => {
     setActive(label);
+    setActiveRange({ from, to });
     setShowCustom(false);
     setCustomError(null);
     onRangeChange(from ? format(from, 'yyyy-MM-dd') : undefined, to ? format(to, 'yyyy-MM-dd') : undefined);
@@ -50,8 +52,13 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
     }
     setCustomError(null);
     setActive('Custom');
+    setActiveRange({ from: new Date(customFrom + 'T00:00:00'), to: new Date(customTo + 'T00:00:00') });
     onRangeChange(customFrom, customTo);
   };
+
+  const rangeLabel = activeRange.from && activeRange.to
+    ? `Showing: ${format(activeRange.from, 'MMM d, yyyy')} – ${format(activeRange.to, 'MMM d, yyyy')}`
+    : active === 'All Time' ? 'Showing: All loads' : null;
 
   return (
     <div className="space-y-2">
@@ -104,6 +111,9 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
             <p className="text-[11px] text-destructive font-medium">{customError}</p>
           )}
         </div>
+      )}
+      {rangeLabel && (
+        <p className="text-[11px] text-muted-foreground font-medium pl-0.5">{rangeLabel}</p>
       )}
     </div>
   );
