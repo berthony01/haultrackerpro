@@ -24,6 +24,7 @@ import type { Load } from '@/hooks/useLoads';
 import { computeLoadPay } from '@/lib/computeLoadPay';
 import { resolvePayModel, type PayModel } from '@/lib/payModels';
 import { resolveDeadheadPay } from '@/lib/deadheadPay';
+import { resolveOperatingMiles } from '@/lib/mileageMath';
 
 const num = (v: unknown): number => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
