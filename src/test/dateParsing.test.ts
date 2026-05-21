@@ -19,7 +19,7 @@ describe('parseLocalYMD', () => {
     expect(d.toDateString()).toMatch(/May 11 2026$/);
     // Mid-year date avoids any month-boundary ambiguity from DST in extreme zones.
     const d2 = parseLocalYMD('2026-07-04');
-    expect(d2.toDateString()).toMatch(/Jul 4 2026$/);
+    expect(d2.toDateString()).toMatch(/Jul 0?4 2026$/);
   });
 
   it('throws RangeError on malformed input', () => {
