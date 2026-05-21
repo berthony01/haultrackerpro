@@ -98,6 +98,7 @@ export function DateRangeFilter({ onRangeChange, currentRange }: DateRangeFilter
               key={p.label}
               variant="ghost"
               size="sm"
+              aria-pressed={isActive}
               className={`text-xs h-8 rounded-lg font-semibold border ${
                 isActive
                   ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/20'
@@ -112,6 +113,7 @@ export function DateRangeFilter({ onRangeChange, currentRange }: DateRangeFilter
         <Button
           variant="ghost"
           size="sm"
+          aria-pressed={showCustom || activeLabel === 'Custom'}
           className={`text-xs h-8 rounded-lg font-semibold border ${
             showCustom || activeLabel === 'Custom'
               ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/20'
