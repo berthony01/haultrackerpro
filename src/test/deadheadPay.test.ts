@@ -271,3 +271,127 @@ describe('getLoadExpectedPay — Phase 6C.1 no double-count guard', () => {
     expect(getLoadExpectedPay(load as any)).toBe(777);
   });
 });
+
+describe('getLoadPaidMiles — Phase 6C.2 companion metric consistency', () => {
+  it('loaded_miles_only + structured per_mile (amount > 0) includes deadhead miles', () => {
+    const load = {
+      ...base,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 1,
+    };
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+
+  it('loaded_miles_only + structured flat (amount > 0) includes deadhead miles', () => {
+    const load = {
+      ...base,
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 75,
+    };
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+
+  it('loaded_miles_only + legacy [dh_pay:same] includes deadhead miles', () => {
+    const load = { ...base, notes: '[dh_pay:same]' };
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+
+  it('loaded_miles_only + legacy [dh_pay:custom:0.85] includes deadhead miles', () => {
+    const load = { ...base, notes: '[dh_pay:custom:0.85]' };
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+
+  it('loaded_miles_only + structured unpaid does NOT include deadhead miles', () => {
+    const load = { ...base, deadhead_pay_status: 'unpaid' };
+    expect(getLoadPaidMiles(load as any)).toBe(100);
+  });
+
+  it('loaded_miles_only + per_mile missing rate does NOT include deadhead miles', () => {
+    const load = {
+      ...base,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: null,
+    };
+    expect(getLoadPaidMiles(load as any)).toBe(100);
+  });
+
+  it('loaded_miles_only + flat missing amount does NOT include deadhead miles', () => {
+    const load = {
+      ...base,
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: null,
+    };
+    expect(getLoadPaidMiles(load as any)).toBe(100);
+  });
+
+  it('loaded_miles_only + malformed/no notes does NOT include deadhead miles', () => {
+    const load = { ...base, notes: 'random no tag' };
+    expect(getLoadPaidMiles(load as any)).toBe(100);
+  });
+
+  it('loaded_plus_deadhead remains loaded + deadhead (no change, no double count)', () => {
+    const load = {
+      ...base,
+      pay_model: 'loaded_plus_deadhead',
+      deadhead_rate_per_mile: 1,
+      deadhead_pay_status: 'per_mile',
+    };
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+
+  it('total_miles remains total miles (no extra logic)', () => {
+    const load = {
+      ...base,
+      pay_model: 'total_miles',
+      total_miles: 175,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 1,
+    };
+    expect(getLoadPaidMiles(load as any)).toBe(175);
+  });
+
+  it('flat_rate remains total operating miles', () => {
+    const load = {
+      ...base,
+      pay_model: 'flat_rate',
+      flat_rate_amount: 500,
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 75,
+    };
+    // total = loaded(100) + dh(50) = 150
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+
+  it('manual remains total operating miles', () => {
+    const load = {
+      ...base,
+      pay_model: 'manual',
+      deadhead_pay_status: 'flat',
+      deadhead_pay_amount: 75,
+    };
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+
+  it('getLoadPaidRPM reflects updated paid miles for loaded_miles_only paid-deadhead row', () => {
+    const load = {
+      ...base,
+      estimated_pay: null,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 1,
+    };
+    // expected pay = 100*2 + 50*1 = 250; paid miles = 150; rpm = 1.666...
+    expect(getLoadPaidRPM(load as any)).toBeCloseTo(250 / 150);
+  });
+
+  it('estimated_pay-present does not affect getLoadPaidMiles incorrectly', () => {
+    const load = {
+      ...base,
+      estimated_pay: 777,
+      deadhead_pay_status: 'per_mile',
+      deadhead_rate_per_mile: 1,
+    };
+    // estimated_pay is authoritative for expected pay only; paid miles still
+    // honors resolved deadhead pay for loaded_miles_only.
+    expect(getLoadPaidMiles(load as any)).toBe(150);
+  });
+});
