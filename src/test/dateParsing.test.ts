@@ -29,8 +29,7 @@ describe('parseLocalYMD', () => {
     expect(() => parseLocalYMD('not-a-date')).toThrow(RangeError);
     // Real-shape but impossible day.
     expect(() => parseLocalYMD('2026-02-31')).toThrow(RangeError);
-    // @ts-expect-error — runtime guard.
-    expect(() => parseLocalYMD(undefined)).toThrow(RangeError);
+    expect(() => parseLocalYMD(undefined as unknown as string)).toThrow(RangeError);
   });
 
   it('matches the multi-arg Date constructor exactly (epoch equality)', () => {
