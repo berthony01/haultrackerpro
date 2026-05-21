@@ -4,7 +4,8 @@ import {
   parseLegacyDeadheadPayFromNotes,
   getResolvedDeadheadPayAmount,
 } from '@/lib/deadheadPay';
-import { getLoadExpectedPay } from '@/lib/loadMetrics';
+import { getLoadExpectedPay, getLoadPaidMiles, getLoadPaidRPM } from '@/lib/loadMetrics';
+
 
 const base = {
   loaded_miles: 100,
