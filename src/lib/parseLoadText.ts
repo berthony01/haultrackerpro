@@ -42,6 +42,8 @@ export interface ParsedLoadData {
   flat_rate?: string;
   gross_revenue?: string;
   load_date?: string;
+  /** Phase 6C.6: drop-off / delivery date extracted from source (OCR/AI). Regex parser does not currently extract this. */
+  dropoff_date?: string;
   notes?: string;
   trip_id?: string;
   multiStopDetected?: boolean;
