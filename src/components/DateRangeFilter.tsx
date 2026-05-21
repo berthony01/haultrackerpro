@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
   startOfQuarter, endOfQuarter, subWeeks, subMonths, subQuarters, subYears, format,
+  parseISO, isValid,
 } from 'date-fns';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { weekStartDayToNumber } from '@/lib/loadUtils';
@@ -11,9 +12,22 @@ import { validateCustomRange } from '@/lib/reportRanges';
 
 interface DateRangeFilterProps {
   onRangeChange: (from?: string, to?: string) => void;
+  /**
+   * Authoritative applied range from the parent. When provided, the visible
+   * active preset chip and "Showing: …" label are derived from this — the
+   * filter holds no independent applied state of its own.
+   */
+  currentRange?: { from?: string; to?: string };
 }
 
-export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
+/** Local-safe ISO (yyyy-MM-dd) → Date. Returns null on invalid input. */
+function safeParseISO(iso?: string): Date | null {
+  if (!iso) return null;
+  const d = parseISO(iso);
+  return isValid(d) ? d : null;
+}
+
+export function DateRangeFilter({ onRangeChange, currentRange }: DateRangeFilterProps) {
   const { settings } = useUserSettings();
   const wso = weekStartDayToNumber(settings?.week_start_day);
 
@@ -26,19 +40,31 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
     { label: 'Previous Quarter',  getRange: () => { const d = subQuarters(new Date(), 1); return { from: startOfQuarter(d), to: endOfQuarter(d) }; } },
     { label: 'Year to Date',      getRange: () => ({ from: startOfYear(new Date()), to: new Date() }) },
     { label: 'Last Year',         getRange: () => { const d = subYears(new Date(), 1); return { from: startOfYear(d), to: endOfYear(d) }; } },
-    { label: 'All Time',          getRange: () => ({ from: undefined, to: undefined }) },
+    { label: 'All Time',          getRange: () => ({ from: undefined as Date | undefined, to: undefined as Date | undefined }) },
   ];
 
-  const [active, setActive] = useState('All Time');
-  const [activeRange, setActiveRange] = useState<{ from?: Date; to?: Date }>({});
+  // Custom-range input state is purely local UI scratch — not applied state.
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [showCustom, setShowCustom] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
 
+  // Derive the active preset label from the parent's authoritative range.
+  // Falls back to 'All Time' (both undefined) or 'Custom' (both defined, no match).
+  const fromISO = currentRange?.from;
+  const toISO = currentRange?.to;
+  const activeLabel = (() => {
+    if (!fromISO && !toISO) return 'All Time';
+    for (const p of presets) {
+      const r = p.getRange();
+      const pFrom = r.from ? format(r.from, 'yyyy-MM-dd') : undefined;
+      const pTo = r.to ? format(r.to, 'yyyy-MM-dd') : undefined;
+      if (pFrom === fromISO && pTo === toISO) return p.label;
+    }
+    return 'Custom';
+  })();
+
   const handlePreset = (label: string, from?: Date, to?: Date) => {
-    setActive(label);
-    setActiveRange({ from, to });
     setShowCustom(false);
     setCustomError(null);
     onRangeChange(from ? format(from, 'yyyy-MM-dd') : undefined, to ? format(to, 'yyyy-MM-dd') : undefined);
@@ -51,21 +77,22 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
       return;
     }
     setCustomError(null);
-    setActive('Custom');
-    setActiveRange({ from: new Date(customFrom + 'T00:00:00'), to: new Date(customTo + 'T00:00:00') });
     onRangeChange(customFrom, customTo);
   };
 
-  const rangeLabel = activeRange.from && activeRange.to
-    ? `Showing: ${format(activeRange.from, 'MMM d, yyyy')} – ${format(activeRange.to, 'MMM d, yyyy')}`
-    : active === 'All Time' ? 'Showing: All loads' : null;
+  // Derive the "Showing: …" label safely from the parent's range.
+  const fromDate = safeParseISO(fromISO);
+  const toDate = safeParseISO(toISO);
+  const rangeLabel = fromDate && toDate
+    ? `Showing: ${format(fromDate, 'MMM d, yyyy')} – ${format(toDate, 'MMM d, yyyy')}`
+    : (!fromISO && !toISO) ? 'Showing: All loads' : null;
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
         {presets.map(p => {
           const { from, to } = p.getRange();
-          const isActive = active === p.label;
+          const isActive = activeLabel === p.label;
           return (
             <Button
               key={p.label}
@@ -86,7 +113,7 @@ export function DateRangeFilter({ onRangeChange }: DateRangeFilterProps) {
           variant="ghost"
           size="sm"
           className={`text-xs h-8 rounded-lg font-semibold border ${
-            showCustom
+            showCustom || activeLabel === 'Custom'
               ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/20'
               : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-secondary/60'
           }`}

@@ -26,6 +26,7 @@ Index.tsx (parent)
 ## Changes
 
 ### 1. `src/components/DateRangeFilter.tsx`
+
 - Add prop `currentRange?: { from?: string; to?: string }`.
 - Remove internal `active` / `activeRange` state.
 - Derive `activeLabel` each render by matching `currentRange.from`/`to` against each preset's `getRange()` (compare as `yyyy-MM-dd` strings). If no match and both undefined → `'All Time'`. If no match and both defined → `'Custom'`.
@@ -34,18 +35,22 @@ Index.tsx (parent)
 - `handlePreset` and `handleCustom` keep calling `onRangeChange`; they no longer mutate local active state.
 
 ### 2. `src/components/LoadsListView.tsx`
+
 - Add prop `currentDateRange?: { from?: string; to?: string }`.
 - Pass it through to `<DateRangeFilter currentRange={currentDateRange} onRangeChange={onDateRangeChange} />`.
 
 ### 3. `src/pages/Index.tsx`
+
 - Pass `currentDateRange={dateRange}` to the existing `<LoadsListView …>` render site. No other changes.
 
 ### 4. Tests
+
 - No existing test harness for these components. Add no new files unless needed; verify by build + manual matrix below.
 
 ## Dashboard vs Loads page consistency notes
 
 `DashboardView` runs an entirely independent preset state (`activePreset`, lines 92-95) keyed off `PresetKey` which does **not** include `'all_time'`. Its KPI cards and trend math (`prevRange`, lines 175-…) **require** a bounded interval to compute previous-period deltas. Adding an "All Time" preset here would force null-handling across:
+
 - `prevRange` memo
 - every trend computation downstream
 - the trend arrow/percentage UI
@@ -83,3 +88,17 @@ Build/test: `bunx vitest run` must remain green (199 tests).
 2. Revert `src/components/LoadsListView.tsx` to drop the `currentDateRange` pass-through.
 3. Revert the single prop add in `src/pages/Index.tsx`.
 4. No DB, no migration, no data repair.
+
+ADDITIONAL REQUIREMENTS:
+
+1. Date label parsing safety:
+
+When deriving the “Showing: …” label from currentRange.from/[currentRange.to](http://currentRange.to), do not use unsafe new Date('YYYY-MM-DD') parsing. Use parseISO + isValid or an equivalent local-safe helper. Invalid date values should not crash the component and should fall back safely.
+
+2. Pagination reset precision:
+
+Pagination must reset when the actual applied date range changes, or when status/pay/search filters change. Avoid causing unnecessary resets only because the loads array reference changes after a background refetch, unless there is no safer option.
+
+3. Controlled-state authority:
+
+After this patch, DateRangeFilter must not have its own independent applied active preset/range state. It may keep temporary custom input state, but the applied chip/label must derive from currentRange provided by the parent.
