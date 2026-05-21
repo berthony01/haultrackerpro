@@ -85,7 +85,15 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
                 contentStyle={{ background: 'hsl(220 46% 9%)', border: '1px solid hsl(220 30% 22%)', borderRadius: 12, fontSize: 12, color: 'hsl(220 12% 92%)' }}
                 labelStyle={{ color: 'hsl(220 12% 92%)', fontWeight: 600 }}
                 itemStyle={{ color: 'hsl(220 12% 88%)' }}
-                formatter={(v: any, name: any) => [`$${Math.abs(Number(v)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name]}
+                formatter={(v: any, name: any) => {
+                  const num = Number(v);
+                  // Revenue/Expenses bars display magnitude; Net Profit keeps its sign.
+                  if (name === 'Net Profit') {
+                    const sign = num < 0 ? '-' : '';
+                    return [`${sign}$${Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name];
+                  }
+                  return [`$${Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name];
+                }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="revenue" name="Revenue" fill="hsl(142 71% 45%)" radius={[4, 4, 0, 0]} maxBarSize={28} />
