@@ -14,6 +14,14 @@ interface Props {
   expenses: Expense[];
 }
 
+/**
+ * Per-day Net Profit for the Profit Overview chart and its tooltip.
+ * Must equal revenue - expenses (signed); covered by unit tests.
+ */
+export function computeDailyNetProfit(revenue: number, expenses: number): number {
+  return revenue - expenses;
+}
+
 export function ProfitOverviewChart({ loads, expenses }: Props) {
   const data = useMemo(() => {
     const map = new Map<string, { date: string; revenue: number; expenses: number; net: number }>();
@@ -33,7 +41,7 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
     return Array.from(map.values())
       .map(d => ({
         ...d,
-        net: d.revenue - Math.abs(d.expenses),
+        net: computeDailyNetProfit(d.revenue, Math.abs(d.expenses)),
         expenses: -Math.abs(d.expenses),
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -77,7 +85,15 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
                 contentStyle={{ background: 'hsl(220 46% 9%)', border: '1px solid hsl(220 30% 22%)', borderRadius: 12, fontSize: 12, color: 'hsl(220 12% 92%)' }}
                 labelStyle={{ color: 'hsl(220 12% 92%)', fontWeight: 600 }}
                 itemStyle={{ color: 'hsl(220 12% 88%)' }}
-                formatter={(v: any, name: any) => [`$${Math.abs(Number(v)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name]}
+                formatter={(v: any, name: any) => {
+                  const num = Number(v);
+                  // Revenue/Expenses bars display magnitude; Net Profit keeps its sign.
+                  if (name === 'Net Profit') {
+                    const sign = num < 0 ? '-' : '';
+                    return [`${sign}$${Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name];
+                  }
+                  return [`$${Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name];
+                }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="revenue" name="Revenue" fill="hsl(142 71% 45%)" radius={[4, 4, 0, 0]} maxBarSize={28} />
