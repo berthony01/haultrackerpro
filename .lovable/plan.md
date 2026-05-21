@@ -1,112 +1,85 @@
-## Surgical hardening pass — 10 targeted fixes
+# Phase 6C.7A — Date Range State Authority Patch
 
-Scope is locked to the files listed below. No UI styling, theme, routes, pricing copy, landing, recruiter, parking, or contract changes.
+## Issue confirmed
 
----
+`DateRangeFilter` owns its own `active` / `activeRange` state (lines 32-33). The parent (`Index.tsx`, line 76) owns the real applied filter as `dateRange = { from, to }`. The filter only pushes outward via `onRangeChange` — it never reads back from the parent. Consequences:
 
-### Fix 1 — Lock down checkout legacy `priceId`
+- On remount (navigate away → back to Loads), the filter resets visually to "All Time" with no `from`/`to`, but `Index.dateRange` is preserved → label and active chip drift from the real filter.
+- The chip highlighting is computed via `active === p.label`, which only updates on click — not in response to the parent's authoritative range.
 
-**File:** `supabase/functions/create-checkout/index.ts`
+`LoadsListView` already correctly resets pagination on `loads` change (line 71, fixed in Phase 6C.7). No regression there.
 
-- Keep `planKey` as the preferred path (unchanged).
-- For legacy `body.priceId`: build the allowlist from `STRIPE_PRO_MONTHLY_PRICE_ID` and `STRIPE_PRO_YEARLY_PRICE_ID` only. If `priceId` is not an exact match, return HTTP 400 `{ error: "Invalid price ID" }`.
-- Remove the "still allow — backward compat" branch.
+## Date range authority map (target state)
 
-### Fix 2 — Unknown Stripe price must not grant Pro
+```text
+Index.tsx (parent)
+  dateRange { from?, to? }  ← source of truth
+        │  passed down ▼
+  LoadsListView
+        │  passes both currentRange + onChange ▼
+  DateRangeFilter (now controlled)
+        - derives active preset label from currentRange
+        - derives "Showing: …" label from currentRange
+        - calls onRangeChange on user action; never holds its own copy
+```
 
-**File:** `supabase/functions/stripe-webhook/index.ts`
+## Changes
 
-- Change `resolvePlanKey` to return `null` for unknown price IDs (instead of fallback `"pro_monthly"`).
-- In `checkout.session.completed` and `customer.subscription.created/updated`: if resolved plan is `null` AND no `session.metadata.plan_key`, log a warning and skip the Pro upsert (do not write `plan_key: "pro_monthly"` or set profiles to `pro`). Webhook still returns 200 so Stripe does not retry.
-- `customer.subscription.deleted` path is unaffected (already sets `free`).
+### 1. `src/components/DateRangeFilter.tsx`
+- Add prop `currentRange?: { from?: string; to?: string }`.
+- Remove internal `active` / `activeRange` state.
+- Derive `activeLabel` each render by matching `currentRange.from`/`to` against each preset's `getRange()` (compare as `yyyy-MM-dd` strings). If no match and both undefined → `'All Time'`. If no match and both defined → `'Custom'`.
+- Derive `rangeLabel` from `currentRange` directly (parse ISO → format MMM d, yyyy). `'All Time'` when both undefined.
+- Keep `customFrom`/`customTo`/`showCustom`/`customError` as local UI state only — they don't represent applied state.
+- `handlePreset` and `handleCustom` keep calling `onRangeChange`; they no longer mutate local active state.
 
-### Fix 3 — `useLoads` effective-date underfetch
+### 2. `src/components/LoadsListView.tsx`
+- Add prop `currentDateRange?: { from?: string; to?: string }`.
+- Pass it through to `<DateRangeFilter currentRange={currentDateRange} onRangeChange={onDateRangeChange} />`.
 
-**File:** `src/hooks/useLoads.ts`
+### 3. `src/pages/Index.tsx`
+- Pass `currentDateRange={dateRange}` to the existing `<LoadsListView …>` render site. No other changes.
 
-- Replace the `load_date`-only server filter with an OR filter that includes `dropoff_date`:
-`query.or(\`and(load_date.gte.{from},load_date.lte.{to}),and(dropoff_date.gte.{from},dropoff_date.lte.{to}))`(build the string defensively when only`from`or only`to` is provided).
-- Keep the client-side effective-date refinement (drop-off ?? pickup) so the final list matches the contract.
-- Note in a code comment that `totalCount` reflects the OR-prefilter, which is a superset of the client-filtered list — this is acceptable for pagination as it never underfetches.
+### 4. Tests
+- No existing test harness for these components. Add no new files unless needed; verify by build + manual matrix below.
 
-**Acceptance:** load with `load_date=2026-05-28`, `dropoff_date=2026-06-01`, filter 2026-06-01..2026-06-07 → present.
+## Dashboard vs Loads page consistency notes
 
-### Fix 4 — Server-side Pro gating in `ai-insight`
+`DashboardView` runs an entirely independent preset state (`activePreset`, lines 92-95) keyed off `PresetKey` which does **not** include `'all_time'`. Its KPI cards and trend math (`prevRange`, lines 175-…) **require** a bounded interval to compute previous-period deltas. Adding an "All Time" preset here would force null-handling across:
+- `prevRange` memo
+- every trend computation downstream
+- the trend arrow/percentage UI
 
-**File:** `supabase/functions/ai-insight/index.ts`
+That is not a small/safe change inside this phase's scope. **Deferred** (see D1 below). Dashboard remains period-comparison-only, intentional. Loads page "All Time" still does not affect Dashboard — same as before.
 
-- After JWT validation, define:
-  - `FREE_TYPES = new Set(['parse_expense', 'parse_ratecon'])`
-  - `PRO_TYPES = new Set(['lane_advice', 'weekly_report', 'tax_tips'])`
-- If request `type` is in `PRO_TYPES`: query `subscriptions` for `user_id` with `status = 'active'`; if no row, also check `admin_users` for the user as an override. Otherwise return HTTP 403 `{ error: "Pro required" }`.
-- Use the service-role client for this lookup (read-only). Do not touch client-side checks.
+## Verification matrix (manual after build)
 
-### Fix 5 — Batch fuel logs
+1. Loads page: pick **Last Week** → navigate to Dashboard → back to Loads → chip shows **Last Week** and label shows the correct Mon–Sun / Sun–Sat range.
+2. Pick **All Time** → navigate away → back → chip shows **All Time**, label shows "Showing: All loads", list shows every load.
+3. Monday week-start setting → Last Week renders Monday-to-Sunday range label.
+4. Sunday week-start setting → Last Week renders Sunday-to-Saturday range label.
+5. Apply a Custom range → label persists while applied; chip shows **Custom**.
+6. Switch presets → pagination resets (already in place).
+7. Dashboard: presets behave unchanged; no "All Time" appears.
 
-**File:** `src/hooks/useFuelLogs.ts`
+Build/test: `bunx vitest run` must remain green (199 tests).
 
-- Mirror `useExpenses` pattern: loop `range(offset, offset + FETCH_SIZE - 1)` with `FETCH_SIZE = 1000` and safety cap (e.g. 50 iterations → 50k rows).
-- Preserve `dateRange` filters on each page request.
-- Return shape stays `{ fuelLogs, isLoading, addFuelLog, updateFuelLog, deleteFuelLog }`.
+## Intentionally not changed
 
-### Fix 6 — Dashboard Projected Net warning click
+- `useLoads`, `loadUtils`, `computeLoadPay`, mileage math, reports/exports, schema, types — all forbidden by phase scope.
+- Pagination dep array in `LoadsListView` (already correct from 6C.7).
+- Custom-date input parsing (`new Date('YYYY-MM-DD')`) — pre-existing concern, see D2.
+- DashboardView preset structure.
 
-**File:** `src/components/DashboardView.tsx`
+## Deferred findings
 
-- On the Projected Net `StatCard`: if `missingMiles === true`, always wire the click/tap to `onNavigate?.('settings')` regardless of whether `projectedNet` has a value.
-- If `missingMiles === false`, leave existing onClick behavior untouched.
+- **D1**: DashboardView lacks an `'all_time'` preset. Adding it requires null-handling across `prevRange` and all trend math; out of scope for this surgical patch.
+- **D2**: Custom date input uses `new Date('YYYY-MM-DD')` which is UTC-parsed; not user-visible at present but a latent timezone risk.
+- **D3**: No automated test harness covers DateRangeFilter / LoadsListView interaction. Worth adding a small RTL test file in a future phase.
 
-### Fix 7 — `useProfitCheck` regression coverage
+## Rollback plan
 
-**File:** `src/test/costProfileCPM.test.ts` (extend) and/or new `src/test/profitCheckSource.test.ts`
-
-- Test A: `computeCostProfileCPM` with a fixed-only profile + missing `estimated_monthly_miles` → `warnings` includes `'fixed_missing_monthly_miles'`.
-- Test B: If hook test is heavy, extract the small "cost source selection" decision from `useProfitCheck` into a pure helper (e.g. `selectCostSource({ profileCpm, profileWarnings, historyCpm })`) returning `{ source: 'profile' | 'history' | 'none', warnings }`. Update `useProfitCheck` to call that helper (no behavior change). Test that when profile has warnings AND history CPM exists, helper still returns `source: 'profile'` so the warning is not hidden.
-
-### Fix 8 — Defensive ownership filters in `useLoads`
-
-**File:** `src/hooks/useLoads.ts`
-
-- `updateLoad` and `deleteLoad` mutationFns: throw if `!user`; add `.eq('user_id', user.id)` next to `.eq('id', id)` (delete) and to the `update().eq('id', id)` chain.
-
-### Fix 9 — Report cancelled-load clarity
-
-**Files:** `src/lib/reportAggregator.ts`, `src/lib/reportCsv.ts`, `src/lib/reportPdf.ts`
-
-- Aggregator: expose `activeLoads` (loads excluding `status === 'cancelled'`) alongside existing fields. Keep existing cancelled-loads section data source intact.
-- CSV + PDF: regular breakdown tables (load list, broker breakdown, lane breakdown, etc.) consume `activeLoads`. Cancelled Loads section remains the only place cancelled loads appear.
-- PDF `settlement_dispute` issue filter: explicitly exclude `status === 'cancelled'` from disputed/unpaid issue detection.
-
-(Exact field/function names will be confirmed by reading the three files; no schema or column changes.)
-
-### Fix 10 — Update stale comment
-
-**File:** `src/hooks/useCostProfile.ts`
-
-- Update the docstring on `profileHasUsableData` to state: fixed-only profiles count as usable so the `fixed_missing_monthly_miles` warning can surface downstream instead of silently falling back to history. (The code already does this; only the comment needs refreshing if outdated.)
-
----
-
-### Verification
-
-- `bunx vitest run` (or `npm test`) — all existing + new tests pass.
-- Build/typecheck via harness — clean.
-- Manual: confirm a load with mismatched pickup/drop-off shows in date-filtered Loads list; confirm Dashboard Projected Net warning tile navigates to Settings; confirm `ai-insight` returns 403 for free user on `lane_advice`.
-
-### Out of scope (will not touch)
-
-UI redesign, theme tokens, routes, pricing copy, landing pages, recruiter UX, parking, contract UI, DB schema, RLS policies, or any file not listed above.
-
-For the useLoads OR filter, build the condition carefully for three cases:
-
-1. both from and to exist
-
-2. only from exists
-
-3. only to exists
-
-Do not generate invalid Supabase OR syntax when one boundary is missing.
-
-For subscription access, treat the user as Pro only if the subscription row has status = 'active' or status = 'trialing' if trialing exists in this project. Do not count canceled, incomplete, unpaid, expired, or past_due unless the current app already treats them as active elsewhere.
-
-Cancelled loads must never appear in normal revenue, broker, lane, settlement dispute, or unpaid-load breakdowns. They should only appear in the dedicated Cancelled Loads section.
+1. Revert `src/components/DateRangeFilter.tsx` to restore internal `active` / `activeRange` state and remove the `currentRange` prop.
+2. Revert `src/components/LoadsListView.tsx` to drop the `currentDateRange` pass-through.
+3. Revert the single prop add in `src/pages/Index.tsx`.
+4. No DB, no migration, no data repair.
