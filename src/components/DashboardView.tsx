@@ -94,6 +94,45 @@ export function getTrendSuffix(key: PresetKey): string {
   }
 }
 
+/**
+ * Build the "Showing: …" label for the Dashboard date-range pills.
+ * Mirrors the Loads-page wording (`MMM d, yyyy` start/end via date-fns `format`).
+ * Returns null for Custom when both dates are blank.
+ */
+export function getShowingLabel(
+  key: PresetKey,
+  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0,
+  customFrom?: string,
+  customTo?: string,
+  now: Date = new Date(),
+): string | null {
+  const fmt = (d: Date) => format(d, 'MMM d, yyyy');
+  if (key === 'custom') {
+    const f = customFrom ? parseISO(customFrom) : null;
+    const t = customTo ? parseISO(customTo) : null;
+    if (f && t && isValid(f) && isValid(t)) return `Showing: ${fmt(f)} - ${fmt(t)}`;
+    return null;
+  }
+  let start: Date; let end: Date;
+  switch (key) {
+    case 'this_week': start = startOfWeek(now, { weekStartsOn }); end = endOfWeek(now, { weekStartsOn }); break;
+    case 'last_week': { const lw = subWeeks(now, 1); start = startOfWeek(lw, { weekStartsOn }); end = endOfWeek(lw, { weekStartsOn }); break; }
+    case 'this_month': start = startOfMonth(now); end = endOfMonth(now); break;
+    case 'last_month': { const lm = subMonths(now, 1); start = startOfMonth(lm); end = endOfMonth(lm); break; }
+    case 'this_year': start = startOfYear(now); end = endOfYear(now); break;
+  }
+  return `Showing: ${fmt(start!)} - ${fmt(end!)}`;
+}
+
+/**
+ * Cancelled-loads footnote shown below the Dashboard KPI strip.
+ * Returns null when N <= 0 so callers can render conditionally.
+ */
+export function getCancelledFootnote(n: number): string | null {
+  if (!n || n <= 0) return null;
+  return `${n} cancelled load${n === 1 ? '' : 's'} excluded`;
+}
+
 
 export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
