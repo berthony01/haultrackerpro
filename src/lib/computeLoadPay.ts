@@ -1,4 +1,5 @@
 import { PayModel } from '@/lib/payModels';
+import { resolveOperatingMiles } from '@/lib/mileageMath';
 
 export interface ComputeLoadPayInput {
   payModel: PayModel;
@@ -45,10 +46,15 @@ export function computeLoadPay(input: ComputeLoadPayInput): ComputeLoadPayResult
   const fees = num(input.fees);
   const warnings: string[] = [];
 
-  // Resolve total operating miles. Prefer explicit total when present and self-consistent.
-  let totalOperatingMiles = loaded + deadhead;
+  // Phase 6C.4: use shared sanity helper so a stale/corrupted totalMiles
+  // can't override valid loaded+deadhead components. Mismatch warnings still
+  // fire so the user sees the inconsistency in the form preview.
+  const totalOperatingMiles = resolveOperatingMiles({
+    loadedMiles: loaded,
+    deadheadMiles: deadhead,
+    totalMiles: totalRaw,
+  });
   if (totalRaw > 0) {
-    totalOperatingMiles = totalRaw;
     if (loaded > 0 && deadhead >= 0 && Math.abs(loaded + deadhead - totalRaw) > 2) {
       warnings.push(
         `Mileage mismatch: loaded (${loaded}) + deadhead (${deadhead}) = ${loaded + deadhead}, but total miles = ${totalRaw}.`,
