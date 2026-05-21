@@ -164,7 +164,7 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
           </div>
           <div>
             <p className="text-label mb-2 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-primary" /> Date Range</p>
-            <DateRangeFilter onRangeChange={(from, to) => setDateRange({ from, to })} />
+            <DateRangeFilter currentRange={dateRange} onRangeChange={(from, to) => setDateRange({ from, to })} />
           </div>
         </div>
 
