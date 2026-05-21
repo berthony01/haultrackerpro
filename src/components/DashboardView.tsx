@@ -340,11 +340,12 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </TooltipProvider>
           </div>
 
-          {summary.cancelledCount > 0 && (
-            <p className="text-[11px] text-muted-foreground -mt-2">
-              {summary.cancelledCount} cancelled load{summary.cancelledCount === 1 ? '' : 's'} excluded from totals.
-            </p>
-          )}
+          {(() => {
+            const footnote = getCancelledFootnote(summary.cancelledCount);
+            return footnote ? (
+              <p className="text-[11px] text-muted-foreground -mt-2">{footnote}</p>
+            ) : null;
+          })()}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
