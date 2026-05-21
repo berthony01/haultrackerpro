@@ -59,13 +59,29 @@ export function getLoadPaidMiles(load: Load): number {
   const dh = num(load.deadhead_miles);
   const total = getLoadOperatingMiles(load);
   switch (model) {
-    case 'loaded_miles_only': return loaded;
+    case 'loaded_miles_only': {
+      // Phase 6C.2: if resolved deadhead pay is actually paid (structured or
+      // legacy notes, amount > 0, deadhead miles > 0), treat deadhead miles
+      // as paid miles so paid RPM mirrors expected pay. Otherwise legacy
+      // behavior: loaded miles only.
+      if (dh > 0) {
+        const resolved = resolveDeadheadPay(load as any);
+        if (
+          (resolved.source === 'structured' || resolved.source === 'legacy_notes') &&
+          resolved.amount > 0
+        ) {
+          return loaded + dh;
+        }
+      }
+      return loaded;
+    }
     case 'total_miles':       return total;
     case 'loaded_plus_deadhead': return loaded + dh;
     case 'flat_rate':         return total;
     case 'manual':            return total;
   }
 }
+
 
 function fees(load: Load): number {
   return num(load.wait_fee) + num(load.detention_fee) + num(load.other_fees);
