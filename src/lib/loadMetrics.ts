@@ -37,12 +37,34 @@ export function getLoadPayModel(load: Load): PayModel {
 
 /**
  * Total physical miles driven for the load.
- * Uses persisted `total_miles` when > 0, otherwise loaded + deadhead.
+ *
+ * Phase 6C.3 — Stored Derived Field Sanity:
+ * `total_miles` is a stored/optional summary field; `loaded_miles` and
+ * `deadhead_miles` are raw component fields. If `total_miles` is missing,
+ * obviously stale, or contradicts the raw components (e.g. a corrupted "1"),
+ * we fall back to the component sum so downstream Effective RPM and KPI
+ * totals don't get poisoned. We never mutate the load or write back.
  */
 export function getLoadOperatingMiles(load: Load): number {
   const stored = num((load as any).total_miles);
+  const loaded = num(load.loaded_miles);
+  const dh = num(load.deadhead_miles);
+  const componentTotal = loaded + dh;
+
+  if (componentTotal > 0) {
+    // Stored missing/non-positive → trust components.
+    if (stored <= 0) return componentTotal;
+    // Stored clearly less than loaded alone → invalid summary, trust components.
+    if (loaded > 0 && stored < loaded) return componentTotal;
+    // Stored materially less than component total (>2mi tolerance) → invalid.
+    if (stored < componentTotal - 2) return componentTotal;
+    // Stored is plausible (>= component total, or within tolerance) → trust it.
+    return stored;
+  }
+
+  // No component miles — fall back to stored summary if present.
   if (stored > 0) return stored;
-  return num(load.loaded_miles) + num(load.deadhead_miles);
+  return 0;
 }
 
 /**
