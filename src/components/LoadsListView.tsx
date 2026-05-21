@@ -68,7 +68,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
     [filtered, currentPage]
   );
 
-  useEffect(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery]);
+  useEffect(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery, loads]);
 
   return (
     <div className="space-y-5 animate-fade-in">
