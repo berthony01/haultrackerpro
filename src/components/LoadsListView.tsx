@@ -21,11 +21,13 @@ interface LoadsListViewProps {
   onUpdate: (id: string, data: LoadUpdate) => void;
   onDuplicate: (load: Load) => void;
   onDateRangeChange: (from?: string, to?: string) => void;
+  /** Authoritative applied date range from the parent. */
+  currentDateRange?: { from?: string; to?: string };
   isLoading?: boolean;
   initialPayFilter?: string;
 }
 
-export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate, onDuplicate, onDateRangeChange, isLoading, initialPayFilter }: LoadsListViewProps) {
+export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate, onDuplicate, onDateRangeChange, currentDateRange, isLoading, initialPayFilter }: LoadsListViewProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [payFilter, setPayFilter] = useState(initialPayFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +70,9 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
     [filtered, currentPage]
   );
 
-  useEffect(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery, loads]);
+  // Reset pagination on filter / search / applied date-range change only.
+  // Avoids spurious resets when `loads` reference changes from a background refetch.
+  useEffect(() => { setCurrentPage(0); }, [statusFilter, payFilter, searchQuery, currentDateRange?.from, currentDateRange?.to]);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -83,7 +87,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       </div>
 
       {/* Date range */}
-      <DateRangeFilter onRangeChange={onDateRangeChange} />
+      <DateRangeFilter onRangeChange={onDateRangeChange} currentRange={currentDateRange} />
 
       {/* KPI strip */}
       {filtered.length > 0 && <LoadsKpiStrip loads={filtered} />}

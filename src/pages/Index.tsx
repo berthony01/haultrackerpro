@@ -810,6 +810,7 @@ const Index = () => {
                 onUpdate={handleQuickUpdate}
                 onDuplicate={handleDuplicate}
                 onDateRangeChange={(from, to) => setDateRange({ from, to })}
+                currentDateRange={dateRange}
                 isLoading={allLoadsQuery.isLoading}
                 initialPayFilter={loadsPayFilter}
               />
