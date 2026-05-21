@@ -14,6 +14,14 @@ interface Props {
   expenses: Expense[];
 }
 
+/**
+ * Per-day Net Profit for the Profit Overview chart and its tooltip.
+ * Must equal revenue - expenses (signed); covered by unit tests.
+ */
+export function computeDailyNetProfit(revenue: number, expenses: number): number {
+  return revenue - expenses;
+}
+
 export function ProfitOverviewChart({ loads, expenses }: Props) {
   const data = useMemo(() => {
     const map = new Map<string, { date: string; revenue: number; expenses: number; net: number }>();
@@ -33,7 +41,7 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
     return Array.from(map.values())
       .map(d => ({
         ...d,
-        net: d.revenue - Math.abs(d.expenses),
+        net: computeDailyNetProfit(d.revenue, Math.abs(d.expenses)),
         expenses: -Math.abs(d.expenses),
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
