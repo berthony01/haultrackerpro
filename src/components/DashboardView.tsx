@@ -320,6 +320,12 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs flex-1 rounded-xl" />
           </div>
         )}
+        {(() => {
+          const label = getShowingLabel(activePreset, weekStartsOn, customFrom, customTo);
+          return label ? (
+            <p className="text-[11px] text-muted-foreground font-medium pl-0.5">{label}</p>
+          ) : null;
+        })()}
       </div>
 
       {/* === PREMIUM ANALYTICS HERO === */}
