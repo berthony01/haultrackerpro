@@ -280,10 +280,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const prevGross = prevSummary.grossRevenue;
   const prevNet = prevSummary.netProfit;
   const prevPpm = prevSummary.netRPM;
-  const pct = (curr: number, prev: number) => {
-    if (!isFinite(prev) || prev === 0) return null;
-    return ((curr - prev) / Math.abs(prev)) * 100;
-  };
+  const pct = computeTrendPct;
   const trendRevenue = pct(grossRevenue, prevGross);
   const trendNet = pct(netProfit, prevNet);
   const trendPpm = pct(netRPM, prevPpm);
