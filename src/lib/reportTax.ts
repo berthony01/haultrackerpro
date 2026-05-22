@@ -3,6 +3,7 @@
 import type { Load } from '@/hooks/useLoads';
 import type { Expense } from '@/hooks/useExpenses';
 import type { UserSettings } from '@/hooks/useUserSettings';
+import { getLoadExpectedPay } from '@/lib/loadMetrics';
 
 export interface TaxEstimateResult {
   enabled: boolean;
