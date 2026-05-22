@@ -34,13 +34,17 @@ export function useSubmitParkingReport() {
         throw new Error('You already reported this lot in the last hour');
       }
 
-      const { error: insertErr } = await supabase.from('parking_reports').insert({
-        parking_id: parkingId,
-        user_id: user.id,
-        status,
-        safety_rating: safetyRating ?? null,
-        notes: notes ?? null,
-      } as never);
+      const { data: inserted, error: insertErr } = await supabase
+        .from('parking_reports')
+        .insert({
+          parking_id: parkingId,
+          user_id: user.id,
+          status,
+          safety_rating: safetyRating ?? null,
+          notes: notes ?? null,
+        } as never)
+        .select('id')
+        .single();
       if (insertErr) {
         // 23505 = unique_violation from parking_reports_one_per_hour index
         if ((insertErr as { code?: string }).code === '23505') {
@@ -49,15 +53,15 @@ export function useSubmitParkingReport() {
         throw insertErr;
       }
 
-      // Award points (5 for a report).
-      const { data: pointsRow, error: pointsErr } = await supabase.rpc('award_points', {
-        _user_id: user.id,
-        _category: 'parking',
-        _amount: 5,
-      });
+      // Award points (5 for a report) via event-bound RPC — ledger-deduped server-side.
+      const reportId = (inserted as { id: string }).id;
+      const { data: pointsRow, error: pointsErr } = await supabase.rpc(
+        'award_parking_report_points',
+        { _report_id: reportId },
+      );
       if (pointsErr) {
         // Non-fatal — the report was saved.
-        console.warn('award_points failed:', pointsErr);
+        console.warn('award_parking_report_points failed:', pointsErr);
       }
 
       return { pointsRow };
