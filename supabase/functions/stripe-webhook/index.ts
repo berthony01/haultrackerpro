@@ -50,27 +50,6 @@ const RECRUITER_PLAN_LEGACY_LIMITS: Record<string, number> = {
 
 
 function resolveRecruiterPlan(priceId: string, metadataPlan?: string | null): string | null {
-  if (metadataPlan && RECRUITER_PLAN_LIMITS[metadataPlan] != null) return metadataPlan;
-  const map: Record<string, string> = {
-    [Deno.env.get("STRIPE_RECRUITER_STARTER_PRICE_ID") ?? ""]: "starter",
-    [Deno.env.get("STRIPE_RECRUITER_GROWTH_PRICE_ID") ?? ""]: "growth",
-    [Deno.env.get("STRIPE_RECRUITER_FLEET_PRICE_ID") ?? ""]: "fleet",
-  };
-  return map[priceId] ?? null;
-}
-
-async function handleRecruiterSubscription(
-  supabaseClient: any,
-  subscription: Stripe.Subscription,
-  metadata: Record<string, string>,
-) {
-  const userId = metadata.user_id;
-  const recruiterId = metadata.recruiter_id;
-  if (!userId || !recruiterId) {
-    logStep("Recruiter sub missing metadata", { subId: subscription.id });
-    return;
-  }
-function resolveRecruiterPlan(priceId: string, metadataPlan?: string | null): string | null {
   if (metadataPlan && RECRUITER_PLAN_LEGACY_LIMITS[metadataPlan] != null) return metadataPlan;
   const map: Record<string, string> = {
     [Deno.env.get("STRIPE_RECRUITER_STARTER_PRICE_ID") ?? ""]: "starter",
