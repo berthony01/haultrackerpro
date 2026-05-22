@@ -22,7 +22,7 @@ export type RecruiterBillingStatus =
   | 'active'
   | 'past_due'
   | 'canceled'
-  | 'trialing'
+  | 'trialing'  // trial-allowlist: Stripe subscription status literal, not user-facing copy
   | (string & {});
 
 export type RecruiterCapabilityTier =
