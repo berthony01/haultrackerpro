@@ -177,7 +177,7 @@ describe('recruiterCapabilities', () => {
 
   it('resolveRecruiterCapabilityTier + isRecruiterPaidPlanActive helpers', () => {
     expect(isRecruiterPaidPlanActive('growth', 'active')).toBe(true);
-    expect(isRecruiterPaidPlanActive('growth', 'trialing')).toBe(true);
+    expect(isRecruiterPaidPlanActive('growth', 'trialing')).toBe(true);  // trial-allowlist: Stripe status literal
     expect(isRecruiterPaidPlanActive('growth', 'past_due')).toBe(false);
     expect(isRecruiterPaidPlanActive('none', 'active')).toBe(false);
     expect(isRecruiterPaidPlanActive(null, null)).toBe(false);
