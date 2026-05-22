@@ -149,6 +149,31 @@ describe('recruiterCapabilities', () => {
     expect(caps.canPostStandardOpportunities).toBe(false);
   });
 
+  it('growth active + unapproved: premium caps still resolve but posting stays false', () => {
+    const caps = getRecruiterPlanCapabilities({
+      plan: 'growth',
+      status: 'active',
+      isApprovedRecruiter: false,
+      isSuspended: false,
+    });
+    expect(caps.canPostStandardOpportunities).toBe(false);
+    expect(caps.canUsePriorityPlacement).toBe(true);
+    expect(caps.canExportRecruiterReports).toBe(true);
+  });
+
+  it('growth active + suspended: premium caps still resolve but posting stays false', () => {
+    const caps = getRecruiterPlanCapabilities({
+      plan: 'growth',
+      status: 'active',
+      isApprovedRecruiter: true,
+      isSuspended: true,
+    });
+    expect(caps.canPostStandardOpportunities).toBe(false);
+    expect(caps.canUsePriorityPlacement).toBe(true);
+    expect(caps.canViewAdvancedRecruiterReports).toBe(true);
+  });
+
+
   it('resolveRecruiterCapabilityTier + isRecruiterPaidPlanActive helpers', () => {
     expect(isRecruiterPaidPlanActive('growth', 'active')).toBe(true);
     expect(isRecruiterPaidPlanActive('growth', 'trialing')).toBe(true);
