@@ -29,7 +29,7 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Article',
   headline: 'Recruiter User Guide | HaulTrackerPro',
-  description: 'How recruiters get verified, post structured opportunities, manage applicants, and use Contract Protection on HaulTrackerPro.',
+  description: 'How recruiters get verified, post unlimited standard opportunities, manage applicants, and use contract workflow tools on HaulTrackerPro.',
   publisher: { '@type': 'Organization', name: 'HaulTrackerPro', url: 'https://haultrackerpro.com' },
   mainEntityOfPage: 'https://haultrackerpro.com/recruiter/guide',
 };
