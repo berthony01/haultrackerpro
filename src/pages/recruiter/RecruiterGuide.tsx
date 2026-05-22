@@ -40,7 +40,7 @@ export default function RecruiterGuide() {
     <div className="min-h-screen bg-background text-foreground">
       <SEOHead
         title="Recruiter User Guide | HaulTrackerPro"
-        description="Step-by-step guide for trucking recruiters: verification, posting opportunities, managing applicants, and Contract Protection."
+        description="Step-by-step guide for trucking recruiters: verification, posting unlimited standard opportunities, managing applicants, and contract workflow tools."
         path="/recruiter/guide"
         jsonLd={jsonLd}
       />
