@@ -22,9 +22,32 @@ function resolvePlanKey(priceId: string): string | null {
   return null;
 }
 
-const RECRUITER_PLAN_LIMITS: Record<string, number> = {
+/**
+ * LEGACY recruiter plan capacity values.
+ *
+ * Historically these gated how many active standard opportunities a recruiter
+ * could post. As of Phase 2 of the recruiter model rework, standard opportunity
+ * posting is gated by recruiter approval/verification (see
+ * `opportunities_billing_guard()`), NOT by Stripe plan or this numeric limit.
+ *
+ * These numbers are retained ONLY for:
+ *   - backward compatibility with the NOT NULL `active_opportunity_limit`
+ *     column on `recruiter_billing_profiles`,
+ *   - legacy admin/UI displays still reading that column.
+ *
+ * Do NOT use this map to authorize posting. Paid premium capabilities
+ * (priority placement, featured listings, recruiter reports, exports,
+ * analytics, etc.) are derived from `plan` + `status` via
+ * `getRecruiterPlanCapabilities` and `recruiter_has_priority_plan()`.
+ *
+ * Do NOT substitute a fake "unlimited" sentinel (999999, MAX_SAFE_INTEGER,
+ * Infinity) here — the column is `integer NOT NULL` and downstream displays
+ * would render it.
+ */
+const RECRUITER_PLAN_LEGACY_LIMITS: Record<string, number> = {
   none: 0, starter: 1, growth: 5, fleet: 25,
 };
+
 
 function resolveRecruiterPlan(priceId: string, metadataPlan?: string | null): string | null {
   if (metadataPlan && RECRUITER_PLAN_LIMITS[metadataPlan] != null) return metadataPlan;
