@@ -3,9 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRecruiterProfile } from './useRecruiterProfile';
 import type { Tables } from '@/integrations/supabase/types';
+import {
+  getRecruiterPlanCapabilities,
+  isRecruiterPaidPlanActive,
+  resolveRecruiterCapabilityTier,
+} from '@/lib/recruiterCapabilities';
 
 export type RecruiterBilling = Tables<'recruiter_billing_profiles'>;
 export type RecruiterPlan = 'none' | 'starter' | 'growth' | 'fleet';
+
 
 export const RECRUITER_PLAN_LIMITS: Record<RecruiterPlan, number> = {
   none: 0,
@@ -64,7 +70,24 @@ export function useRecruiterBilling() {
   const status = billing?.status ?? 'inactive';
   const isBillingActive = status === 'active' || status === 'trialing'; // trial-allowlist
   const activeCount = activeCountQuery.data ?? 0;
+  // Legacy: canSubmitMore is the pre-capability-layer numeric gate. Kept for
+  // backward compatibility with existing consumers. New code should prefer
+  // `capabilities.canPostStandardOpportunities`.
   const canSubmitMore = isBillingActive && activeCount < limit;
+
+  // New capability layer. Approval/suspension are not currently tracked on
+  // `recruiter_billing_profiles`; pass through what we have from the recruiter
+  // profile when available so future UI gates resolve correctly.
+  const isApprovedRecruiter = (profile as { approved?: boolean } | null)?.approved ?? true;
+  const isSuspended = (profile as { suspended?: boolean } | null)?.suspended ?? false;
+  const capabilities = getRecruiterPlanCapabilities({
+    plan,
+    status,
+    isApprovedRecruiter,
+    isSuspended,
+  });
+  const capabilityTier = capabilities.tier;
+  const isPaidRecruiterPlanActive = isRecruiterPaidPlanActive(plan, status);
 
   const startCheckout = useMutation({
     mutationFn: async (selectedPlan: Exclude<RecruiterPlan, 'none'>) => {
@@ -77,6 +100,7 @@ export function useRecruiterBilling() {
       window.open(url, '_blank');
     },
   });
+
 
   const openPortal = useMutation({
     mutationFn: async () => {
@@ -105,5 +129,21 @@ export function useRecruiterBilling() {
     startCheckout,
     openPortal,
     refresh,
+    // Capability layer (new)
+    capabilities,
+    capabilityTier,
+    isPaidRecruiterPlanActive,
+    canPostStandardOpportunitiesCapability: capabilities.canPostStandardOpportunities,
+    canUsePriorityPlacement: capabilities.canUsePriorityPlacement,
+    canUseFeaturedListings: capabilities.canUseFeaturedListings,
+    canExportRecruiterReports: capabilities.canExportRecruiterReports,
+    canViewAdvancedRecruiterReports: capabilities.canViewAdvancedRecruiterReports,
+    canUseContractWorkflowTools: capabilities.canUseContractWorkflowTools,
+    canUseReferralTracking: capabilities.canUseReferralTracking,
+    canUseTeamSeats: capabilities.canUseTeamSeats,
+    canUseBulkOpportunityTools: capabilities.canUseBulkOpportunityTools,
   };
 }
+
+export { resolveRecruiterCapabilityTier, isRecruiterPaidPlanActive };
+
