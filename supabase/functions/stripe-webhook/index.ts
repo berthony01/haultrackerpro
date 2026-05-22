@@ -70,12 +70,38 @@ async function handleRecruiterSubscription(
     logStep("Recruiter sub missing metadata", { subId: subscription.id });
     return;
   }
+function resolveRecruiterPlan(priceId: string, metadataPlan?: string | null): string | null {
+  if (metadataPlan && RECRUITER_PLAN_LEGACY_LIMITS[metadataPlan] != null) return metadataPlan;
+  const map: Record<string, string> = {
+    [Deno.env.get("STRIPE_RECRUITER_STARTER_PRICE_ID") ?? ""]: "starter",
+    [Deno.env.get("STRIPE_RECRUITER_GROWTH_PRICE_ID") ?? ""]: "growth",
+    [Deno.env.get("STRIPE_RECRUITER_FLEET_PRICE_ID") ?? ""]: "fleet",
+  };
+  return map[priceId] ?? null;
+}
+
+async function handleRecruiterSubscription(
+  supabaseClient: any,
+  subscription: Stripe.Subscription,
+  metadata: Record<string, string>,
+) {
+  const userId = metadata.user_id;
+  const recruiterId = metadata.recruiter_id;
+  if (!userId || !recruiterId) {
+    logStep("Recruiter sub missing metadata", { subId: subscription.id });
+    return;
+  }
   const priceId = subscription.items.data[0]?.price?.id ?? "";
+  // Plan + status drive paid recruiter capabilities (priority placement,
+  // featured, reports, exports, analytics) via getRecruiterPlanCapabilities
+  // and recruiter_has_priority_plan(). They do NOT control standard
+  // opportunity posting — that is gated on recruiter approval (Phase 2).
   const isCanceledLike = ["canceled", "incomplete_expired"].includes(subscription.status);
   const plan = isCanceledLike
     ? "none"
     : (resolveRecruiterPlan(priceId, metadata.plan) ?? "none");
-  const limit = RECRUITER_PLAN_LIMITS[plan] ?? 0;
+  // Legacy column write only; no longer used for posting entitlement.
+  const legacyLimit = RECRUITER_PLAN_LEGACY_LIMITS[plan] ?? 0;
   const periodEnd = subscription.current_period_end
     ? new Date(subscription.current_period_end * 1000).toISOString()
     : null;
@@ -91,15 +117,19 @@ async function handleRecruiterSubscription(
         stripe_subscription_id: subscription.id,
         plan,
         status,
-        active_opportunity_limit: limit,
+        // Legacy/compat field (NOT NULL integer). Kept in sync with the
+        // previous mapping so admin displays still render expected numbers.
+        // Posting entitlement is no longer derived from this value.
+        active_opportunity_limit: legacyLimit,
         current_period_end: periodEnd,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "recruiter_id" },
     );
   if (error) logStep("Recruiter billing upsert error", { error: error.message });
-  else logStep("Recruiter billing updated", { recruiterId, plan, status, limit });
+  else logStep("Recruiter billing updated", { recruiterId, plan, status, legacyLimit });
 }
+
 
 /** Upsert the subscriptions table row */
 async function upsertSubscription(
