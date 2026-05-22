@@ -91,6 +91,7 @@ export function getTrendSuffix(key: PresetKey): string {
     case 'this_month':
     case 'last_month': return 'vs previous month';
     case 'this_year': return 'vs previous year';
+    case 'all': return '';
     case 'custom': return 'vs previous period';
   }
 }
