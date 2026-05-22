@@ -70,11 +70,25 @@ export function useRecruiterBilling() {
   const status = billing?.status ?? 'inactive';
   const isBillingActive = status === 'active' || status === 'trialing'; // trial-allowlist
   const activeCount = activeCountQuery.data ?? 0;
+  // Legacy: canSubmitMore is the pre-capability-layer numeric gate. Kept for
+  // backward compatibility with existing consumers. New code should prefer
+  // `capabilities.canPostStandardOpportunities`.
   const canSubmitMore = isBillingActive && activeCount < limit;
 
-  const startCheckout = useMutation({
-    mutationFn: async (selectedPlan: Exclude<RecruiterPlan, 'none'>) => {
-      const { data, error } = await supabase.functions.invoke('create-recruiter-checkout', {
+  // New capability layer. Approval/suspension are not currently tracked on
+  // `recruiter_billing_profiles`; pass through what we have from the recruiter
+  // profile when available so future UI gates resolve correctly.
+  const isApprovedRecruiter = (profile as { approved?: boolean } | null)?.approved ?? true;
+  const isSuspended = (profile as { suspended?: boolean } | null)?.suspended ?? false;
+  const capabilities = getRecruiterPlanCapabilities({
+    plan,
+    status,
+    isApprovedRecruiter,
+    isSuspended,
+  });
+  const capabilityTier = capabilities.tier;
+  const isPaidRecruiterPlanActive = isRecruiterPaidPlanActive(plan, status);
+
         body: { plan: selectedPlan },
       });
       if (error) throw error;
