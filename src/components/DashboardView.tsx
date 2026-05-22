@@ -60,7 +60,7 @@ interface DashboardViewProps {
   isPro?: boolean;
 }
 
-type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
+type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
 
 const presets: { key: PresetKey; label: string }[] = [
   { key: 'this_week', label: 'This Week' },
@@ -68,6 +68,7 @@ const presets: { key: PresetKey; label: string }[] = [
   { key: 'this_month', label: 'This Month' },
   { key: 'last_month', label: 'Last Month' },
   { key: 'this_year', label: 'This Year' },
+  { key: 'all', label: 'All Time' },
   { key: 'custom', label: 'Custom' },
 ];
 
