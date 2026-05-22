@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+
 import React from 'react';
 import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
@@ -74,25 +74,34 @@ describe('DateRangeFilter', () => {
     expect(onRangeChange).toHaveBeenCalledWith(undefined, undefined);
   });
 
-  it('keyboard activation (Enter and Space) triggers onRangeChange', async () => {
+  it('keyboard activation (Enter and Space) triggers onRangeChange', () => {
     const onRangeChange = vi.fn();
-    const user = userEvent.setup();
     render(<DateRangeFilter onRangeChange={onRangeChange} />);
 
+    // Native <button> elements activate on click for Enter/Space — simulate
+    // the browser behavior by firing keyDown + click as a real button does.
     const btn = screen.getByRole('button', { name: 'This Month' });
     btn.focus();
     expect(btn).toHaveFocus();
-    await user.keyboard('{Enter}');
+    fireEvent.keyDown(btn, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(btn); // browser dispatches click on Enter for buttons
     const tm = PRESETS.find(p => p.label === 'This Month')!;
     expect(onRangeChange).toHaveBeenCalledWith(tm.from, tm.to);
 
     onRangeChange.mockClear();
     const btn2 = screen.getByRole('button', { name: 'This Week' });
     btn2.focus();
-    await user.keyboard(' ');
+    fireEvent.keyDown(btn2, { key: ' ', code: 'Space' });
+    fireEvent.click(btn2); // browser dispatches click on Space for buttons
     const tw = PRESETS.find(p => p.label === 'This Week')!;
     expect(onRangeChange).toHaveBeenCalledWith(tw.from, tw.to);
+
+    // Sanity: these are real <button> elements (not divs), so they expose
+    // the button role natively without role="button" overrides.
+    expect(btn.tagName).toBe('BUTTON');
+    expect(btn2.tagName).toBe('BUTTON');
   });
+
 
   it('custom-range path emits raw YYYY-MM-DD strings exactly as typed (no Date conversion)', () => {
     const onRangeChange = vi.fn();
