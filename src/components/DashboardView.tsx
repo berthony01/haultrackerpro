@@ -128,6 +128,7 @@ export function getShowingLabel(
   now: Date = new Date(),
 ): string | null {
   const fmt = (d: Date) => format(d, 'MMM d, yyyy');
+  if (key === 'all') return 'Showing: All Time';
   if (key === 'custom') {
     const f = customFrom ? parseISO(customFrom) : null;
     const t = customTo ? parseISO(customTo) : null;
