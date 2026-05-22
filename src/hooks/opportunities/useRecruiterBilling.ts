@@ -29,9 +29,10 @@ export const RECRUITER_PLAN_LABELS: Record<RecruiterPlan, string> = {
 
 export function useRecruiterBilling() {
   const { user } = useAuth();
-  const { profile } = useRecruiterProfile();
+  const { profile, isApproved, isSuspended } = useRecruiterProfile();
   const recruiterId = profile?.id ?? null;
   const qc = useQueryClient();
+
 
   const billingQuery = useQuery({
     queryKey: ['recruiter_billing', recruiterId],
