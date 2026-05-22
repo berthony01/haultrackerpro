@@ -89,6 +89,9 @@ export function useRecruiterBilling() {
   const capabilityTier = capabilities.tier;
   const isPaidRecruiterPlanActive = isRecruiterPaidPlanActive(plan, status);
 
+  const startCheckout = useMutation({
+    mutationFn: async (selectedPlan: Exclude<RecruiterPlan, 'none'>) => {
+      const { data, error } = await supabase.functions.invoke('create-recruiter-checkout', {
         body: { plan: selectedPlan },
       });
       if (error) throw error;
@@ -97,6 +100,7 @@ export function useRecruiterBilling() {
       window.open(url, '_blank');
     },
   });
+
 
   const openPortal = useMutation({
     mutationFn: async () => {
