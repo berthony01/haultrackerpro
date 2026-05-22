@@ -156,7 +156,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">25. Recruiter Account Termination</h3>
-          <p className="text-muted-foreground">Recruiter accounts may be terminated by HaulTrackerPro for verification failure, fraud, repeated complaints, violations of these terms, or non-payment. Upon termination, active opportunities are unpublished, pending applicant data is retained per the Privacy Policy, and billing stops at the end of the current period (no refund except where required by law).</p>
+          <p className="text-muted-foreground">Recruiter accounts may be suspended or terminated by HaulTrackerPro for verification failure, fraud, repeated complaints, misleading postings, safety concerns, or violations of these terms. Failure to pay for a recruiter subscription may result in loss of paid premium features, but does not automatically revoke approved recruiter access unless connected to a separate policy violation, chargeback abuse, fraud, or account suspension. Upon account suspension or termination, active opportunities may be unpublished, pending applicant data is retained per the Privacy Policy, and any paid billing stops at the end of the current period except where required by law.</p>
         </section>
 
         <section className="space-y-2">
