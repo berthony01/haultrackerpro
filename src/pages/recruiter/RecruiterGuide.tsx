@@ -21,7 +21,7 @@ const steps = [
 const tips = [
   'Be specific about pay — drivers convert better on transparent CPM, deductions, and home-time than on vague "up to $X" claims.',
   'Respond fast. Response time is one of the biggest drivers of conversion across the pipeline.',
-  'Use Contract Protection for any lease, escrow, or non-standard agreement. It builds trust and reduces disputes.',
+  'Use contract workflow tools for any lease, escrow, or non-standard agreement. They make terms easier to review and reduce back-and-forth. (Not legal advice.)',
   'Pause listings that are full instead of leaving them stale. Standard posting is unlimited for verified recruiters — upgrade only when you want premium visibility, reports, or contract workflow tools.',
 ];
 
