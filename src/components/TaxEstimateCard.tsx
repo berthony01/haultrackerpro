@@ -3,6 +3,7 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { UserSettings } from '@/hooks/useUserSettings';
 import { formatCurrency } from '@/lib/loadUtils';
+import { computeTaxEstimate } from '@/lib/reportTax';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calculator, Info, Sparkles, Loader2, ChevronDown } from 'lucide-react';
 
@@ -48,65 +49,11 @@ export function TaxEstimateCard({ loads, expenses, settings, isPro = false }: Ta
   const [aiLoading, setAiLoading] = useState(false);
 
   const result = useMemo(() => {
-    if (!settings?.tax_estimator_enabled) return null;
-
-    const federalRate = Number(settings.federal_tax_percent ?? 0) / 100;
-    const stateRate = Number(settings.state_tax_percent ?? 0) / 100;
-    const includeSE = settings.include_se_tax ?? false;
-    const seRate = includeSE ? Number(settings.se_tax_percent ?? 15.3) / 100 : 0;
-    const bufferRate = Number(settings.buffer_percent ?? 0) / 100;
-
-    if (federalRate + stateRate + seRate + bufferRate <= 0) return null;
-
-    // Calculate gross revenue (actual when available, estimated as fallback)
-    const paidLoads = loads.filter(l => l.actual_pay_received != null);
-    const grossRevenue = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-      loads.filter(l => l.actual_pay_received == null).reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
-
-    const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
-    const netProfit = grossRevenue - totalExpenses;
-
-    // Determine tax base (gross or net, based on user setting)
-    const taxBase = settings.tax_base_type === 'gross' ? grossRevenue : netProfit;
-    if (taxBase <= 0) {
-      return { 
-        seTax: 0, federalTax: 0, stateTax: 0, bufferTax: 0,
-        totalTax: 0, profitAfterTax: netProfit, netProfit, grossRevenue, totalExpenses,
-        baseLabel: settings.tax_base_type === 'gross' ? 'gross' : 'net',
-        totalPercent: (federalRate + stateRate + seRate + bufferRate) * 100,
-      };
-    }
-
-    // ── CORRECTED SE TAX CALCULATION (IRS method) ──
-    const seAdjustedBase = taxBase * 0.9235;
-    const seTax = includeSE ? seAdjustedBase * seRate : 0;
-
-    // ── CORRECTED INCOME TAX CALCULATION ──
-    const seDeduction = seTax / 2;
-    const incomeForIncomeTax = Math.max(0, taxBase - seDeduction);
-
-    const federalTax = incomeForIncomeTax * federalRate;
-    const stateTax = incomeForIncomeTax * stateRate;
-    const bufferTax = taxBase * bufferRate;
-
-    const totalTax = seTax + federalTax + stateTax + bufferTax;
-    const profitAfterTax = netProfit - totalTax;
-
-    const totalPercent = (federalRate + stateRate + seRate + bufferRate) * 100;
-
-    return {
-      seTax,
-      federalTax,
-      stateTax,
-      bufferTax,
-      totalTax,
-      profitAfterTax,
-      netProfit,
-      grossRevenue,
-      totalExpenses,
-      baseLabel: settings.tax_base_type === 'gross' ? 'gross' : 'net',
-      totalPercent,
-    };
+    // Canonical source of truth — same helper used by reports/exports.
+    const r = computeTaxEstimate(loads, expenses, settings);
+    if (!r.enabled) return null;
+    if (r.totalPercent <= 0) return null;
+    return r;
   }, [loads, expenses, settings]);
 
   // Fetch AI tax tips for Pro users (quarterly)
