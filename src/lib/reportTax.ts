@@ -54,7 +54,7 @@ export function computeTaxEstimate(
   const paidLoads = loads.filter(l => l.actual_pay_received != null);
   const grossRevenue =
     paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-    loads.filter(l => l.actual_pay_received == null).reduce((s, l) => s + Number(l.estimated_pay ?? 0), 0);
+    loads.filter(l => l.actual_pay_received == null).reduce((s, l) => s + (getLoadExpectedPay(l) || 0), 0);
 
   const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const netProfit = grossRevenue - totalExpenses;
