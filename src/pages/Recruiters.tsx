@@ -50,9 +50,10 @@ export default function Recruiters() {
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
         title="Recruiter Access | HaulTrackerPro"
-        description="Approved recruiters and carriers can post structured trucking opportunities, manage driver requests, and connect with drivers using HaulTrackerPro's profit-first ecosystem."
+        description="Verified recruiters can post unlimited standard trucking opportunities. Paid plans add priority placement, recruiter reports, and contract workflow tools."
         path="/recruiters"
       />
+
 
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
