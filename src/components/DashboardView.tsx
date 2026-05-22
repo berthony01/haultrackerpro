@@ -475,10 +475,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             let projectedWarnings: string[] = [];
             if (profileHasUsableData(costProfile) && totalMiles > 0) {
               const grossForProj = (() => {
-                const paid = filteredLoads.filter(l => l.actual_pay_received != null);
+                const paid = activeLoads.filter(l => l.actual_pay_received != null);
                 if (paid.length > 0) {
                   return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
-                    + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
+                    + sumExpectedPay(activeLoads.filter(l => l.actual_pay_received == null));
                 }
                 return estimated;
               })();
@@ -596,13 +596,14 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           })()}
 
           {/* Cost Breakdown: Fixed vs Variable + Contribution Margin */}
-          <ContributionMarginCard loads={filteredLoads} expenses={filteredExpenses} />
+          <ContributionMarginCard loads={activeLoads} expenses={filteredExpenses} />
+
 
           {/* Fuel Analytics */}
-          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={filteredLoads} isPro={isPro} onNavigate={onNavigate} />
+          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={activeLoads} isPro={isPro} onNavigate={onNavigate} />
 
           {/* Tax Estimate */}
-          <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
+          <TaxEstimateCard loads={activeLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
 
           {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (
