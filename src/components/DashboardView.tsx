@@ -475,10 +475,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             let projectedWarnings: string[] = [];
             if (profileHasUsableData(costProfile) && totalMiles > 0) {
               const grossForProj = (() => {
-                const paid = filteredLoads.filter(l => l.actual_pay_received != null);
+                const paid = activeLoads.filter(l => l.actual_pay_received != null);
                 if (paid.length > 0) {
                   return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
-                    + sumExpectedPay(filteredLoads.filter(l => l.actual_pay_received == null));
+                    + sumExpectedPay(activeLoads.filter(l => l.actual_pay_received == null));
                 }
                 return estimated;
               })();
