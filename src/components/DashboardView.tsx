@@ -60,7 +60,7 @@ interface DashboardViewProps {
   isPro?: boolean;
 }
 
-type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'custom';
+type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
 
 const presets: { key: PresetKey; label: string }[] = [
   { key: 'this_week', label: 'This Week' },
@@ -68,6 +68,7 @@ const presets: { key: PresetKey; label: string }[] = [
   { key: 'this_month', label: 'This Month' },
   { key: 'last_month', label: 'Last Month' },
   { key: 'this_year', label: 'This Year' },
+  { key: 'all', label: 'All Time' },
   { key: 'custom', label: 'Custom' },
 ];
 
@@ -90,6 +91,7 @@ export function getTrendSuffix(key: PresetKey): string {
     case 'this_month':
     case 'last_month': return 'vs previous month';
     case 'this_year': return 'vs previous year';
+    case 'all': return '';
     case 'custom': return 'vs previous period';
   }
 }
@@ -126,6 +128,7 @@ export function getShowingLabel(
   now: Date = new Date(),
 ): string | null {
   const fmt = (d: Date) => format(d, 'MMM d, yyyy');
+  if (key === 'all') return 'Showing: All Time';
   if (key === 'custom') {
     const f = customFrom ? parseISO(customFrom) : null;
     const t = customTo ? parseISO(customTo) : null;
@@ -167,6 +170,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const showCustom = activePreset === 'custom';
 
   const filteredLoads = useMemo(() => {
+    if (activePreset === 'all') return loads;
     if (activePreset === 'custom') {
       return loads.filter(l => {
         const d = getEffectiveDate(l);
@@ -183,6 +187,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   }, [loads, activePreset, customFrom, customTo, weekStartsOn]);
 
   const filteredExpenses = useMemo(() => {
+    if (activePreset === 'all') return expenses;
     if (activePreset === 'custom') {
       return expenses.filter(e => {
         const d = e.expense_date;
