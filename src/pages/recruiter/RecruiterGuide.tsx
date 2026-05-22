@@ -22,7 +22,7 @@ const tips = [
   'Be specific about pay — drivers convert better on transparent CPM, deductions, and home-time than on vague "up to $X" claims.',
   'Respond fast. Response time is one of the biggest drivers of conversion across the pipeline.',
   'Use Contract Protection for any lease, escrow, or non-standard agreement. It builds trust and reduces disputes.',
-  'Pause listings that are full instead of leaving them stale. Active limits are per-plan and you can upgrade in-app.',
+  'Pause listings that are full instead of leaving them stale. Standard posting is unlimited for verified recruiters — upgrade only when you want premium visibility, reports, or contract workflow tools.',
 ];
 
 const jsonLd = {
