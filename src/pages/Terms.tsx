@@ -78,7 +78,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">11. Recruiter Billing &amp; Subscriptions</h3>
-          <p className="text-muted-foreground">Posting active opportunities requires an active recruiter subscription (Starter, Growth, or Fleet). Subscriptions are billed monthly through Stripe and are subject to active opportunity limits per plan. Cancelling a subscription removes access to post or keep listings active; existing applications remain visible per applicable retention rules. HaulTrackerPro does not refund partial billing periods unless required by law.</p>
+          <p className="text-muted-foreground">Recruiter access requires approval. Approved recruiters may submit standard opportunities for review without an active paid recruiter subscription. Paid recruiter subscriptions unlock premium features, which may include priority placement, featured visibility, reports, analytics, contract workflow tools, and other premium recruiting tools. Cancelling or failing to pay a recruiter subscription may remove premium features, but does not automatically revoke approved recruiter status unless the account violates platform rules or is suspended. Listings remain subject to admin review, moderation, accuracy requirements, and platform policies. HaulTrackerPro does not guarantee hires, applications, driver quality, earnings, or placement results. Contract workflow tools are informational and are not legal advice.</p>
         </section>
 
         <section className="space-y-2">

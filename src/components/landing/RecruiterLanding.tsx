@@ -33,7 +33,7 @@ const features = [
   { icon: ClipboardList, title: 'Structured opportunity postings', desc: 'Required fields for pay, lanes, equipment, deductions, and home-time create clear, comparable listings.' },
   { icon: Users, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions. They evaluate opportunities by the numbers.' },
   { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, manage driver contact requests, and track status from one dashboard — no spreadsheets.' },
-  { icon: BarChart3, title: 'Transparent, flat-rate pricing', desc: 'Pay by active-opportunity slot, not per click or per lead. Predictable monthly cost.' },
+  { icon: BarChart3, title: 'Free verified posting', desc: 'Verified recruiters post unlimited standard opportunities at no cost. Upgrade for premium recruiting tools.' },
   { icon: Search, title: 'Contract Protection workflow (Growth & Fleet)', desc: "Upload contracts and get AI risk flags. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
 ];
 
@@ -45,9 +45,10 @@ const steps = [
 ];
 
 const plans = [
-  { name: 'Starter', price: '$19', limit: '1 active opportunity', features: ['Applicant pipeline', 'Driver contact requests', 'Verified Recruiter badge'] },
-  { name: 'Growth', price: '$49', limit: '5 active opportunities', features: ['Everything in Starter', 'Contract Protection', 'Priority placement', 'Recruiter Activity & Pipeline reports (PDF + CSV)'], highlight: true },
-  { name: 'Fleet', price: '$149', limit: '25 active opportunities', features: ['Everything in Growth', 'Higher posting capacity', 'Recruiter Activity & Pipeline reports (PDF + CSV)', 'Priority support'] },
+  { name: 'Free Verified', price: '$0', limit: 'Unlimited standard posts', features: ['Unlimited standard opportunity posts', 'Admin-reviewed listings', 'Basic applicant & contact request flow', 'Standard placement'] },
+  { name: 'Starter', price: '$19', limit: 'Premium tools', features: ['Enhanced applicant tracking', 'Applicant notes & status history', 'Basic listing analytics', 'Recruiter trust tools'] },
+  { name: 'Growth', price: '$49', limit: 'Premium tools', features: ['Priority placement', 'Featured listing eligibility', 'Recruiter reports (PDF + CSV)', 'Contract workflow tools', 'Pipeline analytics'], highlight: true },
+  { name: 'Fleet', price: '$149', limit: 'Premium tools', features: ['Top placement eligibility', 'Advanced analytics', 'Priority support', 'Team seats (coming soon)', 'Bulk opportunity tools (coming soon)'] },
 ];
 
 const testimonials = [
@@ -58,11 +59,11 @@ const testimonials = [
 
 const faqs = [
   { q: 'How long does verification take?', a: 'Most recruiter accounts are approved within 1 business day after we confirm your USDOT/MC and company details.' },
-  { q: 'What counts as a "hire" for billing?', a: 'You pay for active opportunity slots, not per hire. There is no per-hire fee or success fee on the Starter, Growth, or Fleet plans.' },
+  { q: 'What counts as a "hire" for billing?', a: 'You pay for premium recruiting tools, not per hire. There is no per-hire fee or success fee on any plan.' },
   { q: 'What is your refund policy?', a: 'We refund pro-rated billing periods only when caused by a platform fault. Standard cancellations stop renewal at the end of the current period.' },
   { q: 'Can I post multiple lanes in one opportunity?', a: 'Yes. Each opportunity supports multiple hiring states and equipment types. Use separate postings when pay or deductions differ significantly.' },
   { q: 'Do drivers see my direct contact info?', a: 'Only after a driver opts in by requesting more information on your opportunity. Driver-initiated contact only — no scraping or off-platform solicitation is allowed.' },
-  { q: 'Can I post before paying?', a: 'You can apply for recruiter access and prepare a draft opportunity at no cost. Publishing a live opportunity requires an active recruiter subscription (Starter, Growth, or Fleet) and admin approval of your recruiter profile. You can cancel anytime from Recruiter Settings → Billing.' },
+  { q: 'Can I post before paying?', a: 'Yes. Approved recruiters can post unlimited standard opportunities at no cost. Paid plans unlock premium tools like priority placement, featured listings, and reports. You can cancel anytime from Recruiter Settings → Billing.' },
 ];
 
 export default function RecruiterLanding() {
@@ -231,12 +232,12 @@ export default function RecruiterLanding() {
       <section className="px-4 sm:px-6 py-12 sm:py-16" style={{ background: NAVY }}>
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-black text-center mb-2" style={{ color: TEXT }}>
-            Simple, flat-rate recruiter pricing
+            Recruiter plans
           </h2>
           <p className="text-center text-sm mb-10" style={{ color: MUTED }}>
-            Pay by active-opportunity slot. No per-click fees, no success fees.
+            Verified recruiters post unlimited standard opportunities. Upgrade for premium tools.
           </p>
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {plans.map((p) => (
               <div
                 key={p.name}
