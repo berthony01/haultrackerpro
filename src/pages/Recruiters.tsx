@@ -23,17 +23,19 @@ export default function Recruiters() {
   const steps = [
     'Apply for recruiter access',
     'Submit company / recruiter details',
-    'Get approved by HaulTrackerPro',
-    'Choose Starter, Growth, or Fleet plan',
-    'Post structured opportunities',
+    'Get verified by HaulTrackerPro admin review',
+    'Post unlimited standard opportunities',
     'Manage driver requests',
+    'Upgrade for premium recruiting tools (optional)',
   ];
 
   const plans = [
-    { name: 'Starter', price: '$19', limit: '1 active opportunity' },
-    { name: 'Growth', price: '$49', limit: '5 active opportunities', highlight: true },
-    { name: 'Fleet', price: '$149', limit: '25 active opportunities' },
+    { name: 'Free Verified', price: 'Free', tagline: 'Unlimited standard posts for approved recruiters' },
+    { name: 'Starter', price: '$19', tagline: 'Enhanced applicant tracking & trust tools' },
+    { name: 'Growth', price: '$49', tagline: 'Priority placement, reports & contract workflow', highlight: true },
+    { name: 'Fleet', price: '$149', tagline: 'Top placement, advanced analytics & priority support' },
   ];
+
 
   const driverSees = [
     'Estimated gross & net pay',
