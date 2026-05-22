@@ -129,5 +129,21 @@ export function useRecruiterBilling() {
     startCheckout,
     openPortal,
     refresh,
+    // Capability layer (new)
+    capabilities,
+    capabilityTier,
+    isPaidRecruiterPlanActive,
+    canPostStandardOpportunitiesCapability: capabilities.canPostStandardOpportunities,
+    canUsePriorityPlacement: capabilities.canUsePriorityPlacement,
+    canUseFeaturedListings: capabilities.canUseFeaturedListings,
+    canExportRecruiterReports: capabilities.canExportRecruiterReports,
+    canViewAdvancedRecruiterReports: capabilities.canViewAdvancedRecruiterReports,
+    canUseContractWorkflowTools: capabilities.canUseContractWorkflowTools,
+    canUseReferralTracking: capabilities.canUseReferralTracking,
+    canUseTeamSeats: capabilities.canUseTeamSeats,
+    canUseBulkOpportunityTools: capabilities.canUseBulkOpportunityTools,
   };
 }
+
+export { resolveRecruiterCapabilityTier, isRecruiterPaidPlanActive };
+
