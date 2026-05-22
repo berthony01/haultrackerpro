@@ -170,6 +170,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const showCustom = activePreset === 'custom';
 
   const filteredLoads = useMemo(() => {
+    if (activePreset === 'all') return loads;
     if (activePreset === 'custom') {
       return loads.filter(l => {
         const d = getEffectiveDate(l);
@@ -186,6 +187,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   }, [loads, activePreset, customFrom, customTo, weekStartsOn]);
 
   const filteredExpenses = useMemo(() => {
+    if (activePreset === 'all') return expenses;
     if (activePreset === 'custom') {
       return expenses.filter(e => {
         const d = e.expense_date;
