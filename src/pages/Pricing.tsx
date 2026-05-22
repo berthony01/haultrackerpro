@@ -390,56 +390,73 @@ export default function Pricing() {
                 For Recruiters &amp; Carriers
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'hsl(220, 20%, 16%)', color: 'hsl(220, 10%, 55%)' }}>
-                Approval required before posting
+                Admin review required before posting
               </div>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
               Recruiter &amp; Carrier Plans
             </h2>
             <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              Post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers. Growth and Fleet plans add the Contract Protection workflow: upload contracts, send them to drivers, track approval status, and only mark a driver hired after the driver approves the current contract.
+              Verified recruiters can post unlimited standard opportunities. Paid plans unlock premium visibility, recruiter reports, contract workflow tools, and pipeline analytics on top.
             </p>
             <p className="text-[11px] mt-4 max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
-              Opportunity pay and match details are estimates based on recruiter-provided information. No job or income is guaranteed. Contract Protection is designed to help create a clearer workflow between drivers and recruiters — it is not legal advice.
+              Standard posting is based on recruiter approval. Premium features are based on your paid plan. Contract workflow tools are designed to make the recruiter–driver workflow clearer — they are not legal advice.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
+              {
+                name: 'Free Verified',
+                price: 'Free',
+                limit: 'For approved recruiters',
+                bullets: [
+                  'Unlimited standard opportunity posts',
+                  'Verified Recruiter badge on driver listings',
+                  'Admin-reviewed listings',
+                  'Basic applicant & contact request flow',
+                  'Standard marketplace placement',
+                ],
+              },
               {
                 name: 'Starter',
                 price: '$19',
-                limit: '1 active opportunity',
+                limit: 'Recruiter trust tools',
                 bullets: [
-                  '1 active opportunity',
-                  'Verified Recruiter badge on driver listings',
-                  'Applicant pipeline',
-                  'Driver contact requests',
-                  'Admin-reviewed listings',
+                  'Everything in Free Verified',
+                  'Enhanced applicant tracking',
+                  'Applicant notes & status history',
+                  'Basic listing analytics',
+                  'Referral progress tracking (coming soon)',
                 ],
               },
               {
                 name: 'Growth',
                 price: '$49',
-                limit: '5 active opportunities',
+                limit: 'Premium visibility & reports',
                 highlight: true,
                 bullets: [
                   'Everything in Starter',
                   'Priority placement in driver listings',
-                  'Recruiter Activity & Pipeline reports (PDF + CSV)',
-                  'Application status workflow',
-                  'Priority moderation queue',
+                  'Featured listing eligibility',
+                  'Recruiter reports (PDF + CSV exports)',
+                  'Contract workflow tools',
+                  'Pipeline analytics',
+                  'Opportunity performance insights',
                 ],
               },
               {
                 name: 'Fleet',
                 price: '$149',
-                limit: '25 active opportunities',
+                limit: 'Advanced recruiting toolkit',
                 bullets: [
                   'Everything in Growth',
-                  'Priority placement in driver listings',
-                  'Recruiter Activity & Pipeline reports (PDF + CSV)',
+                  'Top placement eligibility',
+                  'Advanced analytics',
                   'Priority support',
+                  'Team seats (coming soon)',
+                  'Bulk opportunity tools (coming soon)',
+                  'Company-level hiring dashboard (coming soon)',
                 ],
               },
             ].map((p) => (
@@ -461,7 +478,9 @@ export default function Pricing() {
                 <p className="text-xs mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>{p.limit}</p>
                 <div className="mb-5">
                   <span className="text-3xl font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.price}</span>
-                  <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                  {p.price !== 'Free' && (
+                    <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                  )}
                 </div>
                 <ul className="space-y-2.5 mb-5">
                   {p.bullets.map((b) => (
@@ -485,7 +504,7 @@ export default function Pricing() {
               {user ? 'Open Recruiter Access' : 'Apply for Recruiter Access'} <ArrowRight className="h-4 w-4" />
             </Button>
             <span className="text-xs" style={{ color: 'hsl(220, 10%, 50%)' }}>
-              Approval required before posting. Active subscription required to submit listings.
+              Get verified to post standard opportunities. Upgrade for premium recruiting tools.
             </span>
           </div>
 
@@ -494,6 +513,7 @@ export default function Pricing() {
           </p>
         </div>
       </section>
+
 
       {/* Lead magnet CTA */}
       <section className="py-8" style={{ background: 'hsl(220, 20%, 8%)' }}>
