@@ -3,9 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRecruiterProfile } from './useRecruiterProfile';
 import type { Tables } from '@/integrations/supabase/types';
+import {
+  getRecruiterPlanCapabilities,
+  isRecruiterPaidPlanActive,
+  resolveRecruiterCapabilityTier,
+} from '@/lib/recruiterCapabilities';
 
 export type RecruiterBilling = Tables<'recruiter_billing_profiles'>;
 export type RecruiterPlan = 'none' | 'starter' | 'growth' | 'fleet';
+
 
 export const RECRUITER_PLAN_LIMITS: Record<RecruiterPlan, number> = {
   none: 0,
