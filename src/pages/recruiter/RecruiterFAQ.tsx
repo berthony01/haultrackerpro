@@ -23,7 +23,8 @@ const faqs = [
   },
   {
     q: 'What plans are available and what do they include?',
-    a: 'Starter ($19/mo) includes 1 active opportunity, the Verified Recruiter badge on driver listings, the applicant pipeline, and driver contact requests. Growth ($49/mo) adds Contract Protection, Priority Placement in driver listings, Recruiter Activity & Pipeline reports (PDF + CSV), and raises the limit to 5 active opportunities. Fleet ($149/mo) keeps everything in Growth and raises the limit to 25 active opportunities with priority support. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
+    a: 'Verified recruiters can post unlimited standard opportunities for free — no paid subscription required. Paid plans add premium recruiting tools on top: Starter ($19/mo) adds enhanced applicant tracking, applicant notes, status history, basic listing analytics, and recruiter trust tools. Growth ($49/mo) adds Priority Placement in driver listings, featured listing eligibility, Recruiter Activity & Pipeline reports (PDF + CSV), contract workflow tools, and pipeline analytics. Fleet ($149/mo) keeps everything in Growth and adds top placement eligibility, advanced analytics, and priority support — with team seats, bulk opportunity tools, and a company-level hiring dashboard coming soon. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
+
   },
   {
     q: 'How are payments processed and is my card data safe?',
