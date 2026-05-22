@@ -23,7 +23,8 @@ const faqs = [
   },
   {
     q: 'What plans are available and what do they include?',
-    a: 'Starter ($19/mo) includes 1 active opportunity, the Verified Recruiter badge on driver listings, the applicant pipeline, and driver contact requests. Growth ($49/mo) adds Contract Protection, Priority Placement in driver listings, Recruiter Activity & Pipeline reports (PDF + CSV), and raises the limit to 5 active opportunities. Fleet ($149/mo) keeps everything in Growth and raises the limit to 25 active opportunities with priority support. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
+    a: 'Verified recruiters can post unlimited standard opportunities for free — no paid subscription required. Paid plans add premium recruiting tools on top: Starter ($19/mo) adds enhanced applicant tracking, applicant notes, status history, basic listing analytics, and recruiter trust tools. Growth ($49/mo) adds Priority Placement in driver listings, featured listing eligibility, Recruiter Activity & Pipeline reports (PDF + CSV), contract workflow tools, and pipeline analytics. Fleet ($149/mo) keeps everything in Growth and adds top placement eligibility, advanced analytics, and priority support — with team seats, bulk opportunity tools, and a company-level hiring dashboard coming soon. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
+
   },
   {
     q: 'How are payments processed and is my card data safe?',
@@ -38,8 +39,9 @@ const faqs = [
     a: 'Today, drivers receive your contact info and you respond via email or phone. In-app messaging is on the roadmap; meanwhile every status change on an application is logged so you and the driver share a clean timeline.',
   },
   {
-    q: 'How does Contract Protection work?',
-    a: "Contract Protection is included with the Growth and Fleet recruiter plans. Attach a contract (PDF or image) to any application. HaulTrackerPro parses it and surfaces plain-English risk flags to the driver. The driver can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record.",
+    q: 'How do contract workflow tools work?',
+    a: "Contract workflow tools are included with the Growth and Fleet recruiter plans. Attach a contract (PDF or image) to any application. HaulTrackerPro parses it and surfaces plain-English risk flags to the driver. The driver can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record. These tools are designed to make the workflow clearer — they are not legal advice.",
+
   },
   {
     q: 'Is the in-app signature legally binding?',
@@ -67,7 +69,7 @@ export default function RecruiterFAQ() {
     <div className="min-h-screen bg-background text-foreground">
       <SEOHead
         title="Recruiter FAQ | HaulTrackerPro"
-        description="Answers for recruiters: verification, posting opportunities, billing, applicants, and Contract Protection on HaulTrackerPro."
+        description="Answers for recruiters: verification, posting unlimited standard opportunities, billing, applicants, and contract workflow tools on HaulTrackerPro."
         path="/recruiter/faq"
         jsonLd={jsonLd}
       />
@@ -90,7 +92,7 @@ export default function RecruiterFAQ() {
           </div>
           <h1 className="text-3xl sm:text-4xl font-black font-heading tracking-tight">Recruiter FAQ</h1>
           <p className="mt-3 text-sm text-muted-foreground max-w-xl">
-            Everything you need to know about verification, posting, billing, applicants, and Contract Protection.
+            Everything you need to know about verification, posting, billing, applicants, and contract workflow tools.
           </p>
         </header>
 

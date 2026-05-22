@@ -23,17 +23,19 @@ export default function Recruiters() {
   const steps = [
     'Apply for recruiter access',
     'Submit company / recruiter details',
-    'Get approved by HaulTrackerPro',
-    'Choose Starter, Growth, or Fleet plan',
-    'Post structured opportunities',
+    'Get verified by HaulTrackerPro admin review',
+    'Post unlimited standard opportunities',
     'Manage driver requests',
+    'Upgrade for premium recruiting tools (optional)',
   ];
 
   const plans = [
-    { name: 'Starter', price: '$19', limit: '1 active opportunity' },
-    { name: 'Growth', price: '$49', limit: '5 active opportunities', highlight: true },
-    { name: 'Fleet', price: '$149', limit: '25 active opportunities' },
+    { name: 'Free Verified', price: 'Free', tagline: 'Unlimited standard posts for approved recruiters' },
+    { name: 'Starter', price: '$19', tagline: 'Enhanced applicant tracking & trust tools' },
+    { name: 'Growth', price: '$49', tagline: 'Priority placement, reports & contract workflow', highlight: true },
+    { name: 'Fleet', price: '$149', tagline: 'Top placement, advanced analytics & priority support' },
   ];
+
 
   const driverSees = [
     'Estimated gross & net pay',
@@ -48,9 +50,10 @@ export default function Recruiters() {
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
         title="Recruiter Access | HaulTrackerPro"
-        description="Approved recruiters and carriers can post structured trucking opportunities, manage driver requests, and connect with drivers using HaulTrackerPro's profit-first ecosystem."
+        description="Verified recruiters can post unlimited standard trucking opportunities. Paid plans add priority placement, recruiter reports, and contract workflow tools."
         path="/recruiters"
       />
+
 
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
@@ -143,10 +146,11 @@ export default function Recruiters() {
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
             Recruiter Plans
           </h2>
-          <p className="text-center text-sm mb-10" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Pick a plan that matches the volume of opportunities you post.
+          <p className="text-center text-sm mb-10 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
+            Verified recruiters can post unlimited standard opportunities for free. Paid plans add premium visibility, recruiter reports, and contract workflow tools.
           </p>
-          <div className="grid sm:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+
             {plans.map((p) => (
               <div key={p.name} className="p-6 rounded-2xl border relative" style={{
                 background: 'hsl(220, 20%, 10%)',
@@ -159,10 +163,12 @@ export default function Recruiters() {
                   </div>
                 )}
                 <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.name}</h3>
-                <p className="text-xs mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>{p.limit}</p>
+                <p className="text-xs mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>{p.tagline}</p>
                 <div>
                   <span className="text-3xl font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.price}</span>
-                  <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                  {p.price !== 'Free' && (
+                    <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                  )}
                 </div>
               </div>
             ))}
