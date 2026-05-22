@@ -285,7 +285,7 @@ export function aggregateReport(args: {
   for (const l of activeLoads) {
     const key = format(startOfMonth(parseISO(getEffectiveDate(l))), 'yyyy-MM');
     const cur = monthMap.get(key) ?? { month: key, gross: 0, expenses: 0, fuel: 0, net: 0, loads: 0 };
-    cur.gross += getLoadExpectedPay(l);
+    cur.gross += getLoadRealizedRevenue(l);
     cur.loads += 1;
     monthMap.set(key, cur);
   }
