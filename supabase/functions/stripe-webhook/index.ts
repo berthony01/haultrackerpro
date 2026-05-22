@@ -22,12 +22,35 @@ function resolvePlanKey(priceId: string): string | null {
   return null;
 }
 
-const RECRUITER_PLAN_LIMITS: Record<string, number> = {
+/**
+ * LEGACY recruiter plan capacity values.
+ *
+ * Historically these gated how many active standard opportunities a recruiter
+ * could post. As of Phase 2 of the recruiter model rework, standard opportunity
+ * posting is gated by recruiter approval/verification (see
+ * `opportunities_billing_guard()`), NOT by Stripe plan or this numeric limit.
+ *
+ * These numbers are retained ONLY for:
+ *   - backward compatibility with the NOT NULL `active_opportunity_limit`
+ *     column on `recruiter_billing_profiles`,
+ *   - legacy admin/UI displays still reading that column.
+ *
+ * Do NOT use this map to authorize posting. Paid premium capabilities
+ * (priority placement, featured listings, recruiter reports, exports,
+ * analytics, etc.) are derived from `plan` + `status` via
+ * `getRecruiterPlanCapabilities` and `recruiter_has_priority_plan()`.
+ *
+ * Do NOT substitute a fake "unlimited" sentinel (999999, MAX_SAFE_INTEGER,
+ * Infinity) here — the column is `integer NOT NULL` and downstream displays
+ * would render it.
+ */
+const RECRUITER_PLAN_LEGACY_LIMITS: Record<string, number> = {
   none: 0, starter: 1, growth: 5, fleet: 25,
 };
 
+
 function resolveRecruiterPlan(priceId: string, metadataPlan?: string | null): string | null {
-  if (metadataPlan && RECRUITER_PLAN_LIMITS[metadataPlan] != null) return metadataPlan;
+  if (metadataPlan && RECRUITER_PLAN_LEGACY_LIMITS[metadataPlan] != null) return metadataPlan;
   const map: Record<string, string> = {
     [Deno.env.get("STRIPE_RECRUITER_STARTER_PRICE_ID") ?? ""]: "starter",
     [Deno.env.get("STRIPE_RECRUITER_GROWTH_PRICE_ID") ?? ""]: "growth",
@@ -48,11 +71,16 @@ async function handleRecruiterSubscription(
     return;
   }
   const priceId = subscription.items.data[0]?.price?.id ?? "";
+  // Plan + status drive paid recruiter capabilities (priority placement,
+  // featured, reports, exports, analytics) via getRecruiterPlanCapabilities
+  // and recruiter_has_priority_plan(). They do NOT control standard
+  // opportunity posting — that is gated on recruiter approval (Phase 2).
   const isCanceledLike = ["canceled", "incomplete_expired"].includes(subscription.status);
   const plan = isCanceledLike
     ? "none"
     : (resolveRecruiterPlan(priceId, metadata.plan) ?? "none");
-  const limit = RECRUITER_PLAN_LIMITS[plan] ?? 0;
+  // Legacy column write only; no longer used for posting entitlement.
+  const legacyLimit = RECRUITER_PLAN_LEGACY_LIMITS[plan] ?? 0;
   const periodEnd = subscription.current_period_end
     ? new Date(subscription.current_period_end * 1000).toISOString()
     : null;
@@ -68,15 +96,19 @@ async function handleRecruiterSubscription(
         stripe_subscription_id: subscription.id,
         plan,
         status,
-        active_opportunity_limit: limit,
+        // Legacy/compat field (NOT NULL integer). Kept in sync with the
+        // previous mapping so admin displays still render expected numbers.
+        // Posting entitlement is no longer derived from this value.
+        active_opportunity_limit: legacyLimit,
         current_period_end: periodEnd,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "recruiter_id" },
     );
   if (error) logStep("Recruiter billing upsert error", { error: error.message });
-  else logStep("Recruiter billing updated", { recruiterId, plan, status, limit });
+  else logStep("Recruiter billing updated", { recruiterId, plan, status, legacyLimit });
 }
+
 
 /** Upsert the subscriptions table row */
 async function upsertSubscription(

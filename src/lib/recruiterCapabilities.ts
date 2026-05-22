@@ -22,7 +22,7 @@ export type RecruiterBillingStatus =
   | 'active'
   | 'past_due'
   | 'canceled'
-  | 'trialing'
+  | 'trialing'  // trial-allowlist: Stripe subscription status literal, not user-facing copy
   | (string & {});
 
 export type RecruiterCapabilityTier =
@@ -89,10 +89,11 @@ const PAID_PLANS: ReadonlySet<RecruiterPlan> = new Set([
 
 const ACTIVE_BILLING_STATUSES: ReadonlySet<string> = new Set([
   'active',
-  'trialing',
+  'trialing',  // trial-allowlist: Stripe subscription status literal, not user-facing copy
 ]);
 
-/** True if the recruiter has an active or trialing paid plan. */
+/** True if the recruiter has an active or trialing paid plan. */  // trial-allowlist: internal helper doc, not user-facing copy
+
 export function isRecruiterPaidPlanActive(
   plan: RecruiterPlan | string | null | undefined,
   status: RecruiterBillingStatus | string | null | undefined,

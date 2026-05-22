@@ -42,9 +42,10 @@ describe('recruiterCapabilities', () => {
     expect(caps.canUseTeamSeats).toBe(false);
   });
 
-  it('starter trialing: same paid capabilities as active', () => {
+  it('starter trialing: same paid capabilities as active', () => {  // trial-allowlist: test name references Stripe status, not user-facing copy
     const a = getRecruiterPlanCapabilities({ plan: 'starter', status: 'active' });
-    const t = getRecruiterPlanCapabilities({ plan: 'starter', status: 'trialing' });
+    const t = getRecruiterPlanCapabilities({ plan: 'starter', status: 'trialing' });  // trial-allowlist: Stripe status literal
+
     expect(t).toEqual(a);
   });
 
@@ -176,7 +177,7 @@ describe('recruiterCapabilities', () => {
 
   it('resolveRecruiterCapabilityTier + isRecruiterPaidPlanActive helpers', () => {
     expect(isRecruiterPaidPlanActive('growth', 'active')).toBe(true);
-    expect(isRecruiterPaidPlanActive('growth', 'trialing')).toBe(true);
+    expect(isRecruiterPaidPlanActive('growth', 'trialing')).toBe(true);  // trial-allowlist: Stripe status literal
     expect(isRecruiterPaidPlanActive('growth', 'past_due')).toBe(false);
     expect(isRecruiterPaidPlanActive('none', 'active')).toBe(false);
     expect(isRecruiterPaidPlanActive(null, null)).toBe(false);
