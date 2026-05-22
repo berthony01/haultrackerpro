@@ -161,10 +161,12 @@ export default function Recruiters() {
                   </div>
                 )}
                 <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.name}</h3>
-                <p className="text-xs mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>{p.limit}</p>
+                <p className="text-xs mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>{p.tagline}</p>
                 <div>
                   <span className="text-3xl font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.price}</span>
-                  <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                  {p.price !== 'Free' && (
+                    <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                  )}
                 </div>
               </div>
             ))}
