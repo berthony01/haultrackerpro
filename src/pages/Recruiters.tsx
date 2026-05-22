@@ -145,10 +145,11 @@ export default function Recruiters() {
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-center mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
             Recruiter Plans
           </h2>
-          <p className="text-center text-sm mb-10" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Pick a plan that matches the volume of opportunities you post.
+          <p className="text-center text-sm mb-10 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
+            Verified recruiters can post unlimited standard opportunities for free. Paid plans add premium visibility, recruiter reports, and contract workflow tools.
           </p>
-          <div className="grid sm:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+
             {plans.map((p) => (
               <div key={p.name} className="p-6 rounded-2xl border relative" style={{
                 background: 'hsl(220, 20%, 10%)',
