@@ -92,7 +92,7 @@ export default function RecruiterFAQ() {
           </div>
           <h1 className="text-3xl sm:text-4xl font-black font-heading tracking-tight">Recruiter FAQ</h1>
           <p className="mt-3 text-sm text-muted-foreground max-w-xl">
-            Everything you need to know about verification, posting, billing, applicants, and Contract Protection.
+            Everything you need to know about verification, posting, billing, applicants, and contract workflow tools.
           </p>
         </header>
 
