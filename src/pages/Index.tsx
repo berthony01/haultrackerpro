@@ -321,18 +321,18 @@ const Index = () => {
         if (stops && stops.length > 0 && result?.id) {
           loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
         }
-        // Award +5 load points (Pro only). Fire-and-forget; never block the save.
-        if (user && isPro) {
+        // Award +5 load points (Pro only) via event-bound RPC. Fire-and-forget.
+        if (user && isPro && result?.id) {
           try {
             supabase
-              .rpc('award_points', { _user_id: user.id, _category: 'load', _amount: 5 })
+              .rpc('award_load_points', { _load_id: result.id })
               .then(({ error }) => {
-                if (error) console.warn('award_points(load) failed', error);
+                if (error) console.warn('award_load_points failed', error);
                 queryClient.invalidateQueries({ queryKey: ['driver-points'] });
                 queryClient.invalidateQueries({ queryKey: ['driver-leaderboard'] });
               });
           } catch (e) {
-            console.warn('award_points(load) threw', e);
+            console.warn('award_load_points threw', e);
           }
         }
         if (allExpensesQuery.expenses.length === 0) {

@@ -757,6 +757,36 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_point_events: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          id: string
+          source_id: string
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          id?: string
+          source_id: string
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          id?: string
+          source_id?: string
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       driver_points: {
         Row: {
           best_weekly_period_start: string | null
@@ -2459,6 +2489,72 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      award_load_points: {
+        Args: { _load_id: string }
+        Returns: {
+          best_weekly_period_start: string | null
+          best_weekly_points: number
+          last_activity_date: string | null
+          load_points: number
+          parking_points: number
+          streak_days: number
+          total_points: number
+          updated_at: string
+          user_id: string
+          weekly_period_start: string | null
+          weekly_points: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_points"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      award_parking_report_points: {
+        Args: { _report_id: string }
+        Returns: {
+          best_weekly_period_start: string | null
+          best_weekly_points: number
+          last_activity_date: string | null
+          load_points: number
+          parking_points: number
+          streak_days: number
+          total_points: number
+          updated_at: string
+          user_id: string
+          weekly_period_start: string | null
+          weekly_points: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_points"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      award_parking_verification_points: {
+        Args: { _verification_id: string }
+        Returns: {
+          best_weekly_period_start: string | null
+          best_weekly_points: number
+          last_activity_date: string | null
+          load_points: number
+          parking_points: number
+          streak_days: number
+          total_points: number
+          updated_at: string
+          user_id: string
+          weekly_period_start: string | null
+          weekly_points: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_points"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       award_points: {
         Args: { _amount: number; _category: string; _user_id: string }
         Returns: {

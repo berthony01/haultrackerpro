@@ -61,13 +61,15 @@ export function useSubmitParkingVerification() {
     mutationFn: async ({ parkingId, status }: SubmitVerificationArgs) => {
       if (!user) throw new Error('You must be signed in to verify parking');
 
-      const { error: insertErr } = await supabase
+      const { data: inserted, error: insertErr } = await supabase
         .from('parking_verifications')
         .insert({
           parking_id: parkingId,
           user_id: user.id,
           verified_status: status,
-        } as never);
+        } as never)
+        .select('id')
+        .single();
       if (insertErr) {
         if ((insertErr as { code?: string }).code === '23505') {
           throw new Error('You already verified this location recently.');
@@ -75,13 +77,13 @@ export function useSubmitParkingVerification() {
         throw insertErr;
       }
 
-      const { data: pointsRow, error: pointsErr } = await supabase.rpc('award_points', {
-        _user_id: user.id,
-        _category: 'parking',
-        _amount: 3,
-      });
+      const verificationId = (inserted as { id: string }).id;
+      const { data: pointsRow, error: pointsErr } = await supabase.rpc(
+        'award_parking_verification_points',
+        { _verification_id: verificationId },
+      );
       if (pointsErr) {
-        console.warn('award_points failed:', pointsErr);
+        console.warn('award_parking_verification_points failed:', pointsErr);
       }
       return { pointsRow };
     },
