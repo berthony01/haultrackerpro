@@ -69,7 +69,7 @@ export default function RecruiterFAQ() {
     <div className="min-h-screen bg-background text-foreground">
       <SEOHead
         title="Recruiter FAQ | HaulTrackerPro"
-        description="Answers for recruiters: verification, posting opportunities, billing, applicants, and Contract Protection on HaulTrackerPro."
+        description="Answers for recruiters: verification, posting unlimited standard opportunities, billing, applicants, and contract workflow tools on HaulTrackerPro."
         path="/recruiter/faq"
         jsonLd={jsonLd}
       />
