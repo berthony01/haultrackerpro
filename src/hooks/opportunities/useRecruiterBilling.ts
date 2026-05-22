@@ -29,9 +29,10 @@ export const RECRUITER_PLAN_LABELS: Record<RecruiterPlan, string> = {
 
 export function useRecruiterBilling() {
   const { user } = useAuth();
-  const { profile } = useRecruiterProfile();
+  const { profile, isApproved, isSuspended } = useRecruiterProfile();
   const recruiterId = profile?.id ?? null;
   const qc = useQueryClient();
+
 
   const billingQuery = useQuery({
     queryKey: ['recruiter_billing', recruiterId],
@@ -75,17 +76,16 @@ export function useRecruiterBilling() {
   // `capabilities.canPostStandardOpportunities`.
   const canSubmitMore = isBillingActive && activeCount < limit;
 
-  // New capability layer. Approval/suspension are not currently tracked on
-  // `recruiter_billing_profiles`; pass through what we have from the recruiter
-  // profile when available so future UI gates resolve correctly.
-  const isApprovedRecruiter = (profile as { approved?: boolean } | null)?.approved ?? true;
-  const isSuspended = (profile as { suspended?: boolean } | null)?.suspended ?? false;
+  // New capability layer. Approval/suspension come from the recruiter profile
+  // hook (real `isApproved`/`isSuspended` values derived from
+  // recruiter_profiles), not invented boolean fields.
   const capabilities = getRecruiterPlanCapabilities({
     plan,
     status,
-    isApprovedRecruiter,
+    isApprovedRecruiter: isApproved,
     isSuspended,
   });
+
   const capabilityTier = capabilities.tier;
   const isPaidRecruiterPlanActive = isRecruiterPaidPlanActive(plan, status);
 
