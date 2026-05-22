@@ -10,11 +10,12 @@ import SEOHead from '@/components/SEOHead';
 const steps = [
   { num: '01', icon: Building2, title: 'Submit your recruiter profile', desc: 'Company name, DOT, MC, address, hiring states, equipment types, and recruiter contact details. Admin review is typically within one business day.' },
   { num: '02', icon: ShieldCheck, title: 'Get verified', desc: 'A HaulTrackerPro admin reviews every recruiter. Approved profiles unlock posting; rejected profiles include reviewer notes so you can resubmit.' },
-  { num: '03', icon: CreditCard, title: 'Activate a plan', desc: 'Choose Starter (1 active), Growth (5), or Fleet (25 active opportunities). Billing is handled by Stripe — change or cancel anytime in Recruiter Settings.' },
-  { num: '04', icon: ClipboardList, title: 'Post a structured opportunity', desc: 'Pay model, CPM/percentage/flat, deductions, deadhead, escrow, home time, equipment, sign-on. Clear structure means drivers can compare you on real numbers.' },
+  { num: '03', icon: ClipboardList, title: 'Post standard opportunities (unlimited)', desc: 'Once verified, post as many standard opportunities as you need — no per-plan post cap. Pay model, CPM/percentage/flat, deductions, deadhead, escrow, home time, equipment, sign-on. Clear structure means drivers can compare you on real numbers.' },
+  { num: '04', icon: CreditCard, title: 'Upgrade for premium tools (optional)', desc: 'Standard posting is always available to verified recruiters. Upgrade to Starter ($19), Growth ($49), or Fleet ($149) when you want premium visibility, recruiter reports, contract workflow tools, and analytics. Billing is handled by Stripe — change or cancel anytime in Recruiter Settings.' },
   { num: '05', icon: Users, title: 'Manage your applicant pipeline', desc: 'Each driver request lands in your dashboard with contact info and preferences. Move them through new → contacted → interview → offer → hired.' },
-  { num: '06', icon: FileSignature, title: 'Use Contract Protection (Growth & Fleet)', desc: "Attach a contract to an application. Drivers see AI-assisted risk flags and can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
+  { num: '06', icon: FileSignature, title: 'Use contract workflow tools (Growth & Fleet)', desc: "Attach a contract to an application. Drivers see AI-assisted risk flags and can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record. These tools are designed to make the workflow clearer — they are not legal advice." },
   { num: '07', icon: BarChart3, title: 'Track what works', desc: 'Recruiting Snapshot on the dashboard shows active opportunities, new requests, contacted, interviews, hires, and response rate.' },
+
 ];
 
 const tips = [
