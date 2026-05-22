@@ -3,7 +3,7 @@ import type { Expense } from '@/hooks/useExpenses';
 import type { FuelLog } from '@/hooks/useFuelLogs';
 import type { UserSettings } from '@/hooks/useUserSettings';
 import { parseISO, isWithinInterval, endOfDay, format, startOfMonth } from 'date-fns';
-import { summarizeLoads, excludeCancelled, onlyCancelled } from '@/lib/financialCalculations';
+import { summarizeLoads, excludeCancelled, onlyCancelled, getLoadRealizedRevenue } from '@/lib/financialCalculations';
 import { getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadExpectedPay, getLoadOperatingMiles } from '@/lib/loadMetrics';
 import { computeTaxEstimate, type TaxEstimateResult } from '@/lib/reportTax';
