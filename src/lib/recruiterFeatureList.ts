@@ -29,7 +29,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: Briefcase, title: 'Structured Opportunity Form', description: 'Capture pay model, CPM/percentage/flat, deductions, deadhead, escrow, home time, equipment, and bonuses in a clear schema drivers actually understand.' },
       { icon: ClipboardList, title: 'Opportunity Manager', description: 'Edit, pause, close, or resubmit your opportunities. See active vs draft vs closed status at a glance.' },
       { icon: Eye, title: 'View Counts', description: 'See how many drivers have viewed each opportunity so you know what is resonating.' },
-      { icon: BarChart3, title: 'Plan-Based Active Limits', description: 'Starter, Growth, and Fleet plans each cap concurrent active opportunities — upgrade in-app when you need more headroom.' },
+      { icon: ShieldCheck, title: 'Unlimited Standard Posts (Verified Recruiters)', description: 'Once your recruiter profile is approved, you can post unlimited standard opportunities — no per-plan post cap. Paid plans add premium visibility and recruiting tools on top.' },
     ],
   },
   {
