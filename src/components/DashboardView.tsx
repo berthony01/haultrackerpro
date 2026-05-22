@@ -600,10 +600,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
 
           {/* Fuel Analytics */}
-          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={filteredLoads} isPro={isPro} onNavigate={onNavigate} />
+          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={activeLoads} isPro={isPro} onNavigate={onNavigate} />
 
           {/* Tax Estimate */}
-          <TaxEstimateCard loads={filteredLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
+          <TaxEstimateCard loads={activeLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
 
           {/* Finalize Weekly Summary Button */}
           {(showCloseoutButton || true) && onNavigate && (
