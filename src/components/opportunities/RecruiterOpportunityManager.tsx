@@ -35,7 +35,7 @@ interface Props {
   onBack: () => void;
 }
 
-type View = 'list' | 'edit';
+type View = 'list' | 'edit' | 'referrals';
 
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
