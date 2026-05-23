@@ -31,6 +31,14 @@ function routeForNotification(n: NotificationRow): string | null {
     // Opportunity admin review (recruiter)
     case 'opportunity_reviewed':
       return 'recruiter-access:manager';
+    // Referrals — recruiter-side notifications go to recruiter manager;
+    // driver-side referral notifications go to opportunities.
+    case 'referral_created':
+      return 'recruiter-access:manager';
+    case 'referral_status_updated':
+    case 'referral_paid_externally_marked':
+    case 'referred_driver_linked':
+      return 'opportunities';
     default:
       if (n.type.startsWith('contract_')) return 'contracts';
       return null;
