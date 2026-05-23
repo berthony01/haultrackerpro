@@ -35,6 +35,7 @@ import {
   type RecruiterReferral,
 } from '@/hooks/opportunities/useRecruiterReferrals';
 import { useReferralEvents } from '@/hooks/opportunities/useDriverReferrals';
+import { RecruiterReferralSettingsCard } from './RecruiterReferralSettingsCard';
 import {
   RECRUITER_SELECTABLE_STATUSES,
   REFERRAL_STATUS_LABELS,
