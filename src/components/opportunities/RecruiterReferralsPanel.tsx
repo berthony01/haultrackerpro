@@ -184,6 +184,10 @@ function RecruiterReferralRow({
     .filter(Boolean)
     .join(' • ');
 
+  const referrerLabel = referral.referring_driver_id
+    ? `Driver · #${referral.referring_driver_id.slice(0, 8)}`
+    : 'Driver';
+
   return (
     <Card className="p-5 border-border/60">
       <div className="flex flex-col gap-3">
@@ -198,6 +202,9 @@ function RecruiterReferralRow({
             {subContacts && (
               <p className="text-xs text-muted-foreground mb-2 truncate">{subContacts}</p>
             )}
+            <p className="text-xs text-muted-foreground mb-2">
+              Referred by: <span className="font-medium text-foreground">{referrerLabel}</span>
+            </p>
             <p className="text-sm text-foreground">
               {referral.opportunities?.title ?? 'Opportunity'}
               {referral.opportunities?.company_name && (
@@ -215,6 +222,7 @@ function RecruiterReferralRow({
               {new Date(referral.last_status_at).toLocaleDateString()}
             </p>
           </div>
+
           <div className="flex flex-col gap-2 sm:w-56">
             <Select
               value=""
