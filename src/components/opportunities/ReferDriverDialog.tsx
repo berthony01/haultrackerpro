@@ -34,6 +34,7 @@ export function ReferDriverDialog({
   companyName,
 }: Props) {
   const { create } = useDriverReferrals();
+  const { settings, isLoading: settingsLoading } = useRecruiterReferralSettings(recruiterId);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
