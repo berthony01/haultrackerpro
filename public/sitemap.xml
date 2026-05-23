@@ -200,4 +200,17 @@
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://haultrackerpro.com/resources</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url><loc>https://haultrackerpro.com/resources/truck-driver-profit-tracking</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/resources/load-profit-calculator</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/resources/real-rpm-trucking</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/resources/1099-truck-driver-expenses</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/resources/trucking-contract-clarity</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/resources/truck-parking-tracker</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/resources/driver-referral-tracking</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/resources/trucking-recruiter-tools</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
 </urlset>
