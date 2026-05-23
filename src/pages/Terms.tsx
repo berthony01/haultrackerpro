@@ -165,14 +165,26 @@ export default function Terms() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">27. Governing Law</h3>
+          <h3 className="text-base font-bold">27. Driver Referral Tracking</h3>
+          <p className="text-muted-foreground">HaulTrackerPro includes a driver-to-driver referral tracking system. Drivers may refer other drivers to recruiter opportunities, and recruiters may view and manage referrals tied to their own opportunities, update referral statuses, and define their own external referral terms. The referring driver may view progress on referrals they created, and a linked referred driver may view referral information tied to their account where applicable. Referral statuses (including a status indicating that a bonus has been <span className="font-semibold text-foreground">marked paid externally</span>) are for tracking and visibility only and reflect updates made by the recruiter; they are not a confirmation by HaulTrackerPro that any payment actually occurred.</p>
+          <p className="text-muted-foreground"><span className="font-semibold text-foreground">HaulTrackerPro tracks referral progress only.</span> HaulTrackerPro does not process, verify, guarantee, enforce, collect, hold, or pay referral bonuses, and is not responsible for referral payment disputes between drivers and recruiters. Referral bonuses, if offered, are paid externally by the recruiter according to the recruiter's own stated terms, eligibility rules, and timing. Drivers should review any recruiter-stated referral terms before participating and contact the recruiter directly with questions about eligibility or payment.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">28. Admin Oversight of Referral Activity</h3>
+          <p className="text-muted-foreground">Platform administrators may review referral activity and related metadata to operate, secure, support, moderate, and improve the service, including detecting abuse, investigating policy violations, responding to user support requests, and maintaining platform safety. This oversight is operational and is not a form of payment enforcement, payment guarantee, or dispute settlement between drivers and recruiters.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">29. Governing Law</h3>
           <p className="text-muted-foreground">These terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">28. Contact Information</h3>
+          <h3 className="text-base font-bold">30. Contact Information</h3>
           <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.com.</p>
         </section>
+
 
         <p className="text-xs text-muted-foreground/60 pt-4 border-t border-border">
           Last Updated: {lastUpdated}
