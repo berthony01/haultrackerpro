@@ -128,10 +128,16 @@ export function AdminRecruitersPanel() {
                     <Mini label="Phone" value={r.recruiter_phone ?? '—'} />
                     <Mini label="DOT" value={r.dot_number ?? '—'} />
                     <Mini label="MC" value={r.mc_number ?? '—'} />
-                    <Mini label="Active opps" value={r.active_opportunity_count ?? 0} />
+                    <Mini label="Active listings" value={r.active_opportunity_count ?? 0} />
                     <Mini
-                      label="Capacity"
-                      value={r.billing?.active_opportunity_limit ?? 0}
+                      label="Priority placement"
+                      value={
+                        r.billing &&
+                        ['growth', 'fleet'].includes(r.billing.plan) &&
+                        ['active', 'trialing'].includes(r.billing.status)
+                          ? 'Included'
+                          : 'Not included'
+                      }
                     />
                     <Mini
                       label="Created"
