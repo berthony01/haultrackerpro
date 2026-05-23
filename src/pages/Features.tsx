@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { featureList, downloadFeatureSheet } from '@/lib/featureList';
