@@ -111,6 +111,8 @@ function fmtDate(d?: string | null) {
 
 export function RecruiterApplicationsDashboard({ onBack }: Props) {
   const { profile, isApproved, isSuspended, isLoading: recruiterLoading } = useRecruiterProfile();
+  const recruiterBilling = useRecruiterBilling();
+  const canUseContractWorkflow = recruiterBilling.canUseContractWorkflowTools === true;
   const {
     recruiterApplications,
     isLoadingRecruiter,
