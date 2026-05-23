@@ -105,8 +105,9 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
 
   const recentPosts = useMemo(() => opportunities.slice(0, 5), [opportunities]);
 
-  const canPost = state === 'approved_active';
-  const postDisabled = state !== 'approved_active' && state !== 'approved_no_billing';
+  // Approved/verified recruiters can post unlimited standard opportunities — billing is only for premium tools.
+  const canPost = state === 'approved_active' || state === 'approved_no_billing';
+  const postDisabled = !canPost;
 
   const handlePost = () => {
     if (state === 'none' || state === 'rejected') {
@@ -117,10 +118,6 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       return;
     }
     if (state === 'pending' || state === 'suspended') return;
-    if (state === 'approved_no_billing') {
-      billingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
     onManage();
   };
 
