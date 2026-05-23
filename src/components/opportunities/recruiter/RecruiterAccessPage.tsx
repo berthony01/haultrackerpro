@@ -633,7 +633,6 @@ function NextSteps({
 }) {
   const profileDone = state !== 'none';
   const approved = state === 'approved_active' || state === 'approved_no_billing';
-  const billingDone = state === 'approved_active';
 
   const steps = [
     {
@@ -647,24 +646,24 @@ function NextSteps({
       onClick: undefined,
     },
     {
-      label: 'Choose recruiter plan',
-      done: billingDone,
-      onClick: billingDone ? undefined : onChoosePlan,
-    },
-    {
       label: 'Post your first opportunity',
       done: hasPosts,
-      onClick: hasPosts || !billingDone ? undefined : onPost,
+      onClick: hasPosts || !approved ? undefined : onPost,
     },
     {
       label: 'Review driver requests',
       done: hasApps,
-      onClick: hasApps && billingDone ? onApplications : undefined,
+      onClick: hasApps && approved ? onApplications : undefined,
     },
     {
       label: 'Improve response rate',
       done: responseRate >= 70 && hasApps,
       onClick: hasApps ? onApplications : undefined,
+    },
+    {
+      label: 'Unlock premium recruiting tools (optional)',
+      done: state === 'approved_active',
+      onClick: state === 'approved_active' ? undefined : onChoosePlan,
     },
   ];
 
