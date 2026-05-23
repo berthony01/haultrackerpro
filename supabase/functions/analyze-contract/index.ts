@@ -215,7 +215,6 @@ serve(async (req) => {
     if (!existing && !isRecruiter && !isAdmin) {
       return json({ error: "AI analysis has not been run for this contract yet" }, 404);
     }
-    }
 
     await admin.from("contract_audit_log").insert({
       contract_id: version.contract_id,
