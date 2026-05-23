@@ -151,7 +151,7 @@ serve(async (req) => {
     const { data: version, error: vErr } = await admin
       .from("contract_versions")
       .select(
-        "id, contract_id, upload_status, parse_status, extracted_text, contracts:contract_id(id, status, recruiter_user_id, driver_user_id, current_version_id)"
+        "id, contract_id, upload_status, parse_status, extracted_text, contracts:contract_id(id, status, recruiter_user_id, recruiter_id, driver_user_id, current_version_id)"
       )
       .eq("id", version_id)
       .maybeSingle();
@@ -195,6 +195,24 @@ serve(async (req) => {
     // Drivers cannot trigger NEW analyses, only view existing — keep AI cost on recruiters/admins.
     if (!existing && !isRecruiter && !isAdmin) {
       return json({ error: "AI analysis has not been run for this contract yet" }, 404);
+    }
+
+    // Recruiter-initiated NEW analysis requires Growth/Fleet active/trialing. // trial-allowlist
+    // Existing reviews remain viewable by all parties (drivers included) above.
+    if (!existing && isRecruiter && !isAdmin) {
+      const { data: billingRow } = await admin
+        .from("recruiter_billing_profiles")
+        .select("plan, status")
+        .eq("recruiter_id", c.recruiter_id)
+        .maybeSingle();
+      const planOk = billingRow?.plan === "growth" || billingRow?.plan === "fleet";
+      const statusOk = billingRow?.status === "active" || billingRow?.status === "trialing"; // trial-allowlist
+      if (!planOk || !statusOk) {
+        return json(
+          { error: "Growth or Fleet recruiter plan required for contract workflow tools.", code: "recruiter_plan_required" },
+          403,
+        );
+      }
     }
 
     await admin.from("contract_audit_log").insert({

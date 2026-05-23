@@ -42,6 +42,7 @@ import {
   type RecruiterApplicationStatus,
 } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
@@ -110,6 +111,8 @@ function fmtDate(d?: string | null) {
 
 export function RecruiterApplicationsDashboard({ onBack }: Props) {
   const { profile, isApproved, isSuspended, isLoading: recruiterLoading } = useRecruiterProfile();
+  const recruiterBilling = useRecruiterBilling();
+  const canUseContractWorkflow = recruiterBilling.canUseContractWorkflowTools === true;
   const {
     recruiterApplications,
     isLoadingRecruiter,
@@ -346,7 +349,19 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
               </div>
 
               <div className="mb-3">
-                <ContractAttachment applicationId={a.id} role="recruiter" />
+                {canUseContractWorkflow ? (
+                  <ContractAttachment applicationId={a.id} role="recruiter" />
+                ) : (
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3 flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-xs text-muted-foreground leading-relaxed">
+                      <div className="font-semibold text-foreground/90 mb-0.5">
+                        Contract workflow tools are available on Growth and Fleet plans.
+                      </div>
+                      Upgrade for contract transparency tools, document workflow, and premium recruiting features.
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           );
