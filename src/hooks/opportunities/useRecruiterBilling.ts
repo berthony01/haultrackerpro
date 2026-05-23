@@ -132,7 +132,13 @@ export function useRecruiterBilling() {
     limit,
     activeCount,
     isBillingActive,
-    canSubmitMore,
+    /**
+     * @deprecated Legacy pre-pivot posting-limit flag. Do NOT use for standard
+     * opportunity posting. Use `canPostStandardOpportunitiesCapability` or a
+     * specific premium capability flag instead. Kept only as a compatibility
+     * alias for any unknown external consumers.
+     */
+    canSubmitMore: legacyCanSubmitMore_DO_NOT_USE_FOR_STANDARD_POSTING,
     isLoading: billingQuery.isLoading || activeCountQuery.isLoading,
     startCheckout,
     openPortal,
