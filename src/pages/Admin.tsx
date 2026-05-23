@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { AdminOpportunitiesPanel } from '@/components/admin/opportunities/AdminOpportunitiesPanel';
 import { AdminRecruitersPanel } from '@/components/admin/opportunities/AdminRecruitersPanel';
 import { AdminContractsPanel } from '@/components/admin/contracts/AdminContractsPanel';
+import { AdminReferralOversightPanel } from '@/components/admin/referrals/AdminReferralOversightPanel';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 
