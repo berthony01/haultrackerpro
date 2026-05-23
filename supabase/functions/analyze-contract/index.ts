@@ -197,7 +197,7 @@ serve(async (req) => {
       return json({ error: "AI analysis has not been run for this contract yet" }, 404);
     }
 
-    // Recruiter-initiated NEW analysis requires Growth/Fleet active/trialing.
+    // Recruiter-initiated NEW analysis requires Growth/Fleet active/trialing. // trial-allowlist
     // Existing reviews remain viewable by all parties (drivers included) above.
     if (!existing && isRecruiter && !isAdmin) {
       const { data: billingRow } = await admin
