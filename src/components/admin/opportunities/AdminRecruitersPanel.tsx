@@ -134,7 +134,7 @@ export function AdminRecruitersPanel() {
                       value={
                         r.billing &&
                         ['growth', 'fleet'].includes(r.billing.plan) &&
-                        ['active', 'trialing'].includes(r.billing.status)
+                        ['active', 'trialing'].includes(r.billing.status) // trial-allowlist
                           ? 'Included'
                           : 'Not included'
                       }
