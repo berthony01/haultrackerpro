@@ -789,7 +789,7 @@ function HowItWorks() {
       </div>
       <p className="text-[11px] text-muted-foreground mt-4 flex items-start gap-1.5">
         <Info className="h-3 w-3 mt-0.5 shrink-0" />
-        Driver interest and hiring outcomes are not guaranteed. Approval and billing are required to post.
+        Driver interest and hiring outcomes are not guaranteed. Approval is required to post; paid plans are optional and unlock premium recruiting tools.
       </p>
     </Card>
   );
