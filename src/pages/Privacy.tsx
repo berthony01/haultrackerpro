@@ -139,9 +139,65 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">16. Contact Information</h3>
+          <h3 className="text-base font-bold">16. Referral Tracking Data</h3>
+          <p className="text-muted-foreground">When drivers and recruiters use the driver-to-driver referral tracking system, HaulTrackerPro may collect, store, and process referral-related data, including:</p>
+          <ul className="list-disc list-inside text-muted-foreground space-y-1">
+            <li>The referring driver's account/user ID</li>
+            <li>The referred driver's name</li>
+            <li>The referred driver's email</li>
+            <li>The referred driver's phone number (if provided)</li>
+            <li>Referral notes entered by the referring driver or recruiter</li>
+            <li>The opportunity linked to the referral</li>
+            <li>The recruiter/company linked to the referral</li>
+            <li>Referral status and status history/events</li>
+            <li>Recruiter-stated referral terms</li>
+            <li>Referral notification metadata</li>
+            <li>Admin oversight and analytics metadata</li>
+            <li>Timestamps such as created_at, updated_at, and last_status_at</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">17. How Referral Data Is Used</h3>
+          <ul className="list-disc list-inside text-muted-foreground space-y-1">
+            <li>Create and track driver-to-driver referrals</li>
+            <li>Show referral status to authorized users</li>
+            <li>Allow recruiters to manage referrals tied to their own opportunities</li>
+            <li>Display recruiter-stated referral terms</li>
+            <li>Send in-app referral notifications to authorized users</li>
+            <li>Support admin oversight of referral activity</li>
+            <li>Prevent abuse, fraud, and spam</li>
+            <li>Provide customer support</li>
+            <li>Improve and secure the platform</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">18. Who Can See Referral Data</h3>
+          <ul className="list-disc list-inside text-muted-foreground space-y-1">
+            <li>The referring driver may see referrals they created.</li>
+            <li>A linked referred driver may see referral information tied to their account.</li>
+            <li>The owning recruiter may see referrals tied to their own opportunities.</li>
+            <li>Platform administrators may see referral data for operations, support, safety, abuse prevention, and compliance with platform rules.</li>
+          </ul>
+          <p className="text-muted-foreground">Raw email or phone contacts entered as referral contact information are not contacted externally by HaulTrackerPro just because they appear in a referral record. HaulTrackerPro does not send SMS or email referral notifications to unregistered contacts in this phase; if the platform later adds such features, this policy will be updated accordingly.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">19. Referral Notification Metadata</h3>
+          <p className="text-muted-foreground">In-app referral notifications may include metadata such as referral_id, opportunity_id, recruiter_id, current status or new status, notification type, read/unread status, and timestamps. This metadata is used to deliver in-app notifications, mark them as read, and support troubleshooting and abuse prevention.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">20. Referral Payment &amp; Tax Safety</h3>
+          <p className="text-muted-foreground">HaulTrackerPro does not process or guarantee referral payments. HaulTrackerPro does not collect bank account, debit card, or other payout information for referral bonus payouts, and does not issue tax forms (such as 1099s) for recruiter-paid external referral bonuses. Referral bonus arrangements, if any, are handled externally between recruiters and participating drivers according to the recruiter's own stated terms. A referral status indicating that a bonus has been <span className="font-semibold text-foreground">marked paid externally</span> reflects an update made by the recruiter and is not a confirmation by HaulTrackerPro that any payment actually occurred.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">21. Contact Information</h3>
           <p className="text-muted-foreground">For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.com.</p>
         </section>
+
 
         <p className="text-xs text-muted-foreground/60 pt-4 border-t border-border">
           Last Updated: {lastUpdated}
