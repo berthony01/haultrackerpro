@@ -35,8 +35,9 @@ export interface AdminRecruiterRow {
 
 export interface AdminReferralSettingsRow {
   recruiter_id: string;
+  referral_bonus_enabled?: boolean | null;
   bonus_amount?: number | null;
-  terms?: string | null;
+  bonus_terms?: string | null;
 }
 
 export interface AdminReferralKpis {
