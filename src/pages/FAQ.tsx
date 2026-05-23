@@ -573,6 +573,7 @@ const faqs: Faq[] = [
     question: 'Does HaulTrackerPro handle referral payments?',
     answer: 'No. HaulTrackerPro tracks referral progress only — it does not process, hold, or guarantee referral payments. Referral bonuses, if a recruiter offers them, are paid externally by the recruiter according to their own terms.',
     keywords: 'referral payment bonus external paid',
+  },
   {
     id: 'request-info-contact',
     question: 'What happens when a driver requests info?',
