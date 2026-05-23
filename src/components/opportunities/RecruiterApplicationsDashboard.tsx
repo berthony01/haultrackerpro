@@ -349,9 +349,20 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
               </div>
 
               <div className="mb-3">
-                <ContractAttachment applicationId={a.id} role="recruiter" />
+                {canUseContractWorkflow ? (
+                  <ContractAttachment applicationId={a.id} role="recruiter" />
+                ) : (
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3 flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-xs text-muted-foreground leading-relaxed">
+                      <div className="font-semibold text-foreground/90 mb-0.5">
+                        Contract workflow tools are available on Growth and Fleet plans.
+                      </div>
+                      Upgrade for contract transparency tools, document workflow, and premium recruiting features.
+                    </div>
+                  </div>
+                )}
               </div>
-            </>
           );
         })()}
 
