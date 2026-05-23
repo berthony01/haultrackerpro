@@ -19,8 +19,11 @@ export function buildRecruiterReportCSV(type: RecruiterReportType, data: Recruit
   lines.push(row('Recruiter', data.header.recruiterName));
   lines.push(row('Date Range', `${data.range.from} to ${data.range.to}`));
   lines.push(row('Generated', data.generatedAt));
-  lines.push(row('Plan', `${labelStatus(data.header.plan)} (${labelStatus(data.header.planStatus)})`));
-  lines.push(row('Plan Usage', `${data.header.activeCount} / ${data.header.activeLimit} active opportunity slots used`));
+  lines.push(row('Plan', labelStatus(data.header.plan)));
+  lines.push(row('Billing Status', labelStatus(data.header.planStatus)));
+  lines.push(row('Standard Posting', 'Unlimited after verification'));
+  lines.push(row('Premium Tools', data.header.plan === 'growth' || data.header.plan === 'fleet' ? 'Active' : 'Upgrade to Growth'));
+  lines.push(row('Priority Placement', data.header.plan === 'growth' || data.header.plan === 'fleet' ? 'Included' : 'Upgrade to Growth'));
   lines.push(blank());
 
   lines.push(row('EXECUTIVE SUMMARY'));

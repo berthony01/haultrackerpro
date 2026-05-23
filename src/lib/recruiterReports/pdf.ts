@@ -35,11 +35,16 @@ function drawHeader(doc: JsPDFType, type: RecruiterReportType, data: RecruiterRe
   doc.text(`Recruiter: ${data.header.recruiterName}`, 14, y + 5);
   doc.text(`Date Range: ${data.range.from} to ${data.range.to}`, 14, y + 10);
   doc.text(`Generated: ${data.generatedAt}`, 14, y + 15);
+  const isPremium = data.header.plan === 'growth' || data.header.plan === 'fleet';
   doc.text(
-    `Plan: ${labelStatus(data.header.plan)} (${labelStatus(data.header.planStatus)}) · ${data.header.activeCount}/${data.header.activeLimit} active slots used`,
+    `Plan: ${labelStatus(data.header.plan)} (${labelStatus(data.header.planStatus)})`,
     14, y + 20
   );
-  return y + 28;
+  doc.text(
+    `Standard posting: Unlimited after verification · Premium tools: ${isPremium ? 'Active' : 'Upgrade to Growth'} · Priority placement: ${isPremium ? 'Included' : 'Upgrade to Growth'}`,
+    14, y + 25
+  );
+  return y + 33;
 }
 
 function drawFooter(doc: JsPDFType) {
