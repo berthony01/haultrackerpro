@@ -345,6 +345,39 @@ export default function Landing() {
 
 
       {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 1.7: DRIVER-TO-DRIVER REFERRALS    */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+              <Users className="h-3.5 w-3.5" /> Driver-to-Driver Referrals
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Know Where Your Referrals Stand
+            </h2>
+            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
+              Refer another driver to a recruiter opportunity and follow the referral's progress — sent, contacted, hired, eligible based on recruiter-stated terms, or marked paid externally — all in one place.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
+            <div className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+              <h3 className="text-base font-bold mb-1.5" style={{ color: 'hsl(0, 0%, 100%)' }}>For Drivers</h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>Refer drivers you trust, track each referral's status, and view the recruiter's stated external terms — no guessing where things stand.</p>
+            </div>
+            <div className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+              <h3 className="text-base font-bold mb-1.5" style={{ color: 'hsl(0, 0%, 100%)' }}>For Recruiters</h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>Manage driver referrals, update progress, set your external referral terms, and review referral analytics from one pipeline.</p>
+            </div>
+          </div>
+          <p className="text-[11px] text-center mt-5 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
+            Referral bonuses, if offered, are paid externally by recruiters according to recruiter-stated terms. HaulTrackerPro tracks referral progress only and does not process, verify, or guarantee payments.
+          </p>
+        </div>
+      </section>
+
+
+      {/* ═══════════════════════════════════════════ */}
       <section id="how-it-works" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center mb-14">
