@@ -23,11 +23,12 @@ import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
-import { Info } from 'lucide-react';
+import { Info, UserPlus } from 'lucide-react';
 import { OpportunityProfitBreakdown } from './OpportunityProfitBreakdown';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
+import { ReferDriverDialog } from './ReferDriverDialog';
 
 interface Props {
   opportunity: Opportunity;
