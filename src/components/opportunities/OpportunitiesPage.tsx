@@ -285,6 +285,24 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
         </div>
       </Card>
 
+      {/* My Referrals entry */}
+      <Card className="p-5 border-border/60">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+            <UserPlus className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-foreground mb-1">My Referrals</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Track drivers you've referred to opportunities. Bonuses, if offered, are paid externally by the recruiter.
+            </p>
+            <Button onClick={() => setShowReferrals(true)} variant="outline">
+              View My Referrals <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={BriefcaseBusiness} label="Available" value={kpis.count.toString()} />
