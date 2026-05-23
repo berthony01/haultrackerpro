@@ -36,6 +36,7 @@ import {
 } from '@/hooks/opportunities/useRecruiterReferrals';
 import { useReferralEvents } from '@/hooks/opportunities/useDriverReferrals';
 import { RecruiterReferralSettingsCard } from './RecruiterReferralSettingsCard';
+import { RecruiterReferralAnalyticsCard } from './RecruiterReferralAnalyticsCard';
 import {
   RECRUITER_SELECTABLE_STATUSES,
   REFERRAL_STATUS_LABELS,
@@ -98,6 +99,8 @@ export function RecruiterReferralsPanel({ recruiterId, onBack }: Props) {
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
         <span>{EXTERNAL_PAYMENT_DISCLAIMER}</span>
       </div>
+
+      <RecruiterReferralAnalyticsCard recruiterId={recruiterId} />
 
       <RecruiterReferralSettingsCard recruiterId={recruiterId} />
 
