@@ -215,7 +215,15 @@ export function AdminRecruitersPanel() {
                   <>
                     <KV k="Billing plan" v={detail.billing.plan} />
                     <KV k="Billing status" v={detail.billing.status} />
-                    <KV k="Capacity" v={String(detail.billing.active_opportunity_limit)} />
+                    <KV
+                      k="Priority placement"
+                      v={
+                        ['growth', 'fleet'].includes(detail.billing.plan) &&
+                        ['active', 'trialing'].includes(detail.billing.status)
+                          ? 'Included'
+                          : 'Not included'
+                      }
+                    />
                     <KV
                       k="Period end"
                       v={detail.billing.current_period_end
