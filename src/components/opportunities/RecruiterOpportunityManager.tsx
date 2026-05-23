@@ -65,33 +65,21 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     return <Gate onBack={onBack} title="Pending Review" body="Your recruiter profile is pending review." Icon={Clock} />;
   }
 
+  // Verified recruiters can submit unlimited standard opportunities.
+  // Approval/suspension gating is already enforced above; billing is only for premium tools.
   if (view === 'edit') {
     return (
       <RecruiterOpportunityForm
         initial={editing}
         onBack={() => { setView('list'); setEditing(null); }}
         onSaved={() => { setView('list'); setEditing(null); refetch(); }}
-        canSubmitForReview={billing.canSubmitMore}
-        submitBlockReason={
-          !billing.isBillingActive
-            ? 'Recruiter billing required to submit opportunities for review.'
-            : billing.activeCount >= billing.limit
-              ? "You've reached your active opportunity limit. Upgrade your plan."
-              : null
-        }
+        canSubmitForReview={true}
+        submitBlockReason={null}
       />
     );
   }
 
   const handleStatus = (id: string, status: 'active' | 'paused' | 'closed') => {
-    if (status === 'active' && !billing.canSubmitMore) {
-      if (!billing.isBillingActive) {
-        toast.error('Recruiter billing required to submit opportunities for review.');
-      } else {
-        toast.error("You've reached your active opportunity limit. Upgrade your plan.");
-      }
-      return;
-    }
     setStatus.mutate(
       { id, status },
       {
@@ -101,7 +89,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   };
 
-  const canActivate = billing.canSubmitMore;
+  const canActivate = true;
 
   return (
     <div className="space-y-6 animate-fade-in">
