@@ -33,6 +33,8 @@ export default function ContractClarityGuide() {
         },
       ]}
       disclaimer="Contract tools are informational only and are not legal advice. Drivers should review documents carefully and consult a qualified professional when needed."
+      ctaTitle="Review contracts with more confidence"
+      ctaDescription="Use informational contract summaries and risk flags to review documents more clearly. Not legal advice."
       ctas={[
         { label: 'Review Contracts More Clearly', to: '/auth' },
         { label: 'View Pricing', to: '/pricing', variant: 'outline' },
