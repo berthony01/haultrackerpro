@@ -94,6 +94,17 @@ const TruckingEscrowAgreementReview = lazy(() => import("./pages/TruckingEscrowA
 const TenNinetyNineTruckDriverContractProtection = lazy(() => import("./pages/TenNinetyNineTruckDriverContractProtection"));
 const AiContractReviewForTruckers = lazy(() => import("./pages/AiContractReviewForTruckers"));
 
+// Resource hub + guides
+const ResourcesHub = lazy(() => import("./pages/resources/ResourcesHub"));
+const ResProfitTracking = lazy(() => import("./pages/resources/ProfitTrackingGuide"));
+const ResLoadProfit = lazy(() => import("./pages/resources/LoadProfitCalculatorGuide"));
+const ResRealRpm = lazy(() => import("./pages/resources/RealRpmGuide"));
+const Res1099Expenses = lazy(() => import("./pages/resources/ExpenseTrackingGuide1099"));
+const ResContractClarity = lazy(() => import("./pages/resources/ContractClarityGuide"));
+const ResParking = lazy(() => import("./pages/resources/ParkingTrackerGuide"));
+const ResDriverReferral = lazy(() => import("./pages/resources/DriverReferralGuide"));
+const ResRecruiterTools = lazy(() => import("./pages/resources/RecruiterToolsGuide"));
+
 const queryClient = new QueryClient();
 
 function PageFallback() {
