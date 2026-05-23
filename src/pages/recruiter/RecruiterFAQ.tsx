@@ -40,7 +40,7 @@ const faqs = [
   },
   {
     q: 'Can drivers refer other drivers to my opportunities?',
-    a: 'Yes. Drivers can refer another driver to one of your opportunities, and you\'ll see each referral in your recruiter dashboard. You can move referrals through new → contacted → interviewed → hired → closed, or mark them paid externally once you\'ve fulfilled your referral terms outside the platform.',
+    a: 'Yes. Drivers can refer another driver to one of your opportunities, and you\'ll see each referral in your recruiter dashboard. You can move referrals through new → contacted → interviewed → hired → closed, or mark them as paid externally once you\'ve fulfilled your referral terms outside the platform.',
   },
   {
     q: 'Does HaulTrackerPro handle referral payments?',

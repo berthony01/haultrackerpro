@@ -555,7 +555,7 @@ const faqs: Faq[] = [
   {
     id: 'how-recruiters-post',
     question: 'How do recruiters post opportunities?',
-    answer: 'Recruiters apply for access, submit company details, and must be approved before posting. Approved recruiters can post unlimited standard opportunities. Paid plans add premium recruiting tools such as priority placement, reports, contract workflow tools, analytics, and future referral tracking.',
+    answer: 'Recruiters apply for access, submit company details, and must be approved before posting. Approved recruiters can post unlimited standard opportunities. Paid plans add premium recruiting tools such as priority placement, reports, contract workflow tools, analytics, and referral tracking and analytics.',
   },
   {
     id: 'recruiter-plans',
