@@ -25,6 +25,8 @@ export interface ResourceArticleProps {
   disclaimer?: string;
   ctas: ResourceCTA[];
   related?: { to: string; title: string }[];
+  ctaTitle?: string;
+  ctaDescription?: string;
 }
 
 export default function ResourceArticle({
