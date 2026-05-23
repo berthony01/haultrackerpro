@@ -42,6 +42,7 @@ import {
   type RecruiterApplicationStatus,
 } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
