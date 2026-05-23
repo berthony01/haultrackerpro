@@ -219,7 +219,7 @@ export function AdminRecruitersPanel() {
                       k="Priority placement"
                       v={
                         ['growth', 'fleet'].includes(detail.billing.plan) &&
-                        ['active', 'trialing'].includes(detail.billing.status)
+                        ['active', 'trialing'].includes(detail.billing.status) // trial-allowlist
                           ? 'Included'
                           : 'Not included'
                       }
