@@ -86,6 +86,23 @@ serve(async (req) => {
     }
     const actorRole: "admin" | "recruiter" = isAdmin ? "admin" : "recruiter";
 
+    // Recruiter-side contract workflow is Growth/Fleet only. Admins bypass.
+    if (!isAdmin) {
+      const { data: billingRow } = await admin
+        .from("recruiter_billing_profiles")
+        .select("plan, status")
+        .eq("recruiter_id", c.recruiter_id)
+        .maybeSingle();
+      const planOk = billingRow?.plan === "growth" || billingRow?.plan === "fleet";
+      const statusOk = billingRow?.status === "active" || billingRow?.status === "trialing";
+      if (!planOk || !statusOk) {
+        return json(
+          { error: "Growth or Fleet recruiter plan required for contract workflow tools.", code: "recruiter_plan_required" },
+          403,
+        );
+      }
+    }
+
     if (version.upload_status !== "uploaded") {
       return json({ error: "Version is not uploaded yet" }, 409);
     }
