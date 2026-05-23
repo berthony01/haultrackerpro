@@ -131,10 +131,7 @@ export function ReferDriverDialog({
             />
           </div>
 
-          <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground">
-            <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-            <span>{EXTERNAL_PAYMENT_DISCLAIMER}</span>
-          </div>
+          <ReferralTermsDisplay settings={settings} isLoading={settingsLoading} />
 
           <DialogFooter className="gap-2 sm:gap-2">
             <Button
