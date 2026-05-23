@@ -39,6 +39,8 @@ export default function ResourceArticle({
   disclaimer,
   ctas,
   related,
+  ctaTitle,
+  ctaDescription,
 }: ResourceArticleProps) {
   const navigate = useNavigate();
 
