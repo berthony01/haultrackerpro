@@ -209,6 +209,10 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     );
   }
 
+  if (showReferrals) {
+    return <DriverReferralsPanel onBack={() => setShowReferrals(false)} />;
+  }
+
   if (showProfile) {
     return <DriverOpportunityProfile onBack={() => setShowProfile(false)} />;
   }
