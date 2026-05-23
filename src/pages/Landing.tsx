@@ -174,10 +174,10 @@ export default function Landing() {
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]" style={{ color: 'hsl(0, 0%, 100%)' }}>
                   Stop Driving Blind.{' '}
-                  <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit.</span>
+                  <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit Before and After Every Load.</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Track your real profit, compare trucking opportunities, and use recruiter-provided details to make better money decisions before you commit.
+                  Track loads, fuel, and expenses. See real RPM and net profit. Compare opportunities, avoid bad deals, and keep reports organized for taxes and records — plus contract clarity tools before you sign.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -187,19 +187,28 @@ export default function Landing() {
                 }}>
                   Start Tracking Free <ArrowRight className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => navigate('/recruiters')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
+                <Button variant="outline" size="lg" onClick={() => navigate('/pricing')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
                   borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
                 }}>
-                  Explore Recruiter Access
+                  View Pricing
                 </Button>
               </div>
-              <button
-                onClick={() => document.getElementById('opportunities-ecosystem')?.scrollIntoView({ behavior: 'smooth' })}
-                className="text-sm font-semibold underline-offset-4 hover:underline"
-                style={{ color: 'hsl(25, 95%, 60%)' }}
-              >
-                See How Opportunities Work →
-              </button>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <button
+                  onClick={() => document.getElementById('opportunities-ecosystem')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-sm font-semibold underline-offset-4 hover:underline"
+                  style={{ color: 'hsl(25, 95%, 60%)' }}
+                >
+                  See How Opportunities Work →
+                </button>
+                <button
+                  onClick={() => navigate('/recruiters')}
+                  className="text-sm font-semibold underline-offset-4 hover:underline"
+                  style={{ color: 'hsl(25, 95%, 60%)' }}
+                >
+                  Recruiter? Get Verified →
+                </button>
+              </div>
               <div className="flex items-center gap-6 pt-2">
                 {['No credit card', 'Free plan available', 'Pro from $19.99/mo'].map(t => (
                   <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
