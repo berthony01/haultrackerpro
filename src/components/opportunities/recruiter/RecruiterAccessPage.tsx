@@ -364,7 +364,7 @@ function StateCard({
       : state === 'suspended'
       ? { Icon: Ban, title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: null }
       : state === 'approved_no_billing'
-      ? { Icon: CreditCard, title: 'Choose a recruiter plan to submit opportunities', body: 'Your recruiter profile is approved. Activate a plan to start posting structured opportunities.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'Choose Plan', onClick: onChoosePlan } }
+      ? { Icon: Sparkles, title: "You're approved — post unlimited standard opportunities", body: 'Standard posting is included for verified recruiters. Upgrade only to unlock premium recruiting tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
       : null;
 
   if (!cfg) return null;
