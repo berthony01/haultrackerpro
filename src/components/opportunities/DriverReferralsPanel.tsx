@@ -21,6 +21,8 @@ import {
   EXTERNAL_PAYMENT_DISCLAIMER,
   referralStatusLabel,
 } from '@/lib/opportunities/referralStatus';
+import { useRecruiterReferralSettings } from '@/hooks/opportunities/useRecruiterReferralSettings';
+import { ReferralTermsDisplay } from './ReferralTermsDisplay';
 
 interface Props {
   onBack: () => void;
@@ -138,8 +140,24 @@ function ReferralRow({
         </Button>
       </div>
 
-      {expanded && <ReferralTimeline referralId={referral.id} />}
+      {expanded && (
+        <div className="mt-4 space-y-4">
+          <ReferralTermsForRecruiter recruiterId={referral.recruiter_id} />
+          <ReferralTimeline referralId={referral.id} />
+        </div>
+      )}
     </Card>
+  );
+}
+
+function ReferralTermsForRecruiter({ recruiterId }: { recruiterId: string }) {
+  const { settings, isLoading } = useRecruiterReferralSettings(recruiterId);
+  return (
+    <ReferralTermsDisplay
+      settings={settings}
+      isLoading={isLoading}
+      showDisclaimer={false}
+    />
   );
 }
 

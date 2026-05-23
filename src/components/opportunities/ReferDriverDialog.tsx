@@ -11,10 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDriverReferrals } from '@/hooks/opportunities/useDriverReferrals';
-import { EXTERNAL_PAYMENT_DISCLAIMER } from '@/lib/opportunities/referralStatus';
+import { useRecruiterReferralSettings } from '@/hooks/opportunities/useRecruiterReferralSettings';
+import { ReferralTermsDisplay } from './ReferralTermsDisplay';
 
 interface Props {
   open: boolean;
@@ -34,6 +34,7 @@ export function ReferDriverDialog({
   companyName,
 }: Props) {
   const { create } = useDriverReferrals();
+  const { settings, isLoading: settingsLoading } = useRecruiterReferralSettings(recruiterId);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -130,10 +131,7 @@ export function ReferDriverDialog({
             />
           </div>
 
-          <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground">
-            <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-            <span>{EXTERNAL_PAYMENT_DISCLAIMER}</span>
-          </div>
+          <ReferralTermsDisplay settings={settings} isLoading={settingsLoading} />
 
           <DialogFooter className="gap-2 sm:gap-2">
             <Button
