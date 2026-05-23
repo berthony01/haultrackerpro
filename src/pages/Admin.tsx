@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { AdminOpportunitiesPanel } from '@/components/admin/opportunities/AdminOpportunitiesPanel';
 import { AdminRecruitersPanel } from '@/components/admin/opportunities/AdminRecruitersPanel';
 import { AdminContractsPanel } from '@/components/admin/contracts/AdminContractsPanel';
+import { AdminReferralOversightPanel } from '@/components/admin/referrals/AdminReferralOversightPanel';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 
@@ -583,6 +584,7 @@ export default function Admin() {
             <TabsTrigger value="leads">Starter Kit</TabsTrigger>
             <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
             <TabsTrigger value="recruiters">Recruiters</TabsTrigger>
+            <TabsTrigger value="referrals">Referral Oversight</TabsTrigger>
             <TabsTrigger value="contracts">Contracts</TabsTrigger>
             <TabsTrigger value="admins">Admins</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
@@ -595,6 +597,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="recruiters" className="space-y-3">
             <AdminRecruitersPanel />
+          </TabsContent>
+          <TabsContent value="referrals" className="space-y-3">
+            <AdminReferralOversightPanel />
           </TabsContent>
           <TabsContent value="contracts" className="space-y-3">
             <AdminContractsPanel />
