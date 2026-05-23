@@ -47,6 +47,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
   const { saved, save, unsave } = useSavedOpportunities();
   const { driverApplications, createApplication } = useOpportunityApplications();
   const [submitting, setSubmitting] = useState(false);
+  const [showRefer, setShowRefer] = useState(false);
 
   const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
   const alreadyApplied = useMemo(
