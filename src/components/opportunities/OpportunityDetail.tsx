@@ -273,12 +273,24 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {isSaved ? 'Saved' : 'Save'}
           </Button>
+          <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
+            <UserPlus className="h-4 w-4" /> Refer a Driver
+          </Button>
           <Button onClick={handleRequestInfo} disabled={alreadyApplied || submitting} className="flex-1">
             <Send className="h-4 w-4" />
             {alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}
           </Button>
         </div>
       </div>
+
+      <ReferDriverDialog
+        open={showRefer}
+        onOpenChange={setShowRefer}
+        opportunityId={o.id}
+        recruiterId={o.recruiter_id}
+        opportunityTitle={o.title}
+        companyName={o.company_name}
+      />
     </div>
   );
 }
