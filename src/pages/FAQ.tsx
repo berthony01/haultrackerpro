@@ -762,19 +762,21 @@ export default function FAQ() {
         description="Answers about tracking load profit, fuel and expenses, RPM, reports, recruiter opportunities, and driver referral tracking on HaulTrackerPro."
         path="/faq"
         jsonLd={safeFaqSchema(
-          faqs.filter((f) =>
-            [
-              'free-plan',
-              'net-profit',
-              'tax-estimator',
-              'what-are-opportunities',
-              'opportunity-earnings-guaranteed',
-              'how-recruiters-post',
-              'driver-refer-driver',
-              'referral-payment-safety',
-              'contract-legal-advice',
-            ].includes(f.id),
-          ),
+          faqs
+            .filter((f) =>
+              [
+                'free-plan',
+                'net-profit',
+                'tax-estimator',
+                'what-are-opportunities',
+                'opportunity-earnings-guaranteed',
+                'how-recruiters-post',
+                'driver-refer-driver',
+                'referral-payment-safety',
+                'contract-legal-advice',
+              ].includes(f.id) && typeof f.answer === 'string',
+            )
+            .map((f) => ({ question: f.question, answer: f.answer as string })),
         )}
       />
       <header className="sticky top-0 z-40 bg-background border-b border-border">
