@@ -73,7 +73,7 @@ export default function Landing() {
         description={
           isRecruiterAudience
             ? 'HaulTrackerPro connects verified recruiters with financially serious owner-operators. Structured postings, applicant pipeline, contract protection — flat-rate pricing.'
-            : 'HaulTrackerPro: trucking profit tracking for drivers, profit-first Opportunities, and approved recruiter access — all in one platform.'
+            : 'HaulTrackerPro: real profit tracking, expense and fuel tracking, opportunity comparison, contract clarity, and driver referral progress tracking — all in one platform.'
         }
         path="/"
         jsonLd={[
