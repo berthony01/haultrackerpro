@@ -82,6 +82,15 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   }
 
+  if (view === 'referrals' && profile) {
+    return (
+      <RecruiterReferralsPanel
+        recruiterId={profile.id}
+        onBack={() => setView('list')}
+      />
+    );
+  }
+
   const handleStatus = (id: string, status: 'active' | 'paused' | 'closed') => {
     setStatus.mutate(
       { id, status },
