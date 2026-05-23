@@ -58,6 +58,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: BarChart3, title: 'Referral Analytics', description: 'See referral volume, hire rate, and top referring drivers across your opportunities so you can lean into what works.' },
       { icon: AlertCircle, title: 'Paid Externally by Recruiter', description: 'HaulTrackerPro tracks referral progress only. Referral bonuses, if offered, are paid externally by you according to your terms — HaulTrackerPro does not process, hold, or guarantee referral payments.' },
     ],
+  },
   {
     category: 'Billing & Account',
     features: [
