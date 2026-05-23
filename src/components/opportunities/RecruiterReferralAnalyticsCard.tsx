@@ -58,6 +58,9 @@ export function RecruiterReferralAnalyticsCard({ recruiterId }: Props) {
           </Button>
         ))}
       </div>
+      <p className="text-[11px] text-muted-foreground -mt-2 mb-3">
+        Timeframes are based on referral creation date.
+      </p>
 
       <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground mb-4">
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
@@ -114,11 +117,9 @@ export function RecruiterReferralAnalyticsCard({ recruiterId }: Props) {
                     <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-foreground truncate">{o.title}</p>
-                        {o.company_name && (
-                          <p className="text-[11px] text-muted-foreground truncate">
-                            {o.company_name}
-                          </p>
-                        )}
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {o.company_name ?? 'Company unavailable'}
+                        </p>
                       </div>
                       <Badge variant="outline" className="border-primary/40 text-primary whitespace-nowrap">
                         {o.hire_rate.toFixed(0)}% hire rate
@@ -128,11 +129,8 @@ export function RecruiterReferralAnalyticsCard({ recruiterId }: Props) {
                       <Mini label="Total" value={o.total} />
                       <Mini label="Hired" value={o.hired} />
                       <Mini label="Eligible" value={o.eligible} />
-                      <Mini label="Paid externally" value={o.marked_paid_externally} />
-                      <Mini
-                        label="Last referral"
-                        value={new Date(o.last_referral_at).toLocaleDateString()}
-                      />
+                      <Mini label="Marked paid externally" value={o.marked_paid_externally} />
+                      <Mini label="Last referral" value={safeDateLabel(o.last_referral_at)} />
                     </div>
                   </div>
                 ))}
@@ -149,13 +147,16 @@ export function RecruiterReferralAnalyticsCard({ recruiterId }: Props) {
               <ol className="space-y-2 border-l border-border/60 pl-4">
                 {analytics.recent.map((r) => {
                   const contact =
-                    r.referred_driver_name ||
-                    r.referred_driver_email ||
-                    r.referred_driver_phone ||
+                    (r.referred_driver_name?.trim() ||
+                      r.referred_driver_email?.trim() ||
+                      r.referred_driver_phone?.trim()) ??
                     'Referred driver';
                   const referrer = r.referring_driver_id
                     ? `Driver · #${r.referring_driver_id.slice(0, 8)}`
                     : 'Driver';
+                  const oppTitle = r.opportunities?.title?.trim() || 'Untitled opportunity';
+                  const oppCompany = r.opportunities?.company_name?.trim() || null;
+                  const dateLabel = safeDateLabel(r.last_status_at ?? r.created_at);
                   return (
                     <li key={r.id} className="relative">
                       <span className="absolute -left-[1.05rem] top-1.5 h-2 w-2 rounded-full bg-primary" />
@@ -166,12 +167,8 @@ export function RecruiterReferralAnalyticsCard({ recruiterId }: Props) {
                         </Badge>
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Referred by {referrer} ·{' '}
-                        {r.opportunities?.title ?? 'Opportunity'}
-                        {r.opportunities?.company_name
-                          ? ` · ${r.opportunities.company_name}`
-                          : ''}{' '}
-                        · {new Date(r.last_status_at ?? r.created_at).toLocaleDateString()}
+                        Referred by {referrer} · {oppTitle}
+                        {oppCompany ? ` · ${oppCompany}` : ''} · {dateLabel}
                       </p>
                       {r.status === 'marked_paid_externally' && (
                         <p className="text-[11px] text-muted-foreground italic mt-0.5">
