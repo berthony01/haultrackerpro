@@ -53,7 +53,7 @@ describe('aggregateAdminReferrals', () => {
       ],
       opportunities,
       recruiters,
-      settings: [{ recruiter_id: 'rec-1', bonus_amount: 500, terms: null }],
+      settings: [{ recruiter_id: 'rec-1', bonus_amount: 500, bonus_terms: null }],
       timeframe: 'all',
     });
     expect(a.kpis.total).toBe(5);
@@ -85,7 +85,7 @@ describe('aggregateAdminReferrals', () => {
       ],
       opportunities,
       recruiters,
-      settings: [{ recruiter_id: 'rec-1', bonus_amount: 500, terms: null }],
+      settings: [{ recruiter_id: 'rec-1', bonus_amount: 500, bonus_terms: null }],
       timeframe: 'all',
       now: new Date('2026-01-01').getTime(),
     });
@@ -104,7 +104,7 @@ describe('aggregateAdminReferrals', () => {
       ],
       opportunities,
       recruiters,
-      settings: [{ recruiter_id: 'rec-1', bonus_amount: 100, terms: null }],
+      settings: [{ recruiter_id: 'rec-1', bonus_amount: 100, bonus_terms: null }],
       timeframe: 'all',
     });
     // Only valid created_at survives timeframe filter when not 'all', but here 'all' keeps all.
