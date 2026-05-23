@@ -229,6 +229,15 @@ const App = () => (
               <Route path="/recruiter/features" element={<RecruiterFeatures />} />
               <Route path="/recruiter/guide" element={<RecruiterGuide />} />
               <Route path="/recruiter/updates" element={<RecruiterUpdates />} />
+              <Route path="/resources" element={<ResourcesHub />} />
+              <Route path="/resources/truck-driver-profit-tracking" element={<ResProfitTracking />} />
+              <Route path="/resources/load-profit-calculator" element={<ResLoadProfit />} />
+              <Route path="/resources/real-rpm-trucking" element={<ResRealRpm />} />
+              <Route path="/resources/1099-truck-driver-expenses" element={<Res1099Expenses />} />
+              <Route path="/resources/trucking-contract-clarity" element={<ResContractClarity />} />
+              <Route path="/resources/truck-parking-tracker" element={<ResParking />} />
+              <Route path="/resources/driver-referral-tracking" element={<ResDriverReferral />} />
+              <Route path="/resources/trucking-recruiter-tools" element={<ResRecruiterTools />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
