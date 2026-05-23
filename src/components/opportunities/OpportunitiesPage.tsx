@@ -30,7 +30,8 @@ import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
 import { DriverApplicationsPanel } from './DriverApplicationsPanel';
-import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info } from 'lucide-react';
+import { DriverReferralsPanel } from './DriverReferralsPanel';
+import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info, UserPlus } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
 
