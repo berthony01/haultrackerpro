@@ -28,6 +28,13 @@ const TIMEFRAMES: { value: Timeframe; label: string }[] = [
 const ANALYTICS_DISCLAIMER =
   'Referral analytics are for tracking progress only. Referral bonuses, if offered, are paid externally by the recruiter. Haul Tracker Pro does not process, verify, or guarantee payments.';
 
+function safeDateLabel(iso: string | null | undefined): string {
+  if (!iso) return 'Date unavailable';
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return 'Date unavailable';
+  return new Date(t).toLocaleDateString();
+}
+
 export function RecruiterReferralAnalyticsCard({ recruiterId }: Props) {
   const [timeframe, setTimeframe] = useState<Timeframe>('all');
   const { analytics, isLoading, isError } = useRecruiterReferralAnalytics(recruiterId, timeframe);
