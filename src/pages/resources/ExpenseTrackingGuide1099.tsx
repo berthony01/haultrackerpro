@@ -34,6 +34,8 @@ export default function ExpenseTrackingGuide1099() {
         },
       ]}
       disclaimer="This information is for general organization and recordkeeping only and is not tax advice. Consult a qualified tax professional for your situation."
+      ctaTitle="Organize your trucking expenses"
+      ctaDescription="Keep cleaner records for your own organization and tax preparation. Not tax advice."
       ctas={[
         { label: 'Start Tracking Free', to: '/auth' },
         { label: 'View Pricing', to: '/pricing', variant: 'outline' },
