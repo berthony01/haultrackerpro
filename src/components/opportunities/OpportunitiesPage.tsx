@@ -51,6 +51,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
+  const [showReferrals, setShowReferrals] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
