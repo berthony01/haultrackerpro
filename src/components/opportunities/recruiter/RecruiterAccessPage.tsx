@@ -757,11 +757,11 @@ function Row({ label, value }: { label: string; value: string }) {
 function HowItWorks() {
   const steps = [
     { n: 1, title: 'Apply for recruiter access', body: 'Submit your recruiter profile for review.' },
-    { n: 2, title: 'Activate a recruiter plan', body: 'Choose the plan that matches how many opportunities you post.' },
-    { n: 3, title: 'Post structured opportunities', body: 'Drivers see real pay clarity, route info, and your hiring intent.' },
-    { n: 4, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
-    { n: 5, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },
-    { n: 6, title: 'Manage your hiring pipeline', body: 'Move drivers through the structured hiring pipeline with clarity.' },
+    { n: 2, title: 'Post structured opportunities', body: 'Once approved, post unlimited standard opportunities — drivers see real pay clarity, route info, and your hiring intent.' },
+    { n: 3, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
+    { n: 4, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },
+    { n: 5, title: 'Manage your hiring pipeline', body: 'Move drivers through the structured hiring pipeline with clarity.' },
+    { n: 6, title: 'Unlock premium tools (optional)', body: 'Upgrade for priority placement, featured visibility, reports, and other premium recruiting tools.' },
   ];
   return (
     <Card className="p-6 border-border/60">
