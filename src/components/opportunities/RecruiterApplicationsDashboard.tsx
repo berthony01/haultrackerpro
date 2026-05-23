@@ -363,6 +363,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                   </div>
                 )}
               </div>
+            </>
           );
         })()}
 
