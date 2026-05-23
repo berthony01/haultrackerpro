@@ -178,6 +178,25 @@ serve(async (req) => {
     const text = (version.extracted_text || "").trim();
     if (!text) return json({ error: "No extracted text to analyze" }, 422);
 
+    // Recruiter Growth/Fleet eligibility — checked BEFORE returning existing reviews
+    // so non-eligible recruiters cannot retrieve cached AI analyses for contract
+    // workflow tools. Drivers and admins are unaffected. // trial-allowlist
+    if (isRecruiter && !isAdmin) {
+      const { data: billingRow } = await admin
+        .from("recruiter_billing_profiles")
+        .select("plan, status")
+        .eq("recruiter_id", c.recruiter_id)
+        .maybeSingle();
+      const planOk = billingRow?.plan === "growth" || billingRow?.plan === "fleet";
+      const statusOk = billingRow?.status === "active" || billingRow?.status === "trialing"; // trial-allowlist
+      if (!planOk || !statusOk) {
+        return json(
+          { error: "Growth or Fleet recruiter plan required for contract workflow tools.", code: "recruiter_plan_required" },
+          403,
+        );
+      }
+    }
+
     // Idempotency: existing AI review for this version
     const { data: existing } = await admin
       .from("contract_reviews")
@@ -196,23 +215,6 @@ serve(async (req) => {
     if (!existing && !isRecruiter && !isAdmin) {
       return json({ error: "AI analysis has not been run for this contract yet" }, 404);
     }
-
-    // Recruiter-initiated NEW analysis requires Growth/Fleet active/trialing. // trial-allowlist
-    // Existing reviews remain viewable by all parties (drivers included) above.
-    if (!existing && isRecruiter && !isAdmin) {
-      const { data: billingRow } = await admin
-        .from("recruiter_billing_profiles")
-        .select("plan, status")
-        .eq("recruiter_id", c.recruiter_id)
-        .maybeSingle();
-      const planOk = billingRow?.plan === "growth" || billingRow?.plan === "fleet";
-      const statusOk = billingRow?.status === "active" || billingRow?.status === "trialing"; // trial-allowlist
-      if (!planOk || !statusOk) {
-        return json(
-          { error: "Growth or Fleet recruiter plan required for contract workflow tools.", code: "recruiter_plan_required" },
-          403,
-        );
-      }
     }
 
     await admin.from("contract_audit_log").insert({
