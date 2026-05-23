@@ -39,6 +39,18 @@ const faqs = [
     a: 'Today, drivers receive your contact info and you respond via email or phone. In-app messaging is on the roadmap; meanwhile every status change on an application is logged so you and the driver share a clean timeline.',
   },
   {
+    q: 'Can drivers refer other drivers to my opportunities?',
+    a: 'Yes. Drivers can refer another driver to one of your opportunities, and you\'ll see each referral in your recruiter dashboard. You can move referrals through new → contacted → interviewed → hired → closed, or mark them paid externally once you\'ve fulfilled your referral terms outside the platform.',
+  },
+  {
+    q: 'Does HaulTrackerPro handle referral payments?',
+    a: 'No. HaulTrackerPro tracks referral progress only — it does not process, hold, or guarantee referral payments. Referral bonuses, if you offer them, are paid externally by you to the referring driver according to your own terms.',
+  },
+  {
+    q: 'How do I set my referral terms?',
+    a: 'In Recruiter Settings → Referral Terms, you can define your bonus amount, payout trigger (e.g., after hire, after 30 days), and any conditions. Referring drivers see your terms before sending a referral, so expectations are clear up front.',
+  },
+  {
     q: 'How do contract workflow tools work?',
     a: "Contract workflow tools are included with the Growth and Fleet recruiter plans. Attach a contract (PDF or image) to any application. HaulTrackerPro parses it and surfaces plain-English risk flags to the driver. The driver can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record. These tools are designed to make the workflow clearer — they are not legal advice.",
 

@@ -6,6 +6,7 @@ import {
   Search,
   Handshake,
   BarChart3,
+  Share2,
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
@@ -35,6 +36,7 @@ const features = [
   { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, manage driver contact requests, and track status from one dashboard — no spreadsheets.' },
   { icon: BarChart3, title: 'Free verified posting', desc: 'Verified recruiters post unlimited standard opportunities at no cost. Upgrade for premium recruiting tools.' },
   { icon: Search, title: 'Contract Protection workflow (Growth & Fleet)', desc: "Upload contracts and get AI risk flags. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
+  { icon: Share2, title: 'Driver-to-driver referral tracking', desc: 'Drivers can refer other drivers to your opportunities. Track referral progress, set your external referral terms, and see referral analytics. Referral bonuses, if offered, are paid externally by you — HaulTrackerPro does not process referral payments.' },
 ];
 
 const steps = [
@@ -46,8 +48,8 @@ const steps = [
 
 const plans = [
   { name: 'Free Verified', price: '$0', limit: 'Unlimited standard posts', features: ['Unlimited standard opportunity posts', 'Admin-reviewed listings', 'Basic applicant & contact request flow', 'Standard placement'] },
-  { name: 'Starter', price: '$19', limit: 'Premium tools', features: ['Enhanced applicant tracking', 'Applicant notes & status history', 'Basic listing analytics', 'Recruiter trust tools'] },
-  { name: 'Growth', price: '$49', limit: 'Premium tools', features: ['Priority placement', 'Featured listing eligibility', 'Recruiter reports (PDF + CSV)', 'Contract workflow tools', 'Pipeline analytics'], highlight: true },
+  { name: 'Starter', price: '$19', limit: 'Premium tools', features: ['Enhanced applicant tracking', 'Applicant notes & status history', 'Basic listing analytics', 'Referral progress tracking', 'Recruiter trust tools'] },
+  { name: 'Growth', price: '$49', limit: 'Premium tools', features: ['Priority placement', 'Featured listing eligibility', 'Recruiter reports (PDF + CSV)', 'Contract workflow tools', 'Referral tracking & analytics', 'Pipeline analytics'], highlight: true },
   { name: 'Fleet', price: '$149', limit: 'Premium tools', features: ['Top placement eligibility', 'Advanced analytics', 'Priority support', 'Team seats (coming soon)', 'Bulk opportunity tools (coming soon)'] },
 ];
 
@@ -63,6 +65,8 @@ const faqs = [
   { q: 'What is your refund policy?', a: 'We refund pro-rated billing periods only when caused by a platform fault. Standard cancellations stop renewal at the end of the current period.' },
   { q: 'Can I post multiple lanes in one opportunity?', a: 'Yes. Each opportunity supports multiple hiring states and equipment types. Use separate postings when pay or deductions differ significantly.' },
   { q: 'Do drivers see my direct contact info?', a: 'Only after a driver opts in by requesting more information on your opportunity. Driver-initiated contact only — no scraping or off-platform solicitation is allowed.' },
+  { q: 'Can drivers refer other drivers to my opportunity?', a: 'Yes. Drivers can refer another driver to your opportunity. You see each referral in your pipeline and can mark it contacted, interviewed, hired, closed, or paid externally. HaulTrackerPro tracks referral progress only — referral bonuses, if offered, are paid externally by you according to your own terms.' },
+  { q: 'Does HaulTrackerPro pay referral bonuses?', a: 'No. HaulTrackerPro does not process, hold, or guarantee referral payments. You set your external referral terms, and you pay any bonus directly to the referring driver outside the platform.' },
   { q: 'Can I post before paying?', a: 'Yes. Approved recruiters can post unlimited standard opportunities at no cost. Paid plans unlock premium tools like priority placement, featured listings, and reports. You can cancel anytime from Recruiter Settings → Billing.' },
 ];
 

@@ -563,6 +563,18 @@ const faqs: Faq[] = [
     answer: 'Starter ($19/month) unlocks enhanced applicant tracking and basic analytics. Growth ($49/month) adds priority placement, featured listing eligibility, recruiter reports, contract workflow tools, and pipeline analytics. Fleet ($149/month) adds top placement eligibility, advanced analytics, priority support, and future team/bulk tools. All plans include unlimited standard opportunity posting for verified recruiters.',
   },
   {
+    id: 'driver-refer-driver',
+    question: 'Can drivers refer other drivers to a recruiter opportunity?',
+    answer: 'Yes. Drivers can refer another driver to a recruiter opportunity and track referral progress in their dashboard. Recruiters see referrals in their pipeline and can move them through contacted, interviewed, hired, closed, or marked paid externally.',
+    keywords: 'driver referral refer friend',
+  },
+  {
+    id: 'referral-payment-safety',
+    question: 'Does HaulTrackerPro handle referral payments?',
+    answer: 'No. HaulTrackerPro tracks referral progress only — it does not process, hold, or guarantee referral payments. Referral bonuses, if a recruiter offers them, are paid externally by the recruiter according to their own terms.',
+    keywords: 'referral payment bonus external paid',
+  },
+  {
     id: 'request-info-contact',
     question: 'What happens when a driver requests info?',
     answer: 'The driver\'s contact snapshot is shared only with the recruiter connected to that opportunity so they can follow up.',

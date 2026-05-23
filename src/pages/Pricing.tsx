@@ -427,7 +427,7 @@ export default function Pricing() {
                   'Enhanced applicant tracking',
                   'Applicant notes & status history',
                   'Basic listing analytics',
-                  'Referral progress tracking (coming soon)',
+                  'Referral progress tracking',
                 ],
               },
               {
@@ -441,6 +441,7 @@ export default function Pricing() {
                   'Featured listing eligibility',
                   'Recruiter reports (PDF + CSV exports)',
                   'Contract workflow tools',
+                  'Referral tracking & analytics',
                   'Pipeline analytics',
                   'Opportunity performance insights',
                 ],
@@ -508,8 +509,9 @@ export default function Pricing() {
             </span>
           </div>
 
-          <p className="text-[11px] text-center mt-6" style={{ color: 'hsl(220, 10%, 40%)' }}>
+          <p className="text-[11px] text-center mt-6 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
             Pay figures and Profit Intelligence shown to drivers are estimates based on recruiter-provided data — never guaranteed earnings or guaranteed jobs.
+            HaulTrackerPro tracks referral progress only. Referral bonuses, if offered, are paid externally by the recruiter according to their own terms — HaulTrackerPro does not process or guarantee referral payments.
           </p>
         </div>
       </section>
