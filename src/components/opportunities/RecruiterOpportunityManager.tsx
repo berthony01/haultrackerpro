@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Inbox,
   Send,
+  UserPlus,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
@@ -26,6 +28,7 @@ import {
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
 import { RecruiterBillingPanel } from './RecruiterBillingPanel';
+import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 
 interface Props {
