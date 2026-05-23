@@ -50,8 +50,8 @@ export default function Recruiters() {
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
-        title="Recruiter Access | HaulTrackerPro"
-        description="Verified recruiters can post unlimited standard trucking opportunities. Paid plans add priority placement, recruiter reports, and contract workflow tools."
+        title="For Recruiters — Truck Driver Recruiter Platform | HaulTrackerPro"
+        description="Verified trucking recruiter platform: post unlimited standard driver opportunities after approval, manage applicants, track driver referrals, and unlock premium visibility, recruiter analytics, and contract workflow tools on paid plans."
         path="/recruiters"
       />
 
