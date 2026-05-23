@@ -715,13 +715,13 @@ function BillingSummary({
     return (
       <Card className="p-5 border-primary/30 bg-primary/5">
         <div className="flex items-start gap-3">
-          <CreditCard className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-foreground">Recruiter billing required</p>
+            <p className="text-sm font-bold text-foreground">Premium recruiting tools (optional)</p>
             <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-              Activate a recruiter plan to submit opportunities for review.
+              Standard posting is already included with your verified recruiter account. Upgrade to unlock priority placement, featured visibility, reports, and other premium recruiting tools.
             </p>
-            <Button size="sm" onClick={onManagePlan}>Choose Plan</Button>
+            <Button size="sm" onClick={onManagePlan}>See Premium Plans</Button>
           </div>
         </div>
       </Card>
