@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { featureList, downloadFeatureSheet } from '@/lib/featureList';
@@ -105,6 +105,26 @@ export default function Features() {
             </Button>
             <Button onClick={() => navigate('/pricing')} variant="outline" className="rounded-xl font-bold" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
               View Pricing
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Resource Hub CTA */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+        <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
+            Want a deeper breakdown?
+          </h2>
+          <p className="text-sm mb-4 max-w-2xl" style={{ color: 'hsl(220, 10%, 55%)' }}>
+            Explore trucking resources on profit tracking, real RPM, load profit calculators, 1099 expenses, contract clarity, parking, referrals, and recruiter tools.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={() => navigate('/resources')} className="rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+              Explore trucking resources <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => navigate('/resources/truck-driver-profit-tracking')} variant="outline" className="rounded-xl font-bold" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
+              Profit Tracking Guide
             </Button>
           </div>
         </div>

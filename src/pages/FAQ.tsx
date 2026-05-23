@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, AlertTriangle, BarChart3, Link2, Search, CheckCircle2, XCircle, Loader2, ExternalLink, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, AlertTriangle, BarChart3, Link2, Search, CheckCircle2, XCircle, Loader2, ExternalLink, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -854,6 +854,16 @@ export default function FAQ() {
             ))}
           </Accordion>
         )}
+
+        <div className="mt-8 rounded-2xl border border-primary/20 bg-primary/5 p-6 text-center space-y-3">
+          <h3 className="text-lg font-black font-heading">Want a deeper breakdown?</h3>
+          <p className="text-sm text-muted-foreground">
+            Visit the Haul Tracker Pro resource hub for guides on profit tracking, 1099 expenses, real RPM, contracts, referrals, and recruiter tools.
+          </p>
+          <Button size="sm" onClick={() => navigate('/resources')} className="rounded-xl gap-1">
+            Explore trucking resources <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </main>
     </div>
   );

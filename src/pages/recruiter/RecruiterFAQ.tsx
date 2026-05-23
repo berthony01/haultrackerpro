@@ -124,6 +124,12 @@ export default function RecruiterFAQ() {
             <Button size="sm" onClick={() => navigate('/recruiter/guide')} className="rounded-xl gap-1">Recruiter Guide <ArrowRight className="h-3.5 w-3.5" /></Button>
             <Button size="sm" variant="outline" onClick={() => navigate('/recruiter/features')} className="rounded-xl gap-1">Features <ArrowRight className="h-3.5 w-3.5" /></Button>
           </div>
+          <p className="text-sm text-muted-foreground pt-1">
+            Want the full breakdown?{' '}
+            <button onClick={() => navigate('/resources/trucking-recruiter-tools')} className="font-semibold text-primary hover:underline">
+              Read the trucking recruiter tools guide →
+            </button>
+          </p>
         </div>
       </main>
     </div>
