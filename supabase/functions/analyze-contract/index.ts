@@ -197,6 +197,24 @@ serve(async (req) => {
       return json({ error: "AI analysis has not been run for this contract yet" }, 404);
     }
 
+    // Recruiter-initiated NEW analysis requires Growth/Fleet active/trialing.
+    // Existing reviews remain viewable by all parties (drivers included) above.
+    if (!existing && isRecruiter && !isAdmin) {
+      const { data: billingRow } = await admin
+        .from("recruiter_billing_profiles")
+        .select("plan, status")
+        .eq("recruiter_id", c.recruiter_id)
+        .maybeSingle();
+      const planOk = billingRow?.plan === "growth" || billingRow?.plan === "fleet";
+      const statusOk = billingRow?.status === "active" || billingRow?.status === "trialing";
+      if (!planOk || !statusOk) {
+        return json(
+          { error: "Growth or Fleet recruiter plan required for contract workflow tools.", code: "recruiter_plan_required" },
+          403,
+        );
+      }
+    }
+
     await admin.from("contract_audit_log").insert({
       contract_id: version.contract_id,
       version_id,
