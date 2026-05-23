@@ -23,11 +23,12 @@ import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useSavedOpportunities } from '@/hooks/opportunities/useSavedOpportunities';
 import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
-import { Info } from 'lucide-react';
+import { Info, UserPlus } from 'lucide-react';
 import { OpportunityProfitBreakdown } from './OpportunityProfitBreakdown';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
+import { ReferDriverDialog } from './ReferDriverDialog';
 
 interface Props {
   opportunity: Opportunity;
@@ -46,6 +47,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
   const { saved, save, unsave } = useSavedOpportunities();
   const { driverApplications, createApplication } = useOpportunityApplications();
   const [submitting, setSubmitting] = useState(false);
+  const [showRefer, setShowRefer] = useState(false);
 
   const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
   const alreadyApplied = useMemo(
@@ -271,12 +273,24 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {isSaved ? 'Saved' : 'Save'}
           </Button>
+          <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
+            <UserPlus className="h-4 w-4" /> Refer a Driver
+          </Button>
           <Button onClick={handleRequestInfo} disabled={alreadyApplied || submitting} className="flex-1">
             <Send className="h-4 w-4" />
             {alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}
           </Button>
         </div>
       </div>
+
+      <ReferDriverDialog
+        open={showRefer}
+        onOpenChange={setShowRefer}
+        opportunityId={o.id}
+        recruiterId={o.recruiter_id}
+        opportunityTitle={o.title}
+        companyName={o.company_name}
+      />
     </div>
   );
 }

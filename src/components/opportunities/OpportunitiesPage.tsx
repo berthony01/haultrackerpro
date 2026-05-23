@@ -30,7 +30,8 @@ import { OpportunityCard } from './OpportunityCard';
 import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
 import { DriverApplicationsPanel } from './DriverApplicationsPanel';
-import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info } from 'lucide-react';
+import { DriverReferralsPanel } from './DriverReferralsPanel';
+import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info, UserPlus } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
 
@@ -50,6 +51,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
+  const [showReferrals, setShowReferrals] = useState(false);
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
@@ -207,6 +209,10 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     );
   }
 
+  if (showReferrals) {
+    return <DriverReferralsPanel onBack={() => setShowReferrals(false)} />;
+  }
+
   if (showProfile) {
     return <DriverOpportunityProfile onBack={() => setShowProfile(false)} />;
   }
@@ -274,6 +280,24 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
             </p>
             <Button onClick={() => setShowDriverApps(true)} variant="outline">
               View My Requests <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* My Referrals entry */}
+      <Card className="p-5 border-border/60">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+            <UserPlus className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-foreground mb-1">My Referrals</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              Track drivers you've referred to opportunities. Bonuses, if offered, are paid externally by the recruiter.
+            </p>
+            <Button onClick={() => setShowReferrals(true)} variant="outline">
+              View My Referrals <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
         </div>

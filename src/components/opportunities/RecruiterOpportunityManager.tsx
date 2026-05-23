@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Inbox,
   Send,
+  UserPlus,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
@@ -26,13 +28,14 @@ import {
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
 import { RecruiterBillingPanel } from './RecruiterBillingPanel';
+import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 
 interface Props {
   onBack: () => void;
 }
 
-type View = 'list' | 'edit';
+type View = 'list' | 'edit' | 'referrals';
 
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
@@ -79,6 +82,15 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   }
 
+  if (view === 'referrals' && profile) {
+    return (
+      <RecruiterReferralsPanel
+        recruiterId={profile.id}
+        onBack={() => setView('list')}
+      />
+    );
+  }
+
   const handleStatus = (id: string, status: 'active' | 'paused' | 'closed') => {
     setStatus.mutate(
       { id, status },
@@ -116,6 +128,24 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
       </Card>
 
       <RecruiterBillingPanel />
+
+      <Card className="p-5 border-border/60">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+            <UserPlus className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-foreground mb-1">Driver Referrals</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              View driver referrals tied to your opportunities and update their status.
+              Bonuses, if offered, are paid externally by you — Haul Tracker Pro tracks progress only.
+            </p>
+            <Button onClick={() => setView('referrals')} variant="outline">
+              Manage Referrals <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {isLoading ? (
         <div className="space-y-3">
