@@ -48,7 +48,7 @@ const faqs = [
   },
   {
     q: 'How do I set my referral terms?',
-    a: 'In Recruiter Settings → Referral Terms, you can define your bonus amount, payout trigger (e.g., after hire, after 30 days), and any conditions. Referring drivers see your terms before sending a referral, so expectations are clear up front.',
+    a: 'In Recruiter Settings → Referral Terms, you can define your bonus amount, when a bonus may be paid externally (for example, after hire or after 30 days), and any conditions. Referring drivers see your terms before sending a referral, so expectations are clear up front.',
   },
   {
     q: 'How do contract workflow tools work?',

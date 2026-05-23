@@ -54,7 +54,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
     category: 'Driver-to-Driver Referrals',
     features: [
       { icon: Share2, title: 'Referral Progress Tracking', description: 'Drivers can refer other drivers to your opportunities. You see each referral in your pipeline and can move it through new, contacted, interviewed, hired, closed, or marked paid externally.' },
-      { icon: ClipboardList, title: 'External Referral Terms', description: 'Set your own referral terms — bonus amount, payout trigger, and conditions — directly on your recruiter profile so referring drivers see what you offer up front.' },
+      { icon: ClipboardList, title: 'External Referral Terms', description: 'Set your own referral terms — bonus amount, when a bonus may be paid externally, and conditions — directly on your recruiter profile so referring drivers see what you offer up front.' },
       { icon: BarChart3, title: 'Referral Analytics', description: 'See referral volume, hire rate, and top referring drivers across your opportunities so you can lean into what works.' },
       { icon: AlertCircle, title: 'Paid Externally by Recruiter', description: 'HaulTrackerPro tracks referral progress only. Referral bonuses, if offered, are paid externally by you according to your terms — HaulTrackerPro does not process, hold, or guarantee referral payments.' },
     ],
