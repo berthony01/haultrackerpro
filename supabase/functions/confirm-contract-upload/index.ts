@@ -87,7 +87,7 @@ serve(async (req) => {
       .eq("recruiter_id", c.recruiter_id)
       .maybeSingle();
     const planOk = billingRow?.plan === "growth" || billingRow?.plan === "fleet";
-    const statusOk = billingRow?.status === "active" || billingRow?.status === "trialing";
+    const statusOk = billingRow?.status === "active" || billingRow?.status === "trialing"; // trial-allowlist
     if (!planOk || !statusOk) {
       return json(
         { error: "Growth or Fleet recruiter plan required for contract workflow tools.", code: "recruiter_plan_required" },
