@@ -374,8 +374,9 @@ export function aggregateAdminReferrals(args: {
     const settingsRow = settingsByRecruiter.get(rp.recruiter_id);
     const hasTerms =
       !!settingsRow &&
-      ((typeof settingsRow.bonus_amount === 'number' && settingsRow.bonus_amount > 0) ||
-        !!settingsRow.terms?.trim());
+      (settingsRow.referral_bonus_enabled === true ||
+        (typeof settingsRow.bonus_amount === 'number' && settingsRow.bonus_amount > 0) ||
+        !!settingsRow.bonus_terms?.trim());
     if (!hasTerms) {
       watchlist.push({
         kind: 'missing_terms',
