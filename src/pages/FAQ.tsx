@@ -381,6 +381,16 @@ const AnchorValidator = () => {
   );
 };
 
+const safeFaqSchema = (entries: { question: string; answer: string }[]) => ({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: entries.map((f) => ({
+    '@type': 'Question',
+    name: f.question,
+    acceptedAnswer: { '@type': 'Answer', text: f.answer },
+  })),
+});
+
 const faqs: Faq[] = [
   {
     id: 'estimated-vs-actual',
@@ -747,7 +757,28 @@ export default function FAQ() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title="FAQ | HaulTrackerPro" description="Answers to common questions about tracking loads, expenses, and profit." path="/faq" />
+      <SEOHead
+        title="FAQ — Truck Driver Profit Tracking & Recruiter Platform | HaulTrackerPro"
+        description="Answers about tracking load profit, fuel and expenses, RPM, reports, recruiter opportunities, and driver referral tracking on HaulTrackerPro."
+        path="/faq"
+        jsonLd={safeFaqSchema(
+          faqs
+            .filter((f) =>
+              [
+                'free-plan',
+                'net-profit',
+                'tax-estimator',
+                'what-are-opportunities',
+                'opportunity-earnings-guaranteed',
+                'how-recruiters-post',
+                'driver-refer-driver',
+                'referral-payment-safety',
+                'contract-legal-advice',
+              ].includes(f.id) && typeof f.answer === 'string',
+            )
+            .map((f) => ({ question: f.question, answer: f.answer as string })),
+        )}
+      />
       <header className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
           <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={() => navigate(-1)}>

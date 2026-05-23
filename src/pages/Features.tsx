@@ -9,7 +9,7 @@ export default function Features() {
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Features | HaulTrackerPro" description="Track loads, expenses, profit, and taxes with tools built specifically for truck drivers." path="/features" />
+      <SEOHead title="Features — Truck Driver Profit, Expense & RPM Tracker | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, reports, contract clarity, parking, and driver referrals — built for owner-operators and 1099 truck drivers." path="/features" />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">

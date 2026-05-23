@@ -9,8 +9,8 @@ export default function RecruiterFeatures() {
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
-        title="Recruiter Features | HaulTrackerPro"
-        description="Post structured opportunities, manage applicants, attach contracts, and bill through Stripe — built for trucking recruiters."
+        title="Recruiter Features — Trucking Recruiter Platform | HaulTrackerPro"
+        description="Verified trucking recruiter tools: unlimited standard opportunity posting after approval, applicant tracking, driver referral tracking and analytics, plus premium visibility and contract workflow tools on paid plans."
         path="/recruiter/features"
       />
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
