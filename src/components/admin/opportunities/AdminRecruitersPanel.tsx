@@ -54,6 +54,7 @@ export function AdminRecruitersPanel() {
           <Skeleton className="h-16 w-full" />
         ) : billingSummary.data ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
+            <Mini label="Total" value={billingSummary.data.total} />
             <Mini label="Active" value={billingSummary.data.active} />
             <Mini label="Past Due" value={billingSummary.data.past_due} />
             <Mini label="Canceled" value={billingSummary.data.canceled} />
@@ -61,7 +62,6 @@ export function AdminRecruitersPanel() {
             <Mini label="Starter" value={billingSummary.data.starter} />
             <Mini label="Growth" value={billingSummary.data.growth} />
             <Mini label="Fleet" value={billingSummary.data.fleet} />
-            <Mini label="Active Capacity" value={billingSummary.data.capacity} />
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">No billing data.</p>
