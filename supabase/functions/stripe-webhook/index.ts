@@ -181,14 +181,15 @@ serve(async (req) => {
 
   // Idempotency: only process each verified Stripe event once.
   // Insert is attempted AFTER signature verification so unverified events
-  // never touch the ledger. A duplicate (23505 unique_violation) means we
-  // already processed this event — return 200 without reprocessing.
+  // never touch the ledger. Fail-closed: if the ledger insert fails for any
+  // reason other than a duplicate (23505 unique_violation), return 500 and
+  // let Stripe retry — never process an event that wasn't durably recorded.
   try {
     const { error: idemError } = await supabaseClient
       .from("stripe_webhook_events")
       .insert({ stripe_event_id: event.id, event_type: event.type });
     if (idemError) {
-      // Postgres unique_violation
+      // Postgres unique_violation → already processed, safe to ack.
       if ((idemError as { code?: string }).code === "23505") {
         logStep("Duplicate event ignored", { id: event.id, type: event.type });
         return new Response(JSON.stringify({ received: true, duplicate: true }), {
@@ -196,12 +197,29 @@ serve(async (req) => {
           status: 200,
         });
       }
-      // Unexpected error — log but continue so we don't lose the event.
-      logStep("Idempotency insert error (continuing)", { message: idemError.message });
+      // Fail closed — do not process without a durable ledger entry.
+      logStep("Idempotency insert failed — refusing to process (will retry)", {
+        id: event.id,
+        type: event.type,
+        code: (idemError as { code?: string }).code,
+        message: idemError.message,
+      });
+      return new Response(
+        JSON.stringify({ error: "Idempotency ledger insert failed" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
+      );
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    logStep("Idempotency check threw (continuing)", { message: msg });
+    logStep("Idempotency check threw — refusing to process (will retry)", {
+      id: event.id,
+      type: event.type,
+      message: msg,
+    });
+    return new Response(
+      JSON.stringify({ error: "Idempotency ledger check threw" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
+    );
   }
 
   try {
