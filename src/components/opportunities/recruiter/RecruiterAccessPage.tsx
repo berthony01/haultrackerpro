@@ -18,7 +18,7 @@ import {
   ShieldCheck,
   PlusCircle,
   HelpCircle,
-  CreditCard,
+  
   Truck,
   Eye,
   Edit,
@@ -59,7 +59,7 @@ interface Props {
 
 export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onApplications }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
-  const { isBillingActive, plan, status, limit, activeCount, isLoading: billingLoading } = useRecruiterBilling();
+  const { isBillingActive, plan, status, isLoading: billingLoading } = useRecruiterBilling();
   const { opportunities, isLoading: oppsLoading } = useRecruiterOpportunities();
   const { recruiterApplications, isLoadingRecruiter } = useOpportunityApplications({ recruiterId: profile?.id ?? undefined });
 
@@ -292,8 +292,6 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               loading={billingLoading}
               plan={plan}
               status={status}
-              limit={limit}
-              activeCount={activeCount}
               isBillingActive={isBillingActive}
               onManagePlan={() => scrollTo(billingRef)}
             />
@@ -697,16 +695,12 @@ function BillingSummary({
   loading,
   plan,
   status,
-  limit,
-  activeCount,
   isBillingActive,
   onManagePlan,
 }: {
   loading: boolean;
   plan: keyof typeof RECRUITER_PLAN_LABELS;
   status: string;
-  limit: number;
-  activeCount: number;
   isBillingActive: boolean;
   onManagePlan: () => void;
 }) {
@@ -727,6 +721,8 @@ function BillingSummary({
       </Card>
     );
   }
+  const priorityPlacement =
+    plan === 'growth' || plan === 'fleet' ? 'Included' : 'Upgrade to Growth';
   return (
     <Card className="p-5 border-border/60">
       <div className="flex items-center justify-between mb-3">
@@ -735,8 +731,10 @@ function BillingSummary({
       </div>
       <div className="space-y-2 text-sm">
         <Row label="Plan" value={RECRUITER_PLAN_LABELS[plan]} />
-        <Row label="Active opportunity limit" value={limit.toString()} />
-        <Row label="Active used" value={`${activeCount} / ${limit}`} />
+        <Row label="Premium status" value={status} />
+        <Row label="Standard posting" value="Unlimited after verification" />
+        <Row label="Premium tools" value="Based on your current plan" />
+        <Row label="Priority placement" value={priorityPlacement} />
       </div>
       <Button size="sm" variant="outline" className="w-full mt-4" onClick={onManagePlan}>
         Manage Plan <ArrowRight className="h-3.5 w-3.5" />
