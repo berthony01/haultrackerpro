@@ -21,6 +21,8 @@ import {
   EXTERNAL_PAYMENT_DISCLAIMER,
   referralStatusLabel,
 } from '@/lib/opportunities/referralStatus';
+import { useRecruiterReferralSettings } from '@/hooks/opportunities/useRecruiterReferralSettings';
+import { ReferralTermsDisplay } from './ReferralTermsDisplay';
 
 interface Props {
   onBack: () => void;
