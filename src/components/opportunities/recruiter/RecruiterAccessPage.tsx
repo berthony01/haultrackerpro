@@ -105,8 +105,9 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
 
   const recentPosts = useMemo(() => opportunities.slice(0, 5), [opportunities]);
 
-  const canPost = state === 'approved_active';
-  const postDisabled = state !== 'approved_active' && state !== 'approved_no_billing';
+  // Approved/verified recruiters can post unlimited standard opportunities — billing is only for premium tools.
+  const canPost = state === 'approved_active' || state === 'approved_no_billing';
+  const postDisabled = !canPost;
 
   const handlePost = () => {
     if (state === 'none' || state === 'rejected') {
@@ -117,10 +118,6 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       return;
     }
     if (state === 'pending' || state === 'suspended') return;
-    if (state === 'approved_no_billing') {
-      billingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
     onManage();
   };
 
@@ -367,7 +364,7 @@ function StateCard({
       : state === 'suspended'
       ? { Icon: Ban, title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: null }
       : state === 'approved_no_billing'
-      ? { Icon: CreditCard, title: 'Choose a recruiter plan to submit opportunities', body: 'Your recruiter profile is approved. Activate a plan to start posting structured opportunities.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'Choose Plan', onClick: onChoosePlan } }
+      ? { Icon: Sparkles, title: "You're approved — post unlimited standard opportunities", body: 'Standard posting is included for verified recruiters. Upgrade only to unlock premium recruiting tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
       : null;
 
   if (!cfg) return null;
@@ -636,7 +633,6 @@ function NextSteps({
 }) {
   const profileDone = state !== 'none';
   const approved = state === 'approved_active' || state === 'approved_no_billing';
-  const billingDone = state === 'approved_active';
 
   const steps = [
     {
@@ -650,24 +646,24 @@ function NextSteps({
       onClick: undefined,
     },
     {
-      label: 'Choose recruiter plan',
-      done: billingDone,
-      onClick: billingDone ? undefined : onChoosePlan,
-    },
-    {
       label: 'Post your first opportunity',
       done: hasPosts,
-      onClick: hasPosts || !billingDone ? undefined : onPost,
+      onClick: hasPosts || !approved ? undefined : onPost,
     },
     {
       label: 'Review driver requests',
       done: hasApps,
-      onClick: hasApps && billingDone ? onApplications : undefined,
+      onClick: hasApps && approved ? onApplications : undefined,
     },
     {
       label: 'Improve response rate',
       done: responseRate >= 70 && hasApps,
       onClick: hasApps ? onApplications : undefined,
+    },
+    {
+      label: 'Unlock premium recruiting tools (optional)',
+      done: state === 'approved_active',
+      onClick: state === 'approved_active' ? undefined : onChoosePlan,
     },
   ];
 
@@ -719,13 +715,13 @@ function BillingSummary({
     return (
       <Card className="p-5 border-primary/30 bg-primary/5">
         <div className="flex items-start gap-3">
-          <CreditCard className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-foreground">Recruiter billing required</p>
+            <p className="text-sm font-bold text-foreground">Premium recruiting tools (optional)</p>
             <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-              Activate a recruiter plan to submit opportunities for review.
+              Standard posting is already included with your verified recruiter account. Upgrade to unlock priority placement, featured visibility, reports, and other premium recruiting tools.
             </p>
-            <Button size="sm" onClick={onManagePlan}>Choose Plan</Button>
+            <Button size="sm" onClick={onManagePlan}>See Premium Plans</Button>
           </div>
         </div>
       </Card>
@@ -761,11 +757,11 @@ function Row({ label, value }: { label: string; value: string }) {
 function HowItWorks() {
   const steps = [
     { n: 1, title: 'Apply for recruiter access', body: 'Submit your recruiter profile for review.' },
-    { n: 2, title: 'Activate a recruiter plan', body: 'Choose the plan that matches how many opportunities you post.' },
-    { n: 3, title: 'Post structured opportunities', body: 'Drivers see real pay clarity, route info, and your hiring intent.' },
-    { n: 4, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
-    { n: 5, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },
-    { n: 6, title: 'Manage your hiring pipeline', body: 'Move drivers through the structured hiring pipeline with clarity.' },
+    { n: 2, title: 'Post structured opportunities', body: 'Once approved, post unlimited standard opportunities — drivers see real pay clarity, route info, and your hiring intent.' },
+    { n: 3, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
+    { n: 4, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },
+    { n: 5, title: 'Manage your hiring pipeline', body: 'Move drivers through the structured hiring pipeline with clarity.' },
+    { n: 6, title: 'Unlock premium tools (optional)', body: 'Upgrade for priority placement, featured visibility, reports, and other premium recruiting tools.' },
   ];
   return (
     <Card className="p-6 border-border/60">
@@ -793,7 +789,7 @@ function HowItWorks() {
       </div>
       <p className="text-[11px] text-muted-foreground mt-4 flex items-start gap-1.5">
         <Info className="h-3 w-3 mt-0.5 shrink-0" />
-        Driver interest and hiring outcomes are not guaranteed. Approval and billing are required to post.
+        Driver interest and hiring outcomes are not guaranteed. Approval is required to post; paid plans are optional and unlock premium recruiting tools.
       </p>
     </Card>
   );
