@@ -151,7 +151,7 @@ serve(async (req) => {
     const { data: version, error: vErr } = await admin
       .from("contract_versions")
       .select(
-        "id, contract_id, upload_status, parse_status, extracted_text, contracts:contract_id(id, status, recruiter_user_id, driver_user_id, current_version_id)"
+        "id, contract_id, upload_status, parse_status, extracted_text, contracts:contract_id(id, status, recruiter_user_id, recruiter_id, driver_user_id, current_version_id)"
       )
       .eq("id", version_id)
       .maybeSingle();
