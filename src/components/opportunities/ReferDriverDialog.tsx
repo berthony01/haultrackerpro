@@ -11,10 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDriverReferrals } from '@/hooks/opportunities/useDriverReferrals';
-import { EXTERNAL_PAYMENT_DISCLAIMER } from '@/lib/opportunities/referralStatus';
+import { useRecruiterReferralSettings } from '@/hooks/opportunities/useRecruiterReferralSettings';
+import { ReferralTermsDisplay } from './ReferralTermsDisplay';
 
 interface Props {
   open: boolean;
