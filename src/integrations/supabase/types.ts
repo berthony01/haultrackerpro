@@ -829,6 +829,69 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_referrals: {
+        Row: {
+          created_at: string
+          id: string
+          last_status_at: string
+          opportunity_id: string
+          recruiter_id: string
+          referred_driver_email: string | null
+          referred_driver_name: string | null
+          referred_driver_note: string | null
+          referred_driver_phone: string | null
+          referred_driver_user_id: string | null
+          referring_driver_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_status_at?: string
+          opportunity_id: string
+          recruiter_id: string
+          referred_driver_email?: string | null
+          referred_driver_name?: string | null
+          referred_driver_note?: string | null
+          referred_driver_phone?: string | null
+          referred_driver_user_id?: string | null
+          referring_driver_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_status_at?: string
+          opportunity_id?: string
+          recruiter_id?: string
+          referred_driver_email?: string | null
+          referred_driver_name?: string | null
+          referred_driver_note?: string | null
+          referred_driver_phone?: string | null
+          referred_driver_user_id?: string | null
+          referring_driver_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_referrals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_referrals_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -2131,6 +2194,53 @@ export type Database = {
         }
         Relationships: []
       }
+      recruiter_referral_settings: {
+        Row: {
+          bonus_amount: number | null
+          bonus_terms: string | null
+          created_at: string
+          external_payment_disclaimer: string
+          id: string
+          payment_trigger: string | null
+          recruiter_id: string
+          referral_bonus_enabled: boolean
+          updated_at: string
+          waiting_period_days: number | null
+        }
+        Insert: {
+          bonus_amount?: number | null
+          bonus_terms?: string | null
+          created_at?: string
+          external_payment_disclaimer?: string
+          id?: string
+          payment_trigger?: string | null
+          recruiter_id: string
+          referral_bonus_enabled?: boolean
+          updated_at?: string
+          waiting_period_days?: number | null
+        }
+        Update: {
+          bonus_amount?: number | null
+          bonus_terms?: string | null
+          created_at?: string
+          external_payment_disclaimer?: string
+          id?: string
+          payment_trigger?: string | null
+          recruiter_id?: string
+          referral_bonus_enabled?: boolean
+          updated_at?: string
+          waiting_period_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_referral_settings_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: true
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_expense_templates: {
         Row: {
           amount: number
@@ -2193,6 +2303,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      referral_status_events: {
+        Row: {
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string
+          id: string
+          new_status: string
+          note: string | null
+          old_status: string | null
+          referral_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          new_status: string
+          note?: string | null
+          old_status?: string | null
+          referral_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string
+          note?: string | null
+          old_status?: string | null
+          referral_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_status_events_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "driver_referrals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_opportunities: {
         Row: {
