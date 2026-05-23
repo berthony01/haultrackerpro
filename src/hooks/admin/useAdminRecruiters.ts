@@ -130,7 +130,7 @@ export function useRecruiterBillingSummary() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recruiter_billing_profiles')
-        .select('plan, status, active_opportunity_limit');
+        .select('plan, status');
       if (error) throw error;
       const rows = data ?? [];
       const summary = {
@@ -142,7 +142,6 @@ export function useRecruiterBillingSummary() {
         starter: 0,
         growth: 0,
         fleet: 0,
-        capacity: 0,
       };
       for (const r of rows) {
         const s = (r.status ?? 'inactive').toLowerCase();
@@ -154,9 +153,6 @@ export function useRecruiterBillingSummary() {
         if (p === 'starter') summary.starter++;
         else if (p === 'growth') summary.growth++;
         else if (p === 'fleet') summary.fleet++;
-        if (s === 'active' || s === 'trialing') { // trial-allowlist
-          summary.capacity += r.active_opportunity_limit ?? 0;
-        }
       }
       return summary;
     },
