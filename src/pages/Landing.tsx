@@ -67,13 +67,13 @@ export default function Landing() {
       <SEOHead
         title={
           isRecruiterAudience
-            ? 'Hire Verified Truck Drivers Faster | HaulTrackerPro'
-            : 'HaulTrackerPro | Know Your Real Profit Per Load'
+            ? 'For Recruiters — Verified Recruiter Access & Driver Referral Tracking | HaulTrackerPro'
+            : 'HaulTrackerPro — Truck Driver Profit Tracker, Load Profit Calculator & Real RPM'
         }
         description={
           isRecruiterAudience
-            ? 'HaulTrackerPro connects verified recruiters with financially serious owner-operators. Structured postings, applicant pipeline, contract protection — flat-rate pricing.'
-            : 'HaulTrackerPro: real profit tracking, expense and fuel tracking, opportunity comparison, contract clarity, and driver referral progress tracking — all in one platform.'
+            ? 'Verified recruiter access for trucking recruiters and carriers. Post unlimited standard opportunities after approval, manage driver applicants, track driver referrals, and unlock recruiter analytics, premium visibility, and contract workflow tools on paid plans.'
+            : 'Truck driver profit tracker and load profit calculator for owner-operators and 1099 drivers. Track loads, fuel, and expenses. See real RPM and net profit. Compare opportunities, avoid bad deals, and keep reports organized — start free.'
         }
         path="/"
         jsonLd={[
@@ -177,7 +177,7 @@ export default function Landing() {
                   <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit Before and After Every Load.</span>
                 </h1>
                 <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Track loads, fuel, and expenses. See real RPM and net profit. Compare opportunities, avoid bad deals, and keep reports organized for taxes and records — plus contract clarity tools before you sign.
+                  Track loads, fuel, and expenses in one place. See your real RPM and net profit on every load. Compare opportunities before you commit, avoid bad deals, and keep clean records — start free.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -209,8 +209,13 @@ export default function Landing() {
                   Recruiter? Get Verified →
                 </button>
               </div>
-              <div className="flex items-center gap-6 pt-2">
-                {['No credit card', 'Free plan available', 'Pro from $19.99/mo'].map(t => (
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-2">
+                {[
+                  'Built for owner-operators & 1099 drivers',
+                  'Track loads, fuel, expenses & real RPM',
+                  'No spreadsheet chaos',
+                  'Contract clarity before you sign',
+                ].map(t => (
                   <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
                     <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'hsl(152, 60%, 42%)' }} /> {t}
                   </span>
