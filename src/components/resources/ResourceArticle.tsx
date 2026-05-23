@@ -25,6 +25,8 @@ export interface ResourceArticleProps {
   disclaimer?: string;
   ctas: ResourceCTA[];
   related?: { to: string; title: string }[];
+  ctaTitle?: string;
+  ctaDescription?: string;
 }
 
 export default function ResourceArticle({
@@ -37,6 +39,8 @@ export default function ResourceArticle({
   disclaimer,
   ctas,
   related,
+  ctaTitle,
+  ctaDescription,
 }: ResourceArticleProps) {
   const navigate = useNavigate();
 
@@ -117,7 +121,10 @@ export default function ResourceArticle({
         )}
 
         <section className="rounded-xl border border-primary/20 bg-primary/5 p-6 text-center space-y-4">
-          <h3 className="text-xl font-black font-heading">Get clearer numbers on every load</h3>
+          <h3 className="text-xl font-black font-heading">{ctaTitle ?? 'Get clearer numbers on every load'}</h3>
+          {ctaDescription && (
+            <p className="text-sm text-muted-foreground max-w-xl mx-auto">{ctaDescription}</p>
+          )}
           <div className="flex flex-wrap justify-center gap-3">
             {ctas.map((c) => (
               <Button

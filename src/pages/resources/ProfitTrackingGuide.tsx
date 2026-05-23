@@ -32,6 +32,8 @@ export default function ProfitTrackingGuide() {
           body: 'HaulTrackerPro lets you log each load with rate, miles, deadhead, and expenses, then shows estimated net profit and real RPM. You can review weekly summaries, watch lane trends, and keep clean records — all from your phone.',
         },
       ]}
+      ctaTitle="Start tracking your real profit"
+      ctaDescription="Track loads, expenses, and real RPM so you know what you actually keep."
       ctas={[
         { label: 'Start Tracking Free', to: '/auth' },
         { label: 'View Pricing', to: '/pricing', variant: 'outline' },

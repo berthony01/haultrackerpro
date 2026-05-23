@@ -31,6 +31,8 @@ export default function ParkingTrackerGuide() {
         },
       ]}
       disclaimer="Parking reports are community-sourced and informational only. HaulTrackerPro does not guarantee parking availability, conditions, or safety."
+      ctaTitle="Plan stops with better parking visibility"
+      ctaDescription="Browse driver-reported parking availability and contribute updates to help others plan stops."
       ctas={[
         { label: 'Explore Parking Tools', to: '/auth' },
         { label: 'View Pricing', to: '/pricing', variant: 'outline' },

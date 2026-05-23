@@ -36,6 +36,8 @@ export default function RecruiterToolsGuide() {
         },
       ]}
       disclaimer="HaulTrackerPro does not guarantee hires, driver quality, or specific recruiting outcomes. Referral payments, if offered, are paid externally by the recruiter under recruiter-stated terms."
+      ctaTitle="Build a cleaner driver recruiting pipeline"
+      ctaDescription="Apply for verified recruiter access, post standard opportunities after approval, and upgrade for premium recruiting tools."
       ctas={[
         { label: 'Apply for Recruiter Access', to: '/recruiters' },
         { label: 'Explore Recruiter Tools', to: '/recruiter/features', variant: 'outline' },

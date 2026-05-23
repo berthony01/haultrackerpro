@@ -35,6 +35,8 @@ export default function RealRpmGuide() {
           body: 'HaulTrackerPro calculates real RPM on every logged load and tracks it across lanes, brokers, and weeks. You can see which routes consistently pay and which ones drain the truck.',
         },
       ]}
+      ctaTitle="Track your real RPM before you commit"
+      ctaDescription="See your true rate per mile after deadhead and operating costs on every load you log."
       ctas={[
         { label: 'Track Your Real RPM', to: '/auth' },
         { label: 'View Pricing', to: '/pricing', variant: 'outline' },

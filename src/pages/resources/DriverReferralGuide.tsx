@@ -32,6 +32,8 @@ export default function DriverReferralGuide() {
         },
       ]}
       disclaimer="Referral bonuses, if offered, are paid externally by recruiters. HaulTrackerPro tracks referral progress only and does not process, verify, guarantee, collect, hold, enforce, or pay referral bonuses."
+      ctaTitle="Track referrals without guessing"
+      ctaDescription="Referral bonuses, if offered, are paid externally by recruiters. HaulTrackerPro tracks progress only."
       ctas={[
         { label: 'Explore Opportunities', to: '/auth' },
         { label: 'Apply for Recruiter Access', to: '/recruiters', variant: 'outline' },

@@ -32,6 +32,8 @@ export default function LoadProfitCalculatorGuide() {
           body: 'Enter rate, miles, deadhead, fuel price, and known expenses. HaulTrackerPro shows estimated net profit and real RPM so you can compare offers side by side. Numbers are estimates, not guarantees.',
         },
       ]}
+      ctaTitle="Know if the next load is worth it"
+      ctaDescription="Estimate net profit and real RPM before you accept a load. Numbers are estimates, not guarantees."
       ctas={[
         { label: 'Start Tracking Free', to: '/auth' },
         { label: 'View Pricing', to: '/pricing', variant: 'outline' },
