@@ -99,6 +99,10 @@ export function RecruiterReferralsPanel({ recruiterId, onBack }: Props) {
         <span>{EXTERNAL_PAYMENT_DISCLAIMER}</span>
       </div>
 
+      <RecruiterReferralSettingsCard recruiterId={recruiterId} />
+
+
+
       {isLoading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 w-full" />)}
