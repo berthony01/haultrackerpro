@@ -27,9 +27,16 @@ export interface ReferralAnalytics {
   recent: RecruiterReferral[];
 }
 
-function withinTimeframe(iso: string, tf: Timeframe): boolean {
+function safeTime(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+function withinTimeframe(iso: string | null | undefined, tf: Timeframe): boolean {
   if (tf === 'all') return true;
-  const d = new Date(iso).getTime();
+  const d = safeTime(iso);
+  if (d === null) return false;
   const now = Date.now();
   if (tf === '30d') return now - d <= 30 * 86400_000;
   if (tf === '90d') return now - d <= 90 * 86400_000;
