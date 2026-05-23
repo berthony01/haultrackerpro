@@ -208,6 +208,13 @@ export default function Landing() {
                 >
                   Recruiter? Get Verified →
                 </button>
+                <button
+                  onClick={() => navigate('/resources')}
+                  className="text-sm font-semibold underline-offset-4 hover:underline"
+                  style={{ color: 'hsl(25, 95%, 60%)' }}
+                >
+                  Explore trucking resources →
+                </button>
               </div>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-2">
                 {[
@@ -982,6 +989,7 @@ export default function Landing() {
               <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
               <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:block max-w-xs mx-auto sm:max-w-none sm:mx-0">
                 {[
+                  { label: 'Trucking Resources', href: '/resources' },
                   { label: 'Free Starter Kit', href: '/starter-kit' },
                   { label: 'Finance Guides', href: '/trucking-finance-guides' },
                   { label: 'How to Use', href: '/how-to-use-haultrackerpro' },

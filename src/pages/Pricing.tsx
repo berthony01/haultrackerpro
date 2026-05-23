@@ -533,6 +533,18 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* Resource Hub CTA */}
+      <section className="py-4" style={{ background: 'hsl(220, 20%, 8%)' }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
+            Not sure which tools you need?{' '}
+            <button onClick={() => navigate('/resources')} className="font-semibold hover:underline" style={{ color: 'hsl(25, 95%, 60%)' }}>
+              Explore trucking resources →
+            </button>
+          </p>
+        </div>
+      </section>
+
       {/* Bottom CTA */}
       <section className="py-20 sm:py-28 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{

@@ -84,6 +84,12 @@ export default function RecruiterFeatures() {
               Recruiter FAQ
             </Button>
           </div>
+          <p className="text-sm mt-5" style={{ color: 'hsl(220, 10%, 55%)' }}>
+            Want the full breakdown?{' '}
+            <button onClick={() => navigate('/resources/trucking-recruiter-tools')} className="font-semibold hover:underline" style={{ color: 'hsl(25, 95%, 60%)' }}>
+              Read the trucking recruiter tools guide →
+            </button>
+          </p>
         </div>
       </section>
 
