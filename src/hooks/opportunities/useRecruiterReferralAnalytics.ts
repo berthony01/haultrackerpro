@@ -12,7 +12,7 @@ export interface OpportunityPerformance {
   hired: number;
   eligible: number;
   marked_paid_externally: number;
-  last_referral_at: string;
+  last_referral_at: string | null;
   hire_rate: number;
 }
 
@@ -27,9 +27,16 @@ export interface ReferralAnalytics {
   recent: RecruiterReferral[];
 }
 
-function withinTimeframe(iso: string, tf: Timeframe): boolean {
+function safeTime(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+function withinTimeframe(iso: string | null | undefined, tf: Timeframe): boolean {
   if (tf === 'all') return true;
-  const d = new Date(iso).getTime();
+  const d = safeTime(iso);
+  if (d === null) return false;
   const now = Date.now();
   if (tf === '30d') return now - d <= 30 * 86400_000;
   if (tf === '90d') return now - d <= 90 * 86400_000;
@@ -67,8 +74,10 @@ export function useRecruiterReferralAnalytics(
     for (const r of filtered) {
       const oid = r.opportunity_id;
       const existing = oppMap.get(oid);
-      const title = r.opportunities?.title ?? 'Opportunity';
-      const company = r.opportunities?.company_name ?? null;
+      const title = r.opportunities?.title?.trim() || 'Untitled opportunity';
+      const company = r.opportunities?.company_name?.trim() || null;
+      const lastRaw = r.last_status_at ?? r.created_at ?? null;
+      const lastT = safeTime(lastRaw);
       if (!existing) {
         oppMap.set(oid, {
           opportunity_id: oid,
@@ -78,7 +87,7 @@ export function useRecruiterReferralAnalytics(
           hired: r.status === 'hired' ? 1 : 0,
           eligible: r.status === 'eligible_for_bonus' ? 1 : 0,
           marked_paid_externally: r.status === 'marked_paid_externally' ? 1 : 0,
-          last_referral_at: r.last_status_at ?? r.created_at,
+          last_referral_at: lastT !== null ? lastRaw : null,
           hire_rate: 0,
         });
       } else {
@@ -86,9 +95,9 @@ export function useRecruiterReferralAnalytics(
         if (r.status === 'hired') existing.hired += 1;
         if (r.status === 'eligible_for_bonus') existing.eligible += 1;
         if (r.status === 'marked_paid_externally') existing.marked_paid_externally += 1;
-        const last = r.last_status_at ?? r.created_at;
-        if (new Date(last) > new Date(existing.last_referral_at)) {
-          existing.last_referral_at = last;
+        const prevT = safeTime(existing.last_referral_at);
+        if (lastT !== null && (prevT === null || lastT > prevT)) {
+          existing.last_referral_at = lastRaw;
         }
       }
     }
@@ -99,8 +108,8 @@ export function useRecruiterReferralAnalytics(
     const recent = [...filtered]
       .sort(
         (a, b) =>
-          new Date(b.last_status_at ?? b.created_at).getTime() -
-          new Date(a.last_status_at ?? a.created_at).getTime(),
+          (safeTime(b.last_status_at ?? b.created_at) ?? 0) -
+          (safeTime(a.last_status_at ?? a.created_at) ?? 0),
       )
       .slice(0, 8);
 
