@@ -18,6 +18,7 @@ export default function Recruiters() {
     { icon: ClipboardList, title: 'Post structured opportunities', desc: 'Required fields for pay, lanes, equipment, and deductions create clear, comparable listings.' },
     { icon: Handshake, title: 'Manage driver requests', desc: 'A built-in applications dashboard lets you review interest and respond from one place.' },
     { icon: ShieldCheck, title: 'Build trust through transparency', desc: 'Approved-only access and reviewed listings protect both drivers and recruiters.' },
+    { icon: Users, title: 'Driver-to-driver referral tracking', desc: 'Drivers can refer other drivers to your opportunities. Track referral progress and set your external referral terms — HaulTrackerPro tracks referral progress only, bonuses are paid externally by you.' },
   ];
 
   const steps = [
