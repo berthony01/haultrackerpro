@@ -179,6 +179,31 @@ serve(async (req) => {
     return new Response(`Webhook Error: ${msg}`, { status: 400 });
   }
 
+  // Idempotency: only process each verified Stripe event once.
+  // Insert is attempted AFTER signature verification so unverified events
+  // never touch the ledger. A duplicate (23505 unique_violation) means we
+  // already processed this event — return 200 without reprocessing.
+  try {
+    const { error: idemError } = await supabaseClient
+      .from("stripe_webhook_events")
+      .insert({ stripe_event_id: event.id, event_type: event.type });
+    if (idemError) {
+      // Postgres unique_violation
+      if ((idemError as { code?: string }).code === "23505") {
+        logStep("Duplicate event ignored", { id: event.id, type: event.type });
+        return new Response(JSON.stringify({ received: true, duplicate: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+      // Unexpected error — log but continue so we don't lose the event.
+      logStep("Idempotency insert error (continuing)", { message: idemError.message });
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logStep("Idempotency check threw (continuing)", { message: msg });
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
