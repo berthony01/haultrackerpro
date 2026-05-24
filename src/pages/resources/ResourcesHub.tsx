@@ -98,6 +98,17 @@ export default function ResourcesHub() {
             </div>
           </div>
         </section>
+
+        <nav aria-label="More about HaulTrackerPro" className="border-t border-border pt-6 text-center space-y-3">
+          <p className="text-sm text-muted-foreground">More about HaulTrackerPro</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => navigate('/about')}>About</Button>
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => navigate('/features')}>Features</Button>
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => navigate('/pricing')}>Pricing</Button>
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => navigate('/recruiters')}>For Recruiters</Button>
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => navigate('/faq')}>FAQ</Button>
+          </div>
+        </nav>
       </main>
     </div>
   );
