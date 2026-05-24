@@ -577,6 +577,8 @@ export default function Pricing() {
             {[
               { label: 'Features', href: '/features' },
               { label: 'Pricing', href: '/pricing' },
+              { label: 'Resources', href: '/resources' },
+              { label: 'About', href: '/about' },
               { label: 'Terms', href: '/terms' },
               { label: 'Privacy', href: '/privacy' },
               { label: 'FAQ', href: '/faq' },

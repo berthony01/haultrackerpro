@@ -82,9 +82,22 @@ export default function Landing() {
             "@type": "SoftwareApplication",
             "name": "HaulTrackerPro",
             "applicationCategory": "FinanceApplication",
+            "applicationSubCategory": "Trucking Software",
             "operatingSystem": "Web",
             "description": "Track loads, expenses, and real net profit for owner-operators and lease drivers.",
             "url": "https://haultrackerpro.com",
+            "featureList": [
+              "Load profit tracking",
+              "Trucking expense tracking",
+              "Fuel cost tracking",
+              "Deadhead mile tracking",
+              "Effective RPM calculation",
+              "Net profit reporting",
+              "CSV exports",
+              "Pro PDF reports",
+              "Contract clarity tools",
+              "Recruiter opportunity tools"
+            ],
             "offers": [
               { "@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free" },
               { "@type": "Offer", "price": "19.99", "priceCurrency": "USD", "name": "Pro Monthly" }
@@ -103,11 +116,13 @@ export default function Landing() {
             <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
             <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
           </div>
-          <div className="hidden sm:flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
-            <Button variant="ghost" onClick={() => navigate('/recruiters')} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
-            <Button variant="ghost" onClick={goToAuth} className="text-sm px-4" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
+          <div className="hidden sm:flex items-center gap-2">
+            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
+            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
+            <Button variant="ghost" onClick={() => navigate('/resources')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Resources</Button>
+            <Button variant="ghost" onClick={() => navigate('/about')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>About</Button>
+            <Button variant="ghost" onClick={() => navigate('/recruiters')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
+            <Button variant="ghost" onClick={goToAuth} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
             <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
               Start Tracking Free
             </Button>
@@ -127,6 +142,8 @@ export default function Landing() {
               {[
                 { label: 'Features', href: '/features' },
                 { label: 'Pricing', href: '/pricing' },
+                { label: 'Resources', href: '/resources' },
+                { label: 'About', href: '/about' },
                 { label: 'For Recruiters', href: '/recruiters' },
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Sign In', href: '/auth' },
@@ -969,14 +986,13 @@ export default function Landing() {
       {/* ═══════════════════════════════════════════ */}
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-8 sm:gap-4">
             <div className="text-center sm:text-left">
               <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
               <div className="flex justify-center sm:block gap-4 sm:gap-0">
                 {[
                   { label: 'Features', href: '/features' },
                   { label: 'Pricing', href: '/pricing' },
-                  { label: 'For Recruiters', href: '/recruiters' },
                   { label: 'FAQ', href: '/faq' },
                 ].map(link => (
                   <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
@@ -1014,9 +1030,24 @@ export default function Landing() {
               </div>
             </div>
             <div className="text-center sm:text-left">
-              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Legal</p>
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Recruiters</p>
               <div className="flex justify-center sm:block gap-4 sm:gap-0">
                 {[
+                  { label: 'For Recruiters', href: '/recruiters' },
+                  { label: 'Recruiter Features', href: '/recruiter/features' },
+                  { label: 'Recruiter FAQ', href: '/recruiter/faq' },
+                ].map(link => (
+                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+            <div className="text-center sm:text-left">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Company</p>
+              <div className="flex justify-center sm:block gap-4 sm:gap-0">
+                {[
+                  { label: 'About', href: '/about' },
                   { label: 'Terms', href: '/terms' },
                   { label: 'Privacy', href: '/privacy' },
                 ].map(link => (
