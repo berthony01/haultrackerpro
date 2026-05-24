@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent } from 'react';
 import { CSV_HEADERS_LOADS, CSV_HEADERS_PROFIT, CSV_HEADERS_SCHEDULE_C } from '@/lib/loadUtils';
 import { trackFaqShareLinkCopied } from '@/lib/analytics';
