@@ -24,13 +24,16 @@ export default function ResourcesHub() {
         title="Trucking Resources for Profit, Expenses, Contracts & Recruiting | HaulTrackerPro"
         description="Free trucking guides for owner-operators, 1099 drivers, and recruiters — load profit, real RPM, expenses, contracts, parking, and referral tracking."
         path="/resources"
-        jsonLd={{
-          '@context': 'https://schema.org',
-          '@type': 'CollectionPage',
-          headline: 'Trucking Resources for Profit, Expenses, Contracts, Referrals, and Recruiting',
-          description: 'Guides that help truck drivers and recruiters understand trucking business workflows.',
-          author: { '@type': 'Organization', name: 'HaulTrackerPro' },
-        }}
+        jsonLd={[
+          {
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            headline: 'Trucking Resources for Profit, Expenses, Contracts, Referrals, and Recruiting',
+            description: 'Guides that help truck drivers and recruiters understand trucking business workflows.',
+            author: { '@type': 'Organization', name: 'HaulTrackerPro' },
+          },
+          buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Resources', path: '/resources' }]),
+        ]}
       />
 
       <header className="sticky top-0 z-40 bg-background border-b border-border">
