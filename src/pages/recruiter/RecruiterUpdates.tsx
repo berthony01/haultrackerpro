@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Sparkles, Check, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
