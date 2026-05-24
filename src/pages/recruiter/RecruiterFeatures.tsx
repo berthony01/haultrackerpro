@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Truck, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import { recruiterFeatureList, downloadRecruiterFeatureSheet } from '@/lib/recruiterFeatureList';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 
 export default function RecruiterFeatures() {
   const navigate = useNavigate();
