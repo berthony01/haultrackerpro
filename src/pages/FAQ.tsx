@@ -862,11 +862,22 @@ export default function FAQ() {
         <div className="mt-8 rounded-2xl border border-primary/20 bg-primary/5 p-6 text-center space-y-3">
           <h3 className="text-lg font-black font-heading">Want a deeper breakdown?</h3>
           <p className="text-sm text-muted-foreground">
-            Visit the Haul Tracker Pro resource hub for guides on profit tracking, 1099 expenses, real RPM, contracts, referrals, and recruiter tools.
+            Visit the Haul Tracker Pro resource hub for guides on profit tracking, 1099 expenses, real RPM, contracts, referrals, and recruiter tools — or learn more about why we built it.
           </p>
-          <Button size="sm" onClick={() => navigate('/resources')} className="rounded-xl gap-1">
-            Explore trucking resources <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2 pt-1">
+            <Button size="sm" onClick={() => navigate('/resources')} className="rounded-xl gap-1">
+              Explore Resources <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/about')} className="rounded-xl">
+              Learn About Haul Tracker Pro
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/auth')} className="rounded-xl">
+              Start Tracking Free
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/pricing')} className="rounded-xl">
+              View Pricing
+            </Button>
+          </div>
         </div>
       </main>
     </div>
