@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead';
 import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import SafeMarkdown from '@/components/resources/SafeMarkdown';
 
 interface PublishedArticle {
   id: string;
