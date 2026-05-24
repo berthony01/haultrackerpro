@@ -3,13 +3,14 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { featureList, downloadFeatureSheet } from '@/lib/featureList';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 
 export default function Features() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Features — Truck Driver Profit, Expense & RPM Tracker | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, reports, contract clarity, parking, and driver referrals — built for owner-operators and 1099 truck drivers." path="/features" />
+      <SEOHead title="Features — Truck Driver Profit, Expense & RPM Tracker | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, reports, contract clarity, parking, and driver referrals — built for owner-operators and 1099 truck drivers." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
@@ -134,8 +135,8 @@ export default function Features() {
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs" style={{ color: 'hsl(220, 10%, 40%)' }}>© {new Date().getFullYear()} HaulTrackerPro. All rights reserved.</span>
-          <div className="flex items-center gap-5">
-            {[{ label: 'Features', href: '/features' }, { label: 'Pricing', href: '/pricing' }, { label: 'Terms', href: '/terms' }, { label: 'Privacy', href: '/privacy' }, { label: 'FAQ', href: '/faq' }].map(link => (
+          <div className="flex items-center gap-5 flex-wrap justify-center">
+            {[{ label: 'Features', href: '/features' }, { label: 'Pricing', href: '/pricing' }, { label: 'Resources', href: '/resources' }, { label: 'About', href: '/about' }, { label: 'Terms', href: '/terms' }, { label: 'Privacy', href: '/privacy' }, { label: 'FAQ', href: '/faq' }].map(link => (
               <a key={link.href} href={link.href} className="text-xs font-medium hover:underline" style={{ color: 'hsl(220, 10%, 50%)' }}>
                 {link.label}
               </a>

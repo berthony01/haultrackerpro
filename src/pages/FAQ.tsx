@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type KeyboardEvent } from 'react';
 import { CSV_HEADERS_LOADS, CSV_HEADERS_PROFIT, CSV_HEADERS_SCHEDULE_C } from '@/lib/loadUtils';
 import { trackFaqShareLinkCopied } from '@/lib/analytics';
@@ -761,23 +762,26 @@ export default function FAQ() {
         title="FAQ — Truck Driver Profit Tracking & Recruiter Platform | HaulTrackerPro"
         description="Answers about tracking load profit, fuel and expenses, RPM, reports, recruiter opportunities, and driver referral tracking on HaulTrackerPro."
         path="/faq"
-        jsonLd={safeFaqSchema(
-          faqs
-            .filter((f) =>
-              [
-                'free-plan',
-                'net-profit',
-                'tax-estimator',
-                'what-are-opportunities',
-                'opportunity-earnings-guaranteed',
-                'how-recruiters-post',
-                'driver-refer-driver',
-                'referral-payment-safety',
-                'contract-legal-advice',
-              ].includes(f.id) && typeof f.answer === 'string',
-            )
-            .map((f) => ({ question: f.question, answer: f.answer as string })),
-        )}
+        jsonLd={[
+          safeFaqSchema(
+            faqs
+              .filter((f) =>
+                [
+                  'free-plan',
+                  'net-profit',
+                  'tax-estimator',
+                  'what-are-opportunities',
+                  'opportunity-earnings-guaranteed',
+                  'how-recruiters-post',
+                  'driver-refer-driver',
+                  'referral-payment-safety',
+                  'contract-legal-advice',
+                ].includes(f.id) && typeof f.answer === 'string',
+              )
+              .map((f) => ({ question: f.question, answer: f.answer as string })),
+          ),
+          buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq' }]),
+        ]}
       />
       <header className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
@@ -858,11 +862,22 @@ export default function FAQ() {
         <div className="mt-8 rounded-2xl border border-primary/20 bg-primary/5 p-6 text-center space-y-3">
           <h3 className="text-lg font-black font-heading">Want a deeper breakdown?</h3>
           <p className="text-sm text-muted-foreground">
-            Visit the Haul Tracker Pro resource hub for guides on profit tracking, 1099 expenses, real RPM, contracts, referrals, and recruiter tools.
+            Visit the Haul Tracker Pro resource hub for guides on profit tracking, 1099 expenses, real RPM, contracts, referrals, and recruiter tools — or learn more about why we built it.
           </p>
-          <Button size="sm" onClick={() => navigate('/resources')} className="rounded-xl gap-1">
-            Explore trucking resources <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2 pt-1">
+            <Button size="sm" onClick={() => navigate('/resources')} className="rounded-xl gap-1">
+              Explore Resources <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/about')} className="rounded-xl">
+              Learn About Haul Tracker Pro
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/auth')} className="rounded-xl">
+              Start Tracking Free
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/pricing')} className="rounded-xl">
+              View Pricing
+            </Button>
+          </div>
         </div>
       </main>
     </div>

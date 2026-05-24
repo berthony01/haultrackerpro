@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Truck, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import { recruiterFeatureList, downloadRecruiterFeatureSheet } from '@/lib/recruiterFeatureList';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 
 export default function RecruiterFeatures() {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ export default function RecruiterFeatures() {
         title="Recruiter Features — Trucking Recruiter Platform | HaulTrackerPro"
         description="Verified trucking recruiter tools: unlimited standard opportunity posting after approval, applicant tracking, driver referral tracking and analytics, plus premium visibility and contract workflow tools on paid plans."
         path="/recruiter/features"
+        jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }, { name: 'Recruiter Features', path: '/recruiter/features' }])}
       />
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
@@ -96,11 +98,16 @@ export default function RecruiterFeatures() {
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs" style={{ color: 'hsl(220, 10%, 40%)' }}>© {new Date().getFullYear()} HaulTrackerPro. All rights reserved.</span>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-5 flex-wrap justify-center">
             {[
+              { label: 'For Recruiters', href: '/recruiters' },
               { label: 'Recruiter Features', href: '/recruiter/features' },
               { label: 'Recruiter Guide', href: '/recruiter/guide' },
               { label: 'Recruiter FAQ', href: '/recruiter/faq' },
+              { label: 'Recruiter Updates', href: '/recruiter/updates' },
+              { label: 'Pricing', href: '/pricing' },
+              { label: 'About', href: '/about' },
+              { label: 'Resources', href: '/resources' },
               { label: 'Terms', href: '/terms' },
               { label: 'Privacy', href: '/privacy' },
             ].map(link => (
