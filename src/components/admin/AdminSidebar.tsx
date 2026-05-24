@@ -1,4 +1,5 @@
-import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, FileText, Share2, LucideIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, FileText, Share2, BookOpen, LucideIcon } from 'lucide-react';
 
 export interface AdminNavItem {
   value: string;
