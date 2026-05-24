@@ -13,6 +13,7 @@ HaulTrackerPro replaces notebooks and spreadsheets with a mobile-first system de
 - [How to use HaulTrackerPro](/how-to-use-haultrackerpro): Step-by-step usage guide.
 - [Starter Kit](/starter-kit): Free downloadable starter resources for owner-operators.
 - [About](/about): Why Haul Tracker Pro exists, who it helps, and what it tracks.
+- [Resources](/resources): Trucking resource hub — guides on profit tracking, real RPM, 1099 expenses, contracts, parking, referrals, and recruiter tools.
 - [Recruiter Features](/recruiter/features): Tools available for verified trucking recruiters.
 - [Recruiter FAQ](/recruiter/faq): Common questions from trucking recruiters and carriers.
 - [Recruiter Guide](/recruiter/guide): How recruiters get verified and post opportunities.
