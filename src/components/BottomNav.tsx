@@ -68,6 +68,7 @@ export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavPr
     { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') },
     { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') },
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
+    { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
   const recruiterMoreItems: MoreItem[] = [
