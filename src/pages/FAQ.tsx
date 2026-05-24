@@ -762,23 +762,26 @@ export default function FAQ() {
         title="FAQ — Truck Driver Profit Tracking & Recruiter Platform | HaulTrackerPro"
         description="Answers about tracking load profit, fuel and expenses, RPM, reports, recruiter opportunities, and driver referral tracking on HaulTrackerPro."
         path="/faq"
-        jsonLd={safeFaqSchema(
-          faqs
-            .filter((f) =>
-              [
-                'free-plan',
-                'net-profit',
-                'tax-estimator',
-                'what-are-opportunities',
-                'opportunity-earnings-guaranteed',
-                'how-recruiters-post',
-                'driver-refer-driver',
-                'referral-payment-safety',
-                'contract-legal-advice',
-              ].includes(f.id) && typeof f.answer === 'string',
-            )
-            .map((f) => ({ question: f.question, answer: f.answer as string })),
-        )}
+        jsonLd={[
+          safeFaqSchema(
+            faqs
+              .filter((f) =>
+                [
+                  'free-plan',
+                  'net-profit',
+                  'tax-estimator',
+                  'what-are-opportunities',
+                  'opportunity-earnings-guaranteed',
+                  'how-recruiters-post',
+                  'driver-refer-driver',
+                  'referral-payment-safety',
+                  'contract-legal-advice',
+                ].includes(f.id) && typeof f.answer === 'string',
+              )
+              .map((f) => ({ question: f.question, answer: f.answer as string })),
+          ),
+          buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq' }]),
+        ]}
       />
       <header className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
