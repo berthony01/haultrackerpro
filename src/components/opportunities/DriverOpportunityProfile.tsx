@@ -374,12 +374,17 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         />
       </Section>
 
-      <div className="flex flex-col sm:flex-row gap-3 sticky bottom-20 lg:bottom-4 bg-card/80 backdrop-blur-md p-3 rounded-xl border border-border/60">
-        <Button variant="outline" onClick={onBack} className="flex-1">Cancel</Button>
-        <Button onClick={handleSave} disabled={upsertProfile.isPending} className="flex-1">
-          <Save className="h-4 w-4" />
-          {upsertProfile.isPending ? 'Saving…' : 'Save Preferences'}
-        </Button>
+      {/* Spacer so fixed mobile action bar doesn't cover content */}
+      <div aria-hidden className="h-24 lg:hidden" />
+
+      <div className="fixed lg:sticky left-0 right-0 lg:left-auto lg:right-auto bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30">
+        <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
+          <Button variant="outline" onClick={onBack} className="flex-1">Cancel</Button>
+          <Button onClick={handleSave} disabled={upsertProfile.isPending} className="flex-1">
+            <Save className="h-4 w-4" />
+            {upsertProfile.isPending ? 'Saving…' : 'Save Preferences'}
+          </Button>
+        </div>
       </div>
     </div>
   );
