@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BookOpen, TrendingUp, Calculator, Gauge, Receipt, FileSignature, ParkingCircle, Users, Briefcase, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 
 export const RESOURCE_GUIDES = [
   { to: '/resources/truck-driver-profit-tracking', title: 'Truck Driver Profit Tracking', desc: 'Gross pay vs. real net profit — what to track on every load.', icon: TrendingUp },
