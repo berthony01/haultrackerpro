@@ -25,7 +25,7 @@ const SEOHead = forwardRef<HTMLDivElement, SEOHeadProps>(function SEOHead(
       <meta name="description" content={description} />
       <link rel="canonical" href={canonicalUrl} />
 
-      {noindex && <meta name="robots" content="noindex, nofollow" />}
+      <meta name="robots" content={noindex ? "noindex, nofollow" : "index, follow"} />
 
       {/* Open Graph */}
       <meta property="og:title" content={title} />

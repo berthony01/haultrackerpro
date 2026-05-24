@@ -213,4 +213,9 @@
   <url><loc>https://haultrackerpro.com/resources/truck-parking-tracker</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://haultrackerpro.com/resources/driver-referral-tracking</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://haultrackerpro.com/resources/trucking-recruiter-tools</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/recruiter/features</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/recruiter/faq</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://haultrackerpro.com/recruiter/guide</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://haultrackerpro.com/recruiter/updates</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>
 </urlset>

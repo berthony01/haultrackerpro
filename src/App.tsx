@@ -58,6 +58,7 @@ const RecruiterFAQ = lazy(() => import("./pages/recruiter/RecruiterFAQ"));
 const RecruiterFeatures = lazy(() => import("./pages/recruiter/RecruiterFeatures"));
 const RecruiterGuide = lazy(() => import("./pages/recruiter/RecruiterGuide"));
 const RecruiterUpdates = lazy(() => import("./pages/recruiter/RecruiterUpdates"));
+const About = lazy(() => import("./pages/About"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -186,6 +187,7 @@ const App = () => (
               <Route path="/features" element={<Features />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/recruiters" element={<Recruiters />} />
+              <Route path="/about" element={<About />} />
               <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/install" element={<Install />} />
