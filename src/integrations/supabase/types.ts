@@ -2345,6 +2345,72 @@ export type Database = {
           },
         ]
       }
+      resource_articles: {
+        Row: {
+          ai_generation_prompt: string | null
+          approval_status: string
+          author_name: string | null
+          content: string
+          created_at: string
+          created_by: string | null
+          excerpt: string | null
+          generated_by_ai: boolean
+          id: string
+          meta_description: string
+          published_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          seo_title: string
+          slug: string
+          status: string
+          title: string
+          topic_cluster: string
+          updated_at: string
+        }
+        Insert: {
+          ai_generation_prompt?: string | null
+          approval_status?: string
+          author_name?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string | null
+          generated_by_ai?: boolean
+          id?: string
+          meta_description?: string
+          published_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          seo_title?: string
+          slug: string
+          status?: string
+          title: string
+          topic_cluster?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_generation_prompt?: string | null
+          approval_status?: string
+          author_name?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string | null
+          generated_by_ai?: boolean
+          id?: string
+          meta_description?: string
+          published_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          seo_title?: string
+          slug?: string
+          status?: string
+          title?: string
+          topic_cluster?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       saved_opportunities: {
         Row: {
           created_at: string
