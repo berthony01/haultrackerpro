@@ -8,7 +8,7 @@ export type VerifiedStatus = 'available' | 'limited' | 'full';
 export interface ParkingVerificationRow {
   id: string;
   parking_id: string;
-  user_id: string;
+  // user_id intentionally omitted — sourced from parking_verifications_public view.
   verified_status: VerifiedStatus;
   created_at: string;
 }
@@ -19,8 +19,8 @@ export function useRecentParkingVerifications() {
     queryFn: async (): Promise<ParkingVerificationRow[]> => {
       const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const { data, error } = await supabase
-        .from('parking_verifications')
-        .select('id,parking_id,user_id,verified_status,created_at')
+        .from('parking_verifications_public' as never)
+        .select('id,parking_id,verified_status,created_at')
         .gte('created_at', since)
         .order('created_at', { ascending: false })
         .limit(1000);
@@ -37,8 +37,8 @@ export function useParkingVerificationsForLocation(parkingId: string | null) {
     enabled: !!parkingId,
     queryFn: async (): Promise<ParkingVerificationRow[]> => {
       const { data, error } = await supabase
-        .from('parking_verifications')
-        .select('id,parking_id,user_id,verified_status,created_at')
+        .from('parking_verifications_public' as never)
+        .select('id,parking_id,verified_status,created_at')
         .eq('parking_id', parkingId!)
         .order('created_at', { ascending: false })
         .limit(20);
