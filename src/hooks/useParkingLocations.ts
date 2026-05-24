@@ -19,7 +19,8 @@ export interface ParkingLocation {
 export interface ParkingReportRow {
   id: string;
   parking_id: string;
-  user_id: string;
+  // user_id intentionally omitted — sourced from parking_reports_public view which
+  // does not expose the reporter's identity to other authenticated users.
   status: 'available' | 'limited' | 'full';
   safety_rating: number | null;
   notes: string | null;
