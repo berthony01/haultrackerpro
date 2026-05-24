@@ -21,6 +21,7 @@ export default function RecruiterUpdates() {
         title="What's New for Recruiters | HaulTrackerPro"
         description="Recent updates and improvements for HaulTrackerPro recruiters."
         path="/recruiter/updates"
+        jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }, { name: 'Recruiter Updates', path: '/recruiter/updates' }])}
       />
 
       <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
