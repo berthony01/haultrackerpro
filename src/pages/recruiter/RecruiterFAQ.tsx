@@ -84,7 +84,7 @@ export default function RecruiterFAQ() {
         title="Recruiter FAQ | HaulTrackerPro"
         description="Answers for recruiters: verification, posting unlimited standard opportunities, billing, applicants, and contract workflow tools on HaulTrackerPro."
         path="/recruiter/faq"
-        jsonLd={jsonLd}
+        jsonLd={[jsonLd, buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }, { name: 'Recruiter FAQ', path: '/recruiter/faq' }])]}
       />
       <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
         <div className="max-w-3xl mx-auto flex items-center justify-between px-4 py-3">
