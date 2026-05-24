@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { featureList, downloadFeatureSheet } from '@/lib/featureList';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 
 export default function Features() {
   const navigate = useNavigate();
