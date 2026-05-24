@@ -101,6 +101,26 @@ export default function ResourcesHub() {
           })}
         </section>
 
+        {dynamicArticles.length > 0 && (
+          <section className="space-y-3 border-t border-border pt-6">
+            <h3 className="font-black font-heading text-lg text-center">More trucking articles</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {dynamicArticles.map((a) => (
+                <Link key={a.id} to={`/resources/${a.slug}`} className="flex items-start gap-3 p-4 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors">
+                  <FileText className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-foreground text-sm">{a.title}</div>
+                    {a.excerpt && <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{a.excerpt}</div>}
+                    <div className="text-[10px] text-muted-foreground/70 mt-1 uppercase tracking-wider">{a.topic_cluster}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+
+
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 space-y-3 text-center">
             <Truck className="h-8 w-8 text-primary mx-auto" />
