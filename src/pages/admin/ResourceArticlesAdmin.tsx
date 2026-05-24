@@ -1,0 +1,452 @@
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAdmin } from '@/hooks/useAdmin';
+import { useAuth } from '@/hooks/useAuth';
+import SEOHead from '@/components/SEOHead';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
+import { ArrowLeft, Plus, Sparkles, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+type Status = 'draft' | 'approved' | 'published' | 'archived';
+type Approval = 'pending_review' | 'approved' | 'rejected' | 'needs_revision';
+
+const TOPIC_CLUSTERS = [
+  'profit', 'rpm', 'fuel', 'expenses', 'taxes', 'bookkeeping',
+  'deadhead', 'contracts', 'recruiter_tools', 'parking', 'load_selection',
+] as const;
+
+interface Article {
+  id: string;
+  slug: string;
+  title: string;
+  seo_title: string;
+  meta_description: string;
+  excerpt: string | null;
+  content: string;
+  topic_cluster: string;
+  status: Status;
+  approval_status: Approval;
+  author_name: string | null;
+  generated_by_ai: boolean;
+  ai_generation_prompt: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  published_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const EMPTY: Partial<Article> = {
+  slug: '', title: '', seo_title: '', meta_description: '', excerpt: '',
+  content: '', topic_cluster: 'profit', status: 'draft',
+  approval_status: 'pending_review', author_name: '', generated_by_ai: false,
+};
+
+function slugify(t: string) {
+  return t.toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+}
+
+export default function ResourceArticlesAdmin() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isAdmin, isLoading } = useAdmin();
+
+  const [filter, setFilter] = useState<'all' | Status | 'pending_review'>('all');
+  const [rows, setRows] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [editing, setEditing] = useState<Partial<Article>>(EMPTY);
+  const [safetyChecked, setSafetyChecked] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // AI form
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiCluster, setAiCluster] = useState<string>('profit');
+  const [aiAudience, setAiAudience] = useState('owner-operator');
+  const [aiAngle, setAiAngle] = useState('');
+  const [aiNotes, setAiNotes] = useState('');
+  const [aiKeyword, setAiKeyword] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && !isAdmin) navigate('/', { replace: true });
+  }, [isLoading, isAdmin, navigate]);
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    let q = supabase.from('resource_articles').select('*').order('updated_at', { ascending: false });
+    if (filter === 'pending_review') q = q.eq('approval_status', 'pending_review');
+    else if (filter !== 'all') q = q.eq('status', filter);
+    const { data, error } = await q;
+    if (error) toast.error(error.message);
+    else setRows((data ?? []) as Article[]);
+    setLoading(false);
+  }, [filter]);
+
+  useEffect(() => { if (isAdmin) fetchRows(); }, [isAdmin, fetchRows]);
+
+  const openNew = () => {
+    setEditing({ ...EMPTY, created_by: user?.id });
+    setSafetyChecked(false);
+    setEditorOpen(true);
+  };
+
+  const openEdit = (a: Article) => {
+    setEditing({ ...a });
+    setSafetyChecked(false);
+    setEditorOpen(true);
+  };
+
+  const canPublish = useMemo(() => {
+    const e = editing;
+    return Boolean(
+      e.title && e.slug && e.seo_title && e.meta_description &&
+      e.excerpt && e.content && e.topic_cluster &&
+      e.approval_status === 'approved' && safetyChecked
+    );
+  }, [editing, safetyChecked]);
+
+  const requiredOk = useMemo(() => {
+    const e = editing;
+    return Boolean(e.title && e.slug && e.seo_title && e.meta_description && e.content && e.topic_cluster);
+  }, [editing]);
+
+  const save = async (override?: Partial<Article>) => {
+    const payload = { ...editing, ...(override ?? {}) };
+    if (!payload.title || !payload.slug) {
+      toast.error('Title and slug are required');
+      return null;
+    }
+    setSaving(true);
+    const upsertData = {
+      slug: payload.slug,
+      title: payload.title,
+      seo_title: payload.seo_title ?? '',
+      meta_description: payload.meta_description ?? '',
+      excerpt: payload.excerpt ?? '',
+      content: payload.content ?? '',
+      topic_cluster: payload.topic_cluster ?? 'profit',
+      status: payload.status ?? 'draft',
+      approval_status: payload.approval_status ?? 'pending_review',
+      author_name: payload.author_name ?? null,
+      generated_by_ai: !!payload.generated_by_ai,
+      ai_generation_prompt: payload.ai_generation_prompt ?? null,
+      reviewed_by: payload.reviewed_by ?? null,
+      reviewed_at: payload.reviewed_at ?? null,
+      published_at: payload.published_at ?? null,
+      created_by: payload.created_by ?? user?.id ?? null,
+    };
+    let res;
+    if (payload.id) {
+      res = await supabase.from('resource_articles').update(upsertData).eq('id', payload.id).select().maybeSingle();
+    } else {
+      res = await supabase.from('resource_articles').insert(upsertData).select().maybeSingle();
+    }
+    setSaving(false);
+    if (res.error) { toast.error(res.error.message); return null; }
+    toast.success('Saved');
+    setEditing(res.data as Article);
+    fetchRows();
+    return res.data as Article;
+  };
+
+  const setApproval = async (approval_status: Approval) => {
+    const updates: Partial<Article> = { approval_status };
+    if (approval_status === 'approved') {
+      updates.status = 'approved';
+      updates.reviewed_by = user?.id ?? null;
+      updates.reviewed_at = new Date().toISOString();
+    }
+    await save(updates);
+  };
+
+  const publish = async () => {
+    if (!canPublish) {
+      toast.error('Approve, fill all required fields, and confirm review first.');
+      return;
+    }
+    await save({
+      status: 'published',
+      published_at: new Date().toISOString(),
+      reviewed_by: user?.id ?? null,
+      reviewed_at: new Date().toISOString(),
+    });
+  };
+
+  const archive = async () => { await save({ status: 'archived' }); };
+
+  const runAi = async () => {
+    if (!aiTopic.trim()) { toast.error('Topic required'); return; }
+    setAiBusy(true);
+    const { data, error } = await supabase.functions.invoke('generate-resource-article-draft', {
+      body: {
+        topic: aiTopic, audience: aiAudience, topic_cluster: aiCluster,
+        angle: aiAngle, notes: aiNotes, target_keyword: aiKeyword,
+      },
+    });
+    setAiBusy(false);
+    if (error) {
+      toast.error(error.message || 'AI draft generation is not configured yet. You can still create articles manually.');
+      return;
+    }
+    const d = (data as { draft?: Record<string, string>; ai_generation_prompt?: string }) ?? {};
+    const draft = d.draft ?? {};
+    setEditing({
+      ...EMPTY,
+      title: String(draft.title ?? ''),
+      slug: slugify(String(draft.slug ?? draft.title ?? '')),
+      seo_title: String(draft.seo_title ?? '').slice(0, 60),
+      meta_description: String(draft.meta_description ?? '').slice(0, 160),
+      excerpt: String(draft.excerpt ?? ''),
+      content: String(draft.content ?? ''),
+      topic_cluster: aiCluster,
+      generated_by_ai: true,
+      ai_generation_prompt: d.ai_generation_prompt ?? null,
+      status: 'draft',
+      approval_status: 'pending_review',
+      created_by: user?.id,
+    });
+    setSafetyChecked(false);
+    setAiOpen(false);
+    setEditorOpen(true);
+    toast.success('Draft generated. Review carefully before approving.');
+  };
+
+  if (isLoading) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  if (!isAdmin) return null;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <SEOHead title="Resource Articles Admin" description="Admin-only resource article manager" path="/admin/resource-articles" noindex />
+
+      <header className="sticky top-0 z-40 bg-background border-b border-border">
+        <div className="flex items-center gap-3 px-4 py-3 max-w-6xl mx-auto">
+          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate('/admin')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-bold font-heading flex-1">Resource Articles</h1>
+          <Button variant="outline" className="rounded-xl" onClick={() => setAiOpen(true)}>
+            <Sparkles className="h-4 w-4 mr-1" /> AI Draft
+          </Button>
+          <Button className="rounded-xl" onClick={openNew}>
+            <Plus className="h-4 w-4 mr-1" /> New Draft
+          </Button>
+        </div>
+      </header>
+
+      <main className="px-4 py-6 max-w-6xl mx-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <Label>Filter:</Label>
+          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="pending_review">Pending review</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Card>
+          <CardHeader><CardTitle>Articles ({rows.length})</CardTitle></CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="text-muted-foreground">Loading…</p>
+            ) : rows.length === 0 ? (
+              <p className="text-muted-foreground">No articles yet. Create a draft to get started.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Cluster</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Approval</TableHead>
+                    <TableHead>AI</TableHead>
+                    <TableHead>Published</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell>
+                        <div className="font-medium">{a.title}</div>
+                        <div className="text-xs text-muted-foreground">/{a.slug}</div>
+                      </TableCell>
+                      <TableCell><Badge variant="outline">{a.topic_cluster}</Badge></TableCell>
+                      <TableCell><Badge>{a.status}</Badge></TableCell>
+                      <TableCell><Badge variant="secondary">{a.approval_status}</Badge></TableCell>
+                      <TableCell>{a.generated_by_ai ? 'Yes' : '—'}</TableCell>
+                      <TableCell className="text-xs">{a.published_at ? new Date(a.published_at).toLocaleDateString() : '—'}</TableCell>
+                      <TableCell><Button size="sm" variant="outline" onClick={() => openEdit(a)}>Edit</Button></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+
+      {/* Editor */}
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing.id ? 'Edit article' : 'New article draft'}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <Label>Title *</Label>
+              <Input value={editing.title ?? ''} onChange={(e) => {
+                const v = e.target.value;
+                setEditing((p) => ({ ...p, title: v, slug: p.slug || slugify(v) }));
+              }} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Slug *</Label>
+                <Input value={editing.slug ?? ''} onChange={(e) => setEditing((p) => ({ ...p, slug: slugify(e.target.value) }))} />
+              </div>
+              <div>
+                <Label>Topic cluster *</Label>
+                <Select value={editing.topic_cluster ?? 'profit'} onValueChange={(v) => setEditing((p) => ({ ...p, topic_cluster: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TOPIC_CLUSTERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>SEO title * <span className="text-xs text-muted-foreground">(max 60)</span></Label>
+              <Input maxLength={60} value={editing.seo_title ?? ''} onChange={(e) => setEditing((p) => ({ ...p, seo_title: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Meta description * <span className="text-xs text-muted-foreground">(max 160)</span></Label>
+              <Textarea maxLength={160} rows={2} value={editing.meta_description ?? ''} onChange={(e) => setEditing((p) => ({ ...p, meta_description: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Excerpt</Label>
+              <Textarea rows={2} value={editing.excerpt ?? ''} onChange={(e) => setEditing((p) => ({ ...p, excerpt: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Content * (Markdown)</Label>
+              <Textarea rows={14} className="font-mono text-sm" value={editing.content ?? ''} onChange={(e) => setEditing((p) => ({ ...p, content: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Author name</Label>
+                <Input value={editing.author_name ?? ''} onChange={(e) => setEditing((p) => ({ ...p, author_name: e.target.value }))} />
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={!!editing.generated_by_ai} onCheckedChange={(v) => setEditing((p) => ({ ...p, generated_by_ai: v }))} />
+                <Label>Generated by AI</Label>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2 text-sm">
+              <div className="font-semibold">Pre-publish safety checklist</div>
+              <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                <li>No fake statistics, quotes, or citations</li>
+                <li>No guaranteed profit / savings / tax / legal claims</li>
+                <li>Includes disclaimer where tax/legal/financial topics are discussed</li>
+                <li>Useful even if reader does not sign up</li>
+                <li>Internal links are relevant; meta title/description are accurate</li>
+              </ul>
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox id="safety" checked={safetyChecked} onCheckedChange={(v) => setSafetyChecked(!!v)} />
+                <Label htmlFor="safety">I reviewed this article for accuracy and safe claims.</Label>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge>Status: {editing.status}</Badge>
+              <Badge variant="secondary">Approval: {editing.approval_status}</Badge>
+              {editing.generated_by_ai && <Badge variant="outline">AI-assisted</Badge>}
+            </div>
+          </div>
+
+          <DialogFooter className="flex-wrap gap-2">
+            <Button variant="outline" onClick={() => save()} disabled={saving}>Save Draft</Button>
+            <Button variant="outline" onClick={() => setApproval('needs_revision')} disabled={saving}>Mark Needs Revision</Button>
+            <Button variant="outline" onClick={() => setApproval('approved')} disabled={saving || !requiredOk}>Approve</Button>
+            <Button onClick={publish} disabled={saving || !canPublish}>Publish</Button>
+            <Button variant="destructive" onClick={archive} disabled={saving || !editing.id}>Archive</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI dialog */}
+      <Dialog open={aiOpen} onOpenChange={setAiOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Generate AI draft</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Drafts are never auto-published. You must review, approve, and confirm the safety checklist.
+            </p>
+            <div>
+              <Label>Topic *</Label>
+              <Input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="e.g. How owner-operators can lower deadhead miles" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Topic cluster *</Label>
+                <Select value={aiCluster} onValueChange={setAiCluster}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TOPIC_CLUSTERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Audience</Label>
+                <Input value={aiAudience} onChange={(e) => setAiAudience(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label>Angle</Label>
+              <Input value={aiAngle} onChange={(e) => setAiAngle(e.target.value)} />
+            </div>
+            <div>
+              <Label>Target keyword</Label>
+              <Input value={aiKeyword} onChange={(e) => setAiKeyword(e.target.value)} />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea rows={3} value={aiNotes} onChange={(e) => setAiNotes(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiOpen(false)}>Cancel</Button>
+            <Button onClick={runAi} disabled={aiBusy}>
+              {aiBusy ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating</> : 'Generate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

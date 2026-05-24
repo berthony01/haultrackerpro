@@ -1,8 +1,14 @@
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, TrendingUp, Calculator, Gauge, Receipt, FileSignature, ParkingCircle, Users, Briefcase, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, TrendingUp, Calculator, Gauge, Receipt, FileSignature, ParkingCircle, Users, Briefcase, Truck, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
+import { supabase } from '@/integrations/supabase/client';
+
+interface PublishedArticle {
+  id: string; slug: string; title: string; excerpt: string | null; topic_cluster: string;
+}
 
 export const RESOURCE_GUIDES = [
   { to: '/resources/truck-driver-profit-tracking', title: 'Truck Driver Profit Tracking', desc: 'Gross pay vs. real net profit — what to track on every load.', icon: TrendingUp },
@@ -17,6 +23,23 @@ export const RESOURCE_GUIDES = [
 
 export default function ResourcesHub() {
   const navigate = useNavigate();
+  const [dynamicArticles, setDynamicArticles] = useState<PublishedArticle[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // RLS restricts this to published rows; failures fall back to static content silently.
+      const { data, error } = await supabase
+        .from('resource_articles')
+        .select('id,slug,title,excerpt,topic_cluster')
+        .eq('status', 'published')
+        .not('published_at', 'is', null)
+        .order('published_at', { ascending: false })
+        .limit(24);
+      if (!cancelled && !error && data) setDynamicArticles(data as PublishedArticle[]);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,6 +100,26 @@ export default function ResourcesHub() {
             );
           })}
         </section>
+
+        {dynamicArticles.length > 0 && (
+          <section className="space-y-3 border-t border-border pt-6">
+            <h3 className="font-black font-heading text-lg text-center">More trucking articles</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {dynamicArticles.map((a) => (
+                <Link key={a.id} to={`/resources/${a.slug}`} className="flex items-start gap-3 p-4 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors">
+                  <FileText className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-semibold text-foreground text-sm">{a.title}</div>
+                    {a.excerpt && <div className="text-xs text-muted-foreground mt-1 leading-relaxed">{a.excerpt}</div>}
+                    <div className="text-[10px] text-muted-foreground/70 mt-1 uppercase tracking-wider">{a.topic_cluster}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+
 
         <section className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 space-y-3 text-center">
