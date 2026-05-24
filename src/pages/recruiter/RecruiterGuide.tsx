@@ -6,6 +6,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 
 const steps = [
   { num: '01', icon: Building2, title: 'Submit your recruiter profile', desc: 'Company name, DOT, MC, address, hiring states, equipment types, and recruiter contact details. Admin review is typically within one business day.' },
