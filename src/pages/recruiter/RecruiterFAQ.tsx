@@ -124,6 +124,10 @@ export default function RecruiterFAQ() {
           <div className="flex flex-wrap gap-2 justify-center pt-2">
             <Button size="sm" onClick={() => navigate('/recruiter/guide')} className="rounded-xl gap-1">Recruiter Guide <ArrowRight className="h-3.5 w-3.5" /></Button>
             <Button size="sm" variant="outline" onClick={() => navigate('/recruiter/features')} className="rounded-xl gap-1">Features <ArrowRight className="h-3.5 w-3.5" /></Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/recruiter/updates')} className="rounded-xl">Updates</Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/recruiters')} className="rounded-xl">For Recruiters</Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/about')} className="rounded-xl">About</Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/pricing')} className="rounded-xl">Pricing</Button>
           </div>
           <p className="text-sm text-muted-foreground pt-1">
             Want the full breakdown?{' '}
