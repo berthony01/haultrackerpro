@@ -260,15 +260,18 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         </Section>
       )}
 
-      {/* Sticky actions */}
-      <div className="space-y-2 sticky bottom-20 lg:bottom-4">
+      {/* Spacer so fixed mobile action bar doesn't cover content */}
+      <div aria-hidden className="h-32 lg:hidden" />
+
+      {/* Action bar: fixed above BottomNav on mobile, sticky on desktop */}
+      <div className="fixed lg:sticky left-0 right-0 lg:left-auto lg:right-auto bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30 space-y-2">
         {profileIncomplete && !alreadyApplied && (
-          <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground">
+          <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
             <span>Add a few Opportunity Preferences to improve your match score and give recruiters better context.</span>
           </div>
         )}
-        <div className="flex flex-col sm:flex-row gap-3 bg-card/80 backdrop-blur-md p-3 rounded-xl border border-border/60">
+        <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
           <Button variant="outline" onClick={handleToggleSave} className="flex-1">
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {isSaved ? 'Saved' : 'Save'}
