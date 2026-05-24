@@ -62,6 +62,8 @@ const About = lazy(() => import("./pages/About"));
 const CompareVsSpreadsheets = lazy(() => import("./pages/comparisons/HaulTrackerProVsSpreadsheets"));
 const CompareVsQuickBooks = lazy(() => import("./pages/comparisons/HaulTrackerProVsQuickBooks"));
 const BestProfitTracker = lazy(() => import("./pages/comparisons/BestTruckDriverProfitTracker"));
+const ResourceArticlesAdmin = lazy(() => import("./pages/admin/ResourceArticlesAdmin"));
+const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -246,6 +248,10 @@ const App = () => (
               <Route path="/haultrackerpro-vs-spreadsheets" element={<CompareVsSpreadsheets />} />
               <Route path="/haultrackerpro-vs-quickbooks" element={<CompareVsQuickBooks />} />
               <Route path="/best-truck-driver-profit-tracker" element={<BestProfitTracker />} />
+              <Route path="/admin/resource-articles" element={<AdminRoute><ResourceArticlesAdmin /></AdminRoute>} />
+              {/* Dynamic published-article fallback. Registered AFTER all static /resources/* routes
+                  so existing static guides always win. Published articles only — drafts are blocked by RLS. */}
+              <Route path="/resources/:slug" element={<ResourceArticleDynamic />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

@@ -1,8 +1,14 @@
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, TrendingUp, Calculator, Gauge, Receipt, FileSignature, ParkingCircle, Users, Briefcase, Truck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, TrendingUp, Calculator, Gauge, Receipt, FileSignature, ParkingCircle, Users, Briefcase, Truck, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
+import { supabase } from '@/integrations/supabase/client';
+
+interface PublishedArticle {
+  id: string; slug: string; title: string; excerpt: string | null; topic_cluster: string;
+}
 
 export const RESOURCE_GUIDES = [
   { to: '/resources/truck-driver-profit-tracking', title: 'Truck Driver Profit Tracking', desc: 'Gross pay vs. real net profit — what to track on every load.', icon: TrendingUp },
@@ -17,6 +23,23 @@ export const RESOURCE_GUIDES = [
 
 export default function ResourcesHub() {
   const navigate = useNavigate();
+  const [dynamicArticles, setDynamicArticles] = useState<PublishedArticle[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // RLS restricts this to published rows; failures fall back to static content silently.
+      const { data, error } = await supabase
+        .from('resource_articles')
+        .select('id,slug,title,excerpt,topic_cluster')
+        .eq('status', 'published')
+        .not('published_at', 'is', null)
+        .order('published_at', { ascending: false })
+        .limit(24);
+      if (!cancelled && !error && data) setDynamicArticles(data as PublishedArticle[]);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
