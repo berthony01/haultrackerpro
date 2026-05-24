@@ -54,6 +54,7 @@ export default function Recruiters() {
         title="For Recruiters — Truck Driver Recruiter Platform | HaulTrackerPro"
         description="Verified trucking recruiter platform: post unlimited standard driver opportunities after approval, manage applicants, track driver referrals, and unlock premium visibility, recruiter analytics, and contract workflow tools on paid plans."
         path="/recruiters"
+        jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }])}
       />
 
 
