@@ -43,7 +43,7 @@ export default function RecruiterGuide() {
         title="Recruiter User Guide | HaulTrackerPro"
         description="Step-by-step guide for trucking recruiters: verification, posting unlimited standard opportunities, managing applicants, and contract workflow tools."
         path="/recruiter/guide"
-        jsonLd={jsonLd}
+        jsonLd={[jsonLd, buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }, { name: 'Recruiter Guide', path: '/recruiter/guide' }])]}
       />
 
       <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
