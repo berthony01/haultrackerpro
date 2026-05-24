@@ -59,6 +59,9 @@ const RecruiterFeatures = lazy(() => import("./pages/recruiter/RecruiterFeatures
 const RecruiterGuide = lazy(() => import("./pages/recruiter/RecruiterGuide"));
 const RecruiterUpdates = lazy(() => import("./pages/recruiter/RecruiterUpdates"));
 const About = lazy(() => import("./pages/About"));
+const CompareVsSpreadsheets = lazy(() => import("./pages/comparisons/HaulTrackerProVsSpreadsheets"));
+const CompareVsQuickBooks = lazy(() => import("./pages/comparisons/HaulTrackerProVsQuickBooks"));
+const BestProfitTracker = lazy(() => import("./pages/comparisons/BestTruckDriverProfitTracker"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -240,6 +243,9 @@ const App = () => (
               <Route path="/resources/truck-parking-tracker" element={<ResParking />} />
               <Route path="/resources/driver-referral-tracking" element={<ResDriverReferral />} />
               <Route path="/resources/trucking-recruiter-tools" element={<ResRecruiterTools />} />
+              <Route path="/haultrackerpro-vs-spreadsheets" element={<CompareVsSpreadsheets />} />
+              <Route path="/haultrackerpro-vs-quickbooks" element={<CompareVsQuickBooks />} />
+              <Route path="/best-truck-driver-profit-tracker" element={<BestProfitTracker />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
