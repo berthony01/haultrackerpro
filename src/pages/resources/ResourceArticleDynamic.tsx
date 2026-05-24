@@ -101,8 +101,8 @@ export default function ResourceArticleDynamic() {
       </header>
       <main className="px-4 py-8 max-w-3xl mx-auto space-y-6">
         {article.excerpt && <p className="text-lg text-muted-foreground leading-relaxed">{article.excerpt}</p>}
-        <article className="prose prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-foreground">
-          {article.content}
+        <article className="max-w-none">
+          <SafeMarkdown content={article.content} />
         </article>
         <div className="border-t border-border pt-4 text-xs text-muted-foreground">
           Educational content only. HaulTrackerPro is not a CPA, attorney, or financial advisor. Consult a qualified professional for tax, legal, or financial decisions.
