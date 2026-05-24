@@ -63,3 +63,9 @@ HaulTrackerPro replaces notebooks and spreadsheets with a mobile-first system de
 
 - [Terms of service](/terms): Legal terms.
 - [Privacy policy](/privacy): How user data is handled.
+
+## Comparisons
+
+- [Haul Tracker Pro vs Spreadsheets](/haultrackerpro-vs-spreadsheets): Trucking profit tracker compared with spreadsheets.
+- [Haul Tracker Pro vs QuickBooks](/haultrackerpro-vs-quickbooks): Trucking-specific tracker compared with general bookkeeping.
+- [Best Truck Driver Profit Tracker](/best-truck-driver-profit-tracker): Buyer guide for choosing a trucking profit tracker.
