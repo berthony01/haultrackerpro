@@ -112,14 +112,23 @@ export default function RecruiterGuide() {
           <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
             Apply for recruiter access. Verification is typically within one business day.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
             <Button asChild size="lg" className="rounded-xl font-bold text-base px-10">
               <Link to="/auth?intent=recruiter">Apply for Recruiter Access <ArrowRight className="ml-1 h-4 w-4" /></Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-xl font-bold text-base px-10">
               <Link to="/recruiter/faq">Recruiter FAQ</Link>
             </Button>
+            <Button asChild variant="outline" size="lg" className="rounded-xl font-bold text-base px-10">
+              <Link to="/recruiter/features">Recruiter Features</Link>
+            </Button>
           </div>
+          <p className="text-sm text-muted-foreground mt-6">
+            New to HaulTrackerPro?{' '}
+            <Link to="/about" className="font-semibold text-primary hover:underline">Learn why we built it</Link>
+            {' '}or{' '}
+            <Link to="/resources" className="font-semibold text-primary hover:underline">explore the resource hub</Link>.
+          </p>
         </div>
       </section>
     </div>
