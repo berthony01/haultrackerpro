@@ -167,6 +167,14 @@ export default function About() {
               <Briefcase className="h-4 w-4" /> For Recruiters
             </Button>
           </div>
+          <div className="pt-6 space-y-2">
+            <p className="text-xs uppercase tracking-wide" style={{ color: 'hsl(220, 10%, 50%)' }}>Compare options</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate('/haultrackerpro-vs-spreadsheets')} className="rounded-xl" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>vs Spreadsheets</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/haultrackerpro-vs-quickbooks')} className="rounded-xl" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>vs QuickBooks</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/best-truck-driver-profit-tracker')} className="rounded-xl" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>Best Profit Tracker</Button>
+            </div>
+          </div>
         </section>
       </main>
 

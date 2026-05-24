@@ -99,6 +99,22 @@ export default function ResourcesHub() {
           </div>
         </section>
 
+        <section className="space-y-3 border-t border-border pt-6">
+          <h3 className="font-black font-heading text-lg text-center">Compare trucking profit tracking options</h3>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { to: '/haultrackerpro-vs-spreadsheets', title: 'Haul Tracker Pro vs Spreadsheets', desc: 'Trucking profit tracker compared to spreadsheets.' },
+              { to: '/haultrackerpro-vs-quickbooks', title: 'Haul Tracker Pro vs QuickBooks', desc: 'Trucking-specific tracker vs general bookkeeping.' },
+              { to: '/best-truck-driver-profit-tracker', title: 'Best Truck Driver Profit Tracker', desc: 'What owner-operators should look for.' },
+            ].map((c) => (
+              <Link key={c.to} to={c.to} className="block p-4 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors">
+                <div className="font-semibold text-foreground text-sm">{c.title}</div>
+                <div className="text-xs text-muted-foreground mt-1">{c.desc}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         <nav aria-label="More about HaulTrackerPro" className="border-t border-border pt-6 text-center space-y-3">
           <p className="text-sm text-muted-foreground">More about HaulTrackerPro</p>
           <div className="flex flex-wrap justify-center gap-2">

@@ -127,6 +127,9 @@ export default function Features() {
             <Button onClick={() => navigate('/resources/truck-driver-profit-tracking')} variant="outline" className="rounded-xl font-bold" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
               Profit Tracking Guide
             </Button>
+            <Button onClick={() => navigate('/best-truck-driver-profit-tracker')} variant="outline" className="rounded-xl font-bold" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
+              Best Truck Driver Profit Tracker
+            </Button>
           </div>
         </div>
       </section>
