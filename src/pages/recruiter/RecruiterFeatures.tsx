@@ -98,11 +98,16 @@ export default function RecruiterFeatures() {
       <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs" style={{ color: 'hsl(220, 10%, 40%)' }}>© {new Date().getFullYear()} HaulTrackerPro. All rights reserved.</span>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-5 flex-wrap justify-center">
             {[
+              { label: 'For Recruiters', href: '/recruiters' },
               { label: 'Recruiter Features', href: '/recruiter/features' },
               { label: 'Recruiter Guide', href: '/recruiter/guide' },
               { label: 'Recruiter FAQ', href: '/recruiter/faq' },
+              { label: 'Recruiter Updates', href: '/recruiter/updates' },
+              { label: 'Pricing', href: '/pricing' },
+              { label: 'About', href: '/about' },
+              { label: 'Resources', href: '/resources' },
               { label: 'Terms', href: '/terms' },
               { label: 'Privacy', href: '/privacy' },
             ].map(link => (
