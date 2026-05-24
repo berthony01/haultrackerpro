@@ -564,6 +564,11 @@ export default function Pricing() {
           }}>
             Start Tracking Free <ArrowRight className="h-5 w-5" />
           </Button>
+          <div className="pt-6 flex flex-wrap justify-center gap-2">
+            <a href="/haultrackerpro-vs-spreadsheets" className="text-xs font-medium underline" style={{ color: 'hsl(220, 10%, 60%)' }}>Compare vs Spreadsheets</a>
+            <span style={{ color: 'hsl(220, 10%, 30%)' }}>·</span>
+            <a href="/haultrackerpro-vs-quickbooks" className="text-xs font-medium underline" style={{ color: 'hsl(220, 10%, 60%)' }}>Compare vs QuickBooks</a>
+          </div>
         </div>
       </section>
 
