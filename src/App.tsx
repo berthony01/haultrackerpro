@@ -63,6 +63,7 @@ const CompareVsSpreadsheets = lazy(() => import("./pages/comparisons/HaulTracker
 const CompareVsQuickBooks = lazy(() => import("./pages/comparisons/HaulTrackerProVsQuickBooks"));
 const BestProfitTracker = lazy(() => import("./pages/comparisons/BestTruckDriverProfitTracker"));
 const ResourceArticlesAdmin = lazy(() => import("./pages/admin/ResourceArticlesAdmin"));
+const ContentCalendarAdmin = lazy(() => import("./pages/admin/ContentCalendarAdmin"));
 const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
 
 // SEO content pages
