@@ -1,4 +1,5 @@
-import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, FileText, Share2, LucideIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, FileText, Share2, BookOpen, LucideIcon } from 'lucide-react';
 
 export interface AdminNavItem {
   value: string;
@@ -74,8 +75,17 @@ export function AdminSidebar({ value, onChange, role, email }: AdminSidebarProps
         })}
       </nav>
 
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-[10px] text-white/40">
-        v1.0 · Command Center
+      <div className="space-y-2">
+        <Link
+          to="/admin/resource-articles"
+          className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <BookOpen className="h-4 w-4 text-white/50" />
+          Resource Articles
+        </Link>
+        <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-[10px] text-white/40">
+          v1.0 · Command Center
+        </div>
       </div>
     </aside>
   );

@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Admins can delete resource articles" ON public.resource_articles;
