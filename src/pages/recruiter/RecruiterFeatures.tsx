@@ -13,6 +13,7 @@ export default function RecruiterFeatures() {
         title="Recruiter Features — Trucking Recruiter Platform | HaulTrackerPro"
         description="Verified trucking recruiter tools: unlimited standard opportunity posting after approval, applicant tracking, driver referral tracking and analytics, plus premium visibility and contract workflow tools on paid plans."
         path="/recruiter/features"
+        jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }, { name: 'Recruiter Features', path: '/recruiter/features' }])}
       />
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
