@@ -207,8 +207,34 @@ export default function ResourceArticlesAdmin() {
       toast.error(error.message || 'AI draft generation is not configured yet. You can still create articles manually.');
       return;
     }
-    const d = (data as { draft?: Record<string, string>; ai_generation_prompt?: string }) ?? {};
-    const draft = d.draft ?? {};
+    const d = (data as { draft?: Record<string, unknown>; ai_generation_prompt?: string }) ?? {};
+    const draft = (d.draft ?? {}) as Record<string, unknown>;
+
+    // Preserve AI-generated FAQ, internal links, and disclaimer by appending
+    // them to the markdown content so the admin can edit before saving.
+    let mergedContent = String(draft.content ?? '').trimEnd();
+    const faqItems = Array.isArray(draft.faq_items) ? (draft.faq_items as Array<{ q?: unknown; a?: unknown }>) : [];
+    const validFaq = faqItems
+      .map((f) => ({ q: String(f?.q ?? '').trim(), a: String(f?.a ?? '').trim() }))
+      .filter((f) => f.q && f.a);
+    if (validFaq.length && !/##\s+Frequently Asked Questions/i.test(mergedContent)) {
+      mergedContent += '\n\n## Frequently Asked Questions\n' +
+        validFaq.map((f) => `\n### ${f.q}\n\n${f.a}`).join('\n');
+    }
+    const links = Array.isArray(draft.suggested_internal_links)
+      ? (draft.suggested_internal_links as Array<{ label?: unknown; path?: unknown }>) : [];
+    const validLinks = links
+      .map((l) => ({ label: String(l?.label ?? '').trim(), path: String(l?.path ?? '').trim() }))
+      .filter((l) => l.label && l.path.startsWith('/'));
+    if (validLinks.length && !/##\s+Related Resources/i.test(mergedContent)) {
+      mergedContent += '\n\n## Related Resources\n\n' +
+        validLinks.map((l) => `- [${l.label}](${l.path})`).join('\n');
+    }
+    const disclaimer = String(draft.disclaimer ?? '').trim();
+    if (disclaimer && !/##\s+Disclaimer/i.test(mergedContent)) {
+      mergedContent += `\n\n## Disclaimer\n\n${disclaimer}`;
+    }
+
     setEditing({
       ...EMPTY,
       title: String(draft.title ?? ''),
@@ -216,7 +242,7 @@ export default function ResourceArticlesAdmin() {
       seo_title: String(draft.seo_title ?? '').slice(0, 60),
       meta_description: String(draft.meta_description ?? '').slice(0, 160),
       excerpt: String(draft.excerpt ?? ''),
-      content: String(draft.content ?? ''),
+      content: mergedContent,
       topic_cluster: aiCluster,
       generated_by_ai: true,
       ai_generation_prompt: d.ai_generation_prompt ?? null,
@@ -229,6 +255,7 @@ export default function ResourceArticlesAdmin() {
     setEditorOpen(true);
     toast.success('Draft generated. Review carefully before approving.');
   };
+
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (!isAdmin) return null;
