@@ -83,6 +83,13 @@ export function AdminSidebar({ value, onChange, role, email }: AdminSidebarProps
           <BookOpen className="h-4 w-4 text-white/50" />
           Resource Articles
         </Link>
+        <Link
+          to="/admin/content-calendar"
+          className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <BookOpen className="h-4 w-4 text-white/50" />
+          Content Calendar
+        </Link>
         <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-[10px] text-white/40">
           v1.0 · Command Center
         </div>
