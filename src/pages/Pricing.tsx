@@ -3,6 +3,7 @@ import { ArrowRight, Check, Minus, Truck, Shield, TrendingUp, Target, BarChart3,
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
