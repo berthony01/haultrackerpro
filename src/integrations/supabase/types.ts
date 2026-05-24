@@ -2724,7 +2724,76 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      parking_reports_public: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          notes: string | null
+          parking_id: string | null
+          report_hour_bucket: string | null
+          safety_rating: number | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          notes?: string | null
+          parking_id?: string | null
+          report_hour_bucket?: string | null
+          safety_rating?: number | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          notes?: string | null
+          parking_id?: string | null
+          report_hour_bucket?: string | null
+          safety_rating?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_reports_parking_id_fkey"
+            columns: ["parking_id"]
+            isOneToOne: false
+            referencedRelation: "parking_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parking_verifications_public: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          parking_id: string | null
+          verification_hour_bucket: string | null
+          verified_status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          parking_id?: string | null
+          verification_hour_bucket?: string | null
+          verified_status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          parking_id?: string | null
+          verification_hour_bucket?: string | null
+          verified_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_verifications_parking_id_fkey"
+            columns: ["parking_id"]
+            isOneToOne: false
+            referencedRelation: "parking_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       award_load_points: {

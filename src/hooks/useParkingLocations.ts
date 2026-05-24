@@ -19,7 +19,8 @@ export interface ParkingLocation {
 export interface ParkingReportRow {
   id: string;
   parking_id: string;
-  user_id: string;
+  // user_id intentionally omitted — sourced from parking_reports_public view which
+  // does not expose the reporter's identity to other authenticated users.
   status: 'available' | 'limited' | 'full';
   safety_rating: number | null;
   notes: string | null;
@@ -47,9 +48,10 @@ export function useRecentParkingReports() {
     queryKey: ['parking-reports', 'recent'],
     queryFn: async (): Promise<ParkingReportRow[]> => {
       // Pull last 24h of reports across all locations to compute confidence client-side.
+      // Reads the sanitized public view (no reporter user_id exposed).
       const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const { data, error } = await supabase
-        .from('parking_reports')
+        .from('parking_reports_public' as never)
         .select('*')
         .gte('created_at', since)
         .order('created_at', { ascending: false })
@@ -67,7 +69,7 @@ export function useParkingReportsForLocation(parkingId: string | null) {
     enabled: !!parkingId,
     queryFn: async (): Promise<ParkingReportRow[]> => {
       const { data, error } = await supabase
-        .from('parking_reports')
+        .from('parking_reports_public' as never)
         .select('*')
         .eq('parking_id', parkingId!)
         .order('created_at', { ascending: false })
