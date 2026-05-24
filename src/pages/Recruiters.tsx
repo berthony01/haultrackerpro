@@ -2,6 +2,7 @@ import { ArrowRight, Truck, Users, ShieldCheck, ClipboardList, Search, Handshake
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
+import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Recruiters() {
