@@ -1976,6 +1976,7 @@ export type Database = {
           handle_emoji: string | null
           handle_public: boolean
           id: string
+          intended_role: string
           last_seen_release_id: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -1992,6 +1993,7 @@ export type Database = {
           handle_emoji?: string | null
           handle_public?: boolean
           id?: string
+          intended_role?: string
           last_seen_release_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -2008,6 +2010,7 @@ export type Database = {
           handle_emoji?: string | null
           handle_public?: boolean
           id?: string
+          intended_role?: string
           last_seen_release_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
