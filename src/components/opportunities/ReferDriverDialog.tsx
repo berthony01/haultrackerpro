@@ -23,6 +23,8 @@ interface Props {
   recruiterId: string;
   opportunityTitle?: string | null;
   companyName?: string | null;
+  isPro?: boolean;
+  onUpgrade?: () => void;
 }
 
 export function ReferDriverDialog({
@@ -32,6 +34,8 @@ export function ReferDriverDialog({
   recruiterId,
   opportunityTitle,
   companyName,
+  isPro = true,
+  onUpgrade,
 }: Props) {
   const { create } = useDriverReferrals();
   const { settings, isLoading: settingsLoading } = useRecruiterReferralSettings(recruiterId);
