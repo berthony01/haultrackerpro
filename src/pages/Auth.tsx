@@ -78,7 +78,7 @@ export default function Auth() {
     persistIntent(role);
     try {
       if (mode === 'signup') {
-        const { error } = await signUp(form.email, form.password, form.name);
+        const { error } = await signUp(form.email, form.password, form.name, role);
         if (error) throw error;
         trackSignUp('email');
         const TEST_ACCOUNTS = ['berthonyxyz@gmail.com', 'peejayslifestyle@gmail.com', 'wysdomaniac@gmail.com'];
