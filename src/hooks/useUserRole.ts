@@ -16,9 +16,10 @@ function readRecruiterIntent(): boolean {
 
 /**
  * Derives the user's primary role from existing data:
- * - recruiter = has a row in `recruiter_profiles` OR has fresh recruiter signup intent
- *   (so a brand-new recruiter isn't bounced out of /recruiter-access before
- *   they complete onboarding and the profile row gets written)
+ * - recruiter = has a row in `recruiter_profiles`
+ *   OR has `profiles.intended_role = 'recruiter'` (durable signup intent)
+ *   OR has fresh recruiter sessionStorage intent (fallback for the brief
+ *   window before the profile row is written by handle_new_user())
  * - driver    = everyone else
  *
  * Admin / owner accounts are tracked separately via `useAdmin()` and keep
@@ -44,11 +45,29 @@ export function useUserRole() {
     staleTime: 60_000,
   });
 
+  const intentQuery = useQuery({
+    queryKey: ['user-role-profile-intent', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('intended_role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.intended_role as UserRole | undefined) ?? null;
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
   const hasRecruiterProfile = !!recruiterQuery.data;
-  const intentRecruiter = readRecruiterIntent();
-  const isRecruiter = hasRecruiterProfile || intentRecruiter;
+  const profileIntentRecruiter = intentQuery.data === 'recruiter';
+  const sessionIntentRecruiter = readRecruiterIntent();
+  const isRecruiter = hasRecruiterProfile || profileIntentRecruiter || sessionIntentRecruiter;
   const role: UserRole = isRecruiter ? 'recruiter' : 'driver';
-  const isLoading = authLoading || adminLoading || recruiterQuery.isLoading;
+  const isLoading =
+    authLoading || adminLoading || recruiterQuery.isLoading || intentQuery.isLoading;
 
   return {
     role,
@@ -57,6 +76,6 @@ export function useUserRole() {
     isAdmin,
     isLoading,
     hasRecruiterProfile,
-    intentRecruiter,
+    intentRecruiter: profileIntentRecruiter || sessionIntentRecruiter,
   };
 }
