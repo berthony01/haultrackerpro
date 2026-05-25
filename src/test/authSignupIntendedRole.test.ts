@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock supabase client BEFORE importing the hook
-const signUpMock = vi.fn(async () => ({ data: { user: null, session: null }, error: null }));
+const signUpMock = vi.fn(async (_args: any) => ({ data: { user: null, session: null }, error: null }));
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
-      signUp: (...args: any[]) => signUpMock(...args),
+      signUp: (args: any) => signUpMock(args),
       signInWithPassword: vi.fn(async () => ({ error: null })),
       signOut: vi.fn(async () => {}),
       getSession: vi.fn(async () => ({ data: { session: null } })),
