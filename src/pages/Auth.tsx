@@ -253,7 +253,7 @@ export default function Auth() {
                       </p>
                     ) : (
                       <p className="text-[11px] text-muted-foreground mt-1">
-                        We'll walk you through a quick setup (cost profile, pay model, first load) right after sign up.
+                        We'll walk you through a quick setup (pay model and your first load) right after sign up.
                       </p>
                     )}
                   </div>
