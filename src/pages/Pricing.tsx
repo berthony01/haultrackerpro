@@ -72,6 +72,7 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Real-time Parking Finder', free: '—', pro: '✓' },
   { feature: 'Driver points & leaderboard', free: '—', pro: '✓' },
   { feature: 'Parking log export (CSV + PDF)', free: '—', pro: '✓' },
+  { feature: 'Driver-to-driver referral submissions', free: 'View referral history only', pro: 'Included' },
   { feature: 'CSV exports', free: '✓', pro: '✓' },
   { feature: 'PDF reports', free: '—', pro: '✓' },
   { feature: 'View contracts sent by recruiters', free: '✓', pro: '✓' },
