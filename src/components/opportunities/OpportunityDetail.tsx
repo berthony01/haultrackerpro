@@ -304,12 +304,14 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
       </div>
 
       <ReferDriverDialog
-        open={showRefer}
+        open={showRefer && isPro}
         onOpenChange={setShowRefer}
         opportunityId={o.id}
         recruiterId={o.recruiter_id}
         opportunityTitle={o.title}
         companyName={o.company_name}
+        isPro={isPro}
+        onUpgrade={onUpgrade}
       />
     </div>
   );
