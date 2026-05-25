@@ -150,7 +150,7 @@ export function ReferDriverDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={create.isPending || !hasContact}>
+            <Button type="submit" disabled={create.isPending || !hasContact || !isPro}>
               {create.isPending ? 'Sending…' : 'Send Referral'}
             </Button>
           </DialogFooter>
