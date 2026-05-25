@@ -576,7 +576,7 @@ const faqs: Faq[] = [
   {
     id: 'driver-refer-driver',
     question: 'Can drivers refer other drivers to a recruiter opportunity?',
-    answer: 'Yes. Drivers can refer another driver to a recruiter opportunity and track referral progress in their dashboard. Recruiters see referrals in their pipeline and can move them through contacted, interviewed, hired, closed, or marked paid externally.',
+    answer: 'Yes. Submitting a new driver referral is a Pro driver feature. Pro drivers can refer another driver to a recruiter opportunity and track referral progress in their dashboard. Free drivers can still view their existing referral history. Recruiters see referrals in their pipeline and can move them through contacted, interviewed, hired, closed, or marked paid externally.',
     keywords: 'driver referral refer friend',
   },
   {
