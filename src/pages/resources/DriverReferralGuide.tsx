@@ -7,13 +7,14 @@ export default function DriverReferralGuide() {
       seoTitle="Driver Referral Tracking for Trucking Opportunities | HaulTrackerPro"
       seoDescription="Learn how drivers can refer other drivers to recruiter opportunities and track referral progress with recruiter-stated terms."
       pageTitle="Driver Referral Tracking Guide"
-      intro="HaulTrackerPro lets drivers refer other drivers to recruiter opportunities and track referral progress. Recruiters update referral statuses based on their own stated terms."
+      intro="HaulTrackerPro lets Pro drivers refer other drivers to recruiter opportunities and track referral progress. Recruiters update referral statuses based on their own stated terms. Free drivers can still view their existing referral history."
       sections={[
         {
           heading: 'How driver referrals work',
           bullets: [
-            'Drivers can share opportunities with other drivers',
-            'Drivers can track referral progress in one place',
+            'Submitting a new driver referral is a Pro driver feature',
+            'Pro drivers can share opportunities with other drivers and track progress in one place',
+            'Free drivers can still view existing referrals they previously created',
             'Recruiters update statuses such as contacted, hired, eligible based on recruiter terms, or marked paid externally',
             'Recruiter-stated external referral terms are shown on the opportunity',
           ],

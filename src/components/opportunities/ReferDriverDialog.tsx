@@ -23,6 +23,8 @@ interface Props {
   recruiterId: string;
   opportunityTitle?: string | null;
   companyName?: string | null;
+  isPro?: boolean;
+  onUpgrade?: () => void;
 }
 
 export function ReferDriverDialog({
@@ -32,6 +34,8 @@ export function ReferDriverDialog({
   recruiterId,
   opportunityTitle,
   companyName,
+  isPro = true,
+  onUpgrade,
 }: Props) {
   const { create } = useDriverReferrals();
   const { settings, isLoading: settingsLoading } = useRecruiterReferralSettings(recruiterId);
@@ -52,6 +56,10 @@ export function ReferDriverDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPro) {
+      toast.error('Driver referrals are a Pro feature.');
+      return;
+    }
     if (!hasContact) {
       toast.error('Add at least a name, email, or phone number.');
       return;
@@ -85,6 +93,17 @@ export function ReferDriverDialog({
             {opportunityTitle ? <>For <span className="text-foreground font-semibold">{opportunityTitle}</span>{companyName ? <> at {companyName}</> : null}.</> : 'Share this opportunity with a driver you know.'}
           </DialogDescription>
         </DialogHeader>
+
+        {!isPro && (
+          <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-foreground">
+            Driver referrals are a Pro feature. Upgrade to Pro to refer drivers and track referral progress.
+            {onUpgrade && (
+              <Button size="sm" className="mt-2" onClick={() => { onOpenChange(false); onUpgrade(); }}>
+                Upgrade to Pro
+              </Button>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1.5">
@@ -142,7 +161,7 @@ export function ReferDriverDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={create.isPending || !hasContact}>
+            <Button type="submit" disabled={create.isPending || !hasContact || !isPro}>
               {create.isPending ? 'Sending…' : 'Send Referral'}
             </Button>
           </DialogFooter>

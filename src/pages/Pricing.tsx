@@ -45,6 +45,7 @@ const proFeatures = [
   'Real-time Parking Finder with driver-verified availability',
   'Driver points, streaks & community leaderboard',
   'Parking log export (CSV + PDF) for paperwork',
+  'Driver-to-driver referral submissions (recruiters pay any bonuses externally)',
 ];
 
 const comparisonRows: { feature: string; free: string; pro: string }[] = [

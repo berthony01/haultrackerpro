@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Crown,
 } from 'lucide-react';
 import {
   useDriverReferrals,
@@ -26,9 +27,11 @@ import { ReferralTermsDisplay } from './ReferralTermsDisplay';
 
 interface Props {
   onBack: () => void;
+  isPro?: boolean;
+  onUpgrade?: () => void;
 }
 
-export function DriverReferralsPanel({ onBack }: Props) {
+export function DriverReferralsPanel({ onBack, isPro = true, onUpgrade }: Props) {
   const { referrals, isLoading, isError, refetch } = useDriverReferrals();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -57,6 +60,27 @@ export function DriverReferralsPanel({ onBack }: Props) {
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
         <span>{EXTERNAL_PAYMENT_DISCLAIMER}</span>
       </div>
+
+      {!isPro && (
+        <Card className="p-4 border-primary/40 bg-primary/5">
+          <div className="flex items-start gap-3">
+            <Crown className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-foreground mb-1">Pro feature</p>
+              <p className="text-xs text-muted-foreground">
+                New driver referrals are a Pro feature. Existing referrals remain visible here.
+                Referral bonuses, if offered, are paid externally by recruiters. Haul Tracker Pro
+                tracks referral progress only.
+              </p>
+              {onUpgrade && (
+                <Button size="sm" className="mt-3" onClick={onUpgrade}>
+                  <Crown className="h-4 w-4" /> Upgrade to Pro
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">

@@ -276,9 +276,26 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {isSaved ? 'Saved' : 'Save'}
           </Button>
-          <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
-            <UserPlus className="h-4 w-4" /> Refer a Driver
-          </Button>
+          {isPro ? (
+            <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
+              <UserPlus className="h-4 w-4" /> Refer a Driver
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => {
+                toast.message('Driver referrals are a Pro feature.', {
+                  description:
+                    'Upgrade to Pro to refer drivers to recruiter opportunities and track referral progress.',
+                });
+                onUpgrade();
+              }}
+              className="flex-1"
+              aria-label="Refer a Driver — Pro feature"
+            >
+              <Lock className="h-4 w-4" /> Refer a Driver — Pro
+            </Button>
+          )}
           <Button onClick={handleRequestInfo} disabled={alreadyApplied || submitting} className="flex-1">
             <Send className="h-4 w-4" />
             {alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}
@@ -287,12 +304,14 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
       </div>
 
       <ReferDriverDialog
-        open={showRefer}
+        open={showRefer && isPro}
         onOpenChange={setShowRefer}
         opportunityId={o.id}
         recruiterId={o.recruiter_id}
         opportunityTitle={o.title}
         companyName={o.company_name}
+        isPro={isPro}
+        onUpgrade={onUpgrade}
       />
     </div>
   );

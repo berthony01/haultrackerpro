@@ -210,7 +210,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   }
 
   if (showReferrals) {
-    return <DriverReferralsPanel onBack={() => setShowReferrals(false)} />;
+    return <DriverReferralsPanel onBack={() => setShowReferrals(false)} isPro={isPro} onUpgrade={onUpgrade} />;
   }
 
   if (showProfile) {
