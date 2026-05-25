@@ -94,6 +94,17 @@ export function ReferDriverDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {!isPro && (
+          <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-foreground">
+            Driver referrals are a Pro feature. Upgrade to Pro to refer drivers and track referral progress.
+            {onUpgrade && (
+              <Button size="sm" className="mt-2" onClick={() => { onOpenChange(false); onUpgrade(); }}>
+                Upgrade to Pro
+              </Button>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="ref-name">Driver name</Label>
