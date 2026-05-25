@@ -27,9 +27,11 @@ import { ReferralTermsDisplay } from './ReferralTermsDisplay';
 
 interface Props {
   onBack: () => void;
+  isPro?: boolean;
+  onUpgrade?: () => void;
 }
 
-export function DriverReferralsPanel({ onBack }: Props) {
+export function DriverReferralsPanel({ onBack, isPro = true, onUpgrade }: Props) {
   const { referrals, isLoading, isError, refetch } = useDriverReferrals();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
