@@ -56,6 +56,10 @@ export function ReferDriverDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPro) {
+      toast.error('Driver referrals are a Pro feature.');
+      return;
+    }
     if (!hasContact) {
       toast.error('Add at least a name, email, or phone number.');
       return;
