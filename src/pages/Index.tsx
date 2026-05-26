@@ -90,18 +90,32 @@ const Index = () => {
   });
   const { ready: releaseReady, hasSeenLatest, markSeen } = useReleaseNotesSeen();
 
+  // URL-based guard: catches /dashboard?page=add before state effects settle.
+  const isAddLoadDeepLinkUrl =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('page') === 'add';
+
   // Auto-open the What's New modal once per user (after onboarding modal isn't blocking)
   useEffect(() => {
     if (
       releaseReady &&
       !hasSeenLatest &&
       !showOnboardingModal &&
+      !isAddLoadDeepLinkUrl &&
       !suppressOnboardingForAddDeepLink &&
       page !== 'add'
     ) {
       setShowWhatsNew(true);
     }
-  }, [releaseReady, hasSeenLatest, showOnboardingModal, suppressOnboardingForAddDeepLink, page]);
+  }, [releaseReady, hasSeenLatest, showOnboardingModal, isAddLoadDeepLinkUrl, suppressOnboardingForAddDeepLink, page]);
+
+  // Defensive close: if What's New opened before the add-load deep link settled,
+  // close it without marking as seen so it can appear in a normal session later.
+  useEffect(() => {
+    if (showWhatsNew && (suppressOnboardingForAddDeepLink || page === 'add')) {
+      setShowWhatsNew(false);
+    }
+  }, [showWhatsNew, suppressOnboardingForAddDeepLink, page]);
 
   const handleCloseWhatsNew = () => {
     markSeen();
