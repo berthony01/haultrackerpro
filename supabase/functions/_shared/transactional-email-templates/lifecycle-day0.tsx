@@ -28,7 +28,7 @@ const Day0Email = ({ name }: Props) => (
           Check, lane intelligence, and the Weekly Closeout summary.
         </Text>
         <Section style={buttonContainer}>
-          <Button style={button} href={`${APP_URL}/dashboard`}>
+          <Button style={button} href={`${APP_URL}/dashboard?page=add`}>
             Log my first load
           </Button>
         </Section>
