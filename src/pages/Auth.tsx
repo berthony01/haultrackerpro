@@ -72,8 +72,42 @@ export default function Auth() {
     }
   };
 
+  // Common email domain typo detection.
+  const DOMAIN_TYPOS: Record<string, string> = {
+    'gmail.comm': 'gmail.com',
+    'gmail.con': 'gmail.com',
+    'gmial.com': 'gmail.com',
+    'gmaill.com': 'gmail.com',
+    'yahoo.con': 'yahoo.com',
+    'yaho.com': 'yahoo.com',
+    'outlook.con': 'outlook.com',
+    'hotmail.con': 'hotmail.com',
+    'hotmial.com': 'hotmail.com',
+    'icloud.con': 'icloud.com',
+  };
+  const suggestEmailFix = (email: string): string | null => {
+    const at = email.lastIndexOf('@');
+    if (at < 0) return null;
+    const local = email.slice(0, at);
+    const domain = email.slice(at + 1).toLowerCase();
+    const fix = DOMAIN_TYPOS[domain];
+    return fix ? `${local}@${fix}` : null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === 'signup') {
+      const suggested = suggestEmailFix(form.email.trim());
+      if (suggested && suggested !== form.email.trim()) {
+        const useFixed = window.confirm(`Did you mean ${suggested}?\n\nClick OK to use the corrected email, or Cancel to keep ${form.email}.`);
+        if (useFixed) {
+          setForm(p => ({ ...p, email: suggested }));
+          // Defer actual submit to next click — user sees the correction.
+          toast.info(`Email updated to ${suggested}. Click Create Account again to continue.`);
+          return;
+        }
+      }
+    }
     setLoading(true);
     persistIntent(role);
     try {
