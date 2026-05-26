@@ -63,18 +63,21 @@ describe('recruiterCapabilities', () => {
     expect(caps.canUseTeamSeats).toBe(false);
   });
 
-  it('fleet active: all growth capabilities plus team/bulk/custom profile/priority support', () => {
+  it('fleet active: unlocks growth capabilities plus priority support; coming-soon features stay false', () => {
     const caps = getRecruiterPlanCapabilities({ plan: 'fleet', status: 'active' });
     expect(caps.tier).toBe('fleet');
     expect(caps.canUsePriorityPlacement).toBe(true);
     expect(caps.canUseFeaturedListings).toBe(true);
     expect(caps.canExportRecruiterReports).toBe(true);
     expect(caps.canUseContractWorkflowTools).toBe(true);
-    expect(caps.canUseTeamSeats).toBe(true);
-    expect(caps.canUseBulkOpportunityTools).toBe(true);
-    expect(caps.canUseCustomRecruiterProfile).toBe(true);
+    expect(caps.canUsePipelineAnalytics).toBe(true);
     expect(caps.canUsePrioritySupport).toBe(true);
-    expect(caps.canUseCompanyLevelHiringDashboard).toBe(true);
+    // Coming-soon features are represented in copy only — capability flags
+    // must stay false until the underlying UI ships.
+    expect(caps.canUseTeamSeats).toBe(false);
+    expect(caps.canUseBulkOpportunityTools).toBe(false);
+    expect(caps.canUseCustomRecruiterProfile).toBe(false);
+    expect(caps.canUseCompanyLevelHiringDashboard).toBe(false);
   });
 
   it('growth canceled: falls back to free_verified capabilities', () => {
