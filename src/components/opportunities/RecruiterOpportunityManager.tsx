@@ -127,8 +127,6 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
         </div>
       </Card>
 
-      <RecruiterBillingPanel />
-
       <Card className="p-5 border-border/60">
         <div className="flex items-start gap-4">
           <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
