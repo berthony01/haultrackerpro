@@ -28,9 +28,9 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
     tagline: 'Better applicant tracking and trust signals.',
     perks: [
       'Enhanced applicant tracking',
-      'Applicant notes & status history',
-      'Basic listing analytics',
-      { label: 'Basic referral tracking view', tag: 'coming-soon' },
+      'Applicant status history',
+      'Basic applicant pipeline analytics',
+      'Basic referral tracking view',
       'Recruiter trust badge',
     ],
   },
@@ -43,8 +43,8 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
       'Featured listing eligibility',
       'Recruiter reports (PDF/CSV)',
       'Contract workflow tools',
-      'Pipeline analytics',
-      { label: 'Referral progress tracking', tag: 'coming-soon' },
+      'Pipeline analytics and recruiter reports',
+      'Referral progress tracking',
     ],
   },
   {
@@ -58,6 +58,7 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
       { label: 'Team seats', tag: 'coming-soon' },
       { label: 'Bulk opportunity tools', tag: 'coming-soon' },
       { label: 'Custom recruiter profile', tag: 'coming-soon' },
+      { label: 'Company-level hiring dashboard', tag: 'coming-soon' },
     ],
   },
 ];
@@ -213,6 +214,10 @@ export function RecruiterBillingPanel() {
           <ExternalLink className="h-4 w-4" /> Manage Billing
         </Button>
       )}
+
+      <p className="text-[11px] text-muted-foreground">
+        Referral bonuses, if offered, are paid externally by recruiters. Haul Tracker Pro tracks referral progress only and does not process, verify, or guarantee payments.
+      </p>
 
       <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck className="h-3 w-3" /> Billing is processed securely by Stripe.

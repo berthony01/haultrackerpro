@@ -27,7 +27,6 @@ import {
   type Opportunity,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
-import { RecruiterBillingPanel } from './RecruiterBillingPanel';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 
@@ -126,8 +125,6 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
           </Button>
         </div>
       </Card>
-
-      <RecruiterBillingPanel />
 
       <Card className="p-5 border-border/60">
         <div className="flex items-start gap-4">

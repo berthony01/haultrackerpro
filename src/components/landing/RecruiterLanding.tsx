@@ -48,15 +48,17 @@ const steps = [
 
 const plans = [
   { name: 'Free Verified', price: '$0', limit: 'Unlimited standard posts', features: ['Unlimited standard opportunity posts', 'Admin-reviewed listings', 'Basic applicant & contact request flow', 'Standard placement'] },
-  { name: 'Starter', price: '$19', limit: 'Premium tools', features: ['Enhanced applicant tracking', 'Applicant notes & status history', 'Basic listing analytics', 'Referral progress tracking', 'Recruiter trust tools'] },
-  { name: 'Growth', price: '$49', limit: 'Premium tools', features: ['Priority placement', 'Featured listing eligibility', 'Recruiter reports (PDF + CSV)', 'Contract workflow tools', 'Referral tracking & analytics', 'Pipeline analytics'], highlight: true },
-  { name: 'Fleet', price: '$149', limit: 'Premium tools', features: ['Top placement eligibility', 'Advanced analytics', 'Priority support', 'Team seats (coming soon)', 'Bulk opportunity tools (coming soon)'] },
+  { name: 'Starter', price: '$19', limit: 'Premium tools', features: ['Enhanced applicant tracking', 'Applicant status history', 'Basic applicant pipeline analytics', 'Basic referral tracking view', 'Recruiter trust tools'] },
+  { name: 'Growth', price: '$49', limit: 'Premium tools', features: ['Priority placement', 'Featured listing eligibility', 'Recruiter reports (PDF + CSV)', 'Contract workflow tools', 'Referral progress tracking', 'Pipeline analytics and recruiter reports'], highlight: true },
+  { name: 'Fleet', price: '$149', limit: 'Premium tools', features: ['Top placement eligibility', 'Advanced analytics', 'Priority support', 'Team seats (coming soon)', 'Bulk opportunity tools (coming soon)', 'Custom recruiter profile (coming soon)', 'Company-level hiring dashboard (coming soon)'] },
 ];
 
-const testimonials = [
-  // Placeholder testimonials — replace with real recruiter quotes when available.
-  { quote: 'The verified-driver filter alone saved my team hours every week. We stopped chasing tire-kickers.', author: 'Recruiting Manager', company: 'Regional Carrier (placeholder)' },
-  { quote: 'Flat monthly pricing instead of pay-per-click changed our hiring economics overnight.', author: 'Director of Recruiting', company: 'Reefer Carrier (placeholder)' },
+const trustPoints = [
+  { icon: ShieldCheck, title: 'Admin-reviewed recruiter access', desc: 'Every recruiter is approved by our team before they can post opportunities.' },
+  { icon: CheckCircle2, title: 'Verified recruiter profiles', desc: 'Drivers see a verified badge on every listing tied to an approved recruiter.' },
+  { icon: ClipboardList, title: 'Structured opportunity posts', desc: 'Required fields for pay, lanes, equipment, and home-time keep listings clear and comparable.' },
+  { icon: Handshake, title: 'Driver contact permission workflow', desc: 'Drivers opt in to share contact info — no scraping, no off-platform solicitation.' },
+  { icon: Share2, title: 'Referral progress tracking', desc: 'Track driver-to-driver referrals end to end. Referral bonuses, if offered, are paid externally by recruiters — Haul Tracker Pro tracks progress only and does not process, verify, or guarantee payments.' },
 ];
 
 const faqs = [
@@ -298,26 +300,30 @@ export default function RecruiterLanding() {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
+      {/* TRUST */}
       <section className="px-4 sm:px-6 py-12 sm:py-16" style={{ background: NAVY_2 }}>
-        <div className="max-w-4xl mx-auto grid sm:grid-cols-2 gap-4">
-          {testimonials.map((t, i) => (
-            <div
-              key={i}
-              className="p-6 rounded-2xl border"
-              style={{ background: NAVY, borderColor: BORDER }}
-            >
-              <p className="text-sm italic mb-4" style={{ color: TEXT }}>
-                "{t.quote}"
-              </p>
-              <p className="text-xs font-bold" style={{ color: AMBER }}>
-                {t.author}
-              </p>
-              <p className="text-xs" style={{ color: MUTED }}>
-                {t.company}
-              </p>
-            </div>
-          ))}
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-black text-center mb-3" style={{ color: TEXT }}>
+            Built for trust-first trucking recruiting
+          </h2>
+          <p className="text-sm text-center mb-8 max-w-2xl mx-auto" style={{ color: MUTED }}>
+            We don't publish customer testimonials we can't verify. Here's what the platform actually enforces today.
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {trustPoints.map((t, i) => (
+              <div
+                key={i}
+                className="p-5 rounded-2xl border"
+                style={{ background: NAVY, borderColor: BORDER }}
+              >
+                <div className="rounded-lg p-2 w-fit mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
+                  <t.icon className="h-5 w-5" style={{ color: AMBER }} />
+                </div>
+                <p className="text-sm font-bold mb-1" style={{ color: TEXT }}>{t.title}</p>
+                <p className="text-xs leading-snug" style={{ color: MUTED }}>{t.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

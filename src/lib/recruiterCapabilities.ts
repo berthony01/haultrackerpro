@@ -145,9 +145,11 @@ function starter(): Omit<RecruiterCapabilities, 'canPostStandardOpportunities'> 
   return {
     ...freeVerified(),
     tier: 'starter',
-    canUseApplicantNotes: true,
+    // canUseApplicantNotes intentionally false until a private notes UI ships.
     canUseApplicantStatusHistory: true,
-    canUseBasicListingAnalytics: true,
+    // canUseBasicListingAnalytics intentionally false — true listing impression
+    // analytics are not built; "basic applicant pipeline analytics" is shown
+    // in copy only.
     canUseReferralTracking: 'basic',
   };
 }
@@ -171,11 +173,14 @@ function fleet(): Omit<RecruiterCapabilities, 'canPostStandardOpportunities'> {
   return {
     ...growth(),
     tier: 'fleet',
-    canUseTeamSeats: true,
-    canUseBulkOpportunityTools: true,
-    canUseCustomRecruiterProfile: true,
+    // Coming-soon capabilities. Kept false until the underlying features ship
+    // so capability checks never silently unlock unbuilt UI.
+    canUseTeamSeats: false,
+    canUseBulkOpportunityTools: false,
+    canUseCustomRecruiterProfile: false,
+    canUseCompanyLevelHiringDashboard: false,
+    // Priority support is a manual support promise the business honors today.
     canUsePrioritySupport: true,
-    canUseCompanyLevelHiringDashboard: true,
   };
 }
 
