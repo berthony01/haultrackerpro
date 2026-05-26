@@ -451,11 +451,28 @@ export default function ResourceArticlesAdmin() {
       </main>
 
       {/* Editor */}
-      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+      <Dialog open={editorOpen} onOpenChange={(open) => { setEditorOpen(open); if (!open) setPrefillNotice(null); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing.id ? 'Edit article' : 'New article draft'}</DialogTitle>
           </DialogHeader>
+
+          {prefillNotice && !editing.id && (
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge variant="default">Calendar Draft Prefill</Badge>
+                {prefillNotice.duplicateSlug && <Badge variant="destructive">Possible duplicate slug</Badge>}
+              </div>
+              <p className="text-muted-foreground">
+                This draft was prefilled from the content calendar ({prefillNotice.title}). Review, edit, and save it as a draft before approval or publishing.
+              </p>
+              {prefillNotice.duplicateSlug && (
+                <p className="text-destructive text-xs">
+                  An article with this slug may already exist. Review existing drafts before saving to avoid overwriting.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3">
             <div>
