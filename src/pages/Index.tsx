@@ -253,6 +253,15 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (recruiterIntent) {
       setPage('recruiter-access');
+    } else if (pageParam === 'add') {
+      // First-load email deep link. Recruiter view never lands on driver add-load.
+      if (isRecruiterView) {
+        setPage('recruiter-access');
+      } else {
+        setEditingLoad(null);
+        setPage('add');
+      }
+      window.history.replaceState({}, '', window.location.pathname);
     }
     if (recruiterIntent) {
       // Suppress driver-first onboarding modal once for recruiter signups
