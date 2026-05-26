@@ -83,6 +83,7 @@ const Index = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [suppressOnboardingForAddDeepLink, setSuppressOnboardingForAddDeepLink] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [roleCardDismissed, setRoleCardDismissed] = useState(() => {
     try { return localStorage.getItem('htp_role_card_dismissed') === '1'; } catch { return false; }
@@ -258,6 +259,7 @@ const Index = () => {
       if (isRecruiterView) {
         setPage('recruiter-access');
       } else {
+        setSuppressOnboardingForAddDeepLink(true);
         setEditingLoad(null);
         setPage('add');
       }
@@ -302,6 +304,7 @@ const Index = () => {
   // Show onboarding modal for first-time users
   useEffect(() => {
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
+      if (suppressOnboardingForAddDeepLink) return;
       let recruiter = false;
       try { recruiter = sessionStorage.getItem('htp_recruiter_intent') === '1'; } catch {}
       if (recruiter) {
@@ -310,7 +313,7 @@ const Index = () => {
       }
       setShowOnboardingModal(true);
     }
-  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length]);
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboardingModal(false);

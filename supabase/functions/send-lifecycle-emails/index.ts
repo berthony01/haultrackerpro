@@ -89,7 +89,17 @@ Deno.serve(async (req) => {
       [...day1Candidates, ...day2Candidates, ...day4Candidates].map(u => u.id),
     )]
     if (candidateIds.length === 0) {
-      return json({ checked: allUsers.length, sent_day1: 0, sent_day2: 0, sent_day4: 0 })
+      return json({
+        checked: allUsers.length,
+        day1_candidates: 0,
+        day2_candidates: 0,
+        day4_candidates: 0,
+        sent_day1: 0,
+        sent_day2: 0,
+        sent_day4: 0,
+        skipped_active: 0,
+        skipped_opt_out: 0,
+      })
     }
 
     // "Loads inserted" gate — count actual loads rows per user (strict, not just signup age)
