@@ -53,12 +53,14 @@ Deno.serve(async (req) => {
     const now = Date.now()
     const day = 24 * 60 * 60 * 1000
 
-    // Eligible age windows
+    // Eligible age windows — first-load activation sequence
+    const day1Window = (ageMs: number) => ageMs >= 1 * day && ageMs < 2 * day
     const day2Window = (ageMs: number) => ageMs >= 2 * day && ageMs < 3 * day
-    const day7Window = (ageMs: number) => ageMs >= 7 * day && ageMs < 8 * day
+    const day4Window = (ageMs: number) => ageMs >= 4 * day && ageMs < 5 * day
 
+    const day1Candidates: AuthUser[] = []
     const day2Candidates: AuthUser[] = []
-    const day7Candidates: AuthUser[] = []
+    const day4Candidates: AuthUser[] = []
 
     const recentEmailChangeCutoff = now - RECENT_EMAIL_CHANGE_HOURS * 60 * 60 * 1000
 
@@ -78,13 +80,16 @@ Deno.serve(async (req) => {
       }
 
       const age = now - new Date(u.created_at).getTime()
-      if (day2Window(age)) day2Candidates.push(u)
-      else if (day7Window(age)) day7Candidates.push(u)
+      if (day1Window(age)) day1Candidates.push(u)
+      else if (day2Window(age)) day2Candidates.push(u)
+      else if (day4Window(age)) day4Candidates.push(u)
     }
 
-    const candidateIds = [...new Set([...day2Candidates, ...day7Candidates].map(u => u.id))]
+    const candidateIds = [...new Set(
+      [...day1Candidates, ...day2Candidates, ...day4Candidates].map(u => u.id),
+    )]
     if (candidateIds.length === 0) {
-      return json({ checked: allUsers.length, sent_day2: 0, sent_day7: 0 })
+      return json({ checked: allUsers.length, sent_day1: 0, sent_day2: 0, sent_day4: 0 })
     }
 
     // "Loads inserted" gate — count actual loads rows per user (strict, not just signup age)
@@ -107,8 +112,9 @@ Deno.serve(async (req) => {
       optedIn.set(r.user_id, r.lifecycle_emails_opt_in !== false)
     }
 
+    let sentDay1 = 0
     let sentDay2 = 0
-    let sentDay7 = 0
+    let sentDay4 = 0
     let skippedActive = 0
     let skippedOptOut = 0
 
@@ -144,19 +150,24 @@ Deno.serve(async (req) => {
       return true
     }
 
+    for (const u of day1Candidates) {
+      if (await send('lifecycle-day1', u)) sentDay1++
+    }
     for (const u of day2Candidates) {
       if (await send('lifecycle-day2', u)) sentDay2++
     }
-    for (const u of day7Candidates) {
-      if (await send('lifecycle-day7', u)) sentDay7++
+    for (const u of day4Candidates) {
+      if (await send('lifecycle-day4', u)) sentDay4++
     }
 
     return json({
       checked: allUsers.length,
+      day1_candidates: day1Candidates.length,
       day2_candidates: day2Candidates.length,
-      day7_candidates: day7Candidates.length,
+      day4_candidates: day4Candidates.length,
+      sent_day1: sentDay1,
       sent_day2: sentDay2,
-      sent_day7: sentDay7,
+      sent_day4: sentDay4,
       skipped_active: skippedActive,
       skipped_opt_out: skippedOptOut,
     })
