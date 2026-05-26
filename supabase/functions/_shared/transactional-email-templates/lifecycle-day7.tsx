@@ -40,7 +40,7 @@ const Day7Email = ({ name }: Props) => (
 export const template = {
   component: Day7Email,
   subject: 'Keep building your tracking habit',
-  displayName: 'Lifecycle — Day 7 (habit nudge)',
+  displayName: 'Lifecycle — Day 7 (legacy habit nudge)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry
 
