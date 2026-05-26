@@ -1231,8 +1231,11 @@ export default function Admin() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="welcome">welcome (Day 0)</SelectItem>
-                      <SelectItem value="lifecycle-day2">lifecycle-day2</SelectItem>
-                      <SelectItem value="lifecycle-day7">lifecycle-day7</SelectItem>
+                      <SelectItem value="lifecycle-day1">lifecycle-day1 (first load push)</SelectItem>
+                      <SelectItem value="lifecycle-day2">lifecycle-day2 (first load rescue)</SelectItem>
+                      <SelectItem value="lifecycle-day4">lifecycle-day4 (final rescue)</SelectItem>
+                      <SelectItem value="lifecycle-day7">lifecycle-day7 (legacy)</SelectItem>
+                      <SelectItem value="inactive-feedback">inactive-feedback (manual only)</SelectItem>
                     </SelectContent>
                   </Select>
 
