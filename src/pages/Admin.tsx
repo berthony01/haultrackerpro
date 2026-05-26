@@ -179,7 +179,9 @@ interface ActivationResponse {
   cohorts: ActivationCohort[];
   emailImpact: {
     day0: { sent: number; activated_after: number; rate: number } | null;
+    day1: { sent: number; activated_after: number; rate: number } | null;
     day2: { sent: number; activated_after: number; rate: number } | null;
+    day4: { sent: number; activated_after: number; rate: number } | null;
     day7: { sent: number; activated_after: number; rate: number } | null;
   };
 }
