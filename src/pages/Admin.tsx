@@ -285,7 +285,8 @@ export default function Admin() {
 
   // Test email panel
   const TEST_ACCOUNTS = ['berthonyxyz@gmail.com', 'peejayslifestyle@gmail.com', 'wysdomaniac@gmail.com'];
-  const [testTemplate, setTestTemplate] = useState<'welcome' | 'lifecycle-day2' | 'lifecycle-day7'>('welcome');
+  type TestTemplate = 'welcome' | 'lifecycle-day1' | 'lifecycle-day2' | 'lifecycle-day4' | 'lifecycle-day7' | 'inactive-feedback';
+  const [testTemplate, setTestTemplate] = useState<TestTemplate>('welcome');
   const [testRecipientId, setTestRecipientId] = useState<string>('');
   const [testIncludeTest, setTestIncludeTest] = useState(false);
   const [testSending, setTestSending] = useState(false);
