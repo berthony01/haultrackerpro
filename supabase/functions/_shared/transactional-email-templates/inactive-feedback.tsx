@@ -9,23 +9,29 @@ const APP_URL = 'https://haultrackerpro.com'
 
 interface Props { name?: string }
 
-const Day0Email = ({ name }: Props) => (
+const InactiveFeedbackEmail = ({ name }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Welcome to {SITE_NAME} — your account is ready</Preview>
+    <Preview>What stopped you from using {SITE_NAME}?</Preview>
     <Body style={main}>
       <Container style={container}>
         <Heading style={h1}>
-          {name ? `Welcome, ${name}!` : `Welcome to ${SITE_NAME}!`}
+          {name ? `Hey ${name},` : 'Hey there,'}
         </Heading>
         <Text style={text}>
-          You're all set. {SITE_NAME} helps you stop driving blind — track loads,
-          expenses, and fuel so you know exactly what each mile actually pays.
+          I noticed you signed up for {SITE_NAME} but never logged a load.
+          Totally fine — I'm not writing to push anything on you.
         </Text>
         <Text style={text}>
-          Your account is on the <strong>Free plan</strong>. Start tracking
-          right away — and upgrade to Pro when you want Smart Alerts, Profit
-          Check, lane intelligence, and the Weekly Closeout summary.
+          I'm trying to make this genuinely useful for drivers, and I'd really
+          appreciate one honest answer:
+        </Text>
+        <Text style={textBold}>
+          What made you sign up, and what stopped you from logging your first load?
+        </Text>
+        <Text style={text}>
+          You can just hit reply — it comes straight to me. Or if you want to
+          give it another shot, the link below opens the add-load form directly.
         </Text>
         <Section style={buttonContainer}>
           <Button style={button} href={`${APP_URL}/dashboard?page=add`}>
@@ -33,24 +39,16 @@ const Day0Email = ({ name }: Props) => (
           </Button>
         </Section>
         <Hr style={hr} />
-        <Text style={tipsHeading}>Quick start</Text>
-        <Text style={text}>
-          1. Add your first load to see your true rate per mile.<br />
-          2. Log an expense or fuel stop — we'll categorize it for Schedule C.<br />
-          3. Check the dashboard Sunday for your Weekly Closeout.
-        </Text>
-        <Text style={footer}>
-          Drive smart,<br />The {SITE_NAME} Team
-        </Text>
+        <Text style={footer}>Thanks,<br />The {SITE_NAME} Team</Text>
       </Container>
     </Body>
   </Html>
 )
 
 export const template = {
-  component: Day0Email,
-  subject: `Welcome to ${SITE_NAME} — your account is ready`,
-  displayName: 'Lifecycle — Day 0 (welcome)',
+  component: InactiveFeedbackEmail,
+  subject: `What stopped you from using ${SITE_NAME}?`,
+  displayName: 'Inactive user feedback (manual send)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry
 
@@ -58,8 +56,8 @@ const main = { backgroundColor: '#ffffff', fontFamily: '-apple-system, BlinkMacS
 const container = { padding: '32px 24px', maxWidth: '560px', margin: '0 auto' }
 const h1 = { fontSize: '24px', fontWeight: 'bold', color: '#0b1220', margin: '0 0 20px' }
 const text = { fontSize: '15px', color: '#374151', lineHeight: '1.6', margin: '0 0 16px' }
+const textBold = { fontSize: '15px', color: '#0b1220', lineHeight: '1.6', margin: '0 0 16px', fontWeight: 'bold' as const }
 const buttonContainer = { margin: '28px 0' }
 const button = { backgroundColor: '#f59e0b', color: '#0b1220', fontSize: '15px', fontWeight: 'bold', padding: '12px 22px', borderRadius: '8px', textDecoration: 'none', display: 'inline-block' }
 const hr = { borderColor: '#e5e7eb', margin: '28px 0' }
-const tipsHeading = { fontSize: '14px', fontWeight: 'bold', color: '#0b1220', margin: '0 0 8px', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }
-const footer = { fontSize: '13px', color: '#6b7280', margin: '28px 0 0' }
+const footer = { fontSize: '13px', color: '#6b7280', margin: '20px 0 0' }

@@ -12,20 +12,24 @@ interface Props { name?: string }
 const Day2Email = ({ name }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Need a hand logging your first load?</Preview>
+    <Preview>One load shows more than gross pay.</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>{name ? `Hey ${name},` : 'Hey driver,'} need a hand?</Heading>
+        <Heading style={h1}>
+          {name ? `${name}, your real RPM starts with one load` : 'Your real RPM starts with one load'}
+        </Heading>
         <Text style={text}>
-          Noticed you haven't logged your first load yet. It takes about 30 seconds —
-          we even pre-fill a sample so you just edit the numbers.
+          Gross pay alone doesn't tell you what a load actually paid. One logged
+          load starts showing loaded miles, deadhead miles, rate per mile, and
+          estimated pay side by side.
         </Text>
         <Text style={text}>
-          Once one load is in, your dashboard lights up: real rate per mile, deadhead %,
-          and a Profit Check on every future load.
+          We pre-fill a sample so you can just edit the numbers — pickup, dropoff,
+          miles, rate — and save. Add fuel or expenses afterward for a clearer
+          net profit picture.
         </Text>
         <Section style={buttonContainer}>
-          <Button style={button} href={`${APP_URL}/dashboard`}>Log my first load</Button>
+          <Button style={button} href={`${APP_URL}/dashboard?page=add`}>Log my first load</Button>
         </Section>
         <Hr style={hr} />
         <Text style={text}>
@@ -39,8 +43,8 @@ const Day2Email = ({ name }: Props) => (
 
 export const template = {
   component: Day2Email,
-  subject: 'Need a hand logging your first load?',
-  displayName: 'Lifecycle — Day 2 (no loads)',
+  subject: 'Log your first load today — your real RPM starts there',
+  displayName: 'Lifecycle — Day 2 (first load rescue)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry
 

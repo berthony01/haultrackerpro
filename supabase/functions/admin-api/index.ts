@@ -549,7 +549,7 @@ Deno.serve(async (req) => {
 
       const userIds = realUsers.map((u) => u.id);
       if (userIds.length === 0) {
-        return json({ cohorts: [], emailImpact: { day0: null, day2: null, day7: null } });
+        return json({ cohorts: [], emailImpact: { day0: null, day1: null, day2: null, day4: null, day7: null } });
       }
 
       // Earliest load per user (cap query at 5000 rows for safety)
@@ -610,12 +610,21 @@ Deno.serve(async (req) => {
               : null,
         }));
 
-      // Email impact — for each lifecycle email (welcome, lifecycle-day2, lifecycle-day7),
+      // Email impact — for each lifecycle email,
       // % of recipients who logged a load AFTER receiving the email.
-      const TEMPLATES_FOR_IMPACT = ["lifecycle-day0", "welcome", "lifecycle-day2", "lifecycle-day7"] as const;
+      const TEMPLATES_FOR_IMPACT = [
+        "lifecycle-day0",
+        "welcome",
+        "lifecycle-day1",
+        "lifecycle-day2",
+        "lifecycle-day4",
+        "lifecycle-day7",
+      ] as const;
       const emailImpact: Record<string, { sent: number; activated_after: number; rate: number } | null> = {
         day0: null,
+        day1: null,
         day2: null,
+        day4: null,
         day7: null,
       };
 
@@ -682,7 +691,9 @@ Deno.serve(async (req) => {
         return { sent, activated_after, rate: sent > 0 ? Math.round((activated_after / sent) * 1000) / 10 : 0 };
       };
       emailImpact.day0 = merge(day0FromDay0, day0FromWelcome);
+      emailImpact.day1 = computeImpact("lifecycle-day1");
       emailImpact.day2 = computeImpact("lifecycle-day2");
+      emailImpact.day4 = computeImpact("lifecycle-day4");
       emailImpact.day7 = computeImpact("lifecycle-day7");
 
       // Headline: overall activation rate (excluding test accounts)
@@ -704,7 +715,14 @@ Deno.serve(async (req) => {
         "peejayslifestyle@gmail.com",
         "wysdomaniac@gmail.com",
       ]);
-      const ALLOWED_TEMPLATES = new Set(["welcome", "lifecycle-day2", "lifecycle-day7"]);
+      const ALLOWED_TEMPLATES = new Set([
+        "welcome",
+        "lifecycle-day1",
+        "lifecycle-day2",
+        "lifecycle-day4",
+        "lifecycle-day7",
+        "inactive-feedback",
+      ]);
 
       const templateName = String(body.templateName || "");
       const mode = String(body.mode || "single"); // 'single' | 'all-inactive'

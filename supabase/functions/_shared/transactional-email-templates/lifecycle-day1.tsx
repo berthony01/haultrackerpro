@@ -9,23 +9,22 @@ const APP_URL = 'https://haultrackerpro.com'
 
 interface Props { name?: string }
 
-const Day0Email = ({ name }: Props) => (
+const Day1Email = ({ name }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Welcome to {SITE_NAME} — your account is ready</Preview>
+    <Preview>Log one load and see what the numbers really look like.</Preview>
     <Body style={main}>
       <Container style={container}>
         <Heading style={h1}>
-          {name ? `Welcome, ${name}!` : `Welcome to ${SITE_NAME}!`}
+          {name ? `${name}, your first load is 60 seconds away` : 'Your first load is 60 seconds away'}
         </Heading>
         <Text style={text}>
-          You're all set. {SITE_NAME} helps you stop driving blind — track loads,
-          expenses, and fuel so you know exactly what each mile actually pays.
+          Your dashboard starts showing real rate per mile, deadhead percentage,
+          and estimated pay as soon as one load is in.
         </Text>
         <Text style={text}>
-          Your account is on the <strong>Free plan</strong>. Start tracking
-          right away — and upgrade to Pro when you want Smart Alerts, Profit
-          Check, lane intelligence, and the Weekly Closeout summary.
+          We pre-fill a sample load so you can just edit the numbers — pickup,
+          dropoff, miles, and rate — and save. No setup, no spreadsheets.
         </Text>
         <Section style={buttonContainer}>
           <Button style={button} href={`${APP_URL}/dashboard?page=add`}>
@@ -33,24 +32,16 @@ const Day0Email = ({ name }: Props) => (
           </Button>
         </Section>
         <Hr style={hr} />
-        <Text style={tipsHeading}>Quick start</Text>
-        <Text style={text}>
-          1. Add your first load to see your true rate per mile.<br />
-          2. Log an expense or fuel stop — we'll categorize it for Schedule C.<br />
-          3. Check the dashboard Sunday for your Weekly Closeout.
-        </Text>
-        <Text style={footer}>
-          Drive smart,<br />The {SITE_NAME} Team
-        </Text>
+        <Text style={footer}>The {SITE_NAME} Team</Text>
       </Container>
     </Body>
   </Html>
 )
 
 export const template = {
-  component: Day0Email,
-  subject: `Welcome to ${SITE_NAME} — your account is ready`,
-  displayName: 'Lifecycle — Day 0 (welcome)',
+  component: Day1Email,
+  subject: 'Your first load is 60 seconds away',
+  displayName: 'Lifecycle — Day 1 (first load push)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry
 
@@ -61,5 +52,4 @@ const text = { fontSize: '15px', color: '#374151', lineHeight: '1.6', margin: '0
 const buttonContainer = { margin: '28px 0' }
 const button = { backgroundColor: '#f59e0b', color: '#0b1220', fontSize: '15px', fontWeight: 'bold', padding: '12px 22px', borderRadius: '8px', textDecoration: 'none', display: 'inline-block' }
 const hr = { borderColor: '#e5e7eb', margin: '28px 0' }
-const tipsHeading = { fontSize: '14px', fontWeight: 'bold', color: '#0b1220', margin: '0 0 8px', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }
-const footer = { fontSize: '13px', color: '#6b7280', margin: '28px 0 0' }
+const footer = { fontSize: '13px', color: '#6b7280', margin: '20px 0 0' }

@@ -28,7 +28,7 @@ const Day7Email = ({ name }: Props) => (
           • <strong>Lane intelligence</strong> — best/weakest routes from your own history
         </Text>
         <Section style={buttonContainer}>
-          <Button style={button} href={`${APP_URL}/dashboard`}>Log a load</Button>
+          <Button style={button} href={`${APP_URL}/dashboard?page=add`}>Log a load</Button>
         </Section>
         <Hr style={hr} />
         <Text style={footer}>The {SITE_NAME} Team</Text>
@@ -40,7 +40,7 @@ const Day7Email = ({ name }: Props) => (
 export const template = {
   component: Day7Email,
   subject: 'Keep building your tracking habit',
-  displayName: 'Lifecycle — Day 7 (habit nudge)',
+  displayName: 'Lifecycle — Day 7 (legacy habit nudge)',
   previewData: { name: 'Sam' },
 } satisfies TemplateEntry
 

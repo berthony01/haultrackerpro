@@ -253,6 +253,15 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (recruiterIntent) {
       setPage('recruiter-access');
+    } else if (pageParam === 'add') {
+      // First-load email deep link. Recruiter view never lands on driver add-load.
+      if (isRecruiterView) {
+        setPage('recruiter-access');
+      } else {
+        setEditingLoad(null);
+        setPage('add');
+      }
+      window.history.replaceState({}, '', window.location.pathname);
     }
     if (recruiterIntent) {
       // Suppress driver-first onboarding modal once for recruiter signups
@@ -315,9 +324,10 @@ const Index = () => {
   const showOnboarding = !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
 
   const handleAddLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
+    const prevLoadCount = allLoadsQuery.loads.length;
     addLoad.mutate(data, {
       onSuccess: (result) => {
-        trackLoadLogged(allLoadsQuery.loads.length + 1);
+        trackLoadLogged(prevLoadCount + 1);
         if (stops && stops.length > 0 && result?.id) {
           loadStopsHook.saveStopsForLoad.mutate({ loadId: result.id, stops });
         }
@@ -335,15 +345,25 @@ const Index = () => {
             console.warn('award_load_points threw', e);
           }
         }
-        if (allExpensesQuery.expenses.length === 0) {
+        if (prevLoadCount === 0) {
+          // First-load success — value proof, not a sales pitch.
+          toast.success('First load logged — now you can see real numbers.', {
+            description:
+              'You can now compare gross pay, miles, deadhead, and estimated pay. Add fuel or expenses next for a clearer net profit picture.',
+            duration: 10000,
+            action: { label: 'Add fuel/expense', onClick: () => { setPage('add_expense'); } },
+          });
+          setPage('dashboard');
+        } else if (allExpensesQuery.expenses.length === 0) {
           toast.success('Load logged!', {
             description: 'Now log your first expense to see real net profit.',
             action: { label: 'Add Expense', onClick: () => { setPage('add_expense'); } },
           });
+          setPage('loads');
         } else {
           toast.success('Load logged successfully!');
+          setPage('loads');
         }
-        setPage('loads');
       },
       onError: (e) => toast.error(e.message),
     });

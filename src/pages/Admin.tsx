@@ -179,7 +179,9 @@ interface ActivationResponse {
   cohorts: ActivationCohort[];
   emailImpact: {
     day0: { sent: number; activated_after: number; rate: number } | null;
+    day1: { sent: number; activated_after: number; rate: number } | null;
     day2: { sent: number; activated_after: number; rate: number } | null;
+    day4: { sent: number; activated_after: number; rate: number } | null;
     day7: { sent: number; activated_after: number; rate: number } | null;
   };
 }
@@ -283,7 +285,8 @@ export default function Admin() {
 
   // Test email panel
   const TEST_ACCOUNTS = ['berthonyxyz@gmail.com', 'peejayslifestyle@gmail.com', 'wysdomaniac@gmail.com'];
-  const [testTemplate, setTestTemplate] = useState<'welcome' | 'lifecycle-day2' | 'lifecycle-day7'>('welcome');
+  type TestTemplate = 'welcome' | 'lifecycle-day1' | 'lifecycle-day2' | 'lifecycle-day4' | 'lifecycle-day7' | 'inactive-feedback';
+  const [testTemplate, setTestTemplate] = useState<TestTemplate>('welcome');
   const [testRecipientId, setTestRecipientId] = useState<string>('');
   const [testIncludeTest, setTestIncludeTest] = useState(false);
   const [testSending, setTestSending] = useState(false);
@@ -648,8 +651,10 @@ export default function Admin() {
                   <CardContent className="space-y-2">
                     {[
                       { key: 'day0' as const, label: 'Day 0 — Welcome' },
-                      { key: 'day2' as const, label: 'Day 2 — "Need a hand?"' },
-                      { key: 'day7' as const, label: 'Day 7 — Habit nudge' },
+                      { key: 'day1' as const, label: 'Day 1 — First load push' },
+                      { key: 'day2' as const, label: 'Day 2 — First load rescue' },
+                      { key: 'day4' as const, label: 'Day 4 — Final first-load rescue' },
+                      { key: 'day7' as const, label: 'Day 7 — Legacy habit nudge' },
                     ].map(({ key, label }) => {
                       const m = activation.emailImpact[key];
                       return (
@@ -1226,8 +1231,11 @@ export default function Admin() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="welcome">welcome (Day 0)</SelectItem>
-                      <SelectItem value="lifecycle-day2">lifecycle-day2</SelectItem>
-                      <SelectItem value="lifecycle-day7">lifecycle-day7</SelectItem>
+                      <SelectItem value="lifecycle-day1">lifecycle-day1 (first load push)</SelectItem>
+                      <SelectItem value="lifecycle-day2">lifecycle-day2 (first load rescue)</SelectItem>
+                      <SelectItem value="lifecycle-day4">lifecycle-day4 (final rescue)</SelectItem>
+                      <SelectItem value="lifecycle-day7">lifecycle-day7 (legacy)</SelectItem>
+                      <SelectItem value="inactive-feedback">inactive-feedback (manual only)</SelectItem>
                     </SelectContent>
                   </Select>
 
