@@ -66,6 +66,7 @@ function slugify(t: string) {
 
 export default function ResourceArticlesAdmin() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { isAdmin, isLoading } = useAdmin();
 
@@ -77,6 +78,8 @@ export default function ResourceArticlesAdmin() {
   const [editing, setEditing] = useState<Partial<Article>>(EMPTY);
   const [safetyChecked, setSafetyChecked] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [prefillNotice, setPrefillNotice] = useState<{ title: string; duplicateSlug: boolean } | null>(null);
+  const handledPrefillRef = useRef<string | null>(null);
 
   // AI form
   const [aiTopic, setAiTopic] = useState('');
