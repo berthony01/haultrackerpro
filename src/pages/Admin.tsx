@@ -651,8 +651,10 @@ export default function Admin() {
                   <CardContent className="space-y-2">
                     {[
                       { key: 'day0' as const, label: 'Day 0 — Welcome' },
-                      { key: 'day2' as const, label: 'Day 2 — "Need a hand?"' },
-                      { key: 'day7' as const, label: 'Day 7 — Habit nudge' },
+                      { key: 'day1' as const, label: 'Day 1 — First load push' },
+                      { key: 'day2' as const, label: 'Day 2 — First load rescue' },
+                      { key: 'day4' as const, label: 'Day 4 — Final first-load rescue' },
+                      { key: 'day7' as const, label: 'Day 7 — Legacy habit nudge' },
                     ].map(({ key, label }) => {
                       const m = activation.emailImpact[key];
                       return (
