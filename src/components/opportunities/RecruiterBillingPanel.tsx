@@ -215,6 +215,10 @@ export function RecruiterBillingPanel() {
         </Button>
       )}
 
+      <p className="text-[11px] text-muted-foreground">
+        Referral bonuses, if offered, are paid externally by recruiters. Haul Tracker Pro tracks referral progress only and does not process, verify, or guarantee payments.
+      </p>
+
       <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck className="h-3 w-3" /> Billing is processed securely by Stripe.
       </p>
