@@ -300,26 +300,30 @@ export default function RecruiterLanding() {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
+      {/* TRUST */}
       <section className="px-4 sm:px-6 py-12 sm:py-16" style={{ background: NAVY_2 }}>
-        <div className="max-w-4xl mx-auto grid sm:grid-cols-2 gap-4">
-          {testimonials.map((t, i) => (
-            <div
-              key={i}
-              className="p-6 rounded-2xl border"
-              style={{ background: NAVY, borderColor: BORDER }}
-            >
-              <p className="text-sm italic mb-4" style={{ color: TEXT }}>
-                "{t.quote}"
-              </p>
-              <p className="text-xs font-bold" style={{ color: AMBER }}>
-                {t.author}
-              </p>
-              <p className="text-xs" style={{ color: MUTED }}>
-                {t.company}
-              </p>
-            </div>
-          ))}
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl font-black text-center mb-3" style={{ color: TEXT }}>
+            Built for trust-first trucking recruiting
+          </h2>
+          <p className="text-sm text-center mb-8 max-w-2xl mx-auto" style={{ color: MUTED }}>
+            We don't publish customer testimonials we can't verify. Here's what the platform actually enforces today.
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {trustPoints.map((t, i) => (
+              <div
+                key={i}
+                className="p-5 rounded-2xl border"
+                style={{ background: NAVY, borderColor: BORDER }}
+              >
+                <div className="rounded-lg p-2 w-fit mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
+                  <t.icon className="h-5 w-5" style={{ color: AMBER }} />
+                </div>
+                <p className="text-sm font-bold mb-1" style={{ color: TEXT }}>{t.title}</p>
+                <p className="text-xs leading-snug" style={{ color: MUTED }}>{t.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
