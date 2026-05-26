@@ -48,15 +48,17 @@ const steps = [
 
 const plans = [
   { name: 'Free Verified', price: '$0', limit: 'Unlimited standard posts', features: ['Unlimited standard opportunity posts', 'Admin-reviewed listings', 'Basic applicant & contact request flow', 'Standard placement'] },
-  { name: 'Starter', price: '$19', limit: 'Premium tools', features: ['Enhanced applicant tracking', 'Applicant notes & status history', 'Basic listing analytics', 'Referral progress tracking', 'Recruiter trust tools'] },
-  { name: 'Growth', price: '$49', limit: 'Premium tools', features: ['Priority placement', 'Featured listing eligibility', 'Recruiter reports (PDF + CSV)', 'Contract workflow tools', 'Referral tracking & analytics', 'Pipeline analytics'], highlight: true },
-  { name: 'Fleet', price: '$149', limit: 'Premium tools', features: ['Top placement eligibility', 'Advanced analytics', 'Priority support', 'Team seats (coming soon)', 'Bulk opportunity tools (coming soon)'] },
+  { name: 'Starter', price: '$19', limit: 'Premium tools', features: ['Enhanced applicant tracking', 'Applicant status history', 'Basic applicant pipeline analytics', 'Basic referral tracking view', 'Recruiter trust tools'] },
+  { name: 'Growth', price: '$49', limit: 'Premium tools', features: ['Priority placement', 'Featured listing eligibility', 'Recruiter reports (PDF + CSV)', 'Contract workflow tools', 'Referral progress tracking', 'Pipeline analytics and recruiter reports'], highlight: true },
+  { name: 'Fleet', price: '$149', limit: 'Premium tools', features: ['Top placement eligibility', 'Advanced analytics', 'Priority support', 'Team seats (coming soon)', 'Bulk opportunity tools (coming soon)', 'Custom recruiter profile (coming soon)', 'Company-level hiring dashboard (coming soon)'] },
 ];
 
-const testimonials = [
-  // Placeholder testimonials — replace with real recruiter quotes when available.
-  { quote: 'The verified-driver filter alone saved my team hours every week. We stopped chasing tire-kickers.', author: 'Recruiting Manager', company: 'Regional Carrier (placeholder)' },
-  { quote: 'Flat monthly pricing instead of pay-per-click changed our hiring economics overnight.', author: 'Director of Recruiting', company: 'Reefer Carrier (placeholder)' },
+const trustPoints = [
+  { icon: ShieldCheck, title: 'Admin-reviewed recruiter access', desc: 'Every recruiter is approved by our team before they can post opportunities.' },
+  { icon: CheckCircle2, title: 'Verified recruiter profiles', desc: 'Drivers see a verified badge on every listing tied to an approved recruiter.' },
+  { icon: ClipboardList, title: 'Structured opportunity posts', desc: 'Required fields for pay, lanes, equipment, and home-time keep listings clear and comparable.' },
+  { icon: Handshake, title: 'Driver contact permission workflow', desc: 'Drivers opt in to share contact info — no scraping, no off-platform solicitation.' },
+  { icon: Share2, title: 'Referral progress tracking', desc: 'Track driver-to-driver referrals end to end. Referral bonuses, if offered, are paid externally by recruiters — Haul Tracker Pro tracks progress only and does not process, verify, or guarantee payments.' },
 ];
 
 const faqs = [
