@@ -92,10 +92,16 @@ const Index = () => {
 
   // Auto-open the What's New modal once per user (after onboarding modal isn't blocking)
   useEffect(() => {
-    if (releaseReady && !hasSeenLatest && !showOnboardingModal) {
+    if (
+      releaseReady &&
+      !hasSeenLatest &&
+      !showOnboardingModal &&
+      !suppressOnboardingForAddDeepLink &&
+      page !== 'add'
+    ) {
       setShowWhatsNew(true);
     }
-  }, [releaseReady, hasSeenLatest, showOnboardingModal]);
+  }, [releaseReady, hasSeenLatest, showOnboardingModal, suppressOnboardingForAddDeepLink, page]);
 
   const handleCloseWhatsNew = () => {
     markSeen();
@@ -350,6 +356,9 @@ const Index = () => {
         }
         if (prevLoadCount === 0) {
           // First-load success — value proof, not a sales pitch.
+          if (suppressOnboardingForAddDeepLink) {
+            setSuppressOnboardingForAddDeepLink(false);
+          }
           toast.success('First load logged — now you can see real numbers.', {
             description:
               'You can now compare gross pay, miles, deadhead, and estimated pay. Add fuel or expenses next for a clearer net profit picture.',
@@ -510,6 +519,9 @@ const Index = () => {
   };
 
   const handleNavigate = (p: string, options?: { filter?: string }) => {
+    if (p !== 'add') {
+      setSuppressOnboardingForAddDeepLink(false);
+    }
     if (p === 'add') {
       setShowAddModal(true);
       return;
