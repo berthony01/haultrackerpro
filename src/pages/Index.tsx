@@ -356,6 +356,9 @@ const Index = () => {
         }
         if (prevLoadCount === 0) {
           // First-load success — value proof, not a sales pitch.
+          if (suppressOnboardingForAddDeepLink) {
+            setSuppressOnboardingForAddDeepLink(false);
+          }
           toast.success('First load logged — now you can see real numbers.', {
             description:
               'You can now compare gross pay, miles, deadhead, and estimated pay. Add fuel or expenses next for a clearer net profit picture.',
