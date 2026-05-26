@@ -114,8 +114,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // No auth gate: invoked by pg_cron (anon Bearer). Function is idempotent
-  // (last_generated_date cursor) and Pro-gated.
+  // Restrict to internal callers (pg_cron) only. The pg_cron job supplies
+  // the matching x-internal-secret header. Without this, any unauthenticated
+  // caller could trigger service-role expense inserts.
+  const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+  const provided = req.headers.get("x-internal-secret") ?? "";
+  if (!internalSecret || provided !== internalSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
