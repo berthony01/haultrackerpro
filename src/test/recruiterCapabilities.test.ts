@@ -27,14 +27,14 @@ describe('recruiterCapabilities', () => {
     expect(caps.canUseBasicApplicantInbox).toBe(true);
   });
 
-  it('starter active: unlocks notes, status history, basic analytics and basic referral tracking', () => {
+  it('starter active: unlocks status history and basic referral tracking; does not unlock unbuilt notes/listing analytics', () => {
     const caps = getRecruiterPlanCapabilities({ plan: 'starter', status: 'active' });
     expect(caps.tier).toBe('starter');
     expect(caps.unlimitedStandardPosts).toBe(true);
     expect(caps.activeOpportunityLimit).toBeNull();
-    expect(caps.canUseApplicantNotes).toBe(true);
+    expect(caps.canUseApplicantNotes).toBe(false);
     expect(caps.canUseApplicantStatusHistory).toBe(true);
-    expect(caps.canUseBasicListingAnalytics).toBe(true);
+    expect(caps.canUseBasicListingAnalytics).toBe(false);
     expect(caps.canUseReferralTracking).toBe('basic');
     expect(caps.canUsePriorityPlacement).toBe(false);
     expect(caps.canUseFeaturedListings).toBe(false);
