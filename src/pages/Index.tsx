@@ -92,10 +92,16 @@ const Index = () => {
 
   // Auto-open the What's New modal once per user (after onboarding modal isn't blocking)
   useEffect(() => {
-    if (releaseReady && !hasSeenLatest && !showOnboardingModal) {
+    if (
+      releaseReady &&
+      !hasSeenLatest &&
+      !showOnboardingModal &&
+      !suppressOnboardingForAddDeepLink &&
+      page !== 'add'
+    ) {
       setShowWhatsNew(true);
     }
-  }, [releaseReady, hasSeenLatest, showOnboardingModal]);
+  }, [releaseReady, hasSeenLatest, showOnboardingModal, suppressOnboardingForAddDeepLink, page]);
 
   const handleCloseWhatsNew = () => {
     markSeen();
@@ -510,6 +516,9 @@ const Index = () => {
   };
 
   const handleNavigate = (p: string, options?: { filter?: string }) => {
+    if (p !== 'add') {
+      setSuppressOnboardingForAddDeepLink(false);
+    }
     if (p === 'add') {
       setShowAddModal(true);
       return;
