@@ -549,7 +549,7 @@ Deno.serve(async (req) => {
 
       const userIds = realUsers.map((u) => u.id);
       if (userIds.length === 0) {
-        return json({ cohorts: [], emailImpact: { day0: null, day2: null, day7: null } });
+        return json({ cohorts: [], emailImpact: { day0: null, day1: null, day2: null, day4: null, day7: null } });
       }
 
       // Earliest load per user (cap query at 5000 rows for safety)
