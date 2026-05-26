@@ -789,6 +789,12 @@ export const CALENDAR_SUMMARY = {
   main_clusters: Array.from(new Set(CONTENT_CALENDAR.map((a) => a.topic_cluster))),
 };
 
+/** Look up a planned calendar article by its stable id. */
+export function getPlannedArticleById(id: string | null | undefined): PlannedArticle | null {
+  if (!id) return null;
+  return CONTENT_CALENDAR.find((a) => a.id === id) ?? null;
+}
+
 /**
  * Build a detailed AI draft prompt for a planned article.
  * The prompt is safe to paste into the Phase 18D article generator or the manual draft editor.

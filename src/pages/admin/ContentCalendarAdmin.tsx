@@ -209,7 +209,7 @@ function ArticleCard({ a, onCopy }: { a: PlannedArticle; onCopy: () => void }) {
           <Copy className="h-4 w-4 mr-1" /> Copy AI Draft Prompt
         </Button>
         <Button size="sm" asChild>
-          <Link to="/admin/resource-articles">
+          <Link to={`/admin/resource-articles?new=1&calendarId=${encodeURIComponent(a.id)}`}>
             <ExternalLink className="h-4 w-4 mr-1" /> Open Article Manager
           </Link>
         </Button>

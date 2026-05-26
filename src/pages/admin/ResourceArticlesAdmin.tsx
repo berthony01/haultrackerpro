@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getPlannedArticleById, buildDraftPrompt, type PlannedArticle } from '@/lib/contentCalendar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useAuth } from '@/hooks/useAuth';
@@ -65,6 +66,7 @@ function slugify(t: string) {
 
 export default function ResourceArticlesAdmin() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { isAdmin, isLoading } = useAdmin();
 
@@ -76,6 +78,8 @@ export default function ResourceArticlesAdmin() {
   const [editing, setEditing] = useState<Partial<Article>>(EMPTY);
   const [safetyChecked, setSafetyChecked] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [prefillNotice, setPrefillNotice] = useState<{ title: string; duplicateSlug: boolean } | null>(null);
+  const handledPrefillRef = useRef<string | null>(null);
 
   // AI form
   const [aiTopic, setAiTopic] = useState('');
@@ -106,14 +110,123 @@ export default function ResourceArticlesAdmin() {
   const openNew = () => {
     setEditing({ ...EMPTY, created_by: user?.id });
     setSafetyChecked(false);
+    setPrefillNotice(null);
     setEditorOpen(true);
   };
 
   const openEdit = (a: Article) => {
     setEditing({ ...a });
     setSafetyChecked(false);
+    setPrefillNotice(null);
     setEditorOpen(true);
   };
+
+  const buildPrefillFromPlan = useCallback((plan: PlannedArticle): Partial<Article> => {
+    const allowed = TOPIC_CLUSTERS as readonly string[];
+    const clusterMap: Record<string, string> = { spreadsheets: 'profit', quickbooks: 'bookkeeping' };
+    const cluster = allowed.includes(plan.topic_cluster)
+      ? plan.topic_cluster
+      : (clusterMap[plan.topic_cluster] ?? 'profit');
+
+    const seoTitleFull = `${plan.title} | Haul Tracker Pro`;
+    const seoTitle = seoTitleFull.length <= 60 ? seoTitleFull : plan.title.slice(0, 60);
+
+    const metaRaw = `${plan.content_angle} For ${plan.target_audience.join(', ')}.`.replace(/\s+/g, ' ').trim();
+    const metaDescription = metaRaw.length <= 160 ? metaRaw : metaRaw.slice(0, 157).trimEnd() + '...';
+
+    const excerpt = plan.content_angle.length <= 220
+      ? plan.content_angle
+      : plan.content_angle.slice(0, 217).trimEnd() + '...';
+
+    const outlineMd = plan.outline_sections.map((s) => `## ${s}\n\nDraft this section. Keep it practical and specific to ${plan.target_audience[0] ?? 'truck drivers'}. Do not invent statistics or cite sources you cannot verify.\n`).join('\n');
+    const faqMd = plan.suggested_faqs.map((q) => `### ${q}\n\nDraft a clear, honest answer here. Review for accuracy before approval.\n`).join('\n');
+    const linksMd = plan.suggested_internal_links.map((l) => `- [${l.label}](${l.path})`).join('\n');
+    const disclaimerMd = plan.disclaimer_required
+      ? 'This article is for educational purposes only and is not tax, legal, accounting, or financial advice. Drivers should consult qualified professionals for decisions specific to their business.'
+      : 'Haul Tracker Pro is a tracking tool, not a CPA or financial advisor. Use the information here as a starting point and confirm specifics with a qualified professional when needed.';
+
+    const content = [
+      `# ${plan.title}`,
+      '',
+      `Short intro placeholder: ${plan.content_angle}`,
+      '',
+      '## Why this matters',
+      '',
+      `Explain why this topic matters to ${plan.target_audience.join(', ')}. Keep claims grounded.`,
+      '',
+      '## Key points to cover',
+      '',
+      outlineMd,
+      '## Practical example',
+      '',
+      'Add a simple example using realistic but clearly illustrative numbers. Do not invent industry-wide statistics.',
+      '',
+      '## How Haul Tracker Pro can help',
+      '',
+      `Mention the recommended CTA naturally: ${plan.recommended_cta}.`,
+      '',
+      '## Frequently Asked Questions',
+      '',
+      faqMd,
+      '## Related Resources',
+      '',
+      linksMd,
+      '',
+      '## Disclaimer',
+      '',
+      disclaimerMd,
+      '',
+    ].join('\n');
+
+    return {
+      title: plan.title,
+      slug: plan.slug,
+      topic_cluster: cluster,
+      seo_title: seoTitle,
+      meta_description: metaDescription,
+      excerpt,
+      content,
+      author_name: 'Haul Tracker Pro',
+      generated_by_ai: false,
+      ai_generation_prompt: buildDraftPrompt(plan),
+      status: 'draft',
+      approval_status: 'pending_review',
+      created_by: user?.id,
+    };
+  }, [user?.id]);
+
+  // Calendar → Article Manager handoff. Reads ?new=1&calendarId=<id>,
+  // looks up the planned article, opens the editor prefilled (never saved).
+  useEffect(() => {
+    if (!isAdmin) return;
+    const isNew = searchParams.get('new') === '1';
+    const calendarId = searchParams.get('calendarId');
+    if (!isNew || !calendarId) return;
+    if (handledPrefillRef.current === calendarId) return;
+
+    const plan = getPlannedArticleById(calendarId);
+    if (!plan) {
+      handledPrefillRef.current = calendarId;
+      toast.error('Calendar article not found. Opening a blank draft.');
+      const next = new URLSearchParams(searchParams);
+      next.delete('new'); next.delete('calendarId');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    const prefill = buildPrefillFromPlan(plan);
+    setEditing(prefill);
+    setSafetyChecked(false);
+    const duplicateSlug = rows.some((r) => r.slug === plan.slug);
+    setPrefillNotice({ title: plan.title, duplicateSlug });
+    setEditorOpen(true);
+    handledPrefillRef.current = calendarId;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('new'); next.delete('calendarId');
+    setSearchParams(next, { replace: true });
+  }, [isAdmin, searchParams, setSearchParams, buildPrefillFromPlan, rows]);
+
 
   const canPublish = useMemo(() => {
     const e = editing;
@@ -338,11 +451,28 @@ export default function ResourceArticlesAdmin() {
       </main>
 
       {/* Editor */}
-      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+      <Dialog open={editorOpen} onOpenChange={(open) => { setEditorOpen(open); if (!open) setPrefillNotice(null); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing.id ? 'Edit article' : 'New article draft'}</DialogTitle>
           </DialogHeader>
+
+          {prefillNotice && !editing.id && (
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge variant="default">Calendar Draft Prefill</Badge>
+                {prefillNotice.duplicateSlug && <Badge variant="destructive">Possible duplicate slug</Badge>}
+              </div>
+              <p className="text-muted-foreground">
+                This draft was prefilled from the content calendar ({prefillNotice.title}). Review, edit, and save it as a draft before approval or publishing.
+              </p>
+              {prefillNotice.duplicateSlug && (
+                <p className="text-destructive text-xs">
+                  An article with this slug may already exist. Review existing drafts before saving to avoid overwriting.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3">
             <div>
