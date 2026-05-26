@@ -715,7 +715,14 @@ Deno.serve(async (req) => {
         "peejayslifestyle@gmail.com",
         "wysdomaniac@gmail.com",
       ]);
-      const ALLOWED_TEMPLATES = new Set(["welcome", "lifecycle-day2", "lifecycle-day7"]);
+      const ALLOWED_TEMPLATES = new Set([
+        "welcome",
+        "lifecycle-day1",
+        "lifecycle-day2",
+        "lifecycle-day4",
+        "lifecycle-day7",
+        "inactive-feedback",
+      ]);
 
       const templateName = String(body.templateName || "");
       const mode = String(body.mode || "single"); // 'single' | 'all-inactive'
