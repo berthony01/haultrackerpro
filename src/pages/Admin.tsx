@@ -609,6 +609,7 @@ export default function Admin() {
               <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
               <TabsTrigger value="feedback"><MessageSquare className="h-4 w-4 mr-1" />Feedback</TabsTrigger>
               <TabsTrigger value="emails"><Mail className="h-4 w-4 mr-1" />Emails</TabsTrigger>
+              <TabsTrigger value="audit-logs"><ScrollText className="h-4 w-4 mr-1" />Audit Logs</TabsTrigger>
             </TabsList>
           </Tabs>
         }
