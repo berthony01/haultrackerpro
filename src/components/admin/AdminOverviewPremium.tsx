@@ -191,6 +191,9 @@ export function AdminOverviewPremium({ overview, onGoToTab }: Props) {
       {/* Phase 7: Marketplace Health */}
       <MarketplaceHealthSection overview={overview} />
 
+      {/* Phase 8: Marketplace Trends (activity-window) */}
+      <MarketplaceTrendsSection data={overview} />
+
       {/* Activity + chart row */}
       <section className="grid gap-4 lg:grid-cols-3">
 
