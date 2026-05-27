@@ -1008,7 +1008,7 @@ function RecruiterDetailDrawer({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
       <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
