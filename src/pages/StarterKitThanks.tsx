@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, Download, Shield, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
-import { STARTER_KIT_DOWNLOAD_URL } from '@/lib/leadMagnet';
+import { STARTER_KIT_DOWNLOAD_URL, triggerStarterKitDownload } from '@/lib/leadMagnet';
 import {
   trackLeadMagnetView,
   trackLeadMagnetDownload,
