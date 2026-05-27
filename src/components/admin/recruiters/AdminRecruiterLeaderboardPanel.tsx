@@ -773,6 +773,7 @@ function RecruiterDetailDrawer({
 }) {
   const open = row !== null;
   const r = row;
+  const outreach = useRecruiterOutreachStatus(r ? [r.recruiter_profile_id] : []);
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
