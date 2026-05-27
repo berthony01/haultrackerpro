@@ -596,6 +596,48 @@ export function AdminRecruiterLeaderboardPanel() {
             ))}
           </select>
         </div>
+        {/* Phase 17: Outreach filters */}
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
+          <select
+            value={outreachStatusFilter}
+            onChange={(e) => setOutreachStatusFilter(e.target.value as OutreachStatusFilter)}
+            className="rounded-lg border border-white/10 bg-[#0A0E16] px-2 py-2 text-xs text-white"
+            aria-label="Outreach Status"
+          >
+            {OUTREACH_STATUS_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.value === 'all' ? o.label : `Outreach: ${o.label}`}
+              </option>
+            ))}
+          </select>
+          <select
+            value={reminderFilter}
+            onChange={(e) => setReminderFilter(e.target.value as ReminderFilter)}
+            className="rounded-lg border border-white/10 bg-[#0A0E16] px-2 py-2 text-xs text-white"
+            aria-label="Reminder Category"
+          >
+            {REMINDER_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.value === 'all' ? o.label : `Reminder: ${o.label}`}
+              </option>
+            ))}
+          </select>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
+            className="rounded-lg border border-white/10 bg-[#0A0E16] px-2 py-2 text-xs text-white"
+            aria-label="Outreach Priority"
+          >
+            {PRIORITY_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.value === 'all' ? o.label : `Priority: ${o.label}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="mt-1 text-[10px] text-white/40">
+          Outreach filters use saved manual outreach tracking only. No emails or reminders are sent.
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-[10px] uppercase tracking-[0.18em] text-white/40">Sort by</span>
           <select
@@ -611,12 +653,17 @@ export function AdminRecruiterLeaderboardPanel() {
             <option value="company">Company A–Z</option>
             <option value="plan">Billing Plan</option>
             <option value="verification">Verification Status</option>
+            <option value="follow_up_urgency">Follow-Up Urgency</option>
+            <option value="follow_up_date">Follow-Up Date</option>
+            <option value="outreach_priority">Outreach Priority</option>
+            <option value="outreach_recently_updated">Outreach Recently Updated</option>
           </select>
           <span className="ml-auto text-[11px] text-white/40">
             {sorted.length} of {rows.length} shown
           </span>
         </div>
       </section>
+
 
       {/* States */}
       {isLoading && (
