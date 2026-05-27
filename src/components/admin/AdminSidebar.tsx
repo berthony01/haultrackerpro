@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, FileText, Share2, BookOpen, LucideIcon } from 'lucide-react';
+import { Truck, BarChart3, TrendingUp, Users, ParkingCircle, Trophy, Gift, Briefcase, Building2, Shield, CreditCard, MessageSquare, Mail, FileText, Share2, BookOpen, ScrollText, LucideIcon } from 'lucide-react';
 
 export interface AdminNavItem {
   value: string;
@@ -22,6 +22,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { value: 'billing', label: 'Billing', icon: CreditCard },
   { value: 'feedback', label: 'Feedback', icon: MessageSquare },
   { value: 'emails', label: 'Emails', icon: Mail },
+  { value: 'audit-logs', label: 'Audit Logs', icon: ScrollText },
 ];
 
 interface AdminSidebarProps {
