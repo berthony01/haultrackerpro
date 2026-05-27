@@ -917,6 +917,21 @@ function RecruiterDetailDrawer({
                 </div>
               </Section>
 
+              {/* Recent Opportunities (Phase 12, display-only) */}
+              <Section title="Recent Opportunities">
+                <p className="-mt-1 mb-2 text-[11px] text-white/55">
+                  Latest listings for this recruiter based on currently loaded admin data.
+                </p>
+                <RecentOpportunitiesList items={r.recent_opportunities} />
+                <p className="mt-2 text-[10px] text-white/40">
+                  Showing up to {RECENT_OPPORTUNITY_DISPLAY_CAP} recent listings. Totals above may
+                  include more opportunities. Recent list is informational and does not recalculate
+                  leaderboard totals.
+                </p>
+              </Section>
+
+
+
               {/* Application & Contact Activity */}
               <Section title="Application & Contact Activity">
                 <div className="grid grid-cols-2 gap-2">
