@@ -16,7 +16,20 @@ import {
   Download,
   Eye,
   X,
+  Bell,
+  CalendarClock,
+  CalendarX,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
+import {
+  computeReminderInfo,
+  reminderCategoryBadgeClass,
+  compareReminders,
+  REMINDER_CATEGORY_LABEL,
+  type ReminderCategory,
+  type ReminderInfo,
+} from '@/lib/admin/recruiterOutreachReminders';
 import {
   Sheet,
   SheetContent,
