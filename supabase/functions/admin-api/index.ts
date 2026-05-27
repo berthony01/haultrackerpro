@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
         // Recruiter billing
         adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }),
         adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "active"),
-        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "trialing"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "trialing"), // trial-allowlist
         adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "past_due"),
         adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "canceled"),
         adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "cancelled"),
