@@ -16,7 +16,20 @@ import {
   Download,
   Eye,
   X,
+  Bell,
+  CalendarClock,
+  CalendarX,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
+import {
+  computeReminderInfo,
+  reminderCategoryBadgeClass,
+  compareReminders,
+  REMINDER_CATEGORY_LABEL,
+  type ReminderCategory,
+  type ReminderInfo,
+} from '@/lib/admin/recruiterOutreachReminders';
 import {
   Sheet,
   SheetContent,
@@ -195,6 +208,11 @@ export function AdminRecruiterLeaderboardPanel() {
   const [selected, setSelected] = useState<LeaderboardRow | null>(null);
 
   const rows: LeaderboardRow[] = data ?? [];
+
+  // Phase 16: Load outreach records for all loaded recruiters so we can derive reminders.
+  const panelOutreach = useRecruiterOutreachStatus(
+    useMemo(() => rows.map((r) => r.recruiter_profile_id), [rows]),
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -377,6 +395,13 @@ export function AdminRecruiterLeaderboardPanel() {
           ))}
         </div>
       </section>
+
+      {/* Phase 16: Outreach Follow-Up Reminders */}
+      <OutreachRemindersSummary
+        rows={sorted}
+        outreachByRecruiterId={panelOutreach.outreachByRecruiterId}
+        onView={(row) => setSelected(row)}
+      />
 
       {/* Filters */}
       <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
@@ -1713,6 +1738,35 @@ function OutreachTrackingSection({
     }
   };
 
+  const handleClearFollowUp = async () => {
+    try {
+      await outreach.clearFollowUp.mutateAsync(baseArgs);
+      setFollowUpInput('');
+      toast.success('Follow-up cleared');
+    } catch (e) {
+      toast.error(`Could not clear follow-up: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleMarkNoResponse = async () => {
+    try {
+      await outreach.markNoResponse.mutateAsync(baseArgs);
+      toast.success('Marked as no response');
+    } catch (e) {
+      toast.error(`Could not mark no response: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleMarkReplied = async () => {
+    try {
+      await outreach.markReplied.mutateAsync(baseArgs);
+      toast.success('Marked as replied');
+    } catch (e) {
+      toast.error(`Could not mark replied: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+
   return (
     <Section title="Manual Outreach Tracking">
       <p className="-mt-1 mb-3 text-[11px] text-white/55">
@@ -1739,6 +1793,9 @@ function OutreachTrackingSection({
           Priority: {currentPriority}
         </span>
       </div>
+
+      {/* Phase 16: Reminder status block */}
+      <ReminderStatusBlock info={computeReminderInfo(existing)} />
 
       {!existing && (
         <p className="mb-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/70">
@@ -1828,7 +1885,30 @@ function OutreachTrackingSection({
         >
           <X className="h-3 w-3" /> Close Outreach
         </button>
+        <button
+          type="button"
+          onClick={handleMarkReplied}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/[0.14]"
+        >
+          <CheckCircle2 className="h-3 w-3" /> Mark Replied
+        </button>
+        <button
+          type="button"
+          onClick={handleMarkNoResponse}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08]"
+        >
+          <Clock className="h-3 w-3" /> Mark No Response
+        </button>
+        <button
+          type="button"
+          onClick={handleClearFollowUp}
+          disabled={!existing?.follow_up_at}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <CalendarX className="h-3 w-3" /> Clear Follow-Up
+        </button>
       </div>
+
 
       <div className="mb-3">
         <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
@@ -1893,5 +1973,191 @@ function OutreachTrackingSection({
         timestamps, status, priority, and your short note.
       </p>
     </Section>
+  );
+}
+
+// ---------------- Phase 16: Outreach Follow-Up Reminders ----------------
+
+function ReminderStatusBlock({ info }: { info: ReminderInfo }) {
+  const dateText = info.followUpAt
+    ? formatLocalDateTime(info.followUpAt)
+    : 'Not scheduled';
+  const priorityLabel = info.priority
+    ? info.priority.charAt(0).toUpperCase() + info.priority.slice(1)
+    : '—';
+  return (
+    <div className="mb-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${reminderCategoryBadgeClass(
+            info.category,
+          )}`}
+        >
+          <Bell className="h-3 w-3" />
+          Reminder: {REMINDER_CATEGORY_LABEL[info.category]}
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+          Priority: <span className="text-white/75 normal-case">{priorityLabel}</span>
+        </span>
+      </div>
+      <div className="mt-2 grid gap-1 text-[11px] text-white/75 sm:grid-cols-2">
+        <div>
+          <span className="text-white/45">Follow-up date:</span>{' '}
+          <span className="text-white/85">{dateText}</span>
+        </div>
+        <div>
+          <span className="text-white/45">Status:</span>{' '}
+          <span className="text-white/85">{info.indicator}</span>
+        </div>
+      </div>
+      <p className="mt-1 text-[10px] text-white/40">
+        This is a manual dashboard reminder only. No notification will be sent.
+      </p>
+    </div>
+  );
+}
+
+interface ReminderSummaryItem {
+  row: LeaderboardRow;
+  info: ReminderInfo;
+}
+
+function OutreachRemindersSummary({
+  rows,
+  outreachByRecruiterId,
+  onView,
+}: {
+  rows: LeaderboardRow[];
+  outreachByRecruiterId: Map<string, RecruiterOutreachStatusRow>;
+  onView: (row: LeaderboardRow) => void;
+}) {
+  const items: ReminderSummaryItem[] = useMemo(
+    () =>
+      rows.map((row) => ({
+        row,
+        info: computeReminderInfo(outreachByRecruiterId.get(row.recruiter_profile_id)),
+      })),
+    [rows, outreachByRecruiterId],
+  );
+
+  const counts = useMemo(() => {
+    const base: Record<ReminderCategory, number> = {
+      overdue: 0,
+      due_today: 0,
+      upcoming: 0,
+      unscheduled: 0,
+      closed: 0,
+      replied: 0,
+    };
+    items.forEach((it) => {
+      base[it.info.category] += 1;
+    });
+    return base;
+  }, [items]);
+
+  const topReminders = useMemo(() => {
+    const active = items.filter(
+      (it) =>
+        it.info.category === 'overdue' ||
+        it.info.category === 'due_today' ||
+        it.info.category === 'upcoming',
+    );
+    active.sort((a, b) =>
+      compareReminders(
+        { info: a.info, score: a.row.performance_score, company: a.row.company_name },
+        { info: b.info, score: b.row.performance_score, company: b.row.company_name },
+      ),
+    );
+    return active.slice(0, 5);
+  }, [items]);
+
+  const cards: { key: ReminderCategory | 'closed_replied'; label: string; value: number; cls: string }[] = [
+    { key: 'overdue', label: 'Overdue', value: counts.overdue, cls: 'text-red-300' },
+    { key: 'due_today', label: 'Due Today', value: counts.due_today, cls: 'text-amber-300' },
+    { key: 'upcoming', label: 'Upcoming', value: counts.upcoming, cls: 'text-sky-300' },
+    { key: 'unscheduled', label: 'Unscheduled', value: counts.unscheduled, cls: 'text-white/70' },
+    {
+      key: 'closed_replied',
+      label: 'Closed / Replied',
+      value: counts.closed + counts.replied,
+      cls: 'text-emerald-300',
+    },
+  ];
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+          <Bell className="mr-1 inline h-3 w-3" />
+          Outreach Follow-Up Reminders
+        </p>
+        <span className="text-[10px] text-white/40">
+          Manual follow-up visibility only. No reminders, emails, or notifications are sent.
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        {cards.map((c) => (
+          <div
+            key={c.key}
+            className="rounded-xl border border-white/[0.06] bg-[#0D111A] px-3 py-2"
+          >
+            <p className="truncate text-[10px] font-medium text-white/50">{c.label}</p>
+            <p className={`font-mono text-xl font-bold ${c.cls}`}>{c.value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-[10px] text-white/40">
+        Counts are based on loaded recruiter rows and saved outreach tracking records.
+      </p>
+
+      {topReminders.length > 0 && (
+        <div className="mt-3 rounded-2xl border border-white/[0.06] bg-[#0D111A]">
+          <p className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+            <CalendarClock className="mr-1 inline h-3 w-3" />
+            Top reminders ({topReminders.length})
+          </p>
+          <ul className="divide-y divide-white/[0.04]">
+            {topReminders.map(({ row, info }) => {
+              const existing = outreachByRecruiterId.get(row.recruiter_profile_id);
+              const priorityLabel = info.priority
+                ? info.priority.charAt(0).toUpperCase() + info.priority.slice(1)
+                : '—';
+              return (
+                <li
+                  key={row.recruiter_profile_id}
+                  className="flex flex-wrap items-center gap-2 px-3 py-2"
+                >
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${reminderCategoryBadgeClass(
+                      info.category,
+                    )}`}
+                  >
+                    {REMINDER_CATEGORY_LABEL[info.category]}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-semibold text-white/90">
+                      {row.company_name || row.recruiter_name || '—'}
+                    </p>
+                    <p className="truncate text-[10px] text-white/55">
+                      {existing ? outreachStatusLabel(existing.status) : 'No outreach record'} ·
+                      Priority: {priorityLabel} · {info.indicator}
+                      {info.followUpAt ? ` · ${formatLocalDateTime(info.followUpAt)}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onView(row)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/15"
+                  >
+                    <Eye className="h-3 w-3" />
+                    View Details
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
