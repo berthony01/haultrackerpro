@@ -161,6 +161,122 @@ Deno.serve(async (req) => {
       const activePro = (subsActive.count ?? 0) + (_subsLegacyStub.count ?? 0);
       const conversionRate = totalUsers > 0 ? Math.round((activePro / totalUsers) * 1000) / 10 : 0;
       const recSuspendedCombined = Math.max(recSuspendedStatus.count ?? 0, recSuspendedVerif.count ?? 0);
+
+      // -------- Recruiter funnel: derived unique counts (ID-only reads, capped) --------
+      const ID_READ_CAP = 5000;
+      const [oppsIdRows, appsIdRows, crIdRows, recProfileIdRows] = await Promise.all([
+        adminDb.from("opportunities").select("recruiter_id, status").limit(ID_READ_CAP),
+        adminDb.from("opportunity_applications").select("recruiter_id").limit(ID_READ_CAP),
+        adminDb.from("recruiter_contact_requests").select("recruiter_user_id").limit(ID_READ_CAP),
+        adminDb.from("recruiter_profiles").select("id, user_id").limit(ID_READ_CAP),
+      ]);
+
+      const recruitersWithOpp = new Set<string>();
+      const recruitersWithActiveOpp = new Set<string>();
+      for (const r of (oppsIdRows.data ?? []) as Array<{ recruiter_id: string | null; status: string | null }>) {
+        if (r.recruiter_id) {
+          recruitersWithOpp.add(r.recruiter_id);
+          if (r.status === "active") recruitersWithActiveOpp.add(r.recruiter_id);
+        }
+      }
+      const recruitersWithApplication = new Set<string>();
+      for (const r of (appsIdRows.data ?? []) as Array<{ recruiter_id: string | null }>) {
+        if (r.recruiter_id) recruitersWithApplication.add(r.recruiter_id);
+      }
+      // Map recruiter_user_id -> recruiter_profiles.id for contact requests
+      const userIdToProfileId = new Map<string, string>();
+      for (const p of (recProfileIdRows.data ?? []) as Array<{ id: string; user_id: string | null }>) {
+        if (p.user_id) userIdToProfileId.set(p.user_id, p.id);
+      }
+      const recruitersWithContactRequest = new Set<string>();
+      for (const r of (crIdRows.data ?? []) as Array<{ recruiter_user_id: string | null }>) {
+        if (!r.recruiter_user_id) continue;
+        const pid = userIdToProfileId.get(r.recruiter_user_id);
+        if (pid) recruitersWithContactRequest.add(pid);
+        else recruitersWithContactRequest.add(r.recruiter_user_id); // fallback dedupe by user id
+      }
+
+      const recruiter_funnel_signups = recTotal.count ?? 0;
+      const recruiter_funnel_approved = recApproved.count ?? 0;
+      const recruiter_funnel_active = recActive.count ?? 0;
+      const recruiter_funnel_with_opportunity = recruitersWithOpp.size;
+      const recruiter_funnel_with_active_opportunity = recruitersWithActiveOpp.size;
+      const recruiter_funnel_with_application = recruitersWithApplication.size;
+      const recruiter_funnel_with_contact_request = recruitersWithContactRequest.size;
+
+      const rate = (n: number, d: number): number => (d > 0 ? Math.round((n / d) * 1000) / 10 : 0);
+      const recruiter_approval_rate = rate(recruiter_funnel_approved, recruiter_funnel_signups);
+      const recruiter_activation_rate = rate(recruiter_funnel_active, recruiter_funnel_signups);
+      const recruiter_posting_rate = rate(recruiter_funnel_with_opportunity, recruiter_funnel_signups);
+      const recruiter_active_posting_rate = rate(recruiter_funnel_with_active_opportunity, recruiter_funnel_signups);
+      const appDen = recruiter_funnel_with_active_opportunity > 0 ? recruiter_funnel_with_active_opportunity : recruiter_funnel_signups;
+      const recruiter_application_rate = rate(recruiter_funnel_with_application, appDen);
+      const crDen = recruiter_funnel_with_application > 0 ? recruiter_funnel_with_application : recruiter_funnel_signups;
+      const recruiter_contact_request_rate = rate(recruiter_funnel_with_contact_request, crDen);
+
+      // Score components
+      const clamp = (v: number, max: number) => Math.max(0, Math.min(max, v));
+      const recruiter_health_approval_points = Math.round(clamp((recruiter_approval_rate / 100) * 20, 20) * 10) / 10;
+      const recruiter_health_posting_points = Math.round(clamp((recruiter_posting_rate / 100) * 25, 25) * 10) / 10;
+      const recruiter_health_active_posting_points = Math.round(clamp((recruiter_active_posting_rate / 100) * 20, 20) * 10) / 10;
+      const recruiter_health_application_points = Math.round(clamp((recruiter_application_rate / 100) * 20, 20) * 10) / 10;
+      const recruiter_health_contact_points = Math.round(clamp((recruiter_contact_request_rate / 100) * 15, 15) * 10) / 10;
+      let recruiter_marketplace_health_score = Math.round(
+        recruiter_health_approval_points +
+          recruiter_health_posting_points +
+          recruiter_health_active_posting_points +
+          recruiter_health_application_points +
+          recruiter_health_contact_points,
+      );
+      if (recruiter_funnel_signups === 0) recruiter_marketplace_health_score = 0;
+      recruiter_marketplace_health_score = clamp(recruiter_marketplace_health_score, 100);
+
+      let recruiter_marketplace_health_label = "Early / insufficient activity";
+      if (recruiter_funnel_signups > 0) {
+        if (recruiter_marketplace_health_score >= 80) recruiter_marketplace_health_label = "Strong";
+        else if (recruiter_marketplace_health_score >= 60) recruiter_marketplace_health_label = "Healthy";
+        else if (recruiter_marketplace_health_score >= 40) recruiter_marketplace_health_label = "Needs attention";
+        else if (recruiter_marketplace_health_score >= 20) recruiter_marketplace_health_label = "Weak";
+        else recruiter_marketplace_health_label = "Early / insufficient activity";
+      }
+
+      const recruiter_health_low_approval = recruiter_funnel_signups >= 3 && recruiter_approval_rate < 50;
+      const recruiter_health_low_posting = recruiter_funnel_signups >= 3 && recruiter_posting_rate < 40;
+      const recruiter_health_low_applications =
+        recruiter_funnel_with_active_opportunity >= 3 && recruiter_application_rate < 30;
+      const recruiter_health_low_contact_requests =
+        recruiter_funnel_with_application >= 3 && recruiter_contact_request_rate < 30;
+
+      let recruiter_marketplace_health_summary: string;
+      if (recruiter_funnel_signups === 0) {
+        recruiter_marketplace_health_summary =
+          "No recruiter signups yet. Health score will become meaningful once recruiters join the marketplace.";
+      } else if (recruiter_funnel_signups < 3) {
+        recruiter_marketplace_health_summary =
+          "Recruiter activity is early. More signups and opportunities are needed before the score is meaningful.";
+      } else if (recruiter_marketplace_health_score >= 80) {
+        recruiter_marketplace_health_summary =
+          "Recruiter marketplace is strong across approvals, postings, and driver interest.";
+      } else if (recruiter_marketplace_health_score >= 60) {
+        recruiter_marketplace_health_summary =
+          "Recruiter marketplace is healthy. Watch the flagged items to keep momentum.";
+      } else if (recruiter_health_low_approval) {
+        recruiter_marketplace_health_summary =
+          "Approval rate is low. Review pending recruiters and tighten verification workflow.";
+      } else if (recruiter_health_low_posting) {
+        recruiter_marketplace_health_summary =
+          "Recruiters are signing up, but more need to post active opportunities.";
+      } else if (recruiter_health_low_applications) {
+        recruiter_marketplace_health_summary =
+          "Opportunities are live but driver applications are low. Review opportunity quality and visibility.";
+      } else if (recruiter_health_low_contact_requests) {
+        recruiter_marketplace_health_summary =
+          "Driver applications are coming in but contact requests are low. Encourage recruiter follow-up.";
+      } else {
+        recruiter_marketplace_health_summary =
+          "Recruiter marketplace needs attention. Check the score breakdown for the weakest stages.";
+      }
+
       return json({
         total_users: totalUsers,
         subs_free: subsFree.count ?? 0,
@@ -217,6 +333,43 @@ Deno.serve(async (req) => {
         contact_requests_total: crTotal.count ?? 0,
         contact_requests_7d: cr7d.count ?? 0,
         contact_requests_30d: cr30d.count ?? 0,
+        // Phase 7: Recruiter funnel
+        recruiter_funnel_signups,
+        recruiter_funnel_approved,
+        recruiter_funnel_active,
+        recruiter_funnel_with_opportunity,
+        recruiter_funnel_with_active_opportunity,
+        recruiter_funnel_with_application,
+        recruiter_funnel_with_contact_request,
+        // Conversion rates (percentages)
+        recruiter_approval_rate,
+        recruiter_activation_rate,
+        recruiter_posting_rate,
+        recruiter_active_posting_rate,
+        recruiter_application_rate,
+        recruiter_contact_request_rate,
+        // Activity aliases (equivalent to Phase 2 fields, kept alongside for clarity)
+        recruiter_marketplace_recruiters_7d: recCreated7d.count ?? 0,
+        recruiter_marketplace_recruiters_30d: recCreated30d.count ?? 0,
+        recruiter_marketplace_opportunities_7d: oppCreated7d.count ?? 0,
+        recruiter_marketplace_opportunities_30d: oppCreated30d.count ?? 0,
+        recruiter_marketplace_applications_7d: apps7d.count ?? 0,
+        recruiter_marketplace_applications_30d: apps30d.count ?? 0,
+        recruiter_marketplace_contact_requests_7d: cr7d.count ?? 0,
+        recruiter_marketplace_contact_requests_30d: cr30d.count ?? 0,
+        // Health score
+        recruiter_marketplace_health_score,
+        recruiter_marketplace_health_label,
+        recruiter_marketplace_health_summary,
+        recruiter_health_approval_points,
+        recruiter_health_posting_points,
+        recruiter_health_active_posting_points,
+        recruiter_health_application_points,
+        recruiter_health_contact_points,
+        recruiter_health_low_approval,
+        recruiter_health_low_posting,
+        recruiter_health_low_applications,
+        recruiter_health_low_contact_requests,
       });
     }
 
