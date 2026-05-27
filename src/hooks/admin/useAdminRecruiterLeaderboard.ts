@@ -20,6 +20,23 @@ export type PerformanceLabel =
   | 'Low Activity'
   | 'Needs Attention';
 
+export interface RecentRecruiterOpportunity {
+  id: string;
+  title: string | null;
+  company_name: string | null;
+  status: string | null;
+  admin_review_status: string | null;
+  created_at: string | null;
+  published_at: string | null;
+  hiring_city: string | null;
+  hiring_state: string | null;
+  trailer_type: string | null;
+  driver_type: string | null;
+  route_type: string | null;
+}
+
+export const RECENT_OPPORTUNITY_DISPLAY_CAP = 10;
+
 export interface LeaderboardRow {
   recruiter_profile_id: string;
   recruiter_user_id: string;
