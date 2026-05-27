@@ -106,6 +106,7 @@ export default function ResourceArticlesAdmin() {
     setLoading(true);
     let q = supabase.from('resource_articles').select('*').order('updated_at', { ascending: false });
     if (filter === 'pending_review') q = q.eq('approval_status', 'pending_review');
+    else if (filter === 'needs_revision') q = q.eq('approval_status', 'needs_revision');
     else if (filter !== 'all') q = q.eq('status', filter);
     const { data, error } = await q;
     if (error) toast.error(error.message);
@@ -115,17 +116,26 @@ export default function ResourceArticlesAdmin() {
 
   useEffect(() => { if (isAdmin) fetchRows(); }, [isAdmin, fetchRows]);
 
-  const openNew = () => {
-    setEditing({ ...EMPTY, created_by: user?.id });
+  const resetEditorTransient = () => {
     setSafetyChecked(false);
     setPrefillNotice(null);
+    setEditorTab('edit');
+    setRevisionNote('');
+    setShowRevisionInput(false);
+    setJustApproved(false);
+    setJustPublishedSlug(null);
+  };
+
+  const openNew = () => {
+    setEditing({ ...EMPTY, created_by: user?.id });
+    resetEditorTransient();
     setEditorOpen(true);
   };
 
-  const openEdit = (a: Article) => {
+  const openEdit = (a: Article, tab: 'edit' | 'preview' = 'edit') => {
     setEditing({ ...a });
-    setSafetyChecked(false);
-    setPrefillNotice(null);
+    resetEditorTransient();
+    setEditorTab(tab);
     setEditorOpen(true);
   };
 
