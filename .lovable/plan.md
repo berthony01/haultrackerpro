@@ -1,27 +1,51 @@
-## Problem
+# Phase 27 — Replace Starter Kit + Improve Lead Magnet Placement
 
-On desktop, the Save / Refer / Request Info action bar at the bottom of the Opportunity Detail page scrolls away with the page instead of staying pinned to the bottom of the viewport.
+## Audit findings
 
-The element currently uses `fixed lg:sticky ... lg:bottom-4`. `position: sticky` only pins to the viewport when its nearest scrolling ancestor is the viewport AND the sticky element is a direct child of a tall flow container. In this layout the action bar is the last child of a `space-y-5` wrapper inside `<main>`, so once that wrapper scrolls past, the sticky element scrolls with it — exactly what the user is seeing.
+- Download URL (fallback): `https://pngptztxwbtozwxrtbwo.supabase.co/storage/v1/object/public/lead-magnets/HaulTrackerPro_Trucker_Starter_Kit_Free.zip` — defined in `src/lib/leadMagnet.ts`.
+- Thank-you copy hardcodes "~70 KB" in `src/pages/StarterKitThanks.tsx:90`.
+- Landing page has only one Starter Kit CTA at line ~831 (Section 6.5), far below the hero (hero ends at line ~260).
+- New uploaded ZIP is 58.5 KB with 6 PDFs but file numbering is `00, 01, 03, 04, 05, 08` (non-sequential).
+- No "passing the CDL" string currently in code — nothing to rename there.
 
-## Fix
+## Changes
 
-Keep mobile behavior identical (fixed above BottomNav). On desktop, switch from `lg:sticky` to `lg:fixed` pinned to the bottom of the viewport, constrained to the main content column so it doesn't overlap the sidebar.
+### 1. Repackage and replace starter kit asset
 
-### Change in `src/components/opportunities/OpportunityDetail.tsx`
+- Re-zip the uploaded PDFs with clean sequential numbering:
+  - `00_Start_Here.pdf`
+  - `01_CDL_Study_Companion.pdf`
+  - `02_CDL_Test_Day_Checklist.pdf`
+  - `03_New_Driver_Mistakes_to_Avoid.pdf`
+  - `04_Owner_Operator_Document_Checklist.pdf`
+  - `05_First_30_Days_Success_Checklist.pdf`
+- Upload the new zip via `supabase--storage_upload` to bucket `lead-magnets` at the existing path `HaulTrackerPro_Trucker_Starter_Kit_Free.zip` so the public URL stays identical. No `leadMagnet.ts` URL change needed.
 
-Update the action-bar wrapper (around line 264) so that on `lg` and up:
-- Use `lg:fixed` with `lg:bottom-4`
-- Position it within the main content area (account for the 240px sidebar: `lg:left-[calc(15rem+1.5rem)] lg:right-6`)
-- Remove `lg:sticky` and the `lg:left-auto lg:right-auto` resets
-- Keep z-index and safe-area handling intact
+### 2. Copy updates
 
-Also keep the existing mobile spacer (`h-32 lg:hidden`) and add a matching desktop spacer (`hidden lg:block lg:h-28`) so the last content card isn't hidden behind the now-pinned bar.
+- `src/pages/StarterKitThanks.tsx`: change "~70 KB" → "~60 KB".
+- `src/pages/StarterKit.tsx`: ensure any preparing-for-CDL language uses "foundation for preparing for the CDL" (currently fine; verify and tweak hero subhead to add explicit "preparing for the CDL" reassurance if appropriate without scope creep). Keep existing disclaimer block in trust section unchanged.
 
-No other files, no business logic, no styling redesign — only the positioning classes on that one wrapper and the spacer.
+### 3. Landing page — add secondary CTA near the top
 
-## Verification
+Insert a new compact CTA band immediately after Section 1 (HERO), before Section 1.5 (Opportunities), at line ~261 of `src/pages/Landing.tsx`. Reuse the existing visual pattern from Section 6.5 (outline orange button on dark band) so the lower CTA remains intact and the new one feels native.
 
-- Desktop ≥1024px: scroll the opportunity detail page; the action bar stays pinned at the bottom of the viewport, aligned with the main content column, not overlapping the sidebar.
-- Mobile <1024px: unchanged — bar sits above the BottomNav with safe-area inset.
-- No content is hidden behind the bar at the end of the page in either mode.
+- Headline: "New to trucking? Download the Free Trucker Starter Kit"
+- Subcopy: "CDL study help, checklists, owner-op paperwork guidance, and first-30-days habits."
+- Button: "Get the Free Kit" → `navigate('/starter-kit')` + `trackStarterKitCTAClicked('landing_top')`.
+- Keep existing Section 6.5 CTA untouched (still tracked as `'landing'`).
+
+### 4. Verification
+
+- `npm run build`
+- `npm run test`
+- Manual: load `/`, confirm top CTA visible under hero; click → `/starter-kit`; submit form → `/starter-kit/thanks`; click Download → fetches new 60 KB ZIP with sequential filenames.
+
+## Files touched
+
+- `supabase storage: lead-magnets/HaulTrackerPro_Trucker_Starter_Kit_Free.zip` (replaced)
+- `src/pages/StarterKitThanks.tsx` (size copy)
+- `src/pages/StarterKit.tsx` (CDL wording verify/adjust)
+- `src/pages/Landing.tsx` (new top CTA band)
+
+No DB migrations, no analytics schema changes, no auth changes, no calculation logic touched.
