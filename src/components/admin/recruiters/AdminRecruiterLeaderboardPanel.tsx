@@ -1765,6 +1765,9 @@ function OutreachTrackingSection({
         </span>
       </div>
 
+      {/* Phase 16: Reminder status block */}
+      <ReminderStatusBlock info={computeReminderInfo(existing)} />
+
       {!existing && (
         <p className="mb-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/70">
           No outreach tracking record yet. The first action below will create one.
