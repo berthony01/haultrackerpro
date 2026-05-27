@@ -831,7 +831,7 @@ export function AdminRecruiterLeaderboardPanel() {
                 {b === 'all'
                   ? 'All billing'
                   : b === 'active_trialing'
-                  ? 'Active/Trialing'
+                  ? 'Active Billing'
                   : b === 'past_due'
                   ? 'Past Due'
                   : b === 'none'
