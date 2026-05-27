@@ -156,14 +156,20 @@ export function getShowingLabel(
     return null;
   }
   let start: Date; let end: Date;
-  switch (key) {
-    case 'this_week': start = startOfWeek(now, { weekStartsOn }); end = endOfWeek(now, { weekStartsOn }); break;
-    case 'last_week': { const lw = subWeeks(now, 1); start = startOfWeek(lw, { weekStartsOn }); end = endOfWeek(lw, { weekStartsOn }); break; }
-    case 'this_month': start = startOfMonth(now); end = endOfMonth(now); break;
-    case 'last_month': { const lm = subMonths(now, 1); start = startOfMonth(lm); end = endOfMonth(lm); break; }
-    case 'this_year': start = startOfYear(now); end = endOfYear(now); break;
+  const shared = SHARED_KEY[key];
+  if (shared) {
+    // Delegate the four shared keys to reportRanges so DateRangeFilter and
+    // DashboardView always agree on the underlying calendar window.
+    const r = getSharedPresetRange(shared, weekStartsOn);
+    start = parseISO(r.from);
+    end = parseISO(r.to);
+  } else if (key === 'this_year') {
+    // Dashboard-only key — reportRanges has no 'this_year' preset.
+    start = startOfYear(now); end = endOfYear(now);
+  } else {
+    return null;
   }
-  return `Showing: ${fmt(start!)} - ${fmt(end!)}`;
+  return `Showing: ${fmt(start)} - ${fmt(end)}`;
 }
 
 /**
