@@ -1225,3 +1225,145 @@ function RecentOpportunitiesList({ items }: { items: RecentRecruiterOpportunity[
     </ul>
   );
 }
+
+// ---------------- Recent Applications / Contact Requests (Phase 13) ----------------
+
+function appStatusBadgeClass(status: string | null | undefined): string {
+  switch (status) {
+    case 'approved':
+      return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+    case 'pending':
+      return 'bg-amber-500/15 text-amber-300 ring-amber-500/30';
+    case 'rejected':
+      return 'bg-red-500/15 text-red-300 ring-red-500/30';
+    case 'withdrawn':
+      return 'bg-white/[0.06] text-white/60 ring-white/10';
+    default:
+      return 'bg-white/[0.04] text-white/60 ring-white/10';
+  }
+}
+
+function crStatusBadgeClass(status: string | null | undefined, responded: boolean): string {
+  if (responded) return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+  switch (status) {
+    case 'approved':
+      return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+    case 'rejected':
+    case 'declined':
+      return 'bg-red-500/15 text-red-300 ring-red-500/30';
+    case 'pending':
+      return 'bg-amber-500/15 text-amber-300 ring-amber-500/30';
+    default:
+      return 'bg-white/[0.04] text-white/60 ring-white/10';
+  }
+}
+
+function RecentApplicationsList({ items }: { items: RecentRecruiterApplication[] }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] text-white/55">
+        No recent applications found for this recruiter.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map((a) => {
+        const statusValue = a.status ?? 'unknown';
+        return (
+          <li key={a.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {a.opportunity_title ?? 'Opportunity unavailable'}
+                </p>
+              </div>
+              <span className="shrink-0 font-mono text-[10px] text-white/40" title={a.id}>
+                {shortId(a.id)}…
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${appStatusBadgeClass(a.status)}`}
+                title={`Application status: ${statusValue}`}
+              >
+                <span className="text-[9px] uppercase tracking-wider text-white/40">App</span>
+                {statusValue}
+              </span>
+              {a.opportunity_status && <StatusPill label="Opp" value={a.opportunity_status} />}
+              {a.opportunity_admin_review_status && (
+                <StatusPill label="Review" value={a.opportunity_admin_review_status} />
+              )}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-white/55">
+              <span>
+                Created: <span className="text-white/80">{formatRecentDate(a.created_at)}</span>
+              </span>
+              <span>
+                Updated: <span className="text-white/80">{formatRecentDate(a.updated_at)}</span>
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function RecentContactRequestsList({ items }: { items: RecentRecruiterContactRequest[] }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] text-white/55">
+        No recent contact requests found for this recruiter.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map((c) => {
+        const responded = !!c.responded_at || c.status === 'responded' || c.status === 'completed';
+        const statusValue = responded ? 'responded' : c.status ?? 'unknown';
+        return (
+          <li key={c.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {c.opportunity_title ?? 'Opportunity unavailable'}
+                </p>
+              </div>
+              <span className="shrink-0 font-mono text-[10px] text-white/40" title={c.id}>
+                {shortId(c.id)}…
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${crStatusBadgeClass(c.status, responded)}`}
+                title={`Contact request status: ${statusValue}`}
+              >
+                <span className="text-[9px] uppercase tracking-wider text-white/40">Req</span>
+                {statusValue}
+              </span>
+              {c.application_status && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${appStatusBadgeClass(c.application_status)}`}
+                  title={`Linked application status: ${c.application_status}`}
+                >
+                  <span className="text-[9px] uppercase tracking-wider text-white/40">App</span>
+                  {c.application_status}
+                </span>
+              )}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-white/55">
+              <span>
+                Created: <span className="text-white/80">{formatRecentDate(c.created_at)}</span>
+              </span>
+              <span>
+                Responded: <span className="text-white/80">{formatRecentDate(c.responded_at)}</span>
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
