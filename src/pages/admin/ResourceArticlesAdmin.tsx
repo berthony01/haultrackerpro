@@ -260,7 +260,7 @@ export default function ResourceArticlesAdmin() {
     return Boolean(e.title && e.slug && e.seo_title && e.meta_description && e.content && e.topic_cluster);
   }, [editing]);
 
-  const save = async (override?: Partial<Article>) => {
+  const save = async (override?: Partial<Article>, opts?: { silent?: boolean }) => {
     const payload = { ...editing, ...(override ?? {}) };
     if (!payload.title || !payload.slug) {
       toast.error('Title and slug are required');
@@ -293,7 +293,7 @@ export default function ResourceArticlesAdmin() {
     }
     setSaving(false);
     if (res.error) { toast.error(res.error.message); return null; }
-    toast.success('Saved');
+    if (!opts?.silent) toast.success('Saved');
     setEditing(res.data as Article);
     fetchRows();
     return res.data as Article;
@@ -306,7 +306,22 @@ export default function ResourceArticlesAdmin() {
       updates.reviewed_by = user?.id ?? null;
       updates.reviewed_at = new Date().toISOString();
     }
-    await save(updates);
+    const result = await save(updates, { silent: true });
+    if (!result) return;
+    if (approval_status === 'approved') {
+      setJustApproved(true);
+      setShowRevisionInput(false);
+      toast.success('Approved — ready to publish', {
+        description: 'Tick the safety checklist, then click Publish.',
+      });
+    } else if (approval_status === 'needs_revision') {
+      setJustApproved(false);
+      toast.warning('Marked as needs revision', {
+        description: revisionNote ? 'Note saved for this session.' : undefined,
+      });
+    } else {
+      toast.success('Saved');
+    }
   };
 
   const publish = async () => {
@@ -314,11 +329,22 @@ export default function ResourceArticlesAdmin() {
       toast.error('Approve, fill all required fields, and confirm review first.');
       return;
     }
-    await save({
+    const result = await save({
       status: 'published',
       published_at: new Date().toISOString(),
       reviewed_by: user?.id ?? null,
       reviewed_at: new Date().toISOString(),
+    }, { silent: true });
+    if (!result) return;
+    setJustPublishedSlug(result.slug);
+    setJustApproved(false);
+    const liveUrl = `/resources/${result.slug}`;
+    toast.success('Published', {
+      description: 'Live now at ' + liveUrl,
+      action: {
+        label: 'Open live page',
+        onClick: () => window.open(liveUrl, '_blank', 'noopener,noreferrer'),
+      },
     });
   };
 
