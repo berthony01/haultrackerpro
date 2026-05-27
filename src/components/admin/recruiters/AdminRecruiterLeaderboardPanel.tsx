@@ -166,6 +166,7 @@ export function AdminRecruiterLeaderboardPanel() {
   const [perfFilter, setPerfFilter] = useState<(typeof PERF_OPTIONS)[number]>('all');
   const [sortBy, setSortBy] = useState<SortKey>('score');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<LeaderboardRow | null>(null);
 
   const rows: LeaderboardRow[] = data ?? [];
 
