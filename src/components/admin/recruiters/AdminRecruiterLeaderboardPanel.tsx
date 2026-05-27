@@ -178,6 +178,66 @@ const WORKFLOW_PRESETS: PresetDef[] = [
   { key: 'closed_or_replied', label: 'Closed / Replied', description: 'Outreach marked closed or replied.' },
 ];
 
+// Phase 19: shared preset predicate. Same logic powers both active filtering
+// and per-preset count badges so counts always agree with the visible list.
+function matchesPreset(
+  row: LeaderboardRow,
+  key: PresetKey,
+  outreach: RecruiterOutreachStatusRow | undefined,
+): boolean {
+  if (key === 'all') return true;
+  const isApprovedOrActive =
+    row.verification_status === 'approved' || row.account_status === 'active';
+  const notClosedOrReplied =
+    !outreach || (outreach.status !== 'closed' && outreach.status !== 'replied');
+  const cat = computeReminderInfo(outreach).category;
+  switch (key) {
+    case 'overdue_followups':
+      return cat === 'overdue';
+    case 'due_today':
+      return cat === 'due_today';
+    case 'upcoming_followups':
+      return cat === 'upcoming';
+    case 'no_outreach_record':
+      return !outreach;
+    case 'needs_first_listing':
+      return isApprovedOrActive && row.total_opportunities === 0 && notClosedOrReplied;
+    case 'needs_applications':
+      return row.active_opportunities > 0 && row.total_applications === 0 && notClosedOrReplied;
+    case 'needs_contact_conversion':
+      return row.total_applications > 0 && row.total_contact_requests === 0 && notClosedOrReplied;
+    case 'past_due_billing':
+      return row.billing_status === 'past_due';
+    case 'high_performers':
+      return row.performance_score >= 80;
+    case 'closed_or_replied':
+      return !!outreach && (outreach.status === 'closed' || outreach.status === 'replied');
+    default:
+      return true;
+  }
+}
+
+function matchesSearch(row: LeaderboardRow, q: string): boolean {
+  if (!q) return true;
+  const hay = [
+    row.recruiter_name,
+    row.recruiter_email ?? '',
+    row.recruiter_phone ?? '',
+    row.company_name,
+    row.company_city ?? '',
+    row.company_state ?? '',
+    row.verification_status,
+    row.account_status,
+    row.billing_plan ?? '',
+    row.billing_status ?? '',
+  ]
+    .join(' ')
+    .toLowerCase();
+  return hay.includes(q);
+}
+
+
+
 
 
 function labelColor(label: PerformanceLabel) {
