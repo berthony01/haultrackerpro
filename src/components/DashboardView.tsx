@@ -78,16 +78,30 @@ const presets: { key: PresetKey; label: string }[] = [
   { key: 'custom', label: 'Custom' },
 ];
 
+// Map dashboard preset keys to reportRanges keys where they overlap. The
+// dashboard exposes `this_year`, `all`, `custom` which the shared helper does
+// not — those stay handled locally below.
+const SHARED_KEY: Partial<Record<PresetKey, RangePresetKey>> = {
+  this_week: 'this_week',
+  last_week: 'last_week',
+  this_month: 'this_month',
+  last_month: 'last_month',
+};
+
 function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): { start: Date; end: Date } {
-  const now = new Date();
-  switch (key) {
-    case 'this_week': return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
-    case 'last_week': { const lw = subWeeks(now, 1); return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) }; }
-    case 'this_month': return { start: startOfMonth(now), end: endOfMonth(now) };
-    case 'last_month': { const lm = subMonths(now, 1); return { start: startOfMonth(lm), end: endOfMonth(lm) }; }
-    case 'this_year': return { start: startOfYear(now), end: endOfYear(now) };
-    default: return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
+  const shared = SHARED_KEY[key];
+  if (shared) {
+    const r = getSharedPresetRange(shared, weekStartsOn);
+    // Helper returns YYYY-MM-DD; widen end to 23:59:59.999 so isWithinInterval
+    // remains inclusive of timestamped dates (defensive — getEffectiveDate
+    // currently returns date-only).
+    return { start: parseISO(r.from), end: parseISO(`${r.to}T23:59:59.999`) };
   }
+  // Dashboard-only keys (this_year + default fallback) — reportRanges has no
+  // matching preset, so keep the math local.
+  const now = new Date();
+  if (key === 'this_year') return { start: startOfYear(now), end: endOfYear(now) };
+  return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
 }
 
 export function getTrendSuffix(key: PresetKey): string {
