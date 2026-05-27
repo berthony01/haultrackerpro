@@ -28,6 +28,8 @@ import {
   useAdminRecruiterLeaderboard,
   type LeaderboardRow,
   type PerformanceLabel,
+  type RecentRecruiterOpportunity,
+  RECENT_OPPORTUNITY_DISPLAY_CAP,
 } from '@/hooks/admin/useAdminRecruiterLeaderboard';
 
 type SortKey =
@@ -915,6 +917,21 @@ function RecruiterDetailDrawer({
                 </div>
               </Section>
 
+              {/* Recent Opportunities (Phase 12, display-only) */}
+              <Section title="Recent Opportunities">
+                <p className="-mt-1 mb-2 text-[11px] text-white/55">
+                  Latest listings for this recruiter based on currently loaded admin data.
+                </p>
+                <RecentOpportunitiesList items={r.recent_opportunities} />
+                <p className="mt-2 text-[10px] text-white/40">
+                  Showing up to {RECENT_OPPORTUNITY_DISPLAY_CAP} recent listings. Totals above may
+                  include more opportunities. Recent list is informational and does not recalculate
+                  leaderboard totals.
+                </p>
+              </Section>
+
+
+
               {/* Application & Contact Activity */}
               <Section title="Application & Contact Activity">
                 <div className="grid grid-cols-2 gap-2">
@@ -1034,5 +1051,116 @@ function MiniStat({ label, value }: { label: string; value: number | string }) {
       <p className="truncate text-[10px] font-medium text-white/50">{label}</p>
       <p className="font-mono text-sm font-bold text-white">{value}</p>
     </div>
+  );
+}
+
+// ---------------- Recent Opportunities (Phase 12) ----------------
+
+function formatRecentDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString();
+}
+
+function statusBadgeClass(status: string | null | undefined): string {
+  switch (status) {
+    case 'active':
+    case 'approved':
+      return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+    case 'pending':
+      return 'bg-amber-500/15 text-amber-300 ring-amber-500/30';
+    case 'flagged':
+      return 'bg-orange-500/15 text-orange-300 ring-orange-500/30';
+    case 'rejected':
+    case 'removed':
+      return 'bg-red-500/15 text-red-300 ring-red-500/30';
+    case 'draft':
+      return 'bg-white/[0.06] text-white/70 ring-white/10';
+    default:
+      return 'bg-white/[0.04] text-white/60 ring-white/10';
+  }
+}
+
+function StatusPill({ label, value }: { label: string; value: string | null | undefined }) {
+  const v = value && value.length > 0 ? value : 'unknown';
+  const display = v === 'unknown' ? 'Unknown' : v;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${statusBadgeClass(v)}`}
+      title={`${label}: ${display}`}
+    >
+      <span className="text-[9px] uppercase tracking-wider text-white/40">{label}</span>
+      {display}
+    </span>
+  );
+}
+
+function RecentOpportunitiesList({ items }: { items: RecentRecruiterOpportunity[] }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] text-white/55">
+        No recent opportunities found for this recruiter.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map((o) => {
+        const route = [o.hiring_city, o.hiring_state].filter(Boolean).join(', ');
+        return (
+          <li
+            key={o.id}
+            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {o.title ?? 'Untitled listing'}
+                </p>
+                {o.company_name && (
+                  <p className="mt-0.5 truncate text-[11px] text-white/60">{o.company_name}</p>
+                )}
+              </div>
+              <span className="shrink-0 font-mono text-[10px] text-white/40" title={o.id}>
+                {shortId(o.id)}…
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <StatusPill label="Status" value={o.status} />
+              <StatusPill label="Review" value={o.admin_review_status} />
+              {o.driver_type && (
+                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/70 ring-1 ring-white/10">
+                  {o.driver_type}
+                </span>
+              )}
+              {o.trailer_type && (
+                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/70 ring-1 ring-white/10">
+                  {o.trailer_type}
+                </span>
+              )}
+              {o.route_type && (
+                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/70 ring-1 ring-white/10">
+                  {o.route_type}
+                </span>
+              )}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-white/55">
+              <span>
+                Created: <span className="text-white/80">{formatRecentDate(o.created_at)}</span>
+              </span>
+              <span>
+                Published: <span className="text-white/80">{formatRecentDate(o.published_at)}</span>
+              </span>
+              {route && (
+                <span className="col-span-2 truncate">
+                  Route: <span className="text-white/80">{route}</span>
+                </span>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
