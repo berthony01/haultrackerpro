@@ -1,52 +1,90 @@
-# Plan: Fix Resource Articles Admin Workflow
+## Audit findings — Starter Kit download button
 
-## What's actually broken (strict analysis)
+The download button lives in two places and both use the same pattern:
 
-After tracing `src/pages/admin/ResourceArticlesAdmin.tsx` and `src/pages/resources/ResourceArticleDynamic.tsx`, the issues you noticed are real:
+- `src/pages/StarterKit.tsx` (line 76) — `directDownload()` for already-signed-in users
+- `src/pages/StarterKitThanks.tsx` (line 36) — `handleDownload()` after form submit
 
-1. **No way to preview the rendered article.** The Content field is a raw Markdown `<Textarea>`. There is no preview tab and no "View" link anywhere — not from the list, not from the editor. You can only stare at raw `##` headings.
-2. **Public route hides anything not published.** `ResourceArticleDynamic` queries `.eq('status','published').not('published_at','is',null)`. So drafts and approved articles return "Resource not found" if you try to visit `/resources/<slug>` — that's why drafts feel invisible.
-3. **Approve gives no visible feedback.** `setApproval('approved')` runs `save()`, which only shows a generic "Saved" toast. The only visible change is two tiny badges at the bottom of the dialog (`Status: approved`, `Approval: approved`) and the Publish button quietly becoming enabled. Nothing draws your eye to it.
-4. **Mark Needs Revision is a dead end.** Same generic "Saved" toast, no field to capture *why* it needs revision, no visible state change beyond the small badge.
-5. **Publish has no "view it live" affordance.** After publishing, the dialog stays open, toast says "Saved", and there's no link to open the public URL.
-6. **Save Draft → "where is it?"** It saves to the list, but the list row has no Preview action, only Edit. So drafts really do feel like they vanish.
+Both call:
 
-These are all UI-layer fixes. No schema, RLS, or backend changes.
+```ts
+window.open(STARTER_KIT_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+```
 
-## Changes (UI only, `src/pages/admin/ResourceArticlesAdmin.tsx`)
+`STARTER_KIT_DOWNLOAD_URL` points to a **.zip** in Supabase Storage on a **different origin** (`pngptztxwbtozwxrtbwo.supabase.co`).
 
-### 1. Add a Preview tab inside the editor dialog
-- Wrap the Title/Slug/SEO/Content block in `Tabs` with two tabs: **Edit** and **Preview**.
-- Preview renders `<SafeMarkdown content={editing.content ?? ''} />` (already used by the public page), plus title, excerpt, and the meta-description preview, so admin sees exactly what readers see.
-- Default tab: Edit. Tab state local to the dialog.
+### Why this is unreliable on mobile
 
-### 2. Add a "Preview" action on each list row
-- Next to the existing **Edit** button, add **Preview** which opens the editor dialog directly on the Preview tab. Same dialog, no new route, no DB changes.
-- For rows already `published`, also add a small **Open Live** link that goes to `/resources/<slug>` in a new tab. Hidden for non-published rows (since the public route 404s them by design).
+1. **iOS Safari + `window.open` to a binary file.** iOS often blocks or silently fails when `window.open('_blank')` targets a non-renderable file (zip). It opens a blank tab that immediately closes, or shows "Safari cannot download this file." Users see nothing happen.
+2. **No `download` attribute, no Content-Disposition.** `window.open` never triggers a save dialog. The browser decides what to do with the response. Because the file is cross-origin from Supabase Storage, even an `<a download>` attribute would be **ignored** unless the object is served with `Content-Disposition: attachment`. We don't control that header today.
+3. **Popup blockers on Android Chrome / in-app browsers** (Gmail, Instagram, Facebook, TikTok webview) frequently kill `_blank` for binary URLs, even inside a direct click handler. In-app browsers also can't always download zips at all.
+4. **Copy says "6 PDFs (~70 KB)" but the asset is a single .zip.** On iOS that means the user gets a "compressed archive" they may not know how to open — and Files app handling varies.
+5. **No visible fallback.** If the new tab is blocked or silently fails, the user has no copyable link, no "tap here if nothing happened" affordance.
 
-### 3. Make Approve / Needs Revision / Publish actually feel like they did something
-- After `setApproval('approved')`: toast `"Approved — ready to publish"` and visually highlight the Publish button (e.g. pulse/ring) while the dialog stays open.
-- After `setApproval('needs_revision')`: open a tiny inline panel (not a separate dialog) with a `Textarea` for an optional revision note that gets appended to the **Excerpt? No — to the existing editor as a yellow banner only**. Since there's no `revision_notes` column and you said no schema changes, store the note in component state and surface it as a banner at the top of the dialog while editing this article in the current session. Toast: `"Marked as needs revision"`. (If you want it persisted, that's a separate phase — see Deferred.)
-- After `publish()` succeeds: toast `"Published"` plus a second toast action button `"Open live page"` linking to `/resources/<slug>` in a new tab. Also show a green inline banner in the dialog with the same link.
+### Fix plan (UI / frontend only — no schema, no backend)
 
-### 4. Clarify state at a glance
-- Move the small `Status` / `Approval` badges from the bottom of the dialog to **right under the dialog title**, made larger and color-coded (draft = secondary, pending_review = warning, approved = success, published = primary, archived = muted, needs_revision = destructive).
-- Footer buttons get hover tooltips explaining what each does and why it's disabled when it is (e.g. Publish disabled tooltip: `"Approve the article and tick the safety checklist first."`).
+All work stays in `src/pages/StarterKit.tsx`, `src/pages/StarterKitThanks.tsx`, and a tiny helper in `src/lib/leadMagnet.ts`. No business logic, no auth, no analytics events change semantics.
 
-### 5. List filter cleanup (small)
-- Add a `Needs revision` option to the Filter `Select` so it's findable without scrolling the All view. Filter logic: `q.eq('approval_status','needs_revision')`.
+1. **New helper `triggerStarterKitDownload()` in `src/lib/leadMagnet.ts`.**
+   - Creates a hidden `<a>` element with `href = STARTER_KIT_DOWNLOAD_URL`, `download="HaulTrackerPro_Trucker_Starter_Kit.zip"`, `rel="noopener noreferrer"`.
+   - On iOS / Safari (detected via `navigator.userAgent`), sets `target="_self"` and uses `window.location.assign(url)` instead — same-tab navigation is the only reliable way iOS will offer "Download Linked File" / open in Files.
+   - On everything else, sets `target="_blank"` and clicks the anchor (so Chrome/Edge/Android honor the download attribute when the server allows it, and otherwise opens in a new tab).
+   - Always returns the URL so callers can show a manual fallback.
 
-## Files touched
+2. **Update both pages to call the helper** instead of `window.open(...)` directly. Analytics tracking calls (`trackLeadMagnetDownload`, `trackStarterKitDownloadClicked`) stay identical and fire before the helper.
 
-- `src/pages/admin/ResourceArticlesAdmin.tsx` — all of the above.
+3. **Add a visible fallback link under each download button.**
+   - Small "Trouble downloading? Tap here to open the file directly" anchor that points to `STARTER_KIT_DOWNLOAD_URL` with `target="_blank"` and `rel="noopener noreferrer"`. Plain `<a href>` is the most mobile-robust escape hatch — long-press to "Download Linked File" on iOS, normal save on Android.
+   - Replaces / augments the existing "Trouble downloading? Try a different browser…" text on the Thanks page; adds a matching line under the "Already signed in — download now" link on the Starter Kit page.
 
-No changes to: `ResourceArticleDynamic.tsx`, `SafeMarkdown.tsx`, schema, RLS, edge functions, public routes.
+4. **Fix the misleading copy** on Thanks page: "(6 PDFs, ~70 KB)" → "(ZIP file — 6 PDFs inside, ~70 KB)" so users on mobile aren't surprised by a compressed archive.
 
-## Deferred (not in this phase)
+5. **No change** to:
+   - `STARTER_KIT_DOWNLOAD_URL` value
+   - The Supabase Storage object or its headers (out of scope for a UI fix; flagged as a follow-up below)
+   - Auth flow, form submission, RPC, or redirect to `/starter-kit/thanks`
+   - Footer, SEO, layout
 
-- Persisting revision notes (would need a `revision_notes` text column + migration).
-- Public preview-by-token route for non-published articles (would need a token column + RLS policy).
-- Diff view between draft and last-published version.
-- Inline AI re-draft on a single section.
+### Files changed
 
-Confirm and I'll implement exactly the above — nothing more.
+- `src/lib/leadMagnet.ts` — add `triggerStarterKitDownload()` helper.
+- `src/pages/StarterKit.tsx` — `directDownload()` uses helper; add fallback `<a>` under the "Already signed in — download now" button.
+- `src/pages/StarterKitThanks.tsx` — `handleDownload()` uses helper; update copy; add fallback `<a>` under the primary Download button.
+
+### Technical detail
+
+Helper sketch (no other behavior changes):
+
+```ts
+export function triggerStarterKitDownload() {
+  const url = STARTER_KIT_DOWNLOAD_URL;
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+
+  if (isIOS) {
+    // Same-tab navigation is the only reliable iOS path for cross-origin binaries.
+    window.location.assign(url);
+    return url;
+  }
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'HaulTrackerPro_Trucker_Starter_Kit.zip';
+  a.rel = 'noopener noreferrer';
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return url;
+}
+```
+
+### Deferred (not part of this UI fix)
+
+- Configure the Supabase Storage object to be served with `Content-Disposition: attachment; filename="HaulTrackerPro_Trucker_Starter_Kit.zip"` so cross-origin `download` actually forces save on desktop Chrome. This requires re-uploading the object with metadata or fronting it with an edge function — out of scope for a frontend audit/fix.
+- Splitting the zip into 6 individual PDFs hosted directly (would remove the iOS zip-handling friction entirely) — product decision, not in this phase.
+
+### Verification
+
+- TypeScript build clean.
+- Manual: open `/starter-kit/thanks?email=test@test.com` on the mobile preview, tap Download → iOS navigates same-tab to the file; Android Chrome triggers download or opens in new tab; fallback link always works via long-press.
