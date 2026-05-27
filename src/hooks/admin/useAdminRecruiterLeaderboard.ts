@@ -198,15 +198,16 @@ export function useAdminRecruiterLeaderboard() {
           .limit(LEADERBOARD_CAPS.opportunities),
         supabase
           .from('opportunity_applications')
-          .select('id,opportunity_id,recruiter_id,status,created_at')
+          .select('id,opportunity_id,recruiter_id,status,created_at,updated_at')
           .order('created_at', { ascending: false })
           .limit(LEADERBOARD_CAPS.applications),
         supabase
           .from('recruiter_contact_requests')
-          .select('id,application_id,recruiter_user_id,status,responded_at,created_at')
+          .select('id,application_id,recruiter_user_id,status,responded_at,created_at,updated_at')
           .order('created_at', { ascending: false })
           .limit(LEADERBOARD_CAPS.contactRequests),
       ]);
+
 
       if (recRes.error) throw recRes.error;
       if (billRes.error) throw billRes.error;
