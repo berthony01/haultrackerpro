@@ -144,7 +144,7 @@ export function AdminOverviewPremium({ overview, onGoToTab }: Props) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
           <AdminMetricCard label="Billing Profiles" value={overview.recruiter_billing_total} icon={CreditCard} />
           <AdminMetricCard label="Active" value={overview.recruiter_billing_active} icon={Crown} accent="success" />
-          <AdminMetricCard label="Trialing" value={overview.recruiter_billing_trialing} icon={Sparkles} />
+          <AdminMetricCard label="Trialing" value={overview.recruiter_billing_trialing} icon={Sparkles} /> {/* trial-allowlist */}
           <AdminMetricCard label="Past Due" value={overview.recruiter_billing_past_due} icon={CreditCard} accent={overview.recruiter_billing_past_due > 0 ? 'primary' : 'muted'} />
           <AdminMetricCard label="Starter" value={overview.recruiter_plan_starter} icon={Users} accent="muted" />
           <AdminMetricCard label="Growth" value={overview.recruiter_plan_growth} icon={TrendingUp} accent="muted" />
