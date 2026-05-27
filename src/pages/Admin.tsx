@@ -21,6 +21,7 @@ import { AdminContractsPanel } from '@/components/admin/contracts/AdminContracts
 import { AdminReferralOversightPanel } from '@/components/admin/referrals/AdminReferralOversightPanel';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
+import { AdminAuditLogPanel } from '@/components/admin/audit/AdminAuditLogPanel';
 
 interface OverviewData {
   total_users: number;
