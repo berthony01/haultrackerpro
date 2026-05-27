@@ -87,6 +87,12 @@ Deno.serve(async (req) => {
         driverPointsActive,
         leadsTotal, leads7d, leads30d,
         parseUsage7d, autoLogs7d, aiInsights7d,
+        recTotal, recPending, recApproved, recRejected, recSuspendedStatus, recSuspendedVerif, recActive, recCreated7d, recCreated30d,
+        rbTotal, rbActive, rbTrialing, rbPastDue, rbCanceled, rbCancelled, rbInactive,
+        rpStarter, rpGrowth, rpFleet,
+        oppTotal, oppActive, oppPending, oppApproved, oppRejected, oppFlagged, oppRemoved, oppCreated7d, oppCreated30d,
+        appsTotal, apps7d, apps30d,
+        crTotal, cr7d, cr30d,
       ] = await Promise.all([
         adminDb.from("profiles").select("id", { count: "exact", head: true }),
         adminDb.from("loads").select("id", { count: "exact", head: true }),
@@ -111,10 +117,50 @@ Deno.serve(async (req) => {
         adminDb.from("parse_usage").select("id", { count: "exact", head: true }).gte("used_at", sevenDaysAgoIso),
         adminDb.from("expense_automation_logs").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
         adminDb.from("ai_insights").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        // Recruiter profiles
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).eq("verification_status", "pending"),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).eq("verification_status", "approved"),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).eq("verification_status", "rejected"),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).eq("status", "suspended"),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).eq("verification_status", "suspended"),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).eq("status", "active"),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("recruiter_profiles").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgoIso),
+        // Recruiter billing
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "active"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "trialing"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "past_due"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "canceled"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "cancelled"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("status", "inactive"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("plan", "starter"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("plan", "growth"),
+        adminDb.from("recruiter_billing_profiles").select("id", { count: "exact", head: true }).eq("plan", "fleet"),
+        // Opportunities
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).eq("status", "active"),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).eq("admin_review_status", "pending"),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).eq("admin_review_status", "approved"),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).eq("admin_review_status", "rejected"),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).eq("admin_review_status", "flagged"),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).eq("status", "removed"),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("opportunities").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgoIso),
+        // Applications
+        adminDb.from("opportunity_applications").select("id", { count: "exact", head: true }),
+        adminDb.from("opportunity_applications").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("opportunity_applications").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgoIso),
+        // Contact requests
+        adminDb.from("recruiter_contact_requests").select("id", { count: "exact", head: true }),
+        adminDb.from("recruiter_contact_requests").select("id", { count: "exact", head: true }).gte("created_at", sevenDaysAgoIso),
+        adminDb.from("recruiter_contact_requests").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgoIso),
       ]);
       const totalUsers = users.count ?? 0;
       const activePro = (subsActive.count ?? 0) + (_subsLegacyStub.count ?? 0);
       const conversionRate = totalUsers > 0 ? Math.round((activePro / totalUsers) * 1000) / 10 : 0;
+      const recSuspendedCombined = Math.max(recSuspendedStatus.count ?? 0, recSuspendedVerif.count ?? 0);
       return json({
         total_users: totalUsers,
         subs_free: subsFree.count ?? 0,
@@ -138,8 +184,42 @@ Deno.serve(async (req) => {
         parse_usage_7d: parseUsage7d.count ?? 0,
         expense_automation_7d: autoLogs7d.count ?? 0,
         ai_insights_7d: aiInsights7d.count ?? 0,
+        // Recruiter marketplace
+        recruiters_total: recTotal.count ?? 0,
+        recruiters_pending: recPending.count ?? 0,
+        recruiters_approved: recApproved.count ?? 0,
+        recruiters_rejected: recRejected.count ?? 0,
+        recruiters_suspended: recSuspendedCombined,
+        recruiters_active: recActive.count ?? 0,
+        recruiters_created_7d: recCreated7d.count ?? 0,
+        recruiters_created_30d: recCreated30d.count ?? 0,
+        recruiter_billing_total: rbTotal.count ?? 0,
+        recruiter_billing_active: rbActive.count ?? 0,
+        recruiter_billing_trialing: rbTrialing.count ?? 0,
+        recruiter_billing_past_due: rbPastDue.count ?? 0,
+        recruiter_billing_canceled: (rbCanceled.count ?? 0) + (rbCancelled.count ?? 0),
+        recruiter_billing_inactive: rbInactive.count ?? 0,
+        recruiter_plan_starter: rpStarter.count ?? 0,
+        recruiter_plan_growth: rpGrowth.count ?? 0,
+        recruiter_plan_fleet: rpFleet.count ?? 0,
+        opportunities_total: oppTotal.count ?? 0,
+        opportunities_active: oppActive.count ?? 0,
+        opportunities_pending: oppPending.count ?? 0,
+        opportunities_approved: oppApproved.count ?? 0,
+        opportunities_rejected: oppRejected.count ?? 0,
+        opportunities_flagged: oppFlagged.count ?? 0,
+        opportunities_removed: oppRemoved.count ?? 0,
+        opportunities_created_7d: oppCreated7d.count ?? 0,
+        opportunities_created_30d: oppCreated30d.count ?? 0,
+        applications_total: appsTotal.count ?? 0,
+        applications_7d: apps7d.count ?? 0,
+        applications_30d: apps30d.count ?? 0,
+        contact_requests_total: crTotal.count ?? 0,
+        contact_requests_7d: cr7d.count ?? 0,
+        contact_requests_30d: cr30d.count ?? 0,
       });
     }
+
 
     if (action === "parking-overview") {
       const sevenDaysAgoIso = new Date(Date.now() - 7 * 86400000).toISOString();
