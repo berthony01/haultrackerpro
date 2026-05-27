@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead';
 import { trackSignUp, trackLogin } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { isInternalTestEmail } from '@/lib/internalTestAccounts';
 
 type Role = 'driver' | 'recruiter';
 
