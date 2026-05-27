@@ -713,6 +713,12 @@ export function AdminRecruiterLeaderboardPanel() {
         onView={(row) => setSelected(row)}
       />
 
+      {/* Phase 20: Outreach Workflow Analytics */}
+      <OutreachWorkflowAnalyticsSection
+        rows={sorted}
+        outreachByRecruiterId={panelOutreach.outreachByRecruiterId}
+      />
+
       {/* Phase 18: Workflow Presets */}
       <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
         <div className="flex items-start justify-between gap-3">
