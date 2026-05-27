@@ -209,6 +209,11 @@ export function AdminRecruiterLeaderboardPanel() {
 
   const rows: LeaderboardRow[] = data ?? [];
 
+  // Phase 16: Load outreach records for all loaded recruiters so we can derive reminders.
+  const panelOutreach = useRecruiterOutreachStatus(
+    useMemo(() => rows.map((r) => r.recruiter_profile_id), [rows]),
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
