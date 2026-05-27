@@ -249,6 +249,9 @@ export function AdminRecruiterLeaderboardPanel() {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_OPTIONS)[number]>('all');
   const [billingFilter, setBillingFilter] = useState<(typeof BILLING_OPTIONS)[number]>('all');
   const [perfFilter, setPerfFilter] = useState<(typeof PERF_OPTIONS)[number]>('all');
+  const [outreachStatusFilter, setOutreachStatusFilter] = useState<OutreachStatusFilter>('all');
+  const [reminderFilter, setReminderFilter] = useState<ReminderFilter>('all');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [sortBy, setSortBy] = useState<SortKey>('score');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<LeaderboardRow | null>(null);
@@ -259,6 +262,7 @@ export function AdminRecruiterLeaderboardPanel() {
   const panelOutreach = useRecruiterOutreachStatus(
     useMemo(() => rows.map((r) => r.recruiter_profile_id), [rows]),
   );
+  const outreachByRecruiterId = panelOutreach.outreachByRecruiterId;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -303,9 +307,42 @@ export function AdminRecruiterLeaderboardPanel() {
       }
       // Performance
       if (perfFilter !== 'all' && r.performance_label !== perfFilter) return false;
+
+      // Phase 17: Outreach status
+      const outreach = outreachByRecruiterId.get(r.recruiter_profile_id);
+      if (outreachStatusFilter !== 'all') {
+        if (outreachStatusFilter === 'no_record') {
+          if (outreach) return false;
+        } else {
+          if (!outreach || outreach.status !== outreachStatusFilter) return false;
+        }
+      }
+      // Phase 17: Reminder category (no outreach record => 'unscheduled')
+      if (reminderFilter !== 'all') {
+        const cat = computeReminderInfo(outreach).category;
+        if (cat !== reminderFilter) return false;
+      }
+      // Phase 17: Priority
+      if (priorityFilter !== 'all') {
+        if (priorityFilter === 'none') {
+          if (outreach) return false;
+        } else {
+          if (!outreach || outreach.priority !== priorityFilter) return false;
+        }
+      }
       return true;
     });
-  }, [rows, search, statusFilter, billingFilter, perfFilter]);
+  }, [
+    rows,
+    search,
+    statusFilter,
+    billingFilter,
+    perfFilter,
+    outreachStatusFilter,
+    reminderFilter,
+    priorityFilter,
+    outreachByRecruiterId,
+  ]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -327,12 +364,67 @@ export function AdminRecruiterLeaderboardPanel() {
           return (a.billing_plan ?? 'zzz').localeCompare(b.billing_plan ?? 'zzz');
         case 'verification':
           return a.verification_status.localeCompare(b.verification_status);
+        case 'follow_up_urgency': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const ia = computeReminderInfo(oa);
+          const ib = computeReminderInfo(ob);
+          const wa = REMINDER_SORT_WEIGHT[ia.category];
+          const wb = REMINDER_SORT_WEIGHT[ib.category];
+          if (wa !== wb) return wa - wb;
+          if (ia.followUpAt && ib.followUpAt) {
+            const ta = new Date(ia.followUpAt).getTime();
+            const tb = new Date(ib.followUpAt).getTime();
+            if (ta !== tb) return ta - tb;
+          } else if (ia.followUpAt) return -1;
+          else if (ib.followUpAt) return 1;
+          if (a.performance_score !== b.performance_score)
+            return b.performance_score - a.performance_score;
+          return a.company_name.localeCompare(b.company_name);
+        }
+        case 'follow_up_date': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const fa = oa?.follow_up_at ? new Date(oa.follow_up_at).getTime() : null;
+          const fb = ob?.follow_up_at ? new Date(ob.follow_up_at).getTime() : null;
+          if (fa !== null && fb !== null) {
+            if (fa !== fb) return fa - fb;
+          } else if (fa !== null) return -1;
+          else if (fb !== null) return 1;
+          return a.company_name.localeCompare(b.company_name);
+        }
+        case 'outreach_priority': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const pa = oa?.priority ? PRIORITY_SORT_WEIGHT[oa.priority] : 3;
+          const pb = ob?.priority ? PRIORITY_SORT_WEIGHT[ob.priority] : 3;
+          if (pa !== pb) return pa - pb;
+          const ia = computeReminderInfo(oa);
+          const ib = computeReminderInfo(ob);
+          const wa = REMINDER_SORT_WEIGHT[ia.category];
+          const wb = REMINDER_SORT_WEIGHT[ib.category];
+          if (wa !== wb) return wa - wb;
+          if (a.performance_score !== b.performance_score)
+            return b.performance_score - a.performance_score;
+          return a.company_name.localeCompare(b.company_name);
+        }
+        case 'outreach_recently_updated': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const ta = oa?.updated_at ? new Date(oa.updated_at).getTime() : null;
+          const tb = ob?.updated_at ? new Date(ob.updated_at).getTime() : null;
+          if (ta !== null && tb !== null) {
+            if (ta !== tb) return tb - ta;
+          } else if (ta !== null) return -1;
+          else if (tb !== null) return 1;
+          return a.company_name.localeCompare(b.company_name);
+        }
         default:
           return 0;
       }
     });
     return copy;
-  }, [filtered, sortBy]);
+  }, [filtered, sortBy, outreachByRecruiterId]);
 
   // Loaded-row summary
   const summary = useMemo(() => {
