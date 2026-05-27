@@ -87,7 +87,7 @@ export default function StarterKitThanks() {
           </h1>
           <p className="mt-3 text-center" style={{ color: TEXT_MUTED }}>
             {email ? <>We've got your email <span className="text-white">({email})</span>. </> : null}
-            Tap the button below to download your kit (6 PDFs, ~70 KB).
+            Tap the button below to download your kit (ZIP file — 6 PDFs inside, ~70 KB).
           </p>
 
           <div
@@ -109,8 +109,17 @@ export default function StarterKitThanks() {
             >
               <Download className="w-5 h-5" /> Download Free Kit
             </Button>
-            <p className="mt-3 text-xs text-center" style={{ color: 'hsl(220, 10%, 45%)' }}>
-              Trouble downloading? Try a different browser or check your popup blocker.
+            <a
+              href={STARTER_KIT_DOWNLOAD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 block text-xs text-center underline underline-offset-4"
+              style={{ color: 'hsl(220, 10%, 55%)' }}
+            >
+              Trouble downloading? Tap here to open the file directly
+            </a>
+            <p className="mt-2 text-xs text-center" style={{ color: 'hsl(220, 10%, 45%)' }}>
+              On iPhone, the file opens in Safari — tap Share → Save to Files. On Android, it saves to Downloads.
             </p>
           </div>
 
