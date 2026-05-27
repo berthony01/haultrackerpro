@@ -1,128 +1,76 @@
-# Phase 23 — Financial Calculation Consistency Repair
+# Phase 23B — Finish Date Range Consolidation
 
-## Audit findings (confirmed by reading the listed files)
+## Audit findings
 
-1. `**RecentLoadsPanel` receives unfiltered loads.** `DashboardView.tsx:382` passes `loads` (all loads) instead of `filteredLoads`, so the panel ignores the dashboard date filter.
-2. `**RecentLoadsPanel` mislabels pay as "Profit".** Line 67 renders `Profit` under the dollar value, but the value is `actual_pay_received ?? getLoadExpectedPay(load)` — that is revenue/pay, not profit.
-3. `**ReportsView` ignores week-start setting.** Line 90: `getWeekSummaries(filteredLoads)` is called without `weekStartsOn`, so weekly report rows always start on Sunday regardless of `user_settings.week_start_day`. The helper already accepts a `weekStartsOn` argument.
-4. `**ProfitByLoadTable` silently understates expenses per row.** It only subtracts `expenses.linked_load_id === load.id`, but the dashboard's total Net Profit uses **all** period expenses. Column is labeled generically "Expenses", which is misleading.
-5. **Date-range logic is partially duplicated.** `DateRangeFilter.tsx` builds presets inline; `src/lib/reportRanges.ts` already exposes `getPresetRange` / `validateCustomRange`. No "previous comparison range" helper exists, and there's no single `isDateInRange` helper.
-6. **Calculation core is already correct.** `financialCalculations.ts` (`summarizeLoads`, `excludeCancelled`, `getLoadRealizedRevenue`) and `loadMetrics.ts` (`getLoadExpectedPay`, `getLoadOperatingMiles`) already enforce rules 1, 2, 4–11. No formula changes needed there — the fixes are wiring + labels + week-start plumbing.
+Duplicated date-range logic still lives in two places:
 
-## Changes
+**`src/components/DateRangeFilter.tsx`** (lines 5-42, 83-88)
+- Inline `presets` array rebuilds `startOfWeek/endOfWeek/startOfMonth/endOfMonth/startOfQuarter/endOfQuarter/startOfYear/endOfYear/subWeeks/subMonths/subQuarters/subYears` for all 8 named presets.
+- Inline "Showing: …" label built from `format(...)` instead of `formatShowingRange`.
+- Already respects `week_start_day` via `useUserSettings` + `weekStartDayToNumber`. ✅
 
-### A. Centralize date-range helpers — `src/lib/reportRanges.ts`
+**`src/components/DashboardView.tsx`** (lines 75-85, 123-147, 229-234, 252-288)
+- Local `getPresetRange(key, weekStartsOn)` returns `{start: Date, end: Date}` for `this_week / last_week / this_month / last_month / this_year`.
+- Local `getShowingLabel(...)` rebuilds the same ranges to emit "Showing: …".
+- Local `prevRange` useMemo rebuilds previous-period math by hand.
+- `thisWeekLoadCount` (line 229) recomputes the current week independently.
+- Dashboard preset set differs from filter: includes `this_year` + `all` + `custom`, omits quarters / last_year / ytd. This is intentional and stays dashboard-local.
 
-Extend (do **not** replace) the existing module:
+**Other files — clean, no change needed**
+- `ReportsView.tsx`, `LoadsListView.tsx`: no date-range preset math (Reports just consumes `getWeekSummaries` with `weekStartsOn`, already fixed in Phase 23).
+- `WeeklyCloseout.tsx`: uses `startOfWeek/endOfWeek` once with `weekStartsOn` for the current pay-week snapshot — that's a single-purpose anchor, not preset math. Leave it.
+- `reportRanges.ts` already exports `getPresetRange`, `formatShowingRange`, `getPreviousComparisonRange`, `isDateInRange`, `validateCustomRange`. ✅
+- Existing tests: `reportRangesPresets.test.ts`, `financialConsistency.test.ts`, `dateRangeFilter.test.tsx`, `dashboardShowingAndCancelled.test.tsx`, `dashboardTrendPct.test.ts`.
 
-- Add `isDateInRange(dateStr: string, range: { from?: string; to?: string }): boolean` — inclusive YYYY-MM-DD compare.
-- Add `getPreviousComparisonRange(key, range, weekStartsOn)` — mirrors the active preset one period back (week→prev week, month→prev month, quarter→prev quarter, ytd→prior YTD slice, custom→same-length window immediately before `from`).
-- Add `formatShowingRange(range)` returning the same "Showing: …" string `DateRangeFilter` builds today.
-- Keep existing exports untouched.
+No unexpected calculation dependency surfaced — safe to refactor.
 
-### B. `DateRangeFilter.tsx`
+## Implementation
 
-- Replace inline preset construction with `getPresetRange(key, wso)` from `reportRanges.ts`.
-- Use `formatShowingRange` for the footer label.
-- No visual change; behavior identical.
+### 1. `src/components/DateRangeFilter.tsx`
 
-### C. `DashboardView.tsx`
+Replace the inline `presets` array with thin wrappers around `getPresetRange` from `reportRanges.ts`. Keep the same visible labels, button order, `aria-pressed` logic, and `onRangeChange(from?, to?)` contract.
 
-- Line 382: pass `filteredLoads` (not `loads`) to `<RecentLoadsPanel>` so the panel honors the dashboard date filter.
+- Import `getPresetRange, formatShowingRange, type RangePresetKey` from `@/lib/reportRanges`.
+- Build presets as `[{ label, key: RangePresetKey | 'all_time' }]`. `'all_time'` stays local (helper has no `all_time` key) and emits `(undefined, undefined)`.
+- Active-pill detection: compare `currentRange.from/to` against `getPresetRange(key, wso).from/to` strings (no more Date→string conversion in the component).
+- Replace inline "Showing: …" construction with `formatShowingRange({ from, to })`.
+- Drop unused date-fns imports.
+- Keep `validateCustomRange` flow untouched.
+- Preserve all classNames and DOM structure exactly.
 
-### D. `RecentLoadsPanel.tsx`
+### 2. `src/components/DashboardView.tsx`
 
-- Change row label from "Profit" → **"Pay"** when `actual_pay_received` is set, otherwise **"Est. Pay"**. Value unchanged.
-- Filter out `status === 'cancelled'` loads from `sorted` (cancelled loads never appear in recent list).
+Minimal surgical swap — do not change the dashboard preset set, custom-range UI, or KPI logic.
 
-### E. `ProfitByLoadTable.tsx`
+- Import `getPresetRange as getSharedPresetRange, getPreviousComparisonRange, formatShowingRange, type RangePresetKey` and `parseISO` (already imported).
+- Rewrite local `getPresetRange(key, wso)` so that for keys shared with the helper (`this_week, last_week, this_month, last_month`) it delegates to `getSharedPresetRange` and converts the returned `from/to` ISO strings to `Date` via `parseISO(from)` and `endOfDay(parseISO(to))`-equivalent (use `parseISO(to + 'T23:59:59')` or just reuse end-of-period Date from existing date-fns — simplest: keep `this_year` and the `default` branch local, and for the four shared keys return `{ start: parseISO(r.from), end: parseISO(r.to) }` plus an explicit `endOfDay`-style adjustment **only if needed by `isWithinInterval`**. Verify by reading the helper's `to` value — it is already `endOf*`-formatted as `yyyy-MM-dd` (midnight). To preserve inclusive comparisons we'll pass `end: parseISO(r.to + 'T23:59:59.999')`.
+- `this_year` and the `default` fallback stay local with a comment: `// dashboard-only key; reportRanges has no 'this_year' preset`.
+- `getShowingLabel`: for shared keys delegate to `formatShowingRange(getSharedPresetRange(key, wso))`. Keep local handling for `'all'` (returns `'Showing: All Time'`), `'custom'`, and `'this_year'` with a comment noting they are dashboard-specific.
+- `thisWeekLoadCount` (line 229): replace inline `startOfWeek/endOfWeek` with `getSharedPresetRange('this_week', weekStartsOn)` + `isDateInRange`.
+- `prevRange` useMemo: for keys covered by `getPreviousComparisonRange` (`this_week, last_week, this_month, last_month`), delegate; convert result to `{start: Date, end: Date}`. `this_year` and `custom` stay local with comments — the helper doesn't expose `this_year`, and the custom branch needs the same equal-length logic the helper provides for `'custom'` so we **can** delegate `custom` too by building a synthetic `DateRange` and calling `getPreviousComparisonRange('custom', ...)`. Use that to remove the custom branch as well.
+- Drop now-unused date-fns imports (`startOfMonth, endOfMonth, subWeeks, subMonths, subYears, differenceInCalendarDays, addDays` once everything routes through the helper for the four shared keys + custom — keep `startOfWeek/endOfWeek/startOfYear/endOfYear` for the `this_year` and `default` branches).
 
-- Rename Expenses column header → **"Linked Expenses"**.
-- Add small subtitle under the panel title:  
-*"Net Profit shown per load reflects expenses linked to that load. Unlinked period expenses appear in dashboard totals."*
-- When `unlinkedTotal = Σ(filteredExpenses where !linked_load_id) > 0`, render a single line under the table:  
-*"Unlinked period expenses: $X — included in dashboard net profit, not assigned to individual loads."*
-- Accept optional `unlinkedExpensesTotal` prop (computed in `DashboardView` from `filteredExpenses`) to avoid re-deriving.
+### 3. Tests
 
-### F. `ReportsView.tsx`
+- **`src/test/reportRangesPresets.test.ts`** — already covers Mon/Sun anchor 2026-05-27 + custom previous range. Extend with assertions for `this_month` / `last_month` at the same anchor.
+- **New `src/test/dashboardDateRangeParity.test.ts`** — for anchor 2026-05-27, both `weekStartsOn ∈ {0,1}`, assert Dashboard `getPresetRange(key, wso)` produces the same `from/to` (as `yyyy-MM-dd`) as `reportRanges.getPresetRange(key, wso)` for `this_week, last_week, this_month, last_month`.
+- **New showing-label parity test** (same file) — `getShowingLabel('this_week', wso)` === `formatShowingRange(getPresetRange('this_week', wso))` for the four shared keys.
+- Existing `financialConsistency.test.ts`, `dateRangeFilter.test.tsx`, `dashboardShowingAndCancelled.test.tsx` must remain green (regression guard).
 
-- Import `weekStartDayToNumber` + `useUserSettings`.
-- Compute `weekStartsOn` and pass it: `getWeekSummaries(filteredLoads, weekStartsOn)`.
-- Memo key updated to include `weekStartsOn`.
+### 4. Verification
 
-### G. Tests — `src/test/`
+- Build runs automatically after edits.
+- Run `bunx vitest run src/test/reportRangesPresets.test.ts src/test/dashboardDateRangeParity.test.ts src/test/financialConsistency.test.ts src/test/dateRangeFilter.test.tsx src/test/dashboardShowingAndCancelled.test.tsx src/test/dashboardTrendPct.test.ts`.
+- Visual check: Dashboard `This Week / Last Week / This Month / Last Month` chips vs Loads DateRangeFilter same chips — both must produce identical date windows and identical "Showing:" labels under Sunday and Monday `week_start_day`.
 
-New file `reportRangesPresets.test.ts`:
+## Out of scope
 
-- Monday start, anchor 2026-05-27: This Week = 2026-05-25 → 2026-05-31; Last Week = 2026-05-18 → 2026-05-24.
-- Sunday start, anchor 2026-05-27: This Week = 2026-05-24 → 2026-05-30; Last Week = 2026-05-17 → 2026-05-23.
+- No UI redesign, no className changes, no new presets.
+- No changes to `ReportsView`, `LoadsListView`, `WeeklyCloseout`, `summarizeLoads`, `loadMetrics`, or any financial formulas.
+- Dashboard-only keys `this_year`, `all`, `custom` remain locally handled — `reportRanges` does not expose them and forcing them in is out of scope.
 
-New file `financialConsistency.test.ts`:
+## Files
 
-- Build a small fixture of loads (incl. one cancelled, one with actual pay, one pending) and assert `summarizeLoads(filtered)` returns the same `grossRevenue`, `loadCount`, `totalMiles`, `effectiveRPM` as the values the Loads KPI strip derives from the same `filtered` array via `loadMetrics` helpers.
-
-New file `recentLoadsPanelLabel.test.tsx`:
-
-- Renders `<RecentLoadsPanel>` and asserts no occurrence of the text "Profit"; asserts "Pay" or "Est. Pay" present.
-
-New file `profitByLoadTableUnlinked.test.tsx`:
-
-- With expenses containing both linked and unlinked rows, asserts column header text is "Linked Expenses" and the unlinked summary line renders with the correct $ total.
-
-New file `reportsWeekStartRespected.test.ts`:
-
-- Calls `getWeekSummaries(loads, 1)` vs `getWeekSummaries(loads, 0)` on identical input and asserts the `weekStart` field shifts by the expected day.
-
-### H. Out of scope (explicitly deferred)
-
-- Rewriting `summarizeLoads` or `loadMetrics` (already correct).
-- Allocating unlinked expenses across loads (no defensible allocation method).
-- `LoadsKpiStrip`, `ProfitOverviewChart`, `WeeklyCloseout`, `useSmartAlerts` — re-read during implementation; only touched if audit reveals a concrete drift. Current reads show they already use `summarizeLoads` / `loadMetrics` / `weekStartDayToNumber`.
-
-## Technical details
-
-- Effective date everywhere continues to flow through `getEffectiveDate` (dropoff fallback to pickup).
-- `isDateInRange` uses string compare on YYYY-MM-DD (timezone-safe, matches how loads are filtered today in `DashboardView`).
-- No DB / RLS / edge-function changes.
-
-## Verification
-
-- `tsc` clean (auto build).
-- `bunx vitest run` — all new + existing tests pass.
-- Manual: switch user week-start between Sunday/Monday; confirm Reports weekly rows shift; confirm Dashboard date filter now constrains Recent Loads list.
-
-## Final report (delivered after build)
-
-Files inspected, files changed, the 11 calculation rules with the helper that enforces each, dashboard ↔ loads ↔ reports parity confirmation, test output, and the deferred items above.
-
-Add Phase 23A protections before implementing:
-
-1. DashboardView must use shared reportRanges helpers for active range, showing label, and previous comparison range. Remove local duplicate date-range helper logic unless there is a documented reason not to.
-
-2. ProfitOverviewChart must exclude cancelled loads before calculating daily revenue/net profit.
-
-3. ProfitByLoadTable must exclude cancelled loads before building rows.
-
-4. getWeekSummaries must either exclude cancelled loads internally or receive already-active loads. Add a test proving cancelled loads are not counted in weekly financial summaries.
-
-5. useSmartAlerts must use the same canonical rules:
-
-   - exclude cancelled loads
-
-   - gross revenue = actual pay when present, otherwise expected pay
-
-   - expenses from the same selected week range
-
-   - week-start setting respected
-
-6. Add tests for cancelled-load exclusion across:
-
-   - ProfitOverviewChart
-
-   - ProfitByLoadTable
-
-   - Reports weekly summaries
-
-   - Smart Alerts
-
-Do not proceed until these are included.
+- Edit: `src/components/DateRangeFilter.tsx`, `src/components/DashboardView.tsx`
+- Edit: `src/test/reportRangesPresets.test.ts`
+- Create: `src/test/dashboardDateRangeParity.test.ts`
