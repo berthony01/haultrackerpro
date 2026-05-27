@@ -255,6 +255,95 @@ export function AdminRecruiterLeaderboardPanel() {
   const [sortBy, setSortBy] = useState<SortKey>('score');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<LeaderboardRow | null>(null);
+  // Phase 18: built-in client-side workflow presets (no DB storage).
+  const [activePreset, setActivePreset] = useState<PresetKey>('all');
+
+  const applyPreset = (key: PresetKey) => {
+    setActivePreset(key);
+    switch (key) {
+      case 'all':
+        setStatusFilter('all' as typeof statusFilter);
+        setBillingFilter('all' as typeof billingFilter);
+        setPerfFilter('all' as typeof perfFilter);
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('score');
+        break;
+      case 'overdue_followups':
+        setOutreachStatusFilter('all');
+        setReminderFilter('overdue');
+        setPriorityFilter('all');
+        setSortBy('follow_up_urgency');
+        break;
+      case 'due_today':
+        setOutreachStatusFilter('all');
+        setReminderFilter('due_today');
+        setPriorityFilter('all');
+        setSortBy('follow_up_urgency');
+        break;
+      case 'upcoming_followups':
+        setOutreachStatusFilter('all');
+        setReminderFilter('upcoming');
+        setPriorityFilter('all');
+        setSortBy('follow_up_date');
+        break;
+      case 'no_outreach_record':
+        setOutreachStatusFilter('no_record');
+        setReminderFilter('unscheduled');
+        setPriorityFilter('none');
+        setSortBy('score');
+        break;
+      case 'needs_first_listing':
+        // Predicate-driven; keep manual selects open.
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('score');
+        break;
+      case 'needs_applications':
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('active_opps');
+        break;
+      case 'needs_contact_conversion':
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('apps');
+        break;
+      case 'past_due_billing':
+        setBillingFilter('past_due' as typeof billingFilter);
+        setSortBy('score');
+        break;
+      case 'high_performers':
+        setPerfFilter('Top Performer' as typeof perfFilter);
+        setSortBy('score');
+        break;
+      case 'closed_or_replied':
+        // Predicate-driven (matches closed OR replied)
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('outreach_recently_updated');
+        break;
+    }
+  };
+
+  const clearPreset = () => setActivePreset('all');
+
+  const resetAllFilters = () => {
+    setActivePreset('all');
+    setSearch('');
+    setStatusFilter('all' as typeof statusFilter);
+    setBillingFilter('all' as typeof billingFilter);
+    setPerfFilter('all' as typeof perfFilter);
+    setOutreachStatusFilter('all');
+    setReminderFilter('all');
+    setPriorityFilter('all');
+    setSortBy('score');
+  };
 
   const rows: LeaderboardRow[] = data ?? [];
 
