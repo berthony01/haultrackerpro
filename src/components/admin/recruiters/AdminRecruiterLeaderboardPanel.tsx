@@ -746,6 +746,7 @@ export function AdminRecruiterLeaderboardPanel() {
         <div className="mt-3 flex flex-wrap gap-2 overflow-x-auto">
           {WORKFLOW_PRESETS.map((p) => {
             const isActive = activePreset === p.key;
+            const count = presetCounts[p.key] ?? 0;
             return (
               <button
                 key={p.key}
@@ -753,20 +754,32 @@ export function AdminRecruiterLeaderboardPanel() {
                 onClick={() => applyPreset(p.key)}
                 title={p.description}
                 className={
-                  'whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ' +
+                  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ' +
                   (isActive
                     ? 'border-primary/50 bg-primary/15 text-primary'
                     : 'border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08]')
                 }
               >
-                {p.label}
+                <span>{p.label}</span>
+                <span
+                  className={
+                    'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ' +
+                    (isActive
+                      ? 'bg-primary/25 text-primary'
+                      : 'bg-white/[0.08] text-white/70')
+                  }
+                  aria-label={`${count} match${count === 1 ? '' : 'es'}`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
         </div>
         <p className="mt-2 text-[10px] text-white/40">
-          Presets are view filters only. They do not send emails, reminders, or notifications. Manual filters and search still apply on top of an active preset.
+          Switching presets resets other preset filters but keeps your search text. Preset counts use the current search text and ignore manual filters. Presets are view filters only — no emails, reminders, or notifications are sent.
         </p>
+
       </section>
 
       {/* Filters */}
