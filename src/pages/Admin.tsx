@@ -630,6 +630,7 @@ export default function Admin() {
             <TabsTrigger value="billing">Billing</TabsTrigger>
             <TabsTrigger value="feedback">Feedback</TabsTrigger>
             <TabsTrigger value="emails">Emails</TabsTrigger>
+            <TabsTrigger value="audit-logs">Audit Logs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="opportunities" className="space-y-3">
