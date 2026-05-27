@@ -21,7 +21,11 @@ function statusFor(load: Load): { key: 'completed' | 'in_progress' | 'scheduled'
 }
 
 export function RecentLoadsPanel({ loads, onViewAll }: Props) {
-  const sorted = [...loads].sort((a, b) => getEffectiveDate(b).localeCompare(getEffectiveDate(a))).slice(0, 5);
+  const sorted = [...loads]
+    .filter(l => (l.status ?? 'completed') !== 'cancelled')
+    .sort((a, b) => getEffectiveDate(b).localeCompare(getEffectiveDate(a)))
+    .slice(0, 5);
+
 
   const reduce = useReducedMotion();
   return (
