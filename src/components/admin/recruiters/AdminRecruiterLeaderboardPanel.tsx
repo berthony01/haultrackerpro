@@ -2798,6 +2798,10 @@ function OutreachWorkflowAnalyticsSection({
         ))}
       </div>
 
+      <OutreachProgressVisuals a={a} />
+
+
+
       {shownInsights.length > 0 && (
         <ul className="mt-3 space-y-1">
           {shownInsights.map((t) => (
