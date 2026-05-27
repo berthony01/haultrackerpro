@@ -678,7 +678,7 @@ export function AdminRecruiterLeaderboardPanel() {
       )}
       {!isLoading && !isError && sorted.length === 0 && (
         <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-8 text-center text-sm text-white/50">
-          No recruiters match the current filters.
+          No recruiters match the current search and filters.
         </div>
       )}
 
