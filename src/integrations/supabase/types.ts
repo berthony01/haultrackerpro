@@ -2119,6 +2119,71 @@ export type Database = {
           },
         ]
       }
+      recruiter_outreach_status: {
+        Row: {
+          admin_note: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          follow_up_at: string | null
+          id: string
+          last_contacted_at: string | null
+          last_copied_at: string | null
+          last_template_key: string | null
+          last_template_label: string | null
+          priority: string
+          recruiter_profile_id: string
+          recruiter_user_id: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          admin_note?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          follow_up_at?: string | null
+          id?: string
+          last_contacted_at?: string | null
+          last_copied_at?: string | null
+          last_template_key?: string | null
+          last_template_label?: string | null
+          priority?: string
+          recruiter_profile_id: string
+          recruiter_user_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          admin_note?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          follow_up_at?: string | null
+          id?: string
+          last_contacted_at?: string | null
+          last_copied_at?: string | null
+          last_template_key?: string | null
+          last_template_label?: string | null
+          priority?: string
+          recruiter_profile_id?: string
+          recruiter_user_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_outreach_status_recruiter_profile_id_fkey"
+            columns: ["recruiter_profile_id"]
+            isOneToOne: true
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruiter_profiles: {
         Row: {
           admin_notes: string | null
