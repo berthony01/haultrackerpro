@@ -37,6 +37,13 @@ import {
   RECENT_APPLICATION_DISPLAY_CAP,
   RECENT_CONTACT_REQUEST_DISPLAY_CAP,
 } from '@/hooks/admin/useAdminRecruiterLeaderboard';
+import {
+  computeRecruiterEmailReadiness,
+  renderRecruiterTemplate,
+  RECRUITER_EMAIL_TEMPLATES,
+  RECRUITER_TEMPLATE_KEYS_ORDERED,
+  type RecruiterEmailTemplateKey,
+} from '@/lib/admin/recruiterEmailTemplates';
 
 
 type SortKey =
