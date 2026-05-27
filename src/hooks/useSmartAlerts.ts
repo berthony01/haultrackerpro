@@ -9,10 +9,11 @@ import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
 import {
   fleetEffectiveRPM,
   fleetDeadheadPct,
-  sumExpectedPay,
   sumOperatingMiles,
   sumDeadheadMiles,
 } from '@/lib/loadMetrics';
+import { excludeCancelled, getLoadRealizedRevenue } from '@/lib/financialCalculations';
+
 import { usePersonalIntelligence } from '@/hooks/usePersonalIntelligence';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { buildProfitDefenseAlerts } from '@/lib/profitDefenseAlerts';
