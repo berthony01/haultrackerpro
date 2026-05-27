@@ -38,7 +38,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subWeeks, subMonths, subYears, differenceInCalendarDays, addDays, parseISO, isWithinInterval, isValid, format } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfYear, endOfYear, parseISO, isWithinInterval, isValid, format } from 'date-fns';
+import {
+  getPresetRange as getSharedPresetRange,
+  getPreviousComparisonRange,
+  isDateInRange,
+  type RangePresetKey,
+} from '@/lib/reportRanges';
 import { Shield } from 'lucide-react';
 import { PremiumKpiCard } from '@/components/premium/PremiumKpiCard';
 import { ProfitOverviewChart } from '@/components/premium/ProfitOverviewChart';
@@ -72,16 +78,30 @@ const presets: { key: PresetKey; label: string }[] = [
   { key: 'custom', label: 'Custom' },
 ];
 
+// Map dashboard preset keys to reportRanges keys where they overlap. The
+// dashboard exposes `this_year`, `all`, `custom` which the shared helper does
+// not — those stay handled locally below.
+const SHARED_KEY: Partial<Record<PresetKey, Exclude<RangePresetKey, 'custom'>>> = {
+  this_week: 'this_week',
+  last_week: 'last_week',
+  this_month: 'this_month',
+  last_month: 'last_month',
+};
+
 function getPresetRange(key: PresetKey, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): { start: Date; end: Date } {
-  const now = new Date();
-  switch (key) {
-    case 'this_week': return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
-    case 'last_week': { const lw = subWeeks(now, 1); return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) }; }
-    case 'this_month': return { start: startOfMonth(now), end: endOfMonth(now) };
-    case 'last_month': { const lm = subMonths(now, 1); return { start: startOfMonth(lm), end: endOfMonth(lm) }; }
-    case 'this_year': return { start: startOfYear(now), end: endOfYear(now) };
-    default: return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
+  const shared = SHARED_KEY[key];
+  if (shared) {
+    const r = getSharedPresetRange(shared, weekStartsOn);
+    // Helper returns YYYY-MM-DD; widen end to 23:59:59.999 so isWithinInterval
+    // remains inclusive of timestamped dates (defensive — getEffectiveDate
+    // currently returns date-only).
+    return { start: parseISO(r.from), end: parseISO(`${r.to}T23:59:59.999`) };
   }
+  // Dashboard-only keys (this_year + default fallback) — reportRanges has no
+  // matching preset, so keep the math local.
+  const now = new Date();
+  if (key === 'this_year') return { start: startOfYear(now), end: endOfYear(now) };
+  return { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
 }
 
 export function getTrendSuffix(key: PresetKey): string {
@@ -136,14 +156,20 @@ export function getShowingLabel(
     return null;
   }
   let start: Date; let end: Date;
-  switch (key) {
-    case 'this_week': start = startOfWeek(now, { weekStartsOn }); end = endOfWeek(now, { weekStartsOn }); break;
-    case 'last_week': { const lw = subWeeks(now, 1); start = startOfWeek(lw, { weekStartsOn }); end = endOfWeek(lw, { weekStartsOn }); break; }
-    case 'this_month': start = startOfMonth(now); end = endOfMonth(now); break;
-    case 'last_month': { const lm = subMonths(now, 1); start = startOfMonth(lm); end = endOfMonth(lm); break; }
-    case 'this_year': start = startOfYear(now); end = endOfYear(now); break;
+  const shared = SHARED_KEY[key];
+  if (shared) {
+    // Delegate the four shared keys to reportRanges so DateRangeFilter and
+    // DashboardView always agree on the underlying calendar window.
+    const r = getSharedPresetRange(shared, weekStartsOn);
+    start = parseISO(r.from);
+    end = parseISO(r.to);
+  } else if (key === 'this_year') {
+    // Dashboard-only key — reportRanges has no 'this_year' preset.
+    start = startOfYear(now); end = endOfYear(now);
+  } else {
+    return null;
   }
-  return `Showing: ${fmt(start!)} - ${fmt(end!)}`;
+  return `Showing: ${fmt(start)} - ${fmt(end)}`;
 }
 
 /**
@@ -227,10 +253,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
   const isLastDayOfPayWeek = new Date().getDay() === ((weekStartsOn + 6) % 7);
   const thisWeekLoadCount = useMemo(() => {
-    const now = new Date();
-    const ws = startOfWeek(now, { weekStartsOn });
-    const we = endOfWeek(now, { weekStartsOn });
-    return loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start: ws, end: we })).length;
+    // Delegate the week window to reportRanges so it matches DateRangeFilter.
+    const r = getSharedPresetRange('this_week', weekStartsOn);
+    return loads.filter(l => isDateInRange(getEffectiveDate(l), { from: r.from, to: r.to })).length;
   }, [loads, weekStartsOn]);
   const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
@@ -250,41 +275,36 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   // - this_year → previous calendar year
   // - custom → equal-length prior period immediately before customFrom (null if range invalid)
   const prevRange = useMemo<{ start: Date; end: Date } | null>(() => {
-    const now = new Date();
-    switch (activePreset) {
-      case 'this_week': {
-        const lw = subWeeks(now, 1);
-        return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) };
-      }
-      case 'last_week': {
-        const llw = subWeeks(now, 2);
-        return { start: startOfWeek(llw, { weekStartsOn }), end: endOfWeek(llw, { weekStartsOn }) };
-      }
-      case 'this_month': {
-        const lm = subMonths(now, 1);
-        return { start: startOfMonth(lm), end: endOfMonth(lm) };
-      }
-      case 'last_month': {
-        const llm = subMonths(now, 2);
-        return { start: startOfMonth(llm), end: endOfMonth(llm) };
-      }
-      case 'this_year': {
-        const ly = subYears(now, 1);
-        return { start: startOfYear(ly), end: endOfYear(ly) };
-      }
-      case 'custom': {
-        if (!customFrom || !customTo) return null;
-        const start = parseISO(customFrom);
-        const end = parseISO(customTo);
-        if (!isValid(start) || !isValid(end) || end < start) return null;
-        const lenDays = differenceInCalendarDays(end, start);
-        const prevEnd = addDays(start, -1);
-        const prevStart = addDays(prevEnd, -lenDays);
-        return { start: prevStart, end: prevEnd };
-      }
-      default:
-        return null;
+    const shared = SHARED_KEY[activePreset];
+    if (shared) {
+      // Shared keys delegate to reportRanges so dashboard trends use the
+      // same previous-period math as future report comparisons.
+      const cur = getSharedPresetRange(shared, weekStartsOn);
+      const prev = getPreviousComparisonRange(shared, cur, weekStartsOn);
+      if (!prev) return null;
+      return { start: parseISO(prev.from), end: parseISO(`${prev.to}T23:59:59.999`) };
     }
+    if (activePreset === 'custom') {
+      if (!customFrom || !customTo) return null;
+      const s = parseISO(customFrom);
+      const e = parseISO(customTo);
+      if (!isValid(s) || !isValid(e) || e < s) return null;
+      const prev = getPreviousComparisonRange(
+        'custom',
+        { key: 'custom', label: 'Custom', from: customFrom, to: customTo },
+        weekStartsOn,
+      );
+      if (!prev) return null;
+      return { start: parseISO(prev.from), end: parseISO(`${prev.to}T23:59:59.999`) };
+    }
+    if (activePreset === 'this_year') {
+      // Dashboard-only key — reportRanges has no 'this_year' preset, so the
+      // previous-year window stays local.
+      const now = new Date();
+      const ly = new Date(now.getFullYear() - 1, 0, 1);
+      return { start: startOfYear(ly), end: endOfYear(ly) };
+    }
+    return null;
   }, [activePreset, weekStartsOn, customFrom, customTo]);
   const prevLoads = useMemo(() => {
     if (!prevRange) return [] as Load[];
