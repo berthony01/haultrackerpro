@@ -1019,6 +1019,9 @@ function RecruiterDetailDrawer({
                 </p>
               </Section>
 
+              {/* Email Readiness (Phase 14, display + copy-only) */}
+              <EmailReadinessSection row={r} />
+
               {/* Guidance */}
               <Section title="Admin Guidance">
 
