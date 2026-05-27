@@ -3138,7 +3138,7 @@ function OutreachMiniKanbanSection({
                                 </span>
                               </div>
                               <p className="mt-1.5 text-[10px] text-white/60">
-                                Opps {r.active_opportunities} · Apps {r.applications_count} · Contacts {r.contact_requests_count}
+                                Opps {r.active_opportunities} · Apps {r.total_applications} · Contacts {r.total_contact_requests}
                               </p>
                               {followUp && (
                                 <p className="mt-0.5 text-[10px] text-white/50">Follow-up: {followUp}</p>
