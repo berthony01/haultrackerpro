@@ -33,7 +33,7 @@ export default function StarterKitThanks() {
   const handleDownload = () => {
     trackLeadMagnetDownload();
     trackStarterKitDownloadClicked('thanks');
-    window.open(STARTER_KIT_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+    triggerStarterKitDownload();
   };
 
   const handleSignup = () => {
