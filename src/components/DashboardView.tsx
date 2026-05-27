@@ -275,41 +275,36 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   // - this_year → previous calendar year
   // - custom → equal-length prior period immediately before customFrom (null if range invalid)
   const prevRange = useMemo<{ start: Date; end: Date } | null>(() => {
-    const now = new Date();
-    switch (activePreset) {
-      case 'this_week': {
-        const lw = subWeeks(now, 1);
-        return { start: startOfWeek(lw, { weekStartsOn }), end: endOfWeek(lw, { weekStartsOn }) };
-      }
-      case 'last_week': {
-        const llw = subWeeks(now, 2);
-        return { start: startOfWeek(llw, { weekStartsOn }), end: endOfWeek(llw, { weekStartsOn }) };
-      }
-      case 'this_month': {
-        const lm = subMonths(now, 1);
-        return { start: startOfMonth(lm), end: endOfMonth(lm) };
-      }
-      case 'last_month': {
-        const llm = subMonths(now, 2);
-        return { start: startOfMonth(llm), end: endOfMonth(llm) };
-      }
-      case 'this_year': {
-        const ly = subYears(now, 1);
-        return { start: startOfYear(ly), end: endOfYear(ly) };
-      }
-      case 'custom': {
-        if (!customFrom || !customTo) return null;
-        const start = parseISO(customFrom);
-        const end = parseISO(customTo);
-        if (!isValid(start) || !isValid(end) || end < start) return null;
-        const lenDays = differenceInCalendarDays(end, start);
-        const prevEnd = addDays(start, -1);
-        const prevStart = addDays(prevEnd, -lenDays);
-        return { start: prevStart, end: prevEnd };
-      }
-      default:
-        return null;
+    const shared = SHARED_KEY[activePreset];
+    if (shared) {
+      // Shared keys delegate to reportRanges so dashboard trends use the
+      // same previous-period math as future report comparisons.
+      const cur = getSharedPresetRange(shared, weekStartsOn);
+      const prev = getPreviousComparisonRange(shared, cur, weekStartsOn);
+      if (!prev) return null;
+      return { start: parseISO(prev.from), end: parseISO(`${prev.to}T23:59:59.999`) };
     }
+    if (activePreset === 'custom') {
+      if (!customFrom || !customTo) return null;
+      const s = parseISO(customFrom);
+      const e = parseISO(customTo);
+      if (!isValid(s) || !isValid(e) || e < s) return null;
+      const prev = getPreviousComparisonRange(
+        'custom',
+        { key: 'custom', label: 'Custom', from: customFrom, to: customTo },
+        weekStartsOn,
+      );
+      if (!prev) return null;
+      return { start: parseISO(prev.from), end: parseISO(`${prev.to}T23:59:59.999`) };
+    }
+    if (activePreset === 'this_year') {
+      // Dashboard-only key — reportRanges has no 'this_year' preset, so the
+      // previous-year window stays local.
+      const now = new Date();
+      const ly = new Date(now.getFullYear() - 1, 0, 1);
+      return { start: startOfYear(ly), end: endOfYear(ly) };
+    }
+    return null;
   }, [activePreset, weekStartsOn, customFrom, customTo]);
   const prevLoads = useMemo(() => {
     if (!prevRange) return [] as Load[];
