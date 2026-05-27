@@ -435,24 +435,7 @@ export function AdminRecruiterLeaderboardPanel() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      // Search
-      if (q) {
-        const hay = [
-          r.recruiter_name,
-          r.recruiter_email ?? '',
-          r.recruiter_phone ?? '',
-          r.company_name,
-          r.company_city ?? '',
-          r.company_state ?? '',
-          r.verification_status,
-          r.account_status,
-          r.billing_plan ?? '',
-          r.billing_status ?? '',
-        ]
-          .join(' ')
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
+      if (!matchesSearch(r, q)) return false;
       // Status
       if (statusFilter !== 'all') {
         if (
@@ -498,42 +481,8 @@ export function AdminRecruiterLeaderboardPanel() {
           if (!outreach || outreach.priority !== priorityFilter) return false;
         }
       }
-      // Phase 18: preset-specific custom predicates (combine with manual filters via AND).
-      if (activePreset !== 'all') {
-        const isApprovedOrActive =
-          r.verification_status === 'approved' || r.account_status === 'active';
-        const notClosedOrReplied =
-          !outreach || (outreach.status !== 'closed' && outreach.status !== 'replied');
-        switch (activePreset) {
-          case 'needs_first_listing':
-            if (!isApprovedOrActive) return false;
-            if (r.total_opportunities !== 0) return false;
-            if (!notClosedOrReplied) return false;
-            break;
-          case 'needs_applications':
-            if (r.active_opportunities <= 0) return false;
-            if (r.total_applications !== 0) return false;
-            if (!notClosedOrReplied) return false;
-            break;
-          case 'needs_contact_conversion':
-            if (r.total_applications <= 0) return false;
-            if (r.total_contact_requests !== 0) return false;
-            if (!notClosedOrReplied) return false;
-            break;
-          case 'past_due_billing':
-            if (r.billing_status !== 'past_due') return false;
-            break;
-          case 'high_performers':
-            if (r.performance_score < 80) return false;
-            break;
-          case 'closed_or_replied':
-            if (!outreach || (outreach.status !== 'closed' && outreach.status !== 'replied'))
-              return false;
-            break;
-          default:
-            break;
-        }
-      }
+      // Phase 18/19: preset predicate (shared with count badges).
+      if (!matchesPreset(r, activePreset, outreach)) return false;
       return true;
     });
   }, [
@@ -548,6 +497,24 @@ export function AdminRecruiterLeaderboardPanel() {
     outreachByRecruiterId,
     activePreset,
   ]);
+
+  // Phase 19: per-preset count badges. Counts respect search text only,
+  // ignoring other manual filters. Derived from loaded rows; no extra queries.
+  const presetCounts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const counts = {} as Record<PresetKey, number>;
+    for (const p of WORKFLOW_PRESETS) counts[p.key] = 0;
+    for (const r of rows) {
+      if (!matchesSearch(r, q)) continue;
+      const outreach = outreachByRecruiterId.get(r.recruiter_profile_id);
+      for (const p of WORKFLOW_PRESETS) {
+        if (matchesPreset(r, p.key, outreach)) counts[p.key] += 1;
+      }
+    }
+    return counts;
+  }, [rows, search, outreachByRecruiterId]);
+
+
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
