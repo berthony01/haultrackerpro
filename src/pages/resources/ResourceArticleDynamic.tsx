@@ -32,14 +32,15 @@ export default function ResourceArticleDynamic() {
     if (!slug) { setNotFound(true); setLoading(false); return; }
     let cancelled = false;
     (async () => {
-      const { data, error } = await (supabase as any)
-        .from('resource_articles_public')
-        .select('id,slug,title,seo_title,meta_description,excerpt,content,topic_cluster,author_name,published_at,updated_at')
-        .eq('slug', slug)
-        .maybeSingle();
+      // Phase 26: public RPC excludes ai_generation_prompt and internal fields.
+      const { data, error } = await (supabase as any).rpc(
+        'get_public_resource_article',
+        { _slug: slug },
+      );
       if (cancelled) return;
-      if (error || !data) { setNotFound(true); }
-      else setArticle(data as PublishedArticle);
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) { setNotFound(true); }
+      else setArticle(row as PublishedArticle);
       setLoading(false);
     })();
     return () => { cancelled = true; };

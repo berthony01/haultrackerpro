@@ -5,6 +5,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Phase 26: never echo raw DB error messages, table names, or constraint
+// details back to the client. Log details server-side only.
+const GENERIC_DELETE_ERROR = "Account deletion failed. Please contact support.";
+
+function clientError(status: number, message: string) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -13,10 +24,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return clientError(401, "Missing authorization");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -28,21 +36,15 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (userError) console.error("[delete-account] auth.getUser failed:", userError);
+      return clientError(401, "Unauthorized");
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const userId = user.id;
 
-    // FK-safe deletion order. Each step is checked — if any deletion fails
-    // we abort BEFORE removing the auth user, so the account remains
-    // recoverable rather than orphaned. Derived tables (lane_stats,
-    // broker_stats, operating_metrics) are user-owned caches and are deleted
-    // for completeness. admin_audit_log / admin_users are intentionally
-    // retained as they are system/audit records, not user content.
+    // FK-safe deletion order. If any step fails we abort BEFORE removing the
+    // auth user so the account remains recoverable.
     const tablesInOrder = [
       "load_stops",
       "expenses",
@@ -67,20 +69,22 @@ Deno.serve(async (req) => {
     for (const table of tablesInOrder) {
       const { error } = await adminClient.from(table).delete().eq("user_id", userId);
       if (error) {
-        return new Response(
-          JSON.stringify({ error: `Failed to delete from ${table}: ${error.message}` }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        // Detailed context server-side only; never leaked to the client.
+        console.error(
+          `[delete-account] user=${userId} table=${table} failed:`,
+          error,
         );
+        return clientError(500, GENERIC_DELETE_ERROR);
       }
     }
 
-    // Only delete the auth user after all data deletions succeeded.
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error(
+        `[delete-account] user=${userId} auth.admin.deleteUser failed:`,
+        deleteError,
+      );
+      return clientError(500, "Unable to complete account deletion at this time.");
     }
 
     return new Response(JSON.stringify({ success: true }), {
@@ -88,10 +92,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[delete-account] unexpected error:", err);
+    return clientError(500, GENERIC_DELETE_ERROR);
   }
 });

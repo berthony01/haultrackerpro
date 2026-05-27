@@ -24,9 +24,6 @@ export interface CreateDriverReferralInput {
   referred_driver_note?: string;
 }
 
-const REFERRAL_SELECT =
-  '*, opportunities:opportunity_id(id,title,company_name,hiring_city,hiring_state)';
-
 /** Driver-facing: list own referrals and create new ones. */
 export function useDriverReferrals() {
   const { user } = useAuth();
@@ -37,15 +34,33 @@ export function useDriverReferrals() {
     enabled: !!user,
     queryFn: async (): Promise<DriverReferral[]> => {
       if (!user) return [];
-      // Read from the driver-safe view so we never pull referred_driver_email
-      // or referred_driver_phone back to the referring driver's client.
-      // The view is filtered to auth.uid() = referring_driver_id.
-      const { data, error } = await (supabase as any)
-        .from('driver_referrals_driver_safe')
-        .select(REFERRAL_SELECT)
-        .order('created_at', { ascending: false });
+      // Phase 26: call the strict RPC `list_my_driver_referrals` instead of a
+      // SECURITY DEFINER view. The RPC enforces auth.uid() = referring_driver_id
+      // server-side and never returns referred_driver_email / _phone / _note.
+      const { data, error } = await (supabase as any).rpc('list_my_driver_referrals');
       if (error) throw error;
-      return (data ?? []) as unknown as DriverReferral[];
+      const rows = (data ?? []) as Array<Record<string, any>>;
+      return rows.map((r) => ({
+        id: r.id,
+        opportunity_id: r.opportunity_id,
+        recruiter_id: r.recruiter_id,
+        referring_driver_id: r.referring_driver_id,
+        referred_driver_user_id: r.referred_driver_user_id,
+        referred_driver_name: r.referred_driver_name,
+        status: r.status,
+        last_status_at: r.last_status_at,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        opportunities: r.opportunity_id
+          ? {
+              id: r.opportunity_id,
+              title: r.opportunity_title ?? null,
+              company_name: r.opportunity_company_name ?? null,
+              hiring_city: r.opportunity_hiring_city ?? null,
+              hiring_state: r.opportunity_hiring_state ?? null,
+            }
+          : null,
+      })) as unknown as DriverReferral[];
     },
   });
 
