@@ -455,6 +455,42 @@ export function AdminRecruiterLeaderboardPanel() {
           if (!outreach || outreach.priority !== priorityFilter) return false;
         }
       }
+      // Phase 18: preset-specific custom predicates (combine with manual filters via AND).
+      if (activePreset !== 'all') {
+        const isApprovedOrActive =
+          r.verification_status === 'approved' || r.account_status === 'active';
+        const notClosedOrReplied =
+          !outreach || (outreach.status !== 'closed' && outreach.status !== 'replied');
+        switch (activePreset) {
+          case 'needs_first_listing':
+            if (!isApprovedOrActive) return false;
+            if (r.total_opportunities !== 0) return false;
+            if (!notClosedOrReplied) return false;
+            break;
+          case 'needs_applications':
+            if (r.active_opportunities <= 0) return false;
+            if (r.total_applications !== 0) return false;
+            if (!notClosedOrReplied) return false;
+            break;
+          case 'needs_contact_conversion':
+            if (r.total_applications <= 0) return false;
+            if (r.total_contact_requests !== 0) return false;
+            if (!notClosedOrReplied) return false;
+            break;
+          case 'past_due_billing':
+            if (r.billing_status !== 'past_due') return false;
+            break;
+          case 'high_performers':
+            if (r.performance_score < 80) return false;
+            break;
+          case 'closed_or_replied':
+            if (!outreach || (outreach.status !== 'closed' && outreach.status !== 'replied'))
+              return false;
+            break;
+          default:
+            break;
+        }
+      }
       return true;
     });
   }, [
@@ -467,6 +503,7 @@ export function AdminRecruiterLeaderboardPanel() {
     reminderFilter,
     priorityFilter,
     outreachByRecruiterId,
+    activePreset,
   ]);
 
   const sorted = useMemo(() => {
