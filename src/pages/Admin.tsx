@@ -23,6 +23,7 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 import { AdminAuditLogPanel } from '@/components/admin/audit/AdminAuditLogPanel';
 import { AdminApplicationsPanel } from '@/components/admin/applications/AdminApplicationsPanel';
+import { AdminRecruiterLeaderboardPanel } from '@/components/admin/recruiters/AdminRecruiterLeaderboardPanel';
 
 interface OverviewData {
   total_users: number;
@@ -639,6 +640,7 @@ export default function Admin() {
               <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
               <TabsTrigger value="applications"><Inbox className="h-4 w-4 mr-1" />Applications</TabsTrigger>
               <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
+              <TabsTrigger value="recruiter-leaderboard"><Trophy className="h-4 w-4 mr-1" />Leaderboard</TabsTrigger>
               <TabsTrigger value="referrals"><Share2 className="h-4 w-4 mr-1" />Referral Oversight</TabsTrigger>
               <TabsTrigger value="contracts"><Shield className="h-4 w-4 mr-1" />Contracts</TabsTrigger>
               <TabsTrigger value="admins"><Shield className="h-4 w-4 mr-1" />Admins</TabsTrigger>
@@ -661,6 +663,7 @@ export default function Admin() {
             <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
             <TabsTrigger value="applications">Applications</TabsTrigger>
             <TabsTrigger value="recruiters">Recruiters</TabsTrigger>
+            <TabsTrigger value="recruiter-leaderboard">Leaderboard</TabsTrigger>
             <TabsTrigger value="referrals">Referral Oversight</TabsTrigger>
             <TabsTrigger value="contracts">Contracts</TabsTrigger>
             <TabsTrigger value="admins">Admins</TabsTrigger>
@@ -678,6 +681,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="recruiters" className="space-y-3">
             <AdminRecruitersPanel />
+          </TabsContent>
+          <TabsContent value="recruiter-leaderboard" className="space-y-3">
+            <AdminRecruiterLeaderboardPanel />
           </TabsContent>
           <TabsContent value="referrals" className="space-y-3">
             <AdminReferralOversightPanel />
