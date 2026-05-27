@@ -1885,7 +1885,30 @@ function OutreachTrackingSection({
         >
           <X className="h-3 w-3" /> Close Outreach
         </button>
+        <button
+          type="button"
+          onClick={handleMarkReplied}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/[0.14]"
+        >
+          <CheckCircle2 className="h-3 w-3" /> Mark Replied
+        </button>
+        <button
+          type="button"
+          onClick={handleMarkNoResponse}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08]"
+        >
+          <Clock className="h-3 w-3" /> Mark No Response
+        </button>
+        <button
+          type="button"
+          onClick={handleClearFollowUp}
+          disabled={!existing?.follow_up_at}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <CalendarX className="h-3 w-3" /> Clear Follow-Up
+        </button>
       </div>
+
 
       <div className="mb-3">
         <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
