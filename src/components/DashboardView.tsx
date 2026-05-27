@@ -81,7 +81,7 @@ const presets: { key: PresetKey; label: string }[] = [
 // Map dashboard preset keys to reportRanges keys where they overlap. The
 // dashboard exposes `this_year`, `all`, `custom` which the shared helper does
 // not — those stay handled locally below.
-const SHARED_KEY: Partial<Record<PresetKey, RangePresetKey>> = {
+const SHARED_KEY: Partial<Record<PresetKey, Exclude<RangePresetKey, 'custom'>>> = {
   this_week: 'this_week',
   last_week: 'last_week',
   this_month: 'this_month',
