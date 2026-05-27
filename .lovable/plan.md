@@ -1,90 +1,128 @@
-## Audit findings — Starter Kit download button
+# Phase 23 — Financial Calculation Consistency Repair
 
-The download button lives in two places and both use the same pattern:
+## Audit findings (confirmed by reading the listed files)
 
-- `src/pages/StarterKit.tsx` (line 76) — `directDownload()` for already-signed-in users
-- `src/pages/StarterKitThanks.tsx` (line 36) — `handleDownload()` after form submit
+1. `**RecentLoadsPanel` receives unfiltered loads.** `DashboardView.tsx:382` passes `loads` (all loads) instead of `filteredLoads`, so the panel ignores the dashboard date filter.
+2. `**RecentLoadsPanel` mislabels pay as "Profit".** Line 67 renders `Profit` under the dollar value, but the value is `actual_pay_received ?? getLoadExpectedPay(load)` — that is revenue/pay, not profit.
+3. `**ReportsView` ignores week-start setting.** Line 90: `getWeekSummaries(filteredLoads)` is called without `weekStartsOn`, so weekly report rows always start on Sunday regardless of `user_settings.week_start_day`. The helper already accepts a `weekStartsOn` argument.
+4. `**ProfitByLoadTable` silently understates expenses per row.** It only subtracts `expenses.linked_load_id === load.id`, but the dashboard's total Net Profit uses **all** period expenses. Column is labeled generically "Expenses", which is misleading.
+5. **Date-range logic is partially duplicated.** `DateRangeFilter.tsx` builds presets inline; `src/lib/reportRanges.ts` already exposes `getPresetRange` / `validateCustomRange`. No "previous comparison range" helper exists, and there's no single `isDateInRange` helper.
+6. **Calculation core is already correct.** `financialCalculations.ts` (`summarizeLoads`, `excludeCancelled`, `getLoadRealizedRevenue`) and `loadMetrics.ts` (`getLoadExpectedPay`, `getLoadOperatingMiles`) already enforce rules 1, 2, 4–11. No formula changes needed there — the fixes are wiring + labels + week-start plumbing.
 
-Both call:
+## Changes
 
-```ts
-window.open(STARTER_KIT_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
-```
+### A. Centralize date-range helpers — `src/lib/reportRanges.ts`
 
-`STARTER_KIT_DOWNLOAD_URL` points to a **.zip** in Supabase Storage on a **different origin** (`pngptztxwbtozwxrtbwo.supabase.co`).
+Extend (do **not** replace) the existing module:
 
-### Why this is unreliable on mobile
+- Add `isDateInRange(dateStr: string, range: { from?: string; to?: string }): boolean` — inclusive YYYY-MM-DD compare.
+- Add `getPreviousComparisonRange(key, range, weekStartsOn)` — mirrors the active preset one period back (week→prev week, month→prev month, quarter→prev quarter, ytd→prior YTD slice, custom→same-length window immediately before `from`).
+- Add `formatShowingRange(range)` returning the same "Showing: …" string `DateRangeFilter` builds today.
+- Keep existing exports untouched.
 
-1. **iOS Safari + `window.open` to a binary file.** iOS often blocks or silently fails when `window.open('_blank')` targets a non-renderable file (zip). It opens a blank tab that immediately closes, or shows "Safari cannot download this file." Users see nothing happen.
-2. **No `download` attribute, no Content-Disposition.** `window.open` never triggers a save dialog. The browser decides what to do with the response. Because the file is cross-origin from Supabase Storage, even an `<a download>` attribute would be **ignored** unless the object is served with `Content-Disposition: attachment`. We don't control that header today.
-3. **Popup blockers on Android Chrome / in-app browsers** (Gmail, Instagram, Facebook, TikTok webview) frequently kill `_blank` for binary URLs, even inside a direct click handler. In-app browsers also can't always download zips at all.
-4. **Copy says "6 PDFs (~70 KB)" but the asset is a single .zip.** On iOS that means the user gets a "compressed archive" they may not know how to open — and Files app handling varies.
-5. **No visible fallback.** If the new tab is blocked or silently fails, the user has no copyable link, no "tap here if nothing happened" affordance.
+### B. `DateRangeFilter.tsx`
 
-### Fix plan (UI / frontend only — no schema, no backend)
+- Replace inline preset construction with `getPresetRange(key, wso)` from `reportRanges.ts`.
+- Use `formatShowingRange` for the footer label.
+- No visual change; behavior identical.
 
-All work stays in `src/pages/StarterKit.tsx`, `src/pages/StarterKitThanks.tsx`, and a tiny helper in `src/lib/leadMagnet.ts`. No business logic, no auth, no analytics events change semantics.
+### C. `DashboardView.tsx`
 
-1. **New helper `triggerStarterKitDownload()` in `src/lib/leadMagnet.ts`.**
-   - Creates a hidden `<a>` element with `href = STARTER_KIT_DOWNLOAD_URL`, `download="HaulTrackerPro_Trucker_Starter_Kit.zip"`, `rel="noopener noreferrer"`.
-   - On iOS / Safari (detected via `navigator.userAgent`), sets `target="_self"` and uses `window.location.assign(url)` instead — same-tab navigation is the only reliable way iOS will offer "Download Linked File" / open in Files.
-   - On everything else, sets `target="_blank"` and clicks the anchor (so Chrome/Edge/Android honor the download attribute when the server allows it, and otherwise opens in a new tab).
-   - Always returns the URL so callers can show a manual fallback.
+- Line 382: pass `filteredLoads` (not `loads`) to `<RecentLoadsPanel>` so the panel honors the dashboard date filter.
 
-2. **Update both pages to call the helper** instead of `window.open(...)` directly. Analytics tracking calls (`trackLeadMagnetDownload`, `trackStarterKitDownloadClicked`) stay identical and fire before the helper.
+### D. `RecentLoadsPanel.tsx`
 
-3. **Add a visible fallback link under each download button.**
-   - Small "Trouble downloading? Tap here to open the file directly" anchor that points to `STARTER_KIT_DOWNLOAD_URL` with `target="_blank"` and `rel="noopener noreferrer"`. Plain `<a href>` is the most mobile-robust escape hatch — long-press to "Download Linked File" on iOS, normal save on Android.
-   - Replaces / augments the existing "Trouble downloading? Try a different browser…" text on the Thanks page; adds a matching line under the "Already signed in — download now" link on the Starter Kit page.
+- Change row label from "Profit" → **"Pay"** when `actual_pay_received` is set, otherwise **"Est. Pay"**. Value unchanged.
+- Filter out `status === 'cancelled'` loads from `sorted` (cancelled loads never appear in recent list).
 
-4. **Fix the misleading copy** on Thanks page: "(6 PDFs, ~70 KB)" → "(ZIP file — 6 PDFs inside, ~70 KB)" so users on mobile aren't surprised by a compressed archive.
+### E. `ProfitByLoadTable.tsx`
 
-5. **No change** to:
-   - `STARTER_KIT_DOWNLOAD_URL` value
-   - The Supabase Storage object or its headers (out of scope for a UI fix; flagged as a follow-up below)
-   - Auth flow, form submission, RPC, or redirect to `/starter-kit/thanks`
-   - Footer, SEO, layout
+- Rename Expenses column header → **"Linked Expenses"**.
+- Add small subtitle under the panel title:  
+*"Net Profit shown per load reflects expenses linked to that load. Unlinked period expenses appear in dashboard totals."*
+- When `unlinkedTotal = Σ(filteredExpenses where !linked_load_id) > 0`, render a single line under the table:  
+*"Unlinked period expenses: $X — included in dashboard net profit, not assigned to individual loads."*
+- Accept optional `unlinkedExpensesTotal` prop (computed in `DashboardView` from `filteredExpenses`) to avoid re-deriving.
 
-### Files changed
+### F. `ReportsView.tsx`
 
-- `src/lib/leadMagnet.ts` — add `triggerStarterKitDownload()` helper.
-- `src/pages/StarterKit.tsx` — `directDownload()` uses helper; add fallback `<a>` under the "Already signed in — download now" button.
-- `src/pages/StarterKitThanks.tsx` — `handleDownload()` uses helper; update copy; add fallback `<a>` under the primary Download button.
+- Import `weekStartDayToNumber` + `useUserSettings`.
+- Compute `weekStartsOn` and pass it: `getWeekSummaries(filteredLoads, weekStartsOn)`.
+- Memo key updated to include `weekStartsOn`.
 
-### Technical detail
+### G. Tests — `src/test/`
 
-Helper sketch (no other behavior changes):
+New file `reportRangesPresets.test.ts`:
 
-```ts
-export function triggerStarterKitDownload() {
-  const url = STARTER_KIT_DOWNLOAD_URL;
-  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-  const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+- Monday start, anchor 2026-05-27: This Week = 2026-05-25 → 2026-05-31; Last Week = 2026-05-18 → 2026-05-24.
+- Sunday start, anchor 2026-05-27: This Week = 2026-05-24 → 2026-05-30; Last Week = 2026-05-17 → 2026-05-23.
 
-  if (isIOS) {
-    // Same-tab navigation is the only reliable iOS path for cross-origin binaries.
-    window.location.assign(url);
-    return url;
-  }
+New file `financialConsistency.test.ts`:
 
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'HaulTrackerPro_Trucker_Starter_Kit.zip';
-  a.rel = 'noopener noreferrer';
-  a.target = '_blank';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  return url;
-}
-```
+- Build a small fixture of loads (incl. one cancelled, one with actual pay, one pending) and assert `summarizeLoads(filtered)` returns the same `grossRevenue`, `loadCount`, `totalMiles`, `effectiveRPM` as the values the Loads KPI strip derives from the same `filtered` array via `loadMetrics` helpers.
 
-### Deferred (not part of this UI fix)
+New file `recentLoadsPanelLabel.test.tsx`:
 
-- Configure the Supabase Storage object to be served with `Content-Disposition: attachment; filename="HaulTrackerPro_Trucker_Starter_Kit.zip"` so cross-origin `download` actually forces save on desktop Chrome. This requires re-uploading the object with metadata or fronting it with an edge function — out of scope for a frontend audit/fix.
-- Splitting the zip into 6 individual PDFs hosted directly (would remove the iOS zip-handling friction entirely) — product decision, not in this phase.
+- Renders `<RecentLoadsPanel>` and asserts no occurrence of the text "Profit"; asserts "Pay" or "Est. Pay" present.
 
-### Verification
+New file `profitByLoadTableUnlinked.test.tsx`:
 
-- TypeScript build clean.
-- Manual: open `/starter-kit/thanks?email=test@test.com` on the mobile preview, tap Download → iOS navigates same-tab to the file; Android Chrome triggers download or opens in new tab; fallback link always works via long-press.
+- With expenses containing both linked and unlinked rows, asserts column header text is "Linked Expenses" and the unlinked summary line renders with the correct $ total.
+
+New file `reportsWeekStartRespected.test.ts`:
+
+- Calls `getWeekSummaries(loads, 1)` vs `getWeekSummaries(loads, 0)` on identical input and asserts the `weekStart` field shifts by the expected day.
+
+### H. Out of scope (explicitly deferred)
+
+- Rewriting `summarizeLoads` or `loadMetrics` (already correct).
+- Allocating unlinked expenses across loads (no defensible allocation method).
+- `LoadsKpiStrip`, `ProfitOverviewChart`, `WeeklyCloseout`, `useSmartAlerts` — re-read during implementation; only touched if audit reveals a concrete drift. Current reads show they already use `summarizeLoads` / `loadMetrics` / `weekStartDayToNumber`.
+
+## Technical details
+
+- Effective date everywhere continues to flow through `getEffectiveDate` (dropoff fallback to pickup).
+- `isDateInRange` uses string compare on YYYY-MM-DD (timezone-safe, matches how loads are filtered today in `DashboardView`).
+- No DB / RLS / edge-function changes.
+
+## Verification
+
+- `tsc` clean (auto build).
+- `bunx vitest run` — all new + existing tests pass.
+- Manual: switch user week-start between Sunday/Monday; confirm Reports weekly rows shift; confirm Dashboard date filter now constrains Recent Loads list.
+
+## Final report (delivered after build)
+
+Files inspected, files changed, the 11 calculation rules with the helper that enforces each, dashboard ↔ loads ↔ reports parity confirmation, test output, and the deferred items above.
+
+Add Phase 23A protections before implementing:
+
+1. DashboardView must use shared reportRanges helpers for active range, showing label, and previous comparison range. Remove local duplicate date-range helper logic unless there is a documented reason not to.
+
+2. ProfitOverviewChart must exclude cancelled loads before calculating daily revenue/net profit.
+
+3. ProfitByLoadTable must exclude cancelled loads before building rows.
+
+4. getWeekSummaries must either exclude cancelled loads internally or receive already-active loads. Add a test proving cancelled loads are not counted in weekly financial summaries.
+
+5. useSmartAlerts must use the same canonical rules:
+
+   - exclude cancelled loads
+
+   - gross revenue = actual pay when present, otherwise expected pay
+
+   - expenses from the same selected week range
+
+   - week-start setting respected
+
+6. Add tests for cancelled-load exclusion across:
+
+   - ProfitOverviewChart
+
+   - ProfitByLoadTable
+
+   - Reports weekly summaries
+
+   - Smart Alerts
+
+Do not proceed until these are included.

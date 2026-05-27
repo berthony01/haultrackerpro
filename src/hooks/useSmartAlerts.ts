@@ -9,10 +9,11 @@ import { weekStartDayToNumber, getEffectiveDate } from '@/lib/loadUtils';
 import {
   fleetEffectiveRPM,
   fleetDeadheadPct,
-  sumExpectedPay,
   sumOperatingMiles,
   sumDeadheadMiles,
 } from '@/lib/loadMetrics';
+import { excludeCancelled, getLoadRealizedRevenue } from '@/lib/financialCalculations';
+
 import { usePersonalIntelligence } from '@/hooks/usePersonalIntelligence';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { buildProfitDefenseAlerts } from '@/lib/profitDefenseAlerts';
@@ -41,9 +42,12 @@ function filterByRange(loads: Load[], start: Date, end: Date) {
   return loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start, end }));
 }
 
-export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): SmartAlert[] {
+export function computeAlerts(loadsIn: Load[], expenses: Expense[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): SmartAlert[] {
   const alerts: SmartAlert[] = [];
   const now = new Date();
+
+  // Phase 23A.5: cancelled loads must never participate in alert math.
+  const loads = excludeCancelled(loadsIn);
 
   // Current week loads/expenses
   const thisWeek = getWeekRange(0, weekStartsOn);
@@ -51,18 +55,20 @@ export function computeAlerts(loads: Load[], expenses: Expense[], weekStartsOn: 
   const thisWeekLoads = filterByRange(loads, thisWeek.start, thisWeek.end);
   const lastWeekLoads = filterByRange(loads, lastWeek.start, lastWeek.end);
 
-  // === Profit calculations (this week) — pay_model aware via helpers ===
-  const thisWeekRevenue = sumExpectedPay(thisWeekLoads);
+  // === Profit calculations (this week) — pay_model aware, actual pay preferred ===
+  const sumRealized = (ls: Load[]) => ls.reduce((s, l) => s + getLoadRealizedRevenue(l), 0);
+  const thisWeekRevenue = sumRealized(thisWeekLoads);
   const thisWeekExpenses = expenses
     .filter(e => isWithinInterval(parseISO(e.expense_date), { start: thisWeek.start, end: thisWeek.end }))
     .reduce((s, e) => s + Number(e.amount), 0);
   const thisWeekProfit = thisWeekRevenue - thisWeekExpenses;
 
-  const lastWeekRevenue = sumExpectedPay(lastWeekLoads);
+  const lastWeekRevenue = sumRealized(lastWeekLoads);
   const lastWeekExpenses = expenses
     .filter(e => isWithinInterval(parseISO(e.expense_date), { start: lastWeek.start, end: lastWeek.end }))
     .reduce((s, e) => s + Number(e.amount), 0);
   const lastWeekProfit = lastWeekRevenue - lastWeekExpenses;
+
 
   // 1. Negative profit
   if (thisWeekLoads.length > 0 && thisWeekProfit < 0) {

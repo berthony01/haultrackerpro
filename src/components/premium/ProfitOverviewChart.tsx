@@ -25,13 +25,17 @@ export function computeDailyNetProfit(revenue: number, expenses: number): number
 export function ProfitOverviewChart({ loads, expenses }: Props) {
   const data = useMemo(() => {
     const map = new Map<string, { date: string; revenue: number; expenses: number; net: number }>();
-    loads.forEach(l => {
-      const d = getEffectiveDate(l);
-      const e = map.get(d) ?? { date: d, revenue: 0, expenses: 0, net: 0 };
-      const pay = l.actual_pay_received != null ? Number(l.actual_pay_received) : getLoadExpectedPay(l);
-      e.revenue += pay;
-      map.set(d, e);
-    });
+    // Phase 23A.2: cancelled loads must not contribute to daily revenue/net.
+    loads
+      .filter(l => (l.status ?? 'completed') !== 'cancelled')
+      .forEach(l => {
+        const d = getEffectiveDate(l);
+        const e = map.get(d) ?? { date: d, revenue: 0, expenses: 0, net: 0 };
+        const pay = l.actual_pay_received != null ? Number(l.actual_pay_received) : getLoadExpectedPay(l);
+        e.revenue += pay;
+        map.set(d, e);
+      });
+
     expenses.forEach(ex => {
       const d = ex.expense_date;
       const e = map.get(d) ?? { date: d, revenue: 0, expenses: 0, net: 0 };

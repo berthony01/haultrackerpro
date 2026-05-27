@@ -2,6 +2,7 @@ import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadExpectedPay, getLoadOperatingMiles } from '@/lib/loadMetrics';
+import { excludeCancelled } from '@/lib/financialCalculations';
 import { motion, useReducedMotion } from 'framer-motion';
 
 interface Props {
@@ -11,10 +12,20 @@ interface Props {
 }
 
 export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
-  const sorted = [...loads].sort((a, b) => getEffectiveDate(b).localeCompare(getEffectiveDate(a))).slice(0, 6);
+  // Phase 23A.3: cancelled loads must never appear in per-load profit rows.
+  const active = excludeCancelled(loads);
+  const sorted = [...active]
+    .sort((a, b) => getEffectiveDate(b).localeCompare(getEffectiveDate(a)))
+    .slice(0, 6);
 
   const expensesByLoad = (loadId: string) =>
     expenses.filter(e => e.linked_load_id === loadId).reduce((s, e) => s + Number(e.amount), 0);
+
+  // Period expenses not tied to any specific load — included in dashboard
+  // Net Profit, but not assigned to individual rows.
+  const unlinkedTotal = expenses
+    .filter(e => !e.linked_load_id)
+    .reduce((s, e) => s + Number(e.amount), 0);
 
   let totalRev = 0, totalExp = 0, totalNet = 0, totalMiles = 0;
   const rows = sorted.map(l => {
@@ -37,7 +48,7 @@ export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-4 sm:p-5"
     >
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-1">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-foreground">Profit by Load</p>
         {onViewAll && (
           <button onClick={onViewAll} className="text-[11px] font-semibold text-primary hover:underline">
@@ -45,6 +56,10 @@ export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
           </button>
         )}
       </div>
+      <p className="text-[11px] text-muted-foreground mb-3">
+        Net Profit per load reflects only expenses linked to that load. Unlinked period expenses are
+        included in the dashboard Net Profit but are not assigned to individual loads.
+      </p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground py-6 text-center">No loads in range.</p>
       ) : (
@@ -55,7 +70,7 @@ export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
                 <th className="text-left font-semibold py-2 px-2">Load #</th>
                 <th className="text-left font-semibold py-2 px-2">Route</th>
                 <th className="text-right font-semibold py-2 px-2">Revenue</th>
-                <th className="text-right font-semibold py-2 px-2">Expenses</th>
+                <th className="text-right font-semibold py-2 px-2" title="Only expenses linked to this load. Unlinked period expenses appear in the dashboard Net Profit.">Linked Expenses</th>
                 <th className="text-right font-semibold py-2 px-2">Net Profit</th>
                 <th className="text-right font-semibold py-2 px-2" title="Effective RPM = gross ÷ all miles, including deadhead.">Eff. RPM</th>
               </tr>
@@ -82,6 +97,12 @@ export function ProfitByLoadTable({ loads, expenses, onViewAll }: Props) {
             </tbody>
           </table>
         </div>
+      )}
+      {unlinkedTotal > 0 && (
+        <p className="text-[11px] text-muted-foreground mt-2 pt-2 border-t border-border/40">
+          Unlinked period expenses: <span className="font-mono font-semibold text-foreground">{formatCurrency(unlinkedTotal)}</span>
+          {' '}— included in dashboard Net Profit, not assigned to individual loads.
+        </p>
       )}
     </motion.div>
   );

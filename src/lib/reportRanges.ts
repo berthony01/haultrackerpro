@@ -1,7 +1,9 @@
 import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter,
   startOfYear, endOfYear, subWeeks, subMonths, subQuarters, subYears, format, parseISO, isValid,
+  differenceInCalendarDays, addDays, subDays,
 } from 'date-fns';
+
 
 export type RangePresetKey =
   | 'this_week' | 'last_week'
@@ -68,3 +70,86 @@ export function buildCustomRange(from: string, to: string): DateRange {
 export function rangeFilenamePart(r: DateRange): string {
   return `${r.from}-to-${r.to}`;
 }
+
+// ── Phase 23: shared helpers consumed by Dashboard / Loads / Reports ───────
+
+/** Inclusive YYYY-MM-DD string compare. Timezone-safe. */
+export function isDateInRange(
+  dateStr: string,
+  range: { from?: string; to?: string },
+): boolean {
+  if (!dateStr) return false;
+  if (range.from && dateStr < range.from) return false;
+  if (range.to && dateStr > range.to) return false;
+  return true;
+}
+
+/** Human "Showing: …" label used by the date-range filter footer. */
+export function formatShowingRange(range: { from?: string; to?: string }): string | null {
+  const f = range.from ? parseISO(range.from) : null;
+  const t = range.to ? parseISO(range.to) : null;
+  if (f && isValid(f) && t && isValid(t)) {
+    return `Showing: ${format(f, 'MMM d, yyyy')} – ${format(t, 'MMM d, yyyy')}`;
+  }
+  if (!range.from && !range.to) return 'Showing: All loads';
+  return null;
+}
+
+/**
+ * Returns the previous comparison range for the given preset.
+ * - this_week → last week    last_week → 2 weeks ago
+ * - this_month → last month  last_month → 2 months ago
+ * - this_quarter → last quarter (etc.)
+ * - ytd → same span ending one year ago
+ * - last_year → year before
+ * - custom → equal-length window immediately before `from`
+ */
+export function getPreviousComparisonRange(
+  key: RangePresetKey,
+  range: DateRange,
+  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0,
+): DateRange | null {
+  const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+  const shift = (preset: Exclude<RangePresetKey, 'custom'>): DateRange => {
+    // Re-anchor the preset one period in the past by passing a shifted "now".
+    const now = new Date();
+    const back = (() => {
+      switch (preset) {
+        case 'this_week':    return subWeeks(now, 1);
+        case 'last_week':    return subWeeks(now, 2);
+        case 'this_month':   return subMonths(now, 1);
+        case 'last_month':   return subMonths(now, 2);
+        case 'this_quarter': return subQuarters(now, 1);
+        case 'last_quarter': return subQuarters(now, 2);
+        case 'ytd':          return subYears(now, 1);
+        case 'last_year':    return subYears(now, 1);
+      }
+    })();
+    switch (preset) {
+      case 'this_week':
+      case 'last_week':
+        return { key: preset, label: 'Previous Period', from: fmt(startOfWeek(back, { weekStartsOn })), to: fmt(endOfWeek(back, { weekStartsOn })) };
+      case 'this_month':
+      case 'last_month':
+        return { key: preset, label: 'Previous Period', from: fmt(startOfMonth(back)), to: fmt(endOfMonth(back)) };
+      case 'this_quarter':
+      case 'last_quarter':
+        return { key: preset, label: 'Previous Period', from: fmt(startOfQuarter(back)), to: fmt(endOfQuarter(back)) };
+      case 'ytd':
+        return { key: preset, label: 'Previous Period', from: fmt(startOfYear(back)), to: fmt(back) };
+      case 'last_year':
+        return { key: preset, label: 'Previous Period', from: fmt(startOfYear(back)), to: fmt(endOfYear(back)) };
+    }
+  };
+  if (key !== 'custom') return shift(key);
+  // Custom: equal-length window immediately before `from`.
+  if (!range.from || !range.to) return null;
+  const f = parseISO(range.from);
+  const t = parseISO(range.to);
+  if (!isValid(f) || !isValid(t)) return null;
+  const days = differenceInCalendarDays(t, f);
+  const newTo = subDays(f, 1);
+  const newFrom = subDays(newTo, days);
+  return { key: 'custom', label: 'Previous Period', from: fmt(newFrom), to: fmt(newTo) };
+}
+
