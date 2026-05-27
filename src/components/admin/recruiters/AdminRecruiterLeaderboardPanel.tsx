@@ -178,6 +178,66 @@ const WORKFLOW_PRESETS: PresetDef[] = [
   { key: 'closed_or_replied', label: 'Closed / Replied', description: 'Outreach marked closed or replied.' },
 ];
 
+// Phase 19: shared preset predicate. Same logic powers both active filtering
+// and per-preset count badges so counts always agree with the visible list.
+function matchesPreset(
+  row: LeaderboardRow,
+  key: PresetKey,
+  outreach: RecruiterOutreachStatusRow | undefined,
+): boolean {
+  if (key === 'all') return true;
+  const isApprovedOrActive =
+    row.verification_status === 'approved' || row.account_status === 'active';
+  const notClosedOrReplied =
+    !outreach || (outreach.status !== 'closed' && outreach.status !== 'replied');
+  const cat = computeReminderInfo(outreach).category;
+  switch (key) {
+    case 'overdue_followups':
+      return cat === 'overdue';
+    case 'due_today':
+      return cat === 'due_today';
+    case 'upcoming_followups':
+      return cat === 'upcoming';
+    case 'no_outreach_record':
+      return !outreach;
+    case 'needs_first_listing':
+      return isApprovedOrActive && row.total_opportunities === 0 && notClosedOrReplied;
+    case 'needs_applications':
+      return row.active_opportunities > 0 && row.total_applications === 0 && notClosedOrReplied;
+    case 'needs_contact_conversion':
+      return row.total_applications > 0 && row.total_contact_requests === 0 && notClosedOrReplied;
+    case 'past_due_billing':
+      return row.billing_status === 'past_due';
+    case 'high_performers':
+      return row.performance_score >= 80;
+    case 'closed_or_replied':
+      return !!outreach && (outreach.status === 'closed' || outreach.status === 'replied');
+    default:
+      return true;
+  }
+}
+
+function matchesSearch(row: LeaderboardRow, q: string): boolean {
+  if (!q) return true;
+  const hay = [
+    row.recruiter_name,
+    row.recruiter_email ?? '',
+    row.recruiter_phone ?? '',
+    row.company_name,
+    row.company_city ?? '',
+    row.company_state ?? '',
+    row.verification_status,
+    row.account_status,
+    row.billing_plan ?? '',
+    row.billing_status ?? '',
+  ]
+    .join(' ')
+    .toLowerCase();
+  return hay.includes(q);
+}
+
+
+
 
 
 function labelColor(label: PerformanceLabel) {
@@ -294,74 +354,56 @@ export function AdminRecruiterLeaderboardPanel() {
   // Phase 18: built-in client-side workflow presets (no DB storage).
   const [activePreset, setActivePreset] = useState<PresetKey>('all');
 
+  // Phase 19: every preset explicitly sets all preset-controlled filters.
+  // Search text is preserved across preset switches. Other preset-controlled
+  // filters (status/billing/perf/outreach/reminder/priority/sort) are reset.
   const applyPreset = (key: PresetKey) => {
     setActivePreset(key);
+    // Reset all preset-controlled filters first.
+    setStatusFilter('all' as typeof statusFilter);
+    setBillingFilter('all' as typeof billingFilter);
+    setPerfFilter('all' as typeof perfFilter);
+    setOutreachStatusFilter('all');
+    setReminderFilter('all');
+    setPriorityFilter('all');
+    setSortBy('score');
     switch (key) {
       case 'all':
-        setStatusFilter('all' as typeof statusFilter);
-        setBillingFilter('all' as typeof billingFilter);
-        setPerfFilter('all' as typeof perfFilter);
-        setOutreachStatusFilter('all');
-        setReminderFilter('all');
-        setPriorityFilter('all');
-        setSortBy('score');
         break;
       case 'overdue_followups':
-        setOutreachStatusFilter('all');
         setReminderFilter('overdue');
-        setPriorityFilter('all');
         setSortBy('follow_up_urgency');
         break;
       case 'due_today':
-        setOutreachStatusFilter('all');
         setReminderFilter('due_today');
-        setPriorityFilter('all');
         setSortBy('follow_up_urgency');
         break;
       case 'upcoming_followups':
-        setOutreachStatusFilter('all');
         setReminderFilter('upcoming');
-        setPriorityFilter('all');
         setSortBy('follow_up_date');
         break;
       case 'no_outreach_record':
         setOutreachStatusFilter('no_record');
         setReminderFilter('unscheduled');
         setPriorityFilter('none');
-        setSortBy('score');
         break;
       case 'needs_first_listing':
-        // Predicate-driven; keep manual selects open.
-        setOutreachStatusFilter('all');
-        setReminderFilter('all');
-        setPriorityFilter('all');
-        setSortBy('score');
+        // Predicate-driven; manual selects stay open.
         break;
       case 'needs_applications':
-        setOutreachStatusFilter('all');
-        setReminderFilter('all');
-        setPriorityFilter('all');
         setSortBy('active_opps');
         break;
       case 'needs_contact_conversion':
-        setOutreachStatusFilter('all');
-        setReminderFilter('all');
-        setPriorityFilter('all');
         setSortBy('apps');
         break;
       case 'past_due_billing':
         setBillingFilter('past_due' as typeof billingFilter);
-        setSortBy('score');
         break;
       case 'high_performers':
         setPerfFilter('Top Performer' as typeof perfFilter);
-        setSortBy('score');
         break;
       case 'closed_or_replied':
-        // Predicate-driven (matches closed OR replied)
-        setOutreachStatusFilter('all');
-        setReminderFilter('all');
-        setPriorityFilter('all');
+        // Predicate-driven (matches closed OR replied).
         setSortBy('outreach_recently_updated');
         break;
     }
@@ -381,6 +423,7 @@ export function AdminRecruiterLeaderboardPanel() {
     setSortBy('score');
   };
 
+
   const rows: LeaderboardRow[] = data ?? [];
 
   // Phase 16: Load outreach records for all loaded recruiters so we can derive reminders.
@@ -392,24 +435,7 @@ export function AdminRecruiterLeaderboardPanel() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      // Search
-      if (q) {
-        const hay = [
-          r.recruiter_name,
-          r.recruiter_email ?? '',
-          r.recruiter_phone ?? '',
-          r.company_name,
-          r.company_city ?? '',
-          r.company_state ?? '',
-          r.verification_status,
-          r.account_status,
-          r.billing_plan ?? '',
-          r.billing_status ?? '',
-        ]
-          .join(' ')
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
+      if (!matchesSearch(r, q)) return false;
       // Status
       if (statusFilter !== 'all') {
         if (
@@ -455,42 +481,8 @@ export function AdminRecruiterLeaderboardPanel() {
           if (!outreach || outreach.priority !== priorityFilter) return false;
         }
       }
-      // Phase 18: preset-specific custom predicates (combine with manual filters via AND).
-      if (activePreset !== 'all') {
-        const isApprovedOrActive =
-          r.verification_status === 'approved' || r.account_status === 'active';
-        const notClosedOrReplied =
-          !outreach || (outreach.status !== 'closed' && outreach.status !== 'replied');
-        switch (activePreset) {
-          case 'needs_first_listing':
-            if (!isApprovedOrActive) return false;
-            if (r.total_opportunities !== 0) return false;
-            if (!notClosedOrReplied) return false;
-            break;
-          case 'needs_applications':
-            if (r.active_opportunities <= 0) return false;
-            if (r.total_applications !== 0) return false;
-            if (!notClosedOrReplied) return false;
-            break;
-          case 'needs_contact_conversion':
-            if (r.total_applications <= 0) return false;
-            if (r.total_contact_requests !== 0) return false;
-            if (!notClosedOrReplied) return false;
-            break;
-          case 'past_due_billing':
-            if (r.billing_status !== 'past_due') return false;
-            break;
-          case 'high_performers':
-            if (r.performance_score < 80) return false;
-            break;
-          case 'closed_or_replied':
-            if (!outreach || (outreach.status !== 'closed' && outreach.status !== 'replied'))
-              return false;
-            break;
-          default:
-            break;
-        }
-      }
+      // Phase 18/19: preset predicate (shared with count badges).
+      if (!matchesPreset(r, activePreset, outreach)) return false;
       return true;
     });
   }, [
@@ -505,6 +497,24 @@ export function AdminRecruiterLeaderboardPanel() {
     outreachByRecruiterId,
     activePreset,
   ]);
+
+  // Phase 19: per-preset count badges. Counts respect search text only,
+  // ignoring other manual filters. Derived from loaded rows; no extra queries.
+  const presetCounts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const counts = {} as Record<PresetKey, number>;
+    for (const p of WORKFLOW_PRESETS) counts[p.key] = 0;
+    for (const r of rows) {
+      if (!matchesSearch(r, q)) continue;
+      const outreach = outreachByRecruiterId.get(r.recruiter_profile_id);
+      for (const p of WORKFLOW_PRESETS) {
+        if (matchesPreset(r, p.key, outreach)) counts[p.key] += 1;
+      }
+    }
+    return counts;
+  }, [rows, search, outreachByRecruiterId]);
+
+
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -736,6 +746,7 @@ export function AdminRecruiterLeaderboardPanel() {
         <div className="mt-3 flex flex-wrap gap-2 overflow-x-auto">
           {WORKFLOW_PRESETS.map((p) => {
             const isActive = activePreset === p.key;
+            const count = presetCounts[p.key] ?? 0;
             return (
               <button
                 key={p.key}
@@ -743,20 +754,32 @@ export function AdminRecruiterLeaderboardPanel() {
                 onClick={() => applyPreset(p.key)}
                 title={p.description}
                 className={
-                  'whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ' +
+                  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ' +
                   (isActive
                     ? 'border-primary/50 bg-primary/15 text-primary'
                     : 'border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08]')
                 }
               >
-                {p.label}
+                <span>{p.label}</span>
+                <span
+                  className={
+                    'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ' +
+                    (isActive
+                      ? 'bg-primary/25 text-primary'
+                      : 'bg-white/[0.08] text-white/70')
+                  }
+                  aria-label={`${count} match${count === 1 ? '' : 'es'}`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
         </div>
         <p className="mt-2 text-[10px] text-white/40">
-          Presets are view filters only. They do not send emails, reminders, or notifications. Manual filters and search still apply on top of an active preset.
+          Switching presets resets other preset filters but keeps your search text. Preset counts use the current search text and ignore manual filters. Presets are view filters only — no emails, reminders, or notifications are sent.
         </p>
+
       </section>
 
       {/* Filters */}
