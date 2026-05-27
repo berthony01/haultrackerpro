@@ -284,10 +284,33 @@ export function AdminRecruitersPanel() {
             </Button>
           ))}
         </div>
-        <Button size="sm" variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={visible.length === 0}
+            onClick={() => {
+              if (visible.length === 0) {
+                toast.error('No recruiters to export');
+                return;
+              }
+              try {
+                downloadRecruitersCsv(visible, filter);
+                toast.success(`Exported ${visible.length} recruiter${visible.length === 1 ? '' : 's'}`);
+              } catch {
+                toast.error('Could not export CSV');
+              }
+            }}
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
       </div>
+      <p className="text-[11px] text-muted-foreground -mt-1">
+        CSV exports the current filtered/search result only.
 
       {/* Search + sort */}
       <div className="flex flex-col sm:flex-row gap-2">
