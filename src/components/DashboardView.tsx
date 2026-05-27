@@ -253,10 +253,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
   const isLastDayOfPayWeek = new Date().getDay() === ((weekStartsOn + 6) % 7);
   const thisWeekLoadCount = useMemo(() => {
-    const now = new Date();
-    const ws = startOfWeek(now, { weekStartsOn });
-    const we = endOfWeek(now, { weekStartsOn });
-    return loads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), { start: ws, end: we })).length;
+    // Delegate the week window to reportRanges so it matches DateRangeFilter.
+    const r = getSharedPresetRange('this_week', weekStartsOn);
+    return loads.filter(l => isDateInRange(getEffectiveDate(l), { from: r.from, to: r.to })).length;
   }, [loads, weekStartsOn]);
   const showCloseoutButton = isLastDayOfPayWeek || thisWeekLoadCount >= 7;
 
