@@ -37,6 +37,54 @@ export interface RecentRecruiterOpportunity {
 
 export const RECENT_OPPORTUNITY_DISPLAY_CAP = 10;
 
+export const RECENT_APPLICATION_DISPLAY_CAP = 10;
+export const RECENT_CONTACT_REQUEST_DISPLAY_CAP = 10;
+
+export interface RecruiterApplicationSummary {
+  total: number;
+  last_30d: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  withdrawn: number;
+  other: number;
+  latest_at: string | null;
+}
+
+export interface RecruiterContactRequestSummary {
+  total: number;
+  last_30d: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  responded: number;
+  other: number;
+  latest_at: string | null;
+  response_rate: number;
+}
+
+export interface RecentRecruiterApplication {
+  id: string;
+  opportunity_id: string | null;
+  opportunity_title: string | null;
+  opportunity_status: string | null;
+  opportunity_admin_review_status: string | null;
+  status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RecentRecruiterContactRequest {
+  id: string;
+  application_id: string | null;
+  opportunity_title: string | null;
+  application_status: string | null;
+  status: string | null;
+  responded_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface LeaderboardRow {
   recruiter_profile_id: string;
   recruiter_user_id: string;
@@ -73,7 +121,6 @@ export interface LeaderboardRow {
   performance_score: number;
   performance_label: PerformanceLabel;
   performance_flags: string[];
-  // For details breakdown
   score_breakdown: {
     listing: number;
     active: number;
@@ -82,6 +129,10 @@ export interface LeaderboardRow {
     account_billing: number;
   };
   recent_opportunities: RecentRecruiterOpportunity[];
+  application_summary: RecruiterApplicationSummary;
+  contact_request_summary: RecruiterContactRequestSummary;
+  recent_applications: RecentRecruiterApplication[];
+  recent_contact_requests: RecentRecruiterContactRequest[];
 }
 
 function clamp(n: number, max = 100) {
