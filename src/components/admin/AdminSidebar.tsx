@@ -22,6 +22,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { value: 'billing', label: 'Billing', icon: CreditCard },
   { value: 'feedback', label: 'Feedback', icon: MessageSquare },
   { value: 'emails', label: 'Emails', icon: Mail },
+  { value: 'audit-logs', label: 'Audit Logs', icon: ScrollText },
 ];
 
 interface AdminSidebarProps {
