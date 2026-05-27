@@ -1404,7 +1404,13 @@ function priorityBadgeClass(p: 'High' | 'Medium' | 'Low'): string {
   }
 }
 
-function EmailReadinessSection({ row }: { row: LeaderboardRow }) {
+function EmailReadinessSection({
+  row,
+  outreach,
+}: {
+  row: LeaderboardRow;
+  outreach: OutreachHandle;
+}) {
   const readiness = useMemo(() => computeRecruiterEmailReadiness(row), [row]);
   const [selectedKey, setSelectedKey] = useState<RecruiterEmailTemplateKey>(
     readiness.suggested_template,
@@ -1415,6 +1421,26 @@ function EmailReadinessSection({ row }: { row: LeaderboardRow }) {
 
   const isNotReady = selectedKey === 'not_ready';
   const copyDisabled = isNotReady;
+
+  const trackCopy = async () => {
+    if (isNotReady) return;
+    try {
+      await outreach.markTemplateCopied.mutateAsync({
+        recruiter_profile_id: row.recruiter_profile_id,
+        recruiter_user_id: row.recruiter_user_id,
+        template_key: template.key,
+        template_label: template.label,
+        default_priority: readiness.priority.toLowerCase() as OutreachPriority,
+      });
+    } catch {
+      toast.error('Template copied, but outreach tracking could not be updated.');
+    }
+  };
+
+  const handleCopy = async (value: string, label: string) => {
+    await copyToClipboard(value, label);
+    await trackCopy();
+  };
 
   return (
     <Section title="Email Readiness">
