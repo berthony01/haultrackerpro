@@ -311,6 +311,7 @@ export function AdminRecruitersPanel() {
       </div>
       <p className="text-[11px] text-muted-foreground -mt-1">
         CSV exports the current filtered/search result only.
+      </p>
 
       {/* Search + sort */}
       <div className="flex flex-col sm:flex-row gap-2">
