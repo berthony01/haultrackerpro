@@ -144,6 +144,42 @@ const PRIORITY_SORT_WEIGHT: Record<OutreachPriority, number> = {
   low: 2,
 };
 
+// Phase 18: Built-in client-side outreach workflow presets.
+type PresetKey =
+  | 'all'
+  | 'overdue_followups'
+  | 'due_today'
+  | 'upcoming_followups'
+  | 'no_outreach_record'
+  | 'needs_first_listing'
+  | 'needs_applications'
+  | 'needs_contact_conversion'
+  | 'past_due_billing'
+  | 'high_performers'
+  | 'closed_or_replied';
+
+interface PresetDef {
+  key: PresetKey;
+  label: string;
+  description: string;
+}
+
+const WORKFLOW_PRESETS: PresetDef[] = [
+  { key: 'all', label: 'All Recruiters', description: 'Clear preset-driven filters and show the full leaderboard.' },
+  { key: 'overdue_followups', label: 'Overdue Follow-Ups', description: 'Recruiters with follow-up dates in the past.' },
+  { key: 'due_today', label: 'Due Today', description: 'Follow-ups scheduled for today.' },
+  { key: 'upcoming_followups', label: 'Upcoming Follow-Ups', description: 'Future follow-ups, soonest first.' },
+  { key: 'no_outreach_record', label: 'No Outreach Record', description: 'Recruiters with no outreach tracking yet.' },
+  { key: 'needs_first_listing', label: 'Needs First Listing', description: 'Approved/active recruiters with zero opportunities.' },
+  { key: 'needs_applications', label: 'Needs Applications', description: 'Active listings with zero applications.' },
+  { key: 'needs_contact_conversion', label: 'Needs Contact Conversion', description: 'Applications received, no contact requests yet.' },
+  { key: 'past_due_billing', label: 'Past Due Billing', description: 'Recruiters with past-due billing status.' },
+  { key: 'high_performers', label: 'High Performers', description: 'Top Performer recruiters (score ≥ 80).' },
+  { key: 'closed_or_replied', label: 'Closed / Replied', description: 'Outreach marked closed or replied.' },
+];
+
+
+
 function labelColor(label: PerformanceLabel) {
   switch (label) {
     case 'Top Performer':
