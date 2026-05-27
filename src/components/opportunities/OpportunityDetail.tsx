@@ -260,11 +260,11 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         </Section>
       )}
 
-      {/* Spacer so fixed mobile action bar doesn't cover content */}
-      <div aria-hidden className="h-32 lg:hidden" />
+      {/* Spacer so fixed action bar doesn't cover content (mobile + desktop) */}
+      <div aria-hidden className="h-32 lg:h-28" />
 
-      {/* Action bar: fixed above BottomNav on mobile, sticky on desktop */}
-      <div className="fixed lg:sticky left-0 right-0 lg:left-auto lg:right-auto bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30 space-y-2">
+      {/* Action bar: fixed above BottomNav on mobile, fixed within main column on desktop */}
+      <div className="fixed left-0 right-0 lg:left-[calc(15rem+1.5rem)] lg:right-6 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30 space-y-2">
         {profileIncomplete && !alreadyApplied && (
           <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
