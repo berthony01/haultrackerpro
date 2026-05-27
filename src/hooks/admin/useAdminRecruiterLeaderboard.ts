@@ -270,8 +270,37 @@ export function useAdminRecruiterLeaderboard() {
         if (cr.responded_at || cr.status === 'responded' || cr.status === 'completed') a.crResponded++;
       }
 
+      // Recent opportunities per recruiter (display-only, capped). Opportunities are
+      // already ordered by created_at desc from the query above, so accumulating in
+      // iteration order with a length cap yields the newest entries first.
+      const recentByRecruiter = new Map<string, RecentRecruiterOpportunity[]>();
+      for (const o of opportunities) {
+        if (!o.recruiter_id) continue;
+        let list = recentByRecruiter.get(o.recruiter_id);
+        if (!list) {
+          list = [];
+          recentByRecruiter.set(o.recruiter_id, list);
+        }
+        if (list.length >= RECENT_OPPORTUNITY_DISPLAY_CAP) continue;
+        list.push({
+          id: o.id,
+          title: (o as { title?: string | null }).title ?? null,
+          company_name: (o as { company_name?: string | null }).company_name ?? null,
+          status: o.status ?? null,
+          admin_review_status: o.admin_review_status ?? null,
+          created_at: o.created_at ?? null,
+          published_at: (o as { published_at?: string | null }).published_at ?? null,
+          hiring_city: (o as { hiring_city?: string | null }).hiring_city ?? null,
+          hiring_state: (o as { hiring_state?: string | null }).hiring_state ?? null,
+          trailer_type: (o as { trailer_type?: string | null }).trailer_type ?? null,
+          driver_type: (o as { driver_type?: string | null }).driver_type ?? null,
+          route_type: (o as { route_type?: string | null }).route_type ?? null,
+        });
+      }
+
       // Build rows
       const rows: LeaderboardRow[] = recruiters.map((r) => {
+
         const a = agg.get(r.id) ?? empty();
         const b = billingByRecruiterId.get(r.id);
         const billing_plan = b?.plan ?? null;
