@@ -2821,3 +2821,154 @@ function OutreachWorkflowAnalyticsSection({
     </section>
   );
 }
+
+// ---------------- Phase 21: Outreach Progress Visuals ----------------
+
+function clampPercent(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(100, v));
+}
+
+function percentOf(part: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((part / total) * 100);
+}
+
+function ProgressBar({ value, tone = 'primary' }: { value: number; tone?: 'primary' | 'danger' | 'warning' | 'success' | 'muted' | 'info' }) {
+  const toneClass =
+    tone === 'danger'
+      ? 'bg-red-500/80'
+      : tone === 'warning'
+        ? 'bg-amber-500/80'
+        : tone === 'success'
+          ? 'bg-emerald-500/80'
+          : tone === 'info'
+            ? 'bg-sky-500/80'
+            : tone === 'muted'
+              ? 'bg-white/30'
+              : 'bg-primary/80';
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+      <div className={`h-full ${toneClass}`} style={{ width: `${clampPercent(value)}%` }} />
+    </div>
+  );
+}
+
+function OutreachProgressVisuals({ a }: { a: OutreachWorkflowAnalytics }) {
+  const visible = a.totalVisible;
+  const closedOrReplied = a.closed + a.replied;
+  // Mutually exclusive follow-up buckets sum to visible
+  const followUpCategorized = a.overdue + a.dueToday + a.upcoming + closedOrReplied;
+  const unscheduled = Math.max(0, visible - followUpCategorized);
+
+  const funnel: { l: string; v: number; tone: 'primary' | 'info' | 'warning' | 'success' | 'muted' }[] = [
+    { l: 'Visible Recruiters', v: visible, tone: 'muted' },
+    { l: 'Outreach Records', v: a.outreachRecords, tone: 'primary' },
+    { l: 'Templates Copied', v: a.templatesCopied, tone: 'info' },
+    { l: 'Contacted Manually', v: a.contactedManually, tone: 'warning' },
+    { l: 'Replied', v: a.replied, tone: 'success' },
+    { l: 'Closed', v: a.closed, tone: 'muted' },
+  ];
+
+  const followUp: { l: string; v: number; tone: 'danger' | 'warning' | 'info' | 'muted' | 'success' }[] = [
+    { l: 'Overdue', v: a.overdue, tone: 'danger' },
+    { l: 'Due Today', v: a.dueToday, tone: 'warning' },
+    { l: 'Upcoming', v: a.upcoming, tone: 'info' },
+    { l: 'Unscheduled', v: unscheduled, tone: 'muted' },
+    { l: 'Closed / Replied', v: closedOrReplied, tone: 'success' },
+  ];
+
+  const rateBars: { l: string; v: number; tone: 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'muted' }[] = [
+    { l: 'Outreach Coverage', v: a.outreachCoverageRate, tone: 'primary' },
+    { l: 'Manual Contact Rate', v: a.manualContactRate, tone: 'info' },
+    { l: 'Reply Rate', v: a.replyRate, tone: 'success' },
+    { l: 'Follow-Up Scheduled', v: a.followUpScheduledRate, tone: 'primary' },
+    { l: 'Overdue Follow-Up Rate', v: a.overdueRate, tone: 'danger' },
+    { l: 'Close Rate', v: a.closeRate, tone: 'muted' },
+  ];
+
+  return (
+    <section className="mt-3 rounded-2xl border border-white/[0.06] bg-[#0B0F18] p-3">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+          Outreach Progress Visuals
+        </p>
+        <p className="mt-1 text-[11px] text-white/60">
+          Current-view progress bars based on visible recruiter rows.
+        </p>
+      </div>
+
+      {/* Outreach Funnel */}
+      <div className="mt-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Outreach Funnel</p>
+        <div className="mt-2 space-y-1.5">
+          {funnel.map((s) => {
+            const pct = percentOf(s.v, visible);
+            return (
+              <div key={s.l} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[11px] text-white/70">{s.l}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-white/50">
+                      {s.v} · {pct}%
+                    </span>
+                  </div>
+                  <div className="mt-1">
+                    <ProgressBar value={pct} tone={s.tone} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Follow-Up Status (mutually exclusive) */}
+      <div className="mt-4">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Follow-Up Status</p>
+        <p className="text-[10px] text-white/40">Mutually exclusive · sums to visible recruiters</p>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {followUp.map((s) => {
+            const pct = percentOf(s.v, visible);
+            return (
+              <div key={s.l} className="min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[11px] text-white/70">{s.l}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-white/50">
+                    {s.v} · {pct}%
+                  </span>
+                </div>
+                <div className="mt-1">
+                  <ProgressBar value={pct} tone={s.tone} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Rate Progress */}
+      <div className="mt-4">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Rate Progress</p>
+        <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+          {rateBars.map((r) => (
+            <div key={r.l} className="min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-[11px] text-white/70">{r.l}</span>
+                <span className="shrink-0 font-mono text-[11px] text-white/50">{clampPercent(r.v)}%</span>
+              </div>
+              <div className="mt-1">
+                <ProgressBar value={r.v} tone={r.tone} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-3 text-[10px] text-white/40">
+        Visuals are based on the current leaderboard view. Nothing is stored; no emails or notifications are sent.
+      </p>
+    </section>
+  );
+}
+
