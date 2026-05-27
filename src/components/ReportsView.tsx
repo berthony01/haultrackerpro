@@ -87,7 +87,9 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
     return isWithinInterval(d, { start, end });
   }), [expenses, dateRange]);
 
-  const summaries = useMemo(() => getWeekSummaries(filteredLoads), [filteredLoads]);
+  const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
+  const summaries = useMemo(() => getWeekSummaries(filteredLoads, weekStartsOn), [filteredLoads, weekStartsOn]);
+
   const monthLoads = useMemo(() => getCurrentMonthLoads(loads), [loads]);
   const hasFilter = !!(dateRange.from || dateRange.to);
 
