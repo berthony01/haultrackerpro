@@ -49,7 +49,9 @@ export function RecentLoadsPanel({ loads, onViewAll }: Props) {
         <ul className="space-y-2">
           {sorted.map(load => {
             const s = statusFor(load);
-            const pay = load.actual_pay_received != null ? Number(load.actual_pay_received) : getLoadExpectedPay(load);
+            const isActual = load.actual_pay_received != null;
+            const pay = isActual ? Number(load.actual_pay_received) : getLoadExpectedPay(load);
+            const payLabel = isActual ? 'Pay' : 'Est. Pay';
             const id = (load as any).load_number || `#${load.id.slice(0, 5)}`;
             return (
               <li key={load.id} className="flex items-center gap-3 rounded-xl px-2.5 py-2 hover:bg-secondary/40 transition-colors">
@@ -68,10 +70,11 @@ export function RecentLoadsPanel({ loads, onViewAll }: Props) {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-mono text-sm font-bold text-foreground">{formatCurrency(pay)}</p>
-                  <p className="text-[10px] text-muted-foreground">Profit</p>
+                  <p className="text-[10px] text-muted-foreground">{payLabel}</p>
                 </div>
               </li>
             );
+
           })}
         </ul>
       )}
