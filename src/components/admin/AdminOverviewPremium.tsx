@@ -178,9 +178,12 @@ export function AdminOverviewPremium({ overview, onGoToTab }: Props) {
         </div>
       </section>
 
+      {/* Phase 7: Marketplace Health */}
+      <MarketplaceHealthSection overview={overview} />
 
       {/* Activity + chart row */}
       <section className="grid gap-4 lg:grid-cols-3">
+
         <div className="space-y-3 lg:col-span-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40">Activity (Last 7 Days)</p>
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
