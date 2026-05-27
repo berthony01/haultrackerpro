@@ -719,6 +719,14 @@ export function AdminRecruiterLeaderboardPanel() {
         outreachByRecruiterId={panelOutreach.outreachByRecruiterId}
       />
 
+      {/* Phase 22: Outreach Mini Kanban */}
+      <OutreachMiniKanbanSection
+        rows={sorted}
+        outreachByRecruiterId={panelOutreach.outreachByRecruiterId}
+        onView={(row) => setSelected(row)}
+      />
+
+
       {/* Phase 18: Workflow Presets */}
       <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
         <div className="flex items-start justify-between gap-3">
