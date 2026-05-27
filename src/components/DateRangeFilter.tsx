@@ -92,8 +92,7 @@ export function DateRangeFilter({ onRangeChange, currentRange }: DateRangeFilter
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
-        {presets.map(p => {
-          const { from, to } = p.getRange();
+        {resolved.map(p => {
           const isActive = activeLabel === p.label;
           return (
             <Button
@@ -106,7 +105,7 @@ export function DateRangeFilter({ onRangeChange, currentRange }: DateRangeFilter
                   ? 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/20'
                   : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-secondary/60'
               }`}
-              onClick={() => handlePreset(p.label, from, to)}
+              onClick={() => handlePreset(p.from, p.to)}
             >
               {p.label}
             </Button>
