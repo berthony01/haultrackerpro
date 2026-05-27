@@ -37,6 +37,54 @@ export interface RecentRecruiterOpportunity {
 
 export const RECENT_OPPORTUNITY_DISPLAY_CAP = 10;
 
+export const RECENT_APPLICATION_DISPLAY_CAP = 10;
+export const RECENT_CONTACT_REQUEST_DISPLAY_CAP = 10;
+
+export interface RecruiterApplicationSummary {
+  total: number;
+  last_30d: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  withdrawn: number;
+  other: number;
+  latest_at: string | null;
+}
+
+export interface RecruiterContactRequestSummary {
+  total: number;
+  last_30d: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  responded: number;
+  other: number;
+  latest_at: string | null;
+  response_rate: number;
+}
+
+export interface RecentRecruiterApplication {
+  id: string;
+  opportunity_id: string | null;
+  opportunity_title: string | null;
+  opportunity_status: string | null;
+  opportunity_admin_review_status: string | null;
+  status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RecentRecruiterContactRequest {
+  id: string;
+  application_id: string | null;
+  opportunity_title: string | null;
+  application_status: string | null;
+  status: string | null;
+  responded_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface LeaderboardRow {
   recruiter_profile_id: string;
   recruiter_user_id: string;
@@ -73,7 +121,6 @@ export interface LeaderboardRow {
   performance_score: number;
   performance_label: PerformanceLabel;
   performance_flags: string[];
-  // For details breakdown
   score_breakdown: {
     listing: number;
     active: number;
@@ -82,6 +129,10 @@ export interface LeaderboardRow {
     account_billing: number;
   };
   recent_opportunities: RecentRecruiterOpportunity[];
+  application_summary: RecruiterApplicationSummary;
+  contact_request_summary: RecruiterContactRequestSummary;
+  recent_applications: RecentRecruiterApplication[];
+  recent_contact_requests: RecentRecruiterContactRequest[];
 }
 
 function clamp(n: number, max = 100) {
@@ -147,15 +198,16 @@ export function useAdminRecruiterLeaderboard() {
           .limit(LEADERBOARD_CAPS.opportunities),
         supabase
           .from('opportunity_applications')
-          .select('id,opportunity_id,recruiter_id,status,created_at')
+          .select('id,opportunity_id,recruiter_id,status,created_at,updated_at')
           .order('created_at', { ascending: false })
           .limit(LEADERBOARD_CAPS.applications),
         supabase
           .from('recruiter_contact_requests')
-          .select('id,application_id,recruiter_user_id,status,responded_at,created_at')
+          .select('id,application_id,recruiter_user_id,status,responded_at,created_at,updated_at')
           .order('created_at', { ascending: false })
           .limit(LEADERBOARD_CAPS.contactRequests),
       ]);
+
 
       if (recRes.error) throw recRes.error;
       if (billRes.error) throw billRes.error;
@@ -297,8 +349,124 @@ export function useAdminRecruiterLeaderboard() {
           route_type: (o as { route_type?: string | null }).route_type ?? null,
         });
       }
+      // Application/contact drill-down (Phase 13, display-only).
+      const oppMeta = new Map<string, { title: string | null; status: string | null; admin_review_status: string | null }>();
+      for (const o of opportunities) {
+        if (!o.id) continue;
+        oppMeta.set(o.id, {
+          title: (o as { title?: string | null }).title ?? null,
+          status: o.status ?? null,
+          admin_review_status: o.admin_review_status ?? null,
+        });
+      }
+
+      const appStatusById = new Map<string, string | null>();
+      for (const ap of applications) {
+        if (ap.id) appStatusById.set(ap.id, ap.status ?? null);
+      }
+
+      const emptyAppSummary = (): RecruiterApplicationSummary => ({
+        total: 0, last_30d: 0, pending: 0, approved: 0, rejected: 0, withdrawn: 0, other: 0, latest_at: null,
+      });
+      const emptyCrSummary = (): RecruiterContactRequestSummary => ({
+        total: 0, last_30d: 0, pending: 0, approved: 0, rejected: 0, responded: 0, other: 0, latest_at: null, response_rate: 0,
+      });
+
+      const appSummaryByRec = new Map<string, RecruiterApplicationSummary>();
+      const recentAppsByRec = new Map<string, RecentRecruiterApplication[]>();
+      const seenApp = new Map<string, Set<string>>();
+
+      for (const ap of applications) {
+        const recId = ap.recruiter_id || (ap.opportunity_id ? oppRecruiter.get(ap.opportunity_id) : undefined);
+        if (!recId || !agg.has(recId)) continue;
+        let seen = seenApp.get(recId);
+        if (!seen) { seen = new Set(); seenApp.set(recId, seen); }
+        if (seen.has(ap.id)) continue;
+        seen.add(ap.id);
+
+        let sum = appSummaryByRec.get(recId);
+        if (!sum) { sum = emptyAppSummary(); appSummaryByRec.set(recId, sum); }
+        sum.total++;
+        if (ap.created_at && new Date(ap.created_at).getTime() >= cutoff) sum.last_30d++;
+        switch (ap.status) {
+          case 'pending': sum.pending++; break;
+          case 'approved': sum.approved++; break;
+          case 'rejected': sum.rejected++; break;
+          case 'withdrawn': sum.withdrawn++; break;
+          default: sum.other++;
+        }
+        if (ap.created_at && (!sum.latest_at || ap.created_at > sum.latest_at)) sum.latest_at = ap.created_at;
+
+        let rl = recentAppsByRec.get(recId);
+        if (!rl) { rl = []; recentAppsByRec.set(recId, rl); }
+        if (rl.length < RECENT_APPLICATION_DISPLAY_CAP) {
+          const meta = ap.opportunity_id ? oppMeta.get(ap.opportunity_id) : undefined;
+          rl.push({
+            id: ap.id,
+            opportunity_id: ap.opportunity_id ?? null,
+            opportunity_title: meta?.title ?? null,
+            opportunity_status: meta?.status ?? null,
+            opportunity_admin_review_status: meta?.admin_review_status ?? null,
+            status: ap.status ?? null,
+            created_at: ap.created_at ?? null,
+            updated_at: (ap as { updated_at?: string | null }).updated_at ?? null,
+          });
+        }
+      }
+
+      const crSummaryByRec = new Map<string, RecruiterContactRequestSummary>();
+      const recentCrByRec = new Map<string, RecentRecruiterContactRequest[]>();
+      const seenCr = new Map<string, Set<string>>();
+
+      for (const cr of contactRequests) {
+        const recId = cr.recruiter_user_id ? userIdToRecId.get(cr.recruiter_user_id) : undefined;
+        if (!recId || !agg.has(recId)) continue;
+        let seen = seenCr.get(recId);
+        if (!seen) { seen = new Set(); seenCr.set(recId, seen); }
+        if (seen.has(cr.id)) continue;
+        seen.add(cr.id);
+
+        let sum = crSummaryByRec.get(recId);
+        if (!sum) { sum = emptyCrSummary(); crSummaryByRec.set(recId, sum); }
+        sum.total++;
+        if (cr.created_at && new Date(cr.created_at).getTime() >= cutoff) sum.last_30d++;
+        // mutually exclusive bucket: responded > approved > rejected > pending > other
+        if (cr.responded_at || cr.status === 'responded' || cr.status === 'completed') sum.responded++;
+        else if (cr.status === 'approved') sum.approved++;
+        else if (cr.status === 'rejected' || cr.status === 'declined') sum.rejected++;
+        else if (cr.status === 'pending') sum.pending++;
+        else sum.other++;
+        if (cr.created_at && (!sum.latest_at || cr.created_at > sum.latest_at)) sum.latest_at = cr.created_at;
+
+        let rl = recentCrByRec.get(recId);
+        if (!rl) { rl = []; recentCrByRec.set(recId, rl); }
+        if (rl.length < RECENT_CONTACT_REQUEST_DISPLAY_CAP) {
+          const appStatus = cr.application_id ? appStatusById.get(cr.application_id) ?? null : null;
+          // try to find opportunity title via application -> opportunity
+          let oppTitle: string | null = null;
+          if (cr.application_id) {
+            const ap = applications.find((x) => x.id === cr.application_id);
+            if (ap?.opportunity_id) oppTitle = oppMeta.get(ap.opportunity_id)?.title ?? null;
+          }
+          rl.push({
+            id: cr.id,
+            application_id: cr.application_id ?? null,
+            opportunity_title: oppTitle,
+            application_status: appStatus,
+            status: cr.status ?? null,
+            responded_at: cr.responded_at ?? null,
+            created_at: cr.created_at ?? null,
+            updated_at: (cr as { updated_at?: string | null }).updated_at ?? null,
+          });
+        }
+      }
+
+      for (const sum of crSummaryByRec.values()) {
+        sum.response_rate = sum.total > 0 ? (sum.responded / sum.total) * 100 : 0;
+      }
 
       // Build rows
+
       const rows: LeaderboardRow[] = recruiters.map((r) => {
 
         const a = agg.get(r.id) ?? empty();
@@ -378,6 +546,10 @@ export function useAdminRecruiterLeaderboard() {
             account_billing: sAccount,
           },
           recent_opportunities: recentByRecruiter.get(r.id) ?? [],
+          application_summary: appSummaryByRec.get(r.id) ?? emptyAppSummary(),
+          contact_request_summary: crSummaryByRec.get(r.id) ?? emptyCrSummary(),
+          recent_applications: recentAppsByRec.get(r.id) ?? [],
+          recent_contact_requests: recentCrByRec.get(r.id) ?? [],
         };
       });
 

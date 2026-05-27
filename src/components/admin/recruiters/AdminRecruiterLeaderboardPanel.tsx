@@ -29,8 +29,15 @@ import {
   type LeaderboardRow,
   type PerformanceLabel,
   type RecentRecruiterOpportunity,
+  type RecentRecruiterApplication,
+  type RecentRecruiterContactRequest,
+  type RecruiterApplicationSummary,
+  type RecruiterContactRequestSummary,
   RECENT_OPPORTUNITY_DISPLAY_CAP,
+  RECENT_APPLICATION_DISPLAY_CAP,
+  RECENT_CONTACT_REQUEST_DISPLAY_CAP,
 } from '@/hooks/admin/useAdminRecruiterLeaderboard';
+
 
 type SortKey =
   | 'score'
@@ -952,8 +959,62 @@ function RecruiterDetailDrawer({
                 </div>
               </Section>
 
+              {/* Application & Contact Drill-Down (Phase 13, display-only) */}
+              <Section title="Application & Contact Drill-Down">
+                <p className="-mt-1 mb-2 text-[11px] text-white/55">
+                  Status and recent activity summary without driver private contact details.
+                </p>
+
+                <p className="mt-1 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Application Status Summary
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniStat label="Total" value={r.application_summary.total} />
+                  <MiniStat label="Last 30d" value={r.application_summary.last_30d} />
+                  <MiniStat label="Pending" value={r.application_summary.pending} />
+                  <MiniStat label="Approved" value={r.application_summary.approved} />
+                  <MiniStat label="Rejected" value={r.application_summary.rejected} />
+                  <MiniStat label="Withdrawn" value={r.application_summary.withdrawn} />
+                  <MiniStat label="Other" value={r.application_summary.other} />
+                  <MiniStat label="Latest" value={formatRecentDate(r.application_summary.latest_at)} />
+                </div>
+
+                <p className="mt-3 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Contact Request Status Summary
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniStat label="Total" value={r.contact_request_summary.total} />
+                  <MiniStat label="Last 30d" value={r.contact_request_summary.last_30d} />
+                  <MiniStat label="Pending" value={r.contact_request_summary.pending} />
+                  <MiniStat label="Approved" value={r.contact_request_summary.approved} />
+                  <MiniStat label="Rejected" value={r.contact_request_summary.rejected} />
+                  <MiniStat label="Responded" value={r.contact_request_summary.responded} />
+                  <MiniStat label="Other" value={r.contact_request_summary.other} />
+                  <MiniStat label="Latest" value={formatRecentDate(r.contact_request_summary.latest_at)} />
+                  <MiniStat
+                    label="Response Rate"
+                    value={`${r.contact_request_summary.response_rate.toFixed(1)}%`}
+                  />
+                </div>
+
+                <p className="mt-3 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Recent Applications
+                </p>
+                <RecentApplicationsList items={r.recent_applications} />
+
+                <p className="mt-3 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Recent Contact Requests
+                </p>
+                <RecentContactRequestsList items={r.recent_contact_requests} />
+
+                <p className="mt-2 text-[10px] text-white/40">
+                  Showing up to {RECENT_APPLICATION_DISPLAY_CAP} recent applications and {RECENT_CONTACT_REQUEST_DISPLAY_CAP} recent contact requests. Totals above may include more activity. Driver contact details, notes, and messages are intentionally hidden in this admin drill-down.
+                </p>
+              </Section>
+
               {/* Guidance */}
               <Section title="Admin Guidance">
+
                 {(() => {
                   const tips = buildGuidance(r);
                   if (tips.length === 0) {
@@ -1157,6 +1218,148 @@ function RecentOpportunitiesList({ items }: { items: RecentRecruiterOpportunity[
                   Route: <span className="text-white/80">{route}</span>
                 </span>
               )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// ---------------- Recent Applications / Contact Requests (Phase 13) ----------------
+
+function appStatusBadgeClass(status: string | null | undefined): string {
+  switch (status) {
+    case 'approved':
+      return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+    case 'pending':
+      return 'bg-amber-500/15 text-amber-300 ring-amber-500/30';
+    case 'rejected':
+      return 'bg-red-500/15 text-red-300 ring-red-500/30';
+    case 'withdrawn':
+      return 'bg-white/[0.06] text-white/60 ring-white/10';
+    default:
+      return 'bg-white/[0.04] text-white/60 ring-white/10';
+  }
+}
+
+function crStatusBadgeClass(status: string | null | undefined, responded: boolean): string {
+  if (responded) return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+  switch (status) {
+    case 'approved':
+      return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+    case 'rejected':
+    case 'declined':
+      return 'bg-red-500/15 text-red-300 ring-red-500/30';
+    case 'pending':
+      return 'bg-amber-500/15 text-amber-300 ring-amber-500/30';
+    default:
+      return 'bg-white/[0.04] text-white/60 ring-white/10';
+  }
+}
+
+function RecentApplicationsList({ items }: { items: RecentRecruiterApplication[] }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] text-white/55">
+        No recent applications found for this recruiter.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map((a) => {
+        const statusValue = a.status ?? 'unknown';
+        return (
+          <li key={a.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {a.opportunity_title ?? 'Opportunity unavailable'}
+                </p>
+              </div>
+              <span className="shrink-0 font-mono text-[10px] text-white/40" title={a.id}>
+                {shortId(a.id)}…
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${appStatusBadgeClass(a.status)}`}
+                title={`Application status: ${statusValue}`}
+              >
+                <span className="text-[9px] uppercase tracking-wider text-white/40">App</span>
+                {statusValue}
+              </span>
+              {a.opportunity_status && <StatusPill label="Opp" value={a.opportunity_status} />}
+              {a.opportunity_admin_review_status && (
+                <StatusPill label="Review" value={a.opportunity_admin_review_status} />
+              )}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-white/55">
+              <span>
+                Created: <span className="text-white/80">{formatRecentDate(a.created_at)}</span>
+              </span>
+              <span>
+                Updated: <span className="text-white/80">{formatRecentDate(a.updated_at)}</span>
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function RecentContactRequestsList({ items }: { items: RecentRecruiterContactRequest[] }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] text-white/55">
+        No recent contact requests found for this recruiter.
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map((c) => {
+        const responded = !!c.responded_at || c.status === 'responded' || c.status === 'completed';
+        const statusValue = responded ? 'responded' : c.status ?? 'unknown';
+        return (
+          <li key={c.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-semibold text-white">
+                  {c.opportunity_title ?? 'Opportunity unavailable'}
+                </p>
+              </div>
+              <span className="shrink-0 font-mono text-[10px] text-white/40" title={c.id}>
+                {shortId(c.id)}…
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${crStatusBadgeClass(c.status, responded)}`}
+                title={`Contact request status: ${statusValue}`}
+              >
+                <span className="text-[9px] uppercase tracking-wider text-white/40">Req</span>
+                {statusValue}
+              </span>
+              {c.application_status && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${appStatusBadgeClass(c.application_status)}`}
+                  title={`Linked application status: ${c.application_status}`}
+                >
+                  <span className="text-[9px] uppercase tracking-wider text-white/40">App</span>
+                  {c.application_status}
+                </span>
+              )}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-white/55">
+              <span>
+                Created: <span className="text-white/80">{formatRecentDate(c.created_at)}</span>
+              </span>
+              <span>
+                Responded: <span className="text-white/80">{formatRecentDate(c.responded_at)}</span>
+              </span>
             </div>
           </li>
         );
