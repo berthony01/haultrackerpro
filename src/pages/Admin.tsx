@@ -645,6 +645,9 @@ export default function Admin() {
           <TabsContent value="contracts" className="space-y-3">
             <AdminContractsPanel />
           </TabsContent>
+          <TabsContent value="audit-logs" className="space-y-3">
+            <AdminAuditLogPanel />
+          </TabsContent>
 
           {/* OVERVIEW */}
           <TabsContent value="overview" className="space-y-4">
