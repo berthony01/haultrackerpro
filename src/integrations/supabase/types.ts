@@ -2411,6 +2411,13 @@ export type Database = {
             referencedRelation: "driver_referrals"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "referral_status_events_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "driver_referrals_driver_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       resource_articles: {
@@ -2792,6 +2799,60 @@ export type Database = {
       }
     }
     Views: {
+      driver_referrals_driver_safe: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          last_status_at: string | null
+          opportunity_id: string | null
+          recruiter_id: string | null
+          referred_driver_name: string | null
+          referred_driver_user_id: string | null
+          referring_driver_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          last_status_at?: string | null
+          opportunity_id?: string | null
+          recruiter_id?: string | null
+          referred_driver_name?: string | null
+          referred_driver_user_id?: string | null
+          referring_driver_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          last_status_at?: string | null
+          opportunity_id?: string | null
+          recruiter_id?: string | null
+          referred_driver_name?: string | null
+          referred_driver_user_id?: string | null
+          referring_driver_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_referrals_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_referrals_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parking_reports_public: {
         Row: {
           created_at: string | null
@@ -2861,6 +2922,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      resource_articles_public: {
+        Row: {
+          author_name: string | null
+          content: string | null
+          excerpt: string | null
+          id: string | null
+          meta_description: string | null
+          published_at: string | null
+          seo_title: string | null
+          slug: string | null
+          title: string | null
+          topic_cluster: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          content?: string | null
+          excerpt?: string | null
+          id?: string | null
+          meta_description?: string | null
+          published_at?: string | null
+          seo_title?: string | null
+          slug?: string | null
+          title?: string | null
+          topic_cluster?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          content?: string | null
+          excerpt?: string | null
+          id?: string | null
+          meta_description?: string | null
+          published_at?: string | null
+          seo_title?: string | null
+          slug?: string | null
+          title?: string | null
+          topic_cluster?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
