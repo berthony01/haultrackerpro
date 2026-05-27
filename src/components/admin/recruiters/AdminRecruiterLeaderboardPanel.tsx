@@ -959,8 +959,62 @@ function RecruiterDetailDrawer({
                 </div>
               </Section>
 
+              {/* Application & Contact Drill-Down (Phase 13, display-only) */}
+              <Section title="Application & Contact Drill-Down">
+                <p className="-mt-1 mb-2 text-[11px] text-white/55">
+                  Status and recent activity summary without driver private contact details.
+                </p>
+
+                <p className="mt-1 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Application Status Summary
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniStat label="Total" value={r.application_summary.total} />
+                  <MiniStat label="Last 30d" value={r.application_summary.last_30d} />
+                  <MiniStat label="Pending" value={r.application_summary.pending} />
+                  <MiniStat label="Approved" value={r.application_summary.approved} />
+                  <MiniStat label="Rejected" value={r.application_summary.rejected} />
+                  <MiniStat label="Withdrawn" value={r.application_summary.withdrawn} />
+                  <MiniStat label="Other" value={r.application_summary.other} />
+                  <MiniStat label="Latest" value={formatRecentDate(r.application_summary.latest_at)} />
+                </div>
+
+                <p className="mt-3 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Contact Request Status Summary
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniStat label="Total" value={r.contact_request_summary.total} />
+                  <MiniStat label="Last 30d" value={r.contact_request_summary.last_30d} />
+                  <MiniStat label="Pending" value={r.contact_request_summary.pending} />
+                  <MiniStat label="Approved" value={r.contact_request_summary.approved} />
+                  <MiniStat label="Rejected" value={r.contact_request_summary.rejected} />
+                  <MiniStat label="Responded" value={r.contact_request_summary.responded} />
+                  <MiniStat label="Other" value={r.contact_request_summary.other} />
+                  <MiniStat label="Latest" value={formatRecentDate(r.contact_request_summary.latest_at)} />
+                  <MiniStat
+                    label="Response Rate"
+                    value={`${r.contact_request_summary.response_rate.toFixed(1)}%`}
+                  />
+                </div>
+
+                <p className="mt-3 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Recent Applications
+                </p>
+                <RecentApplicationsList items={r.recent_applications} />
+
+                <p className="mt-3 mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+                  Recent Contact Requests
+                </p>
+                <RecentContactRequestsList items={r.recent_contact_requests} />
+
+                <p className="mt-2 text-[10px] text-white/40">
+                  Showing up to {RECENT_APPLICATION_DISPLAY_CAP} recent applications and {RECENT_CONTACT_REQUEST_DISPLAY_CAP} recent contact requests. Totals above may include more activity. Driver contact details, notes, and messages are intentionally hidden in this admin drill-down.
+                </p>
+              </Section>
+
               {/* Guidance */}
               <Section title="Admin Guidance">
+
                 {(() => {
                   const tips = buildGuidance(r);
                   if (tips.length === 0) {
