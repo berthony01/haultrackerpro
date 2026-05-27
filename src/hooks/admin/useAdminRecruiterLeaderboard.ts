@@ -81,6 +81,7 @@ export interface LeaderboardRow {
     contact: number;
     account_billing: number;
   };
+  recent_opportunities: RecentRecruiterOpportunity[];
 }
 
 function clamp(n: number, max = 100) {
