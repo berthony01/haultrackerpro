@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
-import { leadMagnetSchema, submitLeadMagnet, STARTER_KIT_DOWNLOAD_URL } from '@/lib/leadMagnet';
+import { leadMagnetSchema, submitLeadMagnet, STARTER_KIT_DOWNLOAD_URL, triggerStarterKitDownload } from '@/lib/leadMagnet';
 import {
   trackLeadMagnetView,
   trackLeadMagnetSubmit,
@@ -73,7 +73,7 @@ export default function StarterKit() {
   const directDownload = () => {
     trackLeadMagnetDownload();
     trackStarterKitDownloadClicked('starter_kit');
-    window.open(STARTER_KIT_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+    triggerStarterKitDownload();
   };
 
   return (
@@ -202,14 +202,25 @@ export default function StarterKit() {
                 {!submitting && <ArrowRight className="w-4 h-4" />}
               </Button>
               {user && (
-                <button
-                  type="button"
-                  onClick={directDownload}
-                  className="w-full text-center text-sm underline underline-offset-4"
-                  style={{ color: TEXT_MUTED }}
-                >
-                  Already signed in — download now
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={directDownload}
+                    className="w-full text-center text-sm underline underline-offset-4"
+                    style={{ color: TEXT_MUTED }}
+                  >
+                    Already signed in — download now
+                  </button>
+                  <a
+                    href={STARTER_KIT_DOWNLOAD_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center text-xs underline underline-offset-4"
+                    style={{ color: 'hsl(220, 10%, 45%)' }}
+                  >
+                    Trouble downloading? Tap here to open the file directly
+                  </a>
+                </>
               )}
             </form>
           </div>
