@@ -24,6 +24,7 @@ import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 import { AdminAuditLogPanel } from '@/components/admin/audit/AdminAuditLogPanel';
 import { AdminApplicationsPanel } from '@/components/admin/applications/AdminApplicationsPanel';
 import { AdminRecruiterLeaderboardPanel } from '@/components/admin/recruiters/AdminRecruiterLeaderboardPanel';
+import { INTERNAL_TEST_ACCOUNTS } from '@/lib/internalTestAccounts';
 
 interface OverviewData {
   total_users: number;
@@ -355,7 +356,7 @@ export default function Admin() {
   const [selectedEmail, setSelectedEmail] = useState<EmailLogRow | null>(null);
 
   // Test email panel
-  const TEST_ACCOUNTS = ['berthonyxyz@gmail.com', 'peejayslifestyle@gmail.com', 'wysdomaniac@gmail.com'];
+  const TEST_ACCOUNTS = INTERNAL_TEST_ACCOUNTS;
   type TestTemplate = 'welcome' | 'lifecycle-day1' | 'lifecycle-day2' | 'lifecycle-day4' | 'lifecycle-day7' | 'inactive-feedback';
   const [testTemplate, setTestTemplate] = useState<TestTemplate>('welcome');
   const [testRecipientId, setTestRecipientId] = useState<string>('');

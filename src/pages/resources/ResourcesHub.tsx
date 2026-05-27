@@ -28,12 +28,10 @@ export default function ResourcesHub() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // RLS restricts this to published rows; failures fall back to static content silently.
-      const { data, error } = await supabase
-        .from('resource_articles')
+      // Public-safe view: excludes ai_generation_prompt and other internal fields.
+      const { data, error } = await (supabase as any)
+        .from('resource_articles_public')
         .select('id,slug,title,excerpt,topic_cluster')
-        .eq('status', 'published')
-        .not('published_at', 'is', null)
         .order('published_at', { ascending: false })
         .limit(24);
       if (!cancelled && !error && data) setDynamicArticles(data as PublishedArticle[]);
