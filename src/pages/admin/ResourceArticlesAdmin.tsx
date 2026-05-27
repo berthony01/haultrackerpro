@@ -485,7 +485,21 @@ export default function ResourceArticlesAdmin() {
                       <TableCell><Badge variant="secondary">{a.approval_status}</Badge></TableCell>
                       <TableCell>{a.generated_by_ai ? 'Yes' : '—'}</TableCell>
                       <TableCell className="text-xs">{a.published_at ? new Date(a.published_at).toLocaleDateString() : '—'}</TableCell>
-                      <TableCell><Button size="sm" variant="outline" onClick={() => openEdit(a)}>Edit</Button></TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 justify-end">
+                          <Button size="sm" variant="ghost" onClick={() => openEdit(a, 'preview')}>
+                            <Eye className="h-3.5 w-3.5 mr-1" /> Preview
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => openEdit(a)}>Edit</Button>
+                          {a.status === 'published' && (
+                            <Button size="sm" variant="ghost" asChild>
+                              <a href={`/resources/${a.slug}`} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-3.5 w-3.5 mr-1" /> Live
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
