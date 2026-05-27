@@ -510,11 +510,80 @@ export default function ResourceArticlesAdmin() {
       </main>
 
       {/* Editor */}
-      <Dialog open={editorOpen} onOpenChange={(open) => { setEditorOpen(open); if (!open) setPrefillNotice(null); }}>
+      <Dialog open={editorOpen} onOpenChange={(open) => { setEditorOpen(open); if (!open) resetEditorTransient(); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing.id ? 'Edit article' : 'New article draft'}</DialogTitle>
           </DialogHeader>
+
+          {/* Status row — always visible right under the title */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant={
+                editing.status === 'published' ? 'default'
+                : editing.status === 'archived' ? 'outline'
+                : 'secondary'
+              }
+            >
+              Status: {editing.status ?? 'draft'}
+            </Badge>
+            <Badge
+              variant={
+                editing.approval_status === 'approved' ? 'default'
+                : editing.approval_status === 'needs_revision' || editing.approval_status === 'rejected' ? 'destructive'
+                : 'secondary'
+              }
+            >
+              Approval: {editing.approval_status ?? 'pending_review'}
+            </Badge>
+            {editing.generated_by_ai && <Badge variant="outline">AI-assisted</Badge>}
+            {editing.id && editing.status === 'published' && editing.slug && (
+              <a
+                href={`/resources/${editing.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <ExternalLink className="h-3 w-3" /> Open live page
+              </a>
+            )}
+          </div>
+
+          {justPublishedSlug && (
+            <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <span className="flex-1">Published successfully.</span>
+              <a
+                href={`/resources/${justPublishedSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Open live page
+              </a>
+            </div>
+          )}
+
+          {justApproved && !justPublishedSlug && (
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <span>Approved. Tick the safety checklist below, then click <strong>Publish</strong>.</span>
+            </div>
+          )}
+
+          {(editing.approval_status === 'needs_revision' || showRevisionInput) && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2">
+              <div className="font-semibold text-destructive">
+                {editing.approval_status === 'needs_revision' ? 'Needs revision' : 'Add a revision note (optional)'}
+              </div>
+              <Textarea
+                rows={2}
+                placeholder="Optional: note what needs to change (session-only, not saved to DB)"
+                value={revisionNote}
+                onChange={(e) => setRevisionNote(e.target.value)}
+              />
+            </div>
+          )}
 
           {prefillNotice && !editing.id && (
             <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm space-y-1">
@@ -533,85 +602,174 @@ export default function ResourceArticlesAdmin() {
             </div>
           )}
 
-          <div className="space-y-3">
-            <div>
-              <Label>Title *</Label>
-              <Input value={editing.title ?? ''} onChange={(e) => {
-                const v = e.target.value;
-                setEditing((p) => ({ ...p, title: v, slug: p.slug || slugify(v) }));
-              }} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Slug *</Label>
-                <Input value={editing.slug ?? ''} onChange={(e) => setEditing((p) => ({ ...p, slug: slugify(e.target.value) }))} />
-              </div>
-              <div>
-                <Label>Topic cluster *</Label>
-                <Select value={editing.topic_cluster ?? 'profit'} onValueChange={(v) => setEditing((p) => ({ ...p, topic_cluster: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TOPIC_CLUSTERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label>SEO title * <span className="text-xs text-muted-foreground">(max 60)</span></Label>
-              <Input maxLength={60} value={editing.seo_title ?? ''} onChange={(e) => setEditing((p) => ({ ...p, seo_title: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Meta description * <span className="text-xs text-muted-foreground">(max 160)</span></Label>
-              <Textarea maxLength={160} rows={2} value={editing.meta_description ?? ''} onChange={(e) => setEditing((p) => ({ ...p, meta_description: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Excerpt</Label>
-              <Textarea rows={2} value={editing.excerpt ?? ''} onChange={(e) => setEditing((p) => ({ ...p, excerpt: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Content * (Markdown)</Label>
-              <Textarea rows={14} className="font-mono text-sm" value={editing.content ?? ''} onChange={(e) => setEditing((p) => ({ ...p, content: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Author name</Label>
-                <Input value={editing.author_name ?? ''} onChange={(e) => setEditing((p) => ({ ...p, author_name: e.target.value }))} />
-              </div>
-              <div className="flex items-center gap-2 pt-6">
-                <Switch checked={!!editing.generated_by_ai} onCheckedChange={(v) => setEditing((p) => ({ ...p, generated_by_ai: v }))} />
-                <Label>Generated by AI</Label>
-              </div>
-            </div>
+          <Tabs value={editorTab} onValueChange={(v) => setEditorTab(v as 'edit' | 'preview')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="edit">Edit</TabsTrigger>
+              <TabsTrigger value="preview"><Eye className="h-3.5 w-3.5 mr-1" /> Preview</TabsTrigger>
+            </TabsList>
 
-            <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2 text-sm">
-              <div className="font-semibold">Pre-publish safety checklist</div>
-              <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                <li>No fake statistics, quotes, or citations</li>
-                <li>No guaranteed profit / savings / tax / legal claims</li>
-                <li>Includes disclaimer where tax/legal/financial topics are discussed</li>
-                <li>Useful even if reader does not sign up</li>
-                <li>Internal links are relevant; meta title/description are accurate</li>
-              </ul>
-              <div className="flex items-center gap-2 pt-1">
-                <Checkbox id="safety" checked={safetyChecked} onCheckedChange={(v) => setSafetyChecked(!!v)} />
-                <Label htmlFor="safety">I reviewed this article for accuracy and safe claims.</Label>
+            <TabsContent value="edit" className="space-y-3 mt-3">
+              <div>
+                <Label>Title *</Label>
+                <Input value={editing.title ?? ''} onChange={(e) => {
+                  const v = e.target.value;
+                  setEditing((p) => ({ ...p, title: v, slug: p.slug || slugify(v) }));
+                }} />
               </div>
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Slug *</Label>
+                  <Input value={editing.slug ?? ''} onChange={(e) => setEditing((p) => ({ ...p, slug: slugify(e.target.value) }))} />
+                </div>
+                <div>
+                  <Label>Topic cluster *</Label>
+                  <Select value={editing.topic_cluster ?? 'profit'} onValueChange={(v) => setEditing((p) => ({ ...p, topic_cluster: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {TOPIC_CLUSTERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label>SEO title * <span className="text-xs text-muted-foreground">(max 60)</span></Label>
+                <Input maxLength={60} value={editing.seo_title ?? ''} onChange={(e) => setEditing((p) => ({ ...p, seo_title: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Meta description * <span className="text-xs text-muted-foreground">(max 160)</span></Label>
+                <Textarea maxLength={160} rows={2} value={editing.meta_description ?? ''} onChange={(e) => setEditing((p) => ({ ...p, meta_description: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Excerpt</Label>
+                <Textarea rows={2} value={editing.excerpt ?? ''} onChange={(e) => setEditing((p) => ({ ...p, excerpt: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Content * (Markdown)</Label>
+                <Textarea rows={14} className="font-mono text-sm" value={editing.content ?? ''} onChange={(e) => setEditing((p) => ({ ...p, content: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Author name</Label>
+                  <Input value={editing.author_name ?? ''} onChange={(e) => setEditing((p) => ({ ...p, author_name: e.target.value }))} />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <Switch checked={!!editing.generated_by_ai} onCheckedChange={(v) => setEditing((p) => ({ ...p, generated_by_ai: v }))} />
+                  <Label>Generated by AI</Label>
+                </div>
+              </div>
 
-            <div className="flex flex-wrap gap-2 text-xs">
-              <Badge>Status: {editing.status}</Badge>
-              <Badge variant="secondary">Approval: {editing.approval_status}</Badge>
-              {editing.generated_by_ai && <Badge variant="outline">AI-assisted</Badge>}
-            </div>
-          </div>
+              <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2 text-sm">
+                <div className="font-semibold">Pre-publish safety checklist</div>
+                <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                  <li>No fake statistics, quotes, or citations</li>
+                  <li>No guaranteed profit / savings / tax / legal claims</li>
+                  <li>Includes disclaimer where tax/legal/financial topics are discussed</li>
+                  <li>Useful even if reader does not sign up</li>
+                  <li>Internal links are relevant; meta title/description are accurate</li>
+                </ul>
+                <div className="flex items-center gap-2 pt-1">
+                  <Checkbox id="safety" checked={safetyChecked} onCheckedChange={(v) => setSafetyChecked(!!v)} />
+                  <Label htmlFor="safety">I reviewed this article for accuracy and safe claims.</Label>
+                </div>
+              </div>
+            </TabsContent>
 
-          <DialogFooter className="flex-wrap gap-2">
-            <Button variant="outline" onClick={() => save()} disabled={saving}>Save Draft</Button>
-            <Button variant="outline" onClick={() => setApproval('needs_revision')} disabled={saving}>Mark Needs Revision</Button>
-            <Button variant="outline" onClick={() => setApproval('approved')} disabled={saving || !requiredOk}>Approve</Button>
-            <Button onClick={publish} disabled={saving || !canPublish}>Publish</Button>
-            <Button variant="destructive" onClick={archive} disabled={saving || !editing.id}>Archive</Button>
-          </DialogFooter>
+            <TabsContent value="preview" className="mt-3">
+              <div className="rounded-lg border border-border bg-background p-4 space-y-4">
+                <div className="text-xs text-muted-foreground border-b border-border pb-2">
+                  Preview of how this article will render on <code>/resources/{editing.slug || '…'}</code>
+                </div>
+                <h2 className="text-2xl font-black font-heading">{editing.title || 'Untitled'}</h2>
+                {editing.excerpt && (
+                  <p className="text-base text-muted-foreground leading-relaxed">{editing.excerpt}</p>
+                )}
+                <SafeMarkdown content={editing.content ?? ''} />
+                <div className="border-t border-border pt-3 text-xs text-muted-foreground space-y-1">
+                  <div><strong>SEO title:</strong> {editing.seo_title || '—'}</div>
+                  <div><strong>Meta description:</strong> {editing.meta_description || '—'}</div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <TooltipProvider>
+            <DialogFooter className="flex-wrap gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button variant="outline" onClick={() => save()} disabled={saving}>Save Draft</Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Save current edits without changing approval status.</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (!showRevisionInput && editing.approval_status !== 'needs_revision') {
+                          setShowRevisionInput(true);
+                          return;
+                        }
+                        setApproval('needs_revision');
+                      }}
+                      disabled={saving}
+                    >
+                      {(showRevisionInput || editing.approval_status === 'needs_revision')
+                        ? 'Confirm Needs Revision'
+                        : 'Mark Needs Revision'}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Flag this article for rework. Optional note is session-only.</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      onClick={() => setApproval('approved')}
+                      disabled={saving || !requiredOk}
+                    >
+                      Approve
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {!requiredOk
+                    ? 'Fill in title, slug, SEO title, meta description, content, and cluster first.'
+                    : 'Mark as approved so it can be published.'}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      onClick={publish}
+                      disabled={saving || !canPublish}
+                      className={justApproved ? 'ring-2 ring-primary ring-offset-2 animate-pulse' : ''}
+                    >
+                      Publish
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {!canPublish
+                    ? 'Approve the article and tick the safety checklist first.'
+                    : 'Publish live to /resources/' + (editing.slug ?? '')}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button variant="destructive" onClick={archive} disabled={saving || !editing.id}>Archive</Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Remove from public view. Reversible by editing status back to draft.</TooltipContent>
+              </Tooltip>
+            </DialogFooter>
+          </TooltipProvider>
         </DialogContent>
       </Dialog>
 
