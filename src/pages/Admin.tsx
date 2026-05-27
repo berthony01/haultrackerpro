@@ -45,7 +45,41 @@ interface OverviewData {
   parse_usage_7d: number;
   expense_automation_7d: number;
   ai_insights_7d: number;
+  // Recruiter marketplace
+  recruiters_total: number;
+  recruiters_pending: number;
+  recruiters_approved: number;
+  recruiters_rejected: number;
+  recruiters_suspended: number;
+  recruiters_active: number;
+  recruiters_created_7d: number;
+  recruiters_created_30d: number;
+  recruiter_billing_total: number;
+  recruiter_billing_active: number;
+  recruiter_billing_trialing: number;
+  recruiter_billing_past_due: number;
+  recruiter_billing_canceled: number;
+  recruiter_billing_inactive: number;
+  recruiter_plan_starter: number;
+  recruiter_plan_growth: number;
+  recruiter_plan_fleet: number;
+  opportunities_total: number;
+  opportunities_active: number;
+  opportunities_pending: number;
+  opportunities_approved: number;
+  opportunities_rejected: number;
+  opportunities_flagged: number;
+  opportunities_removed: number;
+  opportunities_created_7d: number;
+  opportunities_created_30d: number;
+  applications_total: number;
+  applications_7d: number;
+  applications_30d: number;
+  contact_requests_total: number;
+  contact_requests_7d: number;
+  contact_requests_30d: number;
 }
+
 
 interface UserRow {
   user_id: string;

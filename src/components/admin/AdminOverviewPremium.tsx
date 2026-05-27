@@ -1,4 +1,4 @@
-import { Users, Crown, TrendingUp, BarChart3, CreditCard, RefreshCw, Sparkles, ParkingCircle, Shield, Trophy, Gift } from 'lucide-react';
+import { Users, Crown, TrendingUp, BarChart3, CreditCard, RefreshCw, Sparkles, ParkingCircle, Shield, Trophy, Gift, Building2, Briefcase, Mail, Send } from 'lucide-react';
 import { AdminMetricCard } from './AdminMetricCard';
 import { AdminQuickActions } from './AdminQuickActions';
 import { AdminSystemHealth } from './AdminSystemHealth';
@@ -27,7 +27,41 @@ interface OverviewData {
   parse_usage_7d: number;
   expense_automation_7d: number;
   ai_insights_7d: number;
+  // Recruiter marketplace
+  recruiters_total: number;
+  recruiters_pending: number;
+  recruiters_approved: number;
+  recruiters_rejected: number;
+  recruiters_suspended: number;
+  recruiters_active: number;
+  recruiters_created_7d: number;
+  recruiters_created_30d: number;
+  recruiter_billing_total: number;
+  recruiter_billing_active: number;
+  recruiter_billing_trialing: number;
+  recruiter_billing_past_due: number;
+  recruiter_billing_canceled: number;
+  recruiter_billing_inactive: number;
+  recruiter_plan_starter: number;
+  recruiter_plan_growth: number;
+  recruiter_plan_fleet: number;
+  opportunities_total: number;
+  opportunities_active: number;
+  opportunities_pending: number;
+  opportunities_approved: number;
+  opportunities_rejected: number;
+  opportunities_flagged: number;
+  opportunities_removed: number;
+  opportunities_created_7d: number;
+  opportunities_created_30d: number;
+  applications_total: number;
+  applications_7d: number;
+  applications_30d: number;
+  contact_requests_total: number;
+  contact_requests_7d: number;
+  contact_requests_30d: number;
 }
+
 
 interface Props {
   overview: OverviewData | null;
@@ -67,6 +101,57 @@ export function AdminOverviewPremium({ overview, onGoToTab }: Props) {
           <AdminMetricCard label="Pro Conversion" value={`${overview.pro_conversion_rate}%`} icon={TrendingUp} accent="success" />
         </div>
       </section>
+
+      {/* Recruiter Marketplace */}
+      <section>
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40">Recruiter Marketplace</p>
+          <button
+            type="button"
+            onClick={() => onGoToTab('recruiters')}
+            className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80 hover:text-primary"
+          >
+            Manage →
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <button type="button" onClick={() => onGoToTab('recruiters')} className="text-left">
+            <AdminMetricCard label="Total Recruiters" value={overview.recruiters_total} icon={Building2} sub={`+${overview.recruiters_created_30d} in 30d`} />
+          </button>
+          <button type="button" onClick={() => onGoToTab('recruiters')} className="text-left">
+            <AdminMetricCard label="Pending Review" value={overview.recruiters_pending} icon={Shield} accent={overview.recruiters_pending > 0 ? 'primary' : 'muted'} />
+          </button>
+          <AdminMetricCard label="Approved" value={overview.recruiters_approved} icon={Building2} accent="success" />
+          <AdminMetricCard label="Active" value={overview.recruiters_active} icon={Building2} sub={`${overview.recruiters_suspended} suspended`} />
+          <AdminMetricCard label="New (30d)" value={overview.recruiters_created_30d} icon={TrendingUp} sub={`${overview.recruiters_created_7d} in 7d`} accent="muted" />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <AdminMetricCard label="Total Opportunities" value={overview.opportunities_total} icon={Briefcase} sub={`+${overview.opportunities_created_30d} in 30d`} />
+          <button type="button" onClick={() => onGoToTab('opportunities')} className="text-left">
+            <AdminMetricCard label="Active Opportunities" value={overview.opportunities_active} icon={Briefcase} accent="success" />
+          </button>
+          <button type="button" onClick={() => onGoToTab('opportunities')} className="text-left">
+            <AdminMetricCard label="Pending Opps" value={overview.opportunities_pending} icon={Shield} accent={overview.opportunities_pending > 0 ? 'primary' : 'muted'} sub={`${overview.opportunities_flagged} flagged`} />
+          </button>
+          <AdminMetricCard label="Applications (30d)" value={overview.applications_30d} icon={Send} sub={`${overview.applications_total} total`} />
+          <AdminMetricCard label="Contact Requests (30d)" value={overview.contact_requests_30d} icon={Mail} sub={`${overview.contact_requests_total} total`} accent="muted" />
+        </div>
+      </section>
+
+      {/* Recruiter Billing */}
+      <section>
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/40">Recruiter Billing</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+          <AdminMetricCard label="Billing Profiles" value={overview.recruiter_billing_total} icon={CreditCard} />
+          <AdminMetricCard label="Active" value={overview.recruiter_billing_active} icon={Crown} accent="success" />
+          <AdminMetricCard label="Trialing" value={overview.recruiter_billing_trialing} icon={Sparkles} /> {/* trial-allowlist */}
+          <AdminMetricCard label="Past Due" value={overview.recruiter_billing_past_due} icon={CreditCard} accent={overview.recruiter_billing_past_due > 0 ? 'primary' : 'muted'} />
+          <AdminMetricCard label="Starter" value={overview.recruiter_plan_starter} icon={Users} accent="muted" />
+          <AdminMetricCard label="Growth" value={overview.recruiter_plan_growth} icon={TrendingUp} accent="muted" />
+          <AdminMetricCard label="Fleet" value={overview.recruiter_plan_fleet} icon={Building2} accent="muted" />
+        </div>
+      </section>
+
 
       {/* Activity + chart row */}
       <section className="grid gap-4 lg:grid-cols-3">
