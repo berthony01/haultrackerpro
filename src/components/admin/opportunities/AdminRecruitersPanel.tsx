@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sheet';
 import {
   CheckCircle2, XCircle, Ban, Eye, RefreshCw, Building2, ShieldCheck,
-  Search, Copy, ExternalLink,
+  Search, Copy, ExternalLink, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -95,6 +95,56 @@ function safeWebsiteUrl(raw: string): string {
   if (/^https?:\/\//i.test(t)) return t;
   return `https://${t}`;
 }
+
+const CSV_HEADERS = [
+  'Recruiter Name', 'Recruiter Email', 'Recruiter Phone', 'Company Name',
+  'Company Phone', 'Company Website', 'DOT Number', 'MC Number',
+  'Company Address', 'Company City', 'Company State', 'Hiring States',
+  'Equipment Types', 'Driver Types Hired', 'Verification Status',
+  'Account Status', 'Billing Plan', 'Billing Status', 'Priority Placement',
+  'Active Opportunity Count', 'Verified At', 'Created At', 'Admin Notes',
+];
+
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '""';
+  let s = Array.isArray(value) ? value.filter(Boolean).join('; ') : String(value);
+  // Formula injection protection
+  if (s.length > 0 && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  // Escape quotes
+  s = s.replace(/"/g, '""');
+  return `"${s}"`;
+}
+
+function recruiterToCsvRow(r: AdminRecruiter): string {
+  const priority = isPriorityPlacement(r.billing) ? 'Included' : 'Not included';
+  const cells = [
+    r.recruiter_name, r.recruiter_email, r.recruiter_phone, r.company_name,
+    r.company_phone, r.company_website, r.dot_number, r.mc_number,
+    r.company_address, r.company_city, r.company_state, r.hiring_states,
+    r.equipment_types, r.driver_types_hired, r.verification_status,
+    r.status, r.billing?.plan ?? '', r.billing?.status ?? '', priority,
+    r.active_opportunity_count ?? 0,
+    r.verified_at ? new Date(r.verified_at).toISOString() : '',
+    r.created_at ? new Date(r.created_at).toISOString() : '',
+    r.admin_notes,
+  ];
+  return cells.map(csvCell).join(',');
+}
+
+function downloadRecruitersCsv(rows: AdminRecruiter[], filter: string) {
+  const csv = [CSV_HEADERS.map(csvCell).join(','), ...rows.map(recruiterToCsvRow)].join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `haultrackerpro-recruiters-${filter}-${date}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 
 export function AdminRecruitersPanel() {
   const [filter, setFilter] = useState<RecruiterFilter>('pending');
@@ -234,10 +284,34 @@ export function AdminRecruitersPanel() {
             </Button>
           ))}
         </div>
-        <Button size="sm" variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={visible.length === 0}
+            onClick={() => {
+              if (visible.length === 0) {
+                toast.error('No recruiters to export');
+                return;
+              }
+              try {
+                downloadRecruitersCsv(visible, filter);
+                toast.success(`Exported ${visible.length} recruiter${visible.length === 1 ? '' : 's'}`);
+              } catch {
+                toast.error('Could not export CSV');
+              }
+            }}
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        </div>
       </div>
+      <p className="text-[11px] text-muted-foreground -mt-1">
+        CSV exports the current filtered/search result only.
+      </p>
 
       {/* Search + sort */}
       <div className="flex flex-col sm:flex-row gap-2">
