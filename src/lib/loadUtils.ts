@@ -56,13 +56,17 @@ export function getPayWeekRange(date: Date, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 
 export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): WeekSummary[] {
   const weekMap = new Map<string, Load[]>();
 
-  loads.forEach(load => {
-    const date = parseISO(getEffectiveDate(load));
-    const ws = startOfWeek(date, { weekStartsOn });
-    const key = ws.toISOString();
-    if (!weekMap.has(key)) weekMap.set(key, []);
-    weekMap.get(key)!.push(load);
-  });
+  // Phase 23A.4: weekly financial summaries must exclude cancelled loads.
+  loads
+    .filter(load => (load.status ?? 'completed') !== 'cancelled')
+    .forEach(load => {
+      const date = parseISO(getEffectiveDate(load));
+      const ws = startOfWeek(date, { weekStartsOn });
+      const key = ws.toISOString();
+      if (!weekMap.has(key)) weekMap.set(key, []);
+      weekMap.get(key)!.push(load);
+    });
+
 
   const summaries: WeekSummary[] = [];
   weekMap.forEach((weekLoads, key) => {
