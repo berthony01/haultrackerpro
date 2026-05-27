@@ -78,6 +78,77 @@ async function copyToClipboard(value: string, label: string) {
   }
 }
 
+// ---- CSV export helpers (Phase 10) ----
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '""';
+  let s: string;
+  if (Array.isArray(value)) s = value.filter((v) => v !== null && v !== undefined && v !== '').join('; ');
+  else if (typeof value === 'boolean') s = value ? 'Yes' : 'No';
+  else s = String(value);
+  if (s.length > 0 && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  s = s.replace(/"/g, '""');
+  return `"${s}"`;
+}
+
+const LEADERBOARD_CSV_HEADERS = [
+  'Rank',
+  'Recruiter Name', 'Recruiter Email', 'Recruiter Phone',
+  'Company Name', 'Company City', 'Company State',
+  'Recruiter Profile ID', 'Recruiter User ID',
+  'Verification Status', 'Account Status', 'Created At',
+  'Billing Plan', 'Billing Status', 'Active Opportunity Limit', 'Priority Placement Included',
+  'Performance Score', 'Performance Label', 'Performance Flags',
+  'Total Opportunities', 'Active Opportunities', 'Pending Opportunities',
+  'Approved Opportunities', 'Rejected Opportunities', 'Flagged Opportunities',
+  'Removed Opportunities', 'Opportunities 30d',
+  'Total Applications', 'Applications 30d', 'Applications Per Active Opportunity',
+  'Total Contact Requests', 'Contact Requests 30d', 'Responded Contact Requests',
+  'Contact Requests Per Application', 'Response Rate',
+  'Listing Activity Points', 'Active Listings Points', 'Driver Interest Points',
+  'Contact Conversion Points', 'Account Billing Points',
+];
+
+function leaderboardRowToCsv(r: LeaderboardRow, rank: number): string {
+  const cells: unknown[] = [
+    rank,
+    r.recruiter_name, r.recruiter_email, r.recruiter_phone,
+    r.company_name, r.company_city, r.company_state,
+    r.recruiter_profile_id, r.recruiter_user_id,
+    r.verification_status, r.account_status,
+    r.created_at ? new Date(r.created_at).toISOString() : '',
+    r.billing_plan, r.billing_status, r.active_opportunity_limit, r.priority_placement_included,
+    r.performance_score, r.performance_label, r.performance_flags,
+    r.total_opportunities, r.active_opportunities, r.pending_opportunities,
+    r.approved_opportunities, r.rejected_opportunities, r.flagged_opportunities,
+    r.removed_opportunities, r.opportunities_30d,
+    r.total_applications, r.applications_30d, r.application_per_active_opportunity.toFixed(1),
+    r.total_contact_requests, r.contact_requests_30d, r.responded_contact_requests,
+    r.contact_request_per_application.toFixed(1), `${r.response_rate.toFixed(1)}%`,
+    r.score_breakdown.listing, r.score_breakdown.active, r.score_breakdown.interest,
+    r.score_breakdown.contact, r.score_breakdown.account_billing,
+  ];
+  return cells.map(csvCell).join(',');
+}
+
+function downloadLeaderboardCsv(rows: LeaderboardRow[], perfFilter: string, statusFilter: string) {
+  const body = rows.map((r, i) => leaderboardRowToCsv(r, i + 1));
+  const csv = [LEADERBOARD_CSV_HEADERS.map(csvCell).join(','), ...body].join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0, 10);
+  const slugParts = ['haultrackerpro-recruiter-leaderboard'];
+  if (perfFilter !== 'all') slugParts.push(perfFilter.toLowerCase().replace(/\s+/g, '-'));
+  else if (statusFilter !== 'all') slugParts.push(statusFilter);
+  slugParts.push(date);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${slugParts.join('-')}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export function AdminRecruiterLeaderboardPanel() {
   const { data, isLoading, isError, error, refetch, isFetching } = useAdminRecruiterLeaderboard();
   const [search, setSearch] = useState('');
