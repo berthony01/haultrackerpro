@@ -1562,3 +1562,336 @@ function EmailReadinessSection({
     </Section>
   );
 }
+
+// ---------------- Manual Outreach Tracking (Phase 15) ----------------
+
+function outreachStatusBadgeClass(s: OutreachStatus): string {
+  switch (s) {
+    case 'replied':
+      return 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30';
+    case 'contacted_manually':
+      return 'bg-primary/15 text-primary ring-primary/30';
+    case 'follow_up_scheduled':
+      return 'bg-amber-500/15 text-amber-300 ring-amber-500/30';
+    case 'template_copied':
+      return 'bg-sky-500/15 text-sky-300 ring-sky-500/30';
+    case 'no_response':
+      return 'bg-orange-500/15 text-orange-300 ring-orange-500/30';
+    case 'closed':
+      return 'bg-white/10 text-white/60 ring-white/15';
+    default:
+      return 'bg-white/5 text-white/60 ring-white/10';
+  }
+}
+
+function outreachStatusLabel(s: OutreachStatus): string {
+  return OUTREACH_STATUS_OPTIONS.find((o) => o.value === s)?.label ?? s;
+}
+
+function formatLocalDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return '—';
+  }
+}
+
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function OutreachTrackingSection({
+  row,
+  outreach,
+}: {
+  row: LeaderboardRow;
+  outreach: OutreachHandle;
+}) {
+  const existing: RecruiterOutreachStatusRow | undefined =
+    outreach.outreachByRecruiterId.get(row.recruiter_profile_id);
+
+  const readiness = useMemo(() => computeRecruiterEmailReadiness(row), [row]);
+  const defaultPriority = readiness.priority.toLowerCase() as OutreachPriority;
+
+  const currentStatus: OutreachStatus = existing?.status ?? 'outreach_needed';
+  const currentPriority: OutreachPriority = existing?.priority ?? defaultPriority;
+
+  const [note, setNote] = useState<string>(existing?.admin_note ?? '');
+  const [followUpInput, setFollowUpInput] = useState<string>(toDatetimeLocal(existing?.follow_up_at));
+
+  // Sync local state when the underlying record changes (e.g. after refetch).
+  useEffect(() => {
+    setNote(existing?.admin_note ?? '');
+    setFollowUpInput(toDatetimeLocal(existing?.follow_up_at));
+  }, [existing?.admin_note, existing?.follow_up_at]);
+
+  const charCount = note.length;
+  const baseArgs = {
+    recruiter_profile_id: row.recruiter_profile_id,
+    recruiter_user_id: row.recruiter_user_id,
+  };
+
+  const handleStatus = async (value: OutreachStatus) => {
+    try {
+      await outreach.upsertStatus.mutateAsync({ ...baseArgs, status: value });
+      toast.success(`Outreach status set to "${outreachStatusLabel(value)}"`);
+    } catch (e) {
+      toast.error(`Could not update status: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handlePriority = async (value: OutreachPriority) => {
+    try {
+      await outreach.upsertStatus.mutateAsync({ ...baseArgs, priority: value });
+      toast.success(`Priority set to ${value}`);
+    } catch (e) {
+      toast.error(`Could not update priority: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleMarkCopiedManually = async () => {
+    try {
+      await outreach.markTemplateCopied.mutateAsync({
+        ...baseArgs,
+        template_key: existing?.last_template_key ?? 'manual',
+        template_label: existing?.last_template_label ?? 'Manual mark',
+        default_priority: defaultPriority,
+      });
+      toast.success('Template copy recorded');
+    } catch (e) {
+      toast.error(`Could not record template copy: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleMarkContacted = async () => {
+    try {
+      await outreach.markContactedManually.mutateAsync(baseArgs);
+      toast.success('Manual contact marked');
+    } catch (e) {
+      toast.error(`Could not mark contacted: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleSaveNote = async () => {
+    try {
+      await outreach.saveNote.mutateAsync({ ...baseArgs, admin_note: note });
+      toast.success('Outreach note saved');
+    } catch (e) {
+      toast.error(`Could not save note: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleSaveFollowUp = async () => {
+    try {
+      const iso = followUpInput ? new Date(followUpInput).toISOString() : null;
+      await outreach.scheduleFollowUp.mutateAsync({ ...baseArgs, follow_up_at: iso });
+      toast.success(iso ? 'Follow-up date saved' : 'Follow-up cleared');
+    } catch (e) {
+      toast.error(`Could not save follow-up: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleClose = async () => {
+    try {
+      await outreach.closeOutreach.mutateAsync(baseArgs);
+      toast.success('Outreach closed');
+    } catch (e) {
+      toast.error(`Could not close outreach: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  return (
+    <Section title="Manual Outreach Tracking">
+      <p className="-mt-1 mb-3 text-[11px] text-white/55">
+        Manual workflow tracking only. No emails, reminders, or notifications are sent from this
+        panel.
+      </p>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${outreachStatusBadgeClass(
+            currentStatus,
+          )}`}
+        >
+          Outreach: {outreachStatusLabel(currentStatus)}
+        </span>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${priorityBadgeClass(
+            (currentPriority.charAt(0).toUpperCase() + currentPriority.slice(1)) as
+              | 'High'
+              | 'Medium'
+              | 'Low',
+          )}`}
+        >
+          Priority: {currentPriority}
+        </span>
+      </div>
+
+      {!existing && (
+        <p className="mb-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/70">
+          No outreach tracking record yet. The first action below will create one.
+        </p>
+      )}
+
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+            Status
+          </label>
+          <select
+            value={currentStatus}
+            onChange={(e) => handleStatus(e.target.value as OutreachStatus)}
+            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[11px] text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/40"
+          >
+            {OUTREACH_STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-[#0b1220]">
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+            Priority
+          </label>
+          <select
+            value={currentPriority}
+            onChange={(e) => handlePriority(e.target.value as OutreachPriority)}
+            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[11px] text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/40"
+          >
+            {OUTREACH_PRIORITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-[#0b1220]">
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="mb-3 grid grid-cols-1 gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/75 sm:grid-cols-2">
+        <div>
+          <span className="text-white/45">Last template:</span>{' '}
+          <span className="text-white/85">{existing?.last_template_label ?? '—'}</span>
+        </div>
+        <div>
+          <span className="text-white/45">Last copied:</span>{' '}
+          <span className="text-white/85">{formatLocalDateTime(existing?.last_copied_at)}</span>
+        </div>
+        <div>
+          <span className="text-white/45">Last contacted:</span>{' '}
+          <span className="text-white/85">{formatLocalDateTime(existing?.last_contacted_at)}</span>
+        </div>
+        <div>
+          <span className="text-white/45">Follow-up:</span>{' '}
+          <span className="text-white/85">{formatLocalDateTime(existing?.follow_up_at)}</span>
+        </div>
+        {existing?.closed_at && (
+          <div className="sm:col-span-2">
+            <span className="text-white/45">Closed:</span>{' '}
+            <span className="text-white/85">{formatLocalDateTime(existing.closed_at)}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleMarkCopiedManually}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08]"
+        >
+          <Copy className="h-3 w-3" /> Mark Template Copied
+        </button>
+        <button
+          type="button"
+          onClick={handleMarkContacted}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/[0.08] px-3 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/[0.14]"
+        >
+          <Phone className="h-3 w-3" /> Mark Contacted Manually
+        </button>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08]"
+        >
+          <X className="h-3 w-3" /> Close Outreach
+        </button>
+      </div>
+
+      <div className="mb-3">
+        <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+          Schedule follow-up (manual tracking only)
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="datetime-local"
+            value={followUpInput}
+            onChange={(e) => setFollowUpInput(e.target.value)}
+            className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[11px] text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/40"
+          />
+          <button
+            type="button"
+            onClick={handleSaveFollowUp}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08]"
+          >
+            Save Follow-Up
+          </button>
+          {followUpInput && (
+            <button
+              type="button"
+              onClick={() => {
+                setFollowUpInput('');
+              }}
+              className="text-[10px] text-white/45 hover:text-white/70"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="mt-1 text-[10px] text-white/40">
+          Follow-up dates are for manual tracking only. No reminder is sent.
+        </p>
+      </div>
+
+      <div className="mb-2">
+        <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+          Admin outreach note
+        </label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value.slice(0, 500))}
+          maxLength={500}
+          placeholder="Example: Copied welcome template, planning manual follow-up next week."
+          className="min-h-[72px] w-full rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[11px] text-white/85 focus:outline-none focus:ring-1 focus:ring-primary/40"
+        />
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-[10px] text-white/40">{charCount}/500</span>
+          <button
+            type="button"
+            onClick={handleSaveNote}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08]"
+          >
+            Save Note
+          </button>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[10px] text-white/40">
+        Outreach tracking is admin-only. No email body or subject is stored; only template label,
+        timestamps, status, priority, and your short note.
+      </p>
+    </Section>
+  );
+}
