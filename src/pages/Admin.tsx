@@ -24,6 +24,7 @@ import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 import { AdminAuditLogPanel } from '@/components/admin/audit/AdminAuditLogPanel';
 import { AdminApplicationsPanel } from '@/components/admin/applications/AdminApplicationsPanel';
 import { AdminRecruiterLeaderboardPanel } from '@/components/admin/recruiters/AdminRecruiterLeaderboardPanel';
+import { INTERNAL_TEST_ACCOUNTS } from '@/lib/internalTestAccounts';
 
 interface OverviewData {
   total_users: number;
