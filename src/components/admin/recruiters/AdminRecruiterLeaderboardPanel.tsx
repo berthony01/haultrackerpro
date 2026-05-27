@@ -77,7 +77,11 @@ type SortKey =
   | 'newest'
   | 'company'
   | 'plan'
-  | 'verification';
+  | 'verification'
+  | 'follow_up_urgency'
+  | 'follow_up_date'
+  | 'outreach_priority'
+  | 'outreach_recently_updated';
 
 const STATUS_OPTIONS = ['all', 'approved', 'pending', 'suspended', 'active', 'rejected'] as const;
 const BILLING_OPTIONS = [
@@ -97,6 +101,48 @@ const PERF_OPTIONS = [
   'Low Activity',
   'Needs Attention',
 ] as const;
+
+const OUTREACH_STATUS_FILTER_OPTIONS = [
+  { value: 'all' as const, label: 'All outreach' },
+  { value: 'no_record' as const, label: 'No record' },
+  ...OUTREACH_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+];
+type OutreachStatusFilter = 'all' | 'no_record' | OutreachStatus;
+
+const REMINDER_FILTER_OPTIONS = [
+  { value: 'all', label: 'All reminders' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'due_today', label: 'Due Today' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'unscheduled', label: 'Unscheduled' },
+  { value: 'replied', label: 'Replied' },
+  { value: 'closed', label: 'Closed' },
+] as const;
+type ReminderFilter = (typeof REMINDER_FILTER_OPTIONS)[number]['value'];
+
+const PRIORITY_FILTER_OPTIONS = [
+  { value: 'all', label: 'All priorities' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+  { value: 'none', label: 'No priority' },
+] as const;
+type PriorityFilter = (typeof PRIORITY_FILTER_OPTIONS)[number]['value'];
+
+const REMINDER_SORT_WEIGHT: Record<ReminderCategory, number> = {
+  overdue: 0,
+  due_today: 1,
+  upcoming: 2,
+  unscheduled: 3,
+  replied: 4,
+  closed: 5,
+};
+
+const PRIORITY_SORT_WEIGHT: Record<OutreachPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
 
 function labelColor(label: PerformanceLabel) {
   switch (label) {
@@ -203,6 +249,9 @@ export function AdminRecruiterLeaderboardPanel() {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_OPTIONS)[number]>('all');
   const [billingFilter, setBillingFilter] = useState<(typeof BILLING_OPTIONS)[number]>('all');
   const [perfFilter, setPerfFilter] = useState<(typeof PERF_OPTIONS)[number]>('all');
+  const [outreachStatusFilter, setOutreachStatusFilter] = useState<OutreachStatusFilter>('all');
+  const [reminderFilter, setReminderFilter] = useState<ReminderFilter>('all');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [sortBy, setSortBy] = useState<SortKey>('score');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<LeaderboardRow | null>(null);
@@ -213,6 +262,7 @@ export function AdminRecruiterLeaderboardPanel() {
   const panelOutreach = useRecruiterOutreachStatus(
     useMemo(() => rows.map((r) => r.recruiter_profile_id), [rows]),
   );
+  const outreachByRecruiterId = panelOutreach.outreachByRecruiterId;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -257,9 +307,42 @@ export function AdminRecruiterLeaderboardPanel() {
       }
       // Performance
       if (perfFilter !== 'all' && r.performance_label !== perfFilter) return false;
+
+      // Phase 17: Outreach status
+      const outreach = outreachByRecruiterId.get(r.recruiter_profile_id);
+      if (outreachStatusFilter !== 'all') {
+        if (outreachStatusFilter === 'no_record') {
+          if (outreach) return false;
+        } else {
+          if (!outreach || outreach.status !== outreachStatusFilter) return false;
+        }
+      }
+      // Phase 17: Reminder category (no outreach record => 'unscheduled')
+      if (reminderFilter !== 'all') {
+        const cat = computeReminderInfo(outreach).category;
+        if (cat !== reminderFilter) return false;
+      }
+      // Phase 17: Priority
+      if (priorityFilter !== 'all') {
+        if (priorityFilter === 'none') {
+          if (outreach) return false;
+        } else {
+          if (!outreach || outreach.priority !== priorityFilter) return false;
+        }
+      }
       return true;
     });
-  }, [rows, search, statusFilter, billingFilter, perfFilter]);
+  }, [
+    rows,
+    search,
+    statusFilter,
+    billingFilter,
+    perfFilter,
+    outreachStatusFilter,
+    reminderFilter,
+    priorityFilter,
+    outreachByRecruiterId,
+  ]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -281,12 +364,67 @@ export function AdminRecruiterLeaderboardPanel() {
           return (a.billing_plan ?? 'zzz').localeCompare(b.billing_plan ?? 'zzz');
         case 'verification':
           return a.verification_status.localeCompare(b.verification_status);
+        case 'follow_up_urgency': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const ia = computeReminderInfo(oa);
+          const ib = computeReminderInfo(ob);
+          const wa = REMINDER_SORT_WEIGHT[ia.category];
+          const wb = REMINDER_SORT_WEIGHT[ib.category];
+          if (wa !== wb) return wa - wb;
+          if (ia.followUpAt && ib.followUpAt) {
+            const ta = new Date(ia.followUpAt).getTime();
+            const tb = new Date(ib.followUpAt).getTime();
+            if (ta !== tb) return ta - tb;
+          } else if (ia.followUpAt) return -1;
+          else if (ib.followUpAt) return 1;
+          if (a.performance_score !== b.performance_score)
+            return b.performance_score - a.performance_score;
+          return a.company_name.localeCompare(b.company_name);
+        }
+        case 'follow_up_date': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const fa = oa?.follow_up_at ? new Date(oa.follow_up_at).getTime() : null;
+          const fb = ob?.follow_up_at ? new Date(ob.follow_up_at).getTime() : null;
+          if (fa !== null && fb !== null) {
+            if (fa !== fb) return fa - fb;
+          } else if (fa !== null) return -1;
+          else if (fb !== null) return 1;
+          return a.company_name.localeCompare(b.company_name);
+        }
+        case 'outreach_priority': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const pa = oa?.priority ? PRIORITY_SORT_WEIGHT[oa.priority] : 3;
+          const pb = ob?.priority ? PRIORITY_SORT_WEIGHT[ob.priority] : 3;
+          if (pa !== pb) return pa - pb;
+          const ia = computeReminderInfo(oa);
+          const ib = computeReminderInfo(ob);
+          const wa = REMINDER_SORT_WEIGHT[ia.category];
+          const wb = REMINDER_SORT_WEIGHT[ib.category];
+          if (wa !== wb) return wa - wb;
+          if (a.performance_score !== b.performance_score)
+            return b.performance_score - a.performance_score;
+          return a.company_name.localeCompare(b.company_name);
+        }
+        case 'outreach_recently_updated': {
+          const oa = outreachByRecruiterId.get(a.recruiter_profile_id);
+          const ob = outreachByRecruiterId.get(b.recruiter_profile_id);
+          const ta = oa?.updated_at ? new Date(oa.updated_at).getTime() : null;
+          const tb = ob?.updated_at ? new Date(ob.updated_at).getTime() : null;
+          if (ta !== null && tb !== null) {
+            if (ta !== tb) return tb - ta;
+          } else if (ta !== null) return -1;
+          else if (tb !== null) return 1;
+          return a.company_name.localeCompare(b.company_name);
+        }
         default:
           return 0;
       }
     });
     return copy;
-  }, [filtered, sortBy]);
+  }, [filtered, sortBy, outreachByRecruiterId]);
 
   // Loaded-row summary
   const summary = useMemo(() => {
@@ -458,6 +596,48 @@ export function AdminRecruiterLeaderboardPanel() {
             ))}
           </select>
         </div>
+        {/* Phase 17: Outreach filters */}
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
+          <select
+            value={outreachStatusFilter}
+            onChange={(e) => setOutreachStatusFilter(e.target.value as OutreachStatusFilter)}
+            className="rounded-lg border border-white/10 bg-[#0A0E16] px-2 py-2 text-xs text-white"
+            aria-label="Outreach Status"
+          >
+            {OUTREACH_STATUS_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.value === 'all' ? o.label : `Outreach: ${o.label}`}
+              </option>
+            ))}
+          </select>
+          <select
+            value={reminderFilter}
+            onChange={(e) => setReminderFilter(e.target.value as ReminderFilter)}
+            className="rounded-lg border border-white/10 bg-[#0A0E16] px-2 py-2 text-xs text-white"
+            aria-label="Reminder Category"
+          >
+            {REMINDER_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.value === 'all' ? o.label : `Reminder: ${o.label}`}
+              </option>
+            ))}
+          </select>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
+            className="rounded-lg border border-white/10 bg-[#0A0E16] px-2 py-2 text-xs text-white"
+            aria-label="Outreach Priority"
+          >
+            {PRIORITY_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.value === 'all' ? o.label : `Priority: ${o.label}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="mt-1 text-[10px] text-white/40">
+          Outreach filters use saved manual outreach tracking only. No emails or reminders are sent.
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-[10px] uppercase tracking-[0.18em] text-white/40">Sort by</span>
           <select
@@ -473,12 +653,17 @@ export function AdminRecruiterLeaderboardPanel() {
             <option value="company">Company A–Z</option>
             <option value="plan">Billing Plan</option>
             <option value="verification">Verification Status</option>
+            <option value="follow_up_urgency">Follow-Up Urgency</option>
+            <option value="follow_up_date">Follow-Up Date</option>
+            <option value="outreach_priority">Outreach Priority</option>
+            <option value="outreach_recently_updated">Outreach Recently Updated</option>
           </select>
           <span className="ml-auto text-[11px] text-white/40">
             {sorted.length} of {rows.length} shown
           </span>
         </div>
       </section>
+
 
       {/* States */}
       {isLoading && (
@@ -493,7 +678,7 @@ export function AdminRecruiterLeaderboardPanel() {
       )}
       {!isLoading && !isError && sorted.length === 0 && (
         <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-8 text-center text-sm text-white/50">
-          No recruiters match the current filters.
+          No recruiters match the current search and filters.
         </div>
       )}
 
@@ -2107,7 +2292,7 @@ function OutreachRemindersSummary({
         ))}
       </div>
       <p className="mt-1 text-[10px] text-white/40">
-        Counts are based on loaded recruiter rows and saved outreach tracking records.
+        Reminder counts reflect the current leaderboard view after filters.
       </p>
 
       {topReminders.length > 0 && (
