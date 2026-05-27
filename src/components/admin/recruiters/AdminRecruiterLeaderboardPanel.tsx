@@ -1738,6 +1738,35 @@ function OutreachTrackingSection({
     }
   };
 
+  const handleClearFollowUp = async () => {
+    try {
+      await outreach.clearFollowUp.mutateAsync(baseArgs);
+      setFollowUpInput('');
+      toast.success('Follow-up cleared');
+    } catch (e) {
+      toast.error(`Could not clear follow-up: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleMarkNoResponse = async () => {
+    try {
+      await outreach.markNoResponse.mutateAsync(baseArgs);
+      toast.success('Marked as no response');
+    } catch (e) {
+      toast.error(`Could not mark no response: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  const handleMarkReplied = async () => {
+    try {
+      await outreach.markReplied.mutateAsync(baseArgs);
+      toast.success('Marked as replied');
+    } catch (e) {
+      toast.error(`Could not mark replied: ${(e as Error)?.message ?? 'Unknown error'}`);
+    }
+  };
+
+
   return (
     <Section title="Manual Outreach Tracking">
       <p className="-mt-1 mb-3 text-[11px] text-white/55">
