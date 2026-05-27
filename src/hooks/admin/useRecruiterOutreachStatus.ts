@@ -205,7 +205,49 @@ export function useRecruiterOutreachStatus(recruiterProfileIds: string[]) {
       await upsert({
         recruiter_profile_id: vars.recruiter_profile_id,
         recruiter_user_id: vars.recruiter_user_id,
-        patch: { status: 'closed', closed_at: new Date().toISOString() },
+        patch: {
+          status: 'closed',
+          closed_at: new Date().toISOString(),
+          follow_up_at: null,
+        },
+      });
+    },
+  });
+
+  // Phase 16: clear follow-up without sending notifications.
+  const clearFollowUp = useMutation({
+    mutationFn: async (vars: { recruiter_profile_id: string; recruiter_user_id?: string | null }) => {
+      const existing = outreachByRecruiterId.get(vars.recruiter_profile_id);
+      const patch: Partial<RecruiterOutreachStatusRow> = { follow_up_at: null };
+      if (existing?.status === 'follow_up_scheduled') {
+        patch.status = existing.last_contacted_at ? 'contacted_manually' : 'outreach_needed';
+      }
+      await upsert({
+        recruiter_profile_id: vars.recruiter_profile_id,
+        recruiter_user_id: vars.recruiter_user_id,
+        patch,
+      });
+    },
+  });
+
+  // Phase 16: mark "no response" while preserving follow_up_at.
+  const markNoResponse = useMutation({
+    mutationFn: async (vars: { recruiter_profile_id: string; recruiter_user_id?: string | null }) => {
+      await upsert({
+        recruiter_profile_id: vars.recruiter_profile_id,
+        recruiter_user_id: vars.recruiter_user_id,
+        patch: { status: 'no_response', closed_at: null },
+      });
+    },
+  });
+
+  // Phase 16: mark replied. Removes from active reminders. Does NOT set closed_at.
+  const markReplied = useMutation({
+    mutationFn: async (vars: { recruiter_profile_id: string; recruiter_user_id?: string | null }) => {
+      await upsert({
+        recruiter_profile_id: vars.recruiter_profile_id,
+        recruiter_user_id: vars.recruiter_user_id,
+        patch: { status: 'replied', follow_up_at: null, closed_at: null },
       });
     },
   });
@@ -221,5 +263,8 @@ export function useRecruiterOutreachStatus(recruiterProfileIds: string[]) {
     saveNote,
     scheduleFollowUp,
     closeOutreach,
+    clearFollowUp,
+    markNoResponse,
+    markReplied,
   };
 }
