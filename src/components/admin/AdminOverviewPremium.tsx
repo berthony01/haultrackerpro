@@ -310,3 +310,157 @@ export function AdminOverviewPremium({ overview, onGoToTab }: Props) {
     </div>
   );
 }
+
+function MarketplaceHealthSection({ overview }: { overview: OverviewData }) {
+  const score = overview.recruiter_marketplace_health_score ?? 0;
+  const label = overview.recruiter_marketplace_health_label ?? 'Early / insufficient activity';
+  const summary =
+    overview.recruiter_marketplace_health_summary ??
+    'No recruiter signups yet. Health score will become meaningful once recruiters join the marketplace.';
+
+  const scoreColor =
+    score >= 80
+      ? 'text-emerald-400 ring-emerald-500/30 bg-emerald-500/10'
+      : score >= 60
+      ? 'text-primary ring-primary/30 bg-primary/10'
+      : score >= 40
+      ? 'text-amber-400 ring-amber-500/30 bg-amber-500/10'
+      : score >= 20
+      ? 'text-orange-400 ring-orange-500/30 bg-orange-500/10'
+      : 'text-white/60 ring-white/10 bg-white/5';
+
+  const flags = [
+    overview.recruiter_health_low_approval && 'Low recruiter approval rate',
+    overview.recruiter_health_low_posting && 'Low recruiter posting rate',
+    overview.recruiter_health_low_applications && 'Low application rate',
+    overview.recruiter_health_low_contact_requests && 'Low contact request rate',
+  ].filter(Boolean) as string[];
+
+  const funnel: Array<{ label: string; value: number }> = [
+    { label: 'Signups', value: overview.recruiter_funnel_signups ?? 0 },
+    { label: 'Approved', value: overview.recruiter_funnel_approved ?? 0 },
+    { label: 'Active', value: overview.recruiter_funnel_active ?? 0 },
+    { label: 'Posted Opp', value: overview.recruiter_funnel_with_opportunity ?? 0 },
+    { label: 'Active Opp', value: overview.recruiter_funnel_with_active_opportunity ?? 0 },
+    { label: 'Received App', value: overview.recruiter_funnel_with_application ?? 0 },
+    { label: 'Contact Req', value: overview.recruiter_funnel_with_contact_request ?? 0 },
+  ];
+
+  const rates: Array<{ label: string; value: number }> = [
+    { label: 'Approval Rate', value: overview.recruiter_approval_rate ?? 0 },
+    { label: 'Activation Rate', value: overview.recruiter_activation_rate ?? 0 },
+    { label: 'Posting Rate', value: overview.recruiter_posting_rate ?? 0 },
+    { label: 'Active Posting Rate', value: overview.recruiter_active_posting_rate ?? 0 },
+    { label: 'Application Rate', value: overview.recruiter_application_rate ?? 0 },
+    { label: 'Contact Request Rate', value: overview.recruiter_contact_request_rate ?? 0 },
+  ];
+
+  const breakdown: Array<{ label: string; value: number; max: number }> = [
+    { label: 'Approval', value: overview.recruiter_health_approval_points ?? 0, max: 20 },
+    { label: 'Posting', value: overview.recruiter_health_posting_points ?? 0, max: 25 },
+    { label: 'Active Posting', value: overview.recruiter_health_active_posting_points ?? 0, max: 20 },
+    { label: 'Applications', value: overview.recruiter_health_application_points ?? 0, max: 20 },
+    { label: 'Contact', value: overview.recruiter_health_contact_points ?? 0, max: 15 },
+  ];
+
+  return (
+    <section>
+      <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.22em] text-white/40">Marketplace Health</p>
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Score card */}
+        <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-5 lg:col-span-1">
+          <div className="flex items-center gap-3">
+            <div className={`rounded-xl p-3 ring-1 ${scoreColor}`}>
+              <Gauge className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">Health Score</p>
+              <p className={`font-mono text-3xl font-black tracking-tight`}>
+                <span className="text-white">{score}</span>
+                <span className="text-white/30 text-xl"> / 100</span>
+              </p>
+            </div>
+          </div>
+          <p className={`mt-3 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ${scoreColor}`}>{label}</p>
+          <p className="mt-3 text-xs leading-relaxed text-white/60">{summary}</p>
+        </div>
+
+        {/* Funnel + rates */}
+        <div className="space-y-3 lg:col-span-2">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-4">
+            <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">Recruiter Funnel</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+              {funnel.map((f) => (
+                <div key={f.label} className="rounded-lg bg-white/[0.02] px-2.5 py-2 ring-1 ring-white/[0.04]">
+                  <p className="text-[10px] font-medium text-white/50 truncate">{f.label}</p>
+                  <p className="font-mono text-lg font-bold text-white">{f.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-4">
+            <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">Conversion Rates</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+              {rates.map((r) => (
+                <div key={r.label} className="rounded-lg bg-white/[0.02] px-2.5 py-2 ring-1 ring-white/[0.04]">
+                  <p className="text-[10px] font-medium text-white/50 truncate">{r.label}</p>
+                  <p className="font-mono text-lg font-bold text-white">{r.value}%</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-4 lg:grid-cols-3">
+        {/* Breakdown */}
+        <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-4 lg:col-span-2">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">Score Breakdown</p>
+          <div className="space-y-2">
+            {breakdown.map((b) => {
+              const pct = b.max > 0 ? Math.min(100, Math.round((b.value / b.max) * 100)) : 0;
+              return (
+                <div key={b.label}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-white/70">{b.label}</span>
+                    <span className="font-mono font-bold text-white">
+                      {b.value} <span className="text-white/40">/ {b.max}</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Risk flags */}
+        <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-4">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">Attention Items</p>
+          {flags.length === 0 ? (
+            <div className="flex items-start gap-2 rounded-lg bg-emerald-500/10 px-2.5 py-2 ring-1 ring-emerald-500/20">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+              <p className="text-xs text-white/70">No major recruiter marketplace warnings based on loaded metrics.</p>
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {flags.map((f) => (
+                <li key={f} className="flex items-start gap-2 rounded-lg bg-amber-500/10 px-2.5 py-2 ring-1 ring-amber-500/20">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+                  <span className="text-xs text-white/80">{f}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
