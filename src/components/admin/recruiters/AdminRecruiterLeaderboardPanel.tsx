@@ -703,8 +703,65 @@ export function AdminRecruiterLeaderboardPanel() {
         onView={(row) => setSelected(row)}
       />
 
+      {/* Phase 18: Workflow Presets */}
+      <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+              Workflow Presets
+            </p>
+            <p className="mt-1 text-[11px] text-white/60">
+              Quick views for common recruiter outreach work. Presets only change the current admin view.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {activePreset !== 'all' && (
+              <button
+                type="button"
+                onClick={clearPreset}
+                className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-white/70 hover:bg-white/[0.08]"
+              >
+                Clear Preset
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-white/70 hover:bg-white/[0.08]"
+            >
+              Reset All Filters
+            </button>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 overflow-x-auto">
+          {WORKFLOW_PRESETS.map((p) => {
+            const isActive = activePreset === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => applyPreset(p.key)}
+                title={p.description}
+                className={
+                  'whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ' +
+                  (isActive
+                    ? 'border-primary/50 bg-primary/15 text-primary'
+                    : 'border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08]')
+                }
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-[10px] text-white/40">
+          Presets are view filters only. They do not send emails, reminders, or notifications. Manual filters and search still apply on top of an active preset.
+        </p>
+      </section>
+
       {/* Filters */}
       <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
+
         <div className="grid gap-2 md:grid-cols-5">
           <div className="relative md:col-span-2">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
