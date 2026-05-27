@@ -29,8 +29,15 @@ import {
   type LeaderboardRow,
   type PerformanceLabel,
   type RecentRecruiterOpportunity,
+  type RecentRecruiterApplication,
+  type RecentRecruiterContactRequest,
+  type RecruiterApplicationSummary,
+  type RecruiterContactRequestSummary,
   RECENT_OPPORTUNITY_DISPLAY_CAP,
+  RECENT_APPLICATION_DISPLAY_CAP,
+  RECENT_CONTACT_REQUEST_DISPLAY_CAP,
 } from '@/hooks/admin/useAdminRecruiterLeaderboard';
+
 
 type SortKey =
   | 'score'
