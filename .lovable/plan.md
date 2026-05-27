@@ -1,75 +1,52 @@
-# Phase 18E — 12-Week SEO/AEO Content Calendar (Completed)
+# Plan: Fix Resource Articles Admin Workflow
 
-Goal: give the admin/owner a structured 12-week planning surface for SEO
-and AI Answer Engine (AEO) resource articles, feeding the Phase 18D
-Article Draft Approval System. Planning only — no auto-publish, no
-seeding of `resource_articles`, no public route exposure.
+## What's actually broken (strict analysis)
 
-## What shipped
+After tracing `src/pages/admin/ResourceArticlesAdmin.tsx` and `src/pages/resources/ResourceArticleDynamic.tsx`, the issues you noticed are real:
 
-### Calendar data (`src/lib/contentCalendar.ts`)
-- 24 planned articles across 11 topic clusters (profit, RPM, fuel,
-  taxes, contracts, expenses, parking, referrals, recruiter, bookkeeping,
-  cost-per-mile).
-- Each entry: `id`, `week`, `recommended_publish_day`, `topic_cluster`,
-  `priority`, `disclaimer_required`, `title`, `slug`, primary +
-  secondary keywords, target audience, `search_intent`, `content_angle`,
-  outline sections, suggested FAQs, suggested internal links,
-  `recommended_cta`.
-- `CALENDAR_SUMMARY` (total weeks, articles, per-week, main clusters).
-- `buildDraftPrompt(article)` — generates a safety-bounded brief
-  (no invented stats, no guarantees, disclaimer rules) for paste into
-  the Article Manager.
+1. **No way to preview the rendered article.** The Content field is a raw Markdown `<Textarea>`. There is no preview tab and no "View" link anywhere — not from the list, not from the editor. You can only stare at raw `##` headings.
+2. **Public route hides anything not published.** `ResourceArticleDynamic` queries `.eq('status','published').not('published_at','is',null)`. So drafts and approved articles return "Resource not found" if you try to visit `/resources/<slug>` — that's why drafts feel invisible.
+3. **Approve gives no visible feedback.** `setApproval('approved')` runs `save()`, which only shows a generic "Saved" toast. The only visible change is two tiny badges at the bottom of the dialog (`Status: approved`, `Approval: approved`) and the Publish button quietly becoming enabled. Nothing draws your eye to it.
+4. **Mark Needs Revision is a dead end.** Same generic "Saved" toast, no field to capture *why* it needs revision, no visible state change beyond the small badge.
+5. **Publish has no "view it live" affordance.** After publishing, the dialog stays open, toast says "Saved", and there's no link to open the public URL.
+6. **Save Draft → "where is it?"** It saves to the list, but the list row has no Preview action, only Edit. So drafts really do feel like they vanish.
 
-### Admin Calendar UI (`src/pages/admin/ContentCalendarAdmin.tsx`)
-- Route: `/admin/content-calendar`, lazy-loaded and wrapped in
-  `AdminRoute` in `src/App.tsx` (admin-only; non-admins redirect via
-  `useAdmin`).
-- Week-by-week list grouped by `week`, with cluster filter.
-- Summary cards (weeks, planned articles, per week, clusters, manual
-  approval).
-- **Content Safety Rules** panel (no AI auto-publish, no invented
-  stats/quotes, no guaranteed results, disclaimers for tax/legal/
-  financial topics, manual sitemap + llms.txt updates).
-- Per-article card with copy-to-clipboard AI draft prompt and a link
-  to `/admin/resource-articles` (Article Manager).
-- `<SEOHead noindex>` to prevent indexing.
+These are all UI-layer fixes. No schema, RLS, or backend changes.
 
-### Navigation
-- "Content Calendar" link added to admin-only sidebar footer in
-  `src/components/admin/AdminSidebar.tsx`, alongside the existing
-  "Resource Articles" link.
+## Changes (UI only, `src/pages/admin/ResourceArticlesAdmin.tsx`)
 
-### Public exposure
-- `/admin/*` is already blocked in `public/robots.txt`
-  (`Disallow: /admin`).
-- Not added to `public/sitemap.xml` or `public/llms.txt`. Confirmed
-  via grep — only `Disallow: /admin` mentions admin.
+### 1. Add a Preview tab inside the editor dialog
+- Wrap the Title/Slug/SEO/Content block in `Tabs` with two tabs: **Edit** and **Preview**.
+- Preview renders `<SafeMarkdown content={editing.content ?? ''} />` (already used by the public page), plus title, excerpt, and the meta-description preview, so admin sees exactly what readers see.
+- Default tab: Edit. Tab state local to the dialog.
 
-## Verification (final pass)
+### 2. Add a "Preview" action on each list row
+- Next to the existing **Edit** button, add **Preview** which opens the editor dialog directly on the Preview tab. Same dialog, no new route, no DB changes.
+- For rows already `published`, also add a small **Open Live** link that goes to `/resources/<slug>` in a new tab. Hidden for non-published rows (since the public route 404s them by design).
 
-- `npm install` — already installed, no-op.
-- `npm run build` — ✅ built in ~18s, no errors. Bundle includes
-  `ContentCalendarAdmin-*.js` (~33 kB).
-- `npm run test` (vitest) — ✅ 279/279 passed across 26 files.
-- `npm run seo:audit` — ✅ sitemap audit passed; no admin routes
-  present.
-- Route gating: `<Route path="/admin/content-calendar"
-  element={<AdminRoute><ContentCalendarAdmin/></AdminRoute>} />` plus
-  `useAdmin()` redirect inside the page (defense-in-depth).
-- Sidebar link present in admin sidebar; Article Manager link in the
-  page header points at `/admin/resource-articles`.
+### 3. Make Approve / Needs Revision / Publish actually feel like they did something
+- After `setApproval('approved')`: toast `"Approved — ready to publish"` and visually highlight the Publish button (e.g. pulse/ring) while the dialog stays open.
+- After `setApproval('needs_revision')`: open a tiny inline panel (not a separate dialog) with a `Textarea` for an optional revision note that gets appended to the **Excerpt? No — to the existing editor as a yellow banner only**. Since there's no `revision_notes` column and you said no schema changes, store the note in component state and surface it as a banner at the top of the dialog while editing this article in the current session. Toast: `"Marked as needs revision"`. (If you want it persisted, that's a separate phase — see Deferred.)
+- After `publish()` succeeds: toast `"Published"` plus a second toast action button `"Open live page"` linking to `/resources/<slug>` in a new tab. Also show a green inline banner in the dialog with the same link.
 
-## Out of scope (not touched)
+### 4. Clarify state at a glance
+- Move the small `Status` / `Approval` badges from the bottom of the dialog to **right under the dialog title**, made larger and color-coded (draft = secondary, pending_review = warning, approved = success, published = primary, archived = muted, needs_revision = destructive).
+- Footer buttons get hover tooltips explaining what each does and why it's disabled when it is (e.g. Publish disabled tooltip: `"Approve the article and tick the safety checklist first."`).
 
-Billing, Stripe, Supabase RLS, calculations, reports, loads, expenses,
-fuel, parking, contracts, recruiter dashboards, driver dashboards,
-notifications, public SEO pages, pricing logic, auth.
+### 5. List filter cleanup (small)
+- Add a `Needs revision` option to the Filter `Select` so it's findable without scrolling the All view. Filter logic: `q.eq('approval_status','needs_revision')`.
 
-## Next phases (suggested)
+## Files touched
 
-- Phase 18F — Testimonials / Trust Proof.
-- Phase 18G — Dynamic sitemap generation from `resource_articles` so
-  published drafts auto-appear in `sitemap.xml` / `llms.txt`.
-- Phase 18H — First article draft batch generated through the approval
-  flow.
+- `src/pages/admin/ResourceArticlesAdmin.tsx` — all of the above.
+
+No changes to: `ResourceArticleDynamic.tsx`, `SafeMarkdown.tsx`, schema, RLS, edge functions, public routes.
+
+## Deferred (not in this phase)
+
+- Persisting revision notes (would need a `revision_notes` text column + migration).
+- Public preview-by-token route for non-published articles (would need a token column + RLS policy).
+- Diff view between draft and last-published version.
+- Inline AI re-draft on a single section.
+
+Confirm and I'll implement exactly the above — nothing more.
