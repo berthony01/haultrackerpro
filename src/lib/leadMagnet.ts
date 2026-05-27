@@ -12,6 +12,36 @@ export const STARTER_KIT_DOWNLOAD_URL =
   (import.meta.env?.VITE_STARTER_KIT_DOWNLOAD_URL as string | undefined) ||
   FALLBACK_STARTER_KIT_URL;
 
+/**
+ * Mobile-safe trigger for the Starter Kit zip download.
+ * - iOS: same-tab navigation (only reliable path for cross-origin binaries).
+ * - Other: hidden anchor click with `download` attribute + `_blank` fallback.
+ * Must be called inside a user gesture (click handler).
+ */
+export function triggerStarterKitDownload(): string {
+  const url = STARTER_KIT_DOWNLOAD_URL;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return url;
+
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+
+  if (isIOS) {
+    window.location.assign(url);
+    return url;
+  }
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'HaulTrackerPro_Trucker_Starter_Kit.zip';
+  a.rel = 'noopener noreferrer';
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return url;
+}
+
 export const leadMagnetSchema = z.object({
   email: z
     .string()
