@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp, ParkingCircle, Trophy, Gift, Sparkles, Briefcase, Building2, Truck, Share2, ScrollText } from 'lucide-react';
+import { ArrowLeft, Users, Shield, CreditCard, BarChart3, Search, UserPlus, Trash2, Crown, MessageSquare, Mail, RefreshCw, TrendingUp, ParkingCircle, Trophy, Gift, Sparkles, Briefcase, Building2, Truck, Share2, ScrollText, Inbox } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminOpportunitiesPanel } from '@/components/admin/opportunities/AdminOpportunitiesPanel';
 import { AdminRecruitersPanel } from '@/components/admin/opportunities/AdminRecruitersPanel';
@@ -22,6 +22,7 @@ import { AdminReferralOversightPanel } from '@/components/admin/referrals/AdminR
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminOverviewPremium } from '@/components/admin/AdminOverviewPremium';
 import { AdminAuditLogPanel } from '@/components/admin/audit/AdminAuditLogPanel';
+import { AdminApplicationsPanel } from '@/components/admin/applications/AdminApplicationsPanel';
 
 interface OverviewData {
   total_users: number;
@@ -602,6 +603,7 @@ export default function Admin() {
               <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
               <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
               <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
+              <TabsTrigger value="applications"><Inbox className="h-4 w-4 mr-1" />Applications</TabsTrigger>
               <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
               <TabsTrigger value="referrals"><Share2 className="h-4 w-4 mr-1" />Referral Oversight</TabsTrigger>
               <TabsTrigger value="contracts"><Shield className="h-4 w-4 mr-1" />Contracts</TabsTrigger>
@@ -623,6 +625,7 @@ export default function Admin() {
             <TabsTrigger value="drivers">Drivers</TabsTrigger>
             <TabsTrigger value="leads">Starter Kit</TabsTrigger>
             <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
+            <TabsTrigger value="applications">Applications</TabsTrigger>
             <TabsTrigger value="recruiters">Recruiters</TabsTrigger>
             <TabsTrigger value="referrals">Referral Oversight</TabsTrigger>
             <TabsTrigger value="contracts">Contracts</TabsTrigger>
@@ -635,6 +638,9 @@ export default function Admin() {
 
           <TabsContent value="opportunities" className="space-y-3">
             <AdminOpportunitiesPanel />
+          </TabsContent>
+          <TabsContent value="applications" className="space-y-3">
+            <AdminApplicationsPanel />
           </TabsContent>
           <TabsContent value="recruiters" className="space-y-3">
             <AdminRecruitersPanel />
