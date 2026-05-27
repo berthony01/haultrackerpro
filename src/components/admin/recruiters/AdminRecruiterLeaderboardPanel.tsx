@@ -1031,7 +1031,10 @@ function RecruiterDetailDrawer({
               </Section>
 
               {/* Email Readiness (Phase 14, display + copy-only) */}
-              <EmailReadinessSection row={r} />
+              <EmailReadinessSection row={r} outreach={outreach} />
+
+              {/* Manual Outreach Tracking (Phase 15) */}
+              <OutreachTrackingSection row={r} outreach={outreach} />
 
               {/* Guidance */}
               <Section title="Admin Guidance">
