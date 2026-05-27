@@ -32,12 +32,10 @@ export default function ResourceArticleDynamic() {
     if (!slug) { setNotFound(true); setLoading(false); return; }
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from('resource_articles')
+      const { data, error } = await (supabase as any)
+        .from('resource_articles_public')
         .select('id,slug,title,seo_title,meta_description,excerpt,content,topic_cluster,author_name,published_at,updated_at')
         .eq('slug', slug)
-        .eq('status', 'published')
-        .not('published_at', 'is', null)
         .maybeSingle();
       if (cancelled) return;
       if (error || !data) { setNotFound(true); }
