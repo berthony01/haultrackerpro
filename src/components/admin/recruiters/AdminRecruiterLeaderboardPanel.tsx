@@ -396,6 +396,13 @@ export function AdminRecruiterLeaderboardPanel() {
         </div>
       </section>
 
+      {/* Phase 16: Outreach Follow-Up Reminders */}
+      <OutreachRemindersSummary
+        rows={sorted}
+        outreachByRecruiterId={panelOutreach.outreachByRecruiterId}
+        onView={(row) => setSelected(row)}
+      />
+
       {/* Filters */}
       <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
         <div className="grid gap-2 md:grid-cols-5">
