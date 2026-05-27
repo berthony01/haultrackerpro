@@ -703,6 +703,336 @@ export function AdminRecruiterLeaderboardPanel() {
           );
         })}
       </ul>
+
+      <RecruiterDetailDrawer row={selected} onClose={() => setSelected(null)} />
+    </div>
+  );
+}
+
+// ---------------- Detail Drawer (Phase 11) ----------------
+
+function buildGuidance(r: LeaderboardRow): string[] {
+  const tips: string[] = [];
+  if (r.active_opportunities === 0) {
+    tips.push(
+      'This recruiter has no active listings. Review whether they need onboarding or approval support.'
+    );
+  }
+  if (r.active_opportunities > 0 && r.total_applications === 0) {
+    tips.push('Listings are active, but applications have not started yet.');
+  }
+  if (r.total_applications > 0 && r.total_contact_requests === 0) {
+    tips.push('Applications exist, but contact requests have not converted yet.');
+  }
+  if (r.billing_status === 'past_due') {
+    tips.push('Billing is past due. Review billing status before offering premium placement.');
+  }
+  if (r.performance_score >= 80) {
+    tips.push('This recruiter is performing strongly based on current marketplace activity.');
+  } else if (r.performance_score < 20) {
+    tips.push('Performance score is very low. Consider outreach to identify blockers.');
+  }
+  if (r.verification_status === 'pending') {
+    tips.push('Verification is pending. Review the recruiter profile in the Recruiters tab.');
+  }
+  return tips.slice(0, 5);
+}
+
+function RecruiterDetailDrawer({
+  row,
+  onClose,
+}: {
+  row: LeaderboardRow | null;
+  onClose: () => void;
+}) {
+  const open = row !== null;
+  const r = row;
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent
+        side="right"
+        className="w-full overflow-y-auto border-l border-white/10 bg-[#0A0E16] p-0 text-white sm:max-w-xl"
+      >
+        {r && (
+          <>
+            <SheetHeader className="border-b border-white/[0.06] p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <SheetTitle className="text-base font-bold text-white">
+                    Recruiter Performance Details
+                  </SheetTitle>
+                  <SheetDescription className="mt-0.5 truncate text-xs text-white/60">
+                    {r.recruiter_name} · {r.company_name}
+                  </SheetDescription>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-white/70 hover:bg-white/[0.08]"
+                  aria-label="Close"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${labelColor(r.performance_label)}`}
+                >
+                  {r.performance_label} · {r.performance_score}/100
+                </span>
+                {r.priority_placement_included && (
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 ring-1 ring-emerald-500/20">
+                    priority placement
+                  </span>
+                )}
+              </div>
+            </SheetHeader>
+
+            <div className="space-y-5 p-5">
+              {/* Identity */}
+              <Section title="Recruiter Identity">
+                <KV k="Recruiter" v={r.recruiter_name} />
+                <KV k="Company" v={r.company_name} />
+                <KV k="Email" v={r.recruiter_email ?? '—'} />
+                <KV k="Phone" v={r.recruiter_phone ?? '—'} />
+                <KV
+                  k="Location"
+                  v={[r.company_city, r.company_state].filter(Boolean).join(', ') || '—'}
+                />
+                <KV k="Recruiter ID" v={shortId(r.recruiter_profile_id) + '…'} mono />
+                <KV k="User ID" v={shortId(r.recruiter_user_id) + '…'} mono />
+                <KV
+                  k="Joined"
+                  v={r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}
+                />
+              </Section>
+
+              {/* Account / Billing */}
+              <Section title="Account & Billing">
+                <KV k="Verification" v={r.verification_status} />
+                <KV k="Account status" v={r.account_status} />
+                <KV k="Billing plan" v={r.billing_plan ?? '—'} />
+                <KV k="Billing status" v={r.billing_status ?? '—'} />
+                <KV
+                  k="Active opp limit"
+                  v={r.active_opportunity_limit !== null ? String(r.active_opportunity_limit) : '—'}
+                />
+                <KV
+                  k="Priority placement"
+                  v={r.priority_placement_included ? 'Yes' : 'No'}
+                />
+                <KV
+                  k="Billing period end"
+                  v={
+                    r.current_period_end
+                      ? new Date(r.current_period_end).toLocaleDateString()
+                      : '—'
+                  }
+                />
+              </Section>
+
+              {/* Performance Score */}
+              <Section title="Performance Score">
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] text-white/60">Score</span>
+                    <span className="font-mono text-2xl font-bold text-white">
+                      {r.performance_score}
+                      <span className="text-sm text-white/40"> / 100</span>
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-white/60">
+                    Label: <span className="font-semibold text-white/90">{r.performance_label}</span>
+                  </p>
+                  {r.performance_flags.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {r.performance_flags.map((f) => (
+                        <span
+                          key={f}
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300 ring-1 ring-amber-500/20"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-white/40">No flags.</p>
+                  )}
+                  <p className="mt-2 text-[10px] text-white/40">
+                    Internal directional score based on loaded marketplace activity.
+                  </p>
+                </div>
+              </Section>
+
+              {/* Score Breakdown */}
+              <Section title="Score Breakdown">
+                <div className="space-y-2">
+                  {[
+                    ['Listing Activity', r.score_breakdown.listing, 25],
+                    ['Active Listings', r.score_breakdown.active, 20],
+                    ['Driver Interest', r.score_breakdown.interest, 25],
+                    ['Contact Conversion', r.score_breakdown.contact, 15],
+                    ['Account/Billing', r.score_breakdown.account_billing, 15],
+                  ].map(([l, v, m]) => {
+                    const pct = Math.round(((v as number) / (m as number)) * 100);
+                    return (
+                      <div key={l as string}>
+                        <div className="flex justify-between text-[11px] text-white/70">
+                          <span>{l}</span>
+                          <span className="font-mono text-white/90">
+                            {v as number} / {m as number}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
+
+              {/* Opportunity Breakdown */}
+              <Section title="Opportunity Breakdown">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ['Total', r.total_opportunities],
+                    ['Active', r.active_opportunities],
+                    ['Pending', r.pending_opportunities],
+                    ['Approved', r.approved_opportunities],
+                    ['Rejected', r.rejected_opportunities],
+                    ['Flagged', r.flagged_opportunities],
+                    ['Removed', r.removed_opportunities],
+                    ['Created 30d', r.opportunities_30d],
+                  ].map(([l, v]) => (
+                    <MiniStat key={l as string} label={l as string} value={v as number} />
+                  ))}
+                </div>
+              </Section>
+
+              {/* Application & Contact Activity */}
+              <Section title="Application & Contact Activity">
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniStat label="Total Applications" value={r.total_applications} />
+                  <MiniStat label="Applications 30d" value={r.applications_30d} />
+                  <MiniStat
+                    label="Apps / Active Opp"
+                    value={r.application_per_active_opportunity.toFixed(1)}
+                  />
+                  <MiniStat label="Total Contact Reqs" value={r.total_contact_requests} />
+                  <MiniStat label="Contact Reqs 30d" value={r.contact_requests_30d} />
+                  <MiniStat label="Responded" value={r.responded_contact_requests} />
+                  <MiniStat
+                    label="Contact / App"
+                    value={r.contact_request_per_application.toFixed(1)}
+                  />
+                  <MiniStat label="Response Rate" value={`${r.response_rate.toFixed(1)}%`} />
+                </div>
+              </Section>
+
+              {/* Guidance */}
+              <Section title="Admin Guidance">
+                {(() => {
+                  const tips = buildGuidance(r);
+                  if (tips.length === 0) {
+                    return (
+                      <p className="text-[11px] text-white/50">
+                        No directional guidance at this time.
+                      </p>
+                    );
+                  }
+                  return (
+                    <ul className="space-y-1.5">
+                      {tips.map((t) => (
+                        <li
+                          key={t}
+                          className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/80"
+                        >
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
+                <p className="mt-2 text-[10px] text-white/40">
+                  Guidance is deterministic and based on loaded metrics only.
+                </p>
+              </Section>
+
+              {/* Safe Actions */}
+              <Section title="Safe Actions">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={!r.recruiter_email}
+                    onClick={() =>
+                      r.recruiter_email && copyToClipboard(r.recruiter_email, 'Email')
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Mail className="h-3 w-3" />
+                    <Copy className="h-3 w-3" />
+                    Copy Email
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!r.recruiter_phone}
+                    onClick={() =>
+                      r.recruiter_phone && copyToClipboard(r.recruiter_phone, 'Phone')
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Phone className="h-3 w-3" />
+                    <Copy className="h-3 w-3" />
+                    Copy Phone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08]"
+                  >
+                    Close
+                  </button>
+                </div>
+              </Section>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+        {title}
+      </p>
+      {children}
+    </section>
+  );
+}
+
+function KV({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
+  return (
+    <div className="flex justify-between gap-3 py-0.5 text-[11px]">
+      <span className="text-white/60">{k}</span>
+      <span className={`text-right text-white/90 ${mono ? 'font-mono' : ''}`}>{v}</span>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg bg-white/[0.02] px-2.5 py-1.5 ring-1 ring-white/[0.04]">
+      <p className="truncate text-[10px] font-medium text-white/50">{label}</p>
+      <p className="font-mono text-sm font-bold text-white">{value}</p>
     </div>
   );
 }
