@@ -1,4 +1,4 @@
-import { Users, Crown, TrendingUp, BarChart3, CreditCard, RefreshCw, Sparkles, ParkingCircle, Shield, Trophy, Gift, Building2, Briefcase, Mail, Send, Activity, AlertTriangle, CheckCircle2, Gauge } from 'lucide-react';
+import { Users, Crown, TrendingUp, BarChart3, CreditCard, RefreshCw, Sparkles, ParkingCircle, Shield, Trophy, Gift, Building2, Briefcase, Mail, Send, AlertTriangle, CheckCircle2, Gauge } from 'lucide-react';
 import { AdminMetricCard } from './AdminMetricCard';
 import { AdminQuickActions } from './AdminQuickActions';
 import { AdminSystemHealth } from './AdminSystemHealth';
