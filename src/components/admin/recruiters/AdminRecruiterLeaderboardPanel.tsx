@@ -28,6 +28,8 @@ import {
   useAdminRecruiterLeaderboard,
   type LeaderboardRow,
   type PerformanceLabel,
+  type RecentRecruiterOpportunity,
+  RECENT_OPPORTUNITY_DISPLAY_CAP,
 } from '@/hooks/admin/useAdminRecruiterLeaderboard';
 
 type SortKey =
