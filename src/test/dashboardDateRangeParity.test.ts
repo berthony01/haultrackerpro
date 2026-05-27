@@ -28,13 +28,7 @@ describe('Dashboard ↔ reportRanges parity (anchor 2026-05-27)', () => {
       it('Dashboard getShowingLabel uses the same window as reportRanges.getPresetRange', () => {
         for (const k of keys) {
           const shared = getSharedPresetRange(k, wso);
-          // Re-import dashboard helper lazily to keep its internal `new Date()`
-          // resolved under the fake timer.
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const { getShowingLabel: getLabel } = require('@/components/DashboardView');
-          const label = getLabel(k, wso) as string;
-          // The label is "Showing: <MMM d, yyyy> - <MMM d, yyyy>"; rebuild it
-          // from the shared range and compare bytes.
+          const label = getShowingLabel(k, wso) as string;
           const expected = `Showing: ${format(new Date(shared.from + 'T00:00:00'), 'MMM d, yyyy')} - ${format(new Date(shared.to + 'T00:00:00'), 'MMM d, yyyy')}`;
           expect(label).toBe(expected);
         }
