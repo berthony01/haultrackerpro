@@ -73,15 +73,20 @@ export default function ResourceArticlesAdmin() {
   const { user } = useAuth();
   const { isAdmin, isLoading } = useAdmin();
 
-  const [filter, setFilter] = useState<'all' | Status | 'pending_review'>('all');
+  const [filter, setFilter] = useState<'all' | Status | 'pending_review' | 'needs_revision'>('all');
   const [rows, setRows] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorTab, setEditorTab] = useState<'edit' | 'preview'>('edit');
   const [aiOpen, setAiOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Article>>(EMPTY);
   const [safetyChecked, setSafetyChecked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [prefillNotice, setPrefillNotice] = useState<{ title: string; duplicateSlug: boolean } | null>(null);
+  const [revisionNote, setRevisionNote] = useState('');
+  const [showRevisionInput, setShowRevisionInput] = useState(false);
+  const [justApproved, setJustApproved] = useState(false);
+  const [justPublishedSlug, setJustPublishedSlug] = useState<string | null>(null);
   const handledPrefillRef = useRef<string | null>(null);
 
   // AI form
