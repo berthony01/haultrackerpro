@@ -28,12 +28,11 @@ export default function ResourcesHub() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Public-safe view: excludes ai_generation_prompt and other internal fields.
-      const { data, error } = await (supabase as any)
-        .from('resource_articles_public')
-        .select('id,slug,title,excerpt,topic_cluster')
-        .order('published_at', { ascending: false })
-        .limit(24);
+      // Phase 26: public RPC excludes ai_generation_prompt and other internal fields.
+      const { data, error } = await (supabase as any).rpc(
+        'list_public_resource_articles',
+        { _limit: 24 },
+      );
       if (!cancelled && !error && data) setDynamicArticles(data as PublishedArticle[]);
     })();
     return () => { cancelled = true; };
