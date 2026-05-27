@@ -279,15 +279,41 @@ export function AdminRecruiterLeaderboardPanel() {
               recruiter marketplace data.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/[0.08] disabled:opacity-50"
-          >
-            {isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (sorted.length === 0) {
+                  toast.error('No leaderboard rows to export');
+                  return;
+                }
+                try {
+                  downloadLeaderboardCsv(sorted, perfFilter, statusFilter);
+                  toast.success(`Exported ${sorted.length} recruiter${sorted.length === 1 ? '' : 's'} to CSV`);
+                } catch (e) {
+                  toast.error(`Export failed: ${(e as Error)?.message ?? 'Unknown error'}`);
+                }
+              }}
+              disabled={sorted.length === 0}
+              title="Export current leaderboard view to CSV"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/[0.08] disabled:opacity-50"
+            >
+              {isFetching ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
         </div>
+        <p className="mt-2 text-[10px] text-white/40">
+          CSV export uses the current search, filters, and sort order.
+        </p>
       </div>
 
       {/* Summary cards */}
