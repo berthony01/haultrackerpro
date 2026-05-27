@@ -2513,7 +2513,7 @@ function OutreachRemindersSummary({
         ))}
       </div>
       <p className="mt-1 text-[10px] text-white/40">
-        Reminder counts reflect the current leaderboard view after filters.
+        Reminder counts reflect the current leaderboard view after presets and filters.
       </p>
 
       {topReminders.length > 0 && (
