@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead';
 import { useAuth } from '@/hooks/useAuth';
-import { leadMagnetSchema, submitLeadMagnet, STARTER_KIT_DOWNLOAD_URL } from '@/lib/leadMagnet';
+import { leadMagnetSchema, submitLeadMagnet, STARTER_KIT_DOWNLOAD_URL, triggerStarterKitDownload } from '@/lib/leadMagnet';
 import {
   trackLeadMagnetView,
   trackLeadMagnetSubmit,
