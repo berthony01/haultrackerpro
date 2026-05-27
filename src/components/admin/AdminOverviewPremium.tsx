@@ -3,6 +3,7 @@ import { AdminMetricCard } from './AdminMetricCard';
 import { AdminQuickActions } from './AdminQuickActions';
 import { AdminSystemHealth } from './AdminSystemHealth';
 import { AdminRecentActivity } from './AdminRecentActivity';
+import { MarketplaceTrendsSection } from './MarketplaceTrendsSection';
 
 interface OverviewData {
   total_users: number;
