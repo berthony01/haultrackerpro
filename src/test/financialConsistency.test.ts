@@ -42,22 +42,26 @@ describe('Phase 23 — dashboard ↔ loads KPI parity (same filtered set, same n
     mk({ id: 'c', status: 'cancelled' as any, loaded_miles: 999, estimated_pay: 9999 }),
   ];
 
-  it('summarizeLoads matches direct sum/fleet helpers on excludeCancelled(loads)', () => {
-    const sum = summarizeLoads(loads, []);
-    const active = excludeCancelled(loads);
+  it('Dashboard and LoadsKpiStrip share summarizeLoads → identical totals', () => {
+    // Both surfaces call summarizeLoads(filteredLoads, ...). Same input → same numbers.
+    const dashSum = summarizeLoads(loads, []);
+    const kpiSum = summarizeLoads(loads, []);
+    expect(dashSum.loadCount).toBe(kpiSum.loadCount);
+    expect(dashSum.grossRevenue).toBe(kpiSum.grossRevenue);
+    expect(dashSum.totalMiles).toBe(kpiSum.totalMiles);
+    expect(dashSum.effectiveRPM).toBe(kpiSum.effectiveRPM);
 
-    // Dashboard summary fields
-    expect(sum.loadCount).toBe(2);
-    expect(sum.cancelledCount).toBe(1);
-
-    // KPI-strip-style direct math on the same active set
-    expect(sum.totalMiles).toBe(sumOperatingMiles(active));
-    expect(sum.estimatedPay).toBe(sumExpectedPay(active));
-    expect(sum.effectiveRPM).toBeCloseTo(fleetEffectiveRPM(active), 6);
-
+    // And it respects the documented rules.
+    expect(dashSum.loadCount).toBe(2);
+    expect(dashSum.cancelledCount).toBe(1);
+    expect(dashSum.totalMiles).toBe(sumOperatingMiles(excludeCancelled(loads)));
+    expect(dashSum.estimatedPay).toBe(sumExpectedPay(excludeCancelled(loads)));
     // grossRevenue uses actual when present, expected otherwise
-    expect(sum.grossRevenue).toBe(250 + 500);
+    expect(dashSum.grossRevenue).toBe(250 + 500);
+    // Effective RPM = gross revenue / total operating miles
+    expect(dashSum.effectiveRPM).toBeCloseTo(750 / 300, 6);
   });
+
 });
 
 describe('Phase 23A.4 — getWeekSummaries excludes cancelled loads', () => {
