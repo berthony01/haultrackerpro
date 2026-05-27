@@ -445,6 +445,7 @@ export default function ResourceArticlesAdmin() {
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="pending_review">Pending review</SelectItem>
+              <SelectItem value="needs_revision">Needs revision</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="published">Published</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
