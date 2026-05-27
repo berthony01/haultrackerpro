@@ -87,6 +87,15 @@ interface OverviewData {
   recruiter_health_low_posting?: boolean;
   recruiter_health_low_applications?: boolean;
   recruiter_health_low_contact_requests?: boolean;
+  // Phase 8 aliases (read-only, derived from existing window counts)
+  recruiter_marketplace_recruiters_7d?: number;
+  recruiter_marketplace_recruiters_30d?: number;
+  recruiter_marketplace_opportunities_7d?: number;
+  recruiter_marketplace_opportunities_30d?: number;
+  recruiter_marketplace_applications_7d?: number;
+  recruiter_marketplace_applications_30d?: number;
+  recruiter_marketplace_contact_requests_7d?: number;
+  recruiter_marketplace_contact_requests_30d?: number;
 }
 
 
