@@ -16,8 +16,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Plus, Sparkles, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, Plus, Sparkles, Loader2, Eye, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import SafeMarkdown from '@/components/resources/SafeMarkdown';
 
 type Status = 'draft' | 'approved' | 'published' | 'archived';
 type Approval = 'pending_review' | 'approved' | 'rejected' | 'needs_revision';
