@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getInternalTestEmails } from "../_shared/internal-test-emails.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -756,11 +757,8 @@ Deno.serve(async (req) => {
     if (action === "activation") {
       // Cohort activation: signup-week buckets, % who logged 1st load.
       // Plus impact of Day 0 (welcome) / Day 2 / Day 7 lifecycle emails.
-      const TEST_ACCOUNTS = new Set([
-        "berthonyxyz@gmail.com",
-        "peejayslifestyle@gmail.com",
-        "wysdomaniac@gmail.com",
-      ]);
+      const TEST_ACCOUNTS = getInternalTestEmails();
+
 
       // Pull all auth users (paginated)
       const allUsers: Array<{ id: string; email?: string; created_at: string }> = [];
@@ -943,11 +941,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "send-lifecycle-test" && req.method === "POST") {
-      const TEST_ACCOUNTS = new Set([
-        "berthonyxyz@gmail.com",
-        "peejayslifestyle@gmail.com",
-        "wysdomaniac@gmail.com",
-      ]);
+      const TEST_ACCOUNTS = getInternalTestEmails();
       const ALLOWED_TEMPLATES = new Set([
         "welcome",
         "lifecycle-day1",

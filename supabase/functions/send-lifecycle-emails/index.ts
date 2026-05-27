@@ -1,11 +1,11 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { corsHeaders } from 'jsr:@supabase/supabase-js@2/cors'
+import { getInternalTestEmails } from '../_shared/internal-test-emails.ts'
 
-const TEST_ACCOUNTS = new Set([
-  'berthonyxyz@gmail.com',
-  'peejayslifestyle@gmail.com',
-  'wysdomaniac@gmail.com',
-])
+// Internal staff/test accounts come from the INTERNAL_TEST_EMAILS env var
+// (comma-separated). No personal emails are hardcoded in source.
+const TEST_ACCOUNTS = getInternalTestEmails()
+
 
 // Recent email change cooldown — don't pile lifecycle on top of an email-change event
 const RECENT_EMAIL_CHANGE_HOURS = 72
