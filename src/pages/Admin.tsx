@@ -625,6 +625,7 @@ export default function Admin() {
             <TabsTrigger value="drivers">Drivers</TabsTrigger>
             <TabsTrigger value="leads">Starter Kit</TabsTrigger>
             <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
+            <TabsTrigger value="applications">Applications</TabsTrigger>
             <TabsTrigger value="recruiters">Recruiters</TabsTrigger>
             <TabsTrigger value="referrals">Referral Oversight</TabsTrigger>
             <TabsTrigger value="contracts">Contracts</TabsTrigger>
