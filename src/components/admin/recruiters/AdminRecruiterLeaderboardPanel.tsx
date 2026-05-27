@@ -719,6 +719,14 @@ export function AdminRecruiterLeaderboardPanel() {
         outreachByRecruiterId={panelOutreach.outreachByRecruiterId}
       />
 
+      {/* Phase 22: Outreach Mini Kanban */}
+      <OutreachMiniKanbanSection
+        rows={sorted}
+        outreachByRecruiterId={panelOutreach.outreachByRecruiterId}
+        onView={(row) => setSelected(row)}
+      />
+
+
       {/* Phase 18: Workflow Presets */}
       <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
         <div className="flex items-start justify-between gap-3">
@@ -2972,3 +2980,193 @@ function OutreachProgressVisuals({ a }: { a: OutreachWorkflowAnalytics }) {
   );
 }
 
+
+// ============================================================
+// Phase 22: Outreach Mini Kanban (admin-only, current-view scoped, no automation)
+// ============================================================
+
+type KanbanColKey =
+  | 'no_record'
+  | 'outreach_needed'
+  | 'template_copied'
+  | 'contacted_manually'
+  | 'no_response'
+  | 'follow_up_scheduled'
+  | 'replied'
+  | 'closed';
+
+const KANBAN_COLUMNS: { key: KanbanColKey; label: string }[] = [
+  { key: 'no_record', label: 'No Record' },
+  { key: 'outreach_needed', label: 'Outreach Needed' },
+  { key: 'template_copied', label: 'Template Copied' },
+  { key: 'contacted_manually', label: 'Contacted' },
+  { key: 'no_response', label: 'No Response' },
+  { key: 'follow_up_scheduled', label: 'Follow-Up Scheduled' },
+  { key: 'replied', label: 'Replied' },
+  { key: 'closed', label: 'Closed' },
+];
+
+function kanbanColumnFor(
+  outreach: RecruiterOutreachStatusRow | undefined,
+): KanbanColKey {
+  if (!outreach) return 'no_record';
+  switch (outreach.status) {
+    case 'outreach_needed':
+    case 'template_copied':
+    case 'contacted_manually':
+    case 'no_response':
+    case 'follow_up_scheduled':
+    case 'replied':
+    case 'closed':
+      return outreach.status;
+    default:
+      return 'outreach_needed';
+  }
+}
+
+function OutreachMiniKanbanSection({
+  rows,
+  outreachByRecruiterId,
+  onView,
+}: {
+  rows: LeaderboardRow[];
+  outreachByRecruiterId: Map<string, RecruiterOutreachStatusRow>;
+  onView: (row: LeaderboardRow) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const grouped = useMemo(() => {
+    const map = new Map<KanbanColKey, LeaderboardRow[]>();
+    KANBAN_COLUMNS.forEach((c) => map.set(c.key, []));
+    rows.forEach((r) => {
+      const o = outreachByRecruiterId.get(r.recruiter_profile_id);
+      const col = kanbanColumnFor(o);
+      map.get(col)!.push(r);
+    });
+    return map;
+  }, [rows, outreachByRecruiterId]);
+
+  return (
+    <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+            Outreach Mini Kanban
+          </p>
+          <p className="mt-1 text-[11px] text-white/60">
+            Visual workflow board based on the current leaderboard view. No emails, notifications, or automation are sent.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="shrink-0 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+        >
+          {open ? 'Hide Kanban' : 'Show Kanban'}
+        </button>
+      </div>
+
+      {open && (
+        <>
+          {rows.length === 0 ? (
+            <p className="mt-3 text-[11px] text-white/50">No recruiters in the current view.</p>
+          ) : (
+            <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+              {KANBAN_COLUMNS.map((col) => {
+                const items = grouped.get(col.key) ?? [];
+                return (
+                  <div
+                    key={col.key}
+                    className="flex w-64 shrink-0 flex-col rounded-xl border border-white/[0.06] bg-[#0A0E16] p-2"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                      <p className="truncate text-[11px] font-semibold text-white/80">{col.label}</p>
+                      <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-white/70">
+                        {items.length}
+                      </span>
+                    </div>
+                    {items.length === 0 ? (
+                      <p className="px-1 py-3 text-center text-[10px] text-white/40">No recruiters</p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {items.map((r) => {
+                          const o = outreachByRecruiterId.get(r.recruiter_profile_id);
+                          const info = computeReminderInfo(o);
+                          const company = r.company_name || r.recruiter_name || 'Unnamed recruiter';
+                          const sub = r.company_name && r.recruiter_name ? r.recruiter_name : null;
+                          const priority = o?.priority ?? null;
+                          const followUp = o?.follow_up_at
+                            ? new Date(o.follow_up_at).toLocaleDateString()
+                            : null;
+                          return (
+                            <div
+                              key={r.recruiter_profile_id}
+                              className="rounded-lg border border-white/[0.06] bg-[#0D111A] p-2"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-[12px] font-semibold text-white">{company}</p>
+                                  {sub && (
+                                    <p className="truncate text-[10px] text-white/50">{sub}</p>
+                                  )}
+                                </div>
+                                <span className="shrink-0 font-mono text-[11px] text-white/80">
+                                  {Math.round(r.performance_score)}
+                                </span>
+                              </div>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                {o && (
+                                  <span
+                                    className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ${outreachStatusBadgeClass(o.status)}`}
+                                  >
+                                    {outreachStatusLabel(o.status)}
+                                  </span>
+                                )}
+                                {priority && (
+                                  <span
+                                    className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ${priorityBadgeClass(
+                                      (priority.charAt(0).toUpperCase() + priority.slice(1)) as 'High' | 'Medium' | 'Low',
+                                    )}`}
+                                  >
+                                    {priority}
+                                  </span>
+                                )}
+                                <span
+                                  className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ${reminderCategoryBadgeClass(info.category)}`}
+                                >
+                                  {REMINDER_CATEGORY_LABEL[info.category]}
+                                </span>
+                              </div>
+                              <p className="mt-1.5 text-[10px] text-white/60">
+                                Opps {r.active_opportunities} · Apps {r.total_applications} · Contacts {r.total_contact_requests}
+                              </p>
+                              {followUp && (
+                                <p className="mt-0.5 text-[10px] text-white/50">Follow-up: {followUp}</p>
+                              )}
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => onView(r)}
+                                  className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/80 hover:bg-white/10"
+                                >
+                                  View Details
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className="mt-2 text-[10px] text-white/40">
+            Kanban cards reflect the current leaderboard view after presets, search, filters, and sorting. Each recruiter appears in exactly one column.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
