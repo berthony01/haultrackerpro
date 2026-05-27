@@ -73,7 +73,7 @@ export default function StarterKit() {
   const directDownload = () => {
     trackLeadMagnetDownload();
     trackStarterKitDownloadClicked('starter_kit');
-    window.open(STARTER_KIT_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+    triggerStarterKitDownload();
   };
 
   return (
