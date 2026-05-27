@@ -639,6 +639,9 @@ export default function Admin() {
           <TabsContent value="opportunities" className="space-y-3">
             <AdminOpportunitiesPanel />
           </TabsContent>
+          <TabsContent value="applications" className="space-y-3">
+            <AdminApplicationsPanel />
+          </TabsContent>
           <TabsContent value="recruiters" className="space-y-3">
             <AdminRecruitersPanel />
           </TabsContent>
