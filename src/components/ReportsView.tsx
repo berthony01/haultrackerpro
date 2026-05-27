@@ -5,7 +5,7 @@ import { useLoadStops } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useFuelLogs } from '@/hooks/useFuelLogs';
 import { useAuth } from '@/hooks/useAuth';
-import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, getCurrentMonthLoads, getEffectiveDate } from '@/lib/loadUtils';
+import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, getCurrentMonthLoads, getEffectiveDate, weekStartDayToNumber } from '@/lib/loadUtils';
 import { summarizeLoads, excludeCancelled, onlyCancelled, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
