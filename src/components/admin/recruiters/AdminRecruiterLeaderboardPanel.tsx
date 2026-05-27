@@ -14,7 +14,16 @@ import {
   Send,
   TrendingUp,
   Download,
+  Eye,
+  X,
 } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import {
   useAdminRecruiterLeaderboard,
   type LeaderboardRow,
