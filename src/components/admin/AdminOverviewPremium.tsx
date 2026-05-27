@@ -60,6 +60,32 @@ interface OverviewData {
   contact_requests_total: number;
   contact_requests_7d: number;
   contact_requests_30d: number;
+  // Phase 7
+  recruiter_funnel_signups?: number;
+  recruiter_funnel_approved?: number;
+  recruiter_funnel_active?: number;
+  recruiter_funnel_with_opportunity?: number;
+  recruiter_funnel_with_active_opportunity?: number;
+  recruiter_funnel_with_application?: number;
+  recruiter_funnel_with_contact_request?: number;
+  recruiter_approval_rate?: number;
+  recruiter_activation_rate?: number;
+  recruiter_posting_rate?: number;
+  recruiter_active_posting_rate?: number;
+  recruiter_application_rate?: number;
+  recruiter_contact_request_rate?: number;
+  recruiter_marketplace_health_score?: number;
+  recruiter_marketplace_health_label?: string;
+  recruiter_marketplace_health_summary?: string;
+  recruiter_health_approval_points?: number;
+  recruiter_health_posting_points?: number;
+  recruiter_health_active_posting_points?: number;
+  recruiter_health_application_points?: number;
+  recruiter_health_contact_points?: number;
+  recruiter_health_low_approval?: boolean;
+  recruiter_health_low_posting?: boolean;
+  recruiter_health_low_applications?: boolean;
+  recruiter_health_low_contact_requests?: boolean;
 }
 
 
