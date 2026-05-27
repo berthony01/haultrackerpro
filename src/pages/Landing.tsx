@@ -260,6 +260,44 @@ export default function Landing() {
       </section>
 
       {/* ═══════════════════════════════════════════ */}
+      {/* SECTION 1.25: FREE STARTER KIT (top CTA)   */}
+      {/* ═══════════════════════════════════════════ */}
+      <section className="py-6 sm:py-8" style={{ background: 'hsl(220, 20%, 8%)' }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <div
+            className="p-5 sm:p-6 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5"
+            style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.35)' }}
+          >
+            <div
+              className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}
+            >
+              <FileText className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-base sm:text-lg font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>
+                New to trucking? Download the Free Trucker Starter Kit
+              </h2>
+              <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
+                CDL study help, checklists, owner-op paperwork guidance, and first-30-days habits.
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                trackStarterKitCTAClicked('landing_top');
+                navigate('/starter-kit');
+              }}
+              variant="outline"
+              className="rounded-xl font-bold gap-2 w-full sm:w-auto"
+              style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
+            >
+              Get the Free Kit <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════ */}
       {/* SECTION 1.5: OPPORTUNITIES ECOSYSTEM       */}
       {/* ═══════════════════════════════════════════ */}
       <section id="opportunities-ecosystem" className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>

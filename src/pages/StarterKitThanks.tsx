@@ -87,7 +87,7 @@ export default function StarterKitThanks() {
           </h1>
           <p className="mt-3 text-center" style={{ color: TEXT_MUTED }}>
             {email ? <>We've got your email <span className="text-white">({email})</span>. </> : null}
-            Tap the button below to download your kit (ZIP file — 6 PDFs inside, ~70 KB).
+            Tap the button below to download your kit (ZIP file — 6 PDFs inside, ~60 KB).
           </p>
 
           <div
