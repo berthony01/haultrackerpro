@@ -77,7 +77,11 @@ type SortKey =
   | 'newest'
   | 'company'
   | 'plan'
-  | 'verification';
+  | 'verification'
+  | 'follow_up_urgency'
+  | 'follow_up_date'
+  | 'outreach_priority'
+  | 'outreach_recently_updated';
 
 const STATUS_OPTIONS = ['all', 'approved', 'pending', 'suspended', 'active', 'rejected'] as const;
 const BILLING_OPTIONS = [
@@ -97,6 +101,48 @@ const PERF_OPTIONS = [
   'Low Activity',
   'Needs Attention',
 ] as const;
+
+const OUTREACH_STATUS_FILTER_OPTIONS = [
+  { value: 'all' as const, label: 'All outreach' },
+  { value: 'no_record' as const, label: 'No record' },
+  ...OUTREACH_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+];
+type OutreachStatusFilter = 'all' | 'no_record' | OutreachStatus;
+
+const REMINDER_FILTER_OPTIONS = [
+  { value: 'all', label: 'All reminders' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'due_today', label: 'Due Today' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'unscheduled', label: 'Unscheduled' },
+  { value: 'replied', label: 'Replied' },
+  { value: 'closed', label: 'Closed' },
+] as const;
+type ReminderFilter = (typeof REMINDER_FILTER_OPTIONS)[number]['value'];
+
+const PRIORITY_FILTER_OPTIONS = [
+  { value: 'all', label: 'All priorities' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+  { value: 'none', label: 'No priority' },
+] as const;
+type PriorityFilter = (typeof PRIORITY_FILTER_OPTIONS)[number]['value'];
+
+const REMINDER_SORT_WEIGHT: Record<ReminderCategory, number> = {
+  overdue: 0,
+  due_today: 1,
+  upcoming: 2,
+  unscheduled: 3,
+  replied: 4,
+  closed: 5,
+};
+
+const PRIORITY_SORT_WEIGHT: Record<OutreachPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
 
 function labelColor(label: PerformanceLabel) {
   switch (label) {
