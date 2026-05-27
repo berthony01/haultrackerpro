@@ -37,10 +37,12 @@ export function useDriverReferrals() {
     enabled: !!user,
     queryFn: async (): Promise<DriverReferral[]> => {
       if (!user) return [];
-      const { data, error } = await supabase
-        .from('driver_referrals')
+      // Read from the driver-safe view so we never pull referred_driver_email
+      // or referred_driver_phone back to the referring driver's client.
+      // The view is filtered to auth.uid() = referring_driver_id.
+      const { data, error } = await (supabase as any)
+        .from('driver_referrals_driver_safe')
         .select(REFERRAL_SELECT)
-        .eq('referring_driver_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as DriverReferral[];
