@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '@/components/ui/sheet';
 import {
   CheckCircle2, XCircle, Ban, Eye, RefreshCw, Building2, ShieldCheck,
+  Search, Copy, ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -25,8 +30,76 @@ const FILTERS: { value: RecruiterFilter; label: string }[] = [
   { value: 'all', label: 'All' },
 ];
 
+type SortKey =
+  | 'newest'
+  | 'oldest'
+  | 'company_az'
+  | 'recruiter_az'
+  | 'active_desc'
+  | 'billing_plan'
+  | 'verification';
+
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'company_az', label: 'Company A–Z' },
+  { value: 'recruiter_az', label: 'Recruiter A–Z' },
+  { value: 'active_desc', label: 'Most active listings' },
+  { value: 'billing_plan', label: 'Billing plan' },
+  { value: 'verification', label: 'Verification status' },
+];
+
+const PLAN_ORDER: Record<string, number> = { starter: 1, growth: 2, fleet: 3 };
+
+function recruiterMatches(r: AdminRecruiter, q: string): boolean {
+  if (!q) return true;
+  const hay = [
+    r.recruiter_name,
+    r.recruiter_email,
+    r.recruiter_phone,
+    r.company_name,
+    r.company_phone,
+    r.company_website,
+    r.dot_number,
+    r.mc_number,
+    r.company_city,
+    r.company_state,
+    r.verification_status,
+    r.status,
+    r.billing?.plan,
+    r.billing?.status,
+  ]
+    .filter(Boolean)
+    .join(' \u0001 ')
+    .toLowerCase();
+  return hay.includes(q);
+}
+
+function isPriorityPlacement(b: AdminRecruiter['billing']): boolean {
+  return !!b
+    && ['growth', 'fleet'].includes(b.plan)
+    && ['active', 'trialing'].includes(b.status); // trial-allowlist
+}
+
+async function copyToClipboard(text: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(`${label} copied`);
+  } catch {
+    toast.error(`Could not copy ${label.toLowerCase()}`);
+  }
+}
+
+function safeWebsiteUrl(raw: string): string {
+  const t = raw.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+}
+
 export function AdminRecruitersPanel() {
   const [filter, setFilter] = useState<RecruiterFilter>('pending');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortKey>('newest');
   const [detail, setDetail] = useState<AdminRecruiter | null>(null);
   const { recruiters, isLoading, refetch, approve, reject, suspend } =
     useAdminRecruiters(filter);
@@ -42,13 +115,72 @@ export function AdminRecruitersPanel() {
     });
   };
 
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? recruiters.filter((r) => recruiterMatches(r, q))
+      : recruiters.slice();
+
+    const sorted = filtered.slice().sort((a, b) => {
+      switch (sort) {
+        case 'oldest':
+          return (
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        case 'company_az':
+          return (a.company_name ?? '').localeCompare(b.company_name ?? '');
+        case 'recruiter_az':
+          return (a.recruiter_name ?? '').localeCompare(b.recruiter_name ?? '');
+        case 'active_desc':
+          return (b.active_opportunity_count ?? 0) - (a.active_opportunity_count ?? 0);
+        case 'billing_plan': {
+          const ap = a.billing?.plan ? (PLAN_ORDER[a.billing.plan] ?? 99) : 999;
+          const bp = b.billing?.plan ? (PLAN_ORDER[b.billing.plan] ?? 99) : 999;
+          return ap - bp;
+        }
+        case 'verification':
+          return (a.verification_status ?? '').localeCompare(b.verification_status ?? '');
+        case 'newest':
+        default:
+          return (
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+      }
+    });
+    return sorted;
+  }, [recruiters, search, sort]);
+
+  const viewSummary = useMemo(() => {
+    const s = {
+      showing: visible.length,
+      pending: 0,
+      approved: 0,
+      active: 0,
+      suspended: 0,
+      growth_fleet: 0,
+      past_due: 0,
+    };
+    for (const r of visible) {
+      if (r.verification_status === 'pending') s.pending++;
+      if (r.verification_status === 'approved') s.approved++;
+      if (r.status === 'active') s.active++;
+      if (r.status === 'suspended' || r.verification_status === 'suspended') s.suspended++;
+      if (r.billing && ['growth', 'fleet'].includes(r.billing.plan)) s.growth_fleet++;
+      if (r.billing && r.billing.status === 'past_due') s.past_due++;
+    }
+    return s;
+  }, [visible]);
+
   return (
     <div className="space-y-4">
-      {/* Billing summary */}
+      {/* Global billing summary */}
       <Card className="p-4 border-border/60 bg-card/60">
         <div className="flex items-center gap-2 mb-3">
           <ShieldCheck className="h-4 w-4 text-primary" />
           <p className="text-sm font-bold">Recruiter Billing Summary</p>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground ml-auto">
+            All recruiters
+          </span>
         </div>
         {billingSummary.isLoading ? (
           <Skeleton className="h-16 w-full" />
@@ -68,6 +200,27 @@ export function AdminRecruitersPanel() {
         )}
       </Card>
 
+      {/* Current view summary */}
+      <Card className="p-4 border-border/60 bg-card/60">
+        <div className="flex items-center gap-2 mb-3">
+          <Building2 className="h-4 w-4 text-primary" />
+          <p className="text-sm font-bold">Current View Summary</p>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground ml-auto">
+            Filter: {filter}{search.trim() ? ' · search' : ''}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+          <Mini label="Showing" value={viewSummary.showing} />
+          <Mini label="Pending" value={viewSummary.pending} />
+          <Mini label="Approved" value={viewSummary.approved} />
+          <Mini label="Active" value={viewSummary.active} />
+          <Mini label="Suspended" value={viewSummary.suspended} />
+          <Mini label="Growth/Fleet" value={viewSummary.growth_fleet} />
+          <Mini label="Past Due" value={viewSummary.past_due} />
+        </div>
+      </Card>
+
+      {/* Filters + actions */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           {FILTERS.map((f) => (
@@ -86,6 +239,31 @@ export function AdminRecruitersPanel() {
         </Button>
       </div>
 
+      {/* Search + sort */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search recruiters, emails, companies, DOT, MC..."
+            className="pl-8"
+          />
+        </div>
+        <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+          <SelectTrigger className="sm:w-56">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORTS.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {isLoading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 w-full" />)}
@@ -97,85 +275,122 @@ export function AdminRecruitersPanel() {
           </div>
           <p className="text-sm text-muted-foreground">No recruiters in this view.</p>
         </Card>
+      ) : visible.length === 0 ? (
+        <Card className="p-10 text-center border-dashed border-border/60">
+          <div className="mx-auto mb-3 inline-flex rounded-2xl bg-muted/40 p-3">
+            <Search className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground">No recruiters match your search.</p>
+        </Card>
       ) : (
         <div className="space-y-3">
-          {recruiters.map((r) => (
-            <Card key={r.id} className="p-4 border-border/60 bg-card/60">
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h3 className="text-sm font-bold text-foreground truncate">
-                      {r.recruiter_name}
-                    </h3>
-                    <Badge variant="outline" className="capitalize">
-                      {r.verification_status}
-                    </Badge>
-                    <Badge
-                      variant={r.status === 'suspended' ? 'destructive' : 'secondary'}
-                      className="capitalize"
-                    >
-                      {r.status}
-                    </Badge>
-                    {r.billing && (
+          {visible.map((r) => {
+            const phone = r.recruiter_phone ?? r.company_phone ?? null;
+            return (
+              <Card key={r.id} className="p-4 border-border/60 bg-card/60">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h3 className="text-sm font-bold text-foreground truncate">
+                        {r.recruiter_name}
+                      </h3>
                       <Badge variant="outline" className="capitalize">
-                        Billing: {r.billing.plan}/{r.billing.status}
+                        {r.verification_status}
                       </Badge>
+                      <Badge
+                        variant={r.status === 'suspended' ? 'destructive' : 'secondary'}
+                        className="capitalize"
+                      >
+                        {r.status}
+                      </Badge>
+                      {r.billing && (
+                        <Badge variant="outline" className="capitalize">
+                          Billing: {r.billing.plan}/{r.billing.status}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{r.company_name}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                      <Mini label="Email" value={r.recruiter_email ?? '—'} />
+                      <Mini label="Phone" value={r.recruiter_phone ?? '—'} />
+                      <Mini label="DOT" value={r.dot_number ?? '—'} />
+                      <Mini label="MC" value={r.mc_number ?? '—'} />
+                      <Mini label="Active listings" value={r.active_opportunity_count ?? 0} />
+                      <Mini
+                        label="Priority placement"
+                        value={isPriorityPlacement(r.billing) ? 'Included' : 'Not included'}
+                      />
+                      <Mini
+                        label="Created"
+                        value={new Date(r.created_at).toLocaleDateString()}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:flex-col lg:w-44">
+                    <Button size="sm" variant="outline" onClick={() => setDetail(r)}>
+                      <Eye className="h-4 w-4" /> Profile
+                    </Button>
+                    {r.recruiter_email && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(r.recruiter_email!, 'Email')}
+                      >
+                        <Copy className="h-4 w-4" /> Copy Email
+                      </Button>
                     )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2">{r.company_name}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                    <Mini label="Email" value={r.recruiter_email ?? '—'} />
-                    <Mini label="Phone" value={r.recruiter_phone ?? '—'} />
-                    <Mini label="DOT" value={r.dot_number ?? '—'} />
-                    <Mini label="MC" value={r.mc_number ?? '—'} />
-                    <Mini label="Active listings" value={r.active_opportunity_count ?? 0} />
-                    <Mini
-                      label="Priority placement"
-                      value={
-                        r.billing &&
-                        ['growth', 'fleet'].includes(r.billing.plan) &&
-                        ['active', 'trialing'].includes(r.billing.status) // trial-allowlist
-                          ? 'Included'
-                          : 'Not included'
-                      }
-                    />
-                    <Mini
-                      label="Created"
-                      value={new Date(r.created_at).toLocaleDateString()}
-                    />
+                    {phone && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(phone, 'Phone')}
+                      >
+                        <Copy className="h-4 w-4" /> Copy Phone
+                      </Button>
+                    )}
+                    {r.company_website && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        asChild
+                      >
+                        <a
+                          href={safeWebsiteUrl(r.company_website)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-4 w-4" /> Website
+                        </a>
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => run('Approve', r.id, approve)}
+                      disabled={busy}
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => run('Reject', r.id, reject)}
+                      disabled={busy}
+                    >
+                      <XCircle className="h-4 w-4" /> Reject
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => run('Suspend', r.id, suspend)}
+                      disabled={busy}
+                    >
+                      <Ban className="h-4 w-4" /> Suspend
+                    </Button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 lg:flex-col lg:w-40">
-                  <Button size="sm" variant="outline" onClick={() => setDetail(r)}>
-                    <Eye className="h-4 w-4" /> Profile
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => run('Approve', r.id, approve)}
-                    disabled={busy}
-                  >
-                    <CheckCircle2 className="h-4 w-4" /> Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => run('Reject', r.id, reject)}
-                    disabled={busy}
-                  >
-                    <XCircle className="h-4 w-4" /> Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => run('Suspend', r.id, suspend)}
-                    disabled={busy}
-                  >
-                    <Ban className="h-4 w-4" /> Suspend
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -187,6 +402,42 @@ export function AdminRecruitersPanel() {
                 <SheetTitle>{detail.recruiter_name}</SheetTitle>
                 <SheetDescription>{detail.company_name}</SheetDescription>
               </SheetHeader>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {detail.recruiter_email && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyToClipboard(detail.recruiter_email!, 'Email')}
+                  >
+                    <Copy className="h-4 w-4" /> Copy Email
+                  </Button>
+                )}
+                {(detail.recruiter_phone ?? detail.company_phone) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      copyToClipboard(
+                        (detail.recruiter_phone ?? detail.company_phone)!,
+                        'Phone',
+                      )
+                    }
+                  >
+                    <Copy className="h-4 w-4" /> Copy Phone
+                  </Button>
+                )}
+                {detail.company_website && (
+                  <Button size="sm" variant="outline" asChild>
+                    <a
+                      href={safeWebsiteUrl(detail.company_website)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4" /> Website
+                    </a>
+                  </Button>
+                )}
+              </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                 <KV k="Email" v={detail.recruiter_email ?? '—'} />
                 <KV k="Phone" v={detail.recruiter_phone ?? '—'} />
@@ -217,12 +468,7 @@ export function AdminRecruitersPanel() {
                     <KV k="Billing status" v={detail.billing.status} />
                     <KV
                       k="Priority placement"
-                      v={
-                        ['growth', 'fleet'].includes(detail.billing.plan) &&
-                        ['active', 'trialing'].includes(detail.billing.status) // trial-allowlist
-                          ? 'Included'
-                          : 'Not included'
-                      }
+                      v={isPriorityPlacement(detail.billing) ? 'Included' : 'Not included'}
                     />
                     <KV
                       k="Period end"
