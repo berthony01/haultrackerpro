@@ -144,6 +144,42 @@ const PRIORITY_SORT_WEIGHT: Record<OutreachPriority, number> = {
   low: 2,
 };
 
+// Phase 18: Built-in client-side outreach workflow presets.
+type PresetKey =
+  | 'all'
+  | 'overdue_followups'
+  | 'due_today'
+  | 'upcoming_followups'
+  | 'no_outreach_record'
+  | 'needs_first_listing'
+  | 'needs_applications'
+  | 'needs_contact_conversion'
+  | 'past_due_billing'
+  | 'high_performers'
+  | 'closed_or_replied';
+
+interface PresetDef {
+  key: PresetKey;
+  label: string;
+  description: string;
+}
+
+const WORKFLOW_PRESETS: PresetDef[] = [
+  { key: 'all', label: 'All Recruiters', description: 'Clear preset-driven filters and show the full leaderboard.' },
+  { key: 'overdue_followups', label: 'Overdue Follow-Ups', description: 'Recruiters with follow-up dates in the past.' },
+  { key: 'due_today', label: 'Due Today', description: 'Follow-ups scheduled for today.' },
+  { key: 'upcoming_followups', label: 'Upcoming Follow-Ups', description: 'Future follow-ups, soonest first.' },
+  { key: 'no_outreach_record', label: 'No Outreach Record', description: 'Recruiters with no outreach tracking yet.' },
+  { key: 'needs_first_listing', label: 'Needs First Listing', description: 'Approved/active recruiters with zero opportunities.' },
+  { key: 'needs_applications', label: 'Needs Applications', description: 'Active listings with zero applications.' },
+  { key: 'needs_contact_conversion', label: 'Needs Contact Conversion', description: 'Applications received, no contact requests yet.' },
+  { key: 'past_due_billing', label: 'Past Due Billing', description: 'Recruiters with past-due billing status.' },
+  { key: 'high_performers', label: 'High Performers', description: 'Top Performer recruiters (score ≥ 80).' },
+  { key: 'closed_or_replied', label: 'Closed / Replied', description: 'Outreach marked closed or replied.' },
+];
+
+
+
 function labelColor(label: PerformanceLabel) {
   switch (label) {
     case 'Top Performer':
@@ -255,6 +291,95 @@ export function AdminRecruiterLeaderboardPanel() {
   const [sortBy, setSortBy] = useState<SortKey>('score');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<LeaderboardRow | null>(null);
+  // Phase 18: built-in client-side workflow presets (no DB storage).
+  const [activePreset, setActivePreset] = useState<PresetKey>('all');
+
+  const applyPreset = (key: PresetKey) => {
+    setActivePreset(key);
+    switch (key) {
+      case 'all':
+        setStatusFilter('all' as typeof statusFilter);
+        setBillingFilter('all' as typeof billingFilter);
+        setPerfFilter('all' as typeof perfFilter);
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('score');
+        break;
+      case 'overdue_followups':
+        setOutreachStatusFilter('all');
+        setReminderFilter('overdue');
+        setPriorityFilter('all');
+        setSortBy('follow_up_urgency');
+        break;
+      case 'due_today':
+        setOutreachStatusFilter('all');
+        setReminderFilter('due_today');
+        setPriorityFilter('all');
+        setSortBy('follow_up_urgency');
+        break;
+      case 'upcoming_followups':
+        setOutreachStatusFilter('all');
+        setReminderFilter('upcoming');
+        setPriorityFilter('all');
+        setSortBy('follow_up_date');
+        break;
+      case 'no_outreach_record':
+        setOutreachStatusFilter('no_record');
+        setReminderFilter('unscheduled');
+        setPriorityFilter('none');
+        setSortBy('score');
+        break;
+      case 'needs_first_listing':
+        // Predicate-driven; keep manual selects open.
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('score');
+        break;
+      case 'needs_applications':
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('active_opps');
+        break;
+      case 'needs_contact_conversion':
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('apps');
+        break;
+      case 'past_due_billing':
+        setBillingFilter('past_due' as typeof billingFilter);
+        setSortBy('score');
+        break;
+      case 'high_performers':
+        setPerfFilter('Top Performer' as typeof perfFilter);
+        setSortBy('score');
+        break;
+      case 'closed_or_replied':
+        // Predicate-driven (matches closed OR replied)
+        setOutreachStatusFilter('all');
+        setReminderFilter('all');
+        setPriorityFilter('all');
+        setSortBy('outreach_recently_updated');
+        break;
+    }
+  };
+
+  const clearPreset = () => setActivePreset('all');
+
+  const resetAllFilters = () => {
+    setActivePreset('all');
+    setSearch('');
+    setStatusFilter('all' as typeof statusFilter);
+    setBillingFilter('all' as typeof billingFilter);
+    setPerfFilter('all' as typeof perfFilter);
+    setOutreachStatusFilter('all');
+    setReminderFilter('all');
+    setPriorityFilter('all');
+    setSortBy('score');
+  };
 
   const rows: LeaderboardRow[] = data ?? [];
 
@@ -330,6 +455,42 @@ export function AdminRecruiterLeaderboardPanel() {
           if (!outreach || outreach.priority !== priorityFilter) return false;
         }
       }
+      // Phase 18: preset-specific custom predicates (combine with manual filters via AND).
+      if (activePreset !== 'all') {
+        const isApprovedOrActive =
+          r.verification_status === 'approved' || r.account_status === 'active';
+        const notClosedOrReplied =
+          !outreach || (outreach.status !== 'closed' && outreach.status !== 'replied');
+        switch (activePreset) {
+          case 'needs_first_listing':
+            if (!isApprovedOrActive) return false;
+            if (r.total_opportunities !== 0) return false;
+            if (!notClosedOrReplied) return false;
+            break;
+          case 'needs_applications':
+            if (r.active_opportunities <= 0) return false;
+            if (r.total_applications !== 0) return false;
+            if (!notClosedOrReplied) return false;
+            break;
+          case 'needs_contact_conversion':
+            if (r.total_applications <= 0) return false;
+            if (r.total_contact_requests !== 0) return false;
+            if (!notClosedOrReplied) return false;
+            break;
+          case 'past_due_billing':
+            if (r.billing_status !== 'past_due') return false;
+            break;
+          case 'high_performers':
+            if (r.performance_score < 80) return false;
+            break;
+          case 'closed_or_replied':
+            if (!outreach || (outreach.status !== 'closed' && outreach.status !== 'replied'))
+              return false;
+            break;
+          default:
+            break;
+        }
+      }
       return true;
     });
   }, [
@@ -342,6 +503,7 @@ export function AdminRecruiterLeaderboardPanel() {
     reminderFilter,
     priorityFilter,
     outreachByRecruiterId,
+    activePreset,
   ]);
 
   const sorted = useMemo(() => {
@@ -541,8 +703,65 @@ export function AdminRecruiterLeaderboardPanel() {
         onView={(row) => setSelected(row)}
       />
 
+      {/* Phase 18: Workflow Presets */}
+      <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+              Workflow Presets
+            </p>
+            <p className="mt-1 text-[11px] text-white/60">
+              Quick views for common recruiter outreach work. Presets only change the current admin view.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {activePreset !== 'all' && (
+              <button
+                type="button"
+                onClick={clearPreset}
+                className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-white/70 hover:bg-white/[0.08]"
+              >
+                Clear Preset
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-white/70 hover:bg-white/[0.08]"
+            >
+              Reset All Filters
+            </button>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 overflow-x-auto">
+          {WORKFLOW_PRESETS.map((p) => {
+            const isActive = activePreset === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => applyPreset(p.key)}
+                title={p.description}
+                className={
+                  'whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ' +
+                  (isActive
+                    ? 'border-primary/50 bg-primary/15 text-primary'
+                    : 'border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08]')
+                }
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-[10px] text-white/40">
+          Presets are view filters only. They do not send emails, reminders, or notifications. Manual filters and search still apply on top of an active preset.
+        </p>
+      </section>
+
       {/* Filters */}
       <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
+
         <div className="grid gap-2 md:grid-cols-5">
           <div className="relative md:col-span-2">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
@@ -678,7 +897,9 @@ export function AdminRecruiterLeaderboardPanel() {
       )}
       {!isLoading && !isError && sorted.length === 0 && (
         <div className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-8 text-center text-sm text-white/50">
-          No recruiters match the current search and filters.
+          {activePreset !== 'all'
+            ? 'No recruiters match the active preset and filters.'
+            : 'No recruiters match the current search and filters.'}
         </div>
       )}
 
@@ -2292,7 +2513,7 @@ function OutreachRemindersSummary({
         ))}
       </div>
       <p className="mt-1 text-[10px] text-white/40">
-        Reminder counts reflect the current leaderboard view after filters.
+        Reminder counts reflect the current leaderboard view after presets and filters.
       </p>
 
       {topReminders.length > 0 && (
