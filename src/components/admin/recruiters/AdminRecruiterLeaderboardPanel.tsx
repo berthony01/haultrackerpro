@@ -2596,3 +2596,224 @@ function OutreachRemindersSummary({
     </section>
   );
 }
+
+// ---------------- Phase 20: Outreach Workflow Analytics ----------------
+
+type OutreachWorkflowAnalytics = {
+  totalVisible: number;
+  outreachRecords: number;
+  noOutreachRecord: number;
+  outreachNeeded: number;
+  templatesCopied: number;
+  contactedManually: number;
+  followUpScheduled: number;
+  overdue: number;
+  dueToday: number;
+  upcoming: number;
+  replied: number;
+  noResponse: number;
+  closed: number;
+  highPriority: number;
+  outreachCoverageRate: number;
+  manualContactRate: number;
+  replyRate: number;
+  followUpScheduledRate: number;
+  overdueRate: number;
+  closeRate: number;
+};
+
+function rate(n: number, d: number): number {
+  if (d <= 0) return 0;
+  return Math.round((n / d) * 100);
+}
+
+function computeOutreachAnalytics(
+  rows: LeaderboardRow[],
+  outreachByRecruiterId: Map<string, RecruiterOutreachStatusRow>,
+): OutreachWorkflowAnalytics {
+  let outreachRecords = 0;
+  let noOutreachRecord = 0;
+  let outreachNeeded = 0;
+  let templatesCopied = 0;
+  let contactedManually = 0;
+  let followUpScheduled = 0;
+  let overdue = 0;
+  let dueToday = 0;
+  let upcoming = 0;
+  let replied = 0;
+  let noResponse = 0;
+  let closed = 0;
+  let highPriority = 0;
+
+  for (const row of rows) {
+    const o = outreachByRecruiterId.get(row.recruiter_profile_id);
+    if (!o) {
+      noOutreachRecord += 1;
+      // Reminder category for missing record is 'unscheduled' — no overdue/dueToday/etc.
+      continue;
+    }
+    outreachRecords += 1;
+    if (o.status === 'outreach_needed') outreachNeeded += 1;
+    if (o.status === 'template_copied' || o.last_copied_at) templatesCopied += 1;
+    if (o.status === 'contacted_manually' || o.last_contacted_at) contactedManually += 1;
+    if (
+      (o.status === 'follow_up_scheduled' || !!o.follow_up_at) &&
+      o.status !== 'closed' &&
+      o.status !== 'replied'
+    ) {
+      followUpScheduled += 1;
+    }
+    if (o.status === 'replied') replied += 1;
+    if (o.status === 'no_response') noResponse += 1;
+    if (o.status === 'closed') closed += 1;
+    if (o.priority === 'high') highPriority += 1;
+
+    const cat = computeReminderInfo(o).category;
+    if (cat === 'overdue') overdue += 1;
+    else if (cat === 'due_today') dueToday += 1;
+    else if (cat === 'upcoming') upcoming += 1;
+  }
+
+  const activeFollowUps = overdue + dueToday + upcoming;
+  const totalVisible = rows.length;
+
+  return {
+    totalVisible,
+    outreachRecords,
+    noOutreachRecord,
+    outreachNeeded,
+    templatesCopied,
+    contactedManually,
+    followUpScheduled,
+    overdue,
+    dueToday,
+    upcoming,
+    replied,
+    noResponse,
+    closed,
+    highPriority,
+    outreachCoverageRate: rate(outreachRecords, totalVisible),
+    manualContactRate: rate(contactedManually, outreachRecords),
+    replyRate: rate(replied, contactedManually),
+    followUpScheduledRate: rate(followUpScheduled, outreachRecords),
+    overdueRate: rate(overdue, activeFollowUps),
+    closeRate: rate(closed, outreachRecords),
+  };
+}
+
+function OutreachWorkflowAnalyticsSection({
+  rows,
+  outreachByRecruiterId,
+}: {
+  rows: LeaderboardRow[];
+  outreachByRecruiterId: Map<string, RecruiterOutreachStatusRow>;
+}) {
+  const a = useMemo(
+    () => computeOutreachAnalytics(rows, outreachByRecruiterId),
+    [rows, outreachByRecruiterId],
+  );
+
+  const counts: { l: string; v: number; hint?: string }[] = [
+    { l: 'Outreach Records', v: a.outreachRecords },
+    { l: 'No Outreach Record', v: a.noOutreachRecord },
+    { l: 'Outreach Needed', v: a.outreachNeeded },
+    { l: 'Templates Copied', v: a.templatesCopied },
+    { l: 'Contacted Manually', v: a.contactedManually },
+    { l: 'Follow-Up Scheduled', v: a.followUpScheduled },
+    { l: 'Overdue', v: a.overdue },
+    { l: 'Due Today', v: a.dueToday },
+    { l: 'Replied', v: a.replied },
+    { l: 'No Response', v: a.noResponse },
+    { l: 'Closed', v: a.closed },
+    { l: 'High Priority', v: a.highPriority },
+  ];
+
+  const rates: { l: string; v: number; sub: string }[] = [
+    { l: 'Outreach Coverage', v: a.outreachCoverageRate, sub: 'records / visible' },
+    { l: 'Manual Contact Rate', v: a.manualContactRate, sub: 'contacted / records' },
+    { l: 'Reply Rate', v: a.replyRate, sub: 'replied / contacted' },
+    { l: 'Follow-Up Scheduled', v: a.followUpScheduledRate, sub: 'scheduled / records' },
+    { l: 'Overdue Follow-Up Rate', v: a.overdueRate, sub: 'overdue / active follow-ups' },
+    { l: 'Close Rate', v: a.closeRate, sub: 'closed / records' },
+  ];
+
+  const insights: string[] = [];
+  if (a.overdue > 0) insights.push('Overdue follow-ups need attention first.');
+  if (a.dueToday > 0) insights.push('Some outreach follow-ups are due today.');
+  if (a.outreachCoverageRate < 50 && a.totalVisible > 0) {
+    insights.push('Many visible recruiters do not have outreach tracking yet.');
+  }
+  if (a.contactedManually > 0 && a.replied === 0) {
+    insights.push('Manual contacts exist, but replies have not been recorded yet.');
+  }
+  if (a.replied > 0) {
+    insights.push('Some recruiters have replied. Consider closing or continuing those workflows.');
+  }
+  const shownInsights = insights.slice(0, 3);
+
+  return (
+    <section className="rounded-2xl border border-white/[0.06] bg-[#0D111A] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">
+            Outreach Workflow Analytics
+          </p>
+          <p className="mt-1 text-[11px] text-white/60">
+            Manual outreach progress based on the current leaderboard view. No emails or notifications are sent.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold text-white/60">
+          {a.totalVisible} visible
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        {counts.map((c) => (
+          <div
+            key={c.l}
+            className="rounded-xl border border-white/[0.06] bg-[#0B0F18] px-3 py-2"
+          >
+            <p className="truncate text-[10px] font-medium text-white/50">{c.l}</p>
+            <p className="font-mono text-xl font-bold text-white">{c.v}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {rates.map((r) => (
+          <div
+            key={r.l}
+            className="rounded-xl border border-white/[0.06] bg-[#0B0F18] px-3 py-2"
+          >
+            <p className="truncate text-[10px] font-medium text-white/50">{r.l}</p>
+            <p className="font-mono text-xl font-bold text-white">{r.v}%</p>
+            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className="h-full bg-primary/70"
+                style={{ width: `${Math.max(0, Math.min(100, r.v))}%` }}
+              />
+            </div>
+            <p className="mt-1 truncate text-[10px] text-white/40">{r.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {shownInsights.length > 0 && (
+        <ul className="mt-3 space-y-1">
+          {shownInsights.map((t) => (
+            <li
+              key={t}
+              className="rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/70"
+            >
+              {t}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-2 text-[10px] text-white/40">
+        Analytics reflect the current leaderboard view after presets, search, filters, and sorting. Counts and rates are derived at runtime — nothing is stored, and no emails or notifications are sent.
+      </p>
+    </section>
+  );
+}
