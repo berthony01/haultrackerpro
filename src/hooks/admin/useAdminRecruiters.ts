@@ -72,44 +72,102 @@ export function useAdminRecruiters(filter: RecruiterFilter = 'pending') {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin_recruiters'] });
 
+  const writeAudit = async (
+    action: string,
+    targetUserId: string | null,
+    metadata: Record<string, unknown>,
+  ) => {
+    if (!user) return;
+    const { error } = await supabase.from('admin_audit_log').insert({
+      admin_user_id: user.id,
+      action,
+      target_user_id: targetUserId,
+      metadata: metadata as never,
+    });
+    if (error) throw new Error(`Audit log failed: ${error.message}`);
+  };
+
+  const fetchPrev = async (id: string) => {
+    const { data } = await supabase
+      .from('recruiter_profiles')
+      .select('id, user_id, verification_status, status, recruiter_email, company_name, recruiter_name')
+      .eq('id', id)
+      .maybeSingle();
+    return data;
+  };
+
   const approve = useMutation({
     mutationFn: async (id: string) => {
       if (!user) throw new Error('Not authenticated');
+      const prev = await fetchPrev(id);
+      const verifiedAt = new Date().toISOString();
       const { error } = await supabase
         .from('recruiter_profiles')
         .update({
           verification_status: 'approved',
           status: 'active',
-          verified_at: new Date().toISOString(),
+          verified_at: verifiedAt,
           verified_by: user.id,
         })
         .eq('id', id);
       if (error) throw error;
+      await writeAudit('recruiter.approve', prev?.user_id ?? null, {
+        recruiter_profile_id: id,
+        target_recruiter_user_id: prev?.user_id ?? null,
+        previous_verification_status: prev?.verification_status ?? null,
+        previous_status: prev?.status ?? null,
+        new_verification_status: 'approved',
+        new_status: 'active',
+        verified_by: user.id,
+        verified_at: verifiedAt,
+        source: 'admin_recruiters_panel',
+      });
     },
     onSuccess: invalidate,
   });
 
   const reject = useMutation({
     mutationFn: async (id: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const prev = await fetchPrev(id);
       const { error } = await supabase
         .from('recruiter_profiles')
         .update({ verification_status: 'rejected' })
         .eq('id', id);
       if (error) throw error;
+      await writeAudit('recruiter.reject', prev?.user_id ?? null, {
+        recruiter_profile_id: id,
+        target_recruiter_user_id: prev?.user_id ?? null,
+        previous_verification_status: prev?.verification_status ?? null,
+        new_verification_status: 'rejected',
+        source: 'admin_recruiters_panel',
+      });
     },
     onSuccess: invalidate,
   });
 
   const suspend = useMutation({
     mutationFn: async (id: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const prev = await fetchPrev(id);
       const { error } = await supabase
         .from('recruiter_profiles')
         .update({ status: 'suspended', verification_status: 'suspended' })
         .eq('id', id);
       if (error) throw error;
+      await writeAudit('recruiter.suspend', prev?.user_id ?? null, {
+        recruiter_profile_id: id,
+        target_recruiter_user_id: prev?.user_id ?? null,
+        previous_verification_status: prev?.verification_status ?? null,
+        previous_status: prev?.status ?? null,
+        new_verification_status: 'suspended',
+        new_status: 'suspended',
+        source: 'admin_recruiters_panel',
+      });
     },
     onSuccess: invalidate,
   });
+
 
   return {
     recruiters: query.data ?? [],
