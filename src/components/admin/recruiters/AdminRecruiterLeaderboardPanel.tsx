@@ -44,6 +44,16 @@ import {
   RECRUITER_TEMPLATE_KEYS_ORDERED,
   type RecruiterEmailTemplateKey,
 } from '@/lib/admin/recruiterEmailTemplates';
+import {
+  useRecruiterOutreachStatus,
+  OUTREACH_STATUS_OPTIONS,
+  OUTREACH_PRIORITY_OPTIONS,
+  type OutreachStatus,
+  type OutreachPriority,
+  type RecruiterOutreachStatusRow,
+} from '@/hooks/admin/useRecruiterOutreachStatus';
+
+type OutreachHandle = ReturnType<typeof useRecruiterOutreachStatus>;
 
 
 type SortKey =
