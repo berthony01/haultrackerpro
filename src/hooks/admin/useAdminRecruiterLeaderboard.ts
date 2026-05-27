@@ -377,6 +377,7 @@ export function useAdminRecruiterLeaderboard() {
             contact: sContact,
             account_billing: sAccount,
           },
+          recent_opportunities: recentByRecruiter.get(r.id) ?? [],
         };
       });
 
