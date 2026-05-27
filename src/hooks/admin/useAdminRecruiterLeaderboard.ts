@@ -473,7 +473,7 @@ export function useAdminRecruiterLeaderboard() {
         const b = billingByRecruiterId.get(r.id);
         const billing_plan = b?.plan ?? null;
         const billing_status = b?.status ?? null;
-        const billingActive = billing_status === 'active' || billing_status === 'trialing';
+        const billingActive = billing_status === 'active' || billing_status === 'trialing'; // trial-allowlist
         const isGrowthOrFleet = billing_plan === 'growth' || billing_plan === 'fleet';
         const priority_placement_included = billingActive && isGrowthOrFleet;
 

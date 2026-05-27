@@ -447,7 +447,7 @@ export function AdminRecruiterLeaderboardPanel() {
       // Billing
       if (billingFilter !== 'all') {
         if (billingFilter === 'active_trialing') {
-          if (r.billing_status !== 'active' && r.billing_status !== 'trialing') return false;
+          if (r.billing_status !== 'active' && r.billing_status !== 'trialing') return false; // trial-allowlist
         } else if (billingFilter === 'past_due') {
           if (r.billing_status !== 'past_due') return false;
         } else if (billingFilter === 'none') {
@@ -831,7 +831,7 @@ export function AdminRecruiterLeaderboardPanel() {
                 {b === 'all'
                   ? 'All billing'
                   : b === 'active_trialing'
-                  ? 'Active/Trialing'
+                  ? 'Active Billing'
                   : b === 'past_due'
                   ? 'Past Due'
                   : b === 'none'
