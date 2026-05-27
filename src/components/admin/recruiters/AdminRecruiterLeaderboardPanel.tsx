@@ -1377,3 +1377,148 @@ function RecentContactRequestsList({ items }: { items: RecentRecruiterContactReq
     </ul>
   );
 }
+
+// ---- Phase 14: Email Readiness section ----
+function priorityBadgeClass(p: 'High' | 'Medium' | 'Low'): string {
+  switch (p) {
+    case 'High':
+      return 'bg-rose-500/15 text-rose-300 ring-rose-500/30';
+    case 'Medium':
+      return 'bg-amber-500/15 text-amber-300 ring-amber-500/30';
+    default:
+      return 'bg-white/5 text-white/60 ring-white/10';
+  }
+}
+
+function EmailReadinessSection({ row }: { row: LeaderboardRow }) {
+  const readiness = useMemo(() => computeRecruiterEmailReadiness(row), [row]);
+  const [selectedKey, setSelectedKey] = useState<RecruiterEmailTemplateKey>(
+    readiness.suggested_template,
+  );
+
+  const template = RECRUITER_EMAIL_TEMPLATES[selectedKey];
+  const rendered = useMemo(() => renderRecruiterTemplate(template, row), [template, row]);
+
+  const isNotReady = selectedKey === 'not_ready';
+  const copyDisabled = isNotReady;
+
+  return (
+    <Section title="Email Readiness">
+      <p className="-mt-1 mb-3 text-[11px] text-white/55">
+        Suggested outreach based on this recruiter's current marketplace activity. No emails are
+        sent from this panel.
+      </p>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${labelColor(
+            'Strong' as PerformanceLabel,
+          )}`}
+        >
+          {readiness.readiness_label}
+        </span>
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${priorityBadgeClass(
+            readiness.priority,
+          )}`}
+        >
+          Priority: {readiness.priority}
+        </span>
+      </div>
+
+      <p className="mb-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/80">
+        {readiness.reason}
+      </p>
+
+      {readiness.email_missing && (
+        <p className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-[11px] text-amber-200">
+          Recruiter email is missing. You can still copy a draft, but there is no address to send
+          it to from this account.
+        </p>
+      )}
+
+      <div className="mb-3">
+        <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+          Template
+        </label>
+        <select
+          value={selectedKey}
+          onChange={(e) => setSelectedKey(e.target.value as RecruiterEmailTemplateKey)}
+          className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[11px] text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/40"
+        >
+          {RECRUITER_TEMPLATE_KEYS_ORDERED.map((k) => {
+            const t = RECRUITER_EMAIL_TEMPLATES[k];
+            const suggested = k === readiness.suggested_template ? ' (suggested)' : '';
+            return (
+              <option key={k} value={k} className="bg-[#0b1220]">
+                {t.label}
+                {suggested}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+
+      <div className="mb-2">
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+          Subject
+        </p>
+        <p className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-white/85">
+          {rendered.subject}
+        </p>
+      </div>
+
+      <div className="mb-3">
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">
+          Body preview
+        </p>
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] leading-relaxed text-white/80">
+{rendered.body}
+        </pre>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={copyDisabled}
+          onClick={() => copyToClipboard(rendered.subject, 'Subject')}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Copy className="h-3 w-3" /> Copy Subject
+        </button>
+        <button
+          type="button"
+          disabled={copyDisabled}
+          onClick={() => copyToClipboard(rendered.body, 'Body')}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Copy className="h-3 w-3" /> Copy Body
+        </button>
+        <button
+          type="button"
+          disabled={copyDisabled}
+          onClick={() =>
+            copyToClipboard(
+              `Subject: ${rendered.subject}\n\n${rendered.body}`,
+              'Full email draft',
+            )
+          }
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/[0.08] px-3 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Send className="h-3 w-3" /> Copy Full Email
+        </button>
+      </div>
+
+      {isNotReady && (
+        <p className="mt-2 text-[10px] text-white/50">
+          Copy is disabled for the "Not Ready" template. Choose a different template or wait until
+          this recruiter is eligible for outreach.
+        </p>
+      )}
+
+      <p className="mt-3 text-[10px] text-white/40">
+        This only copies a draft. {`Haul Tracker Pro`} does not send emails from this panel.
+      </p>
+    </Section>
+  );
+}
