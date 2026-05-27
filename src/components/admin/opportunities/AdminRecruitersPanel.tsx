@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sheet';
 import {
   CheckCircle2, XCircle, Ban, Eye, RefreshCw, Building2, ShieldCheck,
-  Search, Copy, ExternalLink,
+  Search, Copy, ExternalLink, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
