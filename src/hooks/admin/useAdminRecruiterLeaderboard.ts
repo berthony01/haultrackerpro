@@ -546,6 +546,10 @@ export function useAdminRecruiterLeaderboard() {
             account_billing: sAccount,
           },
           recent_opportunities: recentByRecruiter.get(r.id) ?? [],
+          application_summary: appSummaryByRec.get(r.id) ?? emptyAppSummary(),
+          contact_request_summary: crSummaryByRec.get(r.id) ?? emptyCrSummary(),
+          recent_applications: recentAppsByRec.get(r.id) ?? [],
+          recent_contact_requests: recentCrByRec.get(r.id) ?? [],
         };
       });
 
