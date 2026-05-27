@@ -1521,7 +1521,7 @@ function EmailReadinessSection({
         <button
           type="button"
           disabled={copyDisabled}
-          onClick={() => copyToClipboard(rendered.subject, 'Subject')}
+          onClick={() => handleCopy(rendered.subject, 'Subject')}
           className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Copy className="h-3 w-3" /> Copy Subject
@@ -1529,7 +1529,7 @@ function EmailReadinessSection({
         <button
           type="button"
           disabled={copyDisabled}
-          onClick={() => copyToClipboard(rendered.body, 'Body')}
+          onClick={() => handleCopy(rendered.body, 'Body')}
           className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Copy className="h-3 w-3" /> Copy Body
@@ -1538,7 +1538,7 @@ function EmailReadinessSection({
           type="button"
           disabled={copyDisabled}
           onClick={() =>
-            copyToClipboard(
+            handleCopy(
               `Subject: ${rendered.subject}\n\n${rendered.body}`,
               'Full email draft',
             )
