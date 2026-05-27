@@ -800,8 +800,8 @@ function RecruiterDetailDrawer({
                   k="Location"
                   v={[r.company_city, r.company_state].filter(Boolean).join(', ') || '—'}
                 />
-                <KV k="Recruiter ID" v={shortId(r.recruiter_profile_id) + '…'} mono />
-                <KV k="User ID" v={shortId(r.recruiter_user_id) + '…'} mono />
+                <KV k="Recruiter ID" v={r.recruiter_profile_id ? `${shortId(r.recruiter_profile_id)}…` : '—'} mono />
+                <KV k="User ID" v={r.recruiter_user_id ? `${shortId(r.recruiter_user_id)}…` : '—'} mono />
                 <KV
                   k="Joined"
                   v={r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}
