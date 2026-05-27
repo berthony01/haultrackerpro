@@ -115,8 +115,7 @@ export default function Auth() {
         const { error } = await signUp(form.email, form.password, form.name, role);
         if (error) throw error;
         trackSignUp('email');
-        const TEST_ACCOUNTS = ['berthonyxyz@gmail.com', 'peejayslifestyle@gmail.com', 'wysdomaniac@gmail.com'];
-        if (!TEST_ACCOUNTS.includes(form.email.toLowerCase().trim())) {
+        if (!isInternalTestEmail(form.email)) {
           supabase.functions.invoke('send-transactional-email', {
             body: {
               templateName: 'lifecycle-day0',
