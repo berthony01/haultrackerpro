@@ -142,7 +142,7 @@ export function useAdminRecruiterLeaderboard() {
           .limit(LEADERBOARD_CAPS.billing),
         supabase
           .from('opportunities')
-          .select('id,recruiter_id,status,admin_review_status,created_at')
+          .select('id,recruiter_id,status,admin_review_status,created_at,title,company_name,published_at,hiring_city,hiring_state,trailer_type,driver_type,route_type')
           .order('created_at', { ascending: false })
           .limit(LEADERBOARD_CAPS.opportunities),
         supabase
