@@ -603,6 +603,7 @@ export default function Admin() {
               <TabsTrigger value="drivers"><Trophy className="h-4 w-4 mr-1" />Drivers</TabsTrigger>
               <TabsTrigger value="leads"><Gift className="h-4 w-4 mr-1" />Starter Kit</TabsTrigger>
               <TabsTrigger value="opportunities"><Briefcase className="h-4 w-4 mr-1" />Opportunities</TabsTrigger>
+              <TabsTrigger value="applications"><Inbox className="h-4 w-4 mr-1" />Applications</TabsTrigger>
               <TabsTrigger value="recruiters"><Building2 className="h-4 w-4 mr-1" />Recruiters</TabsTrigger>
               <TabsTrigger value="referrals"><Share2 className="h-4 w-4 mr-1" />Referral Oversight</TabsTrigger>
               <TabsTrigger value="contracts"><Shield className="h-4 w-4 mr-1" />Contracts</TabsTrigger>
