@@ -44,11 +44,12 @@ function autoMapColumns(headers: string[]): Record<string, number> {
   const mapping: Record<string, number> = {};
   const normalized = headers.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
 
+  // Order matters: more-specific patterns (e.g. dropoff_date) must run before
+  // generic ones (e.g. 'date') so a "Delivery Date" header is not stolen by
+  // pickup-date. We also skip already-claimed headers via `used`.
   const patterns: [string, string[]][] = [
-    ['date', ['loaddate', 'pickupdate', 'date']],
-    // Phase 29: recognize the canonical financial reporting date column under
-    // any common shipper/broker name so imports populate dropoff_date correctly.
     ['dropoff_date', ['dropoffdate', 'deliverydate', 'delivereddate', 'unloaddate', 'dropdate']],
+    ['date', ['loaddate', 'pickupdate', 'date']],
     ['pickup', ['pickup', 'pickuplocation', 'origin', 'from']],
     ['dropoff', ['dropoff', 'dropofflocation', 'destination', 'to', 'delivery']],
     ['loaded_miles', ['loadedmiles', 'tripmiles', 'linehaul', 'miles', 'distance']],
@@ -62,9 +63,13 @@ function autoMapColumns(headers: string[]): Record<string, number> {
     ['actual_pay', ['actualpay', 'pay', 'amount', 'total', 'revenue']],
   ];
 
+  const used = new Set<number>();
   for (const [field, keywords] of patterns) {
-    const idx = normalized.findIndex(h => keywords.some(k => h.includes(k)));
-    if (idx >= 0) mapping[field] = idx;
+    const idx = normalized.findIndex((h, i) => !used.has(i) && keywords.some(k => h.includes(k)));
+    if (idx >= 0) {
+      mapping[field] = idx;
+      used.add(idx);
+    }
   }
 
   return mapping;
