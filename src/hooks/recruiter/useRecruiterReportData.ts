@@ -39,11 +39,13 @@ export function useRecruiterReportData(range: RecruiterReportRange | null, enabl
         .eq('recruiter_id', recruiterId);
       if (oppsErr) throw oppsErr;
 
-      // Applications for this recruiter
-      const { data: apps, error: appsErr } = await supabase
-        .from('opportunity_applications')
-        .select('id,opportunity_id,status,created_at,updated_at')
-        .eq('recruiter_id', recruiterId);
+      // Applications for this recruiter — Phase 28A: recruiters no longer
+      // have direct SELECT on opportunity_applications. Use the non-PII
+      // summary RPC (id, opportunity_id, status, created_at, updated_at only).
+      const { data: apps, error: appsErr } = await (supabase as any).rpc(
+        'list_recruiter_application_summaries',
+        { _recruiter_id: recruiterId },
+      );
       if (appsErr) throw appsErr;
 
       const appIds = (apps ?? []).map(a => a.id);

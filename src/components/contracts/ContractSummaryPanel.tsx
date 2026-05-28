@@ -30,25 +30,19 @@ export function ContractSummaryPanel({ applicationId, role }: Props) {
     queryKey: ['contract-summary-panel', applicationId, role],
     enabled: !!applicationId,
     queryFn: async () => {
-      // Application + nested opportunity. Driver_profile fetched only for recruiter.
-      const select = role === 'recruiter'
-        ? '*, opportunities:opportunity_id(id,title,company_name,hiring_city,hiring_state,pay_model,cpm,percentage_pay,flat_weekly_pay,estimated_weekly_gross), driver_profile:driver_profile_id(id,full_name)'
-        : '*, opportunities:opportunity_id(id,title,company_name,hiring_city,hiring_state,pay_model,cpm,percentage_pay,flat_weekly_pay,estimated_weekly_gross)';
-
-      const { data: app, error: appErr } = await supabase
-        .from('opportunity_applications')
-        .select(select)
-        .eq('id', applicationId)
-        .maybeSingle();
-      if (appErr) throw appErr;
-      if (!app) return null;
-
-      // Recruiter profile (limited fields — no admin_notes)
-      const { data: rp } = await supabase
-        .from('recruiter_profiles')
-        .select('id,company_name,recruiter_name,verification_status,status,mc_number,dot_number,company_city,company_state')
-        .eq('id', (app as any).recruiter_id)
-        .maybeSingle();
+      // Phase 28A: fetch application + opportunity + recruiter card via safe
+      // RPC. Recruiters no longer have direct SELECT on opportunity_applications
+      // or recruiter_profiles; the RPC is gated to application parties + admins
+      // and never returns driver_phone_snapshot / driver_email_snapshot /
+      // admin_notes / verified_by.
+      const { data: summary, error: sumErr } = await (supabase as any).rpc(
+        'get_application_contract_summary',
+        { _application_id: applicationId },
+      );
+      if (sumErr) throw sumErr;
+      if (!summary) return null;
+      const app = summary as any;
+      const rp = app.recruiter ?? null;
 
       // Contract + current version + driver signature
       const { data: contract } = await supabase

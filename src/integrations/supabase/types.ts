@@ -2975,6 +2975,10 @@ export type Database = {
         Returns: number
       }
       expire_stale_contact_requests: { Args: never; Returns: number }
+      get_application_contract_summary: {
+        Args: { _application_id: string }
+        Returns: Json
+      }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
       get_public_resource_article: {
         Args: { _slug: string }
@@ -3011,6 +3015,7 @@ export type Database = {
         Args: { _application_id: string; _user_id: string }
         Returns: boolean
       }
+      is_current_user_recruiter: { Args: never; Returns: boolean }
       is_recruiter_owner: {
         Args: { _recruiter_id: string; _user_id: string }
         Returns: boolean
@@ -3044,6 +3049,16 @@ export type Database = {
           slug: string
           title: string
           topic_cluster: string
+        }[]
+      }
+      list_recruiter_application_summaries: {
+        Args: { _recruiter_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          opportunity_id: string
+          status: string
+          updated_at: string
         }[]
       }
       list_recruiter_applications_safe: {
