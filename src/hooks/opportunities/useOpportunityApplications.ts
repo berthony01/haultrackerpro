@@ -43,6 +43,12 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
         .select(APPLICATION_SELECT_DRIVER)
         .eq('driver_user_id', user.id)
         .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
   // Recruiter: applications tied to one of their opportunities. Phase 28 — go
   // through public.list_recruiter_applications_safe(_recruiter_id) so
   // driver_phone_snapshot / driver_email_snapshot are only revealed when an
@@ -61,13 +67,6 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     enabled: !!opts.recruiterId,
   });
 
-        .eq('recruiter_id', opts.recruiterId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!opts.recruiterId,
-  });
 
   const createApplication = useMutation({
     mutationFn: async (data: OpportunityApplicationInsert) => {
