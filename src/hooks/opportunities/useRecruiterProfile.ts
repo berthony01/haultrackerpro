@@ -16,16 +16,16 @@ export function useRecruiterProfile() {
     queryKey: ['recruiter_profile', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase
-        .from('recruiter_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Phase 28: use safe RPC that omits admin_notes / verified_by so
+      // recruiters never read internal moderation fields about themselves.
+      const { data, error } = await (supabase as any).rpc('get_my_recruiter_profile_safe');
       if (error) throw error;
-      return data;
+      const rows = (data ?? []) as Array<Record<string, any>>;
+      return (rows[0] ?? null) as RecruiterProfile | null;
     },
     enabled: !!user,
   });
+
 
   const upsertProfile = useMutation({
     mutationFn: async (data: RecruiterProfileUpsert) => {

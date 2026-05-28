@@ -374,11 +374,12 @@ function StateCard({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-foreground">{cfg.title}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{cfg.body}</p>
-          {profile?.admin_notes && state === 'rejected' && (
+          {state === 'rejected' && (
             <p className="text-xs text-foreground mt-2 rounded-md bg-background/40 p-2 border border-border/40">
-              Reviewer notes: {profile.admin_notes}
+              Contact support for details on this decision.
             </p>
           )}
+
           {cfg.cta && (
             <Button size="sm" variant="outline" className="mt-3" onClick={cfg.cta.onClick}>
               {cfg.cta.label} <ArrowRight className="h-3.5 w-3.5" />

@@ -134,11 +134,12 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
             </p>
           )}
 
-          {profile?.admin_notes && profile.verification_status === 'rejected' && (
+          {profile?.verification_status === 'rejected' && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-foreground">
-              <span className="font-semibold">Reviewer notes:</span> {profile.admin_notes}
+              Your recruiter profile was not approved. Please update your information and resubmit, or contact support for details.
             </div>
           )}
+
 
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" variant="outline" onClick={onOpenOnboarding}>

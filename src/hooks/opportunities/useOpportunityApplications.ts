@@ -49,21 +49,24 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     enabled: !!user,
   });
 
-  // Recruiter: applications tied to one of their opportunities, with limited driver-profile context
+  // Recruiter: applications tied to one of their opportunities. Phase 28 — go
+  // through public.list_recruiter_applications_safe(_recruiter_id) so
+  // driver_phone_snapshot / driver_email_snapshot are only revealed when an
+  // approved contact request exists AND the driver still consents.
   const recruiterQuery = useQuery({
     queryKey: ['opportunity_applications', 'recruiter', opts.recruiterId],
     queryFn: async () => {
       if (!opts.recruiterId) return [];
-      const { data, error } = await supabase
-        .from('opportunity_applications')
-        .select(APPLICATION_SELECT_RECRUITER)
-        .eq('recruiter_id', opts.recruiterId)
-        .order('created_at', { ascending: false });
+      const { data, error } = await (supabase as any).rpc(
+        'list_recruiter_applications_safe',
+        { _recruiter_id: opts.recruiterId },
+      );
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as any[];
     },
     enabled: !!opts.recruiterId,
   });
+
 
   const createApplication = useMutation({
     mutationFn: async (data: OpportunityApplicationInsert) => {
