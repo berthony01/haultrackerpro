@@ -217,3 +217,81 @@ describe('Phase 28 PII access control hardening', () => {
   });
 });
 
+
+describe('Phase 28A direct base-table PII access closures', () => {
+  function loadPhase28A(): string {
+    return loadMigrationContaining(
+      'CREATE OR REPLACE FUNCTION public.get_application_contract_summary',
+    );
+  }
+
+  it('drops broad recruiter SELECT on opportunity_applications', () => {
+    const sql = loadPhase28A();
+    expect(sql).toMatch(
+      /DROP POLICY IF EXISTS "Recruiter views applications for own opportunities"\s+ON public\.opportunity_applications/,
+    );
+  });
+
+  it('drops recruiter self SELECT on recruiter_profiles', () => {
+    const sql = loadPhase28A();
+    expect(sql).toMatch(
+      /DROP POLICY IF EXISTS "Recruiter views own profile"\s+ON public\.recruiter_profiles/,
+    );
+  });
+
+  it('exposes is_current_user_recruiter() with SECURITY DEFINER', () => {
+    const sql = loadPhase28A();
+    const body = extractFunctionBody(sql, 'is_current_user_recruiter()');
+    expect(body).toMatch(/SECURITY DEFINER/);
+    expect(body).toMatch(/auth\.uid\(\)/);
+  });
+
+  it('list_recruiter_application_summaries returns non-PII fields only', () => {
+    const sql = loadPhase28A();
+    const body = extractFunctionBody(sql, 'list_recruiter_application_summaries(_recruiter_id uuid)');
+    expect(body).toMatch(/SECURITY DEFINER/);
+    // Must not select driver phone/email snapshots or message.
+    expect(body).not.toMatch(/driver_phone_snapshot/);
+    expect(body).not.toMatch(/driver_email_snapshot/);
+    expect(body).not.toMatch(/oa\.message/);
+    // Caller must own recruiter profile.
+    expect(body).toMatch(/rp\.user_id = _uid/);
+  });
+
+  it('get_application_contract_summary excludes PII + admin fields and is party-gated', () => {
+    const sql = loadPhase28A();
+    const body = extractFunctionBody(sql, 'get_application_contract_summary(_application_id uuid)');
+    expect(body).toMatch(/SECURITY DEFINER/);
+    expect(body).toMatch(/is_application_party/);
+    expect(body).not.toMatch(/driver_phone_snapshot/);
+    expect(body).not.toMatch(/driver_email_snapshot/);
+    expect(body).not.toMatch(/admin_notes/);
+    expect(body).not.toMatch(/verified_by/);
+  });
+
+  it('useUserRole detects recruiter role via safe RPC, not direct table SELECT', () => {
+    const src = readFileSync(resolve(__dirname, '../hooks/useUserRole.ts'), 'utf8');
+    expect(src).toMatch(/is_current_user_recruiter/);
+    expect(src).not.toMatch(/\.from\(['"]recruiter_profiles['"]\)/);
+  });
+
+  it('useRecruiterReportData reads applications via safe summary RPC', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../hooks/recruiter/useRecruiterReportData.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/list_recruiter_application_summaries/);
+    expect(src).not.toMatch(/\.from\(['"]opportunity_applications['"]\)/);
+  });
+
+  it('ContractSummaryPanel reads via safe contract-summary RPC', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../components/contracts/ContractSummaryPanel.tsx'),
+      'utf8',
+    );
+    expect(src).toMatch(/get_application_contract_summary/);
+    expect(src).not.toMatch(/\.from\(['"]opportunity_applications['"]\)/);
+    expect(src).not.toMatch(/\.from\(['"]recruiter_profiles['"]\)/);
+  });
+});
+
