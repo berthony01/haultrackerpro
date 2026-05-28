@@ -158,23 +158,37 @@ export function CSVImport({ isPro }: CSVImportProps) {
     setImporting(true);
     let successCount = 0;
 
+    // Phase 29: shared MM/DD/YYYY-or-ISO parser used for BOTH pickup and
+    // drop-off dates so imports populate the canonical reporting date.
+    const parseImportDate = (raw: string | undefined): string | null => {
+      const v = raw?.trim();
+      if (!v) return null;
+      if (v.includes('/')) {
+        const parts = v.split('/');
+        if (parts.length === 3) {
+          const [m, d, y] = parts;
+          const year = y.length === 2 ? `20${y}` : y;
+          return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+      }
+      return v;
+    };
+
     for (const row of rows) {
       try {
-        const dateVal = row[dateIdx]?.trim();
         const pickup = row[pickupIdx]?.trim();
         const dropoff = row[dropoffIdx]?.trim();
-        if (!dateVal || !pickup || !dropoff) continue;
+        const parsedDate = parseImportDate(row[dateIdx]);
+        if (!parsedDate || !pickup || !dropoff) continue;
 
-        // Parse date - try multiple formats
-        let parsedDate = dateVal;
-        if (dateVal.includes('/')) {
-          const parts = dateVal.split('/');
-          if (parts.length === 3) {
-            const [m, d, y] = parts;
-            const year = y.length === 2 ? `20${y}` : y;
-            parsedDate = `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-          }
-        }
+        const dropoffIdxCol = mapping.dropoff_date;
+        const parsedDropoffDate =
+          dropoffIdxCol != null && dropoffIdxCol >= 0
+            ? parseImportDate(row[dropoffIdxCol])
+            : null;
+        // Fallback: dropoff_date = load_date when no delivery column is mapped
+        // or its cell is blank/invalid. Keeps reporting date = pickup date.
+        const finalDropoffDate = parsedDropoffDate ?? parsedDate;
 
         const num = (idx: number | undefined): number => {
           if (idx == null || idx < 0) return 0;
@@ -215,6 +229,7 @@ export function CSVImport({ isPro }: CSVImportProps) {
         const loadData: any = {
           user_id: user.id,
           load_date: parsedDate,
+          dropoff_date: finalDropoffDate,
           pickup_location: pickup,
           dropoff_location: dropoff,
           loaded_miles: loadedMiles,
