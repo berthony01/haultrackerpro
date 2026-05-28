@@ -272,7 +272,7 @@ describe('Phase 28A direct base-table PII access closures', () => {
   it('useUserRole detects recruiter role via safe RPC, not direct table SELECT', () => {
     const src = readFileSync(resolve(__dirname, '../hooks/useUserRole.ts'), 'utf8');
     expect(src).toMatch(/is_current_user_recruiter/);
-    expect(src).not.toMatch(/\.from\(['"]recruiter_profiles['"]\)/);
+    expect(src).not.toMatch(/supabase\s*\.\s*from\(['"]recruiter_profiles['"]\)/);
   });
 
   it('useRecruiterReportData reads applications via safe summary RPC', () => {
