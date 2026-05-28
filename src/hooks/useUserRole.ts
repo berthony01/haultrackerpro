@@ -28,16 +28,13 @@ function readRecruiterIntent(): boolean {
 export function useUserRole() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isLoading: adminLoading } = useAdmin();
-
   const recruiterQuery = useQuery({
     queryKey: ['user-role-recruiter-check', user?.id],
     queryFn: async () => {
       if (!user) return false;
-      const { data, error } = await supabase
-        .from('recruiter_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Phase 28A: use safe RPC; recruiters no longer have direct SELECT on
+      // recruiter_profiles, so .from('recruiter_profiles').select('id') is gone.
+      const { data, error } = await (supabase as any).rpc('is_current_user_recruiter');
       if (error) throw error;
       return !!data;
     },
