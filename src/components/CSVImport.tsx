@@ -40,7 +40,7 @@ function parseCSV(text: string): string[][] {
   });
 }
 
-function autoMapColumns(headers: string[]): Record<string, number> {
+export function autoMapColumns(headers: string[]): Record<string, number> {
   const mapping: Record<string, number> = {};
   const normalized = headers.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
 
