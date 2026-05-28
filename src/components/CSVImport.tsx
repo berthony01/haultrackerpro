@@ -18,7 +18,7 @@ interface CSVImportProps {
 }
 
 const EXPECTED_COLUMNS = [
-  'date', 'pickup', 'dropoff', 'loaded_miles', 'deadhead_miles', 'total_miles',
+  'date', 'dropoff_date', 'pickup', 'dropoff', 'loaded_miles', 'deadhead_miles', 'total_miles',
   'rate_per_mile', 'deadhead_rate_per_mile', 'flat_rate', 'pay_model',
   'expected_gross_pay', 'actual_pay',
 ];
@@ -45,7 +45,10 @@ function autoMapColumns(headers: string[]): Record<string, number> {
   const normalized = headers.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
 
   const patterns: [string, string[]][] = [
-    ['date', ['date', 'loaddate', 'pickupdate']],
+    ['date', ['loaddate', 'pickupdate', 'date']],
+    // Phase 29: recognize the canonical financial reporting date column under
+    // any common shipper/broker name so imports populate dropoff_date correctly.
+    ['dropoff_date', ['dropoffdate', 'deliverydate', 'delivereddate', 'unloaddate', 'dropdate']],
     ['pickup', ['pickup', 'pickuplocation', 'origin', 'from']],
     ['dropoff', ['dropoff', 'dropofflocation', 'destination', 'to', 'delivery']],
     ['loaded_miles', ['loadedmiles', 'tripmiles', 'linehaul', 'miles', 'distance']],
