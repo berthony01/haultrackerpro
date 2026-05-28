@@ -2975,6 +2975,7 @@ export type Database = {
         Returns: number
       }
       expire_stale_contact_requests: { Args: never; Returns: number }
+      get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
       get_public_resource_article: {
         Args: { _slug: string }
         Returns: {
@@ -3044,6 +3045,10 @@ export type Database = {
           title: string
           topic_cluster: string
         }[]
+      }
+      list_recruiter_applications_safe: {
+        Args: { _recruiter_id: string }
+        Returns: Json[]
       }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_notification_read: {
