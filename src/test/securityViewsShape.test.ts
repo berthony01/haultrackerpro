@@ -140,7 +140,9 @@ describe('Phase 26 security RPCs', () => {
     expect(src).toMatch(/Account deletion failed\. Please contact support\./);
     // Server-side logging is preserved.
     expect(src).toMatch(/console\.error\(/);
+  });
 });
+
 
 describe('Phase 28 PII access control hardening', () => {
   function loadPhase28(): string {
