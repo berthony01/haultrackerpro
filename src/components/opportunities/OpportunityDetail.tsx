@@ -85,8 +85,9 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         application_type: 'request_info',
         driver_profile_id: driverProfile?.id ?? null,
         preferred_contact_method: driverProfile?.contact_preference ?? 'in_app',
-        driver_phone_snapshot: driverProfile?.phone ?? null,
-        driver_email_snapshot: driverProfile?.email ?? null,
+        driver_phone_snapshot: driverProfile?.allow_verified_recruiter_contact ? (driverProfile?.phone ?? null) : null,
+        driver_email_snapshot: driverProfile?.allow_verified_recruiter_contact ? (driverProfile?.email ?? null) : null,
+
         message: "I'm interested in learning more about this opportunity.",
       },
       {
