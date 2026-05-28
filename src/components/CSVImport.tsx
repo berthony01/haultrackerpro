@@ -18,7 +18,7 @@ interface CSVImportProps {
 }
 
 const EXPECTED_COLUMNS = [
-  'date', 'pickup', 'dropoff', 'loaded_miles', 'deadhead_miles', 'total_miles',
+  'date', 'dropoff_date', 'pickup', 'dropoff', 'loaded_miles', 'deadhead_miles', 'total_miles',
   'rate_per_mile', 'deadhead_rate_per_mile', 'flat_rate', 'pay_model',
   'expected_gross_pay', 'actual_pay',
 ];
@@ -40,12 +40,16 @@ function parseCSV(text: string): string[][] {
   });
 }
 
-function autoMapColumns(headers: string[]): Record<string, number> {
+export function autoMapColumns(headers: string[]): Record<string, number> {
   const mapping: Record<string, number> = {};
   const normalized = headers.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
 
+  // Order matters: more-specific patterns (e.g. dropoff_date) must run before
+  // generic ones (e.g. 'date') so a "Delivery Date" header is not stolen by
+  // pickup-date. We also skip already-claimed headers via `used`.
   const patterns: [string, string[]][] = [
-    ['date', ['date', 'loaddate', 'pickupdate']],
+    ['dropoff_date', ['dropoffdate', 'deliverydate', 'delivereddate', 'unloaddate', 'dropdate']],
+    ['date', ['loaddate', 'pickupdate', 'date']],
     ['pickup', ['pickup', 'pickuplocation', 'origin', 'from']],
     ['dropoff', ['dropoff', 'dropofflocation', 'destination', 'to', 'delivery']],
     ['loaded_miles', ['loadedmiles', 'tripmiles', 'linehaul', 'miles', 'distance']],
@@ -59,9 +63,13 @@ function autoMapColumns(headers: string[]): Record<string, number> {
     ['actual_pay', ['actualpay', 'pay', 'amount', 'total', 'revenue']],
   ];
 
+  const used = new Set<number>();
   for (const [field, keywords] of patterns) {
-    const idx = normalized.findIndex(h => keywords.some(k => h.includes(k)));
-    if (idx >= 0) mapping[field] = idx;
+    const idx = normalized.findIndex((h, i) => !used.has(i) && keywords.some(k => h.includes(k)));
+    if (idx >= 0) {
+      mapping[field] = idx;
+      used.add(idx);
+    }
   }
 
   return mapping;
@@ -150,23 +158,37 @@ export function CSVImport({ isPro }: CSVImportProps) {
     setImporting(true);
     let successCount = 0;
 
+    // Phase 29: shared MM/DD/YYYY-or-ISO parser used for BOTH pickup and
+    // drop-off dates so imports populate the canonical reporting date.
+    const parseImportDate = (raw: string | undefined): string | null => {
+      const v = raw?.trim();
+      if (!v) return null;
+      if (v.includes('/')) {
+        const parts = v.split('/');
+        if (parts.length === 3) {
+          const [m, d, y] = parts;
+          const year = y.length === 2 ? `20${y}` : y;
+          return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+      }
+      return v;
+    };
+
     for (const row of rows) {
       try {
-        const dateVal = row[dateIdx]?.trim();
         const pickup = row[pickupIdx]?.trim();
         const dropoff = row[dropoffIdx]?.trim();
-        if (!dateVal || !pickup || !dropoff) continue;
+        const parsedDate = parseImportDate(row[dateIdx]);
+        if (!parsedDate || !pickup || !dropoff) continue;
 
-        // Parse date - try multiple formats
-        let parsedDate = dateVal;
-        if (dateVal.includes('/')) {
-          const parts = dateVal.split('/');
-          if (parts.length === 3) {
-            const [m, d, y] = parts;
-            const year = y.length === 2 ? `20${y}` : y;
-            parsedDate = `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-          }
-        }
+        const dropoffIdxCol = mapping.dropoff_date;
+        const parsedDropoffDate =
+          dropoffIdxCol != null && dropoffIdxCol >= 0
+            ? parseImportDate(row[dropoffIdxCol])
+            : null;
+        // Fallback: dropoff_date = load_date when no delivery column is mapped
+        // or its cell is blank/invalid. Keeps reporting date = pickup date.
+        const finalDropoffDate = parsedDropoffDate ?? parsedDate;
 
         const num = (idx: number | undefined): number => {
           if (idx == null || idx < 0) return 0;
@@ -207,6 +229,7 @@ export function CSVImport({ isPro }: CSVImportProps) {
         const loadData: any = {
           user_id: user.id,
           load_date: parsedDate,
+          dropoff_date: finalDropoffDate,
           pickup_location: pickup,
           dropoff_location: dropoff,
           loaded_miles: loadedMiles,

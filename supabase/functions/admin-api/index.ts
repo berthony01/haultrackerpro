@@ -97,6 +97,10 @@ Deno.serve(async (req) => {
       ] = await Promise.all([
         adminDb.from("profiles").select("id", { count: "exact", head: true }),
         adminDb.from("loads").select("id", { count: "exact", head: true }),
+        // Admin "loads created in last 7d" intentionally uses load_date (pickup
+        // activity), NOT the driver-facing financial reporting date
+        // (COALESCE(dropoff_date, load_date)). This metric measures pickup
+        // throughput across the platform and is not a financial total.
         adminDb.from("loads").select("id", { count: "exact", head: true }).gte("load_date", sevenDaysAgoDate),
         adminDb.from("expenses").select("id", { count: "exact", head: true }),
         adminDb.from("expenses").select("id", { count: "exact", head: true }).gte("expense_date", sevenDaysAgoDate),

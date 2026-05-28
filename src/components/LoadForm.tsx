@@ -567,6 +567,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <div>
               <Label htmlFor="dropoff_date">Drop-off Date</Label>
               <DateInput id="dropoff_date" value={form.dropoff_date || form.load_date} onChange={(val) => update('dropoff_date', val)} />
+              <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                Used for dashboard, weekly totals, reports, and exports. If blank, pickup date is used.
+              </p>
             </div>
           </div>
 

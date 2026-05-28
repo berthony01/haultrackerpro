@@ -481,7 +481,19 @@ const Index = () => {
     setEditingLoad(null);
     setEditingStops([]);
     setPage('add');
-    const dup: Load = { ...load, id: '', load_date: new Date().toISOString().split('T')[0], actual_pay_received: null, status: 'pending' };
+    // Phase 29: reset BOTH pickup and drop-off date to today so the duplicated
+    // load lands in the current reporting window. Previously only load_date was
+    // reset, leaving the old dropoff_date (the canonical reporting date) intact
+    // and causing duplicates to appear in the wrong date range.
+    const today = new Date().toISOString().split('T')[0];
+    const dup: Load = {
+      ...load,
+      id: '',
+      load_date: today,
+      dropoff_date: today,
+      actual_pay_received: null,
+      status: 'pending',
+    };
     setEditingLoad(dup);
     const origStops = loadStopsHook.getStopsForLoad(load.id);
     setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes })));
