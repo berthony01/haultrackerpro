@@ -140,5 +140,78 @@ describe('Phase 26 security RPCs', () => {
     expect(src).toMatch(/Account deletion failed\. Please contact support\./);
     // Server-side logging is preserved.
     expect(src).toMatch(/console\.error\(/);
+});
+
+describe('Phase 28 PII access control hardening', () => {
+  function loadPhase28(): string {
+    return loadMigrationContaining('CREATE OR REPLACE FUNCTION public.list_recruiter_applications_safe');
+  }
+
+  it('drops driver-side direct SELECT policies on driver_referrals', () => {
+    const sql = loadPhase28();
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Referred driver views linked referrals" ON public\.driver_referrals/);
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Referring driver views own referrals" ON public\.driver_referrals/);
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Referring driver views linked referrals" ON public\.driver_referrals/);
+  });
+
+  it('list_recruiter_applications_safe gates phone/email by approved contact request + consent', () => {
+    const sql = loadPhase28();
+    const body = extractFunctionBody(sql, 'list_recruiter_applications_safe(_recruiter_id uuid)');
+    expect(body).toMatch(/SECURITY DEFINER/);
+    expect(body).toMatch(/allow_verified_recruiter_contact/);
+    expect(body).toMatch(/recruiter_contact_requests/);
+    expect(body).toMatch(/status = 'approved'/);
+    // Phone/email are wrapped in conditional CASE that requires both consent
+    // AND an approved contact request; otherwise NULL.
+    expect(body).toMatch(/'driver_phone_snapshot',\s*CASE/);
+    expect(body).toMatch(/'driver_email_snapshot',\s*CASE/);
+    expect(body).toMatch(/ELSE NULL/);
+    // Caller must own the recruiter profile.
+    expect(body).toMatch(/rp\.user_id = _uid/);
+  });
+
+  it('snapshot guard trigger nulls phone/email when consent is false', () => {
+    const sql = loadPhase28();
+    const body = extractFunctionBody(sql, 'opportunity_applications_contact_snapshot_guard()');
+    expect(body).toMatch(/allow_verified_recruiter_contact/);
+    expect(body).toMatch(/NEW\.driver_phone_snapshot := NULL/);
+    expect(body).toMatch(/NEW\.driver_email_snapshot := NULL/);
+  });
+
+  it('get_my_recruiter_profile_safe excludes admin_notes and verified_by', () => {
+    const sql = loadPhase28();
+    const body = extractFunctionBody(sql, 'get_my_recruiter_profile_safe()');
+    expect(body).toMatch(/SECURITY DEFINER/);
+    expect(body).toMatch(/- 'admin_notes'/);
+    expect(body).toMatch(/- 'verified_by'/);
+    expect(body).toMatch(/rp\.user_id = _uid/);
+  });
+
+  it('useRecruiterProfile reads via safe RPC, not select(*) on recruiter_profiles', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../hooks/opportunities/useRecruiterProfile.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/get_my_recruiter_profile_safe/);
+    // The profile read query must no longer go through .from('recruiter_profiles').select('*')
+    expect(src).not.toMatch(/\.from\(['"]recruiter_profiles['"]\)\s*\n?\s*\.select\(['"]\*['"]\)/);
+  });
+
+  it('useOpportunityApplications recruiter read goes through safe RPC', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../hooks/opportunities/useOpportunityApplications.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/list_recruiter_applications_safe/);
+  });
+
+  it('OpportunityDetail only sends contact snapshots when driver consent is on', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../components/opportunities/OpportunityDetail.tsx'),
+      'utf8',
+    );
+    expect(src).toMatch(/driver_phone_snapshot:\s*driverProfile\?\.allow_verified_recruiter_contact/);
+    expect(src).toMatch(/driver_email_snapshot:\s*driverProfile\?\.allow_verified_recruiter_contact/);
   });
 });
+
