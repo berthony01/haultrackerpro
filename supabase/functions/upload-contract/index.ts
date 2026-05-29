@@ -192,7 +192,7 @@ serve(async (req) => {
     const { data: signed, error: signedErr } = await admin.storage
       .from(BUCKET)
       .createSignedUploadUrl(storagePath);
-    if (signedErr || !signed) return json({ error: signedErr?.message || "Sign failed" }, 500);
+    if (signedErr || !signed) { console.error("[upload-contract] sign url", signedErr); return json({ error: "Could not create upload URL." }, 500); }
 
     return json({
       contract_id: contractId,
