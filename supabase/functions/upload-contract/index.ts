@@ -120,7 +120,7 @@ serve(async (req) => {
       .select("id")
       .eq("application_id", application_id)
       .maybeSingle();
-    if (existingErr) return json({ error: existingErr.message }, 500);
+    if (existingErr) { console.error("[upload-contract] contract lookup", existingErr); return json({ error: "Could not load contract." }, 500); }
 
     let contractId = existing?.id as string | undefined;
 
