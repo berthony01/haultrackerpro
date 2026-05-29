@@ -149,7 +149,7 @@ serve(async (req) => {
       .eq("contract_id", contractId)
       .order("version_number", { ascending: false })
       .limit(1);
-    if (aggErr) return json({ error: aggErr.message }, 500);
+    if (aggErr) { console.error("[upload-contract] version agg", aggErr); return json({ error: "Could not prepare contract version." }, 500); }
     const nextVersion = (versionAgg?.[0]?.version_number ?? 0) + 1;
 
     // 7. Insert contract_versions row (service role bypasses field guard)
