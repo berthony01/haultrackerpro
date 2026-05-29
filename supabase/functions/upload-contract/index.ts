@@ -204,6 +204,6 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("[upload-contract] error", e);
-    return json({ error: (e as Error).message || "Server error" }, 500);
+    return json({ error: "Server error. Please try again." }, 500);
   }
 });
