@@ -85,7 +85,7 @@ serve(async (req) => {
       .eq("id", application_id)
       .maybeSingle();
 
-    if (appErr) return json({ error: appErr.message }, 500);
+    if (appErr) { console.error("[upload-contract] app lookup", appErr); return json({ error: "Could not load application." }, 500); }
     if (!appRow) return json({ error: "Application not found" }, 404);
 
     const rp = (appRow as any).recruiter_profiles;
