@@ -178,7 +178,7 @@ serve(async (req) => {
 
   try {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!apiKey) { console.error("[ai-insight] missing api key"); throw new Error("AI service unavailable"); }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
