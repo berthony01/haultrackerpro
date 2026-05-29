@@ -177,8 +177,9 @@ serve(async (req) => {
         action: "sign_failed",
         metadata: { reason: stErr?.message || "status transition rejected", phase: "status_update" },
       });
+      if (stErr) console.error("[sign-contract] status update", stErr);
       return json(
-        { error: stErr?.message || "Contract status changed before signing could be saved." },
+        { error: "Contract status changed before signing could be saved." },
         409,
       );
     }
