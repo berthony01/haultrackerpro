@@ -129,7 +129,7 @@ serve(async (req) => {
       .from("contract_versions")
       .update({ upload_status: "uploaded", uploaded_at: new Date().toISOString() })
       .eq("id", version_id);
-    if (updErr) return json({ error: updErr.message }, 500);
+    if (updErr) { console.error("[confirm-contract-upload] version update", updErr); return json({ error: "Could not finalize upload." }, 500); }
 
     // Phase 5 final hardening:
     // - A newly uploaded+confirmed version becomes the current version and resets
