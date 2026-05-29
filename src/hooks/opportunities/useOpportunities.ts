@@ -17,23 +17,20 @@ export function useOpportunities(filters: OpportunityFilters = {}) {
   const query = useQuery({
     queryKey: ['opportunities', filters],
     queryFn: async () => {
-      let q = supabase
-        .from('opportunities')
-        .select('*, recruiter:recruiter_profiles!inner(verification_status, status)')
-        .eq('status', 'active')
-        .eq('admin_review_status', 'approved')
-        .eq('recruiter.verification_status', 'approved')
-        .neq('recruiter.status', 'suspended')
-        .order('featured', { ascending: false })
-        .order('published_at', { ascending: false, nullsFirst: false });
-
-      if (filters.state) q = q.eq('hiring_state', filters.state);
-      if (filters.driverType) q = q.eq('driver_type', filters.driverType);
-      if (filters.routeType) q = q.eq('route_type', filters.routeType);
-
-      const { data, error } = await q;
+      // Phase 28B: drivers no longer have direct SELECT on recruiter_profiles,
+      // so we cannot join it client-side. Use the safe RPC that filters by
+      // approved/non-suspended recruiter server-side and never returns
+      // recruiter PII or internal admin fields.
+      const { data, error } = await (supabase as any).rpc(
+        'list_driver_visible_opportunities',
+        {
+          _state: filters.state ?? null,
+          _driver_type: filters.driverType ?? null,
+          _route_type: filters.routeType ?? null,
+        },
+      );
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Opportunity[];
     },
     enabled: !!user,
   });
