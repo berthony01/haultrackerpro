@@ -184,8 +184,9 @@ serve(async (req) => {
           attempted_status: targetStatus,
         },
       });
+      if (stErr) console.error("[review-contract] status update", stErr);
       return json(
-        { error: stErr?.message || "Contract status changed before your decision could be saved." },
+        { error: "Contract status changed before your decision could be saved." },
         409,
       );
     }
