@@ -153,7 +153,8 @@ serve(async (req) => {
       if (isDup) {
         return json({ error: "You have already submitted a decision for this contract version." }, 409);
       }
-      return json({ error: rvErr?.message || "Could not save your decision" }, 500);
+      console.error("[review-contract] review insert", rvErr);
+      return json({ error: "Could not save your decision." }, 500);
     }
 
     // Advance status only from a decidable state. Service role bypasses the
