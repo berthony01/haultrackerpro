@@ -213,10 +213,83 @@ describe('Phase 28 PII access control hardening', () => {
       resolve(__dirname, '../components/opportunities/OpportunityDetail.tsx'),
       'utf8',
     );
-    expect(src).toMatch(/driver_phone_snapshot:\s*driverProfile\?\.allow_verified_recruiter_contact/);
-    expect(src).toMatch(/driver_email_snapshot:\s*driverProfile\?\.allow_verified_recruiter_contact/);
+    // Phase 28C: snapshots are computed via local `phoneSnap`/`emailSnap` that
+    // gate on consent + matching contact_preference.
+    expect(src).toMatch(/allow_verified_recruiter_contact/);
+    expect(src).toMatch(/pref === 'phone'/);
+    expect(src).toMatch(/pref === 'email'/);
+    expect(src).toMatch(/driver_phone_snapshot:\s*phoneSnap/);
+    expect(src).toMatch(/driver_email_snapshot:\s*emailSnap/);
   });
 });
+
+
+describe('Phase 28C final scanner cleanup + write-path hardening', () => {
+  function loadPhase28C(): string {
+    return loadMigrationContaining(
+      'CREATE OR REPLACE FUNCTION public.create_driver_referral_safe',
+    );
+  }
+
+  it('drops driver UPDATE policy on driver_referrals', () => {
+    const sql = loadPhase28C();
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Referring driver updates own referral early" ON public\.driver_referrals/);
+  });
+
+  it('drops driver direct INSERT policy on driver_referrals', () => {
+    const sql = loadPhase28C();
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Driver inserts own referral" ON public\.driver_referrals/);
+  });
+
+  it('create_driver_referral_safe is SECURITY DEFINER, validates approved opportunity, returns only id', () => {
+    const sql = loadPhase28C();
+    const body = extractFunctionBody(
+      sql,
+      'create_driver_referral_safe(\n  _opportunity_id uuid,\n  _recruiter_id uuid,\n  _referred_driver_name text DEFAULT NULL,\n  _referred_driver_email text DEFAULT NULL,\n  _referred_driver_phone text DEFAULT NULL,\n  _referred_driver_note text DEFAULT NULL\n)',
+    );
+    expect(body).toMatch(/SECURITY DEFINER/);
+    expect(body).toMatch(/RETURNS uuid/);
+    expect(body).toMatch(/admin_review_status = 'approved'/);
+    expect(body).toMatch(/verification_status = 'approved'/);
+    expect(body).toMatch(/referring_driver_id\)?\s*\n?\s*VALUES/);
+    expect(body).toMatch(/auth\.uid\(\)/);
+  });
+
+  it('useDriverReferrals create uses the safe RPC (no direct insert)', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../hooks/opportunities/useDriverReferrals.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/create_driver_referral_safe/);
+    expect(src).not.toMatch(/\.from\(['"]driver_referrals['"]\)\s*\n?\s*\.insert\(/);
+  });
+
+  it('drops open "Anyone can submit lead" INSERT policy on lead_magnet_signups', () => {
+    const sql = loadPhase28C();
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Anyone can submit lead" ON public\.lead_magnet_signups/);
+  });
+
+  it('submit_lead_magnet_signup validates email regex + bundle_version + length', () => {
+    const sql = loadPhase28C();
+    const body = extractFunctionBody(
+      sql,
+      "submit_lead_magnet_signup(\n  _email text,\n  _first_name text DEFAULT NULL,\n  _bundle_name text DEFAULT 'Trucker Starter Kit',\n  _bundle_version text DEFAULT 'free',\n  _source_page text DEFAULT NULL,\n  _utm_source text DEFAULT NULL,\n  _utm_medium text DEFAULT NULL,\n  _utm_campaign text DEFAULT NULL,\n  _utm_content text DEFAULT NULL,\n  _utm_term text DEFAULT NULL,\n  _converted_user_id uuid DEFAULT NULL\n)",
+    );
+    expect(body).toMatch(/SECURITY DEFINER/);
+    expect(body).toMatch(/\^\[a-z0-9\._%\+\-\]\+@/);
+    expect(body).toMatch(/length\(_email_norm\) > 255/);
+    expect(body).toMatch(/_bv NOT IN \('free'\)/);
+    expect(body).toMatch(/ON CONFLICT \(email_lower, bundle_version\)/);
+    expect(body).toMatch(/RETURNING id/);
+  });
+
+  it('leadMagnet.ts has no direct .from(lead_magnet_signups).insert fallback', () => {
+    const src = readFileSync(resolve(__dirname, '../lib/leadMagnet.ts'), 'utf8');
+    expect(src).toMatch(/submit_lead_magnet_signup/);
+    expect(src).not.toMatch(/\.from\(['"]lead_magnet_signups['"]\)\s*\.insert/);
+  });
+});
+
 
 
 describe('Phase 28A direct base-table PII access closures', () => {
