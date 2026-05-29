@@ -276,6 +276,6 @@ serve(async (req) => {
     return json({ ok: true, version_id, contract_id: version.contract_id });
   } catch (e) {
     console.error("[confirm-contract-upload] error", e);
-    return json({ error: (e as Error).message || "Server error" }, 500);
+    return json({ error: "Server error. Please try again." }, 500);
   }
 });
