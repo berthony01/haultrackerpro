@@ -59,10 +59,12 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    console.error("[check-pro-access] error", error);
     const msg = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: msg }), {
+    const isAuth = /unauth|authoriz/i.test(msg);
+    return new Response(JSON.stringify({ error: isAuth ? "Unauthorized" : "Server error" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: isAuth ? 401 : 500,
     });
   }
 });
