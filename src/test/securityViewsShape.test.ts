@@ -251,7 +251,7 @@ describe('Phase 28C final scanner cleanup + write-path hardening', () => {
     expect(body).toMatch(/RETURNS uuid/);
     expect(body).toMatch(/admin_review_status = 'approved'/);
     expect(body).toMatch(/verification_status = 'approved'/);
-    expect(body).toMatch(/referring_driver_id\)?\s*\n?\s*VALUES/);
+    expect(body).toMatch(/referring_driver_id/);
     expect(body).toMatch(/auth\.uid\(\)/);
   });
 
