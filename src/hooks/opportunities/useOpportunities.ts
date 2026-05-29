@@ -16,10 +16,11 @@ export function useOpportunities(filters: OpportunityFilters = {}) {
 
   const query = useQuery({
     queryKey: ['opportunities', filters],
-    queryFn: async () => {
-      // Phase 28B: drivers no longer have direct SELECT on recruiter_profiles,
-      // so we cannot join it client-side. Use the safe RPC that filters by
-      // approved/non-suspended recruiter server-side and never returns
+      // Phase 28B: drivers no longer have direct SELECT on the recruiter
+      // table, so we cannot join it client-side. Use the safe RPC that
+      // server-side filters to approved / non-suspended recruiters and
+      // never returns recruiter PII or internal admin fields.
+
       // recruiter PII or internal admin fields.
       const { data, error } = await (supabase as any).rpc(
         'list_driver_visible_opportunities',
