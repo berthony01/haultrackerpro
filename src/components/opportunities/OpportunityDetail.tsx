@@ -78,18 +78,24 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
   const handleRequestInfo = async () => {
     if (alreadyApplied) return;
     setSubmitting(true);
+    // Phase 28C: only send the snapshot matching the driver's contact_preference,
+    // and only when consent is on. DB trigger is the final authority.
+    const consent = !!driverProfile?.allow_verified_recruiter_contact;
+    const pref = driverProfile?.contact_preference ?? 'in_app';
+    const phoneSnap = consent && pref === 'phone' ? (driverProfile?.phone ?? null) : null;
+    const emailSnap = consent && pref === 'email' ? (driverProfile?.email ?? null) : null;
     createApplication.mutate(
       {
         opportunity_id: o.id,
         recruiter_id: o.recruiter_id,
         application_type: 'request_info',
         driver_profile_id: driverProfile?.id ?? null,
-        preferred_contact_method: driverProfile?.contact_preference ?? 'in_app',
-        driver_phone_snapshot: driverProfile?.allow_verified_recruiter_contact ? (driverProfile?.phone ?? null) : null,
-        driver_email_snapshot: driverProfile?.allow_verified_recruiter_contact ? (driverProfile?.email ?? null) : null,
-
+        preferred_contact_method: pref,
+        driver_phone_snapshot: phoneSnap,
+        driver_email_snapshot: emailSnap,
         message: "I'm interested in learning more about this opportunity.",
       },
+
       {
         onSuccess: () => {
           toast.success('Request sent to recruiter');
