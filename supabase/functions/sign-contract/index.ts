@@ -200,6 +200,6 @@ serve(async (req) => {
     return json({ ok: true, signature_id: sigRow.id, status: "signed", signed_at: nowIso });
   } catch (e) {
     console.error("[sign-contract] error", e);
-    return json({ error: (e as Error).message || "Server error" }, 500);
+    return json({ error: "Server error. Please try again." }, 500);
   }
 });
