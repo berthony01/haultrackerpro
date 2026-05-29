@@ -171,7 +171,7 @@ serve(async (req) => {
         upload_status: "pending_upload",
         uploaded_by: userId,
       });
-    if (versionInsertErr) return json({ error: versionInsertErr.message }, 500);
+    if (versionInsertErr) { console.error("[upload-contract] version insert", versionInsertErr); return json({ error: "Could not save contract version." }, 500); }
 
     // NOTE: current_version_id and contract status are NOT promoted here.
     // The client must call confirm-contract-upload after the storage PUT
