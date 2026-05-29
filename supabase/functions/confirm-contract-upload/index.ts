@@ -105,7 +105,7 @@ serve(async (req) => {
     const { data: listing, error: listErr } = await admin.storage
       .from(version.storage_bucket || BUCKET)
       .list(folder, { limit: 100, search: filename });
-    if (listErr) return json({ error: listErr.message }, 500);
+    if (listErr) { console.error("[confirm-contract-upload] storage list", listErr); return json({ error: "Could not verify upload." }, 500); }
     const exists = (listing || []).some((o) => o.name === filename);
     if (!exists) {
       // Mark failed so UI can hide it / allow retry
