@@ -153,7 +153,8 @@ serve(async (req) => {
         metadata: { reason: sigErr?.message || "signature insert failed", duplicate: isDup },
       });
       if (isDup) return json({ error: "You have already signed this contract version." }, 409);
-      return json({ error: sigErr?.message || "Could not save signature" }, 500);
+      console.error("[sign-contract] signature insert", sigErr);
+      return json({ error: "Could not save signature." }, 500);
     }
 
     // Advance contract status approved -> signed. Scope strictly to avoid races.
