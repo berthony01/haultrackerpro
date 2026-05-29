@@ -146,7 +146,8 @@ describe('Phase 26 security RPCs', () => {
 
 describe('Phase 28 PII access control hardening', () => {
   function loadPhase28(): string {
-    return loadMigrationContaining('CREATE OR REPLACE FUNCTION public.list_recruiter_applications_safe');
+    return loadMigrationContaining('CREATE OR REPLACE FUNCTION public.get_my_recruiter_profile_safe');
+
   }
 
   it('drops driver-side direct SELECT policies on driver_referrals', () => {
@@ -294,4 +295,117 @@ describe('Phase 28A direct base-table PII access closures', () => {
     expect(src).not.toMatch(/\.from\(['"]recruiter_profiles['"]\)/);
   });
 });
+
+describe('Phase 28B scanner reconciliation + opportunity board hardening', () => {
+  function loadPhase28B(): string {
+    return loadMigrationContaining(
+      'CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities',
+    );
+  }
+
+  it('defensively drops all driver-facing SELECT policies on driver_referrals', () => {
+    const sql = loadPhase28B();
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Referring driver views own referrals" ON public\.driver_referrals/);
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Referring driver views linked referrals" ON public\.driver_referrals/);
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Referred driver views linked referrals" ON public\.driver_referrals/);
+  });
+
+  it('list_my_driver_referrals omits referred_driver_email/phone/note (regression)', () => {
+    const sql = loadMigrationContaining('CREATE OR REPLACE FUNCTION public.list_my_driver_referrals');
+    const body = extractFunctionBody(sql, 'list_my_driver_referrals()');
+    expect(body).not.toMatch(/referred_driver_email/);
+    expect(body).not.toMatch(/referred_driver_phone/);
+    expect(body).not.toMatch(/referred_driver_note/);
+  });
+
+  it('useDriverReferrals uses only the safe RPC for reads', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../hooks/opportunities/useDriverReferrals.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/list_my_driver_referrals/);
+    // Driver list read must not go through .from('driver_referrals').select(...)
+    expect(src).not.toMatch(/\.from\(['"]driver_referrals['"]\)\s*\n?\s*\.select\(/);
+  });
+
+  it('list_recruiter_applications_safe also gates phone/email by contact_preference', () => {
+    const sql = loadPhase28B();
+    const body = extractFunctionBody(sql, 'list_recruiter_applications_safe(_recruiter_id uuid)');
+    expect(body).toMatch(/contact_preference = 'phone'/);
+    expect(body).toMatch(/contact_preference = 'email'/);
+    expect(body).toMatch(/allow_verified_recruiter_contact/);
+    expect(body).toMatch(/status = 'approved'/);
+  });
+
+  it('snapshot guard nulls non-matching snapshots by contact_preference', () => {
+    const sql = loadPhase28B();
+    const body = extractFunctionBody(sql, 'opportunity_applications_contact_snapshot_guard()');
+    expect(body).toMatch(/_pref <> 'phone'/);
+    expect(body).toMatch(/_pref <> 'email'/);
+  });
+
+  it('scrub trigger handles consent flip and preference changes', () => {
+    const sql = loadPhase28B();
+    const body = extractFunctionBody(sql, 'driver_opportunity_profiles_scrub_snapshots()');
+    expect(body).toMatch(/allow_verified_recruiter_contact/);
+    expect(body).toMatch(/OLD\.contact_preference IS DISTINCT FROM NEW\.contact_preference/);
+    expect(body).toMatch(/NEW\.contact_preference = 'phone'/);
+    expect(body).toMatch(/NEW\.contact_preference = 'email'/);
+    expect(body).toMatch(/NEW\.contact_preference = 'in_app'/);
+  });
+
+  it('list_driver_visible_opportunities filters by approved recruiter and never exposes recruiter PII', () => {
+    const sql = loadPhase28B();
+    const body = extractFunctionBody(
+      sql,
+      'list_driver_visible_opportunities(\n  _state text DEFAULT NULL,\n  _driver_type text DEFAULT NULL,\n  _route_type text DEFAULT NULL\n)',
+    );
+    expect(body).toMatch(/SECURITY DEFINER/);
+    expect(body).toMatch(/rp\.verification_status = 'approved'/);
+    expect(body).toMatch(/rp\.status <> 'suspended'/);
+    expect(body).toMatch(/o\.status = 'active'/);
+    expect(body).toMatch(/o\.admin_review_status = 'approved'/);
+    // Returns SETOF opportunities (base table) — recruiter PII columns are not
+    // on opportunities, so no recruiter contact / admin fields can leak.
+    expect(body).toMatch(/RETURNS SETOF public\.opportunities/);
+    expect(body).not.toMatch(/admin_notes/);
+    expect(body).not.toMatch(/verified_by/);
+    expect(body).not.toMatch(/contact_email/);
+    expect(body).not.toMatch(/contact_phone/);
+  });
+
+  it('useOpportunities no longer joins recruiter_profiles directly', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../hooks/opportunities/useOpportunities.ts'),
+      'utf8',
+    );
+    expect(src).toMatch(/list_driver_visible_opportunities/);
+    expect(src).not.toMatch(/recruiter_profiles/);
+    expect(src).not.toMatch(/\.from\(['"]opportunities['"]\)/);
+  });
+
+  it('resource_articles has no live anon/authenticated non-admin SELECT policy (RPC-only reads)', () => {
+    // Walk all migrations; any CREATE POLICY ... FOR SELECT on resource_articles
+    // not scoped to is_admin must have a subsequent DROP POLICY removing it.
+    const fs = require('node:fs') as typeof import('node:fs');
+    const path = require('node:path') as typeof import('node:path');
+    const migrationsDir = resolve(__dirname, '../../supabase/migrations');
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+    const liveByName: Record<string, string> = {};
+    for (const f of files) {
+      const text = fs.readFileSync(path.join(migrationsDir, f), 'utf8');
+      const dropRe = /DROP POLICY IF EXISTS\s+"([^"]+)"\s+ON\s+public\.resource_articles/gi;
+      let m: RegExpExecArray | null;
+      while ((m = dropRe.exec(text))) delete liveByName[m[1]];
+      const createRe =
+        /CREATE POLICY\s+"([^"]+)"\s+ON\s+public\.resource_articles[^;]+FOR\s+SELECT[^;]+;/gi;
+      while ((m = createRe.exec(text))) liveByName[m[1]] = m[0];
+    }
+    const offenders = Object.entries(liveByName)
+      .filter(([, sql]) => !/is_admin\s*\(/i.test(sql))
+      .map(([name]) => name);
+    expect(offenders).toEqual([]);
+  });
+});
+
 

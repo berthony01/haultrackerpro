@@ -3021,6 +3021,61 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_driver_visible_opportunities: {
+        Args: { _driver_type?: string; _route_type?: string; _state?: string }
+        Returns: {
+          admin_review_status: string
+          benefits: string | null
+          company_name: string
+          cpm: number | null
+          created_at: string
+          deadhead_paid: boolean | null
+          description: string | null
+          detention_pay: string | null
+          driver_type: string | null
+          equipment_year: string | null
+          escrow_amount: number | null
+          escrow_required: boolean
+          estimated_deadhead_miles: number | null
+          estimated_loaded_miles: number | null
+          estimated_weekly_gross: number | null
+          estimated_weekly_miles: number | null
+          featured: boolean
+          flat_weekly_pay: number | null
+          forced_dispatch: boolean | null
+          fuel_paid_by: string | null
+          hiring_city: string | null
+          hiring_state: string | null
+          hiring_states: string[]
+          home_time: string | null
+          id: string
+          insurance_deductions: number | null
+          layover_pay: string | null
+          lease_payment: number | null
+          maintenance_deductions: number | null
+          other_deductions: number | null
+          pay_model: string | null
+          percentage_pay: number | null
+          pets_allowed: boolean | null
+          published_at: string | null
+          recruiter_id: string
+          riders_allowed: boolean | null
+          route_type: string | null
+          sign_on_bonus: number | null
+          status: string
+          title: string
+          trailer_type: string | null
+          transparency_confirmed: boolean
+          updated_at: string
+          view_count: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "opportunities"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_my_driver_referrals: {
         Args: never
         Returns: {
