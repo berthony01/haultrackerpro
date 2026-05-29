@@ -15,7 +15,7 @@ CREATE OR REPLACE FUNCTION public.list_recruiter_applications_safe(_recruiter_id
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
+AS $$
 DECLARE
   _uid uuid := auth.uid();
 BEGIN
@@ -104,7 +104,7 @@ BEGIN
   WHERE oa.recruiter_id = _recruiter_id
   ORDER BY oa.created_at DESC;
 END;
-$function$;
+$$;
 
 -- (3) Snapshot guard trigger: respect contact_preference.
 CREATE OR REPLACE FUNCTION public.opportunity_applications_contact_snapshot_guard()
@@ -112,7 +112,7 @@ CREATE OR REPLACE FUNCTION public.opportunity_applications_contact_snapshot_guar
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
+AS $$
 DECLARE
   _allowed boolean := false;
   _pref text;
@@ -141,7 +141,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$;
+$$;
 
 -- (4) Scrub trigger: also scrub when contact_preference changes.
 CREATE OR REPLACE FUNCTION public.driver_opportunity_profiles_scrub_snapshots()
@@ -149,7 +149,7 @@ CREATE OR REPLACE FUNCTION public.driver_opportunity_profiles_scrub_snapshots()
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
+AS $$
 BEGIN
   IF TG_OP <> 'UPDATE' THEN RETURN NEW; END IF;
 
@@ -184,7 +184,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$;
+$$;
 
 -- (5) Driver opportunity board RPC — no direct recruiter_profiles join from client.
 CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities(
@@ -196,7 +196,7 @@ CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities(
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
+AS $$
   SELECT o.*
   FROM public.opportunities o
   JOIN public.recruiter_profiles rp ON rp.id = o.recruiter_id
@@ -209,6 +209,6 @@ AS $function$
     AND (_driver_type IS NULL OR o.driver_type = _driver_type)
     AND (_route_type IS NULL OR o.route_type = _route_type)
   ORDER BY o.featured DESC NULLS LAST, o.published_at DESC NULLS LAST;
-$function$;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text, text, text) TO authenticated;
