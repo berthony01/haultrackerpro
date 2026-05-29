@@ -77,9 +77,9 @@ export async function submitLeadMagnet(input: LeadMagnetInput, opts?: { converte
   const utm = getUtmFromUrl();
   const sourcePage = typeof window !== 'undefined' ? window.location.pathname : null;
 
-  // Duplicate-safe: server-side RPC upserts on (lower(email), bundle_version).
-  // Repeat submissions refresh download_sent_at + UTM/source instead of creating
-  // a new row. Falls back to a plain insert if the RPC is unavailable.
+  // Phase 28C: Direct INSERT on `lead_magnet_signups` is no longer permitted by
+  // RLS — all submissions must go through the `submit_lead_magnet_signup` RPC.
+  // The RPC is SECURITY DEFINER and handles validation + duplicate-safe upsert.
   const { error } = await supabase.rpc('submit_lead_magnet_signup', {
     _email: parsed.email.toLowerCase(),
     _first_name: parsed.first_name?.trim() || null,
@@ -94,21 +94,8 @@ export async function submitLeadMagnet(input: LeadMagnetInput, opts?: { converte
     _converted_user_id: opts?.convertedUserId ?? null,
   });
 
-  if (error) {
-    // Fallback: legacy direct insert (will not dedupe but won't break the funnel).
-    const payload = {
-      email: parsed.email.toLowerCase(),
-      first_name: parsed.first_name?.trim() || null,
-      bundle_name: 'Trucker Starter Kit',
-      bundle_version: 'free',
-      source_page: sourcePage,
-      download_sent_at: new Date().toISOString(),
-      converted_user_id: opts?.convertedUserId ?? null,
-      ...utm,
-    };
-    const { error: insertError } = await supabase.from('lead_magnet_signups').insert(payload);
-    if (insertError) throw insertError;
-  }
+  if (error) throw error;
+
 
   return { ok: true as const };
 }

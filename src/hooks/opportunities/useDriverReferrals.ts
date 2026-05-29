@@ -71,29 +71,27 @@ export function useDriverReferrals() {
         const t = (v ?? '').trim();
         return t.length ? t : null;
       };
-      const payload = {
-        opportunity_id: input.opportunity_id,
-        recruiter_id: input.recruiter_id,
-        referring_driver_id: user.id,
-        referred_driver_name: trim(input.referred_driver_name),
-        referred_driver_email: trim(input.referred_driver_email),
-        referred_driver_phone: trim(input.referred_driver_phone),
-        referred_driver_note: trim(input.referred_driver_note),
-      };
-      const { data, error } = await supabase
-        .from('driver_referrals')
-        .insert(payload)
-        .select('id')
-        .single();
+      // Phase 28C: driver-side inserts go through `create_driver_referral_safe`
+      // RPC. The base table no longer exposes a driver INSERT policy.
+      const { data, error } = await (supabase as any).rpc('create_driver_referral_safe', {
+        _opportunity_id: input.opportunity_id,
+        _recruiter_id: input.recruiter_id,
+        _referred_driver_name: trim(input.referred_driver_name),
+        _referred_driver_email: trim(input.referred_driver_email),
+        _referred_driver_phone: trim(input.referred_driver_phone),
+        _referred_driver_note: trim(input.referred_driver_note),
+      });
       if (error) {
         const msg = (error.message || '').toLowerCase();
-        if (msg.includes('duplicate') || msg.includes('unique')) {
+        if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('already exists')) {
           throw new Error('This referral may already exist for this opportunity.');
         }
         if (
+          msg.includes('not available') ||
           msg.includes('row-level security') ||
           msg.includes('row level security') ||
-          msg.includes('permission')
+          msg.includes('permission') ||
+          msg.includes('not authorized')
         ) {
           throw new Error(
             'You can only refer drivers to approved opportunities you can access.',
@@ -101,12 +99,13 @@ export function useDriverReferrals() {
         }
         throw error;
       }
-      return data;
+      return { id: data as string };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['driver_referrals'] });
     },
   });
+
 
   return {
     referrals: list.data ?? [],

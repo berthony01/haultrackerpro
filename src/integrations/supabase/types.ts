@@ -2956,6 +2956,17 @@ export type Database = {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
       }
+      create_driver_referral_safe: {
+        Args: {
+          _opportunity_id: string
+          _recruiter_id: string
+          _referred_driver_email?: string
+          _referred_driver_name?: string
+          _referred_driver_note?: string
+          _referred_driver_phone?: string
+        }
+        Returns: string
+      }
       create_notification: {
         Args: {
           _body: string
