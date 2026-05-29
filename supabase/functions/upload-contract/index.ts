@@ -138,7 +138,7 @@ serve(async (req) => {
         })
         .select("id")
         .single();
-      if (createErr || !created) return json({ error: createErr?.message || "Create failed" }, 500);
+      if (createErr || !created) { console.error("[upload-contract] contract create", createErr); return json({ error: "Could not create contract." }, 500); }
       contractId = created.id;
     }
 
