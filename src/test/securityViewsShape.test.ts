@@ -383,23 +383,28 @@ describe('Phase 28B scanner reconciliation + opportunity board hardening', () =>
     expect(src).not.toMatch(/\.from\(['"]opportunities['"]\)/);
   });
 
-  it('resource_articles has no anon/authenticated non-admin SELECT policy (RPC-only reads)', () => {
-    // Walk all migrations; any CREATE POLICY ... ON public.resource_articles FOR SELECT
-    // must scope to is_admin(auth.uid()).
+  it('resource_articles has no live anon/authenticated non-admin SELECT policy (RPC-only reads)', () => {
+    // Walk all migrations; any CREATE POLICY ... FOR SELECT on resource_articles
+    // not scoped to is_admin must have a subsequent DROP POLICY removing it.
     const fs = require('node:fs') as typeof import('node:fs');
     const path = require('node:path') as typeof import('node:path');
     const migrationsDir = resolve(__dirname, '../../supabase/migrations');
-    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql'));
-    const offenders: string[] = [];
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+    const liveByName: Record<string, string> = {};
     for (const f of files) {
       const text = fs.readFileSync(path.join(migrationsDir, f), 'utf8');
-      const re = /CREATE POLICY[^;]+ON\s+public\.resource_articles[^;]+FOR\s+SELECT[^;]+;/gi;
-      const matches = text.match(re) ?? [];
-      for (const m of matches) {
-        if (!/is_admin\s*\(/i.test(m)) offenders.push(`${f}: ${m.slice(0, 120)}`);
-      }
+      const dropRe = /DROP POLICY IF EXISTS\s+"([^"]+)"\s+ON\s+public\.resource_articles/gi;
+      let m: RegExpExecArray | null;
+      while ((m = dropRe.exec(text))) delete liveByName[m[1]];
+      const createRe =
+        /CREATE POLICY\s+"([^"]+)"\s+ON\s+public\.resource_articles[^;]+FOR\s+SELECT[^;]+;/gi;
+      while ((m = createRe.exec(text))) liveByName[m[1]] = m[0];
     }
+    const offenders = Object.entries(liveByName)
+      .filter(([, sql]) => !/is_admin\s*\(/i.test(sql))
+      .map(([name]) => name);
     expect(offenders).toEqual([]);
   });
 });
+
 
