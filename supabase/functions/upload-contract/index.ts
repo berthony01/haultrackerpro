@@ -85,7 +85,7 @@ serve(async (req) => {
       .eq("id", application_id)
       .maybeSingle();
 
-    if (appErr) return json({ error: appErr.message }, 500);
+    if (appErr) { console.error("[upload-contract] app lookup", appErr); return json({ error: "Could not load application." }, 500); }
     if (!appRow) return json({ error: "Application not found" }, 404);
 
     const rp = (appRow as any).recruiter_profiles;
@@ -120,7 +120,7 @@ serve(async (req) => {
       .select("id")
       .eq("application_id", application_id)
       .maybeSingle();
-    if (existingErr) return json({ error: existingErr.message }, 500);
+    if (existingErr) { console.error("[upload-contract] contract lookup", existingErr); return json({ error: "Could not load contract." }, 500); }
 
     let contractId = existing?.id as string | undefined;
 
@@ -138,7 +138,7 @@ serve(async (req) => {
         })
         .select("id")
         .single();
-      if (createErr || !created) return json({ error: createErr?.message || "Create failed" }, 500);
+      if (createErr || !created) { console.error("[upload-contract] contract create", createErr); return json({ error: "Could not create contract." }, 500); }
       contractId = created.id;
     }
 
@@ -149,7 +149,7 @@ serve(async (req) => {
       .eq("contract_id", contractId)
       .order("version_number", { ascending: false })
       .limit(1);
-    if (aggErr) return json({ error: aggErr.message }, 500);
+    if (aggErr) { console.error("[upload-contract] version agg", aggErr); return json({ error: "Could not prepare contract version." }, 500); }
     const nextVersion = (versionAgg?.[0]?.version_number ?? 0) + 1;
 
     // 7. Insert contract_versions row (service role bypasses field guard)
@@ -171,7 +171,7 @@ serve(async (req) => {
         upload_status: "pending_upload",
         uploaded_by: userId,
       });
-    if (versionInsertErr) return json({ error: versionInsertErr.message }, 500);
+    if (versionInsertErr) { console.error("[upload-contract] version insert", versionInsertErr); return json({ error: "Could not save contract version." }, 500); }
 
     // NOTE: current_version_id and contract status are NOT promoted here.
     // The client must call confirm-contract-upload after the storage PUT
@@ -192,7 +192,7 @@ serve(async (req) => {
     const { data: signed, error: signedErr } = await admin.storage
       .from(BUCKET)
       .createSignedUploadUrl(storagePath);
-    if (signedErr || !signed) return json({ error: signedErr?.message || "Sign failed" }, 500);
+    if (signedErr || !signed) { console.error("[upload-contract] sign url", signedErr); return json({ error: "Could not create upload URL." }, 500); }
 
     return json({
       contract_id: contractId,
@@ -204,6 +204,6 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("[upload-contract] error", e);
-    return json({ error: (e as Error).message || "Server error" }, 500);
+    return json({ error: "Server error. Please try again." }, 500);
   }
 });

@@ -74,7 +74,7 @@ serve(async (req) => {
       )
       .eq("id", version_id)
       .maybeSingle();
-    if (vErr) return json({ error: vErr.message }, 500);
+    if (vErr) { console.error("[sign-contract] version lookup", vErr); return json({ error: "Could not load contract version." }, 500); }
     if (!version) return json({ error: "Version not found" }, 404);
 
     const c: any = (version as any).contracts;
@@ -153,7 +153,8 @@ serve(async (req) => {
         metadata: { reason: sigErr?.message || "signature insert failed", duplicate: isDup },
       });
       if (isDup) return json({ error: "You have already signed this contract version." }, 409);
-      return json({ error: sigErr?.message || "Could not save signature" }, 500);
+      console.error("[sign-contract] signature insert", sigErr);
+      return json({ error: "Could not save signature." }, 500);
     }
 
     // Advance contract status approved -> signed. Scope strictly to avoid races.
@@ -176,8 +177,9 @@ serve(async (req) => {
         action: "sign_failed",
         metadata: { reason: stErr?.message || "status transition rejected", phase: "status_update" },
       });
+      if (stErr) console.error("[sign-contract] status update", stErr);
       return json(
-        { error: stErr?.message || "Contract status changed before signing could be saved." },
+        { error: "Contract status changed before signing could be saved." },
         409,
       );
     }
@@ -198,6 +200,6 @@ serve(async (req) => {
     return json({ ok: true, signature_id: sigRow.id, status: "signed", signed_at: nowIso });
   } catch (e) {
     console.error("[sign-contract] error", e);
-    return json({ error: (e as Error).message || "Server error" }, 500);
+    return json({ error: "Server error. Please try again." }, 500);
   }
 });

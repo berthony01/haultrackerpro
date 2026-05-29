@@ -178,7 +178,7 @@ serve(async (req) => {
 
   try {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!apiKey) { console.error("[ai-insight] missing api key"); throw new Error("AI service unavailable"); }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -345,8 +345,18 @@ serve(async (req) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     log("ERROR", { message: msg });
-    const status = msg.includes("rate limit") ? 429 : msg.includes("credits") ? 402 : 500;
-    return new Response(JSON.stringify({ error: msg }), {
+    const isRate = msg.includes("rate limit");
+    const isCredits = msg.includes("credits");
+    const isUnavailable = msg.includes("AI service unavailable");
+    const status = isRate ? 429 : isCredits ? 402 : 500;
+    const clientMsg = isRate
+      ? "AI rate limit exceeded. Please try again in a moment."
+      : isCredits
+      ? "AI credits exhausted. Please contact support."
+      : isUnavailable
+      ? "AI service unavailable."
+      : "AI request failed. Please try again.";
+    return new Response(JSON.stringify({ error: clientMsg }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -1,51 +1,57 @@
-# Phase 27 — Replace Starter Kit + Improve Lead Magnet Placement
 
-## Audit findings
+## Phase 28D — Final Scanner Reconciliation
 
-- Download URL (fallback): `https://pngptztxwbtozwxrtbwo.supabase.co/storage/v1/object/public/lead-magnets/HaulTrackerPro_Trucker_Starter_Kit_Free.zip` — defined in `src/lib/leadMagnet.ts`.
-- Thank-you copy hardcodes "~70 KB" in `src/pages/StarterKitThanks.tsx:90`.
-- Landing page has only one Starter Kit CTA at line ~831 (Section 6.5), far below the hero (hero ends at line ~260).
-- New uploaded ZIP is 58.5 KB with 6 PDFs but file numbering is `00, 01, 03, 04, 05, 08` (non-sequential).
-- No "passing the CDL" string currently in code — nothing to rename there.
+Most of these warnings are **already addressed** by prior phases (28, 28A, 28B, 28C). The scanner is asking us to either *verify* the current state or close a couple of small remaining gaps. No PII access changes, no UI redesign, no calculation/starter-kit/billing changes.
 
-## Changes
+### Findings triage
 
-### 1. Repackage and replace starter kit asset
+| # | Finding | Action |
+|---|---|---|
+| 1 | `driver_referrals` driver SELECT exposes contact fields | **Verify only** — confirm no driver-side SELECT policy exists on the base table and that `list_my_driver_referrals()` excludes `referred_driver_email/phone/note`. Mark fixed with explanation. |
+| 2 | `lead_magnet_signups` open INSERT to anon | **Small hardening** — keep anon INSERT (intentional lead capture) but tighten the existing `submit_lead_magnet_signup` RPC + revoke direct INSERT policy if any remains; add a per-email/IP rate-limit guard in the RPC. |
+| 3 | `recruiter_profiles` SELECT gap | **Verify only** — scanner itself says "No action required". Mark fixed with explanation. |
+| 4 | Edge functions leak raw `.message` | **Fix** — sanitize error responses in `upload-contract`, `confirm-contract-upload`, `sign-contract`, `review-contract`, `check-pro-access`, `ai-insight`. Log full error server-side, return generic client message. |
+| 5 | `opportunity_applications` driver snapshots readable by recruiters | **Verify only** — Phase 28/28C already gated snapshots through `list_recruiter_applications_safe` RPC + consent-gated triggers, and recruiters do not have a direct SELECT policy returning these fields. Confirm and mark fixed. |
 
-- Re-zip the uploaded PDFs with clean sequential numbering:
-  - `00_Start_Here.pdf`
-  - `01_CDL_Study_Companion.pdf`
-  - `02_CDL_Test_Day_Checklist.pdf`
-  - `03_New_Driver_Mistakes_to_Avoid.pdf`
-  - `04_Owner_Operator_Document_Checklist.pdf`
-  - `05_First_30_Days_Success_Checklist.pdf`
-- Upload the new zip via `supabase--storage_upload` to bucket `lead-magnets` at the existing path `HaulTrackerPro_Trucker_Starter_Kit_Free.zip` so the public URL stays identical. No `leadMagnet.ts` URL change needed.
+### Plan steps
 
-### 2. Copy updates
+1. **Audit (read-only)** — re-read the latest migrations on `driver_referrals`, `lead_magnet_signups`, `opportunity_applications`, plus `list_my_driver_referrals` and `list_recruiter_applications_safe` to confirm current shape.
 
-- `src/pages/StarterKitThanks.tsx`: change "~70 KB" → "~60 KB".
-- `src/pages/StarterKit.tsx`: ensure any preparing-for-CDL language uses "foundation for preparing for the CDL" (currently fine; verify and tweak hero subhead to add explicit "preparing for the CDL" reassurance if appropriate without scope creep). Keep existing disclaimer block in trust section unchanged.
+2. **Migration: `phase_28d_hardening.sql`**
+   - Defensive `DROP POLICY IF EXISTS` for any driver-side SELECT on `driver_referrals` (no-op if already gone).
+   - Drop any remaining direct anon/authenticated INSERT policy on `lead_magnet_signups` (writes go through `submit_lead_magnet_signup` RPC only).
+   - Add lightweight abuse guard inside `submit_lead_magnet_signup`: reject if same `email_lower` submitted >3 times in the last hour.
+   - Re-assert `list_my_driver_referrals()` column list (recreate function) so it explicitly omits `referred_driver_email`, `referred_driver_phone`, `referred_driver_note`.
 
-### 3. Landing page — add secondary CTA near the top
+3. **Edge function error hygiene** (Finding #4)
+   - In each listed function, wrap returned errors:
+     - `console.error('[fn-name] step', err)` server-side.
+     - Client response: `{ error: 'Operation failed. Please try again.' }` with appropriate status.
+     - Keep specific known messages only for: 401 unauthorized, 402 credits exhausted, 403 forbidden, 409 conflict, 429 rate limit.
+   - `ai-insight`: replace `"LOVABLE_API_KEY is not configured"` with generic 500 `{ error: 'AI service unavailable' }` and log internally.
 
-Insert a new compact CTA band immediately after Section 1 (HERO), before Section 1.5 (Opportunities), at line ~261 of `src/pages/Landing.tsx`. Reuse the existing visual pattern from Section 6.5 (outline orange button on dark band) so the lower CTA remains intact and the new one feels native.
+4. **Tests** (`src/test/securityViewsShape.test.ts`)
+   - Assert no `SELECT` policy on `driver_referrals` matches `referring_driver_id`.
+   - Assert `lead_magnet_signups` has no anon/authenticated `INSERT` policy after migration.
+   - Assert `list_my_driver_referrals` return shape excludes the 3 contact columns.
 
-- Headline: "New to trucking? Download the Free Trucker Starter Kit"
-- Subcopy: "CDL study help, checklists, owner-op paperwork guidance, and first-30-days habits."
-- Button: "Get the Free Kit" → `navigate('/starter-kit')` + `trackStarterKitCTAClicked('landing_top')`.
-- Keep existing Section 6.5 CTA untouched (still tracked as `'landing'`).
+5. **Mark findings** via `security--manage_security_finding`:
+   - #1, #3, #5 → `mark_as_fixed` with verification explanation.
+   - #2, #4 → `mark_as_fixed` after the migration + edge function edits land.
 
-### 4. Verification
+6. **Verify**: `npm run build` + `npm run test` + `supabase--linter`.
 
-- `npm run build`
-- `npm run test`
-- Manual: load `/`, confirm top CTA visible under hero; click → `/starter-kit`; submit form → `/starter-kit/thanks`; click Download → fetches new 60 KB ZIP with sequential filenames.
+### Files to change
 
-## Files touched
+- `supabase/migrations/<new>_phase_28d_hardening.sql` (new)
+- `supabase/functions/upload-contract/index.ts`
+- `supabase/functions/confirm-contract-upload/index.ts`
+- `supabase/functions/sign-contract/index.ts`
+- `supabase/functions/review-contract/index.ts`
+- `supabase/functions/check-pro-access/index.ts`
+- `supabase/functions/ai-insight/index.ts`
+- `src/test/securityViewsShape.test.ts`
 
-- `supabase storage: lead-magnets/HaulTrackerPro_Trucker_Starter_Kit_Free.zip` (replaced)
-- `src/pages/StarterKitThanks.tsx` (size copy)
-- `src/pages/StarterKit.tsx` (CDL wording verify/adjust)
-- `src/pages/Landing.tsx` (new top CTA band)
+### Out of scope (per your constraints)
 
-No DB migrations, no analytics schema changes, no auth changes, no calculation logic touched.
+Phase 23 calculations, Phase 27 starter kit, UI redesign, pricing/billing, SEO, recruiter plan logic.

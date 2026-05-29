@@ -86,7 +86,7 @@ serve(async (req) => {
       )
       .eq("id", version_id)
       .maybeSingle();
-    if (vErr) return json({ error: vErr.message }, 500);
+    if (vErr) { console.error("[review-contract] version lookup", vErr); return json({ error: "Could not load contract version." }, 500); }
     if (!version) return json({ error: "Version not found" }, 404);
 
     const c: any = (version as any).contracts;
@@ -153,7 +153,8 @@ serve(async (req) => {
       if (isDup) {
         return json({ error: "You have already submitted a decision for this contract version." }, 409);
       }
-      return json({ error: rvErr?.message || "Could not save your decision" }, 500);
+      console.error("[review-contract] review insert", rvErr);
+      return json({ error: "Could not save your decision." }, 500);
     }
 
     // Advance status only from a decidable state. Service role bypasses the
@@ -183,8 +184,9 @@ serve(async (req) => {
           attempted_status: targetStatus,
         },
       });
+      if (stErr) console.error("[review-contract] status update", stErr);
       return json(
-        { error: stErr?.message || "Contract status changed before your decision could be saved." },
+        { error: "Contract status changed before your decision could be saved." },
         409,
       );
     }
@@ -216,6 +218,6 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("[review-contract] error", e);
-    return json({ error: (e as Error).message || "Server error" }, 500);
+    return json({ error: "Server error. Please try again." }, 500);
   }
 });

@@ -57,7 +57,7 @@ serve(async (req) => {
       )
       .eq("id", version_id)
       .maybeSingle();
-    if (vErr) return json({ error: vErr.message }, 500);
+    if (vErr) { console.error("[confirm-contract-upload] version lookup", vErr); return json({ error: "Could not load contract version." }, 500); }
     if (!version) return json({ error: "Version not found" }, 404);
 
     const c = (version as any).contracts;
@@ -105,7 +105,7 @@ serve(async (req) => {
     const { data: listing, error: listErr } = await admin.storage
       .from(version.storage_bucket || BUCKET)
       .list(folder, { limit: 100, search: filename });
-    if (listErr) return json({ error: listErr.message }, 500);
+    if (listErr) { console.error("[confirm-contract-upload] storage list", listErr); return json({ error: "Could not verify upload." }, 500); }
     const exists = (listing || []).some((o) => o.name === filename);
     if (!exists) {
       // Mark failed so UI can hide it / allow retry
@@ -129,7 +129,7 @@ serve(async (req) => {
       .from("contract_versions")
       .update({ upload_status: "uploaded", uploaded_at: new Date().toISOString() })
       .eq("id", version_id);
-    if (updErr) return json({ error: updErr.message }, 500);
+    if (updErr) { console.error("[confirm-contract-upload] version update", updErr); return json({ error: "Could not finalize upload." }, 500); }
 
     // Phase 5 final hardening:
     // - A newly uploaded+confirmed version becomes the current version and resets
@@ -276,6 +276,6 @@ serve(async (req) => {
     return json({ ok: true, version_id, contract_id: version.contract_id });
   } catch (e) {
     console.error("[confirm-contract-upload] error", e);
-    return json({ error: (e as Error).message || "Server error" }, 500);
+    return json({ error: "Server error. Please try again." }, 500);
   }
 });
