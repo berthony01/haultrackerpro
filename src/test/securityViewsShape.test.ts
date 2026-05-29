@@ -146,7 +146,8 @@ describe('Phase 26 security RPCs', () => {
 
 describe('Phase 28 PII access control hardening', () => {
   function loadPhase28(): string {
-    return loadMigrationContaining('CREATE OR REPLACE FUNCTION public.list_recruiter_applications_safe');
+    return loadMigrationContaining('CREATE OR REPLACE FUNCTION public.get_my_recruiter_profile_safe');
+
   }
 
   it('drops driver-side direct SELECT policies on driver_referrals', () => {
