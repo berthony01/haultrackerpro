@@ -57,7 +57,7 @@ serve(async (req) => {
       )
       .eq("id", version_id)
       .maybeSingle();
-    if (vErr) return json({ error: vErr.message }, 500);
+    if (vErr) { console.error("[confirm-contract-upload] version lookup", vErr); return json({ error: "Could not load contract version." }, 500); }
     if (!version) return json({ error: "Version not found" }, 404);
 
     const c = (version as any).contracts;
