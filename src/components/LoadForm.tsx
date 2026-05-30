@@ -310,23 +310,23 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       location: formatLocation(s.location),
     })) : [];
 
-    // Phase 29: derive the final drop-off date from multi-stop data. If multi-stop is
-    // enabled with 2+ stops and the user provided neither stop_date nor an explicit
-    // dropoff_date different from pickup, warn once before saving (non-blocking).
-    const finalStopDate = multiStop ? deriveFinalDropoffDate(formattedStops) : null;
+    // Phase 29B: ONLY an explicit final Drop stop with a valid stop_date may
+    // override the manual dropoff_date. Intermediate Stop dates never override
+    // the user's manual value (UI describes them as intermediate stops).
+    const explicitFinalDrop = multiStop ? deriveExplicitFinalDropDate(formattedStops) : null;
     const needsDropWarning =
       multiStop &&
-      formattedStops.length >= 2 &&
-      !finalStopDate &&
+      formattedStops.length >= 1 &&
+      !explicitFinalDrop &&
       (!form.dropoff_date || form.dropoff_date === form.load_date);
     if (needsDropWarning && !acknowledgedDropWarning) {
       setAcknowledgedDropWarning(true);
-      toast.warning('Final stop date is missing. This load may be counted on the pickup date instead of the delivery date. Tap save again to confirm.', { duration: 7000 });
+      toast.warning('Final Drop stop date is missing. This load may be counted on the pickup date instead of the delivery date. Tap save again to confirm.', { duration: 7000 });
       return;
     }
 
-    // Resolution order: final stop date > manual dropoff_date > load_date
-    const resolvedDropoff = finalStopDate ?? (form.dropoff_date || form.load_date);
+    // Resolution order: explicit final Drop stop date > manual dropoff_date > load_date
+    const resolvedDropoff = explicitFinalDrop ?? (form.dropoff_date || form.load_date);
 
     onSubmit({
       load_date: form.load_date,
