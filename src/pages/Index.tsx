@@ -503,7 +503,7 @@ const Index = () => {
   const handleEdit = (load: Load) => {
     setEditingLoad(load);
     const origStops = loadStopsHook.getStopsForLoad(load.id);
-    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes })));
+    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes, stop_date: (s as any).stop_date ?? null })));
     setPage('add');
   };
 
