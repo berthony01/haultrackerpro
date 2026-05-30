@@ -657,7 +657,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           <div className="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
             <div>
               <p className="text-sm font-medium">Multi-stop load?</p>
-              <p className="text-xs text-muted-foreground">Add intermediate stops</p>
+              <p className="text-xs text-muted-foreground">Add route stops between pickup and final delivery</p>
             </div>
             <Switch checked={multiStop} onCheckedChange={setMultiStop} />
           </div>
