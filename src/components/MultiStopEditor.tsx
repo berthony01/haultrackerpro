@@ -14,7 +14,12 @@ interface MultiStopEditorProps {
 
 export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEditorProps) {
   const addStop = () => {
-    onChange([...stops, { stop_order: stops.length + 1, location: '', stop_type: 'Stop', detention_minutes: null, stop_date: null }]);
+    // Phase 29E: if the current trailing row is typed 'Drop', demote it to
+    // 'Stop' before appending so we never end up with an interior Drop row.
+    const base = stops.length > 0 && (stops[stops.length - 1].stop_type ?? '').toLowerCase() === 'drop'
+      ? stops.map((s, i) => i === stops.length - 1 ? { ...s, stop_type: 'Stop' } : s)
+      : stops;
+    onChange([...base, { stop_order: base.length + 1, location: '', stop_type: 'Stop', detention_minutes: null, stop_date: null }]);
   };
 
   const removeStop = (index: number) => {
@@ -25,6 +30,7 @@ export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEdito
     const updated = stops.map((s, i) => i === index ? { ...s, [field]: value } : s);
     onChange(updated);
   };
+
 
   return (
     <div className="space-y-3 rounded-xl border border-primary/20 p-3 bg-muted/30">
