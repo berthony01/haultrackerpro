@@ -169,6 +169,26 @@ export function deriveExplicitFinalDropDate(
   return [...drops].sort((a, b) => b.stop_order - a.stop_order)[0].stop_date!;
 }
 
+/**
+ * Phase 29E — Manual-editor-only derivation. Returns the trailing Drop row's
+ * stop_date ONLY when:
+ *   - the LAST row (by stop_order, fallback to array position) is typed 'Drop'
+ *   - that row has a valid ISO stop_date
+ * Returns null otherwise. This mirrors `normalizeEditorStopsForSave`, so the
+ * inline note, missing-final-date warning, and save path all agree.
+ */
+export function deriveTrailingDropDate(
+  stops: { stop_order: number; stop_type: string; stop_date?: string | null }[] | null | undefined,
+): string | null {
+  if (!stops || stops.length === 0) return null;
+  const ordered = [...stops].sort((a, b) => a.stop_order - b.stop_order);
+  const last = ordered[ordered.length - 1];
+  if ((last.stop_type ?? '').toLowerCase() !== 'drop') return null;
+  if (!isValidIso(last.stop_date)) return null;
+  return last.stop_date!;
+}
+
+
 // ───────────────────────────────────────────────────────────────────────────
 // Phase 29D — Manual editor save normalization
 // ───────────────────────────────────────────────────────────────────────────
