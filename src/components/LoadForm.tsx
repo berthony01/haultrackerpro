@@ -31,7 +31,7 @@ import { PasteLoadParser } from '@/components/PasteLoadParser';
 import { ScanLoadModal } from '@/components/ScanLoadModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
-import { applySourceLoadDate, applySourceDropoffDate, resolveImportedLoadDate, resolveImportedDropoffDate } from '@/lib/sourceDate';
+import { resolveImportedLoadDate, resolveImportedDropoffDate } from '@/lib/sourceDate';
 import { useProfitCheck } from '@/hooks/useProfitCheck';
 import { ProfitCheckCard } from '@/components/ProfitCheckCard';
 
