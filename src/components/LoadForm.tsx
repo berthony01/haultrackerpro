@@ -1100,6 +1100,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               location: s.location,
               stop_type: s.stop_type,
               detention_minutes: null,
+              stop_date: (s as any).stop_date ?? null,
             })));
             setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
           }
