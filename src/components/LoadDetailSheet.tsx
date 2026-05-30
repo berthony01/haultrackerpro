@@ -3,6 +3,7 @@ import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { LoadStop } from '@/hooks/useLoadStops';
 import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
+import { dedupeRouteStops } from '@/lib/stopNormalization';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
