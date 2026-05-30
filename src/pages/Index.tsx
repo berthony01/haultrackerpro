@@ -496,7 +496,8 @@ const Index = () => {
     };
     setEditingLoad(dup);
     const origStops = loadStopsHook.getStopsForLoad(load.id);
-    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes })));
+    // Phase 29: clear stop_date so an old final-stop date doesn't carry into the duplicate.
+    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes, stop_date: null })));
   };
 
   const handleEdit = (load: Load) => {
