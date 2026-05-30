@@ -19,6 +19,8 @@
 export interface ParsedStopData {
   location: string;
   stop_type: string;
+  /** Phase 29: optional per-stop date when the source (AI/OCR) provides it. */
+  stop_date?: string;
 }
 
 export type ParsedPayModelSuggestion =
