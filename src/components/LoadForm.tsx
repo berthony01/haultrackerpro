@@ -300,9 +300,27 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       location: formatLocation(s.location),
     })) : [];
 
+    // Phase 29: derive the final drop-off date from multi-stop data. If multi-stop is
+    // enabled with 2+ stops and the user provided neither stop_date nor an explicit
+    // dropoff_date different from pickup, warn once before saving (non-blocking).
+    const finalStopDate = multiStop ? deriveFinalDropoffDate(formattedStops) : null;
+    const needsDropWarning =
+      multiStop &&
+      formattedStops.length >= 2 &&
+      !finalStopDate &&
+      (!form.dropoff_date || form.dropoff_date === form.load_date);
+    if (needsDropWarning && !acknowledgedDropWarning) {
+      setAcknowledgedDropWarning(true);
+      toast.warning('Final stop date is missing. This load may be counted on the pickup date instead of the delivery date. Tap save again to confirm.', { duration: 7000 });
+      return;
+    }
+
+    // Resolution order: final stop date > manual dropoff_date > load_date
+    const resolvedDropoff = finalStopDate ?? (form.dropoff_date || form.load_date);
+
     onSubmit({
       load_date: form.load_date,
-      dropoff_date: form.dropoff_date || form.load_date,
+      dropoff_date: resolvedDropoff,
       pickup_location: formatLocation(form.pickup_location),
       dropoff_location: formatLocation(form.dropoff_location),
       loaded_miles: parseFloat(form.loaded_miles) || 0,
