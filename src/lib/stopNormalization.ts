@@ -5,7 +5,11 @@
  * Rules:
  *  - Top-level fields (pickup_location, dropoff_location, load_date,
  *    dropoff_date) are the canonical endpoints.
- *  - load_stops / `stops` state stores INTERIOR (intermediate) stops only.
+ *  - Saved load_stops rows store INTERIOR (intermediate) stops only.
+ *  - The manual MultiStopEditor temporarily allows a trailing Drop row in
+ *    UI state so the driver can set the final delivery date; that row is
+ *    promoted to top-level dropoff_location/dropoff_date by
+ *    `normalizeEditorStopsForSave` before persisting.
  *  - First Pickup and last Drop are stripped out of the interior list and
  *    promoted to the top-level endpoints.
  *  - Only explicitly typed rows ('Pickup' / 'Drop') promote to endpoints in
