@@ -412,6 +412,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       flat_rate_amount: lastLoad.flat_rate_amount?.toString() ?? '',
       dh_rate_per_mile: (lastLoad as any).deadhead_rate_per_mile?.toString() ?? '',
     });
+    // Phase 29B: copying a previous load is treated as a fresh single-stop load —
+    // clear any lingering multi-stop state from a prior paste/scan/edit session.
+    setMultiStop(false);
+    setStops([]);
+    setMultiStopBanner(null);
     setSaveAsPending(true);
     toast.success('Last load copied');
   };
