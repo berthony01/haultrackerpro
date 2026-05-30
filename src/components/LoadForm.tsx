@@ -1111,16 +1111,23 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               ? data.pay_model_suggestion
               : prev.pay_model,
           }));
-          if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
+          // Phase 29B: normalize scanned stops — endpoints promote, interior
+          // stops go to stops state; clear stale state when no interior stops.
+          const norm = normalizeParsedStops(data);
+          if (norm.multiStop) {
             setMultiStop(true);
-            setStops(data.stops.map((s, i) => ({
+            setStops(norm.interiorStops.map((s, i) => ({
               stop_order: i + 1,
               location: s.location,
               stop_type: s.stop_type,
               detention_minutes: null,
               stop_date: (s as any).stop_date ?? null,
             })));
-            setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
+            setMultiStopBanner(`${norm.interiorStops.length + 2} stops detected. Review stops before logging.`);
+          } else {
+            setMultiStop(false);
+            setStops([]);
+            setMultiStopBanner(null);
           }
         }}
       />
