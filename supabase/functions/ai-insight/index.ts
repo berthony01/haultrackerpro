@@ -101,8 +101,9 @@ const PARSE_RATECON_TOOL = {
             type: "object",
             properties: {
               location: { type: "string" },
-              stop_type: { type: "string", enum: ["Pickup", "Dropoff", "Stop"] },
+              stop_type: { type: "string", enum: ["Pickup", "Stop", "Drop", "Dropoff"], description: "Use Pickup, Stop, or Drop. Dropoff is accepted but will be normalized to Drop." },
               stop_order: { type: "number" },
+              stop_date: { type: "string", description: "ISO date for this stop, only when the rate confirmation clearly shows a full unambiguous date for THIS stop. Omit otherwise. Same year/sanity rules as load_date apply." },
             },
             required: ["location", "stop_type", "stop_order"],
           },
