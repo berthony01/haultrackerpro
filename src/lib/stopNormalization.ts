@@ -170,9 +170,10 @@ export function deriveExplicitFinalDropDate(
 }
 
 /**
- * Phase 29E — Manual-editor-only derivation. Returns the trailing Drop row's
- * stop_date ONLY when:
- *   - the LAST row (by stop_order, fallback to array position) is typed 'Drop'
+ * Phase 29E/F — Manual-editor-only derivation. Returns the trailing Drop
+ * row's stop_date ONLY when:
+ *   - the LAST row (by stop_order ascending; ties broken by later array
+ *     position) is typed 'Drop'
  *   - that row has a valid ISO stop_date
  * Returns null otherwise. This mirrors `normalizeEditorStopsForSave`, so the
  * inline note, missing-final-date warning, and save path all agree.
@@ -181,11 +182,37 @@ export function deriveTrailingDropDate(
   stops: { stop_order: number; stop_type: string; stop_date?: string | null }[] | null | undefined,
 ): string | null {
   if (!stops || stops.length === 0) return null;
-  const ordered = [...stops].sort((a, b) => a.stop_order - b.stop_order);
-  const last = ordered[ordered.length - 1];
+  // Phase 29F: explicit deterministic tie-break — equal stop_order falls back
+  // to original array position so later entries always win.
+  const indexed = stops.map((s, i) => ({ s, i }));
+  indexed.sort((a, b) => {
+    if (a.s.stop_order !== b.s.stop_order) return a.s.stop_order - b.s.stop_order;
+    return a.i - b.i;
+  });
+  const last = indexed[indexed.length - 1].s;
   if ((last.stop_type ?? '').toLowerCase() !== 'drop') return null;
   if (!isValidIso(last.stop_date)) return null;
   return last.stop_date!;
+}
+
+/**
+ * Phase 29F — UI-side renumbering helper. Use after add/remove/edit in
+ * MultiStopEditor so `stop_order` is always sequential 1..N and matches array
+ * position. Pure: preserves all other fields. The save path renumbers again
+ * defensively, but UI consumers (inline note, warning gate) need the same
+ * canonical ordering as save.
+ */
+export function normalizeEditorStopsForUi<
+  T extends {
+    stop_order?: number;
+    location: string;
+    stop_type: string;
+    stop_date?: string | null;
+    detention_minutes?: number | null;
+  },
+>(stops: T[] | null | undefined): T[] {
+  if (!stops || stops.length === 0) return [];
+  return stops.map((s, i) => ({ ...s, stop_order: i + 1 }));
 }
 
 
