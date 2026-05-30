@@ -1090,6 +1090,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
         open={showScanLoad}
         onOpenChange={setShowScanLoad}
         onParsed={(data: ParsedLoadData) => {
+          // Phase 29C: normalize FIRST so endpoint promotion (incl. final Drop
+          // stop_date → top-level dropoff_date) flows in for BOTH AI and
+          // regex-fallback scan payloads.
+          const norm = normalizeParsedStops(data);
           // Scanner safety: only fill EMPTY fields. Never overwrite values the
           // user (or a previous paste) already set, and never write null/undefined.
           const fillIfEmpty = (current: string, incoming: string | undefined): string => {
@@ -1100,8 +1104,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           };
           setForm(prev => ({
             ...prev,
-            pickup_location: fillIfEmpty(prev.pickup_location, data.pickup_location),
-            dropoff_location: fillIfEmpty(prev.dropoff_location, data.dropoff_location),
+            pickup_location: fillIfEmpty(prev.pickup_location, norm.pickup_location ?? data.pickup_location),
+            dropoff_location: fillIfEmpty(prev.dropoff_location, norm.dropoff_location ?? data.dropoff_location),
             loaded_miles: fillIfEmpty(prev.loaded_miles, data.loaded_miles),
             deadhead_miles: fillIfEmpty(prev.deadhead_miles, data.deadhead_miles),
             rate_per_mile: fillIfEmpty(prev.rate_per_mile, data.rate_per_mile),
@@ -1110,7 +1114,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             // be able to override today's default (which makes load_date
             // non-empty so fillIfEmpty would drop them). Apply only when valid.
             load_date: applySourceLoadDate(prev.load_date, data.load_date),
-            dropoff_date: applySourceDropoffDate(prev.dropoff_date, data.dropoff_date),
+            // Phase 29C: prefer normalized dropoff_date over raw parser value.
+            dropoff_date: applySourceDropoffDate(prev.dropoff_date, norm.dropoff_date ?? data.dropoff_date),
             total_miles: fillIfEmpty(prev.total_miles, data.total_miles),
             flat_rate_amount: fillIfEmpty(prev.flat_rate_amount, data.flat_rate),
             dh_rate_per_mile: fillIfEmpty(prev.dh_rate_per_mile, data.deadhead_rate_per_mile),
@@ -1119,9 +1124,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               ? data.pay_model_suggestion
               : prev.pay_model,
           }));
-          // Phase 29B: normalize scanned stops — endpoints promote, interior
-          // stops go to stops state; clear stale state when no interior stops.
-          const norm = normalizeParsedStops(data);
+          // Phase 29B: interior stops only go into stops state; clear stale
+          // state when no interior stops.
           if (norm.multiStop) {
             setMultiStop(true);
             setStops(norm.interiorStops.map((s, i) => ({
