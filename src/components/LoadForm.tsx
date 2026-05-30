@@ -637,6 +637,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 // Phase 29: only seed dropoff from pickup for single-stop loads when the
                 // user hasn't typed a dropoff yet. Multi-stop derives from final stop date.
                 const prevPickup = form.load_date;
+                setUserTouchedLoadDate(true);
                 update('load_date', val);
                 if (!multiStop && (!form.dropoff_date || form.dropoff_date === prevPickup)) {
                   update('dropoff_date', val);
@@ -647,7 +648,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <div>
               <Label htmlFor="dropoff_date">Drop-off Date</Label>
               {/* Phase 29: do NOT mask blank dropoff with load_date — driver must see when it's empty. */}
-              <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => update('dropoff_date', val)} />
+              <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => { setUserTouchedDropoffDate(true); update('dropoff_date', val); }} />
               <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
                 Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'Manual Drop-off Date stays in control unless a final Drop stop date is provided.' : 'If blank, pickup date is used.'}
               </p>
