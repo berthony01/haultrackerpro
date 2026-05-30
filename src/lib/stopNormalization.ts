@@ -107,8 +107,12 @@ export function normalizeParsedStops(
   const pickupStop = stops[firstPickupIdx];
   const dropStop = stops[lastDropIdx];
 
+  // Phase 29G: coerce any interior row to plain 'Stop' — never retain a stale
+  // 'Pickup'/'Drop' type that some AI payloads emit for intermediate rows.
   const interiorStops =
-    firstPickupIdx < lastDropIdx ? stops.slice(firstPickupIdx + 1, lastDropIdx) : [];
+    firstPickupIdx < lastDropIdx
+      ? stops.slice(firstPickupIdx + 1, lastDropIdx).map(s => ({ ...s, stop_type: 'Stop' }))
+      : [];
 
   const derivedDropoffDate =
     dropStop && isValidIso(dropStop.stop_date)
