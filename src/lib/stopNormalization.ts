@@ -93,15 +93,26 @@ export function dedupeRouteStops<T extends { location: string; stop_type?: strin
 ): T[] {
   if (!stops || stops.length === 0) return stops ?? [];
   const norm = (s: string) => (s ?? '').trim().toLowerCase();
-  const typeIs = (s: T, t: string) => (s.stop_type ?? '').toLowerCase() === t;
+  const typeOf = (s: T) => (s.stop_type ?? '').trim().toLowerCase();
+  const typeIs = (s: T, t: string) => typeOf(s) === t;
+  const typeMissing = (s: T) => typeOf(s) === '' || typeOf(s) === 'stop' ? typeOf(s) === '' : false;
+  // Phase 29C: a row is treated as a legacy untyped endpoint only when its
+  // stop_type is missing entirely. Rows explicitly typed 'Stop' that happen
+  // to share the same city as an endpoint must be preserved.
+  const isUntypedEndpointAt = (s: T, endpoint: string) =>
+    typeOf(s) === '' && norm(s.location) === norm(endpoint);
 
   let out = stops;
-  if (out.length > 0 && (typeIs(out[0], 'pickup') || norm(out[0].location) === norm(pickup))) {
+  // Strip leading row if it's explicitly Pickup, or an untyped legacy row
+  // whose location matches the pickup endpoint.
+  if (out.length > 0 && (typeIs(out[0], 'pickup') || isUntypedEndpointAt(out[0], pickup))) {
     out = out.slice(1);
   }
+  // Strip trailing row if it's explicitly Drop, or an untyped legacy row
+  // whose location matches the dropoff endpoint.
   if (out.length > 0) {
     const last = out[out.length - 1];
-    if (typeIs(last, 'drop') || norm(last.location) === norm(dropoff)) {
+    if (typeIs(last, 'drop') || isUntypedEndpointAt(last, dropoff)) {
       out = out.slice(0, -1);
     }
   }
