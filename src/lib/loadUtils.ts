@@ -237,8 +237,8 @@ export function buildStopsSummary(load: Load, stops: LoadStop[]): string {
     .map(formatLocation).join(' → ');
 }
 
-/** Phase 29B — exported for LoadDetailSheet to share the same legacy-dedup rule. */
-export { dedupeRouteStops } from './stopNormalization';
+// dedupeRouteStops is imported above; consumers should import directly from
+// '@/lib/stopNormalization' rather than re-export here.
 
 /** Build the raw data row for a single load in the general CSV export.
  * Exported for testability of CSV column values. */
