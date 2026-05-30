@@ -38,11 +38,29 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
 
     const parsed = data?.parsed;
     if (parsed && (parsed.pickup_location || parsed.dropoff_location || parsed.loaded_miles != null || parsed.total_miles != null || parsed.flat_rate != null || parsed.estimated_pay != null)) {
+      // Phase 29B: normalize AI stop list and surface the final Drop's
+      // stop_date as dropoff_date when top-level dropoff_date is missing.
+      const rawStops: any[] = Array.isArray(parsed.stops) ? parsed.stops : [];
+      const normalizedStops = rawStops.map((s: any) => ({
+        location: s.location,
+        stop_type: normalizeStopType(s.stop_type),
+        stop_date: safeStopDate(s.stop_date),
+      }));
+      let derivedDropoffDate: string | undefined;
+      if (!parsed.dropoff_date && normalizedStops.length > 0) {
+        // Find highest-index Drop with a valid stop_date.
+        for (let i = normalizedStops.length - 1; i >= 0; i--) {
+          if (normalizedStops[i].stop_type === 'Drop' && normalizedStops[i].stop_date) {
+            derivedDropoffDate = normalizedStops[i].stop_date;
+            break;
+          }
+        }
+      }
       const result: ParsedLoadData = {
         pickup_location: parsed.pickup_location || undefined,
         dropoff_location: parsed.dropoff_location || undefined,
         load_date: parsed.load_date || undefined,
-        dropoff_date: parsed.dropoff_date || undefined,
+        dropoff_date: parsed.dropoff_date || derivedDropoffDate || undefined,
         loaded_miles: parsed.loaded_miles?.toString() || undefined,
         deadhead_miles: parsed.deadhead_miles != null ? parsed.deadhead_miles.toString() : undefined,
         total_miles: parsed.total_miles != null ? parsed.total_miles.toString() : undefined,
@@ -53,13 +71,11 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
         notes: parsed.notes || undefined,
         mileage_warning: parsed.mileage_warning || undefined,
         pay_model_suggestion: parsed.pay_model_suggestion || undefined,
-        multiStopDetected: parsed.stops && parsed.stops.length > 2,
-        detectedStopsCount: parsed.stops?.length,
-        stops: parsed.stops?.map((s: any) => ({
-          location: s.location,
-          stop_type: normalizeStopType(s.stop_type),
-          stop_date: safeStopDate(s.stop_date),
-        })),
+        // Phase 29B: align with paste parser — multi-stop iff >= 2 stops.
+        // LoadForm normalization further decides whether interior stops exist.
+        multiStopDetected: normalizedStops.length >= 2,
+        detectedStopsCount: normalizedStops.length,
+        stops: normalizedStops.length > 0 ? normalizedStops : undefined,
       };
       return { data: result, usedAI: true };
     }
