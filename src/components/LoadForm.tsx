@@ -576,8 +576,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <div>
               <Label htmlFor="load_date">Pickup Date</Label>
               <DateInput id="load_date" value={form.load_date} onChange={(val) => {
+                // Phase 29: only seed dropoff from pickup for single-stop loads when the
+                // user hasn't typed a dropoff yet. Multi-stop derives from final stop date.
+                const prevPickup = form.load_date;
                 update('load_date', val);
-                if (!form.dropoff_date || form.dropoff_date === form.load_date) {
+                if (!multiStop && (!form.dropoff_date || form.dropoff_date === prevPickup)) {
                   update('dropoff_date', val);
                 }
               }} />
@@ -585,10 +588,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
             <div>
               <Label htmlFor="dropoff_date">Drop-off Date</Label>
-              <DateInput id="dropoff_date" value={form.dropoff_date || form.load_date} onChange={(val) => update('dropoff_date', val)} />
+              {/* Phase 29: do NOT mask blank dropoff with load_date — driver must see when it's empty. */}
+              <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => update('dropoff_date', val)} />
               <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
-                Used for dashboard, weekly totals, reports, and exports. If blank, pickup date is used.
+                Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'For multi-stop loads, the final stop date will be used.' : 'If blank, pickup date is used.'}
               </p>
+              {multiStop && (() => {
+                const finalStopDate = deriveFinalDropoffDate(stops);
+                return finalStopDate ? (
+                  <p className="text-[10px] text-primary mt-1 leading-snug">
+                    Final stop date {finalStopDate} will be used for reporting.
+                  </p>
+                ) : null;
+              })()}
             </div>
           </div>
 
