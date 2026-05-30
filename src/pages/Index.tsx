@@ -56,6 +56,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { normalizeLegacyEditStops } from '@/lib/stopNormalization';
 import { supabase } from '@/integrations/supabase/client';
 import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
 
