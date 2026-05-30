@@ -20,15 +20,23 @@ export function getEffectiveDate(load: Load): string {
 }
 
 /**
- * Phase 29: Derive the final drop-off date from a load's multi-stop list.
+ * Phase 29 (legacy/parser-only): Derive the final drop-off date from a raw
+ * multi-stop list.
+ *
+ * ⚠️ DO NOT use this helper for the manual editor save / warning / inline-note
+ *    surfaces. Those must use `deriveTrailingDropDate` from
+ *    `@/lib/stopNormalization`, which only honours a TRAILING typed-Drop row.
+ *    This helper has broader semantics (any Drop / any valid stop_date) that
+ *    only make sense for legacy DB rows and parser ingestion fallbacks.
  *
  * Rule:
- *  - Prefer the highest stop_order stop whose stop_type === 'drop' (case-insensitive)
- *    AND has a valid YYYY-MM-DD stop_date.
+ *  - Prefer the highest stop_order stop whose stop_type === 'drop'
+ *    (case-insensitive) AND has a valid YYYY-MM-DD stop_date.
  *  - Else fall back to the highest stop_order stop with any valid stop_date.
- *  - Else null (caller falls back to manual dropoff_date, then load_date).
+ *  - Else null.
  *
- * Invalid / malformed stop_date strings are ignored — they never become loads.dropoff_date.
+ * Invalid / malformed stop_date strings are ignored — they never become
+ * loads.dropoff_date.
  */
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isValidStopDate(d: string | null | undefined): d is string {
