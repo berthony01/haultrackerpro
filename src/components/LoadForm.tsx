@@ -340,7 +340,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     // After Phase 29D promotion, the final Drop is reflected in
     // `normalized.dropoff_date` directly, but we still need to detect the
     // "user enabled multi-stop but left every stop date blank" risk case.
-    const explicitFinalDrop = multiStop ? deriveExplicitFinalDropDate(rawFormattedStops) : null;
+    const explicitFinalDrop = multiStop ? deriveTrailingDropDate(rawFormattedStops) : null;
     const needsDropWarning =
       multiStop &&
       rawFormattedStops.length >= 1 &&
