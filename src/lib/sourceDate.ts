@@ -92,3 +92,49 @@ export function applySourceDropoffDate(
   }
   return current;
 }
+
+/**
+ * Phase 29G — Import-session date resolution for LoadForm paste/scan flows.
+ *
+ * Prevents a stale imported date from silently carrying forward into a
+ * second paste/scan on the same form. Per-field "touched" tracking decides
+ * what to do when the new source has no valid in-window date.
+ *
+ * Returns `{ value, kept }` where `kept` is:
+ *   - 'imported' : new valid source date was applied
+ *   - 'manual'   : driver manually set this field; preserved (caller may toast)
+ *   - 'reset'    : no source date and no manual edit → reset to fallback
+ */
+export type ImportDateResolution = {
+  value: string;
+  kept: 'imported' | 'manual' | 'reset';
+};
+
+export function resolveImportedLoadDate(
+  current: string,
+  incoming: string | undefined | null,
+  userTouched: boolean,
+  now: Date = new Date(),
+): ImportDateResolution {
+  if (isValidISODate(incoming) && isWithinSanityWindow(incoming, now)) {
+    return { value: incoming, kept: 'imported' };
+  }
+  if (userTouched) return { value: current, kept: 'manual' };
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return { value: iso, kept: 'reset' };
+}
+
+export function resolveImportedDropoffDate(
+  current: string,
+  incoming: string | undefined | null,
+  userTouched: boolean,
+  now: Date = new Date(),
+): ImportDateResolution {
+  if (isValidISODate(incoming) && isWithinSanityWindow(incoming, now)) {
+    return { value: incoming, kept: 'imported' };
+  }
+  if (userTouched) return { value: current, kept: 'manual' };
+  return { value: '', kept: 'reset' };
+}
+
