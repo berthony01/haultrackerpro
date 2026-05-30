@@ -602,13 +602,13 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               {/* Phase 29: do NOT mask blank dropoff with load_date — driver must see when it's empty. */}
               <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => update('dropoff_date', val)} />
               <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
-                Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'For multi-stop loads, the final stop date will be used.' : 'If blank, pickup date is used.'}
+                Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'Manual Drop-off Date stays in control unless a final Drop stop date is provided.' : 'If blank, pickup date is used.'}
               </p>
               {multiStop && (() => {
-                const finalStopDate = deriveFinalDropoffDate(stops);
-                return finalStopDate ? (
+                const explicit = deriveExplicitFinalDropDate(stops);
+                return explicit ? (
                   <p className="text-[10px] text-primary mt-1 leading-snug">
-                    Final stop date {finalStopDate} will be used for reporting.
+                    Final Drop stop date {explicit} will be used for reporting.
                   </p>
                 ) : null;
               })()}
