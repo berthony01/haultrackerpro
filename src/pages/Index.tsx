@@ -498,7 +498,27 @@ const Index = () => {
     setEditingLoad(dup);
     const origStops = loadStopsHook.getStopsForLoad(load.id);
     // Phase 29: clear stop_date so an old final-stop date doesn't carry into the duplicate.
-    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes, stop_date: null })));
+    const seeded = origStops.map(s => ({
+      stop_order: s.stop_order,
+      location: s.location,
+      stop_type: s.stop_type,
+      detention_minutes: s.detention_minutes,
+      stop_date: null,
+    }));
+    // Phase 29G: normalize duplicated stops the same way edit mode does so
+    // legacy endpoint rows / blank stop_type values don't get re-seeded into
+    // the editor. Today's top-level dates remain canonical for the duplicate.
+    const normalized = normalizeLegacyEditStops({
+      pickup_location: load.pickup_location,
+      dropoff_location: load.dropoff_location,
+      load_date: today,
+      dropoff_date: today,
+      stops: seeded,
+    });
+    setEditingStops(normalized.editorStops);
+    if (normalized.hasConflict) {
+      toast.warning('A legacy stop row conflicts with this load\'s pickup or drop-off — review it before saving.', { duration: 7000 });
+    }
   };
 
   const handleEdit = (load: Load) => {

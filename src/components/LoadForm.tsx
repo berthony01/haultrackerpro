@@ -31,7 +31,7 @@ import { PasteLoadParser } from '@/components/PasteLoadParser';
 import { ScanLoadModal } from '@/components/ScanLoadModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
-import { applySourceLoadDate, applySourceDropoffDate } from '@/lib/sourceDate';
+import { resolveImportedLoadDate, resolveImportedDropoffDate } from '@/lib/sourceDate';
 import { useProfitCheck } from '@/hooks/useProfitCheck';
 import { ProfitCheckCard } from '@/components/ProfitCheckCard';
 
@@ -164,6 +164,12 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [showScanUpgrade, setShowScanUpgrade] = useState(false);
   const [multiStopBanner, setMultiStopBanner] = useState<string | null>(null);
   const [acknowledgedDropWarning, setAcknowledgedDropWarning] = useState(false);
+
+  // Phase 29G: per-field dirty tracking so a second paste/scan into the same
+  // form cannot silently carry stale imported dates from the previous load.
+  // Flipped to true only when the driver edits the DateInput directly.
+  const [userTouchedLoadDate, setUserTouchedLoadDate] = useState(false);
+  const [userTouchedDropoffDate, setUserTouchedDropoffDate] = useState(false);
 
   // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
   // user changes anything that could move the load into or out of the risky
@@ -515,6 +521,12 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 // Phase 29C: normalize FIRST so endpoint promotion (incl. final
                 // Drop stop_date → top-level dropoff_date) flows into form state.
                 const norm = normalizeParsedStops(data);
+                // Phase 29G: per-field date dirty tracking — stale imported
+                // dates from a prior paste must not silently carry forward.
+                const loadRes = resolveImportedLoadDate(form.load_date, data.load_date, userTouchedLoadDate);
+                const dropRes = resolveImportedDropoffDate(form.dropoff_date, norm.dropoff_date ?? data.dropoff_date, userTouchedDropoffDate);
+                if (loadRes.kept === 'manual') toast.info('No pickup date found in imported text. Kept your manual pickup date.');
+                if (dropRes.kept === 'manual') toast.info('No delivery date found in imported text. Kept your manual drop-off date.');
                 // Atomic apply: always reset mileage fields on a new paste so a
                 // stale "loaded_miles" from a previous paste can't leak into the
                 // new load if this paste only contains deadhead (and vice versa).
@@ -526,13 +538,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   deadhead_miles: data.deadhead_miles ?? '',
                   rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
                   gross_revenue: data.gross_revenue ?? prev.gross_revenue,
-                  // Phase 6C.6: source-date authority — apply only when valid
-                  // ISO date so today's default never blocks a real source date,
-                  // and invalid parser output never corrupts the form value.
-                  load_date: applySourceLoadDate(prev.load_date, data.load_date),
-                  // Phase 29C: prefer normalized dropoff_date (derived from
-                  // final Drop stop_date) over raw parser top-level value.
-                  dropoff_date: applySourceDropoffDate(prev.dropoff_date, norm.dropoff_date ?? data.dropoff_date),
+                  load_date: loadRes.value,
+                  dropoff_date: dropRes.value,
                   // Phase 6C.4: reset total_miles like loaded/deadhead so a
                   // stale total from a previous paste can't leak into the new load.
                   total_miles: data.total_miles ?? '',
@@ -631,6 +638,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 // Phase 29: only seed dropoff from pickup for single-stop loads when the
                 // user hasn't typed a dropoff yet. Multi-stop derives from final stop date.
                 const prevPickup = form.load_date;
+                setUserTouchedLoadDate(true);
                 update('load_date', val);
                 if (!multiStop && (!form.dropoff_date || form.dropoff_date === prevPickup)) {
                   update('dropoff_date', val);
@@ -641,7 +649,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <div>
               <Label htmlFor="dropoff_date">Drop-off Date</Label>
               {/* Phase 29: do NOT mask blank dropoff with load_date — driver must see when it's empty. */}
-              <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => update('dropoff_date', val)} />
+              <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => { setUserTouchedDropoffDate(true); update('dropoff_date', val); }} />
               <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
                 Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'Manual Drop-off Date stays in control unless a final Drop stop date is provided.' : 'If blank, pickup date is used.'}
               </p>
@@ -1127,6 +1135,13 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             const isEmpty = current == null || String(current).trim() === '' || current === '0';
             return isEmpty ? String(incoming) : current;
           };
+          // Phase 29G: per-field date dirty tracking — same rule as paste so a
+          // second scan into the same form cannot silently inherit a prior
+          // imported pickup/drop-off date.
+          const loadRes = resolveImportedLoadDate(form.load_date, data.load_date, userTouchedLoadDate);
+          const dropRes = resolveImportedDropoffDate(form.dropoff_date, norm.dropoff_date ?? data.dropoff_date, userTouchedDropoffDate);
+          if (loadRes.kept === 'manual') toast.info('No pickup date found in imported text. Kept your manual pickup date.');
+          if (dropRes.kept === 'manual') toast.info('No delivery date found in imported text. Kept your manual drop-off date.');
           setForm(prev => ({
             ...prev,
             pickup_location: fillIfEmpty(prev.pickup_location, norm.pickup_location ?? data.pickup_location),
@@ -1135,12 +1150,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             deadhead_miles: fillIfEmpty(prev.deadhead_miles, data.deadhead_miles),
             rate_per_mile: fillIfEmpty(prev.rate_per_mile, data.rate_per_mile),
             gross_revenue: fillIfEmpty(prev.gross_revenue, data.gross_revenue),
-            // Phase 6C.6: source-date authority. OCR/AI extracted dates must
-            // be able to override today's default (which makes load_date
-            // non-empty so fillIfEmpty would drop them). Apply only when valid.
-            load_date: applySourceLoadDate(prev.load_date, data.load_date),
-            // Phase 29C: prefer normalized dropoff_date over raw parser value.
-            dropoff_date: applySourceDropoffDate(prev.dropoff_date, norm.dropoff_date ?? data.dropoff_date),
+            load_date: loadRes.value,
+            dropoff_date: dropRes.value,
             total_miles: fillIfEmpty(prev.total_miles, data.total_miles),
             flat_rate_amount: fillIfEmpty(prev.flat_rate_amount, data.flat_rate),
             dh_rate_per_mile: fillIfEmpty(prev.dh_rate_per_mile, data.deadhead_rate_per_mile),
