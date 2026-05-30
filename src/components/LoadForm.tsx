@@ -518,17 +518,25 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                     ? prev
                     : { ...prev, notes: prev.notes ? `${prev.notes}\nTrip ID: ${data.trip_id}` : `Trip ID: ${data.trip_id}` });
                 }
-                // Multi-stop auto-detection
-                if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
+                // Phase 29B: normalize parsed stops — endpoints promote to
+                // top-level fields, interior stops only go into stops state.
+                // When no interior stops exist (single-stop or [Pickup,Drop]),
+                // clear stale stop state from any previous multi-stop parse.
+                const norm = normalizeParsedStops(data);
+                if (norm.multiStop) {
                   setMultiStop(true);
-                  setStops(data.stops.map((s, i) => ({
+                  setStops(norm.interiorStops.map((s, i) => ({
                     stop_order: i + 1,
                     location: s.location,
                     stop_type: s.stop_type,
                     detention_minutes: null,
                     stop_date: (s as any).stop_date ?? null,
                   })));
-                  setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
+                  setMultiStopBanner(`${norm.interiorStops.length + 2} stops detected. Review stops before logging.`);
+                } else {
+                  setMultiStop(false);
+                  setStops([]);
+                  setMultiStopBanner(null);
                 }
               }}
             />
