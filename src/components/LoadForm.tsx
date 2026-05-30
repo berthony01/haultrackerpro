@@ -521,6 +521,12 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 // Phase 29C: normalize FIRST so endpoint promotion (incl. final
                 // Drop stop_date → top-level dropoff_date) flows into form state.
                 const norm = normalizeParsedStops(data);
+                // Phase 29G: per-field date dirty tracking — stale imported
+                // dates from a prior paste must not silently carry forward.
+                const loadRes = resolveImportedLoadDate(form.load_date, data.load_date, userTouchedLoadDate);
+                const dropRes = resolveImportedDropoffDate(form.dropoff_date, norm.dropoff_date ?? data.dropoff_date, userTouchedDropoffDate);
+                if (loadRes.kept === 'manual') toast.info('No pickup date found in imported text. Kept your manual pickup date.');
+                if (dropRes.kept === 'manual') toast.info('No delivery date found in imported text. Kept your manual drop-off date.');
                 // Atomic apply: always reset mileage fields on a new paste so a
                 // stale "loaded_miles" from a previous paste can't leak into the
                 // new load if this paste only contains deadhead (and vice versa).
@@ -532,13 +538,8 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   deadhead_miles: data.deadhead_miles ?? '',
                   rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
                   gross_revenue: data.gross_revenue ?? prev.gross_revenue,
-                  // Phase 6C.6: source-date authority — apply only when valid
-                  // ISO date so today's default never blocks a real source date,
-                  // and invalid parser output never corrupts the form value.
-                  load_date: applySourceLoadDate(prev.load_date, data.load_date),
-                  // Phase 29C: prefer normalized dropoff_date (derived from
-                  // final Drop stop_date) over raw parser top-level value.
-                  dropoff_date: applySourceDropoffDate(prev.dropoff_date, norm.dropoff_date ?? data.dropoff_date),
+                  load_date: loadRes.value,
+                  dropoff_date: dropRes.value,
                   // Phase 6C.4: reset total_miles like loaded/deadhead so a
                   // stale total from a previous paste can't leak into the new load.
                   total_miles: data.total_miles ?? '',
