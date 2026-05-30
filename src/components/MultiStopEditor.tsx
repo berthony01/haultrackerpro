@@ -58,6 +58,7 @@ export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEdito
       {stops.map((stop, i) => {
         const isDrop = (stop.stop_type ?? '').toLowerCase() === 'drop';
         const isPickup = (stop.stop_type ?? '').toLowerCase() === 'pickup';
+        const isLast = i === stops.length - 1;
         return (
           <div key={i} className="flex items-start gap-2">
             <div className="flex-1 space-y-2">
@@ -73,10 +74,14 @@ export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEdito
                           conflicting pickup endpoints. */}
                       {isPickup && <SelectItem value="Pickup">Pickup</SelectItem>}
                       <SelectItem value="Stop">Stop</SelectItem>
-                      <SelectItem value="Drop">Drop</SelectItem>
+                      {/* Phase 29E: Only the trailing row may be 'Drop' so the
+                          editor cannot create an interior Drop that would
+                          mislead the save / warning / inline-note surfaces. */}
+                      {(isLast || isDrop) && <SelectItem value="Drop">Drop</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <Input
                   placeholder="City, ST"
                   value={stop.location}
