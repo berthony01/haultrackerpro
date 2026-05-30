@@ -57,8 +57,8 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
         detectedStopsCount: parsed.stops?.length,
         stops: parsed.stops?.map((s: any) => ({
           location: s.location,
-          stop_type: s.stop_type || 'Stop',
-          stop_date: s.stop_date || undefined,
+          stop_type: normalizeStopType(s.stop_type),
+          stop_date: safeStopDate(s.stop_date),
         })),
       };
       return { data: result, usedAI: true };
