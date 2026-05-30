@@ -12,9 +12,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import {
   normalizeParsedStops,
-  deriveExplicitFinalDropDate,
+  deriveTrailingDropDate,
   normalizeEditorStopsForSave,
 } from '@/lib/stopNormalization';
+
 import { DateInput } from '@/components/ui/date-input';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
@@ -339,7 +340,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     // After Phase 29D promotion, the final Drop is reflected in
     // `normalized.dropoff_date` directly, but we still need to detect the
     // "user enabled multi-stop but left every stop date blank" risk case.
-    const explicitFinalDrop = multiStop ? deriveExplicitFinalDropDate(rawFormattedStops) : null;
+    const explicitFinalDrop = multiStop ? deriveTrailingDropDate(rawFormattedStops) : null;
     const needsDropWarning =
       multiStop &&
       rawFormattedStops.length >= 1 &&
@@ -644,7 +645,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'Manual Drop-off Date stays in control unless a final Drop stop date is provided.' : 'If blank, pickup date is used.'}
               </p>
               {multiStop && (() => {
-                const explicit = deriveExplicitFinalDropDate(stops);
+                const explicit = deriveTrailingDropDate(stops);
                 return explicit ? (
                   <p className="text-[10px] text-primary mt-1 leading-snug">
                     Final Drop stop date {explicit} will be used for reporting.
