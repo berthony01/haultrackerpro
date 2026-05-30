@@ -38,7 +38,7 @@ export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEdito
       </div>
 
       <p className="text-[10px] text-muted-foreground leading-snug">
-        The final drop-off stop date controls dashboard, reports, weekly totals, and exports.
+        Add route stops between pickup and final delivery. Manual Drop-off Date stays in control unless a final Drop stop date is provided.
       </p>
 
       {stops.length === 0 && (
