@@ -9,8 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCurrency, formatLocation, deriveFinalDropoffDate } from '@/lib/loadUtils';
-import { normalizeParsedStops, deriveExplicitFinalDropDate } from '@/lib/stopNormalization';
+import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import {
+  normalizeParsedStops,
+  deriveExplicitFinalDropDate,
+  normalizeEditorStopsForSave,
+} from '@/lib/stopNormalization';
 import { DateInput } from '@/components/ui/date-input';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
