@@ -554,15 +554,36 @@ export function parseLoadText(text: string): ParsedLoadData {
       if (i === 0) stop_type = 'Pickup';
       else if (i === blocks.length - 1) stop_type = 'Drop';
 
-      // Phase 29A: conservative per-stop date extraction. Only trust a date that
-      // appears clearly inside this stop block AND passes the same sanity window
-      // we apply to scanned source dates. Anything ambiguous → stop_date stays
-      // undefined and the user can enter it manually.
+      // Phase 29A/F: conservative per-stop date extraction. Only accept a
+      // date when it is clearly local to this stop:
+      //   - the block's first (marker) line, OR
+      //   - a line whose only content is a date (optionally prefixed with a
+      //     stop-local label like Pickup/PU/Appt/Delivery/Drop/ETA/Ready), OR
+      //   - a line that begins with one of those labels
+      // If multiple distinct dates qualify, leave stop_date undefined.
       let stop_date: string | undefined;
       const blockBody = block.replace(/^\d+#:\s*/, '');
-      const parsedDate = tryParseDate(blockBody);
-      if (parsedDate && isValidISODate(parsedDate) && isWithinSanityWindow(parsedDate)) {
-        stop_date = parsedDate;
+      const headerLineDate = tryParseDate(blockBody.split('\n')[0] ?? '');
+      const LOCAL_LABEL_RE = /\b(pickup|pu|appt|appointment|delivery|del|drop|eta|ready|dispatch)\b/i;
+      const candidates: string[] = [];
+      if (headerLineDate) candidates.push(headerLineDate);
+      const bodyLines = blockBody.split('\n').slice(1);
+      for (const rawLine of bodyLines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        const d = tryParseDate(line);
+        if (!d) continue;
+        // Accept if line is essentially just the date (≤4 extra chars besides
+        // the date itself) OR if it begins with / contains a stop-local label.
+        const stripped = line.replace(/(\d{4}-\d{2}-\d{2}|\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:,?\s*\d{4})?)/i, '').trim();
+        const isBareDateLine = stripped.length <= 4;
+        const hasLocalLabel = LOCAL_LABEL_RE.test(line);
+        if (isBareDateLine || hasLocalLabel) candidates.push(d);
+      }
+      const distinct = Array.from(new Set(candidates));
+      if (distinct.length === 1) {
+        const only = distinct[0];
+        if (isValidISODate(only) && isWithinSanityWindow(only)) stop_date = only;
       }
 
       if (location) parsedStops.push({ location, stop_type, ...(stop_date ? { stop_date } : {}) });
