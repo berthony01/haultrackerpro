@@ -14,6 +14,7 @@ import {
   normalizeParsedStops,
   deriveTrailingDropDate,
   normalizeEditorStopsForSave,
+  normalizeEditorStopsForUi,
 } from '@/lib/stopNormalization';
 
 import { DateInput } from '@/components/ui/date-input';
