@@ -308,19 +308,41 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     const finalStatus = saveAsPending ? 'pending' : form.status;
 
     // Format stop locations
-    const formattedStops = multiStop ? stops.map((s, i) => ({
+    const rawFormattedStops = multiStop ? stops.map((s, i) => ({
       ...s,
       stop_order: i + 1,
       location: formatLocation(s.location),
     })) : [];
 
-    // Phase 29B: ONLY an explicit final Drop stop with a valid stop_date may
-    // override the manual dropoff_date. Intermediate Stop dates never override
-    // the user's manual value (UI describes them as intermediate stops).
-    const explicitFinalDrop = multiStop ? deriveExplicitFinalDropDate(formattedStops) : null;
+    // Phase 29D: enforce canonical endpoint model on manual save. Promote any
+    // explicit leading Pickup / trailing Drop row out of load_stops and into
+    // top-level fields, so the saved row is always [Pickup endpoint] + interior
+    // stops + [Drop endpoint] with no duplicates.
+    const normalized = multiStop
+      ? normalizeEditorStopsForSave({
+          pickup_location: formatLocation(form.pickup_location),
+          dropoff_location: formatLocation(form.dropoff_location),
+          load_date: form.load_date,
+          dropoff_date: form.dropoff_date,
+          stops: rawFormattedStops,
+        })
+      : {
+          pickup_location: formatLocation(form.pickup_location),
+          dropoff_location: formatLocation(form.dropoff_location),
+          load_date: form.load_date,
+          dropoff_date: form.dropoff_date || form.load_date,
+          interiorStops: [] as typeof rawFormattedStops,
+        };
+
+    // Phase 29B/D: ONLY an explicit final Drop stop with a valid stop_date may
+    // override the manual dropoff_date. Intermediate Stop dates never override.
+    // After Phase 29D promotion, the final Drop is reflected in
+    // `normalized.dropoff_date` directly, but we still need to detect the
+    // "user enabled multi-stop but left every stop date blank" risk case.
+    const explicitFinalDrop = multiStop ? deriveExplicitFinalDropDate(rawFormattedStops) : null;
     const needsDropWarning =
       multiStop &&
-      formattedStops.length >= 1 &&
+      rawFormattedStops.length >= 1 &&
       !explicitFinalDrop &&
       (!form.dropoff_date || form.dropoff_date === form.load_date);
     if (needsDropWarning && !acknowledgedDropWarning) {
@@ -329,14 +351,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       return;
     }
 
-    // Resolution order: explicit final Drop stop date > manual dropoff_date > load_date
-    const resolvedDropoff = explicitFinalDrop ?? (form.dropoff_date || form.load_date);
-
     onSubmit({
-      load_date: form.load_date,
-      dropoff_date: resolvedDropoff,
-      pickup_location: formatLocation(form.pickup_location),
-      dropoff_location: formatLocation(form.dropoff_location),
+      load_date: normalized.load_date,
+      dropoff_date: normalized.dropoff_date,
+      pickup_location: normalized.pickup_location,
+      dropoff_location: normalized.dropoff_location,
       loaded_miles: parseFloat(form.loaded_miles) || 0,
       deadhead_miles: parseFloat(form.deadhead_miles) || 0,
       rate_per_mile: parseFloat(form.rate_per_mile) || 0,
@@ -362,7 +381,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       // so dashboards/reports/exports reflect the active pay model. For percentage-pay
       // users we already routed `estimated` through the percentage formula above.
       estimated_pay: finalStatus === 'cancelled' ? 0 : Math.max(0, Number(estimated.toFixed(2))),
-    } as any, formattedStops);
+    } as any, normalized.interiorStops);
   };
 
   const update = (key: string, value: string) => {
