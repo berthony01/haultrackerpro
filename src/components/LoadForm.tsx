@@ -487,13 +487,16 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <PasteLoadParser
               isPro={isPro}
               onParsed={(data: ParsedLoadData) => {
+                // Phase 29C: normalize FIRST so endpoint promotion (incl. final
+                // Drop stop_date → top-level dropoff_date) flows into form state.
+                const norm = normalizeParsedStops(data);
                 // Atomic apply: always reset mileage fields on a new paste so a
                 // stale "loaded_miles" from a previous paste can't leak into the
                 // new load if this paste only contains deadhead (and vice versa).
                 setForm(prev => ({
                   ...prev,
-                  pickup_location: data.pickup_location ?? prev.pickup_location,
-                  dropoff_location: data.dropoff_location ?? prev.dropoff_location,
+                  pickup_location: norm.pickup_location ?? data.pickup_location ?? prev.pickup_location,
+                  dropoff_location: norm.dropoff_location ?? data.dropoff_location ?? prev.dropoff_location,
                   loaded_miles: data.loaded_miles ?? '',
                   deadhead_miles: data.deadhead_miles ?? '',
                   rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
@@ -502,7 +505,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   // ISO date so today's default never blocks a real source date,
                   // and invalid parser output never corrupts the form value.
                   load_date: applySourceLoadDate(prev.load_date, data.load_date),
-                  dropoff_date: applySourceDropoffDate(prev.dropoff_date, data.dropoff_date),
+                  // Phase 29C: prefer normalized dropoff_date (derived from
+                  // final Drop stop_date) over raw parser top-level value.
+                  dropoff_date: applySourceDropoffDate(prev.dropoff_date, norm.dropoff_date ?? data.dropoff_date),
                   // Phase 6C.4: reset total_miles like loaded/deadhead so a
                   // stale total from a previous paste can't leak into the new load.
                   total_miles: data.total_miles ?? '',
@@ -523,11 +528,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                     ? prev
                     : { ...prev, notes: prev.notes ? `${prev.notes}\nTrip ID: ${data.trip_id}` : `Trip ID: ${data.trip_id}` });
                 }
-                // Phase 29B: normalize parsed stops — endpoints promote to
-                // top-level fields, interior stops only go into stops state.
+                // Phase 29B: interior stops only go into stops state.
                 // When no interior stops exist (single-stop or [Pickup,Drop]),
                 // clear stale stop state from any previous multi-stop parse.
-                const norm = normalizeParsedStops(data);
                 if (norm.multiStop) {
                   setMultiStop(true);
                   setStops(norm.interiorStops.map((s, i) => ({
