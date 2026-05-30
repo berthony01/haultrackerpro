@@ -311,10 +311,18 @@ export interface LegacyEditNormalization {
 }
 
 /**
- * Strip legacy Pickup/Drop endpoint rows from a saved load_stops list when
- * they match the top-level endpoints. When they conflict, keep them so the
- * driver can review.
+ * Phase 29D/F — Strip legacy Pickup/Drop endpoint rows from a saved
+ * load_stops list when they match the top-level endpoints. When they
+ * conflict, keep them so the driver can review.
+ *
+ * Phase 29F: also treats a leading/trailing row as a legacy endpoint when
+ * its stop_type is missing/blank/invalid AND its location matches the
+ * top-level pickup/dropoff. Conflicting untyped endpoint rows are preserved
+ * and flagged. Remaining rows always end up with a valid stop_type ('Stop')
+ * so the editor Select never renders a blank value.
  */
+const VALID_EDITOR_TYPES = new Set(['pickup', 'drop', 'stop']);
+
 export function normalizeLegacyEditStops(args: {
   pickup_location: string;
   dropoff_location: string;
@@ -328,34 +336,57 @@ export function normalizeLegacyEditStops(args: {
   let hasConflict = false;
 
   const norm = (s: string) => (s ?? '').trim().toLowerCase();
+  const isUntypedOrInvalid = (s: EditorStopForSave) =>
+    !VALID_EDITOR_TYPES.has(typeOf(s));
 
-  // Leading Pickup
-  if (stops.length > 0 && typeOf(stops[0]) === 'pickup') {
+  // Leading endpoint: typed Pickup OR untyped row whose location matches pickup
+  if (stops.length > 0) {
     const head = stops[0];
+    const t = typeOf(head);
     const sameCity = norm(head.location) === norm(args.pickup_location);
-    if (sameCity) {
+    if (t === 'pickup') {
+      if (sameCity) {
+        if (!loadDate && isValidIso(head.stop_date)) loadDate = head.stop_date as string;
+        stops.shift();
+      } else {
+        hasConflict = true;
+      }
+    } else if (isUntypedOrInvalid(head) && sameCity) {
       if (!loadDate && isValidIso(head.stop_date)) loadDate = head.stop_date as string;
       stops.shift();
-    } else {
-      hasConflict = true;
     }
   }
-  // Trailing Drop
-  if (stops.length > 0 && typeOf(stops[stops.length - 1]) === 'drop') {
+  // Trailing endpoint: typed Drop OR untyped row whose location matches dropoff
+  if (stops.length > 0) {
     const tail = stops[stops.length - 1];
+    const t = typeOf(tail);
     const sameCity = norm(tail.location) === norm(args.dropoff_location);
-    if (sameCity) {
+    if (t === 'drop') {
+      if (sameCity) {
+        if (!dropDate && isValidIso(tail.stop_date)) dropDate = tail.stop_date as string;
+        stops.pop();
+      } else {
+        hasConflict = true;
+      }
+    } else if (isUntypedOrInvalid(tail) && sameCity) {
       if (!dropDate && isValidIso(tail.stop_date)) dropDate = tail.stop_date as string;
       stops.pop();
-    } else {
-      hasConflict = true;
     }
   }
 
   return {
     load_date: loadDate,
     dropoff_date: dropDate,
-    editorStops: stops.map((s, i) => ({ ...s, stop_order: i + 1 })),
+    editorStops: stops.map((s, i) => ({
+      ...s,
+      stop_order: i + 1,
+      // Phase 29F: any remaining row with a missing/blank/invalid stop_type
+      // (e.g. an untyped intermediate row that did NOT match an endpoint)
+      // becomes a plain 'Stop' so the Select never renders empty.
+      stop_type: VALID_EDITOR_TYPES.has(typeOf(s))
+        ? (typeOf(s) === 'pickup' ? 'Pickup' : typeOf(s) === 'drop' ? 'Drop' : 'Stop')
+        : 'Stop',
+    })),
     hasConflict,
   };
 }
