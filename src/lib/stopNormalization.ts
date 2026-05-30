@@ -95,7 +95,6 @@ export function dedupeRouteStops<T extends { location: string; stop_type?: strin
   const norm = (s: string) => (s ?? '').trim().toLowerCase();
   const typeOf = (s: T) => (s.stop_type ?? '').trim().toLowerCase();
   const typeIs = (s: T, t: string) => typeOf(s) === t;
-  const typeMissing = (s: T) => typeOf(s) === '' || typeOf(s) === 'stop' ? typeOf(s) === '' : false;
   // Phase 29C: a row is treated as a legacy untyped endpoint only when its
   // stop_type is missing entirely. Rows explicitly typed 'Stop' that happen
   // to share the same city as an endpoint must be preserved.
