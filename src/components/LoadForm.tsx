@@ -645,7 +645,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'Manual Drop-off Date stays in control unless a final Drop stop date is provided.' : 'If blank, pickup date is used.'}
               </p>
               {multiStop && (() => {
-                const explicit = deriveExplicitFinalDropDate(stops);
+                const explicit = deriveTrailingDropDate(stops);
                 return explicit ? (
                   <p className="text-[10px] text-primary mt-1 leading-snug">
                     Final Drop stop date {explicit} will be used for reporting.
