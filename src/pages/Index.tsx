@@ -56,6 +56,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { normalizeLegacyEditStops } from '@/lib/stopNormalization';
 import { supabase } from '@/integrations/supabase/client';
 import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
 
@@ -501,9 +502,37 @@ const Index = () => {
   };
 
   const handleEdit = (load: Load) => {
-    setEditingLoad(load);
     const origStops = loadStopsHook.getStopsForLoad(load.id);
-    setEditingStops(origStops.map(s => ({ stop_order: s.stop_order, location: s.location, stop_type: s.stop_type, detention_minutes: s.detention_minutes, stop_date: (s as any).stop_date ?? null })));
+    const seeded = origStops.map(s => ({
+      stop_order: s.stop_order,
+      location: s.location,
+      stop_type: s.stop_type,
+      detention_minutes: s.detention_minutes,
+      stop_date: (s as any).stop_date ?? null,
+    }));
+    // Phase 29D: strip legacy Pickup/Drop endpoint rows from the editor when
+    // they match the top-level endpoints, and seed any missing top-level
+    // dates from a matching legacy row. Conflicting endpoint rows (different
+    // city than the top-level field) are preserved for manual review.
+    const normalized = normalizeLegacyEditStops({
+      pickup_location: load.pickup_location,
+      dropoff_location: load.dropoff_location,
+      load_date: load.load_date,
+      dropoff_date: (load as any).dropoff_date ?? '',
+      stops: seeded,
+    });
+    const editLoad: any = { ...load };
+    if (normalized.load_date && normalized.load_date !== load.load_date) {
+      editLoad.load_date = normalized.load_date;
+    }
+    if (normalized.dropoff_date && normalized.dropoff_date !== (load as any).dropoff_date) {
+      editLoad.dropoff_date = normalized.dropoff_date;
+    }
+    setEditingLoad(editLoad);
+    setEditingStops(normalized.editorStops);
+    if (normalized.hasConflict) {
+      toast.warning('A legacy stop row conflicts with this load\'s pickup or drop-off — review it before saving.', { duration: 7000 });
+    }
     setPage('add');
   };
 

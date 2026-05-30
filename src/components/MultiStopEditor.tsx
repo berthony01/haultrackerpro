@@ -38,7 +38,11 @@ export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEdito
       </div>
 
       <p className="text-[10px] text-muted-foreground leading-snug">
-        Add route stops between pickup and final delivery. Manual Drop-off Date stays in control unless a final Drop stop date is provided.
+        Add intermediate stops between pickup and final delivery. A row typed{' '}
+        <span className="font-semibold text-foreground">Drop</span> becomes the
+        final delivery and syncs the top-level Drop-off fields on save.
+        Pickup is already captured at the top — leave new rows as{' '}
+        <span className="font-semibold text-foreground">Stop</span>.
       </p>
 
       {stops.length === 0 && (
@@ -47,6 +51,7 @@ export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEdito
 
       {stops.map((stop, i) => {
         const isDrop = (stop.stop_type ?? '').toLowerCase() === 'drop';
+        const isPickup = (stop.stop_type ?? '').toLowerCase() === 'pickup';
         return (
           <div key={i} className="flex items-start gap-2">
             <div className="flex-1 space-y-2">
@@ -57,7 +62,10 @@ export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEdito
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Pickup">Pickup</SelectItem>
+                      {/* Phase 29D: 'Pickup' is only offered when the row is
+                          already a legacy Pickup row, so new rows can't create
+                          conflicting pickup endpoints. */}
+                      {isPickup && <SelectItem value="Pickup">Pickup</SelectItem>}
                       <SelectItem value="Stop">Stop</SelectItem>
                       <SelectItem value="Drop">Drop</SelectItem>
                     </SelectContent>
