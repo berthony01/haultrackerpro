@@ -1,57 +1,204 @@
+## Phase 29 — Multi-Stop Final Drop-Off Date Repair
 
-## Phase 28D — Final Scanner Reconciliation
+**Problem.** Multi-stop loads can't store per-stop dates, so the final delivery date never reaches `loads.dropoff_date`. On submit, `LoadForm` writes `dropoff_date: form.dropoff_date || form.load_date`, and the drop-off input visually displays `form.dropoff_date || form.load_date` — masking blank values. Result: a load picked up May 29 / delivered May 30 silently bucket-files under May 29.
 
-Most of these warnings are **already addressed** by prior phases (28, 28A, 28B, 28C). The scanner is asking us to either *verify* the current state or close a couple of small remaining gaps. No PII access changes, no UI redesign, no calculation/starter-kit/billing changes.
+**Rule we are enforcing (no second formula).**
+Financial Reporting Date = `getEffectiveDate(load) = load.dropoff_date ?? load.load_date` — unchanged. The fix is making sure `loads.dropoff_date` is correctly populated from the final stop on save.
 
-### Findings triage
+---
 
-| # | Finding | Action |
-|---|---|---|
-| 1 | `driver_referrals` driver SELECT exposes contact fields | **Verify only** — confirm no driver-side SELECT policy exists on the base table and that `list_my_driver_referrals()` excludes `referred_driver_email/phone/note`. Mark fixed with explanation. |
-| 2 | `lead_magnet_signups` open INSERT to anon | **Small hardening** — keep anon INSERT (intentional lead capture) but tighten the existing `submit_lead_magnet_signup` RPC + revoke direct INSERT policy if any remains; add a per-email/IP rate-limit guard in the RPC. |
-| 3 | `recruiter_profiles` SELECT gap | **Verify only** — scanner itself says "No action required". Mark fixed with explanation. |
-| 4 | Edge functions leak raw `.message` | **Fix** — sanitize error responses in `upload-contract`, `confirm-contract-upload`, `sign-contract`, `review-contract`, `check-pro-access`, `ai-insight`. Log full error server-side, return generic client message. |
-| 5 | `opportunity_applications` driver snapshots readable by recruiters | **Verify only** — Phase 28/28C already gated snapshots through `list_recruiter_applications_safe` RPC + consent-gated triggers, and recruiters do not have a direct SELECT policy returning these fields. Confirm and mark fixed. |
+### Audit confirmed
 
-### Plan steps
+1. `getEffectiveDate` in `src/lib/loadUtils.ts` returns `dropoff_date ?? load_date`. ✔ keep as-is.
+2. Dashboard / Reports / Alerts / WeeklySummaries / CSV exports all already route through `getEffectiveDate` (verified in `loadUtils.ts`, `reportAggregator.ts`, `useSmartAlerts.ts`).
+3. `load_stops` schema (in supabase tables): `id, user_id, load_id, stop_order, location, stop_type, detention_minutes, created_at, updated_at` — **no stop_date column**.
+4. `MultiStopEditor.tsx` exposes only stop_type, location, detention_minutes — no date input.
+5. `LoadForm.handleSubmit` (line 304) writes `dropoff_date: form.dropoff_date || form.load_date`.
+6. `<DateInput id="dropoff_date" value={form.dropoff_date || form.load_date} ...>` (line 569) — masks blank dropoff with load_date.
+7. Paste (`parseLoadText`) and Scan (`ScanLoadModal`) detect multi-stop locations but do not associate dates with individual stops.
 
-1. **Audit (read-only)** — re-read the latest migrations on `driver_referrals`, `lead_magnet_signups`, `opportunity_applications`, plus `list_my_driver_referrals` and `list_recruiter_applications_safe` to confirm current shape.
+---
 
-2. **Migration: `phase_28d_hardening.sql`**
-   - Defensive `DROP POLICY IF EXISTS` for any driver-side SELECT on `driver_referrals` (no-op if already gone).
-   - Drop any remaining direct anon/authenticated INSERT policy on `lead_magnet_signups` (writes go through `submit_lead_magnet_signup` RPC only).
-   - Add lightweight abuse guard inside `submit_lead_magnet_signup`: reject if same `email_lower` submitted >3 times in the last hour.
-   - Re-assert `list_my_driver_referrals()` column list (recreate function) so it explicitly omits `referred_driver_email`, `referred_driver_phone`, `referred_driver_note`.
+### Plan
 
-3. **Edge function error hygiene** (Finding #4)
-   - In each listed function, wrap returned errors:
-     - `console.error('[fn-name] step', err)` server-side.
-     - Client response: `{ error: 'Operation failed. Please try again.' }` with appropriate status.
-     - Keep specific known messages only for: 401 unauthorized, 402 credits exhausted, 403 forbidden, 409 conflict, 429 rate limit.
-   - `ai-insight`: replace `"LOVABLE_API_KEY is not configured"` with generic 500 `{ error: 'AI service unavailable' }` and log internally.
+**1. DB migration — add `stop_date` to `load_stops**`
 
-4. **Tests** (`src/test/securityViewsShape.test.ts`)
-   - Assert no `SELECT` policy on `driver_referrals` matches `referring_driver_id`.
-   - Assert `lead_magnet_signups` has no anon/authenticated `INSERT` policy after migration.
-   - Assert `list_my_driver_referrals` return shape excludes the 3 contact columns.
+- `ALTER TABLE public.load_stops ADD COLUMN stop_date date NULL;` (nullable, no backfill)
+- No RLS / grant changes.
 
-5. **Mark findings** via `security--manage_security_finding`:
-   - #1, #3, #5 → `mark_as_fixed` with verification explanation.
-   - #2, #4 → `mark_as_fixed` after the migration + edge function edits land.
+**2. `src/hooks/useLoadStops.ts**`
 
-6. **Verify**: `npm run build` + `npm run test` + `supabase--linter`.
+- Extend `LoadStop` and `LoadStopInput` with `stop_date?: string | null`.
+- Include in select * (auto), insert mapping in `saveStopsForLoad` (`stop_date: s.stop_date ?? null`).
 
-### Files to change
+**3. `src/components/MultiStopEditor.tsx**`
 
-- `supabase/migrations/<new>_phase_28d_hardening.sql` (new)
-- `supabase/functions/upload-contract/index.ts`
-- `supabase/functions/confirm-contract-upload/index.ts`
-- `supabase/functions/sign-contract/index.ts`
-- `supabase/functions/review-contract/index.ts`
-- `supabase/functions/check-pro-access/index.ts`
-- `supabase/functions/ai-insight/index.ts`
-- `src/test/securityViewsShape.test.ts`
+- Add a `DateInput` (label "Stop Date", placeholder "MM/DD/YYYY") per stop row.
+- Helper text above the list: "The final drop-off stop date controls dashboard, reports, weekly totals, and exports."
+- Emphasize the date field when `stop_type === 'Drop'` (subtle ring/border using existing tokens — no redesign).
 
-### Out of scope (per your constraints)
+**4. `src/lib/loadUtils.ts` — add `deriveFinalDropoffDate` helper (single source of truth)**
 
-Phase 23 calculations, Phase 27 starter kit, UI redesign, pricing/billing, SEO, recruiter plan logic.
+```ts
+export function deriveFinalDropoffDate(
+  stops: { stop_order: number; stop_type: string; stop_date?: string | null }[]
+): string | null {
+  if (!stops?.length) return null;
+  const dropDated = stops.filter(s => s.stop_type?.toLowerCase() === 'drop' && s.stop_date);
+  if (dropDated.length) return dropDated.sort((a,b) => b.stop_order - a.stop_order)[0].stop_date!;
+  const anyDated = stops.filter(s => s.stop_date);
+  if (anyDated.length) return anyDated.sort((a,b) => b.stop_order - a.stop_order)[0].stop_date!;
+  return null;
+}
+```
+
+**5. `src/components/LoadForm.tsx` — save-path fix**
+
+- In `handleSubmit`, before calling `onSubmit`:
+  ```ts
+  const finalStopDate = multiStop ? deriveFinalDropoffDate(formattedStops) : null;
+  const resolvedDropoff = finalStopDate ?? (form.dropoff_date || form.load_date);
+  ```
+  Use `resolvedDropoff` for `dropoff_date`.
+- **Remove UX masking** on the Drop-off Date input:
+  - Change `value={form.dropoff_date || form.load_date}` → `value={form.dropoff_date}`.
+  - Adjust the pickup-onChange sync at line 561 (which writes pickup date into blank dropoff) — keep it ONLY when not multi-stop and the user hasn't typed a dropoff.
+  - Add helper text under the input: "Used for dashboard, weekly totals, reports, and exports. For multi-stop loads, the final stop date will be used."
+  - When `multiStop` is on and a `finalStopDate` is derived, show an inline note: "Final stop date {date} will be used for reporting."
+
+**6. Multi-stop save warning (inline, non-blocking)**
+
+- In `validate()` (or just before submit), if `multiStop && stops.length >= 2 && !deriveFinalDropoffDate(stops) && (!form.dropoff_date || form.dropoff_date === form.load_date)`:
+  - Set a warning state and render an inline alert above the submit button: "Final stop date is missing. This load may be counted on the pickup date instead of the delivery date. Save anyway?"
+  - First submit click sets the warning + returns; second click (with `acknowledgedDropWarning` true) proceeds. Matches existing quick-entry behavior — not a hard block.
+
+**7. Paste parser — `src/lib/parseLoadText.ts**`
+
+- Extend `ParsedStop` (if it exists; otherwise `ParsedLoadData.stops`) with optional `stop_date?: string`.
+- Conservative regex: only capture a date adjacent to a stop line in `MM/DD`, `MM/DD/YYYY`, or `YYYY-MM-DD` shape. If parse confidence low, leave null.
+- `LoadForm` paste handler maps parsed `stops[i].stop_date` into the new MultiStopEditor field.
+
+**8. Scan/OCR — `src/components/ScanLoadModal.tsx` + `supabase/functions/parse-contract` (or scan edge function)**
+
+- Add optional `stop_date` to AI extraction schema for each stop.
+- Map returned `stop_date` into stops; if AI returns top-level `dropoff_date` only, keep current behavior.
+
+**9. CSV import — `src/components/CSVImport.tsx**`
+
+- No change needed. Existing `delivery_date` → `dropoff_date` mapping (Phase 29 prior work) stays. Multi-stop CSV import not in scope.
+
+**10. Tests — `src/test/**`
+
+- New `finalDropoffDate.test.ts`:
+  - `deriveFinalDropoffDate` — drop+date wins; multiple drops → highest stop_order; no drops with date → highest dated stop; no dated stops → null.
+  - Scenario: pickup May 29, final drop stop May 30 → saved `dropoff_date = '2026-05-30'`.
+  - Dashboard range: same load appears in Mon-start week containing May 30, not pickup-only week.
+- Extend `MultiStopEditor` render test: stop_date input renders and onChange propagates.
+- `parseLoadText.test.ts`: parsed stop_date when present; null when absent (no crash).
+- Regression: ensure `effectiveDateAndDuplicate.test.ts`, security tests, starter-kit tests, Phase 23 tests still pass.
+
+**11. Verify**
+
+- `npm run build`, `npm run test`. Lint via supabase linter for the migration.
+
+---
+
+### Files touched
+
+- **Migration (new):** `supabase/migrations/<ts>_load_stops_stop_date.sql`
+- **Edited:** `src/hooks/useLoadStops.ts`, `src/components/MultiStopEditor.tsx`, `src/components/LoadForm.tsx`, `src/lib/loadUtils.ts`, `src/lib/parseLoadText.ts`, `src/components/ScanLoadModal.tsx`
+- **Tests (new/edited):** `src/test/finalDropoffDate.test.ts`, `src/test/parseLoadText.test.ts`, `src/test/multiStopEditor.test.tsx` (if not present, add small render test)
+
+### Out of scope
+
+Phase 23 pay formulas, recruiter security, starter kit, pricing/billing, SEO, UI redesign beyond the date input + helper text + warning, CSV multi-stop import.
+
+### Open questions
+
+None — proceeding with: warning is a confirm-then-save pattern (not a hard block), and stop_time is deferred.
+
+ADD THESE REQUIREMENTS TO PHASE 29 BEFORE IMPLEMENTATION
+
+1. Supabase generated types must be updated
+
+After adding load_stops.stop_date, update the Supabase TypeScript types so stop_date exists in:
+
+- Row
+
+- Insert
+
+- Update
+
+Do not rely only on manual interface edits.
+
+2. Validate stop_date format before using it
+
+deriveFinalDropoffDate must ignore invalid dates.
+
+Only use valid YYYY-MM-DD dates.
+
+Do not allow malformed dates to become loads.dropoff_date.
+
+3. Editing existing multi-stop loads must work
+
+When editing an existing load:
+
+- existing stop_date values must load into MultiStopEditor
+
+- edited stop_date values must save correctly
+
+- removing a stop must not leave stale stop_date data
+
+- reordering stops must still use the highest stop_order dated drop stop
+
+4. Duplicating a multi-stop load must not carry old stop dates
+
+When duplicating a load:
+
+- reset load_date to today
+
+- reset dropoff_date to today or blank based on existing duplicate behavior
+
+- reset all copied stop_date values to null or today
+
+- do not duplicate an old final stop date into a new load
+
+5. Final stop date must override manual dropoff_date only when multi-stop is enabled and a valid final stop date exists
+
+Rule:
+
+- if multiStop and valid final stop date exists: use final stop date
+
+- else if manual dropoff_date exists: use manual dropoff_date
+
+- else use load_date
+
+6. Add explicit test for manual dropoff fallback
+
+Test:
+
+- multi-stop load with no stop dates but manual dropoff_date = May 30 saves dropoff_date = May 30
+
+7. Add explicit test for duplicate behavior
+
+Test:
+
+- duplicated load does not keep old stop_date/dropoff_date from previous load
+
+8. Add manual QA checklist
+
+Verify:
+
+- create one-stop load
+
+- create two-stop load picked up May 29, delivered May 30
+
+- create three-stop load with final drop May 30
+
+- edit final stop date and confirm dashboard week changes
+
+- duplicate old multi-stop load and confirm old drop date is not carried forward
+
+- paste load with no stop dates and confirm warning appears
+
+- scan load with stop dates and confirm final stop date is used
