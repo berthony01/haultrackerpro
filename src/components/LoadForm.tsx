@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation, deriveFinalDropoffDate } from '@/lib/loadUtils';
+import { normalizeParsedStops, deriveExplicitFinalDropDate } from '@/lib/stopNormalization';
 import { DateInput } from '@/components/ui/date-input';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
@@ -309,23 +310,23 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       location: formatLocation(s.location),
     })) : [];
 
-    // Phase 29: derive the final drop-off date from multi-stop data. If multi-stop is
-    // enabled with 2+ stops and the user provided neither stop_date nor an explicit
-    // dropoff_date different from pickup, warn once before saving (non-blocking).
-    const finalStopDate = multiStop ? deriveFinalDropoffDate(formattedStops) : null;
+    // Phase 29B: ONLY an explicit final Drop stop with a valid stop_date may
+    // override the manual dropoff_date. Intermediate Stop dates never override
+    // the user's manual value (UI describes them as intermediate stops).
+    const explicitFinalDrop = multiStop ? deriveExplicitFinalDropDate(formattedStops) : null;
     const needsDropWarning =
       multiStop &&
-      formattedStops.length >= 2 &&
-      !finalStopDate &&
+      formattedStops.length >= 1 &&
+      !explicitFinalDrop &&
       (!form.dropoff_date || form.dropoff_date === form.load_date);
     if (needsDropWarning && !acknowledgedDropWarning) {
       setAcknowledgedDropWarning(true);
-      toast.warning('Final stop date is missing. This load may be counted on the pickup date instead of the delivery date. Tap save again to confirm.', { duration: 7000 });
+      toast.warning('Final Drop stop date is missing. This load may be counted on the pickup date instead of the delivery date. Tap save again to confirm.', { duration: 7000 });
       return;
     }
 
-    // Resolution order: final stop date > manual dropoff_date > load_date
-    const resolvedDropoff = finalStopDate ?? (form.dropoff_date || form.load_date);
+    // Resolution order: explicit final Drop stop date > manual dropoff_date > load_date
+    const resolvedDropoff = explicitFinalDrop ?? (form.dropoff_date || form.load_date);
 
     onSubmit({
       load_date: form.load_date,
@@ -411,6 +412,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       flat_rate_amount: lastLoad.flat_rate_amount?.toString() ?? '',
       dh_rate_per_mile: (lastLoad as any).deadhead_rate_per_mile?.toString() ?? '',
     });
+    // Phase 29B: copying a previous load is treated as a fresh single-stop load —
+    // clear any lingering multi-stop state from a prior paste/scan/edit session.
+    setMultiStop(false);
+    setStops([]);
+    setMultiStopBanner(null);
     setSaveAsPending(true);
     toast.success('Last load copied');
   };
@@ -517,17 +523,25 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                     ? prev
                     : { ...prev, notes: prev.notes ? `${prev.notes}\nTrip ID: ${data.trip_id}` : `Trip ID: ${data.trip_id}` });
                 }
-                // Multi-stop auto-detection
-                if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
+                // Phase 29B: normalize parsed stops — endpoints promote to
+                // top-level fields, interior stops only go into stops state.
+                // When no interior stops exist (single-stop or [Pickup,Drop]),
+                // clear stale stop state from any previous multi-stop parse.
+                const norm = normalizeParsedStops(data);
+                if (norm.multiStop) {
                   setMultiStop(true);
-                  setStops(data.stops.map((s, i) => ({
+                  setStops(norm.interiorStops.map((s, i) => ({
                     stop_order: i + 1,
                     location: s.location,
                     stop_type: s.stop_type,
                     detention_minutes: null,
                     stop_date: (s as any).stop_date ?? null,
                   })));
-                  setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
+                  setMultiStopBanner(`${norm.interiorStops.length + 2} stops detected. Review stops before logging.`);
+                } else {
+                  setMultiStop(false);
+                  setStops([]);
+                  setMultiStopBanner(null);
                 }
               }}
             />
@@ -601,13 +615,13 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               {/* Phase 29: do NOT mask blank dropoff with load_date — driver must see when it's empty. */}
               <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => update('dropoff_date', val)} />
               <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
-                Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'For multi-stop loads, the final stop date will be used.' : 'If blank, pickup date is used.'}
+                Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'Manual Drop-off Date stays in control unless a final Drop stop date is provided.' : 'If blank, pickup date is used.'}
               </p>
               {multiStop && (() => {
-                const finalStopDate = deriveFinalDropoffDate(stops);
-                return finalStopDate ? (
+                const explicit = deriveExplicitFinalDropDate(stops);
+                return explicit ? (
                   <p className="text-[10px] text-primary mt-1 leading-snug">
-                    Final stop date {finalStopDate} will be used for reporting.
+                    Final Drop stop date {explicit} will be used for reporting.
                   </p>
                 ) : null;
               })()}
@@ -656,7 +670,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           <div className="flex items-center justify-between rounded-lg bg-muted px-4 py-3">
             <div>
               <p className="text-sm font-medium">Multi-stop load?</p>
-              <p className="text-xs text-muted-foreground">Add intermediate stops</p>
+              <p className="text-xs text-muted-foreground">Add route stops between pickup and final delivery</p>
             </div>
             <Switch checked={multiStop} onCheckedChange={setMultiStop} />
           </div>
@@ -1102,16 +1116,23 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               ? data.pay_model_suggestion
               : prev.pay_model,
           }));
-          if (data.multiStopDetected && data.stops && data.stops.length >= 2) {
+          // Phase 29B: normalize scanned stops — endpoints promote, interior
+          // stops go to stops state; clear stale state when no interior stops.
+          const norm = normalizeParsedStops(data);
+          if (norm.multiStop) {
             setMultiStop(true);
-            setStops(data.stops.map((s, i) => ({
+            setStops(norm.interiorStops.map((s, i) => ({
               stop_order: i + 1,
               location: s.location,
               stop_type: s.stop_type,
               detention_minutes: null,
               stop_date: (s as any).stop_date ?? null,
             })));
-            setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
+            setMultiStopBanner(`${norm.interiorStops.length + 2} stops detected. Review stops before logging.`);
+          } else {
+            setMultiStop(false);
+            setStops([]);
+            setMultiStopBanner(null);
           }
         }}
       />

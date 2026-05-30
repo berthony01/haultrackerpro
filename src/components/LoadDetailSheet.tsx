@@ -3,6 +3,7 @@ import { Load, LoadUpdate } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { LoadStop } from '@/hooks/useLoadStops';
 import { formatCurrency, formatLocation, getEffectiveDate } from '@/lib/loadUtils';
+import { dedupeRouteStops } from '@/lib/stopNormalization';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +42,10 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
 
   const loadStops = useMemo(() => {
     if (!load) return [];
-    return stops.filter(s => s.load_id === load.id).sort((a, b) => a.stop_order - b.stop_order);
+    // Phase 29B: dedupe legacy rows that already contain Pickup/Drop endpoints
+    // inside load_stops so the route never renders the endpoints twice.
+    const all = stops.filter(s => s.load_id === load.id).sort((a, b) => a.stop_order - b.stop_order);
+    return dedupeRouteStops(load.pickup_location, load.dropoff_location, all);
   }, [stops, load]);
 
   const linkedExpensesTotal = linkedExpenses.reduce((s, e) => s + Number(e.amount), 0);

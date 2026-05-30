@@ -3,6 +3,7 @@ import type { Expense } from '@/hooks/useExpenses';
 import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
 import { getScheduleCLine, groupByScheduleC } from '@/lib/scheduleCMapping';
+import { dedupeRouteStops } from '@/lib/stopNormalization';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import {
   getLoadOperatingMiles,
@@ -227,9 +228,17 @@ function escapeCSV(val: string | number | null | undefined): string {
 export function buildStopsSummary(load: Load, stops: LoadStop[]): string {
   const loadStops = stops.filter(s => s.load_id === load.id).sort((a, b) => a.stop_order - b.stop_order);
   if (loadStops.length === 0) return '';
-  return [load.pickup_location, ...loadStops.map(s => s.location), load.dropoff_location]
+  // Phase 29B: legacy rows may already contain the Pickup/Drop endpoints inside
+  // load_stops. Drop a leading stop that matches pickup_location (or is type
+  // Pickup) and a trailing stop that matches dropoff_location (or is type Drop)
+  // so the route summary never duplicates endpoints.
+  const interior = dedupeRouteStops(load.pickup_location, load.dropoff_location, loadStops);
+  return [load.pickup_location, ...interior.map(s => s.location), load.dropoff_location]
     .map(formatLocation).join(' → ');
 }
+
+// dedupeRouteStops is imported above; consumers should import directly from
+// '@/lib/stopNormalization' rather than re-export here.
 
 /** Build the raw data row for a single load in the general CSV export.
  * Exported for testability of CSV column values. */
