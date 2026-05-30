@@ -3,6 +3,7 @@ import type { Expense } from '@/hooks/useExpenses';
 import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
 import { getScheduleCLine, groupByScheduleC } from '@/lib/scheduleCMapping';
+import { dedupeRouteStops } from '@/lib/stopNormalization';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import {
   getLoadOperatingMiles,
