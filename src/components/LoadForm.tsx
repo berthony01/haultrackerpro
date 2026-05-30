@@ -12,9 +12,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatLocation } from '@/lib/loadUtils';
 import {
   normalizeParsedStops,
-  deriveExplicitFinalDropDate,
+  deriveTrailingDropDate,
   normalizeEditorStopsForSave,
 } from '@/lib/stopNormalization';
+
 import { DateInput } from '@/components/ui/date-input';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
