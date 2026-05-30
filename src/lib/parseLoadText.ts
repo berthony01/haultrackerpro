@@ -16,6 +16,11 @@
  *   7. If only 1 value and it's not deadhead, it's loaded.
  */
 
+import { isValidISODate, isWithinSanityWindow } from './sourceDate';
+
+
+
+
 export interface ParsedStopData {
   location: string;
   stop_type: string;
@@ -549,7 +554,18 @@ export function parseLoadText(text: string): ParsedLoadData {
       if (i === 0) stop_type = 'Pickup';
       else if (i === blocks.length - 1) stop_type = 'Drop';
 
-      if (location) parsedStops.push({ location, stop_type });
+      // Phase 29A: conservative per-stop date extraction. Only trust a date that
+      // appears clearly inside this stop block AND passes the same sanity window
+      // we apply to scanned source dates. Anything ambiguous → stop_date stays
+      // undefined and the user can enter it manually.
+      let stop_date: string | undefined;
+      const blockBody = block.replace(/^\d+#:\s*/, '');
+      const parsedDate = tryParseDate(blockBody);
+      if (parsedDate && isValidISODate(parsedDate) && isWithinSanityWindow(parsedDate)) {
+        stop_date = parsedDate;
+      }
+
+      if (location) parsedStops.push({ location, stop_type, ...(stop_date ? { stop_date } : {}) });
     }
 
     if (parsedStops.length >= 2) {

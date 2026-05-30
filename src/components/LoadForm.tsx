@@ -158,6 +158,15 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [multiStopBanner, setMultiStopBanner] = useState<string | null>(null);
   const [acknowledgedDropWarning, setAcknowledgedDropWarning] = useState(false);
 
+  // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
+  // user changes anything that could move the load into or out of the risky
+  // missing-final-stop-date state. Without this, once a user dismisses the
+  // warning they could never see it again even after editing dates back to a
+  // risky configuration.
+  useEffect(() => {
+    setAcknowledgedDropWarning(false);
+  }, [multiStop, stops, form.dropoff_date, form.load_date]);
+
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
   // Deadhead revenue layer (Phase 5).

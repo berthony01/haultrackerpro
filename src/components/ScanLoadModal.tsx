@@ -3,8 +3,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Camera, Loader2, Check, Image as ImageIcon, AlertCircle, Sparkles, ShieldCheck, Wand2 } from 'lucide-react';
 import { parseLoadText, ParsedLoadData } from '@/lib/parseLoadText';
+import { isValidISODate, isWithinSanityWindow } from '@/lib/sourceDate';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+/** Phase 29A: normalize AI-returned stop_type to the app's vocabulary. */
+function normalizeStopType(raw: unknown): string {
+  const v = String(raw ?? '').trim().toLowerCase();
+  if (v === 'pickup' || v === 'pick-up' || v === 'pick up' || v === 'pu') return 'Pickup';
+  if (v === 'drop' || v === 'dropoff' || v === 'drop-off' || v === 'drop off' || v === 'delivery' || v === 'del') return 'Drop';
+  return 'Stop';
+}
+
+/** Phase 29A: only trust AI/OCR stop_date when valid + inside sanity window. */
+function safeStopDate(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  return isValidISODate(raw) && isWithinSanityWindow(raw) ? raw : undefined;
+}
 
 interface ScanLoadModalProps {
   open: boolean;
@@ -42,8 +57,8 @@ async function parseWithAI(ocrText: string): Promise<{ data: ParsedLoadData; use
         detectedStopsCount: parsed.stops?.length,
         stops: parsed.stops?.map((s: any) => ({
           location: s.location,
-          stop_type: s.stop_type || 'Stop',
-          stop_date: s.stop_date || undefined,
+          stop_type: normalizeStopType(s.stop_type),
+          stop_date: safeStopDate(s.stop_date),
         })),
       };
       return { data: result, usedAI: true };

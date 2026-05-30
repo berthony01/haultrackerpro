@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { parseLoadText } from '@/lib/parseLoadText';
 
 describe('parseLoadText — mileage detection', () => {
@@ -418,3 +418,56 @@ describe('parseLoadText — Phase 5 pay-model & total miles', () => {
     expect(r.mileage_warning).toMatch(/greater than total/i);
   });
 });
+
+describe('parseLoadText — Phase 29A per-stop date extraction', () => {
+  // Anchor "now" so MM/DD dates with implied current year stay in-window.
+  const ANCHOR = new Date('2026-05-30T12:00:00');
+  beforeAll(() => { vi.useFakeTimers(); vi.setSystemTime(ANCHOR); });
+  afterAll(() => vi.useRealTimers());
+
+  it('extracts stop_date when a clear date sits inside the stop block', () => {
+    const sample = `📍1#: AAA
+Pickup
+2026-05-29
+Dallas, TX 75001
+—————————————
+📍2#: BBB
+Drop
+2026-05-30
+Atlanta, GA 30301`;
+    const r = parseLoadText(sample);
+    expect(r.detectedStopsCount).toBe(2);
+    expect(r.stops?.[0].stop_date).toBe('2026-05-29');
+    expect(r.stops?.[1].stop_date).toBe('2026-05-30');
+    expect(r.stops?.[1].stop_type).toBe('Drop');
+  });
+
+  it('leaves stop_date undefined when no date appears in the block', () => {
+    const sample = `📍1#: AAA
+Pickup
+Dallas, TX 75001
+—————————————
+📍2#: BBB
+Drop
+Atlanta, GA 30301`;
+    const r = parseLoadText(sample);
+    expect(r.stops?.[0].stop_date).toBeUndefined();
+    expect(r.stops?.[1].stop_date).toBeUndefined();
+  });
+
+  it('rejects stop_date outside the sanity window (year hallucination)', () => {
+    const sample = `📍1#: AAA
+Pickup
+2019-05-29
+Dallas, TX 75001
+—————————————
+📍2#: BBB
+Drop
+2019-05-30
+Atlanta, GA 30301`;
+    const r = parseLoadText(sample);
+    expect(r.stops?.[0].stop_date).toBeUndefined();
+    expect(r.stops?.[1].stop_date).toBeUndefined();
+  });
+});
+

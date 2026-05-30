@@ -16,6 +16,15 @@ Run through this list on a real mobile device and a desktop browser before each 
 - [ ] Delete load → removed from list and dashboard totals
 - [ ] Multi-stop load saves all stops
 
+### 2a. Phase 29 — Final drop-off date (multi-stop)
+- [ ] Single-stop load: pickup date alone still controls reporting when no drop-off date is entered
+- [ ] Multi-stop load with pickup May 29 and final stop May 30 → load appears in the May 30 week, not May 29
+- [ ] Editing the final stop date and re-saving moves the load into the new week on the dashboard, loads page, reports, and weekly summary
+- [ ] Duplicating a multi-stop load clears all `stop_date` values on the copy (no leaked old dates)
+- [ ] Pasting a multi-stop dispatch with NO stop dates surfaces the "Final stop date is missing" warning; saving again confirms
+- [ ] Scanning a multi-stop rate confirmation that has clear per-stop dates fills them in and the final stop date is used as the reporting date
+- [ ] Scan results map any AI "Dropoff" stop_type to "Drop" in the editor
+
 ## 3. Telegram / Paste Import
 - [ ] Paste raw broker text into Paste Load Parser
 - [ ] Auto-fill populates locations, miles, rate, deadhead

@@ -29,7 +29,7 @@ const SYSTEM_PROMPTS: Record<string, string> = {
 
   parse_expense: `You are an expense data extractor for a trucking app. Given natural language text (possibly from voice input), extract one or more expenses. Return structured data using the provided tool.`,
 
-  parse_ratecon: `You are a rate confirmation parser for a trucking app. Extract structured load data from raw OCR text. Rules: (1) loaded_miles = line-haul/trip miles only. (2) deadhead_miles = empty/DH/bobtail miles only — never guess; omit if not explicitly present. (3) total_miles = dispatcher-provided total/all miles when explicitly labeled — keep separate from loaded. (4) Never treat total miles as deadhead. (5) Extract deadhead_rate_per_mile and flat_rate only if explicitly stated. (6) Suggest pay_model_suggestion based on detected fields: 'flat_rate' if flat amount present, 'loaded_plus_deadhead' if separate DH rate present, 'total_miles' if rate + total miles but no loaded miles, otherwise 'loaded_miles_only'. (7) If loaded+deadhead disagree with total by more than 2 miles, set mileage_warning. (8) DATES: only return load_date / dropoff_date when the rate confirmation explicitly shows a full, unambiguous date. If only a partial date (e.g. "5/17" with no year) appears, assume the CURRENT calendar year — never default to a prior year. Never return a date older than 60 days before today or more than 30 days in the future. If the date is ambiguous or the year is uncertain, omit the field entirely (null) rather than guessing. Use the provided tool.`,
+  parse_ratecon: `You are a rate confirmation parser for a trucking app. Extract structured load data from raw OCR text. Rules: (1) loaded_miles = line-haul/trip miles only. (2) deadhead_miles = empty/DH/bobtail miles only — never guess; omit if not explicitly present. (3) total_miles = dispatcher-provided total/all miles when explicitly labeled — keep separate from loaded. (4) Never treat total miles as deadhead. (5) Extract deadhead_rate_per_mile and flat_rate only if explicitly stated. (6) Suggest pay_model_suggestion based on detected fields: 'flat_rate' if flat amount present, 'loaded_plus_deadhead' if separate DH rate present, 'total_miles' if rate + total miles but no loaded miles, otherwise 'loaded_miles_only'. (7) If loaded+deadhead disagree with total by more than 2 miles, set mileage_warning. (8) DATES: only return load_date / dropoff_date / per-stop stop_date when the rate confirmation explicitly shows a full, unambiguous date. If only a partial date (e.g. "5/17" with no year) appears, assume the CURRENT calendar year — never default to a prior year. Never return a date older than 60 days before today or more than 30 days in the future. If the date is ambiguous or the year is uncertain, omit the field entirely (null) rather than guessing. (9) STOPS: use stop_type values Pickup, Stop, or Drop (final delivery). Do not invent stop dates. Use the provided tool.`,
 };
 
 // ── Tool definitions for structured extraction ───────────────────────
@@ -101,8 +101,9 @@ const PARSE_RATECON_TOOL = {
             type: "object",
             properties: {
               location: { type: "string" },
-              stop_type: { type: "string", enum: ["Pickup", "Dropoff", "Stop"] },
+              stop_type: { type: "string", enum: ["Pickup", "Stop", "Drop", "Dropoff"], description: "Use Pickup, Stop, or Drop. Dropoff is accepted but will be normalized to Drop." },
               stop_order: { type: "number" },
+              stop_date: { type: "string", description: "ISO date for this stop, only when the rate confirmation clearly shows a full unambiguous date for THIS stop. Omit otherwise. Same year/sanity rules as load_date apply." },
             },
             required: ["location", "stop_type", "stop_order"],
           },
