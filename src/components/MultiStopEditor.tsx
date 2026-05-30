@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { Plus, Trash2, MapPin } from 'lucide-react';
+import { normalizeEditorStopsForUi } from '@/lib/stopNormalization';
 
 interface MultiStopEditorProps {
   stops: LoadStopInput[];
@@ -13,22 +14,27 @@ interface MultiStopEditorProps {
 }
 
 export function MultiStopEditor({ stops, onChange, errors = {} }: MultiStopEditorProps) {
+  // Phase 29F: every mutation emits renumbered rows so stop_order is always
+  // 1..N matching array position. UI consumers (inline note, warning gate)
+  // and the save path then agree on ordering.
+  const emit = (next: LoadStopInput[]) => onChange(normalizeEditorStopsForUi(next));
+
   const addStop = () => {
     // Phase 29E: if the current trailing row is typed 'Drop', demote it to
     // 'Stop' before appending so we never end up with an interior Drop row.
     const base = stops.length > 0 && (stops[stops.length - 1].stop_type ?? '').toLowerCase() === 'drop'
       ? stops.map((s, i) => i === stops.length - 1 ? { ...s, stop_type: 'Stop' } : s)
       : stops;
-    onChange([...base, { stop_order: base.length + 1, location: '', stop_type: 'Stop', detention_minutes: null, stop_date: null }]);
+    emit([...base, { stop_order: base.length + 1, location: '', stop_type: 'Stop', detention_minutes: null, stop_date: null }]);
   };
 
   const removeStop = (index: number) => {
-    onChange(stops.filter((_, i) => i !== index));
+    emit(stops.filter((_, i) => i !== index));
   };
 
   const updateStop = (index: number, field: keyof LoadStopInput, value: any) => {
     const updated = stops.map((s, i) => i === index ? { ...s, [field]: value } : s);
-    onChange(updated);
+    emit(updated);
   };
 
 
