@@ -18,6 +18,36 @@ export function getEffectiveDate(load: Load): string {
   return (load as any).dropoff_date ?? load.load_date;
 }
 
+/**
+ * Phase 29: Derive the final drop-off date from a load's multi-stop list.
+ *
+ * Rule:
+ *  - Prefer the highest stop_order stop whose stop_type === 'drop' (case-insensitive)
+ *    AND has a valid YYYY-MM-DD stop_date.
+ *  - Else fall back to the highest stop_order stop with any valid stop_date.
+ *  - Else null (caller falls back to manual dropoff_date, then load_date).
+ *
+ * Invalid / malformed stop_date strings are ignored — they never become loads.dropoff_date.
+ */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isValidStopDate(d: string | null | undefined): d is string {
+  if (!d || !ISO_DATE_RE.test(d)) return false;
+  const [y, m, day] = d.split('-').map(Number);
+  const dt = new Date(y, m - 1, day);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === day;
+}
+
+export function deriveFinalDropoffDate(
+  stops: { stop_order: number; stop_type: string; stop_date?: string | null }[] | null | undefined
+): string | null {
+  if (!stops || stops.length === 0) return null;
+  const valid = stops.filter(s => isValidStopDate(s.stop_date));
+  if (valid.length === 0) return null;
+  const drops = valid.filter(s => (s.stop_type ?? '').toLowerCase() === 'drop');
+  const pool = drops.length > 0 ? drops : valid;
+  return [...pool].sort((a, b) => b.stop_order - a.stop_order)[0].stop_date!;
+}
+
 // ── Canonical CSV header rows (single source of truth) ──────────────────────
 // FAQ live previews import these so docs cannot drift from the real exports.
 export const CSV_HEADERS_LOADS = [

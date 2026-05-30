@@ -1,0 +1,1 @@
+ALTER TABLE public.load_stops ADD COLUMN IF NOT EXISTS stop_date date NULL;

@@ -10,6 +10,7 @@ export interface LoadStop {
   location: string;
   stop_type: string;
   detention_minutes: number | null;
+  stop_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +20,7 @@ export interface LoadStopInput {
   location: string;
   stop_type: string;
   detention_minutes?: number | null;
+  stop_date?: string | null;
 }
 
 export function useLoadStops(loadIds?: string[]) {
@@ -66,6 +68,7 @@ export function useLoadStops(loadIds?: string[]) {
         location: s.location,
         stop_type: s.stop_type,
         detention_minutes: s.detention_minutes ?? null,
+        stop_date: s.stop_date ?? null,
       }));
 
       const { data, error } = await supabase

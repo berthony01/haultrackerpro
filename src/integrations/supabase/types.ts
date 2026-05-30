@@ -1263,6 +1263,7 @@ export type Database = {
           id: string
           load_id: string
           location: string
+          stop_date: string | null
           stop_order: number
           stop_type: string
           updated_at: string
@@ -1274,6 +1275,7 @@ export type Database = {
           id?: string
           load_id: string
           location: string
+          stop_date?: string | null
           stop_order: number
           stop_type?: string
           updated_at?: string
@@ -1285,6 +1287,7 @@ export type Database = {
           id?: string
           load_id?: string
           location?: string
+          stop_date?: string | null
           stop_order?: number
           stop_type?: string
           updated_at?: string

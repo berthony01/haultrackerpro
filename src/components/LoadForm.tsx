@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCurrency, formatLocation } from '@/lib/loadUtils';
+import { formatCurrency, formatLocation, deriveFinalDropoffDate } from '@/lib/loadUtils';
 import { DateInput } from '@/components/ui/date-input';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
@@ -156,6 +156,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [showScanLoad, setShowScanLoad] = useState(false);
   const [showScanUpgrade, setShowScanUpgrade] = useState(false);
   const [multiStopBanner, setMultiStopBanner] = useState<string | null>(null);
+  const [acknowledgedDropWarning, setAcknowledgedDropWarning] = useState(false);
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
@@ -299,9 +300,27 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       location: formatLocation(s.location),
     })) : [];
 
+    // Phase 29: derive the final drop-off date from multi-stop data. If multi-stop is
+    // enabled with 2+ stops and the user provided neither stop_date nor an explicit
+    // dropoff_date different from pickup, warn once before saving (non-blocking).
+    const finalStopDate = multiStop ? deriveFinalDropoffDate(formattedStops) : null;
+    const needsDropWarning =
+      multiStop &&
+      formattedStops.length >= 2 &&
+      !finalStopDate &&
+      (!form.dropoff_date || form.dropoff_date === form.load_date);
+    if (needsDropWarning && !acknowledgedDropWarning) {
+      setAcknowledgedDropWarning(true);
+      toast.warning('Final stop date is missing. This load may be counted on the pickup date instead of the delivery date. Tap save again to confirm.', { duration: 7000 });
+      return;
+    }
+
+    // Resolution order: final stop date > manual dropoff_date > load_date
+    const resolvedDropoff = finalStopDate ?? (form.dropoff_date || form.load_date);
+
     onSubmit({
       load_date: form.load_date,
-      dropoff_date: form.dropoff_date || form.load_date,
+      dropoff_date: resolvedDropoff,
       pickup_location: formatLocation(form.pickup_location),
       dropoff_location: formatLocation(form.dropoff_location),
       loaded_miles: parseFloat(form.loaded_miles) || 0,
@@ -497,6 +516,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                     location: s.location,
                     stop_type: s.stop_type,
                     detention_minutes: null,
+                    stop_date: (s as any).stop_date ?? null,
                   })));
                   setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
                 }
@@ -557,8 +577,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             <div>
               <Label htmlFor="load_date">Pickup Date</Label>
               <DateInput id="load_date" value={form.load_date} onChange={(val) => {
+                // Phase 29: only seed dropoff from pickup for single-stop loads when the
+                // user hasn't typed a dropoff yet. Multi-stop derives from final stop date.
+                const prevPickup = form.load_date;
                 update('load_date', val);
-                if (!form.dropoff_date || form.dropoff_date === form.load_date) {
+                if (!multiStop && (!form.dropoff_date || form.dropoff_date === prevPickup)) {
                   update('dropoff_date', val);
                 }
               }} />
@@ -566,10 +589,19 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
             </div>
             <div>
               <Label htmlFor="dropoff_date">Drop-off Date</Label>
-              <DateInput id="dropoff_date" value={form.dropoff_date || form.load_date} onChange={(val) => update('dropoff_date', val)} />
+              {/* Phase 29: do NOT mask blank dropoff with load_date — driver must see when it's empty. */}
+              <DateInput id="dropoff_date" value={form.dropoff_date} onChange={(val) => update('dropoff_date', val)} />
               <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
-                Used for dashboard, weekly totals, reports, and exports. If blank, pickup date is used.
+                Used for dashboard, weekly totals, reports, and exports. {multiStop ? 'For multi-stop loads, the final stop date will be used.' : 'If blank, pickup date is used.'}
               </p>
+              {multiStop && (() => {
+                const finalStopDate = deriveFinalDropoffDate(stops);
+                return finalStopDate ? (
+                  <p className="text-[10px] text-primary mt-1 leading-snug">
+                    Final stop date {finalStopDate} will be used for reporting.
+                  </p>
+                ) : null;
+              })()}
             </div>
           </div>
 
@@ -1068,6 +1100,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               location: s.location,
               stop_type: s.stop_type,
               detention_minutes: null,
+              stop_date: (s as any).stop_date ?? null,
             })));
             setMultiStopBanner(`${data.detectedStopsCount} stops detected. Review stops before logging.`);
           }
