@@ -165,6 +165,12 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [multiStopBanner, setMultiStopBanner] = useState<string | null>(null);
   const [acknowledgedDropWarning, setAcknowledgedDropWarning] = useState(false);
 
+  // Phase 29G: per-field dirty tracking so a second paste/scan into the same
+  // form cannot silently carry stale imported dates from the previous load.
+  // Flipped to true only when the driver edits the DateInput directly.
+  const [userTouchedLoadDate, setUserTouchedLoadDate] = useState(false);
+  const [userTouchedDropoffDate, setUserTouchedDropoffDate] = useState(false);
+
   // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
   // user changes anything that could move the load into or out of the risky
   // missing-final-stop-date state. Without this, once a user dismisses the
