@@ -156,6 +156,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [showScanLoad, setShowScanLoad] = useState(false);
   const [showScanUpgrade, setShowScanUpgrade] = useState(false);
   const [multiStopBanner, setMultiStopBanner] = useState<string | null>(null);
+  const [acknowledgedDropWarning, setAcknowledgedDropWarning] = useState(false);
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
