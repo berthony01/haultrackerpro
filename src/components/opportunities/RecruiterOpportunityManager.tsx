@@ -27,14 +27,16 @@ import {
   type Opportunity,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
+import { RecruiterQuickPostForm } from './RecruiterQuickPostForm';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
+import type { OpportunityInsert } from '@/hooks/opportunities/useRecruiterOpportunities';
 
 interface Props {
   onBack: () => void;
 }
 
-type View = 'list' | 'edit' | 'referrals';
+type View = 'list' | 'quick' | 'edit' | 'referrals';
 
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
@@ -43,6 +45,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
 
   const [view, setView] = useState<View>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
+  const [seed, setSeed] = useState<Partial<OpportunityInsert> | null>(null);
 
   if (profileLoading) {
     return (

@@ -248,7 +248,7 @@ export function RecruiterOpportunityForm({
       confirm_drivers_see_intel: !!initial.transparency_confirmed,
       confirm_misleading_removed: !!initial.transparency_confirmed,
     });
-  }, [initial, profile]);
+  }, [initial, profile, seed]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
