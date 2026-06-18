@@ -1225,6 +1225,52 @@ function NumField({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
+/**
+ * Specialized CPM input with a $ adornment, a helper showing the expected
+ * format ("$/mile — example: 0.65"), a live "≈ $X/week at Y miles" hint
+ * using the recruiter's own weekly-miles input, and a sanity warning if the
+ * value looks like cents instead of dollars (e.g. 65 instead of 0.65).
+ */
+function CpmField({
+  value, onChange, weeklyMiles,
+}: { value: string; onChange: (v: string) => void; weeklyMiles: string }) {
+  const num = value === '' ? null : Number(value);
+  const validNum = num != null && !Number.isNaN(num) && num >= 0 ? num : null;
+  const miles = Number(weeklyMiles);
+  const validMiles = !Number.isNaN(miles) && miles > 0 ? miles : null;
+  const weekly = validNum != null && validMiles != null ? Math.round(validNum * validMiles) : null;
+  const looksLikeCents = validNum != null && validNum > 2;
+
+  return (
+    <Field
+      label="CPM Rate ($/mi)"
+      helper={
+        looksLikeCents
+          ? `⚠️ ${validNum} looks like cents. Enter dollars per mile (example: 0.65 for 65¢/mi).`
+          : weekly != null
+            ? `≈ $${weekly.toLocaleString()}/week at ${validMiles!.toLocaleString()} miles`
+            : '$/mile — example: 0.65 for 65 cents per mile'
+      }
+    >
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">$</span>
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min={0}
+          max={5}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="0.65"
+          className={`pl-7 ${looksLikeCents ? 'border-amber-500/60 focus-visible:ring-amber-500/40' : ''}`}
+        />
+      </div>
+    </Field>
+  );
+}
+
+
 function TriField({ label, value, onChange }: { label: string; value: Tribool; onChange: (v: Tribool) => void }) {
   return (
     <Field label={label}>
