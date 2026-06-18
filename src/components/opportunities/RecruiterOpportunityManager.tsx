@@ -72,12 +72,23 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
 
   // Verified recruiters can submit unlimited standard opportunities.
   // Approval/suspension gating is already enforced above; billing is only for premium tools.
+  if (view === 'quick') {
+    return (
+      <RecruiterQuickPostForm
+        onBack={() => { setView('list'); setSeed(null); }}
+        onSaved={() => { setView('list'); setSeed(null); refetch(); }}
+        onSwitchToDetailed={(values) => { setSeed(values); setEditing(null); setView('edit'); }}
+      />
+    );
+  }
+
   if (view === 'edit') {
     return (
       <RecruiterOpportunityForm
         initial={editing}
-        onBack={() => { setView('list'); setEditing(null); }}
-        onSaved={() => { setView('list'); setEditing(null); refetch(); }}
+        seed={editing ? null : seed}
+        onBack={() => { setView('list'); setEditing(null); setSeed(null); }}
+        onSaved={() => { setView('list'); setEditing(null); setSeed(null); refetch(); }}
         canSubmitForReview={true}
         submitBlockReason={null}
       />
@@ -123,7 +134,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               Create and manage your trucking opportunities. Submissions are reviewed before going live.
             </p>
           </div>
-          <Button onClick={() => { setEditing(null); setView('edit'); }} className="shrink-0">
+          <Button onClick={() => { setEditing(null); setSeed(null); setView('quick'); }} className="shrink-0">
             <Plus className="h-4 w-4" /> Post Opportunity
           </Button>
         </div>
@@ -160,7 +171,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
           <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
             Create your first opportunity to start connecting with serious drivers.
           </p>
-          <Button onClick={() => { setEditing(null); setView('edit'); }}>
+          <Button onClick={() => { setEditing(null); setSeed(null); setView('quick'); }}>
             <Plus className="h-4 w-4" /> Create Opportunity
           </Button>
         </Card>
