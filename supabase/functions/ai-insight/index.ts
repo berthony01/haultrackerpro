@@ -17,6 +17,7 @@ const MODEL_MAP: Record<string, string> = {
   tax_tips: "google/gemini-3-flash-preview",
   parse_expense: "google/gemini-3-flash-preview",
   parse_ratecon: "google/gemini-3-flash-preview",
+  parse_opportunity: "google/gemini-3-flash-preview",
 };
 
 // ── System prompts ───────────────────────────────────────────────────
@@ -30,6 +31,23 @@ const SYSTEM_PROMPTS: Record<string, string> = {
   parse_expense: `You are an expense data extractor for a trucking app. Given natural language text (possibly from voice input), extract one or more expenses. Return structured data using the provided tool.`,
 
   parse_ratecon: `You are a rate confirmation parser for a trucking app. Extract structured load data from raw OCR text. Rules: (1) loaded_miles = line-haul/trip miles only. (2) deadhead_miles = empty/DH/bobtail miles only — never guess; omit if not explicitly present. (3) total_miles = dispatcher-provided total/all miles when explicitly labeled — keep separate from loaded. (4) Never treat total miles as deadhead. (5) Extract deadhead_rate_per_mile and flat_rate only if explicitly stated. (6) Suggest pay_model_suggestion based on detected fields: 'flat_rate' if flat amount present, 'loaded_plus_deadhead' if separate DH rate present, 'total_miles' if rate + total miles but no loaded miles, otherwise 'loaded_miles_only'. (7) If loaded+deadhead disagree with total by more than 2 miles, set mileage_warning. (8) DATES: only return load_date / dropoff_date / per-stop stop_date when the rate confirmation explicitly shows a full, unambiguous date. If only a partial date (e.g. "5/17" with no year) appears, assume the CURRENT calendar year — never default to a prior year. Never return a date older than 60 days before today or more than 30 days in the future. If the date is ambiguous or the year is uncertain, omit the field entirely (null) rather than guessing. (9) STOPS: use stop_type values Pickup, Stop, or Drop (final delivery). Do not invent stop dates. Use the provided tool.`,
+
+  parse_opportunity: `You are a trucking job-posting parser. Given raw text pasted by a recruiter (job ad, recruiter pitch, internal posting, rate sheet), extract structured opportunity fields using the provided tool. Rules:
+(1) CPM = dollars per mile as a decimal (e.g. "65 cents per mile" → 0.65, "$0.58/mi" → 0.58). Never return cents as whole numbers like 65.
+(2) percentage_pay = percentage as a number 0-100 (e.g. "72% of gross" → 72).
+(3) flat_weekly_pay = weekly salary in dollars.
+(4) estimated_weekly_miles, estimated_loaded_miles, estimated_deadhead_miles = whole miles only.
+(5) pay_model: pick exactly one of cpm | percentage | flat_weekly | salary | mixed | other based on what dominates the posting.
+(6) driver_type: company | owner_operator | lease_purchase | 1099 | team — pick the closest match, otherwise omit.
+(7) route_type: one of Local | Regional | OTR | Dedicated | Semi-Dedicated.
+(8) trailer_type: one of Dry Van | Reefer | Flatbed | Tanker | Car Hauler | Intermodal | Other.
+(9) deadhead_paid, escrow_required, forced_dispatch, pets_allowed, riders_allowed: true/false only when clearly stated; omit otherwise (do not guess).
+(10) hiring_state: 2-letter US state code (e.g. TX). hiring_states: array of 2-letter codes for multi-state postings.
+(11) typical_lanes: short multi-line text of lane pairs like "Dallas, TX → Houston, TX" if mentioned.
+(12) requirements: experience, CDL class, endorsements, MVR rules, drug test, age requirements, etc.
+(13) description: a clean 1-3 sentence summary of the opportunity.
+(14) Never invent numbers. Omit any field not clearly supported by the text.
+(15) Strip recruiter contact info (phone numbers, emails) from all extracted text fields.`,
 };
 
 // ── Tool definitions for structured extraction ───────────────────────
@@ -110,6 +128,54 @@ const PARSE_RATECON_TOOL = {
         },
       },
       required: ["pickup_location", "dropoff_location"],
+    },
+  },
+};
+
+const PARSE_OPPORTUNITY_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "extract_opportunity",
+    description: "Extract structured trucking opportunity fields from a pasted job posting",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        company_name: { type: "string" },
+        hiring_city: { type: "string" },
+        hiring_state: { type: "string", description: "2-letter US state code" },
+        hiring_states: { type: "array", items: { type: "string" }, description: "Array of 2-letter state codes" },
+        driver_type: { type: "string", enum: ["company", "owner_operator", "lease_purchase", "1099", "team"] },
+        route_type: { type: "string", enum: ["Local", "Regional", "OTR", "Dedicated", "Semi-Dedicated"] },
+        trailer_type: { type: "string", enum: ["Dry Van", "Reefer", "Flatbed", "Tanker", "Car Hauler", "Intermodal", "Other"] },
+        description: { type: "string", description: "Short 1-3 sentence summary" },
+        pay_model: { type: "string", enum: ["cpm", "percentage", "flat_weekly", "salary", "mixed", "other"] },
+        cpm: { type: "number", description: "Dollars per mile as decimal (0.65 not 65)" },
+        percentage_pay: { type: "number", description: "0-100" },
+        flat_weekly_pay: { type: "number" },
+        estimated_weekly_gross: { type: "number" },
+        estimated_weekly_miles: { type: "number" },
+        estimated_loaded_miles: { type: "number" },
+        estimated_deadhead_miles: { type: "number" },
+        deadhead_paid: { type: "boolean" },
+        detention_pay: { type: "string", description: "Free-text like '$25/hr after 2 hrs'" },
+        layover_pay: { type: "string" },
+        sign_on_bonus: { type: "number" },
+        fuel_paid_by: { type: "string", enum: ["Company", "Driver", "Split", "Not Disclosed"] },
+        insurance_deductions: { type: "number" },
+        escrow_required: { type: "boolean" },
+        escrow_amount: { type: "number" },
+        lease_payment: { type: "number" },
+        maintenance_deductions: { type: "number" },
+        other_deductions: { type: "number" },
+        home_time: { type: "string", description: "Free-text like 'home weekly' or '2 weeks out, 4 days home'" },
+        forced_dispatch: { type: "boolean" },
+        pets_allowed: { type: "boolean" },
+        riders_allowed: { type: "boolean" },
+        equipment_year: { type: "string" },
+        typical_lanes: { type: "string", description: "Multi-line lane pairs" },
+        requirements: { type: "string", description: "Experience, CDL, endorsements, MVR, etc." },
+      },
     },
   },
 };
