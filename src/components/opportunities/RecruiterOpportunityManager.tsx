@@ -121,7 +121,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
             </p>
           </div>
           <Button onClick={() => { setEditing(null); setView('edit'); }} className="shrink-0">
-            <Plus className="h-4 w-4" /> New
+            <Plus className="h-4 w-4" /> Post Opportunity
           </Button>
         </div>
       </Card>
