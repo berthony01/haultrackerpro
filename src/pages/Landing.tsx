@@ -1,29 +1,28 @@
-import { ArrowRight, TrendingUp, DollarSign, FileText, BarChart3, Shield, Truck, ChevronDown, CheckCircle2, AlertTriangle, Mic, Camera, Menu, X, Star, Users, Zap, ExternalLink, ParkingCircle, Trophy } from 'lucide-react';
+import {
+  ArrowRight,
+  TrendingUp,
+  Shield,
+  Truck,
+  CheckCircle2,
+  AlertTriangle,
+  Users,
+  Briefcase,
+  Menu,
+  X,
+  Sparkles,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
-import reportsMockup from '@/assets/reports-mockup.png';
 import SEOHead from '@/components/SEOHead';
-import ProfitIntelDemo from '@/components/ProfitIntelDemo';
-import { trackLandingFaqDeepLink, trackStarterKitCTAClicked } from '@/lib/analytics';
-import { useLandingAudience } from '@/hooks/useLandingAudience';
-import AudienceToggle from '@/components/landing/AudienceToggle';
-import RecruiterLanding from '@/components/landing/RecruiterLanding';
+import { trackStarterKitCTAClicked } from '@/lib/analytics';
 
-type LandingFaq = { q: string; a: string; deepLink?: string };
-
-const faqs: LandingFaq[] = [
-  { q: 'Is my data secure?', a: 'Yes. All data is encrypted in transit and stored securely. We never sell or share your data with third parties.' },
-  { q: 'Do I need accounting knowledge?', a: 'Not at all. Just enter your loads and expenses — HaulTrackerPro does the math for you automatically.' },
-  { q: 'Is it really free?', a: 'The Free plan gives you unlimited loads, expenses, and CSV exports — no credit card required. Pro unlocks AI-powered automation and advanced features for $19.99/month or $179.88/year.' },
-  { q: 'How is this different from a spreadsheet?', a: 'HaulTrackerPro gives you instant profit calculations, weekly closeouts, pay variance alerts, and professional exports — without any formulas.' },
-  { q: 'Can I try the app before paying?', a: 'Yes — the Free plan gives you unlimited load logging, unlimited expense tracking, net profit per load, multi-stop loads, basic smart alerts, and CSV exports forever. No credit card required. Upgrade to Pro any time to unlock AI automation, advanced insights, and the Driver Scorecard.' },
-  { q: 'How does load scoring use my own history — and what triggers a money-slip or broker warning?', a: 'Every load you log feeds your personal lane stats (avg RPM, margin, deadhead, days-to-pay) and broker stats (reliability, short-pay rate, days-to-pay). Pro scores new loads against your own rolling averages, not generic industry numbers. Money-slip alerts trigger when a lane\'s margin drops vs. its 60-day baseline, deadhead drifts above your target, or your rolling cost-per-mile climbs. Broker warnings trigger on slow payments (days-to-pay above your average), repeated short-pays, or unpaid invoices aging past their due date.' },
-  { q: 'Can I export weekly or monthly summaries as PDF or CSV?', a: 'Yes. From your dashboard, open the Reports view and pick a date range — week, month, quarter, or custom. CSV exports of loads and expenses are included on every plan. Pro adds branded PDF reports with summary totals, ready for tax prep, bookkeepers, or pay disputes. You can also export every dataset on your account as a single JSON backup from Settings.', deepLink: '/faq?open=pdf-mock' },
-  { q: 'What columns are in the CSV export?', a: 'The standard Loads CSV (All Loads, Filtered Loads, Monthly Summary, and per-week exports) includes 17 columns: Date, Pickup, Dropoff, Stops Summary, Loaded Miles, Deadhead Miles, Rate/Mile, Wait Fee, Detention Fee, Other Fees, Estimated Pay, Actual Pay, Difference, Status, Notes, Company Name, and Company Start Date. The Profit Report CSV includes: Date, Pickup, Dropoff, Stops Summary, Estimated Pay, Actual Pay, Linked Expenses, Net Load Profit, Company Name, Company Start Date. The Schedule C Summary CSV groups expenses by IRS Schedule C line: Schedule C Line, Line Description, Categories, Total Amount.', deepLink: '/faq?open=csv-columns' },
-  { q: 'What\'s inside the weekly / monthly PDF report?', a: 'Each branded PDF includes: a header with your company name, the date range, and totals (loads, loaded miles, deadhead miles, estimated pay, actual pay, and pay variance); a per-load table with date, pickup, dropoff, loaded/deadhead miles, $/mile, estimated pay, actual pay, and status; pay variance highlights for short-paid or unpaid loads; and a brief lane and broker summary showing your top lanes by revenue and any brokers with payment issues in the period. See the FAQ page for a visual mock layout.', deepLink: '/faq?open=pdf-mock' },
-  { q: 'How does the Pricing → Profit Intelligence link work with direct URLs and refreshes?', a: 'The "Profit Intelligence" link on the Pricing page points to /#profit-intelligence on the home page. The same URL works as a shareable direct link or after a full refresh — the home page reads the hash on mount and instantly anchors the viewport to the Profit Intelligence section using behavior:auto with a per-frame poll, so there is no top-flash, smooth-scroll jump, or flicker on first load. You land directly on the four flagship cards followed by the interactive demo.', deepLink: '/faq?open=profit-intelligence-link' },
+const faqs = [
+  { q: 'Is it really free?', a: 'Yes. The Free plan gives drivers unlimited load logging, expense tracking, multi-stop loads, basic smart alerts, and CSV exports — no credit card. Pro ($19.99/mo or $179.88/yr) adds AI automation, advanced insights, and the Driver Scorecard.' },
+  { q: 'How do recruiters get verified?', a: 'Recruiters apply for verified access on the Recruiters page. Once approved, they can post unlimited standard opportunities, manage applicants, and track referrals. Paid recruiter plans add premium visibility, analytics, and contract workflow tools.' },
+  { q: 'Is my data secure?', a: 'All data is encrypted in transit and stored securely. We never sell or share your data.' },
+  { q: 'How is this different from a spreadsheet?', a: 'Instant profit calculations, weekly closeouts, pay variance alerts, and exports built specifically for trucking — no formulas to maintain.' },
 ];
 
 const faqJsonLd = {
@@ -36,21 +35,27 @@ const faqJsonLd = {
   })),
 };
 
+const NAVY_BG = 'hsl(220, 20%, 8%)';
+const NAVY_SURFACE = 'hsl(220, 20%, 11%)';
+const NAVY_BORDER = 'hsl(220, 16%, 18%)';
+const AMBER = 'hsl(25, 95%, 53%)';
+const AMBER_BRIGHT = 'hsl(25, 95%, 60%)';
+const TEXT_MUTED = 'hsl(220, 10%, 65%)';
+const TEXT_DIM = 'hsl(220, 10%, 50%)';
+const GREEN = 'hsl(152, 60%, 45%)';
+
 export default function Landing() {
   const navigate = useNavigate();
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { audience, setAudience } = useLandingAudience();
-  const isRecruiterAudience = audience === 'recruiter';
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  const goToAuth = () => navigate('/auth');
+  const goToDriver = () => navigate('/auth?intent=driver');
+  const goToRecruiter = () => navigate('/recruiters');
 
   useEffect(() => {
     if (!window.location.hash) return;
     const id = window.location.hash.slice(1);
     let attempts = 0;
-    // Poll for the target element (it may render after lazy content / images settle).
-    // Use behavior: 'auto' to avoid the "jump-to-top then smooth-scroll" flicker on first load.
     const tryScroll = () => {
       const el = document.getElementById(id);
       if (el) {
@@ -63,1042 +68,622 @@ export default function Landing() {
   }, []);
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ background: 'hsl(220, 20%, 8%)' }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ background: NAVY_BG }}>
       <SEOHead
-        title={
-          isRecruiterAudience
-            ? 'For Recruiters — Verified Recruiter Access & Driver Referral Tracking | HaulTrackerPro'
-            : 'HaulTrackerPro — Truck Driver Profit Tracker, Load Profit Calculator & Real RPM'
-        }
-        description={
-          isRecruiterAudience
-            ? 'Verified recruiter access for trucking recruiters and carriers. Post unlimited standard opportunities after approval, manage driver applicants, track driver referrals, and unlock recruiter analytics, premium visibility, and contract workflow tools on paid plans.'
-            : 'Truck driver profit tracker and load profit calculator for owner-operators and 1099 drivers. Track loads, fuel, and expenses. See real RPM and net profit. Compare opportunities, avoid bad deals, and keep reports organized — start free.'
-        }
+        title="HaulTrackerPro — Honest Trucking Economics for Drivers & Recruiters"
+        description="The trucking platform where owner-operators track real profit per load and verified recruiters post real opportunities. Track loads, fuel, expenses, and RPM. Post jobs, manage applicants, track referrals. Start free."
         path="/"
         jsonLd={[
           {
-            "@context": "https://schema.org",
-            "@type": "SoftwareApplication",
-            "name": "HaulTrackerPro",
-            "applicationCategory": "FinanceApplication",
-            "applicationSubCategory": "Trucking Software",
-            "operatingSystem": "Web",
-            "description": "Track loads, expenses, and real net profit for owner-operators and lease drivers.",
-            "url": "https://haultrackerpro.com",
-            "featureList": [
-              "Load profit tracking",
-              "Trucking expense tracking",
-              "Fuel cost tracking",
-              "Deadhead mile tracking",
-              "Effective RPM calculation",
-              "Net profit reporting",
-              "CSV exports",
-              "Pro PDF reports",
-              "Contract clarity tools",
-              "Recruiter opportunity tools"
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            name: 'HaulTrackerPro',
+            applicationCategory: 'FinanceApplication',
+            applicationSubCategory: 'Trucking Software',
+            operatingSystem: 'Web',
+            description:
+              'Truck driver profit tracker and verified recruiter opportunity platform.',
+            url: 'https://haultrackerpro.com',
+            offers: [
+              { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Driver Free' },
+              { '@type': 'Offer', price: '19.99', priceCurrency: 'USD', name: 'Driver Pro Monthly' },
             ],
-            "offers": [
-              { "@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free" },
-              { "@type": "Offer", "price": "19.99", "priceCurrency": "USD", "name": "Pro Monthly" }
-            ]
           },
           faqJsonLd,
         ]}
       />
 
-      {/* ═══════════════════════════════════════════ */}
       {/* NAV */}
-      {/* ═══════════════════════════════════════════ */}
-      <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+      <nav
+        className="sticky top-0 z-50 border-b"
+        style={{ background: NAVY_BG, borderColor: 'hsl(220, 16%, 16%)' }}
+      >
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
-          <div className="flex items-center gap-2">
-            <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
-            <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
-          </div>
-          <div className="hidden sm:flex items-center gap-2">
-            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
-            <Button variant="ghost" onClick={() => navigate('/resources')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Resources</Button>
-            <Button variant="ghost" onClick={() => navigate('/about')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>About</Button>
-            <Button variant="ghost" onClick={() => navigate('/recruiters')} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>For Recruiters</Button>
-            <Button variant="ghost" onClick={goToAuth} className="text-sm px-3" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
-            <Button onClick={goToAuth} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Tracking Free
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2"
+            aria-label="HaulTrackerPro home"
+          >
+            <Truck className="h-6 w-6" style={{ color: AMBER }} />
+            <span className="text-lg font-black tracking-tight text-white">HaulTrackerPro</span>
+          </button>
+          <div className="hidden md:flex items-center gap-1">
+            {[
+              { label: 'Features', href: '/features' },
+              { label: 'Pricing', href: '/pricing' },
+              { label: 'Resources', href: '/resources' },
+              { label: 'For Recruiters', href: '/recruiters' },
+              { label: 'Sign In', href: '/auth' },
+            ].map((item) => (
+              <Button
+                key={item.href}
+                variant="ghost"
+                onClick={() => navigate(item.href)}
+                className="text-sm px-3"
+                style={{ color: TEXT_MUTED }}
+              >
+                {item.label}
+              </Button>
+            ))}
+            <Button
+              onClick={goToDriver}
+              className="text-sm font-bold rounded-xl px-5 ml-1"
+              style={{ background: AMBER, color: 'white' }}
+            >
+              Start Free
             </Button>
           </div>
-          <div className="flex sm:hidden items-center gap-2">
-            <Button onClick={goToAuth} className="text-xs font-bold rounded-xl px-3" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Tracking Free
+          <div className="flex md:hidden items-center gap-2">
+            <Button
+              onClick={goToDriver}
+              className="text-xs font-bold rounded-xl px-3"
+              style={{ background: AMBER, color: 'white' }}
+            >
+              Start Free
             </Button>
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-lg" aria-label="Toggle menu" style={{ color: 'hsl(220, 10%, 70%)' }}>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg"
+              aria-label="Toggle menu"
+              style={{ color: TEXT_MUTED }}
+            >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>
         {mobileMenuOpen && (
-          <div className="sm:hidden border-t animate-in slide-in-from-top-2 duration-200" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-            <div className="flex flex-col px-4 py-4 space-y-1">
+          <div
+            className="md:hidden border-t"
+            style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}
+          >
+            <div className="flex flex-col px-4 py-3 space-y-1">
               {[
                 { label: 'Features', href: '/features' },
                 { label: 'Pricing', href: '/pricing' },
                 { label: 'Resources', href: '/resources' },
-                { label: 'About', href: '/about' },
                 { label: 'For Recruiters', href: '/recruiters' },
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Sign In', href: '/auth' },
-              ].map(item => (
-                <button key={item.href} onClick={() => { setMobileMenuOpen(false); navigate(item.href); }}
-                  className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
-                  style={{ color: 'hsl(220, 10%, 70%)' }}>{item.label}</button>
+              ].map((item) => (
+                <button
+                  key={item.href}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate(item.href);
+                  }}
+                  className="w-full text-left px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/5"
+                  style={{ color: TEXT_MUTED }}
+                >
+                  {item.label}
+                </button>
               ))}
-              <Button onClick={() => { setMobileMenuOpen(false); goToAuth(); }}
-                className="w-full mt-2 text-sm font-bold rounded-xl"
-                style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-                Start Tracking Free <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
             </div>
           </div>
         )}
       </nav>
 
-      {/* Audience toggle — dual-audience landing */}
-      <div className="border-b" style={{ background: 'hsl(220, 20%, 9%)', borderColor: 'hsl(220, 16%, 14%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex justify-center">
-          <AudienceToggle audience={audience} onChange={setAudience} />
-        </div>
-      </div>
-
       <main>
-      {isRecruiterAudience ? <RecruiterLanding /> : (
-      <>
+        {/* ═══════════════════════════════════════════ */}
+        {/* 1 · UNIFIED HERO — both audiences above the fold */}
+        {/* ═══════════════════════════════════════════ */}
+        <section className="relative overflow-hidden">
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(ellipse 70% 50% at 50% 0%, hsl(25, 95%, 53%, 0.10) 0%, transparent 70%)',
+            }}
+          />
+          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-12 sm:pb-16 text-center">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
+              style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Built for Trucking — Drivers & Recruiters
+            </div>
+            <h1
+              className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] text-white max-w-4xl mx-auto"
+            >
+              The honest trucking platform.{' '}
+              <span style={{ color: AMBER }}>Drivers track real profit. Recruiters post real jobs.</span>
+            </h1>
+            <p
+              className="mt-6 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto"
+              style={{ color: TEXT_MUTED }}
+            >
+              HaulTrackerPro is one place where owner-operators see their true RPM and net profit per
+              load, and verified recruiters reach drivers who actually know their numbers. No
+              spreadsheets. No ghost applicants. No guessing.
+            </p>
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 1: HERO */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: 'radial-gradient(ellipse 80% 60% at 50% 0%, hsl(25, 95%, 53%, 0.08) 0%, transparent 70%)'
-        }} />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-12 sm:pb-20">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6" style={{
-                  background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)'
-                }}>
-                  <TrendingUp className="h-3.5 w-3.5" /> Built for Owner-Operators
+            {/* Dual primary CTAs */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                onClick={goToDriver}
+                size="lg"
+                className="text-base font-bold rounded-xl h-13 px-7 gap-2"
+                style={{
+                  background: AMBER,
+                  color: 'white',
+                  boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
+                }}
+              >
+                <Truck className="h-5 w-5" /> Start tracking as a driver
+              </Button>
+              <Button
+                onClick={goToRecruiter}
+                size="lg"
+                variant="outline"
+                className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent"
+                style={{
+                  borderColor: AMBER,
+                  color: AMBER_BRIGHT,
+                  background: 'transparent',
+                  borderWidth: 2,
+                }}
+              >
+                <Users className="h-5 w-5" /> Post an opportunity as a recruiter
+              </Button>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium" style={{ color: TEXT_DIM }}>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free driver plan, no credit card</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Verified recruiter access</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Built only for trucking</span>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════ */}
+        {/* 2 · SPLIT PROBLEM → SOLUTION */}
+        {/* ═══════════════════════════════════════════ */}
+        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+            <div className="text-center mb-10 sm:mb-14">
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
+                One platform. Two sides of the trucking business — solved.
+              </h2>
+              <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
+                Drivers and recruiters have been working blind in opposite directions. HaulTrackerPro brings them onto the same data.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-5">
+              {/* DRIVERS */}
+              <div
+                className="rounded-2xl border p-6 sm:p-8 flex flex-col"
+                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+              >
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                    <Truck className="h-5 w-5" style={{ color: AMBER }} />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>For Drivers</span>
                 </div>
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]" style={{ color: 'hsl(0, 0%, 100%)' }}>
-                  Stop Driving Blind.{' '}
-                  <span style={{ color: 'hsl(25, 95%, 53%)' }}>Know Your Real Profit Before and After Every Load.</span>
-                </h1>
-                <p className="mt-5 text-base sm:text-lg leading-relaxed max-w-lg" style={{ color: 'hsl(220, 10%, 60%)' }}>
-                  Track loads, fuel, and expenses in one place. See your real RPM and net profit on every load. Compare opportunities before you commit, avoid bad deals, and keep clean records — start free.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button onClick={goToAuth} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
-                  background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
-                  boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)'
-                }}>
-                  Start Tracking Free <ArrowRight className="h-5 w-5" />
+                <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                  Stop driving blind. Know your real profit per load.
+                </h3>
+
+                <div className="mt-6 space-y-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'hsl(0, 70%, 65%)' }}>
+                    <AlertTriangle className="h-3.5 w-3.5" /> The problem
+                  </p>
+                  {[
+                    'Pay statements that don\'t match what you actually earned',
+                    'Receipts lost between fuel stops and tax season',
+                    'No clue which lanes and brokers really pay',
+                  ].map((t) => (
+                    <p key={t} className="text-sm" style={{ color: TEXT_MUTED }}>— {t}</p>
+                  ))}
+                </div>
+
+                <div className="mt-5 space-y-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: GREEN }}>
+                    <CheckCircle2 className="h-3.5 w-3.5" /> What you get
+                  </p>
+                  {[
+                    'Real RPM and net profit on every load',
+                    'Fuel, expenses, and tax-ready records in one app',
+                    'Smart alerts when a lane, broker, or pay starts slipping',
+                  ].map((t) => (
+                    <p key={t} className="text-sm text-white/90">— {t}</p>
+                  ))}
+                </div>
+
+                <Button
+                  onClick={goToDriver}
+                  className="mt-7 rounded-xl font-bold gap-2 self-start"
+                  style={{ background: AMBER, color: 'white' }}
+                >
+                  Start tracking free <ArrowRight className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => navigate('/pricing')} className="text-base font-semibold rounded-xl h-13 px-8" style={{
-                  borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent'
-                }}>
-                  View Pricing
+              </div>
+
+              {/* RECRUITERS */}
+              <div
+                className="rounded-2xl border p-6 sm:p-8 flex flex-col"
+                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+              >
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                    <Briefcase className="h-5 w-5" style={{ color: AMBER }} />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>For Recruiters</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                  Reach drivers who actually know their numbers.
+                </h3>
+
+                <div className="mt-6 space-y-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'hsl(0, 70%, 65%)' }}>
+                    <AlertTriangle className="h-3.5 w-3.5" /> The problem
+                  </p>
+                  {[
+                    'Ghost applicants and wasted ad spend',
+                    'No way to prove your pay claims to skeptical drivers',
+                    'Referrals slip through cracks with no tracking',
+                  ].map((t) => (
+                    <p key={t} className="text-sm" style={{ color: TEXT_MUTED }}>— {t}</p>
+                  ))}
+                </div>
+
+                <div className="mt-5 space-y-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: GREEN }}>
+                    <CheckCircle2 className="h-3.5 w-3.5" /> What you get
+                  </p>
+                  {[
+                    'Verified recruiter access — only real recruiters post',
+                    'Unlimited standard opportunities and applicant management',
+                    'Driver referral tracking and recruiter analytics',
+                  ].map((t) => (
+                    <p key={t} className="text-sm text-white/90">— {t}</p>
+                  ))}
+                </div>
+
+                <Button
+                  onClick={goToRecruiter}
+                  variant="outline"
+                  className="mt-7 rounded-xl font-bold gap-2 self-start hover:bg-transparent"
+                  style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}
+                >
+                  Get verified access <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                <button
-                  onClick={() => document.getElementById('opportunities-ecosystem')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-sm font-semibold underline-offset-4 hover:underline"
-                  style={{ color: 'hsl(25, 95%, 60%)' }}
-                >
-                  See How Opportunities Work →
-                </button>
-                <button
-                  onClick={() => navigate('/recruiters')}
-                  className="text-sm font-semibold underline-offset-4 hover:underline"
-                  style={{ color: 'hsl(25, 95%, 60%)' }}
-                >
-                  Recruiter? Get Verified →
-                </button>
-                <button
-                  onClick={() => navigate('/resources')}
-                  className="text-sm font-semibold underline-offset-4 hover:underline"
-                  style={{ color: 'hsl(25, 95%, 60%)' }}
-                >
-                  Explore trucking resources →
-                </button>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-2">
-                {[
-                  'Built for owner-operators & 1099 drivers',
-                  'Track loads, fuel, expenses & real RPM',
-                  'No spreadsheet chaos',
-                  'Contract clarity before you sign',
-                ].map(t => (
-                  <span key={t} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'hsl(220, 10%, 50%)' }}>
-                    <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'hsl(152, 60%, 42%)' }} /> {t}
-                  </span>
-                ))}
-              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════ */}
+        {/* 3 · PRODUCT VISUAL */}
+        {/* ═══════════════════════════════════════════ */}
+        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
+                One dashboard. One source of truth.
+              </h2>
+              <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
+                Drivers see their real profit, fuel, and expenses. Recruiters see verified applicants and referral performance. Same data. Honest numbers.
+              </p>
             </div>
             <div className="relative">
-              <div className="rounded-2xl overflow-hidden border" style={{
-                borderColor: 'hsl(220, 16%, 18%)',
-                boxShadow: '0 32px 64px -16px hsl(0, 0%, 0%, 0.5), 0 0 0 1px hsl(220, 16%, 16%)'
-              }}>
-                <img src={dashboardMockup} alt="HaulTrackerPro dashboard showing load tracking, net profit, and weekly earnings chart" className="w-full" width={1536} height={1024} {...({ fetchpriority: 'high' } as any)} decoding="async" />
+              <div
+                className="rounded-2xl overflow-hidden border"
+                style={{
+                  borderColor: NAVY_BORDER,
+                  boxShadow: '0 32px 64px -16px hsl(0, 0%, 0%, 0.55), 0 0 0 1px hsl(220, 16%, 16%)',
+                }}
+              >
+                <img
+                  src={dashboardMockup}
+                  alt="HaulTrackerPro dashboard showing load tracking, real RPM, and net profit"
+                  className="w-full"
+                  width={1536}
+                  height={1024}
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
-              <div className="absolute -bottom-4 right-0 w-32 h-32 rounded-full blur-3xl pointer-events-none" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }} />
+              <div
+                className="absolute -bottom-6 right-0 w-40 h-40 rounded-full blur-3xl pointer-events-none"
+                style={{ background: 'hsl(25, 95%, 53%, 0.18)' }}
+              />
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 1.25: FREE STARTER KIT (top CTA)   */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-6 sm:py-8" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div
-            className="p-5 sm:p-6 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5"
-            style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.35)' }}
-          >
-            <div
-              className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}
-            >
-              <FileText className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+        {/* ═══════════════════════════════════════════ */}
+        {/* 4 · TRUST + PRICING STRIP */}
+        {/* ═══════════════════════════════════════════ */}
+        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+            <div className="flex items-center justify-center gap-2 mb-8">
+              <Shield className="h-4 w-4" style={{ color: GREEN }} />
+              <span className="text-sm" style={{ color: TEXT_MUTED }}>
+                Encrypted in transit, stored securely. Your data is never sold or shared.
+              </span>
             </div>
-            <div className="flex-1">
-              <h2 className="text-base sm:text-lg font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>
-                New to trucking? Download the Free Trucker Starter Kit
-              </h2>
-              <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
-                CDL study help, checklists, owner-op paperwork guidance, and first-30-days habits.
-              </p>
-            </div>
-            <Button
-              onClick={() => {
-                trackStarterKitCTAClicked('landing_top');
-                navigate('/starter-kit');
-              }}
-              variant="outline"
-              className="rounded-xl font-bold gap-2 w-full sm:w-auto"
-              style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
-            >
-              Get the Free Kit <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 1.5: OPPORTUNITIES ECOSYSTEM       */}
-      {/* ═══════════════════════════════════════════ */}
-      <section id="opportunities-ecosystem" className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              <Users className="h-3.5 w-3.5" /> Opportunities
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Profit-First Trucking Opportunities
-            </h2>
-            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              HaulTrackerPro helps drivers compare opportunities using estimated pay, deadhead, deductions, RPM, and recruiter-provided details.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-5 max-w-4xl mx-auto">
-            {[
-              { icon: Truck, title: 'For Drivers', desc: 'Browse approved opportunities, compare estimated gross/net/RPM, and request info without guessing.' },
-              { icon: Users, title: 'For Recruiters', desc: 'Apply for recruiter access, post structured opportunities, manage applications, and reach drivers who care about real numbers.' },
-              { icon: Zap, title: 'Smart Fit Matching', desc: 'Match scores are deterministic and based on driver preferences, pay goals, route type, deadhead, deductions, and equipment fit.' },
-            ].map((item) => (
-              <div key={item.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button
-              onClick={() => navigate('/recruiters')}
-              size="lg"
-              className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
-              style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
-            >
-              For Recruiters <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={goToAuth}
-              variant="outline"
-              size="lg"
-              className="text-sm font-bold rounded-xl h-12 px-6"
-              style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}
-            >
-              Start as Driver
-            </Button>
-          </div>
-          <p className="text-[11px] text-center mt-4" style={{ color: 'hsl(220, 10%, 40%)' }}>
-            Pay and match details are estimates based on recruiter-provided data. No job or income is guaranteed.
-          </p>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 1.6: CONTRACT PROTECTION           */}
-      {/* ═══════════════════════════════════════════ */}
-      <section id="contract-protection" className="py-16 sm:py-20 scroll-mt-20" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              <Shield className="h-3.5 w-3.5" /> Contract Protection
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Don't get hired into a <span style={{ color: 'hsl(25, 95%, 53%)' }}>bad contract.</span>
-            </h2>
-            <p className="mt-4 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              HaulTrackerPro helps drivers review recruiter-sent contracts with AI-assisted risk flags, plain-English summaries, driver approval steps, and hired-status workflow protection. Driver Pro adds Plain-English Clause Rewrite for confusing contract language.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              { icon: FileText, title: 'AI-Assisted Contract Review', desc: 'Get a plain-English summary of key contract terms, possible red flags, escrow language, lease-purchase terms, and other details that deserve attention.' },
-              { icon: Shield, title: 'Driver Approval Before Hired', desc: 'Recruiters cannot move a driver forward as hired until the required contract approval or signature step is completed.' },
-              { icon: CheckCircle2, title: 'Approve, Reject, or Request Changes', desc: 'Drivers can review the contract, ask for revisions, reject risky terms, or record their approval inside the platform.' },
-              { icon: Users, title: 'Private Contract Records', desc: 'Contracts are handled as private records between the driver, the recruiter who sent them, and HaulTrackerPro admins when support or moderation is needed.' },
-            ].map((card) => (
-              <div key={card.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <card.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-sm font-bold mb-1.5" style={{ color: 'hsl(0, 0%, 100%)' }}>{card.title}</h3>
-                <p className="text-xs leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{card.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button
-              onClick={goToAuth}
-              size="lg"
-              className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
-              style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
-            >
-              Start Tracking Smarter <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={() => navigate('/features')}
-              variant="outline"
-              size="lg"
-              className="text-sm font-bold rounded-xl h-12 px-6"
-              style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}
-            >
-              See Contract Protection
-            </Button>
-          </div>
-          <p className="text-[11px] text-center mt-5 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
-            AI contract review is informational only and is not legal advice. Always read the full contract before signing.
-          </p>
-        </div>
-      </section>
-
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 1.7: DRIVER-TO-DRIVER REFERRALS    */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              <Users className="h-3.5 w-3.5" /> Driver-to-Driver Referrals
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Know Where Your Referrals Stand
-            </h2>
-            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Refer another driver to a recruiter opportunity and follow the referral's progress — sent, contacted, hired, eligible based on recruiter-stated terms, or marked paid externally — all in one place.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
-            <div className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-              <h3 className="text-base font-bold mb-1.5" style={{ color: 'hsl(0, 0%, 100%)' }}>For Drivers</h3>
-              <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>Refer drivers you trust, track each referral's status, and view the recruiter's stated external terms — no guessing where things stand.</p>
-            </div>
-            <div className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-              <h3 className="text-base font-bold mb-1.5" style={{ color: 'hsl(0, 0%, 100%)' }}>For Recruiters</h3>
-              <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>Manage driver referrals, update progress, set your external referral terms, and review referral analytics from one pipeline.</p>
-            </div>
-          </div>
-          <p className="text-[11px] text-center mt-5 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
-            Referral bonuses, if offered, are paid externally by recruiters according to recruiter-stated terms. HaulTrackerPro tracks referral progress only and does not process, verify, or guarantee payments.
-          </p>
-        </div>
-      </section>
-
-
-      {/* ═══════════════════════════════════════════ */}
-      <section id="how-it-works" className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              HaulTrackerPro Shows You The Truth About Every Load
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Track loads, expenses, and miles in real time — and let the app turn that data into clear money decisions. No spreadsheets. No guessing. No surprises.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
-              { step: '1', title: 'Know What You Actually Made', desc: 'Real net profit per load and per week — after fuel, deadhead, and every expense — not just gross pay.' },
-              { step: '2', title: 'Know Before You Commit', desc: 'See if a load pencils out against your own lane and broker history before you say yes.' },
-              { step: '3', title: 'Know Where Money Is Slipping', desc: 'Catch weak lanes, slow-paying brokers, short-pays, and unpaid invoices before they cost you a week.' },
-            ].map((item, i) => (
-              <div key={i} className="p-6 rounded-2xl border text-center" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-10 w-10 rounded-full flex items-center justify-center mx-auto mb-4 text-sm font-black" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-                  {item.step}
-                </div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 3: PAIN POINTS */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              You're Not Losing Money Because You're Working Hard…{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>You're Losing Money Because You Can't See It.</span>
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Every week, drivers take loads that look good on paper — but after fuel, deadhead, maintenance, and hidden costs, profit is much lower than expected. Sometimes there's no profit at all.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12">
-            {[
-              { icon: AlertTriangle, title: 'You Only See Gross Pay', desc: 'Without expenses per load, profitable-looking runs could be quietly costing you money.' },
-              { icon: DollarSign, title: 'You Miss Short-Pays', desc: "When estimated and actual pay don't match, you need records to catch what you're owed." },
-              { icon: FileText, title: 'You Guess Instead of Knowing', desc: 'Tax season chaos and lost deductions — because the numbers were never tracked.' },
-            ].map((item, i) => (
-              <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Reality Check — $2,000 → $700 */}
-          <div className="max-w-2xl mx-auto p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.25)' }}>
-            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-center mb-6" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              That $2,000 Load Might Only Be{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>$700.</span>
-            </h3>
-            <div className="space-y-2 max-w-sm mx-auto text-sm">
+            <div className="grid sm:grid-cols-3 gap-4">
               {[
-                { label: 'Load pays', val: '$2,000', positive: true },
-                { label: 'Fuel', val: '− $800' },
-                { label: 'Deadhead', val: '− $150' },
-                { label: 'Maintenance', val: '− $200' },
-                { label: 'Insurance', val: '− $150' },
-              ].map((row, i) => (
-                <div key={i} className="flex justify-between py-1.5 border-b" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
-                  <span style={{ color: 'hsl(220, 10%, 65%)' }}>{row.label}</span>
-                  <span className="font-bold tabular-nums" style={{ color: row.positive ? 'hsl(0, 0%, 100%)' : 'hsl(220, 10%, 75%)' }}>{row.val}</span>
-                </div>
-              ))}
-              <div className="flex justify-between pt-3 text-base">
-                <span className="font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Real Profit</span>
-                <span className="font-black tabular-nums" style={{ color: 'hsl(25, 95%, 53%)' }}>$700</span>
-              </div>
-            </div>
-            <p className="text-center mt-6 text-sm italic" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              If you're not tracking this… you're making decisions in the dark.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 3.5: PROFIT INTELLIGENCE (Phases 3–6) */}
-      {/* ═══════════════════════════════════════════ */}
-      <section id="profit-intelligence" className="py-16 sm:py-24 scroll-mt-20" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              <Shield className="h-3.5 w-3.5" /> BUILT TO PROTECT YOUR MONEY
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              The App Tells You{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>If a Load Is Worth It.</span>
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              HaulTrackerPro learns from your own loads, lanes, and brokers — then warns you before you take a bad load, lose margin, or chase money that isn't coming.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-6 max-w-5xl mx-auto">
-            {[
-              { icon: CheckCircle2, title: 'Score a Load Before You Take It', desc: 'Paste a load and get a quick read on whether the rate, miles, deadhead, and broker actually pencil out — based on your own history, not a generic average.' },
-              { icon: BarChart3, title: 'See Your Best & Worst Lanes', desc: 'The dashboard shows which lanes pay you the most, which ones quietly lose money, which brokers pay reliably, and where your margin is leaking.' },
-              { icon: AlertTriangle, title: 'Get Warned Before Money Slips', desc: 'Plain-language alerts when a lane goes weak, a broker pays slow, your margin or deadhead drifts the wrong way, or an invoice is aging unpaid.' },
-              { icon: TrendingUp, title: 'A Clear Read on Your Week', desc: 'At the start of every week, see last week in one card: the lane to repeat, the lane to avoid, and the broker to watch — so this week starts with a plan.' },
-            ].map((item, i) => (
-              <div key={i} className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-          <p className="text-center mt-8 text-sm" style={{ color: 'hsl(220, 10%, 50%)' }}>
-            Included with Pro — no extra setup.
-          </p>
-
-          {/* Interactive demo */}
-          <div className="mt-14">
-            <div className="max-w-3xl mx-auto text-center mb-8">
-              <h3 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-                Try It Yourself —{' '}
-                <span style={{ color: 'hsl(25, 95%, 53%)' }}>Score a Sample Load</span>
-              </h3>
-              <p className="mt-3 text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
-                Punch in a load and see what the app would tell you. Adjust the numbers to see how rate, deadhead, and broker reliability change the verdict.
-              </p>
-            </div>
-            <ProfitIntelDemo />
-            <p className="max-w-3xl mx-auto text-center text-xs mt-5 leading-relaxed" style={{ color: 'hsl(220, 10%, 50%)' }}>
-              <span className="font-semibold" style={{ color: 'hsl(220, 10%, 70%)' }}>"Use My Numbers" prefills:</span>{' '}
-              Load pays → Gross Revenue &amp; Estimated Pay · Loaded miles → Loaded Miles · Deadhead miles → Deadhead Miles · Load pays ÷ Loaded miles → Rate/Mile · Fuel &amp; Other costs → Notes (log as separate expenses). Pickup, dropoff, dates, and broker stay empty for you to fill in.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 4: AI DEMO (NEW) */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Log Expenses{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Without Typing.</span>
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Pro features that no other trucking app offers at this price.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {/* Voice Logging Demo */}
-            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
-                  <Mic className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>AI Voice Logging</h3>
-              </div>
-              <div className="space-y-4">
-                {[
-                  { step: '1', label: 'You say:', text: '"$85 fuel at Pilot, diesel"' },
-                  { step: '2', label: 'AI parses:', text: 'Amount: $85 · Category: Fuel · Station: Pilot' },
-                  { step: '3', label: 'Result:', text: 'Expense logged — hands-free, eyes on the road' },
-                ].map((s) => (
-                  <div key={s.step} className="flex gap-3 items-start">
-                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
-                      {s.step}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
-                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Rate Con Scanner Demo */}
-            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
-                  <Camera className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Scan Rate Con (OCR)</h3>
-              </div>
-              <div className="space-y-4">
-                {[
-                  { step: '1', label: 'You upload:', text: 'Screenshot or photo of your rate confirmation' },
-                  { step: '2', label: 'AI extracts:', text: 'Pickup, dropoff, miles, rate, revenue, date' },
-                  { step: '3', label: 'Result:', text: 'Load form auto-filled — review and save in seconds' },
-                ].map((s) => (
-                  <div key={s.step} className="flex gap-3 items-start">
-                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
-                      {s.step}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
-                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Receipt Scanning Demo */}
-            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
-                  <Camera className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>AI Receipt Scanning</h3>
-              </div>
-              <div className="space-y-4">
-                {[
-                  { step: '1', label: 'You snap:', text: 'Photo of any fuel, toll, or maintenance receipt' },
-                  { step: '2', label: 'AI reads:', text: 'Amount, vendor, date, and category extracted via OCR' },
-                  { step: '3', label: 'Result:', text: 'Expense auto-filled — no typing, no lost receipts' },
-                ].map((s) => (
-                  <div key={s.step} className="flex gap-3 items-start">
-                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
-                      {s.step}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
-                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Telegram / Paste Load Demo */}
-            <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(25, 95%, 53%, 0.2)' }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-11 w-11 rounded-xl flex items-center justify-center" style={{ background: 'hsl(25, 95%, 53%, 0.15)' }}>
-                  <FileText className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-lg font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>Paste From Telegram / SMS</h3>
-              </div>
-              <div className="space-y-4">
-                {[
-                  { step: '1', label: 'You paste:', text: 'Dispatch text from Telegram, SMS, or broker email' },
-                  { step: '2', label: 'AI parses:', text: 'Pickup, dropoff, loaded miles, deadhead, rate' },
-                  { step: '3', label: 'Result:', text: 'Load logged in seconds — 5/wk free, unlimited on Pro' },
-                ].map((s) => (
-                  <div key={s.step} className="flex gap-3 items-start">
-                    <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold mt-0.5" style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: 'hsl(25, 95%, 53%)' }}>
-                      {s.step}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'hsl(220, 10%, 45%)' }}>{s.label}</p>
-                      <p className="text-sm font-medium" style={{ color: 'hsl(0, 0%, 90%)' }}>{s.text}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="text-center mt-10">
-            <p className="text-sm mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Free forever to start. Upgrade to Pro any time. No credit card required.
-            </p>
-            <Button onClick={goToAuth} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{
-              background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)'
-            }}>
-              Start Tracking Free <ArrowRight className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 4.5: FUEL + REPORTS */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Fuel, Miles, and Reports —{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>All In One Place.</span>
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Track every gallon, see your true cost per mile, and pull a clean report for tax day, your bookkeeper, or a pay dispute — in two taps.
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-8 items-center">
-            <div className="space-y-5">
-              {[
-                { icon: Zap, title: 'Fuel Tracking & MPG', desc: 'Log fuel stops in seconds. See your real MPG, fuel cost per mile, and which lanes are quietly burning your margin.' },
-                { icon: BarChart3, title: 'Cost Per Mile, Live', desc: 'Fixed costs + variable costs + fuel = your true CPM. Compare it to every load before you commit.' },
-                { icon: FileText, title: 'Reports & Exports', desc: 'Filter by week, month, quarter, or custom range. CSV on every plan, branded PDF on Pro — ready for tax prep or short-pay disputes.' },
-              ].map((item) => (
-                <div key={item.title} className="flex gap-4 p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                  <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                    <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                    <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="rounded-2xl overflow-hidden border" style={{
-              borderColor: 'hsl(220, 16%, 18%)',
-              boxShadow: '0 24px 48px -12px hsl(0, 0%, 0%, 0.5), 0 0 0 1px hsl(220, 16%, 16%)'
-            }}>
-              <img src={reportsMockup} alt="HaulTrackerPro Reports view with weekly profit chart, totals, and exportable loads table" className="w-full" loading="lazy" width={1536} height={1024} />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 5: SOCIAL PROOF (NEW) */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Not Another Tracking App.{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Your Profit Command Center.</span>
-            </h2>
-            <p className="mt-4 text-base" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Most tools help you find loads, log miles, or track fuel. HaulTrackerPro helps you keep your money — built from the ground up after talking to real owner-operators.
-            </p>
-          </div>
-
-          {/* Trust signals */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto mb-12">
-            {[
-              { icon: Shield, label: 'Your data stays yours', sub: 'Encrypted & private' },
-              { icon: Zap, label: 'Set up in minutes', sub: 'No training needed' },
-              { icon: Users, label: 'Built for solo operators', sub: 'Not bloated fleet software' },
-              { icon: Star, label: 'Free to start', sub: 'No credit card required' },
-            ].map((item, i) => (
-              <div key={i} className="text-center p-4 rounded-xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-9 w-9 rounded-lg flex items-center justify-center mx-auto mb-2" style={{ background: 'hsl(25, 95%, 53%, 0.1)' }}>
-                  <item.icon className="h-4 w-4" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <p className="text-xs font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.label}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'hsl(220, 10%, 50%)' }}>{item.sub}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Testimonial placeholder — replace with real quotes when available */}
-          <div className="max-w-2xl mx-auto">
-            <div className="p-6 rounded-2xl border text-center" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-              <div className="flex justify-center gap-1 mb-3">
-                {[1,2,3,4,5].map(s => (
-                  <Star key={s} className="h-4 w-4 fill-current" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                ))}
-              </div>
-              <p className="text-base italic leading-relaxed mb-4" style={{ color: 'hsl(220, 10%, 70%)' }}>
-                "I thought my best lane was my best lane. Two weeks in, HaulTrackerPro showed me my real pay per mile was $1.42 — not the $2.10 I'd been telling myself. Now I quote brokers with numbers, not feelings."
-              </p>
-              <p className="text-sm font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>— HaulTrackerPro Beta Driver</p>
-              <p className="text-xs" style={{ color: 'hsl(220, 10%, 45%)' }}>Owner-Operator · Reefer · 4 yrs</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 6: FAQ */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-24" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Common{' '}
-              <span style={{ color: 'hsl(25, 95%, 53%)' }}>Questions</span>
-            </h2>
-          </div>
-          <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <div key={i} className="rounded-xl border overflow-hidden" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between p-5 text-left"
+                {
+                  tag: 'DRIVERS',
+                  name: 'Free',
+                  price: '$0',
+                  unit: 'forever',
+                  bullets: ['Unlimited loads & expenses', 'Multi-stop loads, real RPM', 'CSV exports'],
+                  cta: 'Start free',
+                  onClick: goToDriver,
+                  primary: false,
+                },
+                {
+                  tag: 'DRIVERS',
+                  name: 'Pro',
+                  price: '$19.99',
+                  unit: '/month',
+                  bullets: ['AI automation & insights', 'Driver Scorecard, smart alerts', 'PDF reports + Pro analytics'],
+                  cta: 'See Pro',
+                  onClick: () => navigate('/pricing'),
+                  primary: true,
+                },
+                {
+                  tag: 'RECRUITERS',
+                  name: 'Verified',
+                  price: 'Apply',
+                  unit: 'for access',
+                  bullets: ['Unlimited standard opportunities', 'Applicant management', 'Referral tracking & analytics'],
+                  cta: 'Apply now',
+                  onClick: goToRecruiter,
+                  primary: false,
+                },
+              ].map((tier) => (
+                <div
+                  key={tier.tag + tier.name}
+                  className="rounded-2xl border p-6 flex flex-col"
+                  style={{
+                    background: tier.primary ? 'hsl(25, 95%, 53%, 0.06)' : NAVY_SURFACE,
+                    borderColor: tier.primary ? AMBER : NAVY_BORDER,
+                  }}
                 >
-                  <span className="text-sm font-bold" style={{ color: 'hsl(0, 0%, 100%)' }}>{faq.q}</span>
-                  <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-200 ${openFaq === i ? 'rotate-180' : ''}`} style={{ color: 'hsl(220, 10%, 50%)' }} />
-                </button>
-                {openFaq === i && (
-                  <div className="px-5 pb-5 -mt-1 space-y-3">
-                    <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{faq.a}</p>
-                    {faq.deepLink && (
-                      <button
-                        onClick={() => {
-                          trackLandingFaqDeepLink(faq.deepLink!);
-                          navigate(faq.deepLink!);
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold rounded-lg px-3 py-1.5 transition-colors hover:bg-white/5"
-                        style={{ color: 'hsl(25, 95%, 60%)', border: '1px solid hsl(25, 95%, 53%, 0.3)' }}
-                      >
-                        See live preview <ExternalLink className="h-3 w-3" />
-                      </button>
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>
+                    {tier.tag}
+                  </span>
+                  <h3 className="text-xl font-black text-white mt-1">{tier.name}</h3>
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-white">{tier.price}</span>
+                    <span className="text-xs" style={{ color: TEXT_DIM }}>{tier.unit}</span>
+                  </div>
+                  <ul className="mt-5 space-y-2 flex-1">
+                    {tier.bullets.map((b) => (
+                      <li key={b} className="flex items-start gap-2 text-sm" style={{ color: TEXT_MUTED }}>
+                        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: GREEN }} />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    onClick={tier.onClick}
+                    className="mt-6 rounded-xl font-bold w-full"
+                    style={
+                      tier.primary
+                        ? { background: AMBER, color: 'white' }
+                        : { background: 'transparent', color: AMBER_BRIGHT, border: `1.5px solid ${AMBER}` }
+                    }
+                  >
+                    {tier.cta}
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center mt-6">
+              <button
+                onClick={() => navigate('/pricing')}
+                className="text-sm font-semibold underline-offset-4 hover:underline"
+                style={{ color: AMBER_BRIGHT }}
+              >
+                See full pricing & feature comparison →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════ */}
+        {/* 5 · FAQ + FINAL CTA */}
+        {/* ═══════════════════════════════════════════ */}
+        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+            <h2 className="text-2xl sm:text-3xl font-black text-white text-center">
+              Quick answers
+            </h2>
+            <div className="mt-8 space-y-2">
+              {faqs.map((f, i) => {
+                const open = openFaq === i;
+                return (
+                  <div
+                    key={f.q}
+                    className="rounded-xl border"
+                    style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+                  >
+                    <button
+                      onClick={() => setOpenFaq(open ? null : i)}
+                      className="w-full text-left px-5 py-4 flex items-center justify-between gap-4"
+                    >
+                      <span className="text-sm sm:text-base font-bold text-white">{f.q}</span>
+                      <span className="text-xl shrink-0" style={{ color: AMBER }}>{open ? '−' : '+'}</span>
+                    </button>
+                    {open && (
+                      <p className="px-5 pb-5 text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
+                        {f.a}
+                      </p>
                     )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 6.5: FREE STARTER KIT (lead magnet) */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="p-6 sm:p-8 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6"
-            style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-            <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-              <FileText className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                );
+              })}
             </div>
-            <div className="flex-1">
-              <h3 className="text-base sm:text-lg font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>
-                New to trucking? Get the Free Trucker Starter Kit.
-              </h3>
-              <p className="text-sm" style={{ color: 'hsl(220, 10%, 55%)' }}>
-                CDL study, test day checklist, and owner-operator paperwork — six free PDFs, no credit card.
+            <div className="text-center mt-4">
+              <button
+                onClick={() => navigate('/faq')}
+                className="text-sm font-semibold underline-offset-4 hover:underline"
+                style={{ color: AMBER_BRIGHT }}
+              >
+                See full FAQ →
+              </button>
+            </div>
+
+            <div className="mt-14 text-center">
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
+                Pick your side. Start in under a minute.
+              </h2>
+              <p className="mt-3 text-sm" style={{ color: TEXT_MUTED }}>
+                Free for drivers. Verified access for recruiters.
               </p>
-            </div>
-            <Button
-              onClick={() => {
-                trackStarterKitCTAClicked('landing');
-                navigate('/starter-kit');
-              }}
-              variant="outline"
-              className="rounded-xl font-bold gap-2 w-full sm:w-auto"
-              style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
-            >
-              Get the Free Kit <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 6.6: PARKING FINDER (community)    */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-12 sm:py-16" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-3 text-xs font-bold uppercase tracking-wider"
-              style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
-              <ParkingCircle className="h-3.5 w-3.5" /> New • Pro
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-black tracking-tight mb-3" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Find Safe Parking, <span style={{ color: 'hsl(25, 95%, 53%)' }}>Live.</span>
-            </h2>
-            <p className="text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Real-time truck parking availability — verified by drivers, for drivers. Earn points every time you help.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-4">
-            {[
-              { icon: ParkingCircle, title: 'Live Availability', desc: 'See open, limited, or full lots near you — updated by drivers in real time, with safety ratings.' },
-              { icon: CheckCircle2, title: 'Report & Verify', desc: 'Tap a lot to report status. One report per lot per hour keeps the community data clean and trustworthy.' },
-              { icon: Trophy, title: 'Points & Leaderboard', desc: 'Earn 5 points for every verified report. Build streaks, climb the leaderboard, help fellow truckers.' },
-            ].map((item) => (
-              <div key={item.title} className="p-5 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-                <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                  <item.icon className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-                </div>
-                <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{item.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'hsl(220, 10%, 55%)' }}>{item.desc}</p>
+              <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  onClick={goToDriver}
+                  size="lg"
+                  className="text-base font-bold rounded-xl h-13 px-7 gap-2"
+                  style={{
+                    background: AMBER,
+                    color: 'white',
+                    boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
+                  }}
+                >
+                  <Truck className="h-5 w-5" /> Start tracking as a driver
+                </Button>
+                <Button
+                  onClick={goToRecruiter}
+                  size="lg"
+                  variant="outline"
+                  className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent"
+                  style={{
+                    borderColor: AMBER,
+                    color: AMBER_BRIGHT,
+                    background: 'transparent',
+                    borderWidth: 2,
+                  }}
+                >
+                  <Users className="h-5 w-5" /> Post an opportunity as a recruiter
+                </Button>
               </div>
-            ))}
-          </div>
-          <div className="text-center mt-8">
-            <Button onClick={() => navigate('/pricing')} variant="outline" className="rounded-xl font-bold gap-2"
-              style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
-              Included with Pro <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 6.7: CHOOSE YOUR PATH              */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-20" style={{ background: 'hsl(220, 20%, 6%)' }}>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Choose Your HaulTrackerPro Path
-            </h2>
-            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Two ways into the ecosystem. Pick the one that fits.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
-            <div className="p-6 rounded-2xl border flex flex-col" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-              <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                <Truck className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
+              <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs">
+                <button onClick={() => navigate('/features')} className="font-semibold hover:underline" style={{ color: TEXT_MUTED }}>
+                  Explore all features
+                </button>
+                <button onClick={() => navigate('/resources')} className="font-semibold hover:underline" style={{ color: TEXT_MUTED }}>
+                  Trucking resources
+                </button>
+                <button onClick={() => navigate('/about')} className="font-semibold hover:underline" style={{ color: TEXT_MUTED }}>
+                  About HaulTrackerPro
+                </button>
               </div>
-              <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>I'm a Driver</h3>
-              <ul className="space-y-2 text-sm flex-1 mb-5" style={{ color: 'hsl(220, 10%, 70%)' }}>
-                {['Track loads, expenses, and fuel', 'See real net profit and RPM', 'Set Opportunity Preferences', 'Compare approved opportunities'].map(b => (
-                  <li key={b} className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />{b}</li>
-                ))}
-              </ul>
-              <Button onClick={goToAuth} className="w-full rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-                Start as Driver <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-6 rounded-2xl border flex flex-col" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-              <div className="h-10 w-10 rounded-lg flex items-center justify-center mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                <Users className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-              </div>
-              <h3 className="text-lg font-bold mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>I'm a Recruiter or Carrier</h3>
-              <ul className="space-y-2 text-sm flex-1 mb-5" style={{ color: 'hsl(220, 10%, 70%)' }}>
-                {['Apply for verified recruiter access', 'Post unlimited standard opportunities after approval', 'Manage driver interest, applications, and referrals', 'Upgrade for premium visibility, reports, contract tools, and analytics'].map(b => (
-                  <li key={b} className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />{b}</li>
-                ))}
-              </ul>
-              <Button onClick={() => navigate('/recruiters')} variant="outline" className="w-full rounded-xl font-bold gap-2" style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
-                Apply for Recruiter Access <ArrowRight className="h-4 w-4" />
-              </Button>
             </div>
           </div>
-          <p className="text-[11px] text-center mt-6" style={{ color: 'hsl(220, 10%, 40%)' }}>
-            Pay and match details are estimates based on recruiter-provided data. No job or income is guaranteed.
-          </p>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════ */}
-      {/* SECTION 7: FINAL CTA */}
-      {/* ═══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-28 relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: 'radial-gradient(ellipse 60% 50% at 50% 50%, hsl(25, 95%, 53%, 0.06) 0%, transparent 70%)'
-        }} />
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center relative">
-          <h2 className="text-3xl sm:text-5xl font-black tracking-tight mb-5" style={{ color: 'hsl(0, 0%, 100%)' }}>
-            If You Don't Know Your Profit…{' '}
-            <span style={{ color: 'hsl(25, 95%, 53%)' }}>You're Guessing Your Income.</span>
-          </h2>
-          <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            You're already working hard. Now make sure the numbers actually make sense.
-          </p>
-          <Button onClick={goToAuth} size="lg" className="text-lg font-bold rounded-2xl h-14 px-10 gap-2" style={{
-            background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)',
-            boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.5)'
-          }}>
-            Start Tracking Free <ArrowRight className="h-5 w-5" />
-          </Button>
-          <p className="text-xs mt-4" style={{ color: 'hsl(220, 10%, 45%)' }}>
-            No credit card required.
-          </p>
-        </div>
-      </section>
-      </>
-      )}
+        </section>
       </main>
 
-      {/* ═══════════════════════════════════════════ */}
       {/* FOOTER */}
-      {/* ═══════════════════════════════════════════ */}
-      <footer className="border-t py-8" style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}>
+      <footer
+        className="border-t py-8"
+        style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}
+      >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-8 sm:gap-4">
-            <div className="text-center sm:text-left">
-              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Product</p>
-              <div className="flex justify-center sm:block gap-4 sm:gap-0">
-                {[
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+            {[
+              {
+                title: 'Product',
+                links: [
                   { label: 'Features', href: '/features' },
                   { label: 'Pricing', href: '/pricing' },
                   { label: 'FAQ', href: '/faq' },
-                ].map(link => (
-                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-            <div className="text-center sm:text-left">
-              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Resources</p>
-              <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:block max-w-xs mx-auto sm:max-w-none sm:mx-0">
-                {[
-                  { label: 'Trucking Resources', href: '/resources' },
-                  { label: 'Free Starter Kit', href: '/starter-kit' },
-                  { label: 'Finance Guides', href: '/trucking-finance-guides' },
-                  { label: 'How to Use', href: '/how-to-use-haultrackerpro' },
-                  { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
-                  { label: 'Expense Tracker', href: '/owner-operator-expense-tracker' },
+                ],
+              },
+              {
+                title: 'Drivers',
+                links: [
+                  { label: 'Start Free', href: '/auth' },
                   { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
                   { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
-                  { label: 'Bookkeeping', href: '/trucker-bookkeeping-guide' },
-                ].map(link => (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => {
-                      if (link.href === '/starter-kit') trackStarterKitCTAClicked('footer');
-                    }}
-                    className="block text-xs font-medium hover:underline text-center sm:text-left py-1.5 sm:py-0 sm:mb-1.5 rounded-md"
-                    style={{ color: 'hsl(220, 10%, 45%)' }}
-                  >
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-            <div className="text-center sm:text-left">
-              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Recruiters</p>
-              <div className="flex justify-center sm:block gap-4 sm:gap-0">
-                {[
+                  { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
+                  { label: 'Starter Kit', href: '/starter-kit', track: true },
+                ],
+              },
+              {
+                title: 'Recruiters',
+                links: [
                   { label: 'For Recruiters', href: '/recruiters' },
                   { label: 'Recruiter Features', href: '/recruiter/features' },
                   { label: 'Recruiter FAQ', href: '/recruiter/faq' },
-                ].map(link => (
-                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-            <div className="text-center sm:text-left">
-              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'hsl(220, 10%, 50%)' }}>Company</p>
-              <div className="flex justify-center sm:block gap-4 sm:gap-0">
-                {[
+                ],
+              },
+              {
+                title: 'Company',
+                links: [
                   { label: 'About', href: '/about' },
+                  { label: 'Resources', href: '/resources' },
                   { label: 'Terms', href: '/terms' },
                   { label: 'Privacy', href: '/privacy' },
-                ].map(link => (
-                  <a key={link.href} href={link.href} className="inline-block sm:block text-xs font-medium hover:underline mb-0 sm:mb-1.5 px-2 py-1 sm:px-0 sm:py-0" style={{ color: 'hsl(220, 10%, 45%)' }}>
-                    {link.label}
-                  </a>
-                ))}
+                ],
+              },
+            ].map((col) => (
+              <div key={col.title}>
+                <p
+                  className="text-xs font-bold uppercase tracking-wider mb-3"
+                  style={{ color: TEXT_DIM }}
+                >
+                  {col.title}
+                </p>
+                <div className="space-y-1.5">
+                  {col.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => {
+                        if ((link as any).track) trackStarterKitCTAClicked('footer');
+                      }}
+                      className="block text-xs font-medium hover:underline"
+                      style={{ color: 'hsl(220, 10%, 50%)' }}
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-          <div className="flex items-center justify-center sm:justify-start gap-2 pt-4 border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
-            <Shield className="h-4 w-4" style={{ color: 'hsl(220, 10%, 40%)' }} />
-            <span className="text-xs" style={{ color: 'hsl(220, 10%, 40%)' }}>© {new Date().getFullYear()} HaulTrackerPro. All rights reserved.</span>
+          <div
+            className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t"
+            style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          >
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4" style={{ color: TEXT_DIM }} />
+              <span className="text-xs" style={{ color: TEXT_DIM }}>
+                © {new Date().getFullYear()} HaulTrackerPro. All rights reserved.
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px]" style={{ color: TEXT_DIM }}>
+              <TrendingUp className="h-3 w-3" /> Tracking tools only — always verify financial and tax information.
+            </div>
           </div>
         </div>
       </footer>
