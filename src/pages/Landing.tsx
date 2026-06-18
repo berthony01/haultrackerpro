@@ -4,6 +4,7 @@ import {
   Shield,
   Truck,
   CheckCircle2,
+  Check,
   AlertTriangle,
   Users,
   Briefcase,
