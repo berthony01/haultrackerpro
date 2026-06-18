@@ -425,76 +425,150 @@ export default function Landing() {
               </span>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-4">
-              {[
-                {
-                  tag: 'DRIVERS',
-                  name: 'Free',
-                  price: '$0',
-                  unit: 'forever',
-                  bullets: ['Unlimited loads & expenses', 'Multi-stop loads, real RPM', 'CSV exports'],
-                  cta: 'Start free',
-                  onClick: goToDriver,
-                  primary: false,
-                },
-                {
-                  tag: 'DRIVERS',
-                  name: 'Pro',
-                  price: '$19.99',
-                  unit: '/month',
-                  bullets: ['AI automation & insights', 'Driver Scorecard, smart alerts', 'PDF reports + Pro analytics'],
-                  cta: 'See Pro',
-                  onClick: () => navigate('/pricing'),
-                  primary: true,
-                },
-                {
-                  tag: 'RECRUITERS',
-                  name: 'Verified',
-                  price: 'Apply',
-                  unit: 'for access',
-                  bullets: ['Unlimited standard opportunities', 'Applicant management', 'Referral tracking & analytics'],
-                  cta: 'Apply now',
-                  onClick: goToRecruiter,
-                  primary: false,
-                },
-              ].map((tier) => (
-                <div
-                  key={tier.tag + tier.name}
-                  className="rounded-2xl border p-6 flex flex-col"
-                  style={{
-                    background: tier.primary ? 'hsl(25, 95%, 53%, 0.06)' : NAVY_SURFACE,
-                    borderColor: tier.primary ? AMBER : NAVY_BORDER,
-                  }}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>
-                    {tier.tag}
-                  </span>
-                  <h3 className="text-xl font-black text-white mt-1">{tier.name}</h3>
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-white">{tier.price}</span>
-                    <span className="text-xs" style={{ color: TEXT_DIM }}>{tier.unit}</span>
-                  </div>
-                  <ul className="mt-5 space-y-2 flex-1">
-                    {tier.bullets.map((b) => (
-                      <li key={b} className="flex items-start gap-2 text-sm" style={{ color: TEXT_MUTED }}>
-                        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: GREEN }} />
-                        <span>{b}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    onClick={tier.onClick}
-                    className="mt-6 rounded-xl font-bold w-full"
-                    style={
-                      tier.primary
-                        ? { background: AMBER, color: 'white' }
-                        : { background: 'transparent', color: AMBER_BRIGHT, border: `1.5px solid ${AMBER}` }
-                    }
+            {/* Driver Plans */}
+            <div className="mb-10">
+              <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: TEXT_DIM }}>For Drivers</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    name: 'Free',
+                    price: '$0',
+                    unit: 'forever',
+                    bullets: ['Unlimited loads & expenses', 'Multi-stop loads, real RPM', 'CSV exports'],
+                    cta: 'Start free',
+                    onClick: goToDriver,
+                    primary: false,
+                  },
+                  {
+                    name: 'Pro',
+                    price: '$19.99',
+                    unit: '/month',
+                    bullets: ['AI automation & insights', 'Driver Scorecard, smart alerts', 'PDF reports + Pro analytics'],
+                    cta: 'See Pro',
+                    onClick: () => navigate('/pricing'),
+                    primary: true,
+                  },
+                ].map((tier) => (
+                  <div
+                    key={tier.name}
+                    className="rounded-2xl border p-6 flex flex-col"
+                    style={{
+                      background: tier.primary ? 'hsl(25, 95%, 53%, 0.06)' : NAVY_SURFACE,
+                      borderColor: tier.primary ? AMBER : NAVY_BORDER,
+                    }}
                   >
-                    {tier.cta}
-                  </Button>
-                </div>
-              ))}
+                    <h3 className="text-xl font-black text-white">{tier.name}</h3>
+                    <div className="mt-3 flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-white">{tier.price}</span>
+                      <span className="text-xs" style={{ color: TEXT_DIM }}>{tier.unit}</span>
+                    </div>
+                    <ul className="mt-5 space-y-2 flex-1">
+                      {tier.bullets.map((b) => (
+                        <li key={b} className="flex items-start gap-2 text-sm" style={{ color: TEXT_MUTED }}>
+                          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: GREEN }} />
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      onClick={tier.onClick}
+                      className="mt-6 rounded-xl font-bold w-full"
+                      style={
+                        tier.primary
+                          ? { background: AMBER, color: 'white' }
+                          : { background: 'transparent', color: AMBER_BRIGHT, border: `1.5px solid ${AMBER}` }
+                      }
+                    >
+                      {tier.cta}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recruiter Plans */}
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: TEXT_DIM }}>For Recruiters</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  {
+                    name: 'Free Verified',
+                    price: 'Free',
+                    unit: 'for approved recruiters',
+                    bullets: ['Unlimited standard posts', 'Verified badge', 'Basic applicant flow'],
+                    cta: 'Apply',
+                    onClick: goToRecruiter,
+                    highlight: false,
+                  },
+                  {
+                    name: 'Starter',
+                    price: '$19',
+                    unit: '/month',
+                    bullets: ['Enhanced applicant tracking', 'Status history', 'Basic referral view'],
+                    cta: 'See Starter',
+                    onClick: () => navigate('/pricing#for-recruiters'),
+                    highlight: false,
+                  },
+                  {
+                    name: 'Growth',
+                    price: '$49',
+                    unit: '/month',
+                    bullets: ['Priority placement', 'Featured listings', 'Contract tools', 'Pipeline analytics'],
+                    cta: 'See Growth',
+                    onClick: () => navigate('/pricing#for-recruiters'),
+                    highlight: true,
+                  },
+                  {
+                    name: 'Fleet',
+                    price: '$149',
+                    unit: '/month',
+                    bullets: ['Everything in Growth', 'Top placement', 'Priority support', 'Advanced analytics'],
+                    cta: 'See Fleet',
+                    onClick: () => navigate('/pricing#for-recruiters'),
+                    highlight: false,
+                  },
+                ].map((tier) => (
+                  <div
+                    key={tier.name}
+                    className="rounded-2xl border p-5 flex flex-col relative"
+                    style={{
+                      background: tier.highlight ? 'hsl(25, 95%, 53%, 0.06)' : NAVY_SURFACE,
+                      borderColor: tier.highlight ? AMBER : NAVY_BORDER,
+                    }}
+                  >
+                    {tier.highlight && (
+                      <div className="absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: AMBER, color: 'white' }}>
+                        POPULAR
+                      </div>
+                    )}
+                    <h3 className="text-base font-black text-white">{tier.name}</h3>
+                    <div className="mt-2 flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-white">{tier.price}</span>
+                      {tier.price !== 'Free' && <span className="text-[10px]" style={{ color: TEXT_DIM }}>{tier.unit}</span>}
+                    </div>
+                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_DIM }}>{tier.price === 'Free' ? tier.unit : ''}</p>
+                    <ul className="mt-4 space-y-1.5 flex-1">
+                      {tier.bullets.map((b) => (
+                        <li key={b} className="flex items-start gap-1.5 text-xs" style={{ color: TEXT_MUTED }}>
+                          <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: tier.highlight ? AMBER : GREEN }} />
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      onClick={tier.onClick}
+                      className="mt-4 rounded-xl font-bold w-full text-xs"
+                      style={
+                        tier.highlight
+                          ? { background: AMBER, color: 'white' }
+                          : { background: 'transparent', color: AMBER_BRIGHT, border: `1.5px solid ${AMBER}` }
+                      }
+                    >
+                      {tier.cta}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="text-center mt-6">
