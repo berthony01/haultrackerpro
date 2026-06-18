@@ -366,6 +366,11 @@ serve(async (req) => {
         type: "function",
         function: { name: "extract_load" },
       });
+    } else if (type === "parse_opportunity") {
+      result = await callAI(apiKey, model, systemPrompt, contextStr, [PARSE_OPPORTUNITY_TOOL], {
+        type: "function",
+        function: { name: "extract_opportunity" },
+      });
     } else {
       result = await callAI(apiKey, model, systemPrompt, contextStr);
     }
