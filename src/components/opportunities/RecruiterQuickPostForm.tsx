@@ -222,11 +222,10 @@ export function RecruiterQuickPostForm({ onBack, onSaved, onSwitchToDetailed }: 
           </div>
           <Button
             type="button"
-            variant="outline"
             size="sm"
             onClick={() => setPasteOpen(true)}
             disabled={pending}
-            className="shrink-0"
+            className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 border border-primary shadow-sm"
           >
             <Sparkles className="h-4 w-4" /> Paste to auto-fill
           </Button>
