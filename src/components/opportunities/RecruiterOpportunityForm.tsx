@@ -17,7 +17,7 @@ import {
 import {
   ArrowLeft, Briefcase, DollarSign, Home, ShieldCheck, Save, Lock, Send,
   Truck, ChevronRight, Eye, Lock as LockIcon, CheckCircle2, AlertTriangle,
-  Info, MapPin, HelpCircle,
+  Info, MapPin, HelpCircle, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -27,6 +27,8 @@ import {
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { calculateOpportunityFinancials, profitScoreLabel } from '@/lib/opportunities/opportunityProfit';
+import { splitBenefits, joinBenefits } from '@/lib/opportunities/benefitsFormat';
+import { PasteOpportunityDialog, type ExtractedOpportunity } from './PasteOpportunityDialog';
 
 interface Props {
   initial?: Opportunity | null;
@@ -99,7 +101,8 @@ interface FormState {
   pets_allowed: Tribool;
   riders_allowed: Tribool;
   equipment_year: string;
-  benefits: string;
+  benefits: string;          // requirements (Step 4)
+  typical_lanes: string;     // lanes (Step 2) — serialized into benefits column
   // confirm
   transparency_confirmed: boolean;
   confirm_drivers_see_intel: boolean;
@@ -117,8 +120,25 @@ const EMPTY: FormState = {
   fuel_paid_by: '', insurance_deductions: '', escrow_required: false, escrow_amount: '',
   lease_payment: '', maintenance_deductions: '', other_deductions: '',
   home_time: '', forced_dispatch: 'unspecified', pets_allowed: 'unspecified',
-  riders_allowed: 'unspecified', equipment_year: '', benefits: '',
+  riders_allowed: 'unspecified', equipment_year: '', benefits: '', typical_lanes: '',
   transparency_confirmed: false, confirm_drivers_see_intel: false, confirm_misleading_removed: false,
+};
+
+// Friendlier labels for validation errors (D5 fix).
+const FIELD_LABELS: Record<string, string> = {
+  cpm: 'CPM rate',
+  percentage_pay: 'Percentage pay',
+  flat_weekly_pay: 'Flat weekly pay',
+  estimated_weekly_gross: 'Estimated weekly gross',
+  estimated_weekly_miles: 'Estimated weekly miles',
+  estimated_loaded_miles: 'Loaded miles',
+  estimated_deadhead_miles: 'Deadhead miles',
+  sign_on_bonus: 'Sign-on bonus',
+  insurance_deductions: 'Insurance deduction',
+  escrow_amount: 'Escrow amount',
+  lease_payment: 'Lease payment',
+  maintenance_deductions: 'Maintenance deduction',
+  other_deductions: 'Other deductions',
 };
 
 const numOrNull = (v: string): number | null => {
@@ -149,6 +169,8 @@ export function RecruiterOpportunityForm({
   const { profile } = useRecruiterProfile();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [step, setStep] = useState(1);
+  const [pasteOpen, setPasteOpen] = useState(false);
+
 
   useEffect(() => {
     if (!initial) {
@@ -192,7 +214,8 @@ export function RecruiterOpportunityForm({
       pets_allowed: boolToTri(initial.pets_allowed),
       riders_allowed: boolToTri(initial.riders_allowed),
       equipment_year: initial.equipment_year ?? '',
-      benefits: initial.benefits ?? '',
+      benefits: splitBenefits(initial.benefits).requirements,
+      typical_lanes: splitBenefits(initial.benefits).typical_lanes,
       transparency_confirmed: !!initial.transparency_confirmed,
       confirm_drivers_see_intel: !!initial.transparency_confirmed,
       confirm_misleading_removed: !!initial.transparency_confirmed,
@@ -260,7 +283,8 @@ export function RecruiterOpportunityForm({
     for (const k of numericFields) {
       const v = form[k] as string;
       if (v !== '' && (Number.isNaN(Number(v)) || Number(v) < 0)) {
-        return `${k.replace(/_/g, ' ')} cannot be negative.`;
+        const friendly = FIELD_LABELS[k as string] ?? (k as string).replace(/_/g, ' ');
+        return `${friendly} must be 0 or higher.`;
       }
     }
     if (mode === 'submit') {
@@ -314,9 +338,10 @@ export function RecruiterOpportunityForm({
     pets_allowed: triToBool(form.pets_allowed),
     riders_allowed: triToBool(form.riders_allowed),
     equipment_year: form.equipment_year.trim() || null,
-    benefits: form.benefits.trim() || null,
+    benefits: joinBenefits({ typical_lanes: form.typical_lanes, requirements: form.benefits }) || null,
     description: form.description.trim() || null,
-    transparency_confirmed: mode === 'submit',
+    transparency_confirmed:
+      form.transparency_confirmed && form.confirm_drivers_see_intel && form.confirm_misleading_removed,
     status: mode === 'submit' ? 'active' : 'draft',
   });
 
@@ -343,6 +368,69 @@ export function RecruiterOpportunityForm({
     if (step < STEPS.length) setStep(step + 1);
   };
 
+  // Merge AI-extracted fields into form state without overwriting non-empty values the
+  // recruiter has already typed. Strings replace empty strings; numbers replace ''
+  // strings; booleans replace the 'unspecified' tribool/dh sentinels.
+  const handleExtracted = (data: ExtractedOpportunity) => {
+    setForm((f) => {
+      const next = { ...f };
+      const setStr = (k: keyof FormState, v?: string) => {
+        if (v && typeof v === 'string' && !(next[k] as string)) (next[k] as string) = v;
+      };
+      const setNum = (k: keyof FormState, v?: number) => {
+        if (typeof v === 'number' && Number.isFinite(v) && !(next[k] as string)) {
+          (next[k] as string) = String(v);
+        }
+      };
+      const setTri = (k: 'forced_dispatch' | 'pets_allowed' | 'riders_allowed', v?: boolean) => {
+        if (typeof v === 'boolean' && next[k] === 'unspecified') {
+          next[k] = v ? 'yes' : 'no';
+        }
+      };
+      setStr('title', data.title);
+      setStr('company_name', data.company_name);
+      setStr('hiring_city', data.hiring_city);
+      setStr('hiring_state', data.hiring_state);
+      if (Array.isArray(data.hiring_states) && data.hiring_states.length && !next.hiring_states) {
+        next.hiring_states = data.hiring_states.join(', ');
+      }
+      setStr('driver_type', data.driver_type);
+      setStr('route_type', data.route_type);
+      setStr('trailer_type', data.trailer_type);
+      setStr('description', data.description);
+      setStr('pay_model', data.pay_model);
+      setNum('cpm', data.cpm);
+      setNum('percentage_pay', data.percentage_pay);
+      setNum('flat_weekly_pay', data.flat_weekly_pay);
+      setNum('estimated_weekly_gross', data.estimated_weekly_gross);
+      setNum('estimated_weekly_miles', data.estimated_weekly_miles);
+      setNum('estimated_loaded_miles', data.estimated_loaded_miles);
+      setNum('estimated_deadhead_miles', data.estimated_deadhead_miles);
+      if (typeof data.deadhead_paid === 'boolean' && next.deadhead_paid === 'unspecified') {
+        next.deadhead_paid = data.deadhead_paid ? 'paid' : 'unpaid';
+      }
+      setStr('detention_pay', data.detention_pay);
+      setStr('layover_pay', data.layover_pay);
+      setNum('sign_on_bonus', data.sign_on_bonus);
+      setStr('fuel_paid_by', data.fuel_paid_by);
+      setNum('insurance_deductions', data.insurance_deductions);
+      if (typeof data.escrow_required === 'boolean') next.escrow_required = next.escrow_required || data.escrow_required;
+      setNum('escrow_amount', data.escrow_amount);
+      setNum('lease_payment', data.lease_payment);
+      setNum('maintenance_deductions', data.maintenance_deductions);
+      setNum('other_deductions', data.other_deductions);
+      setStr('home_time', data.home_time);
+      setTri('forced_dispatch', data.forced_dispatch);
+      setTri('pets_allowed', data.pets_allowed);
+      setTri('riders_allowed', data.riders_allowed);
+      setStr('equipment_year', data.equipment_year);
+      setStr('typical_lanes', data.typical_lanes);
+      setStr('benefits', data.requirements ?? data.benefits);
+      return next;
+    });
+  };
+
+
   return (
     <div className="animate-fade-in pb-32">
       {/* Header */}
@@ -360,6 +448,17 @@ export function RecruiterOpportunityForm({
           <p className="text-sm text-muted-foreground max-w-2xl mt-1">
             Create a structured opportunity that helps drivers understand pay, route, deadhead, deductions, and real earning potential.
           </p>
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPasteOpen(true)}
+              disabled={pending}
+            >
+              <Sparkles className="h-4 w-4" /> Paste opportunity to auto-fill
+            </Button>
+          </div>
         </div>
         <div className="flex gap-2 shrink-0">
           <Button variant="outline" onClick={() => save('draft')} disabled={pending}>
@@ -381,6 +480,13 @@ export function RecruiterOpportunityForm({
           )}
         </div>
       </div>
+
+      <PasteOpportunityDialog
+        open={pasteOpen}
+        onOpenChange={setPasteOpen}
+        onExtracted={handleExtracted}
+      />
+
 
       {/* Step progress */}
       <StepProgress current={step} onStepClick={setStep} />
@@ -693,8 +799,8 @@ function Step2({
       <Field label="Typical Lanes" helper={'One per line — example: "Dallas, TX → Houston, TX"'}>
         <Textarea
           rows={3}
-          value={form.benefits}
-          onChange={(e) => set('benefits', e.target.value)}
+          value={form.typical_lanes}
+          onChange={(e) => set('typical_lanes', e.target.value)}
           placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
         />
       </Field>
@@ -768,7 +874,13 @@ function Step3({
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {showCpm && <NumField label="CPM Rate ($/mi)" value={form.cpm} onChange={(v) => set('cpm', v)} />}
+        {showCpm && (
+          <CpmField
+            value={form.cpm}
+            onChange={(v) => set('cpm', v)}
+            weeklyMiles={form.estimated_weekly_miles}
+          />
+        )}
         {showPct && <NumField label="Percentage Pay (%)" value={form.percentage_pay} onChange={(v) => set('percentage_pay', v)} />}
         {showFlat && <NumField label="Flat Weekly Pay ($)" value={form.flat_weekly_pay} onChange={(v) => set('flat_weekly_pay', v)} />}
         <NumField label="Est. Weekly Gross ($)" value={form.estimated_weekly_gross} onChange={(v) => set('estimated_weekly_gross', v)} />
@@ -1112,6 +1224,52 @@ function NumField({ label, value, onChange }: { label: string; value: string; on
     </Field>
   );
 }
+
+/**
+ * Specialized CPM input with a $ adornment, a helper showing the expected
+ * format ("$/mile — example: 0.65"), a live "≈ $X/week at Y miles" hint
+ * using the recruiter's own weekly-miles input, and a sanity warning if the
+ * value looks like cents instead of dollars (e.g. 65 instead of 0.65).
+ */
+function CpmField({
+  value, onChange, weeklyMiles,
+}: { value: string; onChange: (v: string) => void; weeklyMiles: string }) {
+  const num = value === '' ? null : Number(value);
+  const validNum = num != null && !Number.isNaN(num) && num >= 0 ? num : null;
+  const miles = Number(weeklyMiles);
+  const validMiles = !Number.isNaN(miles) && miles > 0 ? miles : null;
+  const weekly = validNum != null && validMiles != null ? Math.round(validNum * validMiles) : null;
+  const looksLikeCents = validNum != null && validNum > 2;
+
+  return (
+    <Field
+      label="CPM Rate ($/mi)"
+      helper={
+        looksLikeCents
+          ? `⚠️ ${validNum} looks like cents. Enter dollars per mile (example: 0.65 for 65¢/mi).`
+          : weekly != null
+            ? `≈ $${weekly.toLocaleString()}/week at ${validMiles!.toLocaleString()} miles`
+            : '$/mile — example: 0.65 for 65 cents per mile'
+      }
+    >
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">$</span>
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min={0}
+          max={5}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="0.65"
+          className={`pl-7 ${looksLikeCents ? 'border-amber-500/60 focus-visible:ring-amber-500/40' : ''}`}
+        />
+      </div>
+    </Field>
+  );
+}
+
 
 function TriField({ label, value, onChange }: { label: string; value: Tribool; onChange: (v: Tribool) => void }) {
   return (
