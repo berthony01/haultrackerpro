@@ -32,6 +32,8 @@ import { PasteOpportunityDialog, type ExtractedOpportunity } from './PasteOpport
 
 interface Props {
   initial?: Opportunity | null;
+  /** Optional pre-filled values used when creating new (e.g. handoff from Quick Post). */
+  seed?: Partial<OpportunityInsert> | null;
   onBack: () => void;
   onSaved: () => void;
   canSubmitForReview?: boolean;
