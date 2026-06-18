@@ -448,6 +448,17 @@ export function RecruiterOpportunityForm({
           <p className="text-sm text-muted-foreground max-w-2xl mt-1">
             Create a structured opportunity that helps drivers understand pay, route, deadhead, deductions, and real earning potential.
           </p>
+          <div className="mt-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPasteOpen(true)}
+              disabled={pending}
+            >
+              <Sparkles className="h-4 w-4" /> Paste opportunity to auto-fill
+            </Button>
+          </div>
         </div>
         <div className="flex gap-2 shrink-0">
           <Button variant="outline" onClick={() => save('draft')} disabled={pending}>
@@ -469,6 +480,13 @@ export function RecruiterOpportunityForm({
           )}
         </div>
       </div>
+
+      <PasteOpportunityDialog
+        open={pasteOpen}
+        onOpenChange={setPasteOpen}
+        onExtracted={handleExtracted}
+      />
+
 
       {/* Step progress */}
       <StepProgress current={step} onStepClick={setStep} />
