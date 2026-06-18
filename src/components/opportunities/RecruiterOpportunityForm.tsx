@@ -799,8 +799,8 @@ function Step2({
       <Field label="Typical Lanes" helper={'One per line — example: "Dallas, TX → Houston, TX"'}>
         <Textarea
           rows={3}
-          value={form.benefits}
-          onChange={(e) => set('benefits', e.target.value)}
+          value={form.typical_lanes}
+          onChange={(e) => set('typical_lanes', e.target.value)}
           placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
         />
       </Field>
@@ -874,7 +874,13 @@ function Step3({
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {showCpm && <NumField label="CPM Rate ($/mi)" value={form.cpm} onChange={(v) => set('cpm', v)} />}
+        {showCpm && (
+          <CpmField
+            value={form.cpm}
+            onChange={(v) => set('cpm', v)}
+            weeklyMiles={form.estimated_weekly_miles}
+          />
+        )}
         {showPct && <NumField label="Percentage Pay (%)" value={form.percentage_pay} onChange={(v) => set('percentage_pay', v)} />}
         {showFlat && <NumField label="Flat Weekly Pay ($)" value={form.flat_weekly_pay} onChange={(v) => set('flat_weekly_pay', v)} />}
         <NumField label="Est. Weekly Gross ($)" value={form.estimated_weekly_gross} onChange={(v) => set('estimated_weekly_gross', v)} />
