@@ -169,6 +169,8 @@ export function RecruiterOpportunityForm({
   const { profile } = useRecruiterProfile();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [step, setStep] = useState(1);
+  const [pasteOpen, setPasteOpen] = useState(false);
+
 
   useEffect(() => {
     if (!initial) {
@@ -365,6 +367,69 @@ export function RecruiterOpportunityForm({
   const handleNext = () => {
     if (step < STEPS.length) setStep(step + 1);
   };
+
+  // Merge AI-extracted fields into form state without overwriting non-empty values the
+  // recruiter has already typed. Strings replace empty strings; numbers replace ''
+  // strings; booleans replace the 'unspecified' tribool/dh sentinels.
+  const handleExtracted = (data: ExtractedOpportunity) => {
+    setForm((f) => {
+      const next = { ...f };
+      const setStr = (k: keyof FormState, v?: string) => {
+        if (v && typeof v === 'string' && !(next[k] as string)) (next[k] as string) = v;
+      };
+      const setNum = (k: keyof FormState, v?: number) => {
+        if (typeof v === 'number' && Number.isFinite(v) && !(next[k] as string)) {
+          (next[k] as string) = String(v);
+        }
+      };
+      const setTri = (k: 'forced_dispatch' | 'pets_allowed' | 'riders_allowed', v?: boolean) => {
+        if (typeof v === 'boolean' && next[k] === 'unspecified') {
+          next[k] = v ? 'yes' : 'no';
+        }
+      };
+      setStr('title', data.title);
+      setStr('company_name', data.company_name);
+      setStr('hiring_city', data.hiring_city);
+      setStr('hiring_state', data.hiring_state);
+      if (Array.isArray(data.hiring_states) && data.hiring_states.length && !next.hiring_states) {
+        next.hiring_states = data.hiring_states.join(', ');
+      }
+      setStr('driver_type', data.driver_type);
+      setStr('route_type', data.route_type);
+      setStr('trailer_type', data.trailer_type);
+      setStr('description', data.description);
+      setStr('pay_model', data.pay_model);
+      setNum('cpm', data.cpm);
+      setNum('percentage_pay', data.percentage_pay);
+      setNum('flat_weekly_pay', data.flat_weekly_pay);
+      setNum('estimated_weekly_gross', data.estimated_weekly_gross);
+      setNum('estimated_weekly_miles', data.estimated_weekly_miles);
+      setNum('estimated_loaded_miles', data.estimated_loaded_miles);
+      setNum('estimated_deadhead_miles', data.estimated_deadhead_miles);
+      if (typeof data.deadhead_paid === 'boolean' && next.deadhead_paid === 'unspecified') {
+        next.deadhead_paid = data.deadhead_paid ? 'paid' : 'unpaid';
+      }
+      setStr('detention_pay', data.detention_pay);
+      setStr('layover_pay', data.layover_pay);
+      setNum('sign_on_bonus', data.sign_on_bonus);
+      setStr('fuel_paid_by', data.fuel_paid_by);
+      setNum('insurance_deductions', data.insurance_deductions);
+      if (typeof data.escrow_required === 'boolean') next.escrow_required = next.escrow_required || data.escrow_required;
+      setNum('escrow_amount', data.escrow_amount);
+      setNum('lease_payment', data.lease_payment);
+      setNum('maintenance_deductions', data.maintenance_deductions);
+      setNum('other_deductions', data.other_deductions);
+      setStr('home_time', data.home_time);
+      setTri('forced_dispatch', data.forced_dispatch);
+      setTri('pets_allowed', data.pets_allowed);
+      setTri('riders_allowed', data.riders_allowed);
+      setStr('equipment_year', data.equipment_year);
+      setStr('typical_lanes', data.typical_lanes);
+      setStr('benefits', data.requirements ?? data.benefits);
+      return next;
+    });
+  };
+
 
   return (
     <div className="animate-fade-in pb-32">
