@@ -165,7 +165,7 @@ const STEPS = [
 ];
 
 export function RecruiterOpportunityForm({
-  initial, onBack, onSaved, canSubmitForReview = true, submitBlockReason,
+  initial, seed, onBack, onSaved, canSubmitForReview = true, submitBlockReason,
 }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile } = useRecruiterProfile();
@@ -176,8 +176,34 @@ export function RecruiterOpportunityForm({
 
   useEffect(() => {
     if (!initial) {
-      // Prefill company name from recruiter profile when creating new
-      if (profile?.company_name) {
+      // Prefill from Quick Post seed (if handed off) then recruiter profile company name.
+      if (seed) {
+        const split = splitBenefits(seed.benefits ?? null);
+        setForm((f) => ({
+          ...f,
+          title: seed.title ?? f.title,
+          company_name: seed.company_name ?? f.company_name,
+          hiring_city: seed.hiring_city ?? f.hiring_city,
+          hiring_state: seed.hiring_state ?? f.hiring_state,
+          hiring_states: (seed.hiring_states ?? []).join(', ') || f.hiring_states,
+          driver_type: seed.driver_type ?? f.driver_type,
+          route_type: seed.route_type ?? f.route_type,
+          trailer_type: seed.trailer_type ?? f.trailer_type,
+          description: seed.description ?? f.description,
+          pay_model: seed.pay_model ?? f.pay_model,
+          cpm: seed.cpm != null ? String(seed.cpm) : f.cpm,
+          percentage_pay: seed.percentage_pay != null ? String(seed.percentage_pay) : f.percentage_pay,
+          flat_weekly_pay: seed.flat_weekly_pay != null ? String(seed.flat_weekly_pay) : f.flat_weekly_pay,
+          estimated_weekly_gross: seed.estimated_weekly_gross != null ? String(seed.estimated_weekly_gross) : f.estimated_weekly_gross,
+          estimated_weekly_miles: seed.estimated_weekly_miles != null ? String(seed.estimated_weekly_miles) : f.estimated_weekly_miles,
+          home_time: seed.home_time ?? f.home_time,
+          typical_lanes: split.typical_lanes || f.typical_lanes,
+          benefits: split.requirements || f.benefits,
+          transparency_confirmed: seed.transparency_confirmed ?? f.transparency_confirmed,
+          confirm_drivers_see_intel: seed.transparency_confirmed ?? f.confirm_drivers_see_intel,
+          confirm_misleading_removed: seed.transparency_confirmed ?? f.confirm_misleading_removed,
+        }));
+      } else if (profile?.company_name) {
         setForm((f) => f.company_name ? f : { ...f, company_name: profile.company_name ?? '' });
       }
       return;
