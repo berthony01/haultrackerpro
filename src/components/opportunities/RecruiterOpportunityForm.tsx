@@ -17,7 +17,7 @@ import {
 import {
   ArrowLeft, Briefcase, DollarSign, Home, ShieldCheck, Save, Lock, Send,
   Truck, ChevronRight, Eye, Lock as LockIcon, CheckCircle2, AlertTriangle,
-  Info, MapPin, HelpCircle,
+  Info, MapPin, HelpCircle, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -27,6 +27,8 @@ import {
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { calculateOpportunityFinancials, profitScoreLabel } from '@/lib/opportunities/opportunityProfit';
+import { splitBenefits, joinBenefits } from '@/lib/opportunities/benefitsFormat';
+import { PasteOpportunityDialog, type ExtractedOpportunity } from './PasteOpportunityDialog';
 
 interface Props {
   initial?: Opportunity | null;
@@ -99,7 +101,8 @@ interface FormState {
   pets_allowed: Tribool;
   riders_allowed: Tribool;
   equipment_year: string;
-  benefits: string;
+  benefits: string;          // requirements (Step 4)
+  typical_lanes: string;     // lanes (Step 2) — serialized into benefits column
   // confirm
   transparency_confirmed: boolean;
   confirm_drivers_see_intel: boolean;
@@ -117,8 +120,25 @@ const EMPTY: FormState = {
   fuel_paid_by: '', insurance_deductions: '', escrow_required: false, escrow_amount: '',
   lease_payment: '', maintenance_deductions: '', other_deductions: '',
   home_time: '', forced_dispatch: 'unspecified', pets_allowed: 'unspecified',
-  riders_allowed: 'unspecified', equipment_year: '', benefits: '',
+  riders_allowed: 'unspecified', equipment_year: '', benefits: '', typical_lanes: '',
   transparency_confirmed: false, confirm_drivers_see_intel: false, confirm_misleading_removed: false,
+};
+
+// Friendlier labels for validation errors (D5 fix).
+const FIELD_LABELS: Record<string, string> = {
+  cpm: 'CPM rate',
+  percentage_pay: 'Percentage pay',
+  flat_weekly_pay: 'Flat weekly pay',
+  estimated_weekly_gross: 'Estimated weekly gross',
+  estimated_weekly_miles: 'Estimated weekly miles',
+  estimated_loaded_miles: 'Loaded miles',
+  estimated_deadhead_miles: 'Deadhead miles',
+  sign_on_bonus: 'Sign-on bonus',
+  insurance_deductions: 'Insurance deduction',
+  escrow_amount: 'Escrow amount',
+  lease_payment: 'Lease payment',
+  maintenance_deductions: 'Maintenance deduction',
+  other_deductions: 'Other deductions',
 };
 
 const numOrNull = (v: string): number | null => {
