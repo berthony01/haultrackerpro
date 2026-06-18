@@ -479,10 +479,10 @@ export function RecruiterOpportunityForm({
           <div className="mt-3">
             <Button
               type="button"
-              variant="outline"
               size="sm"
               onClick={() => setPasteOpen(true)}
               disabled={pending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 border border-primary shadow-sm"
             >
               <Sparkles className="h-4 w-4" /> Paste opportunity to auto-fill
             </Button>
