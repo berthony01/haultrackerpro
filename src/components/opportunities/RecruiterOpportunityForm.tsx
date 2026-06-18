@@ -281,7 +281,8 @@ export function RecruiterOpportunityForm({
     for (const k of numericFields) {
       const v = form[k] as string;
       if (v !== '' && (Number.isNaN(Number(v)) || Number(v) < 0)) {
-        return `${k.replace(/_/g, ' ')} cannot be negative.`;
+        const friendly = FIELD_LABELS[k as string] ?? (k as string).replace(/_/g, ' ');
+        return `${friendly} must be 0 or higher.`;
       }
     }
     if (mode === 'submit') {
@@ -335,9 +336,10 @@ export function RecruiterOpportunityForm({
     pets_allowed: triToBool(form.pets_allowed),
     riders_allowed: triToBool(form.riders_allowed),
     equipment_year: form.equipment_year.trim() || null,
-    benefits: form.benefits.trim() || null,
+    benefits: joinBenefits({ typical_lanes: form.typical_lanes, requirements: form.benefits }) || null,
     description: form.description.trim() || null,
-    transparency_confirmed: mode === 'submit',
+    transparency_confirmed:
+      form.transparency_confirmed && form.confirm_drivers_see_intel && form.confirm_misleading_removed,
     status: mode === 'submit' ? 'active' : 'draft',
   });
 
