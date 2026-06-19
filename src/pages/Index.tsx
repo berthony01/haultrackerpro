@@ -230,12 +230,15 @@ const Index = () => {
     // Route to Opportunities / Recruiter Access from external CTA OR auth intent.
     // Wait for role resolution so recruiters don't briefly land on the driver
     // Opportunities page before the role guard redirects them.
+    // Note: we intentionally do NOT remove `htp_auth_intent` here —
+    // `useRoleIntentReconciler` (mounted in App) owns clearing it once the
+    // durable `profiles.intended_role` upsert succeeds. Removing it early
+    // races the reconciler and breaks Google recruiter signups.
     let recruiterIntent = false;
     try {
       const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
       if (storedAuthIntent === 'recruiter') {
         recruiterIntent = true;
-        sessionStorage.removeItem('htp_auth_intent');
       }
     } catch {}
     const pageParam = params.get('page');
@@ -345,7 +348,15 @@ const Index = () => {
     setPage('add');
   };
 
-  const showOnboarding = !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
+  // Driver-only onboarding card. Gate on role so recruiters never see
+  // "Log Your First Load" — even during the brief window before the role
+  // guard effect redirects them off /dashboard.
+  const showOnboarding =
+    !roleLoading &&
+    !isRecruiterView &&
+    !allLoadsQuery.isLoading &&
+    allLoadsQuery.loads.length === 0 &&
+    page === 'dashboard';
 
   const handleAddLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     const prevLoadCount = allLoadsQuery.loads.length;
@@ -599,6 +610,11 @@ const Index = () => {
       setSuppressOnboardingForAddDeepLink(false);
     }
     if (p === 'add') {
+      // Defense-in-depth: recruiters never see the Add Load / Add Expense / Fuel modal.
+      if (isRecruiterView || roleLoading) {
+        setPage(isRecruiterView ? 'recruiter-access' : 'dashboard');
+        return;
+      }
       setShowAddModal(true);
       return;
     }

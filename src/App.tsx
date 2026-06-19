@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { trackPageView } from '@/lib/analytics';
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Critical path — eagerly loaded
@@ -169,6 +170,13 @@ function PageViewTracker() {
   return null;
 }
 
+function RoleIntentReconcilerMount() {
+  // Lives inside AuthProvider + QueryClientProvider so it can read auth state
+  // and invalidate the user-role queries after upserting intended_role.
+  useRoleIntentReconciler();
+  return null;
+}
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -178,6 +186,7 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <PageViewTracker />
+            <RoleIntentReconcilerMount />
             <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
