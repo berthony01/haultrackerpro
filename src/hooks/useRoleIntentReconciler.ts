@@ -54,13 +54,15 @@ export function useRoleIntentReconciler() {
         // intended_role (a BEFORE UPDATE trigger pins it for plain UPDATEs).
         const { error } = await supabase.rpc('apply_recruiter_intent');
         if (error) {
-          // Do NOT silently grant recruiter intent on failure — leave the
-          // sessionStorage flag in place so the next mount retries, and skip
-          // cache invalidation so we don't flip the UI based on the stale
-          // driver row.
+          // Do NOT silently grant recruiter intent on failure — allow retry
+          // on next mount and skip cache invalidation so we don't flip the UI
+          // based on the stale driver row.
           ranForUser.current = null;
           return;
         }
+      } catch {
+        ranForUser.current = null;
+        return;
       }
       try {
         sessionStorage.removeItem('htp_auth_intent');
