@@ -49,26 +49,18 @@ export function useRoleIntentReconciler() {
     ranForUser.current = user.id;
     (async () => {
       try {
-        // Upsert — if handle_new_user already created the row we just flip
-        // intended_role to 'recruiter'; if it raced, we create it.
-        const { error } = await supabase
-          .from('profiles')
-          .upsert(
-            { user_id: user.id, intended_role: 'recruiter' },
-            { onConflict: 'user_id' },
-          );
+        // Server-authoritative: the RPC runs SECURITY DEFINER, validates
+        // auth.uid(), and is the only client-reachable path allowed to flip
+        // intended_role (a BEFORE UPDATE trigger pins it for plain UPDATEs).
+        const { error } = await supabase.rpc('apply_recruiter_intent');
         if (error) {
-          // Retry as a plain update in case upsert hit a NOT NULL we don't know about.
-          await supabase
-            .from('profiles')
-            .update({ intended_role: 'recruiter' })
-            .eq('user_id', user.id);
+          // Do NOT silently grant recruiter intent on failure — leave the
+          // sessionStorage flag in place so the next mount retries, and skip
+          // cache invalidation so we don't flip the UI based on the stale
+          // driver row.
+          ranForUser.current = null;
+          return;
         }
-      } catch {
-        // Non-fatal — the sessionStorage fallback in useUserRole will still
-        // render the recruiter UI for this session; we just won't have
-        // durability across sessions until the user re-authenticates.
-        return;
       }
       try {
         sessionStorage.removeItem('htp_auth_intent');
