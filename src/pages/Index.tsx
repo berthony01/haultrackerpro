@@ -812,6 +812,13 @@ const Index = () => {
         </header>
 
         <main className="px-4 py-5 max-w-7xl mx-auto w-full">
+        {/* Hard render-level role gate. While the role is still resolving,
+            we render a neutral fallback so neither role can flash the wrong
+            UI (driver Add/Onboarding for recruiters, recruiter hub for drivers). */}
+        {roleLoading ? (
+          <ViewFallback />
+        ) : (
+          <>
         {/* Smart Reminders */}
         {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">
