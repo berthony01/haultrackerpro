@@ -56,8 +56,7 @@ export function useUserRole() {
 
   const hasRecruiterProfile = !!recruiterQuery.data;
   const profileIntentRecruiter = intentQuery.data === 'recruiter';
-  const sessionIntentRecruiter = readRecruiterIntent();
-  const isRecruiter = hasRecruiterProfile || profileIntentRecruiter || sessionIntentRecruiter;
+  const isRecruiter = hasRecruiterProfile || profileIntentRecruiter;
   const role: UserRole = isRecruiter ? 'recruiter' : 'driver';
   const isLoading =
     authLoading || adminLoading || recruiterQuery.isLoading || intentQuery.isLoading;
@@ -69,6 +68,6 @@ export function useUserRole() {
     isAdmin,
     isLoading,
     hasRecruiterProfile,
-    intentRecruiter: profileIntentRecruiter || sessionIntentRecruiter,
+    intentRecruiter: profileIntentRecruiter,
   };
 }
