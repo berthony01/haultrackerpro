@@ -5,26 +5,22 @@ import { useAdmin } from '@/hooks/useAdmin';
 
 export type UserRole = 'driver' | 'recruiter';
 
-/** Read sticky recruiter intent set during signup/OAuth round-trip. */
-function readRecruiterIntent(): boolean {
-  try {
-    if (sessionStorage.getItem('htp_auth_intent') === 'recruiter') return true;
-    if (sessionStorage.getItem('htp_recruiter_intent') === '1') return true;
-  } catch {}
-  return false;
-}
-
 /**
- * Derives the user's primary role from existing data:
+ * Derives the user's primary role from server-authoritative data:
  * - recruiter = has a row in `recruiter_profiles`
- *   OR has `profiles.intended_role = 'recruiter'` (durable signup intent)
- *   OR has fresh recruiter sessionStorage intent (fallback for the brief
- *   window before the profile row is written by handle_new_user())
+ *   OR has `profiles.intended_role = 'recruiter'` (durable signup intent,
+ *   written only by `handle_new_user` from signup metadata or by the
+ *   `apply_recruiter_intent` RPC after an eligibility check).
  * - driver    = everyone else
  *
- * Admin / owner accounts are tracked separately via `useAdmin()` and keep
- * cross-role access for management/testing.
+ * SessionStorage is intentionally NOT consulted here. Client storage
+ * can't be trusted to set a role; the recruiter-intent hint in
+ * sessionStorage only nudges the reconciler to call the RPC, and the
+ * RPC decides whether to write.
+ *
+ * Admin / owner accounts are tracked separately via `useAdmin()`.
  */
+
 export function useUserRole() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, isLoading: adminLoading } = useAdmin();
