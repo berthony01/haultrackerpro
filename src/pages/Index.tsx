@@ -1055,6 +1055,8 @@ const Index = () => {
           </>
           </Suspense>
         )}
+          </>
+        )}
       </main>
       </div>
 
