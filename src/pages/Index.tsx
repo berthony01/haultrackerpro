@@ -75,7 +75,23 @@ const Index = () => {
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
-  const [page, setPage] = useState('dashboard');
+  // Compute initial page from URL / sessionStorage so recruiters never even
+  // briefly mount the driver dashboard while their role resolves. Sticky
+  // recruiter intent (from Auth.tsx) and explicit `?page=recruiter-access`
+  // deep links both bypass the 'dashboard' default.
+  const [page, setPage] = useState<string>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const pageParam = sp.get('page');
+      if (pageParam === 'recruiter-access' || pageParam?.startsWith('recruiter-access:')) {
+        return 'recruiter-access';
+      }
+      if (sp.get('intent') === 'recruiter') return 'recruiter-access';
+      if (sessionStorage.getItem('htp_auth_intent') === 'recruiter') return 'recruiter-access';
+      if (sessionStorage.getItem('htp_recruiter_intent') === '1') return 'recruiter-access';
+    } catch {}
+    return 'dashboard';
+  });
   const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -178,7 +194,8 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     }
     // Prefill from Landing Profit Intelligence demo
-    if (params.get('prefill') === 'load') {
+    // Prefill from Landing Profit Intelligence demo — driver-only.
+    if (params.get('prefill') === 'load' && !roleLoading && !isRecruiterView) {
       try {
         const raw = sessionStorage.getItem('htp_demo_prefill');
         if (raw) {
