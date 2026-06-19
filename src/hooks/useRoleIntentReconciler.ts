@@ -48,28 +48,33 @@ export function useRoleIntentReconciler() {
 
     ranForUser.current = user.id;
     (async () => {
+      let applied = false;
       try {
         // Server-authoritative: the RPC runs SECURITY DEFINER, validates
-        // auth.uid(), and is the only client-reachable path allowed to flip
-        // intended_role (a BEFORE UPDATE trigger pins it for plain UPDATEs).
-        const { error } = await supabase.rpc('apply_recruiter_intent');
+        // auth.uid(), and only flips intended_role for genuine new signups
+        // (or existing recruiters). Returns { applied, reason }.
+        const { data, error } = await supabase.rpc('apply_recruiter_intent');
         if (error) {
-          // Do NOT silently grant recruiter intent on failure — allow retry
-          // on next mount and skip cache invalidation so we don't flip the UI
-          // based on the stale driver row.
+          // Transient failure — allow retry on next mount, don't flip UI.
           ranForUser.current = null;
           return;
         }
+        const payload = (data ?? {}) as { applied?: boolean };
+        applied = !!payload.applied;
       } catch {
         ranForUser.current = null;
         return;
       }
+      // Clear the session hint regardless of outcome so we don't loop on
+      // an ineligible driver. If they later complete the real recruiter
+      // application, that flow will set intended_role server-side.
       try {
         sessionStorage.removeItem('htp_auth_intent');
       } catch {}
-      // Refetch role so Index / BottomNav / AppSidebar flip immediately.
-      queryClient.invalidateQueries({ queryKey: ['user-role-profile-intent', user.id] });
-      queryClient.invalidateQueries({ queryKey: ['user-role-recruiter-check', user.id] });
+      if (applied) {
+        queryClient.invalidateQueries({ queryKey: ['user-role-profile-intent', user.id] });
+        queryClient.invalidateQueries({ queryKey: ['user-role-recruiter-check', user.id] });
+      }
     })();
   }, [user, loading, queryClient]);
 }
