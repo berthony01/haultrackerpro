@@ -1,142 +1,97 @@
-# Strict Audit — Recruiter Opportunity Posting Flow
+## Goal
 
-Analysis only. No code changes. Goal: identify why the flow feels heavy and why a recruiter had trouble entering CPM, and propose a tightly scoped simplification plan.
+Stop silent self-conversion of `profiles.intended_role` when an existing driver visits `/?intent=recruiter`, without breaking real recruiter signups (email + Google).
 
-## 1. End-to-end flow as it exists today
+## Approach
 
-```text
-Index.tsx
-  └─ <RecruiterAccessRoute>                       (lazy)
-       ├─ view='hub' → <RecruiterAccessPage>     ← lands here
-       │      "Post Opportunity" / "Manage"
-       ├─ view='manager' → <RecruiterOpportunityManager>
-       │      list + "+ New" button
-       └─ view='manager' + edit → <RecruiterOpportunityForm>
-              5-step wizard, ~30 fields, 1134 lines
-```
+Keep the single `apply_recruiter_intent()` RPC and the BEFORE-UPDATE guard trigger we already added. Add a server-side eligibility check inside the RPC so that flipping `intended_role` to `recruiter` only succeeds for a genuine new-account signup — not for an established driver tampering with the URL. For ineligible callers, return a structured "not eligible" result instead of mutating the profile, and surface an explicit "Become a Recruiter" path in the UI.
 
-Clicks from "I want to post a job" to a usable form: **3** (Hub → Manage → +New). Recruiters never see the form on first arrival; they see a dashboard.
+No new table is needed — the existing `auth.users.created_at`, `profiles.intended_role`, `recruiter_profiles`, `loads`, `expenses`, and `fuel_logs` rows already let us tell "fresh signup" from "established driver".
 
-Verification gating chain (`RecruiterOpportunityManager.tsx:57-68`): no profile → suspended → rejected → pending → approved. Each state returns a different `Gate` card. Correct but adds perceived friction because the same page renders many distinct states.
+## Eligibility rule inside the RPC
 
-## 2. Why the recruiter could not enter CPM (root cause)
+The RPC sets `intended_role = 'recruiter'` only if AT LEAST ONE of these is true for `auth.uid()`:
 
-In `RecruiterOpportunityForm.tsx`:
+1. The user already has a `recruiter_profiles` row (idempotent re-confirmation for real recruiters).
+2. The account is a brand-new signup, defined as ALL of:
+   - `auth.users.created_at > now() - interval '30 minutes'`
+   - `profiles.intended_role = 'driver'` (default from `handle_new_user`)
+   - No rows in `loads`, `expenses`, or `fuel_logs` for this user.
 
-```ts
-// line 742-744
-const showCpm  = form.pay_model === 'cpm' || form.pay_model === 'mixed';
-const showPct  = form.pay_model === 'percentage' || form.pay_model === 'mixed';
-const showFlat = form.pay_model === 'flat_weekly' || form.pay_model === 'salary' || form.pay_model === 'mixed';
+Otherwise the RPC returns `{ applied: false, reason: 'not_eligible' }` and does NOT change `intended_role`. The BEFORE-UPDATE trigger continues to block any direct client write.
 
-// line 771
-{showCpm && <NumField label="CPM Rate ($/mi)" value={form.cpm} ... />}
-```
+This means:
+- Email recruiter signup keeps working (and is already handled by `handle_new_user` from `raw_user_meta_data.intended_role` — the RPC is only the Google parity path).
+- Google recruiter signup keeps working — fresh user, default profile, no data → eligible.
+- An existing driver appending `?intent=recruiter` → ineligible → no silent flip.
 
-The CPM input is **hidden until the recruiter clicks the "CPM" pay-model chip**, which lives on Step 3 of a 5-step wizard. A recruiter who lands on the form intending to "pay drivers 65 cents per mile" must:
+## Client behavior change
 
-1. Fill Step 1 (title, company, hiring type, route, location, summary).
-2. Click "Save & Continue".
-3. Fill Step 2 (trailer, lanes, miles).
-4. Click "Save & Continue".
-5. Reach Step 3, scroll to "Pay Model", click "CPM".
-6. *Now* the CPM field finally appears.
+`useRoleIntentReconciler.ts`:
+- Still triggered by `sessionStorage.htp_auth_intent === 'recruiter'` or `?intent=recruiter`.
+- Calls `apply_recruiter_intent` exactly as today, but reads the new structured result.
+- On `applied: true`: clears the session flag, invalidates role queries (current behavior).
+- On `applied: false` (reason `not_eligible`): clears the session flag so we don't loop, and does NOT invalidate role queries. The user remains a driver in the DB.
 
-There is no shortcut, no label on Step 1 mentioning CPM, and the chip-style pay-model selector does not auto-focus the revealed field. Label `CPM Rate ($/mi)` is also ambiguous — does the recruiter enter `0.65` or `65`? `NumField` is a bare `type="number"` with no `$` adornment, no helper text, no min/max sanity check, and no preview of "you entered $0.65/mi · about $X/week at Y miles".
+`useUserRole.ts`:
+- Remove the sessionStorage-based "treat as recruiter" short-circuit so client storage can no longer fake a role at render time. The session flag stays only as a hint for the reconciler.
 
-This single field is the reason the test recruiter got stuck.
+Route handling in `App.tsx` / `pages/Index.tsx`:
+- Keep the existing "if intent=recruiter, land on recruiter-access" initial-render guard, because the recruiter-access page is the right destination either way:
+  - Eligible new recruiter: their durable role is now recruiter, and the recruiter onboarding/application starts here.
+  - Ineligible existing driver: lands on recruiter-access page which already shows the "Become a Recruiter" CTA / application flow. They keep their driver role in the DB and only become a recruiter by completing the explicit recruiter application.
 
-## 3. Real defects found in the form
+No new "convert me" RPC is added for existing drivers — the existing recruiter application flow (which creates `recruiter_profiles`) is the explicit path, and the RPC's first eligibility branch (`recruiter_profiles` exists) lets that flow flip `intended_role` durably afterward.
 
-These are correctness bugs, not opinions.
+## Migration
 
+Single migration that replaces `public.apply_recruiter_intent()`:
+- `SECURITY DEFINER`, `SET search_path = public`.
+- Returns `jsonb` of shape `{ applied: bool, reason: text }`.
+- `REVOKE ALL FROM PUBLIC; GRANT EXECUTE TO authenticated`.
+- Idempotent: a real recruiter calling repeatedly is a no-op.
 
-| #   | File:line                                                                                                                                                                                                                        | Issue                                                                                                                                                                                                                                                                         | Impact                                                                                                                      |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| D1  | `RecruiterOpportunityForm.tsx:696, 843`                                                                                                                                                                                          | Step 2 "Typical Lanes" textarea and Step 4 "Additional Requirements" textarea both bind to `form.benefits`. Whichever step is edited last wins — the other is silently overwritten.                                                                                           | Data loss; users lose lanes or requirements without warning.                                                                |
-| D2  | `RecruiterOpportunityForm.tsx:319`                                                                                                                                                                                               | `transparency_confirmed: mode === 'submit'` — the persisted flag is set purely from the submit action, ignoring the three checkboxes. The two extra checkboxes (`confirm_drivers_see_intel`, `confirm_misleading_removed`) are validated client-side but **never persisted**. | Transparency state is misleading; admin moderation reads a value that may not reflect the recruiter's actual confirmations. |
-| D3  | `RecruiterOpportunityForm.tsx:65-122`                                                                                                                                                                                            | `hiring_states` is a raw CSV string in form state, parsed with `splitList`. No chips, no multi-select, no validation that entries are valid 2-letter codes.                                                                                                                   | Garbage data; admin search/filter by state silently fails.                                                                  |
-| D4  | `StepProgress` (488-541) clicks jump steps freely, and "Save & Continue" only advances `step` (343) — it does **not** persist anything. Combined with no autosave, a closed tab or accidental navigation loses 5 steps of input. | High abandonment risk.                                                                                                                                                                                                                                                        | &nbsp;                                                                                                                      |
-| D5  | `numericFields` validation (260-264) returns "cpm cannot be negative" with raw underscore key. Error toasts read `"cpm cannot be negative"` instead of "CPM rate must be 0 or higher".                                           | Poor UX for the exact field giving recruiters trouble.                                                                                                                                                                                                                        | &nbsp;                                                                                                                      |
-| D6  | `RecruiterAccessPage.tsx:25` imports `Sparkles` from lucide as identity decoration. Chat-agent contract aside, this surface uses it as part of recruiter branding — acceptable but worth noting if we standardize iconography.   | Cosmetic.                                                                                                                                                                                                                                                                     | &nbsp;                                                                                                                      |
-| D7  | `RecruiterOpportunityManager.tsx:123-126` "+ New" button label is just "New". Hub button is "Manage Opportunities". Neither says "Post a Job".                                                                                   | Discoverability.                                                                                                                                                                                                                                                              | &nbsp;                                                                                                                      |
+The guard trigger `prevent_profile_intended_role_updates` from the previous migration is kept unchanged.
 
+## Files
 
-## 4. Complexity audit — fields vs. what is actually required
+Inspected:
+- `src/hooks/useRoleIntentReconciler.ts`
+- `src/hooks/useUserRole.ts`
+- `src/hooks/useAuth.tsx`
+- `src/pages/Auth.tsx`
+- `src/pages/Index.tsx`
+- `src/App.tsx`
+- `supabase/migrations/2026052523…_profiles_intended_role.sql`
+- `supabase/migrations/20260619172727_…_apply_recruiter_intent.sql`
+- `recruiter_profiles` + RLS, `handle_new_user` trigger.
 
-Form collects **~30 fields across 5 steps**. Server-side required to publish (`validate`, lines 257-282):
+Changed:
+- New migration: `replace apply_recruiter_intent with eligibility gate`.
+- `src/hooks/useRoleIntentReconciler.ts` — handle structured result, no role-query invalidation on `applied: false`.
+- `src/hooks/useUserRole.ts` — remove sessionStorage role short-circuit.
 
-- title
-- company_name
-- driver_type (hiring type)
-- route_type
-- trailer_type
-- pay_model
-- one of {estimated_weekly_gross, cpm, flat_weekly_pay, percentage_pay}
-- 3 transparency checkboxes
+Not changed:
+- `useAuth.tsx` email signup metadata flow.
+- `Auth.tsx` recruiter signup buttons and OAuth redirect (`/?intent=recruiter`).
+- BEFORE-UPDATE trigger on `profiles`.
+- RLS policies (unchanged; no loosening).
+- Recruiter application / `recruiter_profiles` / verification logic.
 
-That's **9 fields**. Everything else (hiring_city/state/states, description, lanes, miles, deadhead, deductions, escrow, home_time, equipment_year, benefits, detention, layover, sign-on, fuel) is optional but is presented with the same visual weight as required fields.
+## Verification scenarios
 
-Visible cost: a 1,134-line component with 5 sub-step components, a sticky preview panel, a strength meter, and a collapsed-section list. Reasonable as an "advanced" mode, excessive as the default first-post experience.
+| # | Scenario | Expected |
+|---|----------|----------|
+| A | New email recruiter signup | Works via `handle_new_user`; reconciler RPC is a no-op or `applied: true` (eligible new user). |
+| B | New Google recruiter signup | RPC eligible (fresh user, default profile, no data) → `applied: true`; routes to recruiter-access. |
+| C | Existing driver hits `/?intent=recruiter` | RPC returns `applied: false`; `intended_role` stays `driver`; UI lands on recruiter-access with explicit "Become a Recruiter" CTA. |
+| D | Existing approved recruiter logs in | `recruiter_profiles` branch → idempotent success; recruiter dashboard works. |
+| E | Existing driver normal login | No reconciler call (no intent flag); driver dashboard works. |
+| F | RPC error / network failure | Reconciler returns early; no role flip; no UI flash (existing `roleLoading` fallback). |
+| G | Driver hits a recruiter-only route via URL | Same as today — recruiter RLS / route guards block; `intended_role` unaffected. |
+| H | Recruiter hits a driver-only route via URL | Same as today — recruiter view redirects to recruiter-access. |
 
-## 5. Strict findings summary
+## Remaining risks
 
-- **Friction: real.** 3 clicks to reach the form, 5 steps to reach CPM, and the CPM input is gated behind a chip the recruiter has not yet learned matters.
-- **Bugs: real.** D1 (benefits field collision) and D2 (transparency flag mismatch) are data correctness issues, not polish.
-- **Required fields: small.** A guided "Quick Post" can cover 9 required fields in one screen.
-- **The wizard should not be removed** — it serves recruiters posting complex lease-purchase opportunities. But it should not be the first-time experience.
-
-## 6. Recommended fix plan (build-mode work, not done now)
-
-Phased so it can ship surgically without touching the wizard's existing structure or backend schema.
-
-### Phase R1 — Stop the bleeding (small, no schema change)
-
-1. Fix D1: split `benefits` storage into two distinct form-state keys (`typical_lanes`, `requirements_text`). Persist `typical_lanes` into `description` or a new optional column later; for now concatenate into `benefits` with clear delimiter so no data is lost.
-2. Fix D2: persist `transparency_confirmed = a && b && c` based on the three checkboxes, regardless of submit/draft.
-3. Fix D5: friendlier validation labels via a `FIELD_LABELS` map.
-4. Rename "+ New" to "+ Post Opportunity" and add the same button to the empty state of `RecruiterAccessPage` so it works from the hub without going through Manage.
-5. Add an inline "$/mile — example: 0.65" helper directly under the CPM field and a live "≈ $X/week at Y miles" hint using the existing financials calculator.
-
-### Phase R2 — One-screen "Quick Post" mode (default for first-time recruiters)
-
-A single screen capturing the 9 required fields, with one collapsible "Add more detail" section that opens the existing wizard's optional fields. Submits through the **same** `createOpportunity` mutation — no new edge function, no schema change.
-
-Routing:
-
-- "+ Post Opportunity" from hub → Quick Post screen.
-- Existing wizard still available via a "Switch to Detailed Editor" link.
-- Edit existing → keep wizard (it is better for review).
-
-Pay-model UX in Quick Post:
-
-- Pay-model chips at top.
-- The matching pay input (CPM / %/ flat) renders immediately and is auto-focused.
-- Add `$` prefix adornment, `step="0.01"`, `min="0"`, `max="2"` for CPM with toast warning if user enters > 2 ("did you mean 0.65?").
-
-### Phase R3 — Reliability
-
-- Local autosave (`useEffect` → localStorage keyed by recruiter id + draft id) so a refresh never loses input.
-- "Save & Continue" actually persists a draft on each step transition.
-- Replace `hiring_states` CSV with a chip multi-select using the existing `US_STATES` array.
-
-### Phase R4 — Polish (optional)
-
-- Move 3 transparency checkboxes into one "I confirm this listing is accurate" with the long disclaimer collapsed below.
-- Inline preview cards on Quick Post mirror what drivers will see.
-
-## 7. What this audit explicitly does **not** recommend
-
-- Do **not** change Phase 23 pay logic, Phase 29 stops, or any driver-side calculation.
-- Do **not** alter the `opportunities` table schema or RLS in R1/R2 (the bug fixes and Quick Post work with existing columns).
-- Do **not** touch recruiter billing, contracts, application pipeline, or referral logic.
-- Do **not** remove the 5-step wizard. Keep it as the "Detailed Editor".
-- Do **not** add a new edge function — `createOpportunity` mutation already does the right thing.
-
-## 8. Suggested order of operations
-
-1. R1 ships first (1 PR, ~150 LOC). Immediately fixes the data bug and surfaces the CPM helper that solves the reported user issue.
-2. R2 ships next as a new component `RecruiterQuickPostForm.tsx` reusing the existing `useRecruiterOpportunities` hook, `calculateOpportunityFinancials`, and `Field`/`NumField` primitives.
-3. R3 and R4 are independent.
-
-If you approve, the next planning step will be a build plan for **Phase R1 only** so we can confirm the bug fixes and the CPM helper land before introducing the Quick Post screen. can you also make it so a recruiter can paste an opportunity which would auto fill the form.
+- A motivated attacker who signs up a brand-new account with Google could still self-identify as recruiter — that is the intended path and is gated by the real recruiter application + verification, not by `intended_role`.
+- The 30-minute freshness window is a heuristic; it covers normal OAuth round-trips with plenty of margin but is not a cryptographic guarantee. The downside of being wrong is purely cosmetic (routing/onboarding) because posting power still requires `recruiter_profiles` + verification.
