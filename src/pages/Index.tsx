@@ -75,7 +75,23 @@ const Index = () => {
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
-  const [page, setPage] = useState('dashboard');
+  // Compute initial page from URL / sessionStorage so recruiters never even
+  // briefly mount the driver dashboard while their role resolves. Sticky
+  // recruiter intent (from Auth.tsx) and explicit `?page=recruiter-access`
+  // deep links both bypass the 'dashboard' default.
+  const [page, setPage] = useState<string>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const pageParam = sp.get('page');
+      if (pageParam === 'recruiter-access' || pageParam?.startsWith('recruiter-access:')) {
+        return 'recruiter-access';
+      }
+      if (sp.get('intent') === 'recruiter') return 'recruiter-access';
+      if (sessionStorage.getItem('htp_auth_intent') === 'recruiter') return 'recruiter-access';
+      if (sessionStorage.getItem('htp_recruiter_intent') === '1') return 'recruiter-access';
+    } catch {}
+    return 'dashboard';
+  });
   const [loadsPayFilter, setLoadsPayFilter] = useState<string | undefined>();
   const [editingLoad, setEditingLoad] = useState<Load | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -178,7 +194,8 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     }
     // Prefill from Landing Profit Intelligence demo
-    if (params.get('prefill') === 'load') {
+    // Prefill from Landing Profit Intelligence demo — driver-only.
+    if (params.get('prefill') === 'load' && !roleLoading && !isRecruiterView) {
       try {
         const raw = sessionStorage.getItem('htp_demo_prefill');
         if (raw) {
@@ -325,8 +342,11 @@ const Index = () => {
     return () => document.body.classList.remove('app-shell-active');
   }, []);
 
-  // Show onboarding modal for first-time users
+  // Show onboarding modal for first-time DRIVERS only.
+  // Gated on roleLoading so recruiters never see "Log Your First Load" —
+  // even returning recruiters with cleared session storage.
   useEffect(() => {
+    if (roleLoading || isRecruiterView) return;
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
       if (suppressOnboardingForAddDeepLink) return;
       let recruiter = false;
@@ -337,7 +357,7 @@ const Index = () => {
       }
       setShowOnboardingModal(true);
     }
-  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink]);
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, roleLoading, isRecruiterView]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboardingModal(false);
@@ -792,6 +812,13 @@ const Index = () => {
         </header>
 
         <main className="px-4 py-5 max-w-7xl mx-auto w-full">
+        {/* Hard render-level role gate. While the role is still resolving,
+            we render a neutral fallback so neither role can flash the wrong
+            UI (driver Add/Onboarding for recruiters, recruiter hub for drivers). */}
+        {roleLoading ? (
+          <ViewFallback />
+        ) : (
+          <>
         {/* Smart Reminders */}
         {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">
@@ -1027,6 +1054,8 @@ const Index = () => {
             ))}
           </>
           </Suspense>
+        )}
+          </>
         )}
       </main>
       </div>
