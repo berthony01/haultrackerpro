@@ -342,8 +342,11 @@ const Index = () => {
     return () => document.body.classList.remove('app-shell-active');
   }, []);
 
-  // Show onboarding modal for first-time users
+  // Show onboarding modal for first-time DRIVERS only.
+  // Gated on roleLoading so recruiters never see "Log Your First Load" —
+  // even returning recruiters with cleared session storage.
   useEffect(() => {
+    if (roleLoading || isRecruiterView) return;
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
       if (suppressOnboardingForAddDeepLink) return;
       let recruiter = false;
@@ -354,7 +357,7 @@ const Index = () => {
       }
       setShowOnboardingModal(true);
     }
-  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink]);
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, roleLoading, isRecruiterView]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboardingModal(false);
