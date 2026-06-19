@@ -345,7 +345,15 @@ const Index = () => {
     setPage('add');
   };
 
-  const showOnboarding = !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0 && page === 'dashboard';
+  // Driver-only onboarding card. Gate on role so recruiters never see
+  // "Log Your First Load" — even during the brief window before the role
+  // guard effect redirects them off /dashboard.
+  const showOnboarding =
+    !roleLoading &&
+    !isRecruiterView &&
+    !allLoadsQuery.isLoading &&
+    allLoadsQuery.loads.length === 0 &&
+    page === 'dashboard';
 
   const handleAddLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     const prevLoadCount = allLoadsQuery.loads.length;
@@ -599,6 +607,11 @@ const Index = () => {
       setSuppressOnboardingForAddDeepLink(false);
     }
     if (p === 'add') {
+      // Defense-in-depth: recruiters never see the Add Load / Add Expense / Fuel modal.
+      if (isRecruiterView || roleLoading) {
+        setPage(isRecruiterView ? 'recruiter-access' : 'dashboard');
+        return;
+      }
       setShowAddModal(true);
       return;
     }
