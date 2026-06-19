@@ -2867,7 +2867,7 @@ export type Database = {
       }
     }
     Functions: {
-      apply_recruiter_intent: { Args: never; Returns: boolean }
+      apply_recruiter_intent: { Args: never; Returns: Json }
       award_load_points: {
         Args: { _load_id: string }
         Returns: {
