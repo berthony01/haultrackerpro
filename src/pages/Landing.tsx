@@ -674,7 +674,7 @@ export default function Landing() {
                     borderWidth: 2,
                   }}
                 >
-                  <Users className="h-5 w-5" /> Post an opportunity as a recruiter
+                  <Users className="h-5 w-5" /> Post Jobs Free as a Recruiter
                 </Button>
               </div>
               <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs">
