@@ -51,7 +51,8 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const goToDriver = () => navigate('/auth?intent=driver');
-  const goToRecruiter = () => navigate('/recruiters');
+  const goToRecruiter = () => navigate('/auth?intent=recruiter');
+  const goToRecruiterInfo = () => navigate('/recruiters');
 
   useEffect(() => {
     if (!window.location.hash) return;
