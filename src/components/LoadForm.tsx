@@ -725,8 +725,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 <SelectTrigger id="pay_model" className="h-9 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PAY_MODEL_VALUES.map(m => (
-                    <SelectItem key={m} value={m}>{PAY_MODEL_LABELS[m]}</SelectItem>
+                    <SelectItem key={m} value={m} data-testid={`pay-model-option-${m}`}>{PAY_MODEL_LABELS[m]}</SelectItem>
                   ))}
+
                 </SelectContent>
               </Select>
               <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
@@ -1112,9 +1113,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           {/* Phase 3: Profit Check */}
           {profitCheck && !isCancelled && <ProfitCheckCard result={profitCheck} />}
 
-          <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
+          <Button type="submit" data-testid="load-form-submit" className="w-full h-12 text-base font-bold" disabled={loading}>
             {loading ? 'Saving...' : initialData ? 'Update Load' : saveAsPending ? 'Save as Pending' : 'Log Load'}
           </Button>
+
         </form>
       </CardContent>
 

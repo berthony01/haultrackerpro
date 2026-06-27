@@ -35,7 +35,9 @@ export default defineConfig({
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } },
+      testIgnore: /driver-journey-mobile\.spec\.ts/,
     },
+
     {
       name: 'mobile',
       use: { ...devices['Pixel 7'] },

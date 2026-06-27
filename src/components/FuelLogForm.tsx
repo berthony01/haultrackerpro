@@ -97,6 +97,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 <Fuel className="h-3.5 w-3.5 text-muted-foreground" /> Gallons
               </Label>
               <Input
+                data-testid="fuel-gallons"
                 type="number"
                 step="0.001"
                 min="0"
@@ -106,6 +107,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 className="h-11 rounded-xl"
                 required
               />
+
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
@@ -114,6 +116,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  data-testid="fuel-price-per-gallon"
                   type="number"
                   step="0.001"
                   min="0"
@@ -123,6 +126,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                   className="h-11 pl-9 rounded-xl"
                   required
                 />
+
               </div>
             </div>
           </div>
@@ -184,11 +188,13 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
               <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Notes (optional)
             </Label>
             <Textarea
+              data-testid="fuel-notes"
               placeholder="Any additional notes..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="min-h-[80px] rounded-xl resize-none"
             />
+
           </div>
         </CardContent>
       </Card>
@@ -198,10 +204,11 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
         <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl font-bold" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" className="flex-1 h-12 rounded-xl font-bold gap-2" disabled={loading || !gallons || !pricePerGallon}>
+        <Button type="submit" data-testid="fuel-form-submit" className="flex-1 h-12 rounded-xl font-bold gap-2" disabled={loading || !gallons || !pricePerGallon}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fuel className="h-4 w-4" />}
           {initialData ? 'Update' : 'Save Fuel Log'}
         </Button>
+
       </div>
     </form>
   );

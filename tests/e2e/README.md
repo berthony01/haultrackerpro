@@ -1,17 +1,20 @@
 # HaulTrackerPro — Driver Journey E2E Runner
 
-Reusable Playwright runner that drives a real browser through the full
-driver money flow (login → settings → load → fuel → expense → dashboard
-→ reports → refresh → invalid-form → cleanup) against a **disposable QA
-driver account**. Outputs a PASS/FAIL report under `test-results/`.
+Real-browser Playwright runner that drives the full driver money flow
+against a **disposable QA driver account**:
 
-## Why a disposable account
+`login → settings (write + persist) → load create (deterministic flat rate) → fuel create → expense create → dashboard numeric assertions → reports parity → refresh → invalid-form error handling → cleanup`
 
-The runner creates real database rows. Running it against the owner's
-production driver account would pollute live financial data. Every row
-the runner creates is tagged with `QA TEST DELETE - <runId>` and the
-`afterAll` hook deletes those rows over the QA driver's own RLS session
-— no service-role key is ever added to the app codebase.
+Outputs `test-results/driver-journey-report.{json,md}` on every run —
+even if the test errors out early.
+
+## Safety
+
+- **Never run against the project owner's real account.** The runner
+  hard-refuses `berthonyxyz@gmail.com`. Use a disposable QA driver.
+- Every row the runner creates is tagged with `QA TEST DELETE - <runId>`
+  and the `finally` block deletes them over the QA driver's RLS session.
+  No service-role key is ever embedded in this repo.
 
 ## Required env vars
 
@@ -25,14 +28,8 @@ the runner creates is tagged with `QA TEST DELETE - <runId>` and the
 | `E2E_RUN_ID`            | Unique marker appended to every test row             | `local-<timestamp>`      |
 | `E2E_CLEANUP_MODE`      | `always` (default) or `never` to inspect manually    | `always`                 |
 
-If `E2E_SUPABASE_URL` / `E2E_SUPABASE_ANON_KEY` are absent, cleanup falls
-back to `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` only when
-they are exported into the test process. If neither is available cleanup
-fails clearly and the final verdict is downgraded.
-
-The disposable account must already be confirmed (email verification is
-mandatory on this project). One-time setup is by hand in the live UI; the
-runner then re-uses it.
+The disposable account must be confirmed (email verification is on).
+Confirm it once in the live UI; the runner reuses it forever.
 
 ## Commands
 
@@ -47,20 +44,54 @@ E2E_RUN_ID=ci-$(date +%s) \
 bunx playwright test --project=desktop tests/e2e/driver-journey.spec.ts
 ```
 
-Reports land at `test-results/driver-journey-report.{json,md}` plus the
-full Playwright HTML report under `test-results/html/`.
-
 ## Verdict rules (strict)
 
-The runner records each step as `PASS`, `FAIL`, `PARTIAL`, or `NOT TESTED`.
-Required steps: login, settings, load_create, fuel_create, expense_create,
-dashboard, reports, refresh_persistence, error_handling, cleanup.
-Optional: export.
+Each step is recorded as `PASS`, `FAIL`, `PARTIAL`, or `NOT TESTED`.
+Required steps: `login, settings, load_create, fuel_create,
+expense_create, dashboard, reports, refresh_persistence,
+error_handling, cleanup`. Optional: `export`.
 
-- **FAIL** — any required step is FAIL, any dashboard KPI fails the
-  `expectClose` assertion, any reports↔dashboard KPI disagrees, cleanup
-  deletes errored, or cleanup verification finds marker rows still present.
-- **PARTIAL** — any required step is NOT TESTED, or cleanup completed with
-  non-fatal errors.
-- **PASS** — every required step passed. `export` may be NOT TESTED.
+- **FAIL** — any required step is FAIL, any dashboard KPI fails
+  `expectClose`, any reports↔dashboard KPI disagrees, cleanup delete
+  errored, or cleanup verify found marker rows remaining.
+- **PARTIAL** — any required step is NOT TESTED or PARTIAL, or cleanup
+  finished with non-fatal errors.
+- **PASS** — every required step is PASS. `export` may be NOT TESTED.
 
+The runner asserts `verdict === 'PASS'`. **PARTIAL fails the runner**
+so CI cannot treat it as success.
+
+## Deterministic test load
+
+Fixed inputs the runner submits — change in lockstep with the dashboard
+assertions if you tune the formula.
+
+| Field            | Value           |
+| ---------------- | --------------- |
+| Pay model        | `flat_rate`     |
+| Flat rate        | `$1000`         |
+| Loaded miles     | `500`           |
+| Deadhead miles   | `50`            |
+| Deadhead pay     | unpaid (default from settings step) |
+| Pickup           | `Dallas, TX`    |
+| Dropoff          | `Atlanta, GA`   |
+| Notes / marker   | `QA TEST DELETE - <runId>` |
+| Fuel (1 log)     | 100 gal × $3.00 = `$300` |
+| Expense (1 row)  | `$50`           |
+
+Expected KPIs (within ±0.01):
+
+- gross revenue = `1000`
+- operating miles = `550`
+- loaded RPM = `2.00`
+- effective/operating RPM ≈ `1.82`
+- total expenses = `350`
+- net profit = `650`
+- net RPM ≈ `1.18`
+
+## Mobile spec
+
+`driver-journey-mobile.spec.ts` is a **smoke test only** — auth +
+dashboard render at a Pixel 7 viewport. It does NOT verify the full
+driver journey at mobile width. Don't report mobile coverage as more
+than smoke based on it.

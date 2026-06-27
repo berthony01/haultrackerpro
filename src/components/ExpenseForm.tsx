@@ -376,8 +376,9 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
               </div>
             )}
 
-            <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
+            <Button type="submit" data-testid="expense-form-submit" className="w-full h-12 text-base font-bold" disabled={loading}>
               {loading ? 'Saving...' : isEdit ? 'Update Expense' : 'Save Expense'}
+
             </Button>
           </form>
         </CardContent>

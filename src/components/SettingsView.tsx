@@ -407,13 +407,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <div className="space-y-2 rounded-xl border border-border/60 p-3 bg-muted/30">
             <Label className="text-xs font-semibold">Do you get paid for Deadhead miles?</Label>
             <Select value={defaultDhPayStatus} onValueChange={(v) => setDefaultDhPayStatus(v as 'unpaid' | 'same' | 'custom')}>
-              <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger data-testid="settings-default-dh-pay-status" className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="unpaid">No — deadhead is unpaid</SelectItem>
-                <SelectItem value="same">Yes — same rate as loaded miles</SelectItem>
-                <SelectItem value="custom">Yes — custom rate per mile</SelectItem>
+                <SelectItem value="unpaid" data-testid="settings-dh-status-unpaid">No — deadhead is unpaid</SelectItem>
+                <SelectItem value="same" data-testid="settings-dh-status-same">Yes — same rate as loaded miles</SelectItem>
+                <SelectItem value="custom" data-testid="settings-dh-status-custom">Yes — custom rate per mile</SelectItem>
               </SelectContent>
             </Select>
+
             {defaultDhPayStatus === 'custom' && (
               <div className="relative">
                 <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -437,13 +438,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <div className="space-y-2 rounded-xl border border-border/60 p-3 bg-muted/30">
             <Label className="text-xs font-semibold">Default Pay Model</Label>
             <Select value={defaultPayModel} onValueChange={setDefaultPayModel}>
-              <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger data-testid="settings-default-pay-model" className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PAY_MODEL_VALUES.map(m => (
-                  <SelectItem key={m} value={m}>{PAY_MODEL_LABELS[m]}</SelectItem>
+                  <SelectItem key={m} value={m} data-testid={`settings-pay-model-option-${m}`}>{PAY_MODEL_LABELS[m]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
             <p className="text-[10px] text-muted-foreground">
               {PAY_MODEL_DESCRIPTIONS[defaultPayModel as PayModel] ?? ''} You can override per load.
             </p>
@@ -453,13 +455,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Week Starts On</Label>
               <Select value={weekStart} onValueChange={setWeekStart}>
-                <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectTrigger data-testid="settings-week-start" className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sunday">Sunday</SelectItem>
-                  <SelectItem value="monday">Monday</SelectItem>
-                  <SelectItem value="saturday">Saturday</SelectItem>
+                  <SelectItem value="sunday" data-testid="settings-week-start-sunday">Sunday</SelectItem>
+                  <SelectItem value="monday" data-testid="settings-week-start-monday">Monday</SelectItem>
+                  <SelectItem value="saturday" data-testid="settings-week-start-saturday">Saturday</SelectItem>
                 </SelectContent>
               </Select>
+
               <p className="text-[10px] text-muted-foreground leading-snug">Controls how weekly dashboard and report totals are grouped.</p>
             </div>
             <div className="space-y-1.5">
@@ -476,7 +479,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             </div>
           </div>
 
-          <Button className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
+          <Button data-testid="settings-save-pay-defaults" className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
+
             {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
           </Button>
         </div>
