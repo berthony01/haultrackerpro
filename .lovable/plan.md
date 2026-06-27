@@ -1,97 +1,66 @@
 ## Goal
 
-Stop silent self-conversion of `profiles.intended_role` when an existing driver visits `/?intent=recruiter`, without breaking real recruiter signups (email + Google).
+Run a strict end-to-end audit of the recruiter posting + driver application flow, then patch only the confirmed blockers that stopped the recruiter from posting. No redesign, no new features, no pricing/role changes beyond what's required to unblock the flow.
 
-## Approach
+## Phase 1 — Audit (read-only, in build mode)
 
-Keep the single `apply_recruiter_intent()` RPC and the BEFORE-UPDATE guard trigger we already added. Add a server-side eligibility check inside the RPC so that flipping `intended_role` to `recruiter` only succeeds for a genuine new-account signup — not for an established driver tampering with the URL. For ineligible callers, return a structured "not eligible" result instead of mutating the profile, and surface an explicit "Become a Recruiter" path in the UI.
+I will inspect each layer and produce a PASS/FAIL line for every scenario A–K with file references and concrete evidence (not guesses).
 
-No new table is needed — the existing `auth.users.created_at`, `profiles.intended_role`, `recruiter_profiles`, `loads`, `expenses`, and `fuel_logs` rows already let us tell "fresh signup" from "established driver".
+1. **Auth + role intent** (Scenarios A, B, C)
+   - `src/pages/Auth.tsx`, `src/hooks/useAuth.tsx`, `src/hooks/useRoleIntentReconciler.ts`, `src/hooks/useUserRole.ts`, `src/pages/Index.tsx`, `src/App.tsx`.
+   - Confirm: email signup writes `intended_role=recruiter`; Google signup triggers `apply_recruiter_intent` RPC and survives reload; no driver-dashboard flash; recruiter lands in `RecruiterAccessRoute`.
+   - Check the `apply_recruiter_intent` eligibility gate against a recruiter who immediately signs in on a second device (created_at > 30 min). If that's a real blocker for the user who complained, flag it.
 
-## Eligibility rule inside the RPC
+2. **Recruiter posting path** (Scenarios D, E, F, G)
+   - `src/components/opportunities/RecruiterAccessRoute.tsx`, `RecruiterOpportunityManager.tsx`, `RecruiterOpportunityForm.tsx`, `RecruiterQuickPostForm.tsx`, `PasteOpportunityDialog.tsx`, `RecruiterOnboarding.tsx`.
+   - `src/hooks/opportunities/useRecruiterOpportunities.ts` (insert payload, required cols, cache invalidation).
+   - DB: `opportunities` columns vs form payload, `opportunities_guard` + `opportunities_billing_guard` triggers (verification gate), `admin_review_status` default, `status` default, RLS insert/select policies, `recruiter_profiles.verification_status='approved'` requirement.
+   - Edge functions used by paste/PDF/image (if any). Verify deployed name + AI gateway secret.
 
-The RPC sets `intended_role = 'recruiter'` only if AT LEAST ONE of these is true for `auth.uid()`:
+3. **Feed visibility** (Scenario H)
+   - `src/components/opportunities/OpportunitiesPage.tsx`, `useOpportunities.ts`, RLS SELECT policy on `opportunities`.
+   - Confirm what driver feed filters by (`status='active'`, `admin_review_status='approved'`, recruiter not suspended). If brand-new posts sit at `pending` review forever with no admin in the loop, the recruiter sees "posted but invisible" — flag as a real blocker and propose either auto-approve for verified recruiters or a clear "pending review" status surface.
 
-1. The user already has a `recruiter_profiles` row (idempotent re-confirmation for real recruiters).
-2. The account is a brand-new signup, defined as ALL of:
-   - `auth.users.created_at > now() - interval '30 minutes'`
-   - `profiles.intended_role = 'driver'` (default from `handle_new_user`)
-   - No rows in `loads`, `expenses`, or `fuel_logs` for this user.
+4. **Driver application** (Scenarios I, J)
+   - `OpportunityDetail.tsx`, `useOpportunityApplications.ts`, `application_events_emit` trigger, RLS on `opportunity_applications`, contact-snapshot guard.
+   - Storage buckets for application uploads (resume/CDL): exists? policies?
 
-Otherwise the RPC returns `{ applied: false, reason: 'not_eligible' }` and does NOT change `intended_role`. The BEFORE-UPDATE trigger continues to block any direct client write.
+5. **Error handling + mobile** (Scenarios K + failure-type sweep)
+   - Toast messages, swallowed catches, disabled submits, sticky-FAB blocking submit on mobile, file-type mismatch (frontend vs storage).
 
-This means:
-- Email recruiter signup keeps working (and is already handled by `handle_new_user` from `raw_user_meta_data.intended_role` — the RPC is only the Google parity path).
-- Google recruiter signup keeps working — fresh user, default profile, no data → eligible.
-- An existing driver appending `?intent=recruiter` → ineligible → no silent flip.
+6. **Supabase audit**
+   - `supabase--read_query` on `pg_policies` for `opportunities`, `opportunity_applications`, `recruiter_profiles`, `profiles`; storage buckets + their policies; recent failed inserts via logs.
+   - `supabase--edge_function_logs` on any AI/parse function used by paste/PDF/image.
 
-## Client behavior change
+Output of Phase 1 = the strict report in the requested 10-section format.
 
-`useRoleIntentReconciler.ts`:
-- Still triggered by `sessionStorage.htp_auth_intent === 'recruiter'` or `?intent=recruiter`.
-- Calls `apply_recruiter_intent` exactly as today, but reads the new structured result.
-- On `applied: true`: clears the session flag, invalidates role queries (current behavior).
-- On `applied: false` (reason `not_eligible`): clears the session flag so we don't loop, and does NOT invalidate role queries. The user remains a driver in the DB.
+## Phase 2 — Minimal patches (only confirmed blockers)
 
-`useUserRole.ts`:
-- Remove the sessionStorage-based "treat as recruiter" short-circuit so client storage can no longer fake a role at render time. The session flag stays only as a hint for the reconciler.
+Patches will be scoped to whichever of these the audit actually proves are broken. Likely candidates based on prior context, but I will not patch any item that audit shows as already working:
 
-Route handling in `App.tsx` / `pages/Index.tsx`:
-- Keep the existing "if intent=recruiter, land on recruiter-access" initial-render guard, because the recruiter-access page is the right destination either way:
-  - Eligible new recruiter: their durable role is now recruiter, and the recruiter onboarding/application starts here.
-  - Ineligible existing driver: lands on recruiter-access page which already shows the "Become a Recruiter" CTA / application flow. They keep their driver role in the DB and only become a recruiter by completing the explicit recruiter application.
+- **Verification gate UX**: if a fresh recruiter signs up and immediately tries to post, `opportunities_billing_guard` throws because `verification_status<>'approved'`. If the form surfaces this as a generic toast or silent failure, replace with a clear blocking banner + "Apply for verification" CTA inside `RecruiterOpportunityManager`/`RecruiterAccessRoute`. No policy loosening.
+- **Admin review invisibility**: if posts land at `admin_review_status='pending'` and never show in the driver feed with no recruiter-side surface, add a "Pending admin review" badge on the recruiter's posted-opportunities list (UI only, no policy change) so the recruiter understands "submitted ≠ live".
+- **Cache invalidation gap**: if `createOpportunity` mutation doesn't invalidate recruiter-list + driver-feed query keys, add the invalidations.
+- **Payload defaults**: ensure insert payload provides every NOT NULL column the trigger doesn't backfill (`recruiter_id`, `status`, etc.) and that enum values match DB constraints.
+- **Paste / PDF / image extractors**: for each, verify wired end-to-end. If not wired or crashing, either fix the obvious bug (try/catch + toast + safe fallback to manual entry) or hide the entry-point button behind a feature flag with a "Manual entry only" note. No half-working buttons.
+- **Driver application submit**: if RLS/insert payload/contact-snapshot guard rejects, fix the payload — do not weaken RLS.
+- **Storage buckets**: if a referenced bucket is missing, create it with least-privilege policies in a single migration.
+- **Silent error swallowing**: replace bare `catch {}` around critical inserts with `toast.error(err.message)` so failures stop being invisible.
 
-No new "convert me" RPC is added for existing drivers — the existing recruiter application flow (which creates `recruiter_profiles`) is the explicit path, and the RPC's first eligibility branch (`recruiter_profiles` exists) lets that flow flip `intended_role` durably afterward.
+Every DB change goes through `supabase--migration` with the exact policy SQL spelled out.
 
-## Migration
+## Phase 3 — Verification
 
-Single migration that replaces `public.apply_recruiter_intent()`:
-- `SECURITY DEFINER`, `SET search_path = public`.
-- Returns `jsonb` of shape `{ applied: bool, reason: text }`.
-- `REVOKE ALL FROM PUBLIC; GRANT EXECUTE TO authenticated`.
-- Idempotent: a real recruiter calling repeatedly is a no-op.
+- `tsgo` typecheck clean.
+- Drive Playwright via shell against localhost:8080 for: recruiter Google-intent restore, recruiter post submit, driver feed shows the new post (or shows pending state with correct messaging), driver opens detail + submits application, recruiter sees application row. Screenshot each step.
+- Re-run `security--run_security_scan` if any RLS/storage policy was touched.
 
-The guard trigger `prevent_profile_intended_role_updates` from the previous migration is kept unchanged.
+## What I will not touch
 
-## Files
+Pricing, plans, landing copy, recruiter monetization, referral system, dashboard redesign, new AI assistants, unrelated tables, driver-only features, or the existing recruiter intent architecture beyond bug fixes.
 
-Inspected:
-- `src/hooks/useRoleIntentReconciler.ts`
-- `src/hooks/useUserRole.ts`
-- `src/hooks/useAuth.tsx`
-- `src/pages/Auth.tsx`
-- `src/pages/Index.tsx`
-- `src/App.tsx`
-- `supabase/migrations/2026052523…_profiles_intended_role.sql`
-- `supabase/migrations/20260619172727_…_apply_recruiter_intent.sql`
-- `recruiter_profiles` + RLS, `handle_new_user` trigger.
+## Deliverable
 
-Changed:
-- New migration: `replace apply_recruiter_intent with eligibility gate`.
-- `src/hooks/useRoleIntentReconciler.ts` — handle structured result, no role-query invalidation on `applied: false`.
-- `src/hooks/useUserRole.ts` — remove sessionStorage role short-circuit.
+Single response with the 10-section strict report, list of files changed, migrations applied, scenarios re-tested with PASS/FAIL, and remaining risks.
 
-Not changed:
-- `useAuth.tsx` email signup metadata flow.
-- `Auth.tsx` recruiter signup buttons and OAuth redirect (`/?intent=recruiter`).
-- BEFORE-UPDATE trigger on `profiles`.
-- RLS policies (unchanged; no loosening).
-- Recruiter application / `recruiter_profiles` / verification logic.
-
-## Verification scenarios
-
-| # | Scenario | Expected |
-|---|----------|----------|
-| A | New email recruiter signup | Works via `handle_new_user`; reconciler RPC is a no-op or `applied: true` (eligible new user). |
-| B | New Google recruiter signup | RPC eligible (fresh user, default profile, no data) → `applied: true`; routes to recruiter-access. |
-| C | Existing driver hits `/?intent=recruiter` | RPC returns `applied: false`; `intended_role` stays `driver`; UI lands on recruiter-access with explicit "Become a Recruiter" CTA. |
-| D | Existing approved recruiter logs in | `recruiter_profiles` branch → idempotent success; recruiter dashboard works. |
-| E | Existing driver normal login | No reconciler call (no intent flag); driver dashboard works. |
-| F | RPC error / network failure | Reconciler returns early; no role flip; no UI flash (existing `roleLoading` fallback). |
-| G | Driver hits a recruiter-only route via URL | Same as today — recruiter RLS / route guards block; `intended_role` unaffected. |
-| H | Recruiter hits a driver-only route via URL | Same as today — recruiter view redirects to recruiter-access. |
-
-## Remaining risks
-
-- A motivated attacker who signs up a brand-new account with Google could still self-identify as recruiter — that is the intended path and is gated by the real recruiter application + verification, not by `intended_role`.
-- The 30-minute freshness window is a heuristic; it covers normal OAuth round-trips with plenty of margin but is not a cryptographic guarantee. The downside of being wrong is purely cosmetic (routing/onboarding) because posting power still requires `recruiter_profiles` + verification.
+Approve to start in build mode.
