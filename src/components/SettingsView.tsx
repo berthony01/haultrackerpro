@@ -407,13 +407,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <div className="space-y-2 rounded-xl border border-border/60 p-3 bg-muted/30">
             <Label className="text-xs font-semibold">Do you get paid for Deadhead miles?</Label>
             <Select value={defaultDhPayStatus} onValueChange={(v) => setDefaultDhPayStatus(v as 'unpaid' | 'same' | 'custom')}>
-              <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger data-testid="settings-default-dh-pay-status" className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="unpaid">No — deadhead is unpaid</SelectItem>
-                <SelectItem value="same">Yes — same rate as loaded miles</SelectItem>
-                <SelectItem value="custom">Yes — custom rate per mile</SelectItem>
+                <SelectItem value="unpaid" data-testid="settings-dh-status-unpaid">No — deadhead is unpaid</SelectItem>
+                <SelectItem value="same" data-testid="settings-dh-status-same">Yes — same rate as loaded miles</SelectItem>
+                <SelectItem value="custom" data-testid="settings-dh-status-custom">Yes — custom rate per mile</SelectItem>
               </SelectContent>
             </Select>
+
             {defaultDhPayStatus === 'custom' && (
               <div className="relative">
                 <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
