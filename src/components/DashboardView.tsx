@@ -289,10 +289,13 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   // ---- Premium hero KPI metrics + week-over-week trends ----
   // Driver-facing Gross Revenue uses actual when present, else expected.
   // Cancelled loads are excluded by summarizeLoads (above).
+  // Net Profit / Net RPM include Fuel Logs via the shared fuel double-count
+  // policy so Dashboard agrees with Reports & exports.
   const grossRevenue = summary.grossRevenue;
-  const totalExpensesAmt = summary.expensesTotal;
-  const netProfit = summary.netProfit;
-  const netRPM = summary.netRPM;
+  const totalExpensesAmt = fuelPolicy.combinedExpensesTotal;
+  const netProfit = grossRevenue - totalExpensesAmt;
+  const netRPM = summary.totalMiles > 0 ? netProfit / summary.totalMiles : 0;
+
 
   // Previous comparison range — matches the selected preset (not always last week).
   // - this_week → previous calendar week
