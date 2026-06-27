@@ -453,9 +453,13 @@ test('driver journey — full sequential flow', async ({ page }) => {
       }
     } catch (e) { record('error_handling', 'FAIL', String(e)); }
   } finally {
-    // --- 10. CLEANUP (always) ------------------------------------------
+    // --- 10. CLEANUP (always, unless owner-blocked — no writes happened) ---
     try {
-      if (process.env.E2E_CLEANUP_MODE === 'never') {
+      if (ownerBlocked) {
+        cleanup = { loads: 0, fuel: 0, expenses: 0, remaining: { loads: 0, fuel: 0, expenses: 0 },
+                    errors: ['skipped (owner account denied — no app writes performed)'] };
+        record('cleanup', 'PARTIAL', 'cleanup skipped (owner account denied)');
+      } else if (process.env.E2E_CLEANUP_MODE === 'never') {
         cleanup = { loads: 0, fuel: 0, expenses: 0, remaining: { loads: 0, fuel: 0, expenses: 0 },
                     errors: ['skipped (E2E_CLEANUP_MODE=never)'] };
         record('cleanup', 'PARTIAL', 'cleanup skipped by env');
