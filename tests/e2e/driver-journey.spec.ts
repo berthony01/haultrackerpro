@@ -297,15 +297,11 @@ test('driver journey — full sequential flow', async ({ page }) => {
           await page.getByTestId('fuel-notes').fill(MARKER);
           await page.getByTestId('fuel-form-submit').click();
 
-          const appeared = await page
-            .getByText(new RegExp(MARKER.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')))
-            .first()
-            .waitFor({ timeout: 10_000 })
-            .then(() => true)
-            .catch(false as any);
-          // Even if note not displayed, the dashboard numeric assertion will catch missing fuel.
-          record('fuel_create', appeared ? 'PASS' : 'PARTIAL',
-            appeared ? 'fuel row visible' : 'fuel saved; marker not shown in list — relying on numeric assertion');
+          const row = page.locator(`[data-testid="fuel-row"][data-marker*="${MARKER}"]`).first();
+          const appeared = await row.waitFor({ state: 'visible', timeout: 15_000 })
+            .then(() => true).catch(() => false);
+          if (appeared) record('fuel_create', 'PASS', 'fuel row visible with marker');
+          else record('fuel_create', 'FAIL', 'no fuel-row with marker found after save');
         }
       }
     } catch (e) { record('fuel_create', 'FAIL', String(e)); }
