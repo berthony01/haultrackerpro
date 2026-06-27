@@ -188,11 +188,13 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
               <FileText className="h-3.5 w-3.5 text-muted-foreground" /> Notes (optional)
             </Label>
             <Textarea
+              data-testid="fuel-notes"
               placeholder="Any additional notes..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="min-h-[80px] rounded-xl resize-none"
             />
+
           </div>
         </CardContent>
       </Card>
