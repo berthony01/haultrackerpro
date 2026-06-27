@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle, BookOpen, BellOff } from 'lucide-react';
+import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle, BookOpen, BellOff, User, Bell, Database, LifeBuoy, Calculator, FileSpreadsheet } from 'lucide-react';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -256,6 +257,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </div>
       </div>
 
+      <Accordion type="multiple" defaultValue={["account", "defaults"]} className="space-y-3">
+
+      <AccordionItem value="account" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><User className="h-4 w-4 text-primary" /> Account & Plan</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Account info */}
       <div className="premium-card p-4 space-y-3">
           <p className="text-label">Account</p>
@@ -361,6 +370,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           ) : null}
         </div>
 
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="defaults" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><DollarSign className="h-4 w-4 text-primary" /> Pay & Calculation Defaults</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Defaults */}
       <div className="premium-card p-4 space-y-4">
           <p className="text-label">Defaults</p>
@@ -442,6 +460,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                   <SelectItem value="saturday">Saturday</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground leading-snug">Controls how weekly dashboard and report totals are grouped.</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Currency</Label>
@@ -519,6 +538,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       {/* Cost Profile - drives Pre-Load Profit Check */}
       <CostProfileSettings />
 
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="taxes" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Calculator className="h-4 w-4 text-primary" /> Reports & Taxes</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Tax Set-Aside Planner */}
       <TaxPlannerSettings
         settings={settings}
@@ -545,8 +573,39 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         isPro={isPro ?? false}
       />
 
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="data" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Database className="h-4 w-4 text-primary" /> Data & Import</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* CSV Import */}
       <CSVImport isPro={isPro ?? false} />
+
+      {/* Data Management */}
+      <div className="premium-card p-4 space-y-3">
+          <p className="text-label">Data</p>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" onClick={handleExportData} disabled={exporting}>
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exporting...' : 'Export All My Data'}
+          </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 text-destructive border-destructive/30 hover:bg-destructive/5" onClick={() => setShowDeleteModal(true)}>
+            <Trash2 className="h-4 w-4" />
+            Delete Account
+          </Button>
+        </div>
+
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="notifications" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Bell className="h-4 w-4 text-primary" /> Notifications & Emails</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
 
       {/* Email Preferences */}
       <div className="premium-card p-4 space-y-3">
@@ -592,18 +651,16 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </p>
         </div>
 
-      {/* Data Management */}
-      <div className="premium-card p-4 space-y-3">
-          <p className="text-label">Data</p>
-          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" onClick={handleExportData} disabled={exporting}>
-            <Download className="h-4 w-4" />
-            {exporting ? 'Exporting...' : 'Export All My Data'}
-          </Button>
-          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 text-destructive border-destructive/30 hover:bg-destructive/5" onClick={() => setShowDeleteModal(true)}>
-            <Trash2 className="h-4 w-4" />
-            Delete Account
-          </Button>
-        </div>
+      <NotificationPreferencesPanel />
+
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="support" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><LifeBuoy className="h-4 w-4 text-primary" /> Support & Legal</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
 
       {/* Support */}
       <div className="premium-card p-4 space-y-3">
@@ -649,6 +706,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </p>
         </div>
 
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="pro" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Crown className="h-4 w-4 text-primary" /> Pro Plan Features</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Pro Plan Features */}
       <div className="premium-card overflow-hidden">
         <div className="bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3 border-b border-border/40">
@@ -680,7 +746,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </div>
       </div>
 
-      <NotificationPreferencesPanel />
+        </AccordionContent>
+      </AccordionItem>
+
+      </Accordion>
 
       {/* Modals */}
       <DeleteAccountModal open={showDeleteModal} onOpenChange={setShowDeleteModal} />
