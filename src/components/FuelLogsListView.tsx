@@ -131,7 +131,7 @@ const FuelLogRowCard = memo(function FuelLogRowCard({
   onDelete,
 }: FuelLogRowCardProps) {
   return (
-    <Card className="premium-card">
+    <Card className="premium-card" data-testid="fuel-row" data-marker={log.notes ?? ''}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-primary/10 p-2.5 shrink-0 ring-1 ring-primary/20">
