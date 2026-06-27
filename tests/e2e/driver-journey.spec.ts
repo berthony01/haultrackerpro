@@ -269,15 +269,12 @@ test('driver journey — full sequential flow', async ({ page }) => {
 
           await page.getByTestId('load-form-submit').click();
 
-          // Verify row appears (notes column shows marker on card, OR list refresh)
-          const appeared = await page
-            .getByText(new RegExp(MARKER.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')))
-            .first()
-            .waitFor({ timeout: 15_000 })
-            .then(() => true)
-            .catch(() => false);
+          // Deterministic row check: a list card with our marker on data-marker.
+          const row = page.locator(`[data-testid="load-row"][data-marker*="${MARKER}"]`).first();
+          const appeared = await row.waitFor({ state: 'visible', timeout: 15_000 })
+            .then(() => true).catch(() => false);
           if (appeared) record('load_create', 'PASS');
-          else record('load_create', 'FAIL', 'load saved but marker not visible in list');
+          else record('load_create', 'FAIL', 'load saved but no load-row with marker found');
         }
       }
     } catch (e) { record('load_create', 'FAIL', String(e)); }
