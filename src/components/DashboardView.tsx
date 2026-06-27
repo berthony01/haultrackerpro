@@ -229,11 +229,38 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     });
   }, [expenses, activePreset, customFrom, customTo, weekStartsOn]);
 
-  // Canonical financial summary (cancelled loads automatically excluded)
-  const summary = useMemo(
-    () => summarizeLoads(filteredLoads, filteredExpenses),
-    [filteredLoads, filteredExpenses],
+  const filteredFuelLogs = useMemo(() => {
+    if (activePreset === 'all') return fuelLogs;
+    if (activePreset === 'custom') {
+      return fuelLogs.filter(f => {
+        const d = f.date;
+        if (customFrom && d < customFrom) return false;
+        if (customTo && d > customTo) return false;
+        return true;
+      });
+    }
+    const { start, end } = getPresetRange(activePreset, weekStartsOn);
+    return fuelLogs.filter(f => {
+      const d = parseISO(f.date);
+      return isWithinInterval(d, { start, end });
+    });
+  }, [fuelLogs, activePreset, customFrom, customTo, weekStartsOn]);
+
+  // Apply the shared fuel double-count policy so Dashboard net profit /
+  // Net RPM / Cost-per-Mile match Reports & exports when both Fuel Logs and
+  // Fuel-category expenses exist.
+  const fuelPolicy = useMemo(
+    () => applyFuelLogPolicy(filteredExpenses, filteredFuelLogs),
+    [filteredExpenses, filteredFuelLogs],
   );
+
+  // Canonical financial summary (cancelled loads automatically excluded).
+  // Feed `expensesForMath` so summarizeLoads doesn't double-count fuel.
+  const summary = useMemo(
+    () => summarizeLoads(filteredLoads, fuelPolicy.expensesForMath),
+    [filteredLoads, fuelPolicy.expensesForMath],
+  );
+
 
   const estimated = summary.estimatedPay;
   const actual = summary.actualPay;
