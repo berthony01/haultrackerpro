@@ -350,15 +350,30 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       return isWithinInterval(d, prevRange);
     });
   }, [expenses, prevRange]);
-  const prevSummary = useMemo(() => summarizeLoads(prevLoads, prevExpenses), [prevLoads, prevExpenses]);
+  const prevFuelLogs = useMemo(() => {
+    if (!prevRange) return [] as FuelLog[];
+    return fuelLogs.filter(f => {
+      const d = parseISO(f.date);
+      return isWithinInterval(d, prevRange);
+    });
+  }, [fuelLogs, prevRange]);
+  const prevFuelPolicy = useMemo(
+    () => applyFuelLogPolicy(prevExpenses, prevFuelLogs),
+    [prevExpenses, prevFuelLogs],
+  );
+  const prevSummary = useMemo(
+    () => summarizeLoads(prevLoads, prevFuelPolicy.expensesForMath),
+    [prevLoads, prevFuelPolicy.expensesForMath],
+  );
   const prevGross = prevSummary.grossRevenue;
-  const prevNet = prevSummary.netProfit;
-  const prevPpm = prevSummary.netRPM;
+  const prevNet = prevGross - prevFuelPolicy.combinedExpensesTotal;
+  const prevPpm = prevSummary.totalMiles > 0 ? prevNet / prevSummary.totalMiles : 0;
   const pct = computeTrendPct;
   const trendRevenue = pct(grossRevenue, prevGross);
   const trendNet = pct(netProfit, prevNet);
   const trendPpm = pct(netRPM, prevPpm);
   const trendLoads = pct(summary.loadCount, prevSummary.loadCount);
+
 
   const scorecard = useDriverScorecard(loads, expenses, settings?.week_start_day);
 
