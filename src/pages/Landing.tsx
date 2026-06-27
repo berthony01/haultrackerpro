@@ -51,7 +51,8 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const goToDriver = () => navigate('/auth?intent=driver');
-  const goToRecruiter = () => navigate('/recruiters');
+  const goToRecruiter = () => navigate('/auth?intent=recruiter');
+  const goToRecruiterInfo = () => navigate('/recruiters');
 
   useEffect(() => {
     if (!window.location.hash) return;
@@ -127,11 +128,19 @@ export default function Landing() {
               </Button>
             ))}
             <Button
+              onClick={goToRecruiter}
+              variant="outline"
+              className="text-sm font-bold rounded-xl px-4 ml-1 hover:bg-transparent"
+              style={{ borderColor: AMBER, color: AMBER_BRIGHT, background: 'transparent', borderWidth: 2 }}
+            >
+              Recruiter Sign Up
+            </Button>
+            <Button
               onClick={goToDriver}
-              className="text-sm font-bold rounded-xl px-5 ml-1"
+              className="text-sm font-bold rounded-xl px-5"
               style={{ background: AMBER, color: 'white' }}
             >
-              Start Free
+              Driver Sign Up
             </Button>
           </div>
           <div className="flex md:hidden items-center gap-2">
@@ -222,20 +231,20 @@ export default function Landing() {
               <Button
                 onClick={goToDriver}
                 size="lg"
-                className="text-base font-bold rounded-xl h-13 px-7 gap-2"
+                className="text-base sm:text-lg font-bold rounded-xl h-14 px-8 gap-2 w-full sm:w-auto"
                 style={{
                   background: AMBER,
                   color: 'white',
                   boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
                 }}
               >
-                <Truck className="h-5 w-5" /> Start tracking as a driver
+                <Truck className="h-5 w-5" /> Start Tracking Free
               </Button>
               <Button
                 onClick={goToRecruiter}
                 size="lg"
                 variant="outline"
-                className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent"
+                className="text-base sm:text-lg font-bold rounded-xl h-14 px-8 gap-2 w-full sm:w-auto hover:bg-transparent"
                 style={{
                   borderColor: AMBER,
                   color: AMBER_BRIGHT,
@@ -243,14 +252,21 @@ export default function Landing() {
                   borderWidth: 2,
                 }}
               >
-                <Users className="h-5 w-5" /> Post an opportunity as a recruiter
+                <Users className="h-5 w-5" /> Post Jobs Free as a Recruiter
               </Button>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium" style={{ color: TEXT_DIM }}>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free driver plan, no credit card</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Verified recruiter access</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Built only for trucking</span>
+            <p className="mt-4 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
+              Drivers track loads, expenses, and profit free — no credit card. Verified recruiters can post standard opportunities free.{' '}
+              <button onClick={goToRecruiterInfo} className="underline-offset-4 hover:underline font-semibold" style={{ color: AMBER_BRIGHT }}>
+                Learn about recruiter access →
+              </button>
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium" style={{ color: TEXT_DIM }}>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free driver plan</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free standard recruiter posting (verified)</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Paid upgrades are optional</span>
             </div>
           </div>
         </section>
@@ -367,7 +383,7 @@ export default function Landing() {
                   className="mt-7 rounded-xl font-bold gap-2 self-start hover:bg-transparent"
                   style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}
                 >
-                  Get verified access <ArrowRight className="h-4 w-4" />
+                  Post jobs free as a recruiter <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -644,7 +660,7 @@ export default function Landing() {
                     boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
                   }}
                 >
-                  <Truck className="h-5 w-5" /> Start tracking as a driver
+                  <Truck className="h-5 w-5" /> Start Tracking Free
                 </Button>
                 <Button
                   onClick={goToRecruiter}
@@ -658,7 +674,7 @@ export default function Landing() {
                     borderWidth: 2,
                   }}
                 >
-                  <Users className="h-5 w-5" /> Post an opportunity as a recruiter
+                  <Users className="h-5 w-5" /> Post Jobs Free as a Recruiter
                 </Button>
               </div>
               <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs">

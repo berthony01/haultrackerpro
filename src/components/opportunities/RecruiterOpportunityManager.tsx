@@ -243,12 +243,21 @@ function OpportunityRow({
           <p className="text-[11px] text-muted-foreground mt-2">
             Created {new Date(o.created_at).toLocaleDateString()}
           </p>
+          {o.admin_review_status === 'rejected' && (
+            <p className="text-[11px] mt-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-destructive">
+              This post was rejected by admin review. Edit it and resubmit — changes are reviewed before going live again.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 lg:flex-col lg:w-44">
           <Button size="sm" variant="outline" onClick={onEdit} disabled={busy}>
             <Pencil className="h-4 w-4" /> Edit
           </Button>
-          {o.status === 'active' ? (
+          {o.admin_review_status === 'rejected' ? (
+            <Button size="sm" variant="outline" onClick={onEdit} disabled={busy}>
+              <Send className="h-4 w-4" /> Resubmit for Review
+            </Button>
+          ) : o.status === 'active' ? (
             <Button size="sm" variant="outline" onClick={onPause} disabled={busy}>
               <PauseCircle className="h-4 w-4" /> Pause
             </Button>
@@ -261,7 +270,7 @@ function OpportunityRow({
               <PlayCircle className="h-4 w-4" /> Activate
             </Button>
           )}
-          {o.status !== 'closed' && (
+          {o.status !== 'closed' && o.admin_review_status !== 'rejected' && (
             <Button size="sm" variant="outline" onClick={onClose} disabled={busy}>
               <XCircle className="h-4 w-4" /> Close
             </Button>
