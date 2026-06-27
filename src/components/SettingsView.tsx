@@ -479,7 +479,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             </div>
           </div>
 
-          <Button className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
+          <Button data-testid="settings-save-pay-defaults" className="w-full h-11 rounded-xl font-bold active:scale-[0.98] transition-transform" onClick={handleSave} disabled={updateSettings.isPending || isLoading}>
+
             {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
           </Button>
         </div>
