@@ -15,48 +15,52 @@ the runner creates is tagged with `QA TEST DELETE - <runId>` and the
 
 ## Required env vars
 
-| Var                 | Purpose                                              | Default                |
-| ------------------- | ---------------------------------------------------- | ---------------------- |
-| `E2E_BASE_URL`      | App origin to test against                           | `http://localhost:8080` |
-| `E2E_DRIVER_EMAIL`  | Disposable QA driver email                           | _required_             |
-| `E2E_DRIVER_PASSWORD` | Disposable QA driver password                      | _required_             |
-| `E2E_RUN_ID`        | Unique marker appended to every test row             | `local-<timestamp>`    |
-| `E2E_CLEANUP_MODE`  | `always` (default) or `never` to inspect manually    | `always`               |
+| Var                     | Purpose                                              | Default                  |
+| ----------------------- | ---------------------------------------------------- | ------------------------ |
+| `E2E_BASE_URL`          | App origin to test against                           | `http://localhost:8080`  |
+| `E2E_DRIVER_EMAIL`      | Disposable QA driver email                           | _required_               |
+| `E2E_DRIVER_PASSWORD`   | Disposable QA driver password                        | _required_               |
+| `E2E_SUPABASE_URL`      | Supabase project URL used by cleanup                 | _required for cleanup_   |
+| `E2E_SUPABASE_ANON_KEY` | Supabase anon key used by cleanup                    | _required for cleanup_   |
+| `E2E_RUN_ID`            | Unique marker appended to every test row             | `local-<timestamp>`      |
+| `E2E_CLEANUP_MODE`      | `always` (default) or `never` to inspect manually    | `always`                 |
+
+If `E2E_SUPABASE_URL` / `E2E_SUPABASE_ANON_KEY` are absent, cleanup falls
+back to `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` only when
+they are exported into the test process. If neither is available cleanup
+fails clearly and the final verdict is downgraded.
 
 The disposable account must already be confirmed (email verification is
-mandatory on this project). One-time setup is by hand in the live UI;
-the runner then re-uses it.
+mandatory on this project). One-time setup is by hand in the live UI; the
+runner then re-uses it.
 
 ## Commands
 
 ```bash
-# install browsers once
 bunx playwright install chromium
 
-# desktop journey
 E2E_DRIVER_EMAIL=qa+driver@example.com \
 E2E_DRIVER_PASSWORD='…' \
+E2E_SUPABASE_URL=https://<project>.supabase.co \
+E2E_SUPABASE_ANON_KEY='…' \
 E2E_RUN_ID=ci-$(date +%s) \
 bunx playwright test --project=desktop tests/e2e/driver-journey.spec.ts
-
-# mobile smoke
-bunx playwright test --project=mobile tests/e2e/driver-journey-mobile.spec.ts
 ```
 
-Reports land at:
-- `test-results/driver-journey-report.json`
-- `test-results/driver-journey-report.md`
-- `test-results/html/` (full Playwright HTML report)
+Reports land at `test-results/driver-journey-report.{json,md}` plus the
+full Playwright HTML report under `test-results/html/`.
 
-## Verdict rules
+## Verdict rules (strict)
 
-The runner records each step as `PASS`, `FAIL`, or `NOT TESTED`. The
-final verdict is:
+The runner records each step as `PASS`, `FAIL`, `PARTIAL`, or `NOT TESTED`.
+Required steps: login, settings, load_create, fuel_create, expense_create,
+dashboard, reports, refresh_persistence, error_handling, cleanup.
+Optional: export.
 
-- **FAIL** if any required create step fails or any KPI is NaN/Infinity.
-- **NOT TESTED** if cleanup reported errors (rows may remain — review).
-- **PASS** otherwise.
+- **FAIL** — any required step is FAIL, any dashboard KPI fails the
+  `expectClose` assertion, any reports↔dashboard KPI disagrees, cleanup
+  deletes errored, or cleanup verification finds marker rows still present.
+- **PARTIAL** — any required step is NOT TESTED, or cleanup completed with
+  non-fatal errors.
+- **PASS** — every required step passed. `export` may be NOT TESTED.
 
-Steps the runner cannot locate by stable selector in your build are
-intentionally marked `NOT TESTED` rather than failing — open the JSON
-report and add the missing `data-testid` to fix.

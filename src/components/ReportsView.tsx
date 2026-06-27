@@ -259,6 +259,17 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
         </div>
       </div>
 
+      {/* Hidden E2E fixture — exposes Reports KPIs with stable testids for parity assertions. */}
+      <div data-testid="reports-metrics" className="sr-only" aria-hidden="true">
+        <span data-testid="reports-gross-revenue" data-value={summary.grossRevenue} />
+        <span data-testid="reports-total-expenses" data-value={summary.expensesTotal} />
+        <span data-testid="reports-net-profit" data-value={summary.netProfit} />
+        <span data-testid="reports-net-rpm" data-value={summary.netRPM} />
+        <span data-testid="reports-loaded-miles" data-value={summary.loadedMiles} />
+        <span data-testid="reports-operating-miles" data-value={summary.totalMiles} />
+        <span data-testid="reports-effective-rpm" data-value={summary.effectiveRPM} />
+      </div>
+
       {/* Detailed Financial Breakdown */}
       <div className="premium-card p-4">
         <p className="text-label mb-3">Financial Breakdown</p>
