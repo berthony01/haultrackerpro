@@ -22,7 +22,10 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: [
     ['list'],
-    ['json', { outputFile: 'test-results/driver-journey-report.json' }],
+    // NOTE: Playwright's machine-readable JSON is written to a separate file so it
+    // never overwrites the custom driver-journey report (driver-journey-report.json),
+    // which is produced by tests/e2e/driver-journey.spec.ts via writeReport().
+    ['json', { outputFile: 'test-results/playwright-results.json' }],
     ['html', { outputFolder: 'test-results/html', open: 'never' }],
   ],
   use: {
