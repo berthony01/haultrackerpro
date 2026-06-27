@@ -131,7 +131,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               Manage Opportunities
             </h1>
             <p className="text-sm text-muted-foreground">
-              Create and manage your trucking opportunities. Submissions are reviewed before going live.
+              Create and manage your trucking opportunities. Verified recruiter posts go live to drivers immediately.
             </p>
           </div>
           <Button onClick={() => { setEditing(null); setSeed(null); setView('quick'); }} className="shrink-0">
