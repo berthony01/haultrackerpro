@@ -1113,9 +1113,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           {/* Phase 3: Profit Check */}
           {profitCheck && !isCancelled && <ProfitCheckCard result={profitCheck} />}
 
-          <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
+          <Button type="submit" data-testid="load-form-submit" className="w-full h-12 text-base font-bold" disabled={loading}>
             {loading ? 'Saving...' : initialData ? 'Update Load' : saveAsPending ? 'Save as Pending' : 'Log Load'}
           </Button>
+
         </form>
       </CardContent>
 
