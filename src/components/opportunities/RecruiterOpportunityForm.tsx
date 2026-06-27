@@ -499,7 +499,7 @@ export function RecruiterOpportunityForm({
               title={submitBlockReason ?? undefined}
             >
               {!canSubmitForReview && <Lock className="h-4 w-4 mr-1" />}
-              <Send className="h-4 w-4" /> Submit for Review
+              <Send className="h-4 w-4" /> Publish Opportunity
             </Button>
           ) : (
             <Button onClick={handleNext}>
@@ -571,7 +571,7 @@ export function RecruiterOpportunityForm({
                       title={submitBlockReason ?? undefined}
                     >
                       {!canSubmitForReview && <Lock className="h-4 w-4 mr-1" />}
-                      <Send className="h-4 w-4" /> Submit for Review
+                      <Send className="h-4 w-4" /> Publish Opportunity
                     </Button>
                   ) : (
                     <Button onClick={handleNext}>

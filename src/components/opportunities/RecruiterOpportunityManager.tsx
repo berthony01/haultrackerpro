@@ -254,7 +254,7 @@ function OpportunityRow({
             </Button>
           ) : o.status === 'draft' ? (
             <Button size="sm" variant="outline" onClick={onActivate} disabled={busy || !canActivate}>
-              <Send className="h-4 w-4" /> Submit for Review
+              <Send className="h-4 w-4" /> Publish
             </Button>
           ) : (
             <Button size="sm" variant="outline" onClick={onActivate} disabled={busy || !canActivate}>
