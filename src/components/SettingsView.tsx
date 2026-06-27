@@ -438,13 +438,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <div className="space-y-2 rounded-xl border border-border/60 p-3 bg-muted/30">
             <Label className="text-xs font-semibold">Default Pay Model</Label>
             <Select value={defaultPayModel} onValueChange={setDefaultPayModel}>
-              <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectTrigger data-testid="settings-default-pay-model" className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PAY_MODEL_VALUES.map(m => (
-                  <SelectItem key={m} value={m}>{PAY_MODEL_LABELS[m]}</SelectItem>
+                  <SelectItem key={m} value={m} data-testid={`settings-pay-model-option-${m}`}>{PAY_MODEL_LABELS[m]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
             <p className="text-[10px] text-muted-foreground">
               {PAY_MODEL_DESCRIPTIONS[defaultPayModel as PayModel] ?? ''} You can override per load.
             </p>
