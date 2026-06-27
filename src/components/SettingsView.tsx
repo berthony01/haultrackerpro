@@ -257,6 +257,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </div>
       </div>
 
+      <Accordion type="multiple" defaultValue={["account", "defaults"]} className="space-y-3">
+
+      <AccordionItem value="account" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><User className="h-4 w-4 text-primary" /> Account & Plan</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Account info */}
       <div className="premium-card p-4 space-y-3">
           <p className="text-label">Account</p>
