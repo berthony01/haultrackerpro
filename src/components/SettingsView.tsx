@@ -443,6 +443,7 @@ export function SettingsView({ onBack }: SettingsViewProps) {
                   <SelectItem value="saturday">Saturday</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground leading-snug">Controls how weekly dashboard and report totals are grouped.</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Currency</Label>
