@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _phase3c_results: {
-        Row: {
-          actual: string | null
-          expected: string | null
-          pass: boolean | null
-          test: string | null
-        }
-        Insert: {
-          actual?: string | null
-          expected?: string | null
-          pass?: boolean | null
-          test?: string | null
-        }
-        Update: {
-          actual?: string | null
-          expected?: string | null
-          pass?: boolean | null
-          test?: string | null
-        }
-        Relationships: []
-      }
       admin_audit_log: {
         Row: {
           action: string
