@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public._phase3c_results;
