@@ -426,6 +426,19 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </TooltipProvider>
           </div>
 
+          {/* Hidden E2E fixture — exposes the full KPI set with stable testids.
+              Visually hidden (no UI change). Used by tests/e2e/driver-journey.spec.ts. */}
+          <div data-testid="dashboard-metrics" className="sr-only" aria-hidden="true">
+            <span data-testid="dashboard-gross-revenue-v" data-value={grossRevenue} />
+            <span data-testid="dashboard-total-expenses" data-value={totalExpensesAmt} />
+            <span data-testid="dashboard-net-profit-v" data-value={netProfit} />
+            <span data-testid="dashboard-net-rpm-v" data-value={netRPM} />
+            <span data-testid="dashboard-loaded-miles" data-value={loadedMiles} />
+            <span data-testid="dashboard-operating-miles" data-value={totalMiles} />
+            <span data-testid="dashboard-loaded-rpm" data-value={loadedMiles > 0 ? grossRevenue / loadedMiles : 0} />
+            <span data-testid="dashboard-effective-rpm" data-value={totalMiles > 0 ? grossRevenue / totalMiles : 0} />
+          </div>
+
           {(() => {
             const footnote = getCancelledFootnote(summary.cancelledCount);
             return footnote ? (
