@@ -26,7 +26,7 @@ export default defineConfig({
     // never overwrites the custom driver-journey report (driver-journey-report.json),
     // which is produced by tests/e2e/driver-journey.spec.ts via writeReport().
     ['json', { outputFile: 'test-results/playwright-results.json' }],
-    ['html', { outputFolder: 'test-results/html', open: 'never' }],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8080',
