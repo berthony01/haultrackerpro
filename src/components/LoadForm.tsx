@@ -725,8 +725,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 <SelectTrigger id="pay_model" className="h-9 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PAY_MODEL_VALUES.map(m => (
-                    <SelectItem key={m} value={m}>{PAY_MODEL_LABELS[m]}</SelectItem>
+                    <SelectItem key={m} value={m} data-testid={`pay-model-option-${m}`}>{PAY_MODEL_LABELS[m]}</SelectItem>
                   ))}
+
                 </SelectContent>
               </Select>
               <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
