@@ -204,10 +204,11 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
         <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl font-bold" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" className="flex-1 h-12 rounded-xl font-bold gap-2" disabled={loading || !gallons || !pricePerGallon}>
+        <Button type="submit" data-testid="fuel-form-submit" className="flex-1 h-12 rounded-xl font-bold gap-2" disabled={loading || !gallons || !pricePerGallon}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fuel className="h-4 w-4" />}
           {initialData ? 'Update' : 'Save Fuel Log'}
         </Button>
+
       </div>
     </form>
   );
