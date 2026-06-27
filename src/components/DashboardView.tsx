@@ -435,7 +435,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
-              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} />
+              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
               <ExpenseDonut expenses={filteredExpenses} />
             </div>
             <div className="space-y-4">
