@@ -97,6 +97,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 <Fuel className="h-3.5 w-3.5 text-muted-foreground" /> Gallons
               </Label>
               <Input
+                data-testid="fuel-gallons"
                 type="number"
                 step="0.001"
                 min="0"
@@ -106,6 +107,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                 className="h-11 rounded-xl"
                 required
               />
+
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
