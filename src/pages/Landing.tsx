@@ -383,7 +383,7 @@ export default function Landing() {
                   className="mt-7 rounded-xl font-bold gap-2 self-start hover:bg-transparent"
                   style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}
                 >
-                  Get verified access <ArrowRight className="h-4 w-4" />
+                  Post jobs free as a recruiter <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
