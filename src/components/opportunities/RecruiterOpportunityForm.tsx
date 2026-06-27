@@ -378,7 +378,7 @@ export function RecruiterOpportunityForm({
     if (err) { toast.error(err); return; }
     const payload = buildPayload(mode);
     const onSuccess = () => {
-      toast.success(mode === 'submit' ? 'Submitted for review' : 'Draft saved');
+      toast.success(mode === 'submit' ? 'Opportunity published — live to drivers now' : 'Draft saved');
       onSaved();
     };
     const onError = (e: Error) => toast.error(e.message);
@@ -499,7 +499,7 @@ export function RecruiterOpportunityForm({
               title={submitBlockReason ?? undefined}
             >
               {!canSubmitForReview && <Lock className="h-4 w-4 mr-1" />}
-              <Send className="h-4 w-4" /> Submit for Review
+              <Send className="h-4 w-4" /> Publish Opportunity
             </Button>
           ) : (
             <Button onClick={handleNext}>
@@ -571,7 +571,7 @@ export function RecruiterOpportunityForm({
                       title={submitBlockReason ?? undefined}
                     >
                       {!canSubmitForReview && <Lock className="h-4 w-4 mr-1" />}
-                      <Send className="h-4 w-4" /> Submit for Review
+                      <Send className="h-4 w-4" /> Publish Opportunity
                     </Button>
                   ) : (
                     <Button onClick={handleNext}>
