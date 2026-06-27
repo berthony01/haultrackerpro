@@ -146,10 +146,6 @@ test.beforeAll(() => { mkdirSync('test-results', { recursive: true }); });
 
 test('driver journey — full sequential flow', async ({ page }) => {
   test.skip(!EMAIL || !PASSWORD, 'E2E_DRIVER_EMAIL / E2E_DRIVER_PASSWORD not set');
-  // Safety: never run against the owner account.
-  if (EMAIL && OWNER_EMAIL_DENYLIST.includes(EMAIL.toLowerCase())) {
-    throw new Error(`Refusing to run E2E against owner account ${EMAIL}. Use a disposable QA driver.`);
-  }
   test.setTimeout(240_000);
 
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
@@ -160,8 +156,17 @@ test('driver journey — full sequential flow', async ({ page }) => {
   record('export', 'NOT TESTED', 'export not automated (optional)');
 
   let cleanup: CleanupResult | null = null;
+  // Owner-account hard denial: still produces a report, but performs no app writes.
+  const ownerBlocked = !!(EMAIL && OWNER_EMAIL_DENYLIST.includes(EMAIL.toLowerCase()));
 
   try {
+    if (ownerBlocked) {
+      record('login', 'FAIL',
+        `Refusing to run E2E against owner account ${EMAIL}. Use a disposable QA driver.`);
+      // Skip all app interaction. Cleanup/report still run via finally.
+      return;
+    }
+
     // --- 1. LOGIN ---------------------------------------------------------
     try {
       await page.goto(`${BASE}/auth`);
