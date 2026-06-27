@@ -660,7 +660,7 @@ export default function Landing() {
                     boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
                   }}
                 >
-                  <Truck className="h-5 w-5" /> Start tracking as a driver
+                  <Truck className="h-5 w-5" /> Start Tracking Free
                 </Button>
                 <Button
                   onClick={goToRecruiter}
