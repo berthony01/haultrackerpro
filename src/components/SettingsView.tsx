@@ -455,13 +455,14 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Week Starts On</Label>
               <Select value={weekStart} onValueChange={setWeekStart}>
-                <SelectTrigger className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectTrigger data-testid="settings-week-start" className="h-10 text-sm rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sunday">Sunday</SelectItem>
-                  <SelectItem value="monday">Monday</SelectItem>
-                  <SelectItem value="saturday">Saturday</SelectItem>
+                  <SelectItem value="sunday" data-testid="settings-week-start-sunday">Sunday</SelectItem>
+                  <SelectItem value="monday" data-testid="settings-week-start-monday">Monday</SelectItem>
+                  <SelectItem value="saturday" data-testid="settings-week-start-saturday">Saturday</SelectItem>
                 </SelectContent>
               </Select>
+
               <p className="text-[10px] text-muted-foreground leading-snug">Controls how weekly dashboard and report totals are grouped.</p>
             </div>
             <div className="space-y-1.5">
