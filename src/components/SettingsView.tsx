@@ -538,6 +538,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       {/* Cost Profile - drives Pre-Load Profit Check */}
       <CostProfileSettings />
 
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="taxes" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Calculator className="h-4 w-4 text-primary" /> Reports & Taxes</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Tax Set-Aside Planner */}
       <TaxPlannerSettings
         settings={settings}
@@ -563,6 +572,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         isPending={updateSettings.isPending}
         isPro={isPro ?? false}
       />
+
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="data" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Database className="h-4 w-4 text-primary" /> Data & Import</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
 
       {/* CSV Import */}
       <CSVImport isPro={isPro ?? false} />
