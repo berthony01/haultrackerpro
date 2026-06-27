@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seo:audit": "tsx scripts/audit-sitemap.ts"
+    "seo:audit": "tsx scripts/audit-sitemap.ts",
+    "e2e": "playwright test",
+    "e2e:driver-journey": "playwright test --project=desktop tests/e2e/driver-journey.spec.ts",
+    "e2e:driver-journey:mobile": "playwright test --project=mobile tests/e2e/driver-journey-mobile.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
