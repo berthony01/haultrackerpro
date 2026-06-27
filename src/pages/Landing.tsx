@@ -128,11 +128,19 @@ export default function Landing() {
               </Button>
             ))}
             <Button
+              onClick={goToRecruiter}
+              variant="outline"
+              className="text-sm font-bold rounded-xl px-4 ml-1 hover:bg-transparent"
+              style={{ borderColor: AMBER, color: AMBER_BRIGHT, background: 'transparent', borderWidth: 2 }}
+            >
+              Recruiter Sign Up
+            </Button>
+            <Button
               onClick={goToDriver}
-              className="text-sm font-bold rounded-xl px-5 ml-1"
+              className="text-sm font-bold rounded-xl px-5"
               style={{ background: AMBER, color: 'white' }}
             >
-              Start Free
+              Driver Sign Up
             </Button>
           </div>
           <div className="flex md:hidden items-center gap-2">
