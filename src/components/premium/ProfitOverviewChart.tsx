@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
+import { FuelLog } from '@/hooks/useFuelLogs';
 import { getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadExpectedPay } from '@/lib/loadMetrics';
 import { format, parseISO } from 'date-fns';
@@ -12,6 +13,13 @@ import { motion, useReducedMotion } from 'framer-motion';
 interface Props {
   loads: Load[];
   expenses: Expense[];
+  /**
+   * Optional fuel logs in the same range. When provided AND non-empty, fuel
+   * logs are the canonical fuel cost source for per-day expenses; Expense
+   * rows with category === 'Fuel' are dropped to avoid double-counting.
+   * Mirrors the policy in `applyFuelLogPolicy` / reportAggregator.
+   */
+  fuelLogs?: FuelLog[];
 }
 
 /**
@@ -22,7 +30,7 @@ export function computeDailyNetProfit(revenue: number, expenses: number): number
   return revenue - expenses;
 }
 
-export function ProfitOverviewChart({ loads, expenses }: Props) {
+export function ProfitOverviewChart({ loads, expenses, fuelLogs = [] }: Props) {
   const data = useMemo(() => {
     const map = new Map<string, { date: string; revenue: number; expenses: number; net: number }>();
     // Phase 23A.2: cancelled loads must not contribute to daily revenue/net.
@@ -36,10 +44,22 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
         map.set(d, e);
       });
 
-    expenses.forEach(ex => {
+    const fuelLogsExist = fuelLogs.length > 0;
+    const expensesForMath = fuelLogsExist
+      ? expenses.filter(ex => ex.category !== 'Fuel')
+      : expenses;
+
+    expensesForMath.forEach(ex => {
       const d = ex.expense_date;
       const e = map.get(d) ?? { date: d, revenue: 0, expenses: 0, net: 0 };
       e.expenses += Number(ex.amount);
+      map.set(d, e);
+    });
+
+    fuelLogs.forEach(f => {
+      const d = f.date;
+      const e = map.get(d) ?? { date: d, revenue: 0, expenses: 0, net: 0 };
+      e.expenses += Number(f.total_cost);
       map.set(d, e);
     });
     return Array.from(map.values())
@@ -49,7 +69,8 @@ export function ProfitOverviewChart({ loads, expenses }: Props) {
         expenses: -Math.abs(d.expenses),
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [loads, expenses]);
+  }, [loads, expenses, fuelLogs]);
+
 
   const empty = data.length === 0;
   const reduce = useReducedMotion();

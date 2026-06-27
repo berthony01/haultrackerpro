@@ -9,7 +9,7 @@ import {
   sumOperatingMiles,
   fleetDeadheadPct,
 } from '@/lib/loadMetrics';
-import { excludeCancelled, summarizeLoads, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
+import { excludeCancelled, summarizeLoads, applyFuelLogPolicy, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { Expense } from '@/hooks/useExpenses';
 import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -229,11 +229,38 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     });
   }, [expenses, activePreset, customFrom, customTo, weekStartsOn]);
 
-  // Canonical financial summary (cancelled loads automatically excluded)
-  const summary = useMemo(
-    () => summarizeLoads(filteredLoads, filteredExpenses),
-    [filteredLoads, filteredExpenses],
+  const filteredFuelLogs = useMemo(() => {
+    if (activePreset === 'all') return fuelLogs;
+    if (activePreset === 'custom') {
+      return fuelLogs.filter(f => {
+        const d = f.date;
+        if (customFrom && d < customFrom) return false;
+        if (customTo && d > customTo) return false;
+        return true;
+      });
+    }
+    const { start, end } = getPresetRange(activePreset, weekStartsOn);
+    return fuelLogs.filter(f => {
+      const d = parseISO(f.date);
+      return isWithinInterval(d, { start, end });
+    });
+  }, [fuelLogs, activePreset, customFrom, customTo, weekStartsOn]);
+
+  // Apply the shared fuel double-count policy so Dashboard net profit /
+  // Net RPM / Cost-per-Mile match Reports & exports when both Fuel Logs and
+  // Fuel-category expenses exist.
+  const fuelPolicy = useMemo(
+    () => applyFuelLogPolicy(filteredExpenses, filteredFuelLogs),
+    [filteredExpenses, filteredFuelLogs],
   );
+
+  // Canonical financial summary (cancelled loads automatically excluded).
+  // Feed `expensesForMath` so summarizeLoads doesn't double-count fuel.
+  const summary = useMemo(
+    () => summarizeLoads(filteredLoads, fuelPolicy.expensesForMath),
+    [filteredLoads, fuelPolicy.expensesForMath],
+  );
+
 
   const estimated = summary.estimatedPay;
   const actual = summary.actualPay;
@@ -262,10 +289,13 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   // ---- Premium hero KPI metrics + week-over-week trends ----
   // Driver-facing Gross Revenue uses actual when present, else expected.
   // Cancelled loads are excluded by summarizeLoads (above).
+  // Net Profit / Net RPM include Fuel Logs via the shared fuel double-count
+  // policy so Dashboard agrees with Reports & exports.
   const grossRevenue = summary.grossRevenue;
-  const totalExpensesAmt = summary.expensesTotal;
-  const netProfit = summary.netProfit;
-  const netRPM = summary.netRPM;
+  const totalExpensesAmt = fuelPolicy.combinedExpensesTotal;
+  const netProfit = grossRevenue - totalExpensesAmt;
+  const netRPM = summary.totalMiles > 0 ? netProfit / summary.totalMiles : 0;
+
 
   // Previous comparison range — matches the selected preset (not always last week).
   // - this_week → previous calendar week
@@ -320,15 +350,30 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       return isWithinInterval(d, prevRange);
     });
   }, [expenses, prevRange]);
-  const prevSummary = useMemo(() => summarizeLoads(prevLoads, prevExpenses), [prevLoads, prevExpenses]);
+  const prevFuelLogs = useMemo(() => {
+    if (!prevRange) return [] as FuelLog[];
+    return fuelLogs.filter(f => {
+      const d = parseISO(f.date);
+      return isWithinInterval(d, prevRange);
+    });
+  }, [fuelLogs, prevRange]);
+  const prevFuelPolicy = useMemo(
+    () => applyFuelLogPolicy(prevExpenses, prevFuelLogs),
+    [prevExpenses, prevFuelLogs],
+  );
+  const prevSummary = useMemo(
+    () => summarizeLoads(prevLoads, prevFuelPolicy.expensesForMath),
+    [prevLoads, prevFuelPolicy.expensesForMath],
+  );
   const prevGross = prevSummary.grossRevenue;
-  const prevNet = prevSummary.netProfit;
-  const prevPpm = prevSummary.netRPM;
+  const prevNet = prevGross - prevFuelPolicy.combinedExpensesTotal;
+  const prevPpm = prevSummary.totalMiles > 0 ? prevNet / prevSummary.totalMiles : 0;
   const pct = computeTrendPct;
   const trendRevenue = pct(grossRevenue, prevGross);
   const trendNet = pct(netProfit, prevNet);
   const trendPpm = pct(netRPM, prevPpm);
   const trendLoads = pct(summary.loadCount, prevSummary.loadCount);
+
 
   const scorecard = useDriverScorecard(loads, expenses, settings?.week_start_day);
 
@@ -390,7 +435,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
-              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} />
+              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
               <ExpenseDonut expenses={filteredExpenses} />
             </div>
             <div className="space-y-4">

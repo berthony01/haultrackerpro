@@ -52,6 +52,42 @@ export function onlyCancelled<T extends { status?: string | null }>(loads: T[]):
   return loads.filter(l => (l.status ?? 'completed') === 'cancelled');
 }
 
+/**
+ * Fuel double-count policy — single source of truth.
+ *
+ * When fuel logs exist for the period, fuel logs are the canonical fuel cost
+ * source. Expense rows with `category === 'Fuel'` are dropped from math so we
+ * don't double-count when the driver logs fuel both ways. Returns:
+ *   - `expensesForMath`: expenses safe to feed to summarizeLoads
+ *   - `fuelTotal`: sum of fuel-log total_cost (canonical fuel cost)
+ *   - `combinedExpensesTotal`: non-fuel expenses + canonical fuel cost
+ *
+ * Used by Dashboard, Reports, CSV/PDF exports so every surface agrees.
+ */
+export function applyFuelLogPolicy<E extends { category?: string | null; amount?: number | string | null }>(
+  expenses: E[],
+  fuelLogs: { total_cost?: number | string | null }[],
+): { expensesForMath: E[]; fuelTotal: number; combinedExpensesTotal: number } {
+  const fuelLogsExist = fuelLogs.length > 0;
+  const expensesForMath = fuelLogsExist
+    ? expenses.filter(e => e.category !== 'Fuel')
+    : expenses;
+  const fuelTotal = fuelLogs.reduce((s, f) => {
+    const n = Number(f.total_cost);
+    return s + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+  const nonFuelExpensesTotal = expensesForMath.reduce((s, e) => {
+    const n = Number(e.amount);
+    return s + (Number.isFinite(n) ? n : 0);
+  }, 0);
+  return {
+    expensesForMath,
+    fuelTotal,
+    combinedExpensesTotal: nonFuelExpensesTotal + fuelTotal,
+  };
+}
+
+
 // ── Per-load helpers (re-exported for one-stop import) ─────────────────────
 
 export {
