@@ -116,6 +116,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  data-testid="fuel-price-per-gallon"
                   type="number"
                   step="0.001"
                   min="0"
@@ -125,6 +126,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
                   className="h-11 pl-9 rounded-xl"
                   required
                 />
+
               </div>
             </div>
           </div>
