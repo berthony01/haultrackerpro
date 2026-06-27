@@ -231,20 +231,20 @@ export default function Landing() {
               <Button
                 onClick={goToDriver}
                 size="lg"
-                className="text-base font-bold rounded-xl h-13 px-7 gap-2"
+                className="text-base sm:text-lg font-bold rounded-xl h-14 px-8 gap-2 w-full sm:w-auto"
                 style={{
                   background: AMBER,
                   color: 'white',
                   boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
                 }}
               >
-                <Truck className="h-5 w-5" /> Start tracking as a driver
+                <Truck className="h-5 w-5" /> Start Tracking Free
               </Button>
               <Button
                 onClick={goToRecruiter}
                 size="lg"
                 variant="outline"
-                className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent"
+                className="text-base sm:text-lg font-bold rounded-xl h-14 px-8 gap-2 w-full sm:w-auto hover:bg-transparent"
                 style={{
                   borderColor: AMBER,
                   color: AMBER_BRIGHT,
@@ -252,14 +252,21 @@ export default function Landing() {
                   borderWidth: 2,
                 }}
               >
-                <Users className="h-5 w-5" /> Post an opportunity as a recruiter
+                <Users className="h-5 w-5" /> Post Jobs Free as a Recruiter
               </Button>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium" style={{ color: TEXT_DIM }}>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free driver plan, no credit card</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Verified recruiter access</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Built only for trucking</span>
+            <p className="mt-4 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
+              Drivers track loads, expenses, and profit free — no credit card. Verified recruiters can post standard opportunities free.{' '}
+              <button onClick={goToRecruiterInfo} className="underline-offset-4 hover:underline font-semibold" style={{ color: AMBER_BRIGHT }}>
+                Learn about recruiter access →
+              </button>
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium" style={{ color: TEXT_DIM }}>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free driver plan</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free standard recruiter posting (verified)</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Paid upgrades are optional</span>
             </div>
           </div>
         </section>
