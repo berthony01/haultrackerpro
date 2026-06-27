@@ -3177,6 +3177,7 @@ export type Database = {
         Returns: boolean
       }
       recruiter_plan_limit: { Args: { _plan: string }; Returns: number }
+      referral_status_rank: { Args: { _s: string }; Returns: number }
       request_driver_contact: {
         Args: { application_id: string; recruiter_note?: string }
         Returns: string
