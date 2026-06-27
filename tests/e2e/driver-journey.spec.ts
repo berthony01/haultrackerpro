@@ -269,15 +269,12 @@ test('driver journey — full sequential flow', async ({ page }) => {
 
           await page.getByTestId('load-form-submit').click();
 
-          // Verify row appears (notes column shows marker on card, OR list refresh)
-          const appeared = await page
-            .getByText(new RegExp(MARKER.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')))
-            .first()
-            .waitFor({ timeout: 15_000 })
-            .then(() => true)
-            .catch(() => false);
+          // Deterministic row check: a list card with our marker on data-marker.
+          const row = page.locator(`[data-testid="load-row"][data-marker*="${MARKER}"]`).first();
+          const appeared = await row.waitFor({ state: 'visible', timeout: 15_000 })
+            .then(() => true).catch(() => false);
           if (appeared) record('load_create', 'PASS');
-          else record('load_create', 'FAIL', 'load saved but marker not visible in list');
+          else record('load_create', 'FAIL', 'load saved but no load-row with marker found');
         }
       }
     } catch (e) { record('load_create', 'FAIL', String(e)); }
@@ -300,15 +297,11 @@ test('driver journey — full sequential flow', async ({ page }) => {
           await page.getByTestId('fuel-notes').fill(MARKER);
           await page.getByTestId('fuel-form-submit').click();
 
-          const appeared = await page
-            .getByText(new RegExp(MARKER.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')))
-            .first()
-            .waitFor({ timeout: 10_000 })
-            .then(() => true)
-            .catch(false as any);
-          // Even if note not displayed, the dashboard numeric assertion will catch missing fuel.
-          record('fuel_create', appeared ? 'PASS' : 'PARTIAL',
-            appeared ? 'fuel row visible' : 'fuel saved; marker not shown in list — relying on numeric assertion');
+          const row = page.locator(`[data-testid="fuel-row"][data-marker*="${MARKER}"]`).first();
+          const appeared = await row.waitFor({ state: 'visible', timeout: 15_000 })
+            .then(() => true).catch(() => false);
+          if (appeared) record('fuel_create', 'PASS', 'fuel row visible with marker');
+          else record('fuel_create', 'FAIL', 'no fuel-row with marker found after save');
         }
       }
     } catch (e) { record('fuel_create', 'FAIL', String(e)); }
@@ -326,18 +319,18 @@ test('driver journey — full sequential flow', async ({ page }) => {
           record('expense_create', 'FAIL', 'add-expense button not found');
         } else {
           await addExp.click();
+          // Deterministically pick a category (Maintenance) — auto-categorization may not fire.
+          await page.getByTestId('expense-category-trigger').click();
+          await page.getByTestId('expense-category-option-maintenance').click();
           await page.locator('#amount').fill('50');
           await page.locator('#expense_notes').fill(MARKER);
           await page.getByTestId('expense-form-submit').click();
 
-          const appeared = await page
-            .getByText(new RegExp(MARKER.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')))
-            .first()
-            .waitFor({ timeout: 10_000 })
-            .then(() => true)
-            .catch(false as any);
-          record('expense_create', appeared ? 'PASS' : 'PARTIAL',
-            appeared ? 'expense row visible' : 'expense saved; marker not shown — relying on numeric assertion');
+          const row = page.locator(`[data-testid="expense-row"][data-marker*="${MARKER}"]`).first();
+          const appeared = await row.waitFor({ state: 'visible', timeout: 15_000 })
+            .then(() => true).catch(() => false);
+          if (appeared) record('expense_create', 'PASS', 'expense row visible with marker');
+          else record('expense_create', 'FAIL', 'no expense-row with marker found after save');
         }
       }
     } catch (e) { record('expense_create', 'FAIL', String(e)); }

@@ -79,6 +79,8 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
       onClick={onTap}
       role="button"
       aria-label={`Load ${formatLocation(load.pickup_location)} to ${formatLocation(load.dropoff_location)}, ${formatCurrency(payShown)}`}
+      data-testid="load-row"
+      data-marker={load.notes ?? ''}
     >
       <CardContent className="p-4">
         {/* Top meta row */}
