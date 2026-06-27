@@ -585,6 +585,28 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       {/* CSV Import */}
       <CSVImport isPro={isPro ?? false} />
 
+      {/* Data Management */}
+      <div className="premium-card p-4 space-y-3">
+          <p className="text-label">Data</p>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" onClick={handleExportData} disabled={exporting}>
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exporting...' : 'Export All My Data'}
+          </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 text-destructive border-destructive/30 hover:bg-destructive/5" onClick={() => setShowDeleteModal(true)}>
+            <Trash2 className="h-4 w-4" />
+            Delete Account
+          </Button>
+        </div>
+
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="notifications" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Bell className="h-4 w-4 text-primary" /> Notifications & Emails</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Email Preferences */}
       <div className="premium-card p-4 space-y-3">
           <p className="text-label flex items-center gap-1.5">
@@ -629,18 +651,16 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </p>
         </div>
 
-      {/* Data Management */}
-      <div className="premium-card p-4 space-y-3">
-          <p className="text-label">Data</p>
-          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2" onClick={handleExportData} disabled={exporting}>
-            <Download className="h-4 w-4" />
-            {exporting ? 'Exporting...' : 'Export All My Data'}
-          </Button>
-          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 text-destructive border-destructive/30 hover:bg-destructive/5" onClick={() => setShowDeleteModal(true)}>
-            <Trash2 className="h-4 w-4" />
-            Delete Account
-          </Button>
-        </div>
+      <NotificationPreferencesPanel />
+
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="support" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><LifeBuoy className="h-4 w-4 text-primary" /> Support & Legal</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
 
       {/* Support */}
       <div className="premium-card p-4 space-y-3">
@@ -686,6 +706,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           </p>
         </div>
 
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="pro" className="border-none">
+        <AccordionTrigger className="px-4 py-3 rounded-xl bg-card hover:no-underline data-[state=open]:rounded-b-none border border-border/60">
+          <span className="flex items-center gap-2 text-sm font-bold"><Crown className="h-4 w-4 text-primary" /> Pro Plan Features</span>
+        </AccordionTrigger>
+        <AccordionContent className="pb-0 pt-3 space-y-3">
+
       {/* Pro Plan Features */}
       <div className="premium-card overflow-hidden">
         <div className="bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3 border-b border-border/40">
@@ -717,7 +746,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         </div>
       </div>
 
-      <NotificationPreferencesPanel />
+        </AccordionContent>
+      </AccordionItem>
+
+      </Accordion>
 
       {/* Modals */}
       <DeleteAccountModal open={showDeleteModal} onOpenChange={setShowDeleteModal} />
