@@ -241,10 +241,10 @@ export function ExpenseForm({ onSubmit, onCancel, loading, loads = [], initialDa
               <div>
                 <Label htmlFor="category">Category</Label>
                 <Select value={form.category} onValueChange={v => update('category', v)}>
-                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectTrigger data-testid="expense-category-trigger"><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
                     {EXPENSE_CATEGORIES.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c} data-testid={`expense-category-option-${c.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>{c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
