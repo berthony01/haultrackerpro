@@ -380,6 +380,25 @@ export function useDriverDecideDelegation() {
   });
 }
 
+export function useRevokeAgencyDelegation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (delegationId: string) => {
+      const { data, error } = await (supabase as any).rpc('revoke_agency_delegation', {
+        _delegation_id: delegationId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-pending-delegations'] });
+      qc.invalidateQueries({ queryKey: ['agency-delegations'] });
+      qc.invalidateQueries({ queryKey: ['agency-clients'] });
+      qc.invalidateQueries({ queryKey: ['my-assistants'] });
+    },
+  });
+}
+
 // ---------- Clients ----------
 export function useAgencyClients(agencyId: string | null | undefined) {
   return useQuery({
