@@ -347,6 +347,15 @@ const Index = () => {
 
   // Activate premium dark theme on body so Radix portals (Sheet/Dialog/Popover/Tooltip)
   // — which mount outside the .app-shell subtree — inherit the same tokens.
+  // Assistant page allow-list bounce. If perms change or the user lands on a
+  // page their permissions don't permit, send them to their first allowed page.
+  useEffect(() => {
+    if (!isActingAsAssistant) return;
+    if (!isAssistantPageAllowed(page, actingPermissions)) {
+      setPage(firstAllowedAssistantPage(actingPermissions));
+    }
+  }, [isActingAsAssistant, actingPermissions, page]);
+
   useEffect(() => {
     document.body.classList.add('app-shell-active');
     return () => document.body.classList.remove('app-shell-active');
