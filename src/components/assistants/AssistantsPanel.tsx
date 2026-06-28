@@ -224,6 +224,15 @@ export function AssistantsPanel() {
             ))}
         </div>
       )}
+
+      <div className="border-t pt-6">
+        <MyAgencyRequestsSection />
+        <p className="mt-3 text-xs text-muted-foreground">
+          Note: an agency can only delegate work to a member who has already
+          accepted their invite and signed in. Email-only invites cannot yet be
+          delegated to your account.
+        </p>
+      </div>
     </div>
   );
 }
