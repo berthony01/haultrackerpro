@@ -49,22 +49,20 @@ function buildEffectiveDateOr(from?: string, to?: string): string | null {
 
 export function useLoads(dateRange?: DateRange, page?: number) {
   const { user } = useAuth();
+  const targetUserId = useTargetUserId();
   const queryClient = useQueryClient();
 
   const loadsQuery = useQuery({
-    queryKey: ['loads', user?.id, dateRange?.from, dateRange?.to, page],
+    queryKey: ['loads', targetUserId, dateRange?.from, dateRange?.to, page],
     queryFn: async () => {
-      if (!user) return { loads: [], totalCount: 0 };
+      if (!targetUserId) return { loads: [], totalCount: 0 };
 
       const buildQuery = () => {
         let q = supabase
           .from('loads')
           .select('*', { count: 'exact' })
-          .eq('user_id', user.id)
+          .eq('user_id', targetUserId)
           .order('load_date', { ascending: false });
-        // Server-side effective-date filtering (load_date OR dropoff_date).
-        // NOTE: totalCount reflects this OR-prefilter which is a superset of the
-        // client-filtered list below — it never underfetches.
         const orFilter = buildEffectiveDateOr(dateRange?.from, dateRange?.to);
         if (orFilter) q = q.or(orFilter);
         return q;
@@ -74,7 +72,6 @@ export function useLoads(dateRange?: DateRange, page?: number) {
       let count: number | null = null;
 
       if (page !== undefined) {
-        // Paged mode: return just the requested page
         const fromIdx = page * PAGE_SIZE;
         const toIdx = fromIdx + PAGE_SIZE - 1;
         const { data, error, count: c } = await buildQuery().range(fromIdx, toIdx);
@@ -82,8 +79,6 @@ export function useLoads(dateRange?: DateRange, page?: number) {
         rawData = (data ?? []) as Load[];
         count = c;
       } else {
-        // Unpaged mode: fetch ALL rows in 1k batches to bypass Supabase's
-        // default 1000-row response cap. Safety cap: 50 pages = 50k rows.
         const FETCH_SIZE = 1000;
         let offset = 0;
         for (let i = 0; i < 50; i++) {
@@ -98,16 +93,8 @@ export function useLoads(dateRange?: DateRange, page?: number) {
       }
 
       let filtered = rawData;
-
-      // Client-side refinement on effective date for precision
-      if (dateRange?.from) {
-        filtered = filtered.filter(l => getEffectiveDate(l) >= dateRange.from!);
-      }
-      if (dateRange?.to) {
-        filtered = filtered.filter(l => getEffectiveDate(l) <= dateRange.to!);
-      }
-
-      // Sort by effective date descending, tie-break by created_at descending
+      if (dateRange?.from) filtered = filtered.filter(l => getEffectiveDate(l) >= dateRange.from!);
+      if (dateRange?.to) filtered = filtered.filter(l => getEffectiveDate(l) <= dateRange.to!);
       filtered.sort((a, b) => {
         const cmp = getEffectiveDate(b).localeCompare(getEffectiveDate(a));
         if (cmp !== 0) return cmp;
@@ -116,15 +103,15 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
       return { loads: filtered, totalCount: count ?? filtered.length };
     },
-    enabled: !!user,
+    enabled: !!targetUserId,
   });
 
   const addLoad = useMutation({
     mutationFn: async (data: LoadInsert) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
       const { data: result, error } = await supabase
         .from('loads')
-        .insert({ ...data, user_id: user.id })
+        .insert({ ...data, user_id: targetUserId })
         .select()
         .single();
       if (error) throw error;
@@ -135,12 +122,12 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
   const updateLoad = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: LoadUpdate }) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('loads')
         .update(data)
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', targetUserId);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loads'] }),
@@ -148,6 +135,7 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
   const deleteLoad = useMutation({
     mutationFn: async (id: string) => {
+      // Deletes are owner-only; assistants cannot delete in Phase 1.
       if (!user) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('loads')
