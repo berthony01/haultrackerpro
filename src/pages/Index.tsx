@@ -626,6 +626,22 @@ const Index = () => {
   };
 
   const handleNavigate = (p: string, options?: { filter?: string }) => {
+    // Assistant page allow-list. When acting as an assistant, restrict navigation
+    // to pages permitted by the granted permissions; redirect blocked pages to
+    // the first allowed page. Also handles the "exit acting context" pseudo-page.
+    if (isActingAsAssistant) {
+      if (p === 'assistant_exit') {
+        exitActingAs();
+        navigate('/assistant');
+        return;
+      }
+      if (!isAssistantPageAllowed(p, actingPermissions)) {
+        const target = firstAllowedAssistantPage(actingPermissions);
+        setPage(target);
+        return;
+      }
+    }
+
     if (p !== 'add') {
       setSuppressOnboardingForAddDeepLink(false);
     }
