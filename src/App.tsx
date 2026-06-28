@@ -189,8 +189,10 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+            <ActingContextProvider>
             <PageViewTracker />
             <RoleIntentReconcilerMount />
+            <ActingAsBanner />
             <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
