@@ -180,46 +180,50 @@ describe('Phase 3 — driver-facing UI surfaces approval, not autoaccess', () =>
   });
 });
 
+function fnBody(sql: string, name: string): string {
+  const m = sql.match(new RegExp(`create or replace function public\\.${name}[\\s\\S]*?\\$function\\$`, 'i'));
+  return m ? m[0] : '';
+}
+
 describe('Phase 3 cleanup — pending delegation filtering', () => {
   it('list_my_pending_delegations filters by pending_driver_approval', () => {
-    const block = CLEANUP_SQL.split('list_my_pending_delegations')[1] ?? '';
-    expect(block).toMatch(/status\s*=\s*'pending_driver_approval'/);
+    const body = fnBody(CLEANUP_SQL, 'list_my_pending_delegations');
+    expect(body).toMatch(/status\s*=\s*'pending_driver_approval'/);
   });
 });
 
 describe('Phase 3 cleanup — work item gating', () => {
   it('create_agency_work_item requires an approved delegation for the driver', () => {
-    const block = CLEANUP_SQL.split('create_agency_work_item')[1]?.split('end \\$function\\$')[0]
-      ?? CLEANUP_SQL.split('create_agency_work_item')[1] ?? '';
-    expect(block).toMatch(/agency_delegation_requests/);
-    expect(block).toMatch(/status\s*=\s*'approved'/);
-    expect(block).toMatch(/not an approved client/i);
+    const body = fnBody(CLEANUP_SQL, 'create_agency_work_item');
+    expect(body).toMatch(/agency_delegation_requests/);
+    expect(body).toMatch(/status\s*=\s*'approved'/);
+    expect(body).toMatch(/not an approved client/i);
   });
 
   it('update_agency_work_item re-verifies approved-client status', () => {
-    const block = CLEANUP_SQL.split('update_agency_work_item')[1] ?? '';
-    expect(block).toMatch(/agency_delegation_requests/);
-    expect(block).toMatch(/no longer an approved client/i);
+    const body = fnBody(CLEANUP_SQL, 'update_agency_work_item');
+    expect(body).toMatch(/agency_delegation_requests/);
+    expect(body).toMatch(/no longer an approved client/i);
   });
 
   it('update_agency_work_item has no _driver_user_id parameter (driver target is immutable)', () => {
-    const sig = CLEANUP_SQL.split('create or replace function public.update_agency_work_item')[1]
-      ?.split(')')[0] ?? '';
+    const body = fnBody(CLEANUP_SQL, 'update_agency_work_item');
+    const sig = body.split(')')[0];
     expect(sig).not.toMatch(/_driver_user_id/);
   });
 });
 
 describe('Phase 3 cleanup — delegation creation gating', () => {
   it('create_agency_delegation_request rejects declined/cancelled/converted requests', () => {
-    const block = CLEANUP_SQL.split('create_agency_delegation_request')[1] ?? '';
-    expect(block).toMatch(/status\s+not\s+in\s*\(\s*'pending'\s*,\s*'approved'\s*\)/);
+    const body = fnBody(CLEANUP_SQL, 'create_agency_delegation_request');
+    expect(body).toMatch(/status\s+not\s+in\s*\(\s*'pending'\s*,\s*'approved'\s*\)/);
   });
 
   it('create_agency_delegation_request still requires an active agency member (email-only blocked)', () => {
-    const block = CLEANUP_SQL.split('create_agency_delegation_request')[1] ?? '';
-    expect(block).toMatch(/agency_members/);
-    expect(block).toMatch(/status\s*=\s*'active'/);
-    expect(block).toMatch(/active agency member with a verified account/i);
+    const body = fnBody(CLEANUP_SQL, 'create_agency_delegation_request');
+    expect(body).toMatch(/agency_members/);
+    expect(body).toMatch(/status\s*=\s*'active'/);
+    expect(body).toMatch(/active agency member with a verified account/i);
   });
 });
 
@@ -227,7 +231,6 @@ describe('Phase 3 cleanup — driver-side request status UI', () => {
   it('MyAgencyRequestsSection uses list_my_agency_client_requests via useMyAgencyRequests', () => {
     const c = read('src/components/assistants/MyAgencyRequestsSection.tsx');
     expect(c).toMatch(/useMyAgencyRequests/);
-    // Shows the required fields
     expect(c).toMatch(/agency_name/);
     expect(c).toMatch(/package_name/);
     expect(c).toMatch(/status/);
@@ -246,4 +249,5 @@ describe('Phase 3 cleanup — driver-side request status UI', () => {
     expect(hook).toMatch(/list_my_agency_client_requests/);
   });
 });
+
 
