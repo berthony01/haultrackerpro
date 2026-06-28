@@ -65,6 +65,92 @@ export type Database = {
         }
         Relationships: []
       }
+      agency_members: {
+        Row: {
+          accepted_at: string | null
+          agency_id: string
+          created_at: string
+          id: string
+          invite_email: string
+          invite_token_hash: string | null
+          invited_at: string
+          member_user_id: string | null
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["agency_member_role"]
+          status: Database["public"]["Enums"]["agency_member_status"]
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          agency_id: string
+          created_at?: string
+          id?: string
+          invite_email: string
+          invite_token_hash?: string | null
+          invited_at?: string
+          member_user_id?: string | null
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["agency_member_role"]
+          status?: Database["public"]["Enums"]["agency_member_status"]
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          agency_id?: string
+          created_at?: string
+          id?: string
+          invite_email?: string
+          invite_token_hash?: string | null
+          invited_at?: string
+          member_user_id?: string | null
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["agency_member_role"]
+          status?: Database["public"]["Enums"]["agency_member_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_members_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_profiles: {
+        Row: {
+          contact_email: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_user_id: string
+          status: Database["public"]["Enums"]["agency_status"]
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_user_id: string
+          status?: Database["public"]["Enums"]["agency_status"]
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          owner_user_id?: string
+          status?: Database["public"]["Enums"]["agency_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_insights: {
         Row: {
           content: string
@@ -3023,6 +3109,29 @@ export type Database = {
       }
     }
     Functions: {
+      accept_agency_invite: {
+        Args: { _token: string }
+        Returns: {
+          accepted_at: string | null
+          agency_id: string
+          created_at: string
+          id: string
+          invite_email: string
+          invite_token_hash: string | null
+          invited_at: string
+          member_user_id: string | null
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["agency_member_role"]
+          status: Database["public"]["Enums"]["agency_member_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       accept_assistant_invite: { Args: { _token: string }; Returns: Json }
       apply_recruiter_intent: { Args: never; Returns: Json }
       assistant_delete_load_stops: {
@@ -3125,6 +3234,25 @@ export type Database = {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
       }
+      create_agency: {
+        Args: { _contact_email?: string; _description?: string; _name: string }
+        Returns: {
+          contact_email: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_user_id: string
+          status: Database["public"]["Enums"]["agency_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_driver_referral_safe: {
         Args: {
           _opportunity_id: string
@@ -3159,6 +3287,20 @@ export type Database = {
         Args: { _application_id: string }
         Returns: Json
       }
+      get_my_agency: {
+        Args: never
+        Returns: {
+          contact_email: string
+          created_at: string
+          description: string
+          id: string
+          my_role: Database["public"]["Enums"]["agency_member_role"]
+          name: string
+          owner_user_id: string
+          status: Database["public"]["Enums"]["agency_status"]
+          updated_at: string
+        }[]
+      }
       get_my_managed_drivers: { Args: never; Returns: Json[] }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
       get_public_resource_article: {
@@ -3191,6 +3333,14 @@ export type Database = {
           weekly_points: number
         }[]
       }
+      invite_agency_member: {
+        Args: {
+          _agency_id: string
+          _email: string
+          _role?: Database["public"]["Enums"]["agency_member_role"]
+        }
+        Returns: Json
+      }
       invite_assistant: {
         Args: { _email: string; _permissions: Json }
         Returns: Json
@@ -3206,6 +3356,33 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_agency_members: {
+        Args: { _agency_id: string }
+        Returns: {
+          accepted_at: string
+          agency_id: string
+          id: string
+          invite_email: string
+          invited_at: string
+          member_user_id: string
+          revoked_at: string
+          role: Database["public"]["Enums"]["agency_member_role"]
+          status: Database["public"]["Enums"]["agency_member_status"]
+        }[]
+      }
+      list_driver_assistant_audit: {
+        Args: { _limit?: number }
+        Returns: {
+          action: string
+          assistant_email: string
+          assistant_user_id: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          metadata: Json
+        }[]
+      }
       list_driver_visible_opportunities: {
         Args: { _driver_type?: string; _route_type?: string; _state?: string }
         Returns: {
@@ -3261,6 +3438,19 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_my_assistant_audit: {
+        Args: { _limit?: number }
+        Returns: {
+          action: string
+          created_at: string
+          driver_email: string
+          driver_user_id: string
+          entity_id: string
+          entity_type: string
+          id: string
+          metadata: Json
+        }[]
+      }
       list_my_assistants: { Args: never; Returns: Json[] }
       list_my_driver_referrals: {
         Args: never
@@ -3279,6 +3469,16 @@ export type Database = {
           referring_driver_id: string
           status: string
           updated_at: string
+        }[]
+      }
+      list_my_pending_assistant_invites: {
+        Args: never
+        Returns: {
+          driver_user_id: string
+          id: string
+          invite_email: string
+          invited_at: string
+          permissions: Json
         }[]
       }
       list_public_resource_articles: {
@@ -3371,6 +3571,7 @@ export type Database = {
         Args: { profile_id: string }
         Returns: undefined
       }
+      revoke_agency_member: { Args: { _member_id: string }; Returns: undefined }
       revoke_assistant: { Args: { _id: string }; Returns: undefined }
       submit_lead_magnet_signup: {
         Args: {
@@ -3392,12 +3593,39 @@ export type Database = {
         Args: { _id: string; _permissions: Json }
         Returns: undefined
       }
+      update_my_agency: {
+        Args: {
+          _contact_email: string
+          _description: string
+          _name: string
+          _status: Database["public"]["Enums"]["agency_status"]
+        }
+        Returns: {
+          contact_email: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_user_id: string
+          status: Database["public"]["Enums"]["agency_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       withdraw_opportunity_application: {
         Args: { application_id: string }
         Returns: undefined
       }
     }
     Enums: {
+      agency_member_role: "agency_owner" | "agency_admin" | "agency_member"
+      agency_member_status: "pending" | "active" | "revoked"
+      agency_status: "active" | "disabled"
       assistant_status: "pending" | "active" | "revoked" | "expired"
       contract_status:
         | "uploaded"
@@ -3538,6 +3766,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agency_member_role: ["agency_owner", "agency_admin", "agency_member"],
+      agency_member_status: ["pending", "active", "revoked"],
+      agency_status: ["active", "disabled"],
       assistant_status: ["pending", "active", "revoked", "expired"],
       contract_status: [
         "uploaded",
