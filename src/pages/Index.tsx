@@ -81,6 +81,7 @@ const Index = () => {
   const { settings } = useUserSettings();
   const {
     isActingAsAssistant,
+    actingDriver,
     permissions: actingPermissions,
     exitActingAs,
   } = useActingContext();
