@@ -1,15 +1,18 @@
 /**
  * Driver Assistants — client-side mirror of the permission keys allowed on the
  * server. UI uses these for gating; server RLS + RPCs are the real enforcement.
+ *
+ * NOTE: `manage_receipts` and `manage_documents` are intentionally NOT exposed
+ * here in Phase 1 — those flows aren't yet wired end-to-end. They will be
+ * re-introduced in a later phase once receipt/document upload paths support
+ * assistant context.
  */
 export const ASSISTANT_PERMISSION_KEYS = [
   'manage_loads',
   'manage_expenses',
   'manage_fuel',
-  'manage_receipts',
   'view_reports',
   'export_reports',
-  'manage_documents',
   'view_dashboard',
   'manage_settings_limited',
 ] as const;
@@ -22,10 +25,8 @@ export const PERMISSION_LABELS: Record<AssistantPermissionKey, string> = {
   manage_loads: 'Loads — view, add, edit',
   manage_expenses: 'Expenses — view, add, edit',
   manage_fuel: 'Fuel logs — view, add, edit',
-  manage_receipts: 'Receipts — upload and attach',
   view_reports: 'Reports — view',
   export_reports: 'Reports — export PDF / CSV',
-  manage_documents: 'Documents — upload, view',
   view_dashboard: 'Dashboard — view KPIs and charts',
   manage_settings_limited: 'Limited settings (cost profile, default pay model)',
 };
@@ -34,7 +35,6 @@ export const PERMISSION_DEFAULTS: AssistantPermissions = {
   manage_loads: true,
   manage_expenses: true,
   manage_fuel: true,
-  manage_receipts: true,
   view_reports: true,
   view_dashboard: true,
 };
@@ -55,4 +55,59 @@ export function hasPerm(
   key: AssistantPermissionKey,
 ): boolean {
   return !!perms && perms[key] === true;
+}
+
+/**
+ * Map a navigation page id (used by BottomNav / AppSidebar / Index router) to
+ * the permission key required when an assistant is acting on behalf of a driver.
+ * Returns null for pages allowed without any specific permission (e.g. 'more'),
+ * or 'BLOCKED' for pages assistants must never reach.
+ */
+export type PageGate = AssistantPermissionKey | 'BLOCKED' | null;
+
+export function assistantPageGate(page: string): PageGate {
+  // Hard blocks — never available to assistants.
+  if (
+    page === 'settings' ||
+    page === 'recruiter-access' ||
+    page === 'opportunities' ||
+    page === 'opportunity-preferences' ||
+    page === 'contracts' ||
+    page.startsWith('recruiter-access:')
+  ) {
+    return 'BLOCKED';
+  }
+  switch (page) {
+    case 'dashboard': return 'view_dashboard';
+    case 'loads':
+    case 'add':
+      return 'manage_loads';
+    case 'expenses': return 'manage_expenses';
+    case 'fuel': return 'manage_fuel';
+    case 'reports': return 'view_reports';
+    case 'more': return null;
+    default: return null;
+  }
+}
+
+/** First nav page an acting assistant can actually visit, given perms. */
+export function firstAllowedAssistantPage(
+  perms: AssistantPermissions | null | undefined,
+): string {
+  if (hasPerm(perms, 'view_dashboard')) return 'dashboard';
+  if (hasPerm(perms, 'manage_loads')) return 'loads';
+  if (hasPerm(perms, 'view_reports')) return 'reports';
+  if (hasPerm(perms, 'manage_expenses')) return 'expenses';
+  if (hasPerm(perms, 'manage_fuel')) return 'fuel';
+  return 'more';
+}
+
+export function isAssistantPageAllowed(
+  page: string,
+  perms: AssistantPermissions | null | undefined,
+): boolean {
+  const gate = assistantPageGate(page);
+  if (gate === 'BLOCKED') return false;
+  if (gate === null) return true;
+  return hasPerm(perms, gate);
 }
