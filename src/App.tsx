@@ -68,6 +68,8 @@ const BestProfitTracker = lazy(() => import("./pages/comparisons/BestTruckDriver
 const ResourceArticlesAdmin = lazy(() => import("./pages/admin/ResourceArticlesAdmin"));
 const ContentCalendarAdmin = lazy(() => import("./pages/admin/ContentCalendarAdmin"));
 const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
+const AssistantDashboard = lazy(() => import("./pages/AssistantDashboard"));
+const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
