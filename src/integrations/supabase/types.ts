@@ -1104,8 +1104,10 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          assistant_delegate_id: string | null
           category: string
           created_at: string
+          created_by_user_id: string | null
           expense_date: string
           expense_type: string
           gallons: number | null
@@ -1113,12 +1115,15 @@ export type Database = {
           linked_load_id: string | null
           notes: string | null
           updated_at: string
+          updated_by_user_id: string | null
           user_id: string
         }
         Insert: {
           amount: number
+          assistant_delegate_id?: string | null
           category: string
           created_at?: string
+          created_by_user_id?: string | null
           expense_date: string
           expense_type?: string
           gallons?: number | null
@@ -1126,12 +1131,15 @@ export type Database = {
           linked_load_id?: string | null
           notes?: string | null
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id: string
         }
         Update: {
           amount?: number
+          assistant_delegate_id?: string | null
           category?: string
           created_at?: string
+          created_by_user_id?: string | null
           expense_date?: string
           expense_type?: string
           gallons?: number | null
@@ -1139,9 +1147,17 @@ export type Database = {
           linked_load_id?: string | null
           notes?: string | null
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_assistant_delegate_id_fkey"
+            columns: ["assistant_delegate_id"]
+            isOneToOne: false
+            referencedRelation: "driver_assistants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_linked_load_id_fkey"
             columns: ["linked_load_id"]
@@ -1180,7 +1196,9 @@ export type Database = {
       }
       fuel_logs: {
         Row: {
+          assistant_delegate_id: string | null
           created_at: string
+          created_by_user_id: string | null
           date: string
           gallons: number
           id: string
@@ -1191,10 +1209,13 @@ export type Database = {
           station: string | null
           total_cost: number
           updated_at: string
+          updated_by_user_id: string | null
           user_id: string
         }
         Insert: {
+          assistant_delegate_id?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           date: string
           gallons: number
           id?: string
@@ -1205,10 +1226,13 @@ export type Database = {
           station?: string | null
           total_cost: number
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id: string
         }
         Update: {
+          assistant_delegate_id?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           date?: string
           gallons?: number
           id?: string
@@ -1219,9 +1243,17 @@ export type Database = {
           station?: string | null
           total_cost?: number
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fuel_logs_assistant_delegate_id_fkey"
+            columns: ["assistant_delegate_id"]
+            isOneToOne: false
+            referencedRelation: "driver_assistants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fuel_logs_linked_load_id_fkey"
             columns: ["linked_load_id"]
@@ -1350,7 +1382,9 @@ export type Database = {
       }
       load_stops: {
         Row: {
+          assistant_delegate_id: string | null
           created_at: string
+          created_by_user_id: string | null
           detention_minutes: number | null
           id: string
           load_id: string
@@ -1359,10 +1393,13 @@ export type Database = {
           stop_order: number
           stop_type: string
           updated_at: string
+          updated_by_user_id: string | null
           user_id: string
         }
         Insert: {
+          assistant_delegate_id?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           detention_minutes?: number | null
           id?: string
           load_id: string
@@ -1371,10 +1408,13 @@ export type Database = {
           stop_order: number
           stop_type?: string
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id: string
         }
         Update: {
+          assistant_delegate_id?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           detention_minutes?: number | null
           id?: string
           load_id?: string
@@ -1383,9 +1423,17 @@ export type Database = {
           stop_order?: number
           stop_type?: string
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "load_stops_assistant_delegate_id_fkey"
+            columns: ["assistant_delegate_id"]
+            isOneToOne: false
+            referencedRelation: "driver_assistants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "load_stops_load_id_fkey"
             columns: ["load_id"]
@@ -1398,9 +1446,11 @@ export type Database = {
       loads: {
         Row: {
           actual_pay_received: number | null
+          assistant_delegate_id: string | null
           broker_id: string | null
           broker_name_raw: string | null
           created_at: string
+          created_by_user_id: string | null
           deadhead_miles: number
           deadhead_pay_amount: number | null
           deadhead_pay_status: string | null
@@ -1429,14 +1479,17 @@ export type Database = {
           status: string
           total_miles: number | null
           updated_at: string
+          updated_by_user_id: string | null
           user_id: string
           wait_fee: number
         }
         Insert: {
           actual_pay_received?: number | null
+          assistant_delegate_id?: string | null
           broker_id?: string | null
           broker_name_raw?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           deadhead_miles?: number
           deadhead_pay_amount?: number | null
           deadhead_pay_status?: string | null
@@ -1465,14 +1518,17 @@ export type Database = {
           status?: string
           total_miles?: number | null
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id: string
           wait_fee?: number
         }
         Update: {
           actual_pay_received?: number | null
+          assistant_delegate_id?: string | null
           broker_id?: string | null
           broker_name_raw?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           deadhead_miles?: number
           deadhead_pay_amount?: number | null
           deadhead_pay_status?: string | null
@@ -1501,10 +1557,18 @@ export type Database = {
           status?: string
           total_miles?: number | null
           updated_at?: string
+          updated_by_user_id?: string | null
           user_id?: string
           wait_fee?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "loads_assistant_delegate_id_fkey"
+            columns: ["assistant_delegate_id"]
+            isOneToOne: false
+            referencedRelation: "driver_assistants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "loads_broker_id_fkey"
             columns: ["broker_id"]
