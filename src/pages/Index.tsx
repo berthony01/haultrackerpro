@@ -868,9 +868,17 @@ const Index = () => {
 
         {showOnboarding ? (
           <Onboarding onGetStarted={() => { setEditingLoad(null); setPage('add'); }} />
+        ) : isActingAsAssistant && !isAssistantPageAllowed(page, actingPermissions) ? (
+          <AssistantBlockedNotice
+            driverName={actingDriver?.driver_name || actingDriver?.driver_email || 'this driver'}
+            permissions={actingPermissions}
+            onGoToAllowed={(p) => setPage(p)}
+            onExit={() => { exitActingAs(); navigate('/assistant'); }}
+          />
         ) : (
           <Suspense fallback={<ViewFallback />}>
           <>
+
             {page === 'dashboard' && (
               <>
                 {releaseReady && !hasSeenLatest && (
