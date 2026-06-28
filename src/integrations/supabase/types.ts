@@ -2961,6 +2961,10 @@ export type Database = {
     Functions: {
       accept_assistant_invite: { Args: { _token: string }; Returns: Json }
       apply_recruiter_intent: { Args: never; Returns: Json }
+      assistant_delete_load_stops: {
+        Args: { _driver: string; _load_id: string }
+        Returns: number
+      }
       assistant_has_permission: {
         Args: { _assistant: string; _driver: string; _perm: string }
         Returns: boolean
