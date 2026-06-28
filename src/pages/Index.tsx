@@ -779,7 +779,7 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
@@ -1087,7 +1087,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
       </div>
       <AddActionModal
         open={showAddModal}
