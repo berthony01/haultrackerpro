@@ -276,7 +276,7 @@ const App = () => (
               <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
               <Route path="/assistant/settings" element={<ProtectedRoute><AssistantLimitedSettings /></ProtectedRoute>} />
               <Route path="/agency" element={<ProtectedRoute><AgencyDashboard /></ProtectedRoute>} />
-              <Route path="/agency/invite/:token" element={<AgencyInviteAccept /></ProtectedRoute>} />
+              <Route path="/agency/invite/:token" element={<AgencyInviteAccept />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
