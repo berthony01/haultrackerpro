@@ -19,6 +19,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Building2, ArrowLeft, Copy, Users, ShieldCheck } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useAgencyMembers,
   useAgencyMutations,
@@ -26,6 +27,11 @@ import {
 } from '@/hooks/useAgency';
 import { useToast } from '@/hooks/use-toast';
 import { useActingContext } from '@/hooks/useActingContext';
+import { ServicePackagesSection } from '@/components/agency/ServicePackagesSection';
+import { ClientRequestsSection } from '@/components/agency/ClientRequestsSection';
+import { ClientListSection } from '@/components/agency/ClientListSection';
+import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
+import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
 
 /**
  * Private agency area. Anyone signed-in can create one personal agency profile
@@ -70,7 +76,34 @@ export default function AgencyDashboard() {
       {!agency ? (
         <CreateAgencyCard />
       ) : (
-        <AgencyDetailCard agency={agency} drivers={managedDrivers.length} />
+        <Tabs defaultValue="overview" className="space-y-4">
+          <TabsList className="flex flex-wrap">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="packages">Packages</TabsTrigger>
+            <TabsTrigger value="requests">Requests</TabsTrigger>
+            <TabsTrigger value="clients">Clients</TabsTrigger>
+            <TabsTrigger value="work">Work queue</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview">
+            <AgencyDetailCard agency={agency} drivers={managedDrivers.length} />
+          </TabsContent>
+          <TabsContent value="packages">
+            <ServicePackagesSection agencyId={agency.id} />
+          </TabsContent>
+          <TabsContent value="requests">
+            <ClientRequestsSection agencyId={agency.id} />
+          </TabsContent>
+          <TabsContent value="clients">
+            <ClientListSection agencyId={agency.id} />
+          </TabsContent>
+          <TabsContent value="work">
+            <WorkQueueSection agencyId={agency.id} />
+          </TabsContent>
+          <TabsContent value="activity">
+            <AgencyAuditSection agencyId={agency.id} />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
