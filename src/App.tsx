@@ -70,6 +70,7 @@ const ContentCalendarAdmin = lazy(() => import("./pages/admin/ContentCalendarAdm
 const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
 const AssistantDashboard = lazy(() => import("./pages/AssistantDashboard"));
 const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept"));
+const AssistantLimitedSettings = lazy(() => import("./pages/AssistantLimitedSettings"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -271,6 +272,7 @@ const App = () => (
               <Route path="/resources/:slug" element={<ResourceArticleDynamic />} />
               <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
               <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
+              <Route path="/assistant/settings" element={<ProtectedRoute><AssistantLimitedSettings /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

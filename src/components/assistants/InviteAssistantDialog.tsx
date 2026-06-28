@@ -73,7 +73,7 @@ export function InviteAssistantDialog({ trigger }: { trigger?: React.ReactNode }
         {!inviteLink ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Invite someone you trust to help manage your loads, expenses, receipts, and reports.
+              Invite someone you trust to help manage your loads, expenses, fuel logs, and reports.
               They will never see your billing, plan, or account settings.
             </p>
 
