@@ -58,6 +58,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { normalizeLegacyEditStops } from '@/lib/stopNormalization';
 import { supabase } from '@/integrations/supabase/client';
+import { useActingContext } from '@/hooks/useActingContext';
+import {
+  isAssistantPageAllowed,
+  firstAllowedAssistantPage,
+} from '@/lib/assistantPermissions';
 import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
 
 // Tiny inline fallback — avoids whole-app skeleton flicker for view swaps.
