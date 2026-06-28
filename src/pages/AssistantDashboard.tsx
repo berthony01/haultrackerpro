@@ -104,26 +104,26 @@ export default function AssistantDashboard() {
           <h2 className="text-sm font-medium text-muted-foreground">Pending invitations</h2>
           <div className="rounded-md border divide-y">
             {invites!.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+              <div
+                key={inv.id}
+                className="flex items-center justify-between gap-3 p-3 text-sm"
+                data-testid="pending-invite-row"
+              >
                 <div className="min-w-0">
                   <p className="font-medium truncate">Invitation for {inv.invite_email}</p>
                   <p className="text-xs text-muted-foreground">
                     Sent {new Date(inv.invited_at).toLocaleString()}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate(`/assistant/invite/pending-${inv.id}`)}
-                >
-                  Open invite link to accept
-                </Button>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  Use the invite link the driver sent you
+                </span>
               </div>
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            Use the link the driver sent you to accept. We don't auto-accept invites here for
-            your safety.
+            For your safety we never auto-accept invitations from this screen. Open the
+            secure link the driver shared with you to accept.
           </p>
         </section>
       )}
