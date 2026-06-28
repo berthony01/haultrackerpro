@@ -60,7 +60,7 @@ describe('Phase 3 — delegation requires driver approval', () => {
     // Function body must compare auth.uid() to driver_user_id before doing
     // anything; otherwise an agency admin could approve on the driver's
     // behalf.
-    expect(SQL).toMatch(/driver_user_id\s*<>\s*v_uid|driver_user_id\s*<>\s*auth\.uid\(\)/);
+    expect(SQL).toMatch(/driver_user_id\s*<>\s*(_uid|v_uid|auth\.uid\(\))/);
   });
 
   it('only creates / updates driver_assistants when the driver approves', () => {
@@ -90,9 +90,10 @@ describe('Phase 3 — agency membership never grants driver data access', () => 
     expect(SQL).not.toMatch(/create policy[^;]+on public\.fuel_logs[^;]+agency_work_items/);
   });
 
-  it('list_agency_clients only joins driver_assistants', () => {
-    const block = SQL.split('list_agency_clients')[1]?.split('end;')[0] ?? '';
-    expect(block).toMatch(/driver_assistants/);
+  it('list_agency_clients only joins approved delegations', () => {
+    const block = SQL.split('list_agency_clients')[1]?.split('$$;')[0] ?? '';
+    expect(block).toMatch(/agency_delegation_requests|driver_assistants/);
+    expect(block).toMatch(/status\s*=\s*'approved'/);
     expect(block).toMatch(/is_agency_owner_or_admin|is_agency_member/);
   });
 
