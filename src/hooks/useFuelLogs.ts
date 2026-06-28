@@ -34,26 +34,24 @@ export interface FuelLogUpdate extends Partial<FuelLogInsert> {}
 
 export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
   const { user } = useAuth();
+  const targetUserId = useTargetUserId();
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['fuel_logs', user?.id, dateRange?.from, dateRange?.to],
+    queryKey: ['fuel_logs', targetUserId, dateRange?.from, dateRange?.to],
     queryFn: async () => {
-      if (!user) return [];
+      if (!targetUserId) return [];
       const buildQuery = () => {
         let q = supabase
           .from('fuel_logs' as any)
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', targetUserId)
           .order('date', { ascending: false });
         if (dateRange?.from) q = q.gte('date', dateRange.from);
         if (dateRange?.to) q = q.lte('date', dateRange.to);
         return q;
       };
 
-      // Fetch ALL rows in batches to bypass Supabase's default 1000-row cap.
-      // Matches the useExpenses pattern so fuel analytics/reports never silently
-      // undercount past 1k logs. Safety cap: 50 pages = 50k rows.
       const FETCH_SIZE = 1000;
       const all: FuelLog[] = [];
       let offset = 0;
@@ -67,15 +65,15 @@ export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
       }
       return all;
     },
-    enabled: !!user,
+    enabled: !!targetUserId,
   });
 
   const addFuelLog = useMutation({
     mutationFn: async (data: FuelLogInsert) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
       const { data: result, error } = await supabase
         .from('fuel_logs' as any)
-        .insert({ ...data, user_id: user.id })
+        .insert({ ...data, user_id: targetUserId })
         .select()
         .single();
       if (error) throw error;
@@ -86,12 +84,12 @@ export function useFuelLogs(dateRange?: { from?: string; to?: string }) {
 
   const updateFuelLog = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: FuelLogUpdate }) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
       const { data: result, error } = await supabase
         .from('fuel_logs' as any)
         .update(data)
         .eq('id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .select()
         .single();
       if (error) throw error;
