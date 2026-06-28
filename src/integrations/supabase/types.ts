@@ -136,6 +136,50 @@ export type Database = {
           },
         ]
       }
+      assistant_audit_log: {
+        Row: {
+          action: string
+          assistant_user_id: string
+          created_at: string
+          delegate_id: string
+          driver_user_id: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          action: string
+          assistant_user_id: string
+          created_at?: string
+          delegate_id: string
+          driver_user_id: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          action?: string
+          assistant_user_id?: string
+          created_at?: string
+          delegate_id?: string
+          driver_user_id?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_audit_log_delegate_id_fkey"
+            columns: ["delegate_id"]
+            isOneToOne: false
+            referencedRelation: "driver_assistants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broker_stats: {
         Row: {
           avg_actual_pay: number
@@ -667,6 +711,54 @@ export type Database = {
           truck_payment?: number | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      driver_assistants: {
+        Row: {
+          accepted_at: string | null
+          assistant_user_id: string | null
+          created_at: string
+          driver_user_id: string
+          id: string
+          invite_email: string
+          invite_token_hash: string | null
+          invited_at: string
+          last_active_at: string | null
+          permissions: Json
+          revoked_at: string | null
+          status: Database["public"]["Enums"]["assistant_status"]
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          assistant_user_id?: string | null
+          created_at?: string
+          driver_user_id: string
+          id?: string
+          invite_email: string
+          invite_token_hash?: string | null
+          invited_at?: string
+          last_active_at?: string | null
+          permissions?: Json
+          revoked_at?: string | null
+          status?: Database["public"]["Enums"]["assistant_status"]
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          assistant_user_id?: string | null
+          created_at?: string
+          driver_user_id?: string
+          id?: string
+          invite_email?: string
+          invite_token_hash?: string | null
+          invited_at?: string
+          last_active_at?: string | null
+          permissions?: Json
+          revoked_at?: string | null
+          status?: Database["public"]["Enums"]["assistant_status"]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2867,7 +2959,12 @@ export type Database = {
       }
     }
     Functions: {
+      accept_assistant_invite: { Args: { _token: string }; Returns: Json }
       apply_recruiter_intent: { Args: never; Returns: Json }
+      assistant_has_permission: {
+        Args: { _assistant: string; _driver: string; _perm: string }
+        Returns: boolean
+      }
       award_load_points: {
         Args: { _load_id: string }
         Returns: {
@@ -2994,6 +3091,7 @@ export type Database = {
         Args: { _application_id: string }
         Returns: Json
       }
+      get_my_managed_drivers: { Args: never; Returns: Json[] }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
       get_public_resource_article: {
         Args: { _slug: string }
@@ -3024,6 +3122,10 @@ export type Database = {
           user_id: string
           weekly_points: number
         }[]
+      }
+      invite_assistant: {
+        Args: { _email: string; _permissions: Json }
+        Returns: Json
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_application_party: {
@@ -3091,6 +3193,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_my_assistants: { Args: never; Returns: Json[] }
       list_my_driver_referrals: {
         Args: never
         Returns: {
@@ -3134,6 +3237,16 @@ export type Database = {
       list_recruiter_applications_safe: {
         Args: { _recruiter_id: string }
         Returns: Json[]
+      }
+      log_assistant_action: {
+        Args: {
+          _action: string
+          _driver: string
+          _entity_id?: string
+          _entity_type?: string
+          _metadata?: Json
+        }
+        Returns: string
       }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_notification_read: {
@@ -3190,6 +3303,7 @@ export type Database = {
         Args: { profile_id: string }
         Returns: undefined
       }
+      revoke_assistant: { Args: { _id: string }; Returns: undefined }
       submit_lead_magnet_signup: {
         Args: {
           _bundle_name?: string
@@ -3206,12 +3320,17 @@ export type Database = {
         }
         Returns: string
       }
+      update_assistant_permissions: {
+        Args: { _id: string; _permissions: Json }
+        Returns: undefined
+      }
       withdraw_opportunity_application: {
         Args: { application_id: string }
         Returns: undefined
       }
     }
     Enums: {
+      assistant_status: "pending" | "active" | "revoked" | "expired"
       contract_status:
         | "uploaded"
         | "parsing"
@@ -3351,6 +3470,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      assistant_status: ["pending", "active", "revoked", "expired"],
       contract_status: [
         "uploaded",
         "parsing",
