@@ -71,6 +71,8 @@ const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArti
 const AssistantDashboard = lazy(() => import("./pages/AssistantDashboard"));
 const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept"));
 const AssistantLimitedSettings = lazy(() => import("./pages/AssistantLimitedSettings"));
+const AgencyDashboard = lazy(() => import("./pages/AgencyDashboard"));
+const AgencyInviteAccept = lazy(() => import("./pages/AgencyInviteAccept"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -273,6 +275,8 @@ const App = () => (
               <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
               <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
               <Route path="/assistant/settings" element={<ProtectedRoute><AssistantLimitedSettings /></ProtectedRoute>} />
+              <Route path="/agency" element={<ProtectedRoute><AgencyDashboard /></ProtectedRoute>} />
+              <Route path="/agency/invite/:token" element={<AgencyInviteAccept />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

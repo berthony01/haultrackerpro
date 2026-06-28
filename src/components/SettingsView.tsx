@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Settings, DollarSign, Calendar, Sparkles, Crown, Lock, ArrowLeft, Shield, Trash2, Download, MessageSquare, Bug, HelpCircle, Mail, FileText, ExternalLink, CheckCircle, Building2, Percent, CreditCard, AlertTriangle, BookOpen, BellOff, User, Bell, Database, LifeBuoy, Calculator, FileSpreadsheet, Users } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { AssistantsPanel } from '@/components/assistants/AssistantsPanel';
+import { DriverAssistantActivityLog } from '@/components/assistants/DriverAssistantActivityLog';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -721,6 +722,15 @@ export function SettingsView({ onBack }: SettingsViewProps) {
         <AccordionContent className="pb-0 pt-3">
           <div className="premium-card p-4">
             <AssistantsPanel />
+          </div>
+          <div className="premium-card p-4 mt-3 space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">Assistant activity log</h3>
+              <p className="text-xs text-muted-foreground">
+                Every action your assistants take on your account is recorded here.
+              </p>
+            </div>
+            <DriverAssistantActivityLog />
           </div>
         </AccordionContent>
       </AccordionItem>
