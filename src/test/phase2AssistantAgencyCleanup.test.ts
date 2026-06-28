@@ -91,7 +91,7 @@ describe('Phase 2 cleanup — managed-driver source isolation', () => {
 
 describe('Phase 2 cleanup — agency RLS uses non-recursive helpers', () => {
   const sql = read(
-    'supabase/migrations/20260628111113_2b9bf3ba-7f95-4b80-9a45-1ca9d04ac030.sql',
+    'supabase/migrations/20260628111108_453e0476-835d-46a6-acd8-45e860a44513.sql',
   ).toLowerCase();
 
   it('declares is_agency_owner and is_agency_member helpers', () => {
