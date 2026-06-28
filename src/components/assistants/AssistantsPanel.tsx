@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAssistants, type AssistantRow } from '@/hooks/useAssistants';
 import { InviteAssistantDialog } from './InviteAssistantDialog';
+import { MyAgencyRequestsSection } from './MyAgencyRequestsSection';
 import {
   ASSISTANT_PERMISSION_KEYS,
   PERMISSION_LABELS,
