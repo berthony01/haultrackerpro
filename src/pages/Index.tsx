@@ -347,14 +347,11 @@ const Index = () => {
     }
   }, [allLoadsQuery.isLoading, allLoadsQuery.loads.length, feedbackResponses.length]);
 
-  // Assistant page allow-list bounce. If perms change or the user lands on a
-  // page their permissions don't permit, send them to their first allowed page.
-  useEffect(() => {
-    if (!isActingAsAssistant) return;
-    if (!isAssistantPageAllowed(page, actingPermissions)) {
-      setPage(firstAllowedAssistantPage(actingPermissions));
-    }
-  }, [isActingAsAssistant, actingPermissions, page]);
+  // NOTE: We intentionally do NOT silently bounce blocked pages here. Instead
+  // the render path shows <AssistantBlockedNotice/> so the assistant gets an
+  // explicit "you don't have permission" explanation with two clear escape
+  // hatches. handleNavigate() still pre-empts blocked nav clicks as a
+  // best-effort early redirect.
 
   // Activate premium dark theme on body so Radix portals (Sheet/Dialog/Popover/Tooltip)
   // — which mount outside the .app-shell subtree — inherit the same tokens.
