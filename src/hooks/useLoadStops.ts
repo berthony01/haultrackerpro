@@ -26,16 +26,17 @@ export interface LoadStopInput {
 
 export function useLoadStops(loadIds?: string[]) {
   const { user } = useAuth();
+  const targetUserId = useTargetUserId();
   const queryClient = useQueryClient();
 
   const stopsQuery = useQuery({
-    queryKey: ['load_stops', user?.id, loadIds],
+    queryKey: ['load_stops', targetUserId, loadIds],
     queryFn: async () => {
-      if (!user) return [];
+      if (!targetUserId) return [];
       let query = supabase
         .from('load_stops' as any)
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .order('stop_order', { ascending: true });
 
       if (loadIds && loadIds.length > 0) {
@@ -46,24 +47,35 @@ export function useLoadStops(loadIds?: string[]) {
       if (error) throw error;
       return (data ?? []) as unknown as LoadStop[];
     },
-    enabled: !!user,
+    enabled: !!targetUserId,
   });
 
   const saveStopsForLoad = useMutation({
     mutationFn: async ({ loadId, stops }: { loadId: string; stops: LoadStopInput[] }) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
 
-      // Delete existing stops for this load
-      await supabase
-        .from('load_stops' as any)
-        .delete()
-        .eq('load_id', loadId)
-        .eq('user_id', user.id);
+      // Delete existing stops for this load. Owner deletes via user.id; assistants
+      // route through the SECURITY DEFINER RPC so they can rewrite stops without
+      // a broad DELETE policy.
+      const isAssistant = !!user && user.id !== targetUserId;
+      if (isAssistant) {
+        const { error: delErr } = await (supabase as any).rpc('assistant_delete_load_stops', {
+          _driver: targetUserId,
+          _load_id: loadId,
+        });
+        if (delErr) throw delErr;
+      } else {
+        await supabase
+          .from('load_stops' as any)
+          .delete()
+          .eq('load_id', loadId)
+          .eq('user_id', targetUserId);
+      }
 
       if (stops.length === 0) return [];
 
       const rows = stops.map((s, i) => ({
-        user_id: user.id,
+        user_id: targetUserId,
         load_id: loadId,
         stop_order: i + 1,
         location: s.location,
