@@ -10,6 +10,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
 import { ActingContextProvider } from "@/hooks/useActingContext";
 import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
+import { PendingDelegationBanner } from "@/components/agency/PendingDelegationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Critical path — eagerly loaded
@@ -73,6 +74,8 @@ const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept")
 const AssistantLimitedSettings = lazy(() => import("./pages/AssistantLimitedSettings"));
 const AgencyDashboard = lazy(() => import("./pages/AgencyDashboard"));
 const AgencyInviteAccept = lazy(() => import("./pages/AgencyInviteAccept"));
+const AgencyRequestPublic = lazy(() => import("./pages/AgencyRequestPublic"));
+const DriverDelegationApprovals = lazy(() => import("./pages/DriverDelegationApprovals"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -196,6 +199,7 @@ const App = () => (
             <PageViewTracker />
             <RoleIntentReconcilerMount />
             <ActingAsBanner />
+            <PendingDelegationBanner />
             <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
@@ -277,6 +281,8 @@ const App = () => (
               <Route path="/assistant/settings" element={<ProtectedRoute><AssistantLimitedSettings /></ProtectedRoute>} />
               <Route path="/agency" element={<ProtectedRoute><AgencyDashboard /></ProtectedRoute>} />
               <Route path="/agency/invite/:token" element={<AgencyInviteAccept />} />
+              <Route path="/agency/request/:agencyId" element={<AgencyRequestPublic />} />
+              <Route path="/driver/agency-approvals" element={<ProtectedRoute><DriverDelegationApprovals /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

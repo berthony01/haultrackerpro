@@ -65,6 +65,179 @@ export type Database = {
         }
         Relationships: []
       }
+      agency_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          agency_id: string
+          created_at: string
+          driver_user_id: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          agency_id: string
+          created_at?: string
+          driver_user_id?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          agency_id?: string
+          created_at?: string
+          driver_user_id?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_audit_log_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_client_requests: {
+        Row: {
+          agency_id: string
+          assigned_member_user_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by_user_id: string | null
+          driver_user_id: string
+          id: string
+          message: string | null
+          phone: string | null
+          preferred_contact_method: string | null
+          requested_permissions: Json
+          selected_package_id: string | null
+          status: Database["public"]["Enums"]["agency_client_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          assigned_member_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by_user_id?: string | null
+          driver_user_id: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          requested_permissions?: Json
+          selected_package_id?: string | null
+          status?: Database["public"]["Enums"]["agency_client_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          assigned_member_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by_user_id?: string | null
+          driver_user_id?: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          requested_permissions?: Json
+          selected_package_id?: string | null
+          status?: Database["public"]["Enums"]["agency_client_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_client_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_client_requests_selected_package_id_fkey"
+            columns: ["selected_package_id"]
+            isOneToOne: false
+            referencedRelation: "agency_service_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_delegation_requests: {
+        Row: {
+          agency_id: string
+          client_request_id: string | null
+          created_at: string
+          created_by_user_id: string
+          decided_at: string | null
+          driver_user_id: string
+          id: string
+          member_invite_email: string
+          member_user_id: string
+          requested_permissions: Json
+          status: Database["public"]["Enums"]["agency_delegation_status"]
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          client_request_id?: string | null
+          created_at?: string
+          created_by_user_id: string
+          decided_at?: string | null
+          driver_user_id: string
+          id?: string
+          member_invite_email: string
+          member_user_id: string
+          requested_permissions?: Json
+          status?: Database["public"]["Enums"]["agency_delegation_status"]
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          client_request_id?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          decided_at?: string | null
+          driver_user_id?: string
+          id?: string
+          member_invite_email?: string
+          member_user_id?: string
+          requested_permissions?: Json
+          status?: Database["public"]["Enums"]["agency_delegation_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_delegation_requests_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_delegation_requests_client_request_id_fkey"
+            columns: ["client_request_id"]
+            isOneToOne: false
+            referencedRelation: "agency_client_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agency_members: {
         Row: {
           accepted_at: string | null
@@ -150,6 +323,128 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      agency_service_packages: {
+        Row: {
+          agency_id: string
+          billing_frequency_display_text: string | null
+          created_at: string
+          description: string | null
+          id: string
+          included_services: Json
+          is_active: boolean
+          name: string
+          price_display_text: string | null
+          recommended_permissions: Json
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          billing_frequency_display_text?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          included_services?: Json
+          is_active?: boolean
+          name: string
+          price_display_text?: string | null
+          recommended_permissions?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          billing_frequency_display_text?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          included_services?: Json
+          is_active?: boolean
+          name?: string
+          price_display_text?: string | null
+          recommended_permissions?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_service_packages_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_work_items: {
+        Row: {
+          agency_id: string
+          assigned_member_user_id: string | null
+          client_request_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by_user_id: string
+          description: string | null
+          driver_user_id: string
+          due_date: string | null
+          id: string
+          priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          status: Database["public"]["Enums"]["agency_work_item_status"]
+          title: string
+          type: Database["public"]["Enums"]["agency_work_item_type"]
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          assigned_member_user_id?: string | null
+          client_request_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by_user_id: string
+          description?: string | null
+          driver_user_id: string
+          due_date?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["agency_work_item_priority"]
+          status?: Database["public"]["Enums"]["agency_work_item_status"]
+          title: string
+          type?: Database["public"]["Enums"]["agency_work_item_type"]
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          assigned_member_user_id?: string | null
+          client_request_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          description?: string | null
+          driver_user_id?: string
+          due_date?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["agency_work_item_priority"]
+          status?: Database["public"]["Enums"]["agency_work_item_status"]
+          title?: string
+          type?: Database["public"]["Enums"]["agency_work_item_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_work_items_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agency_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_work_items_client_request_id_fkey"
+            columns: ["client_request_id"]
+            isOneToOne: false
+            referencedRelation: "agency_client_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_insights: {
         Row: {
@@ -3234,6 +3529,7 @@ export type Database = {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
       }
+      clean_assistant_permissions: { Args: { _p: Json }; Returns: Json }
       create_agency: {
         Args: { _contact_email?: string; _description?: string; _name: string }
         Returns: {
@@ -3249,6 +3545,101 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "agency_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_agency_delegation_request: {
+        Args: {
+          _client_request_id: string
+          _member_user_id: string
+          _requested_permissions: Json
+        }
+        Returns: {
+          agency_id: string
+          client_request_id: string | null
+          created_at: string
+          created_by_user_id: string
+          decided_at: string | null
+          driver_user_id: string
+          id: string
+          member_invite_email: string
+          member_user_id: string
+          requested_permissions: Json
+          status: Database["public"]["Enums"]["agency_delegation_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_delegation_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_agency_package: {
+        Args: {
+          _agency_id: string
+          _billing_frequency_display_text: string
+          _description: string
+          _included_services: Json
+          _name: string
+          _price_display_text: string
+          _recommended_permissions: Json
+          _sort_order?: number
+        }
+        Returns: {
+          agency_id: string
+          billing_frequency_display_text: string | null
+          created_at: string
+          description: string | null
+          id: string
+          included_services: Json
+          is_active: boolean
+          name: string
+          price_display_text: string | null
+          recommended_permissions: Json
+          sort_order: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_service_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_agency_work_item: {
+        Args: {
+          _agency_id: string
+          _assigned_member_user_id: string
+          _client_request_id: string
+          _description: string
+          _driver_user_id: string
+          _due_date: string
+          _priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          _title: string
+          _type: Database["public"]["Enums"]["agency_work_item_type"]
+        }
+        Returns: {
+          agency_id: string
+          assigned_member_user_id: string | null
+          client_request_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by_user_id: string
+          description: string | null
+          driver_user_id: string
+          due_date: string | null
+          id: string
+          priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          status: Database["public"]["Enums"]["agency_work_item_status"]
+          title: string
+          type: Database["public"]["Enums"]["agency_work_item_type"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_work_items"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3278,11 +3669,44 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      driver_decide_delegation: {
+        Args: { _approve: boolean; _id: string }
+        Returns: {
+          agency_id: string
+          client_request_id: string | null
+          created_at: string
+          created_by_user_id: string
+          decided_at: string | null
+          driver_user_id: string
+          id: string
+          member_invite_email: string
+          member_user_id: string
+          requested_permissions: Json
+          status: Database["public"]["Enums"]["agency_delegation_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_delegation_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
       expire_stale_contact_requests: { Args: never; Returns: number }
+      get_agency_public_view: {
+        Args: { _agency_id: string }
+        Returns: {
+          contact_email: string
+          description: string
+          id: string
+          name: string
+          status: string
+        }[]
+      }
       get_application_contract_summary: {
         Args: { _application_id: string }
         Returns: Json
@@ -3354,6 +3778,10 @@ export type Database = {
         Args: { _agency_id: string; _uid: string }
         Returns: boolean
       }
+      is_agency_owner_or_admin: {
+        Args: { _agency_id: string; _user_id?: string }
+        Returns: boolean
+      }
       is_application_party: {
         Args: { _application_id: string; _user_id: string }
         Returns: boolean
@@ -3364,6 +3792,83 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_agency_audit_log: {
+        Args: { _agency_id: string; _limit?: number }
+        Returns: {
+          action: string
+          actor_user_id: string | null
+          agency_id: string
+          created_at: string
+          driver_user_id: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+          target_user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "agency_audit_log"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_agency_client_requests: {
+        Args: { _agency_id: string }
+        Returns: {
+          assigned_member_user_id: string
+          created_at: string
+          decided_at: string
+          driver_email: string
+          driver_name: string
+          driver_user_id: string
+          id: string
+          message: string
+          package_name: string
+          phone: string
+          preferred_contact_method: string
+          requested_permissions: Json
+          selected_package_id: string
+          status: Database["public"]["Enums"]["agency_client_request_status"]
+        }[]
+      }
+      list_agency_clients: {
+        Args: { _agency_id: string }
+        Returns: {
+          delegation_id: string
+          driver_email: string
+          driver_name: string
+          driver_user_id: string
+          last_activity_at: string
+          member_email: string
+          member_user_id: string
+          package_id: string
+          package_name: string
+        }[]
+      }
+      list_agency_delegations: {
+        Args: { _agency_id: string }
+        Returns: {
+          agency_id: string
+          client_request_id: string | null
+          created_at: string
+          created_by_user_id: string
+          decided_at: string | null
+          driver_user_id: string
+          id: string
+          member_invite_email: string
+          member_user_id: string
+          requested_permissions: Json
+          status: Database["public"]["Enums"]["agency_delegation_status"]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "agency_delegation_requests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_agency_members: {
         Args: { _agency_id: string }
         Returns: {
@@ -3376,6 +3881,54 @@ export type Database = {
           revoked_at: string
           role: Database["public"]["Enums"]["agency_member_role"]
           status: Database["public"]["Enums"]["agency_member_status"]
+        }[]
+      }
+      list_agency_packages_public: {
+        Args: { _agency_id: string }
+        Returns: {
+          agency_id: string
+          billing_frequency_display_text: string | null
+          created_at: string
+          description: string | null
+          id: string
+          included_services: Json
+          is_active: boolean
+          name: string
+          price_display_text: string | null
+          recommended_permissions: Json
+          sort_order: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "agency_service_packages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_agency_work_items: {
+        Args: {
+          _agency_id: string
+          _assigned_member_user_id?: string
+          _driver_user_id?: string
+          _status?: Database["public"]["Enums"]["agency_work_item_status"]
+        }
+        Returns: {
+          agency_id: string
+          assigned_member_email: string
+          assigned_member_user_id: string
+          client_request_id: string
+          completed_at: string
+          created_at: string
+          description: string
+          driver_email: string
+          driver_user_id: string
+          due_date: string
+          id: string
+          priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          status: Database["public"]["Enums"]["agency_work_item_status"]
+          title: string
+          type: Database["public"]["Enums"]["agency_work_item_type"]
         }[]
       }
       list_driver_assistant_audit: {
@@ -3446,6 +3999,20 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_my_agency_client_requests: {
+        Args: never
+        Returns: {
+          agency_id: string
+          agency_name: string
+          created_at: string
+          decided_at: string
+          id: string
+          message: string
+          package_name: string
+          selected_package_id: string
+          status: Database["public"]["Enums"]["agency_client_request_status"]
+        }[]
+      }
       list_my_assistant_audit: {
         Args: { _limit?: number }
         Returns: {
@@ -3460,6 +4027,27 @@ export type Database = {
         }[]
       }
       list_my_assistants: { Args: never; Returns: Json[] }
+      list_my_driver_agency_audit_log: {
+        Args: { _limit?: number }
+        Returns: {
+          action: string
+          actor_user_id: string | null
+          agency_id: string
+          created_at: string
+          driver_user_id: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+          target_user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "agency_audit_log"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_my_driver_referrals: {
         Args: never
         Returns: {
@@ -3487,6 +4075,22 @@ export type Database = {
           invite_email: string
           invited_at: string
           permissions: Json
+        }[]
+      }
+      list_my_pending_delegations: {
+        Args: never
+        Returns: {
+          agency_id: string
+          agency_name: string
+          client_request_id: string
+          created_at: string
+          id: string
+          member_email: string
+          member_name: string
+          member_user_id: string
+          package_name: string
+          requested_permissions: Json
+          status: Database["public"]["Enums"]["agency_delegation_status"]
         }[]
       }
       list_public_resource_articles: {
@@ -3581,6 +4185,67 @@ export type Database = {
       }
       revoke_agency_member: { Args: { _member_id: string }; Returns: undefined }
       revoke_assistant: { Args: { _id: string }; Returns: undefined }
+      set_agency_client_request_status: {
+        Args: {
+          _assigned_member_user_id?: string
+          _id: string
+          _status: Database["public"]["Enums"]["agency_client_request_status"]
+        }
+        Returns: {
+          agency_id: string
+          assigned_member_user_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by_user_id: string | null
+          driver_user_id: string
+          id: string
+          message: string | null
+          phone: string | null
+          preferred_contact_method: string | null
+          requested_permissions: Json
+          selected_package_id: string | null
+          status: Database["public"]["Enums"]["agency_client_request_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_client_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      submit_agency_client_request: {
+        Args: {
+          _agency_id: string
+          _consent: boolean
+          _message: string
+          _phone: string
+          _preferred_contact_method: string
+          _selected_package_id: string
+        }
+        Returns: {
+          agency_id: string
+          assigned_member_user_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by_user_id: string | null
+          driver_user_id: string
+          id: string
+          message: string | null
+          phone: string | null
+          preferred_contact_method: string | null
+          requested_permissions: Json
+          selected_package_id: string | null
+          status: Database["public"]["Enums"]["agency_client_request_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_client_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_lead_magnet_signup: {
         Args: {
           _bundle_name?: string
@@ -3596,6 +4261,73 @@ export type Database = {
           _utm_term?: string
         }
         Returns: string
+      }
+      update_agency_package: {
+        Args: {
+          _billing_frequency_display_text: string
+          _description: string
+          _id: string
+          _included_services: Json
+          _is_active: boolean
+          _name: string
+          _price_display_text: string
+          _recommended_permissions: Json
+          _sort_order: number
+        }
+        Returns: {
+          agency_id: string
+          billing_frequency_display_text: string | null
+          created_at: string
+          description: string | null
+          id: string
+          included_services: Json
+          is_active: boolean
+          name: string
+          price_display_text: string | null
+          recommended_permissions: Json
+          sort_order: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_service_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_agency_work_item: {
+        Args: {
+          _assigned_member_user_id: string
+          _description: string
+          _due_date: string
+          _id: string
+          _priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          _status: Database["public"]["Enums"]["agency_work_item_status"]
+          _title: string
+        }
+        Returns: {
+          agency_id: string
+          assigned_member_user_id: string | null
+          client_request_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by_user_id: string
+          description: string | null
+          driver_user_id: string
+          due_date: string | null
+          id: string
+          priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          status: Database["public"]["Enums"]["agency_work_item_status"]
+          title: string
+          type: Database["public"]["Enums"]["agency_work_item_type"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_work_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_assistant_permissions: {
         Args: { _id: string; _permissions: Json }
@@ -3631,9 +4363,36 @@ export type Database = {
       }
     }
     Enums: {
+      agency_client_request_status:
+        | "pending"
+        | "approved"
+        | "declined"
+        | "cancelled"
+        | "converted_to_client"
+      agency_delegation_status:
+        | "pending_driver_approval"
+        | "approved"
+        | "declined"
+        | "revoked"
+        | "expired"
       agency_member_role: "agency_owner" | "agency_admin" | "agency_member"
       agency_member_status: "pending" | "active" | "revoked"
       agency_status: "active" | "disabled"
+      agency_work_item_priority: "low" | "normal" | "high"
+      agency_work_item_status:
+        | "open"
+        | "in_progress"
+        | "waiting_on_driver"
+        | "completed"
+        | "cancelled"
+      agency_work_item_type:
+        | "load_entry"
+        | "expense_entry"
+        | "fuel_entry"
+        | "report_review"
+        | "monthly_closeout"
+        | "document_followup"
+        | "other"
       assistant_status: "pending" | "active" | "revoked" | "expired"
       contract_status:
         | "uploaded"
@@ -3774,9 +4533,40 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agency_client_request_status: [
+        "pending",
+        "approved",
+        "declined",
+        "cancelled",
+        "converted_to_client",
+      ],
+      agency_delegation_status: [
+        "pending_driver_approval",
+        "approved",
+        "declined",
+        "revoked",
+        "expired",
+      ],
       agency_member_role: ["agency_owner", "agency_admin", "agency_member"],
       agency_member_status: ["pending", "active", "revoked"],
       agency_status: ["active", "disabled"],
+      agency_work_item_priority: ["low", "normal", "high"],
+      agency_work_item_status: [
+        "open",
+        "in_progress",
+        "waiting_on_driver",
+        "completed",
+        "cancelled",
+      ],
+      agency_work_item_type: [
+        "load_entry",
+        "expense_entry",
+        "fuel_entry",
+        "report_review",
+        "monthly_closeout",
+        "document_followup",
+        "other",
+      ],
       assistant_status: ["pending", "active", "revoked", "expired"],
       contract_status: [
         "uploaded",
