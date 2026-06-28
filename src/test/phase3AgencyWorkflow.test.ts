@@ -21,6 +21,12 @@ const PHASE3_MIGRATION = readdirSync(join(ROOT, 'supabase/migrations'))
   .filter((f) => f.startsWith('20260628114250_'))[0]!;
 const SQL = read(`supabase/migrations/${PHASE3_MIGRATION}`).toLowerCase();
 
+const CLEANUP_MIGRATION = readdirSync(join(ROOT, 'supabase/migrations'))
+  .filter((f) => /^20260628120/.test(f))
+  .sort()
+  .pop()!;
+const CLEANUP_SQL = read(`supabase/migrations/${CLEANUP_MIGRATION}`).toLowerCase();
+
 describe('Phase 3 — schema and security helpers', () => {
   it('creates all five Phase 3 tables', () => {
     expect(SQL).toMatch(/create table if not exists public\.agency_service_packages/);
