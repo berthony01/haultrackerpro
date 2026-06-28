@@ -535,6 +535,8 @@ export function formatAgencyAuditAction(action: string, entity_type: string): st
     delegation_request_created: 'requested driver approval to delegate access',
     delegation_approved_by_driver: 'approved the delegation',
     delegation_declined_by_driver: 'declined the delegation',
+    delegation_revoked_by_driver: 'revoked agency delegation',
+    delegation_revoked_by_agency: 'revoked the delegation',
     work_item_created: 'created a work item',
     work_item_assigned: 'assigned a work item',
     work_item_status_changed: 'changed a work item status',
