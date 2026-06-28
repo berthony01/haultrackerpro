@@ -4183,6 +4183,29 @@ export type Database = {
         Args: { profile_id: string }
         Returns: undefined
       }
+      revoke_agency_delegation: {
+        Args: { _delegation_id: string }
+        Returns: {
+          agency_id: string
+          client_request_id: string | null
+          created_at: string
+          created_by_user_id: string
+          decided_at: string | null
+          driver_user_id: string
+          id: string
+          member_invite_email: string
+          member_user_id: string
+          requested_permissions: Json
+          status: Database["public"]["Enums"]["agency_delegation_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_delegation_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       revoke_agency_member: { Args: { _member_id: string }; Returns: undefined }
       revoke_assistant: { Args: { _id: string }; Returns: undefined }
       set_agency_client_request_status: {
