@@ -10,6 +10,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
 import { ActingContextProvider } from "@/hooks/useActingContext";
 import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
+import { PendingDelegationBanner } from "@/components/agency/PendingDelegationBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Critical path — eagerly loaded
@@ -198,6 +199,7 @@ const App = () => (
             <PageViewTracker />
             <RoleIntentReconcilerMount />
             <ActingAsBanner />
+            <PendingDelegationBanner />
             <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
