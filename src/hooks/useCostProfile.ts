@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useTargetUserId } from '@/hooks/useActingContext';
 import {
   type CostProfile,
   type CostProfileUpdate,
@@ -22,30 +23,33 @@ export {
 
 export function useCostProfile() {
   const { user } = useAuth();
+  // Scope to the acting driver when an assistant is acting; otherwise self.
+  // RLS additionally enforces this server-side.
+  const targetUserId = useTargetUserId();
   const queryClient = useQueryClient();
 
   const profileQuery = useQuery({
-    queryKey: ['cost_profile', user?.id],
+    queryKey: ['cost_profile', targetUserId],
     queryFn: async () => {
-      if (!user) return null;
+      if (!targetUserId) return null;
       const { data, error } = await supabase
         .from('cost_profile' as any)
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .maybeSingle();
       if (error) throw error;
       return (data as unknown as CostProfile) ?? null;
     },
-    enabled: !!user,
+    enabled: !!targetUserId,
     staleTime: 60_000,
   });
 
   const upsertProfile = useMutation({
     mutationFn: async (updates: CostProfileUpdate) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('cost_profile' as any)
-        .upsert({ user_id: user.id, ...updates } as any, { onConflict: 'user_id' });
+        .upsert({ user_id: targetUserId, ...updates } as any, { onConflict: 'user_id' });
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cost_profile'] }),

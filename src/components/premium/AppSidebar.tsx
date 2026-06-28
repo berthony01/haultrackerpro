@@ -1,11 +1,18 @@
 import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3 } from 'lucide-react';
 import type { UserRole } from '@/hooks/useUserRole';
+import {
+  isAssistantPageAllowed,
+  type AssistantPermissions,
+} from '@/lib/assistantPermissions';
 
 interface AppSidebarProps {
   active: string;
   onNavigate: (page: string) => void;
   role: UserRole;
   roleLoading?: boolean;
+  /** When set, this user is acting as an assistant for a driver and nav items
+   *  are filtered to the keys the driver has granted. */
+  assistantPermissions?: AssistantPermissions | null;
 }
 
 const driverItems = [
@@ -28,8 +35,12 @@ const recruiterItems = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-export function AppSidebar({ active, onNavigate, role, roleLoading }: AppSidebarProps) {
-  const items = role === 'recruiter' ? recruiterItems : driverItems;
+export function AppSidebar({ active, onNavigate, role, roleLoading, assistantPermissions }: AppSidebarProps) {
+  const isAssistant = !!assistantPermissions;
+  const baseItems = role === 'recruiter' ? recruiterItems : driverItems;
+  const items = isAssistant
+    ? baseItems.filter((i) => isAssistantPageAllowed(i.id, assistantPermissions))
+    : baseItems;
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 bg-card/40 backdrop-blur-md sticky top-0 h-screen">
@@ -42,7 +53,7 @@ export function AppSidebar({ active, onNavigate, role, roleLoading }: AppSidebar
             Haul<span className="text-primary">TrackerPro</span>
           </h1>
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.18em]">
-            {roleLoading ? 'Loading…' : role === 'recruiter' ? 'Recruiter Console' : 'Load & Pay Manager'}
+            {roleLoading ? 'Loading…' : isAssistant ? 'Assistant Console' : role === 'recruiter' ? 'Recruiter Console' : 'Load & Pay Manager'}
           </p>
         </div>
       </div>
@@ -73,9 +84,11 @@ export function AppSidebar({ active, onNavigate, role, roleLoading }: AppSidebar
       </nav>
       <div className="p-4 border-t border-border/60">
         <p className="text-[10px] text-muted-foreground/60 leading-snug">
-          {role === 'recruiter'
-            ? 'Post opportunities. Review drivers. Hire smarter.'
-            : 'Track every mile. Every dollar. Every decision.'}
+          {isAssistant
+            ? 'You are acting on behalf of a driver. Every change is recorded in the audit log.'
+            : role === 'recruiter'
+              ? 'Post opportunities. Review drivers. Hire smarter.'
+              : 'Track every mile. Every dollar. Every decision.'}
         </p>
       </div>
     </aside>

@@ -58,6 +58,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { normalizeLegacyEditStops } from '@/lib/stopNormalization';
 import { supabase } from '@/integrations/supabase/client';
+import { useActingContext } from '@/hooks/useActingContext';
+import {
+  isAssistantPageAllowed,
+  firstAllowedAssistantPage,
+} from '@/lib/assistantPermissions';
 import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
 
 // Tiny inline fallback — avoids whole-app skeleton flicker for view swaps.
@@ -74,6 +79,11 @@ const Index = () => {
   const isRecruiterView = effectiveRole === 'recruiter';
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
+  const {
+    isActingAsAssistant,
+    permissions: actingPermissions,
+    exitActingAs,
+  } = useActingContext();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   // Compute initial page from URL / sessionStorage so recruiters never even
   // briefly mount the driver dashboard while their role resolves. Sticky
@@ -334,6 +344,15 @@ const Index = () => {
       return () => clearTimeout(timer);
     }
   }, [allLoadsQuery.isLoading, allLoadsQuery.loads.length, feedbackResponses.length]);
+
+  // Assistant page allow-list bounce. If perms change or the user lands on a
+  // page their permissions don't permit, send them to their first allowed page.
+  useEffect(() => {
+    if (!isActingAsAssistant) return;
+    if (!isAssistantPageAllowed(page, actingPermissions)) {
+      setPage(firstAllowedAssistantPage(actingPermissions));
+    }
+  }, [isActingAsAssistant, actingPermissions, page]);
 
   // Activate premium dark theme on body so Radix portals (Sheet/Dialog/Popover/Tooltip)
   // — which mount outside the .app-shell subtree — inherit the same tokens.
@@ -626,6 +645,22 @@ const Index = () => {
   };
 
   const handleNavigate = (p: string, options?: { filter?: string }) => {
+    // Assistant page allow-list. When acting as an assistant, restrict navigation
+    // to pages permitted by the granted permissions; redirect blocked pages to
+    // the first allowed page. Also handles the "exit acting context" pseudo-page.
+    if (isActingAsAssistant) {
+      if (p === 'assistant_exit') {
+        exitActingAs();
+        navigate('/assistant');
+        return;
+      }
+      if (!isAssistantPageAllowed(p, actingPermissions)) {
+        const target = firstAllowedAssistantPage(actingPermissions);
+        setPage(target);
+        return;
+      }
+    }
+
     if (p !== 'add') {
       setSuppressOnboardingForAddDeepLink(false);
     }
@@ -753,7 +788,7 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
@@ -1061,7 +1096,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
       </div>
       <AddActionModal
         open={showAddModal}
