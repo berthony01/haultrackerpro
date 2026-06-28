@@ -181,9 +181,14 @@ describe('Phase 3 — driver-facing UI surfaces approval, not autoaccess', () =>
 });
 
 function fnBody(sql: string, name: string): string {
-  const m = sql.match(new RegExp(`create or replace function public\\.${name}[\\s\\S]*?\\$function\\$`, 'i'));
+  const re = new RegExp(
+    `create or replace function public\\.${name}[\\s\\S]*?\\$function\\$;`,
+    'i',
+  );
+  const m = sql.match(re);
   return m ? m[0] : '';
 }
+
 
 describe('Phase 3 cleanup — pending delegation filtering', () => {
   it('list_my_pending_delegations filters by pending_driver_approval', () => {
