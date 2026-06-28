@@ -79,6 +79,11 @@ const Index = () => {
   const isRecruiterView = effectiveRole === 'recruiter';
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
+  const {
+    isActingAsAssistant,
+    permissions: actingPermissions,
+    exitActingAs,
+  } = useActingContext();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   // Compute initial page from URL / sessionStorage so recruiters never even
   // briefly mount the driver dashboard while their role resolves. Sticky
