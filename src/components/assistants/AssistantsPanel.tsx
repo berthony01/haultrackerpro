@@ -144,7 +144,7 @@ export function AssistantsPanel() {
           <div className="space-y-2">
             <p className="font-medium">What assistants can and cannot do</p>
             <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-              <li>Can: enter loads, expenses, fuel, receipts, and pull reports — only with the permissions you grant.</li>
+              <li>Can: enter loads, expenses, fuel, and pull reports — only with the permissions you grant.</li>
               <li>Cannot: see or change billing, cancel your subscription, delete your account, or invite other assistants.</li>
               <li>Their access ends the moment you click Revoke.</li>
             </ul>
