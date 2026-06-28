@@ -8,6 +8,8 @@ import { trackPageView } from '@/lib/analytics';
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
+import { ActingContextProvider } from "@/hooks/useActingContext";
+import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Critical path — eagerly loaded
@@ -66,6 +68,8 @@ const BestProfitTracker = lazy(() => import("./pages/comparisons/BestTruckDriver
 const ResourceArticlesAdmin = lazy(() => import("./pages/admin/ResourceArticlesAdmin"));
 const ContentCalendarAdmin = lazy(() => import("./pages/admin/ContentCalendarAdmin"));
 const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
+const AssistantDashboard = lazy(() => import("./pages/AssistantDashboard"));
+const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -185,8 +189,10 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+            <ActingContextProvider>
             <PageViewTracker />
             <RoleIntentReconcilerMount />
+            <ActingAsBanner />
             <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
@@ -263,9 +269,12 @@ const App = () => (
               {/* Dynamic published-article fallback. Registered AFTER all static /resources/* routes
                   so existing static guides always win. Published articles only — drafts are blocked by RLS. */}
               <Route path="/resources/:slug" element={<ResourceArticleDynamic />} />
+              <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
+              <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+            </ActingContextProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

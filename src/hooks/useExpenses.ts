@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useTargetUserId } from '@/hooks/useActingContext';
 
 export const EXPENSE_CATEGORIES = [
   'Fuel',
@@ -59,25 +60,25 @@ const PAGE_SIZE = 50;
 
 export function useExpenses(dateRange?: DateRange, page?: number) {
   const { user } = useAuth();
+  const targetUserId = useTargetUserId();
   const queryClient = useQueryClient();
 
   const expensesQuery = useQuery({
-    queryKey: ['expenses', user?.id, dateRange?.from, dateRange?.to, page],
+    queryKey: ['expenses', targetUserId, dateRange?.from, dateRange?.to, page],
     queryFn: async () => {
-      if (!user) return { expenses: [], totalCount: 0 };
+      if (!targetUserId) return { expenses: [], totalCount: 0 };
 
       const buildQuery = () => {
         let q = supabase
           .from('expenses')
           .select('*', { count: 'exact' })
-          .eq('user_id', user.id)
+          .eq('user_id', targetUserId)
           .order('expense_date', { ascending: false });
         if (dateRange?.from) q = q.gte('expense_date', dateRange.from);
         if (dateRange?.to) q = q.lte('expense_date', dateRange.to);
         return q;
       };
 
-      // Paged mode: return just the requested page
       if (page !== undefined) {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
@@ -89,14 +90,10 @@ export function useExpenses(dateRange?: DateRange, page?: number) {
         };
       }
 
-      // Unpaged mode: fetch ALL rows in batches to bypass Supabase's
-      // default 1000-row response cap. This keeps dashboard totals,
-      // exports, and analytics accurate beyond 1k expenses.
       const FETCH_SIZE = 1000;
       const all: Expense[] = [];
       let offset = 0;
       let totalCount = 0;
-      // Safety cap: 100k rows (100 pages) to avoid runaway loops
       for (let i = 0; i < 100; i++) {
         const { data, error, count } = await buildQuery().range(offset, offset + FETCH_SIZE - 1);
         if (error) throw error;
@@ -106,20 +103,17 @@ export function useExpenses(dateRange?: DateRange, page?: number) {
         if (batch.length < FETCH_SIZE) break;
         offset += FETCH_SIZE;
       }
-      return {
-        expenses: all,
-        totalCount: totalCount || all.length,
-      };
+      return { expenses: all, totalCount: totalCount || all.length };
     },
-    enabled: !!user,
+    enabled: !!targetUserId,
   });
 
   const addExpense = useMutation({
     mutationFn: async (data: ExpenseInsert) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
       const { data: result, error } = await supabase
         .from('expenses')
-        .insert({ ...data, user_id: user.id } as any)
+        .insert({ ...data, user_id: targetUserId } as any)
         .select()
         .single();
       if (error) throw error;
@@ -130,12 +124,12 @@ export function useExpenses(dateRange?: DateRange, page?: number) {
 
   const updateExpense = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ExpenseInsert }) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!targetUserId) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('expenses')
-        .update({ ...data, user_id: user.id } as any)
+        .update({ ...data, user_id: targetUserId } as any)
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', targetUserId);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expenses'] }),
