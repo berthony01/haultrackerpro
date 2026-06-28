@@ -1,146 +1,129 @@
+# Driver Assistants Phase 2 — Multi-Driver Operations + Agency-Ready Foundation
 
-# Driver Assistants — Phase 1 Build Plan
+This is a large phase. I'll execute it in ordered sub-phases so each piece is verifiable. Phase 1 + cleanup is untouched; everything here is additive.
 
-A foundation that lets a driver invite a trusted person to enter loads, expenses, fuel, receipts, and pull reports on their behalf — without touching billing, account ownership, or recruiter surfaces. Built so it can grow into a full agency model later without rework.
+## 0. Package hygiene (do first)
 
-## Scope this phase
+- Inspect `package.json` + `package-lock.json` + `bun.lockb`.
+- Resolve the Playwright lockfile mismatch (`npm install` to regenerate `package-lock.json`, or remove it if the project is Bun-first).
+- Run and capture exact output for: `npm install`, `bunx tsgo --noEmit`, `bun run build`, `bunx vitest run`. No success claim without real output.
 
-In scope:
-- Invite / accept / revoke flow (email-based, account-bound on accept).
-- Granular per-assistant permissions.
-- Acting-as context: assistant signs into their own account, selects a driver they manage, and all writes land on the driver's account.
-- Audit log of assistant actions.
-- Driver settings UI to manage assistants.
-- Assistant dashboard with driver switcher.
-- Hardened DB-level access (RLS + helpers), not just UI hiding.
+## 1. Database foundation (single migration)
 
-Explicitly out of scope (designed-for, not built):
-- Public agency/marketplace directory, ratings, service packages.
-- Agency-of-agencies, team members under an agency owner.
-- Ownership transfer.
-- Assistant-side billing or paid assistant plans.
+- `agency_profiles` — `owner_user_id` (FK auth.users), `name`, `description`, `contact_email`, `status` ('active'|'disabled'), timestamps.
+- `agency_members` — `agency_id`, `member_user_id`, `role` enum ('agency_owner','agency_admin','agency_member'), `invited_email`, `status` ('pending'|'active'|'revoked'), timestamps. Unique (agency_id, member_user_id).
+- GRANTs to `authenticated` + `service_role`. RLS:
+  - Owners full CRUD on their agency + members.
+  - Members SELECT their own agency + member row.
+  - **No implicit driver access.** Driver delegation stays exclusively on `driver_assistants`.
+- RPCs:
+  - `create_agency(_name, _description, _contact_email)` — caller becomes `agency_owner` member.
+  - `invite_agency_member(_agency_id, _email, _role)` — owner only.
+  - `accept_agency_invite(_token)` — accepts pending invite.
+  - `revoke_agency_member(_member_id)` — owner only.
+  - `get_my_agency()` / `list_agency_members(_agency_id)`.
+- New RPC `list_my_assistant_audit(_limit)` — returns assistant's recent actions across their managed drivers (driven by `assistant_audit_log` filtered to `assistant_user_id = auth.uid()`).
+- New RPC `list_driver_assistant_audit(_limit)` — returns driver's audit feed (filtered to `driver_user_id = auth.uid()`), joining `driver_assistants` for assistant email.
+
+## 2. Multi-driver switcher (UI)
+
+- New `AssistantDriverSwitcher.tsx` (Radix Popover) in the app shell: shown only when `managedDrivers.length >= 1` AND user is in acting mode OR has any managed drivers.
+- Mount in the existing top header / `ActingAsBanner` row.
+- Lists active delegated drivers from `useActingContext().managedDrivers` (already RPC-backed).
+- Switching calls `beginActingAs(id)` and stays on the current route when safe; bounces to first allowed page otherwise.
+- Adds "Exit assistant mode" entry.
+
+## 3. Assistant Operations Dashboard upgrade (`/assistant`)
+
+Extend `AssistantDashboard.tsx`:
+
+- Summary cards (real data only):
+  - Active drivers managed (`managedDrivers.length`).
+  - Pending invites (new RPC `list_my_pending_assistant_invites` — invites addressed to my auth email, status='pending').
+  - Drivers with recent activity (last_active_at within 7 days).
+  - Drivers with `view_reports` permission.
+- Per-driver card: permission badges, last_active_at, quick action buttons gated by `hasPerm(...)`; each opens the right route inside acting context.
+- "Recent activity" panel using `list_my_assistant_audit`.
+- Separate "Past / revoked" section if RPC returns any.
+
+## 4. Driver-side audit visibility
+
+- New `AssistantActivityLog.tsx` rendered inside the existing "Driver Assistants" accordion in `SettingsView.tsx`.
+- Pulls from `list_driver_assistant_audit`. Plain-English row format: "{assistant_email} {action_label} at {timestamp}".
+- Drivers only see their own log (enforced server-side).
+
+## 5. Agency area (private)
+
+- Route `/agency` → `AgencyDashboard.tsx`.
+  - If no agency: "Create Agency Profile" card explaining the side-hustle framing.
+  - If agency exists: profile editor, member list with invite/revoke, summary of drivers the **owner** personally manages via `driver_assistants` (not auto-shared with members), recent activity from owner's audit feed.
+- Navigation entry in `SettingsView` "More" area for the owner.
+- Explicit copy: "Agency membership does NOT grant access to a driver's account. Each driver must invite each assistant individually."
+
+## 6. Driver invite flow polish
+
+- Keep current copy-link flow as-is (works without email infra).
+- If existing `send-transactional-email` edge function is present and safe to reuse, add an optional "Email this invite" button that calls a thin new edge function `send-assistant-invite` (server-side; uses existing email infra). If reusing isn't clean, ship copy-link only and document it under Known Limitations.
+
+## 7. Route guards + permission polish
+
+- `assistantPageGate` already covers most pages. Audit `Index.tsx` page handler list and `AppSidebar`/`BottomNav` filters.
+- For BLOCKED pages, show a small `AssistantBlockedNotice.tsx` with: "You do not have permission to access this area for {driver_name}." + button → first allowed page.
+- Re-verify `manage_settings_limited` only exposes cost profile (already done in Phase 1; just confirm).
+
+## 8. Regression + final report
+
+Run the full verification matrix from the spec, plus:
+
+- `bunx vitest run` (full suite — currently 439).
+- `bunx tsgo --noEmit`.
+- `bun run build`.
+- Manual checklist: invite → accept → switch → write → revoke → blocked routes → agency create → agency invite → member has no driver access.
+
+Final report uses the A–O structure requested.
+
+## Technical notes
+
+- All new RPCs are `SECURITY DEFINER` with `SET search_path=public`, `auth.uid()` checks, allow-listed inputs.
+- `agency_members` never participates in any existing table's RLS — there is no policy of the form `EXISTS (select 1 from agency_members ...)` on `loads`/`expenses`/`fuel_logs`. Driver delegation stays exclusively on `driver_assistants`.
+- No new client-side gating replaces server checks; UI gates are convenience only.
+- Tests: add `src/test/agencyMembershipNoDriverAccess.test.ts` (DB-shape test) and `src/test/assistantSwitcherFilter.test.tsx` (filters revoked drivers out).
+
+## What's deliberately NOT in Phase 2
+
+- Public agency directory.
+- Ratings/reviews.
+- Payment processing or assistant-service billing.
 - Assistants inviting other assistants.
+- Cross-agency driver sharing.
 
-## Data model (new tables)
+## Open question
 
-```text
-driver_assistants
-  id, driver_user_id, assistant_user_id (nullable until accept),
-  invite_email (lower, normalized), invite_token (hashed),
-  status: pending | active | revoked | expired,
-  permissions jsonb (see below),
-  invited_at, accepted_at, revoked_at, last_active_at,
-  created_at, updated_at
-  UNIQUE (driver_user_id, invite_email) WHERE status IN (pending, active)
+Email infra for invites: the project has `send-transactional-email`. Do you want me to wire optional email-send for assistant invites in this phase (Option A), or keep copy-link only and revisit later (Option B)? I'll default to **Option A** (reuse existing infra; no new secrets) unless you say otherwise.
 
-assistant_audit_log
-  id, driver_user_id, assistant_user_id, delegate_id,
-  action, entity_type, entity_id, metadata jsonb, created_at
-```
+&nbsp;
 
-Permission keys (booleans inside `permissions` jsonb):
-`manage_loads, manage_expenses, manage_fuel, manage_receipts, view_reports, export_reports, manage_documents, view_dashboard, manage_settings_limited`.
+Proceed with Phase 2.
 
-Hard-blocked everywhere (never reachable via assistant): billing, subscription, account deletion, owner email, recruiter surfaces, inviting other assistants, role/plan changes.
+For the open question: choose **Option A**, but with strict guardrails.
 
-## Access model
+You may wire optional assistant invite email sending only if the existing `send-transactional-email` infrastructure is already safe, working, and reusable without adding new secrets or weakening security.
 
-Single security-definer helper drives every check:
+Rules for invite email:
 
-```sql
-public.assistant_has_permission(_assistant uuid, _driver uuid, _perm text) returns boolean
--- true iff active row exists AND permissions->>_perm = 'true'
-```
+1. Do not expose service role keys or email provider secrets to the client.
+2. Do not fake email sending.
+3. Do not create a half-working email button.
+4. If the existing email function is not cleanly reusable, keep copy-link only and document email sending as a known limitation.
+5. If email sending is added, it must be server-side only through a secure Edge Function.
+6. The driver must still see and be able to copy the invite link manually.
+7. Email sending should be optional, not required for the assistant invite flow to work.
+8. The email content should be simple and professional:  
+“You’ve been invited to help manage a driver’s HaulTracker Pro account.”
+9. The invite acceptance must still be validated by the existing secure RPC flow.
+10. Email delivery must not grant access by itself. Access only activates after the invited assistant signs in with the invited email and accepts the invite.
 
-Existing user-owned tables (`loads`, `expenses`, `fuel_logs`, `load_stops`, etc.) get an **additive** policy:
+Also, I approve the ordered sub-phase approach. Do not skip package hygiene. Do not move forward with UI work until the dependency/lockfile issue is cleaned up and command results are captured honestly.
 
-```sql
--- existing owner policy stays untouched
-CREATE POLICY "<table>_assistant_rw" ON public.<table>
-  FOR ALL TO authenticated
-  USING (public.assistant_has_permission(auth.uid(), user_id, '<perm>'))
-  WITH CHECK (public.assistant_has_permission(auth.uid(), user_id, '<perm>'));
-```
-
-No existing policy is dropped, weakened, or rewritten. Billing tables (`subscriptions`, `recruiter_billing_profiles`, `profiles` intent/billing columns), recruiter tables, and admin tables get **no** assistant policy — assistants simply have no path to them.
-
-`driver_assistants` and `assistant_audit_log` get their own tight RLS: driver sees rows where `driver_user_id = auth.uid()`; assistant sees rows where `assistant_user_id = auth.uid()`; audit log is insert-only for the acting assistant via SECURITY DEFINER RPC, read by driver and by the assistant for their own actions.
-
-## Acting-as context (client)
-
-New hook `useActingContext()`:
-- Reads `?as=<driver_user_id>` from URL (source of truth, shareable, survives reloads).
-- Validates server-side via `get_my_managed_drivers()` RPC; rejects unknown ids.
-- Exposes `{ actingForDriverId, permissions, isAssistant }`.
-- All existing data hooks (`useLoads`, `useExpenses`, `useFuelLogs`, etc.) read `actingForDriverId ?? user.id` when building queries and inserts. Because RLS enforces the same rule, a bug here can't leak data — it just 401s.
-
-A persistent "Acting for: <Driver name>" banner shows whenever `actingForDriverId !== user.id`, with a one-click "Exit assistant mode".
-
-## RPCs (SECURITY DEFINER, search_path = public)
-
-- `invite_assistant(_email, _permissions jsonb)` — driver-only, normalizes email, creates pending row, returns invite link payload.
-- `accept_assistant_invite(_token)` — assistant-only, binds `assistant_user_id = auth.uid()`, flips to active.
-- `revoke_assistant(_id)` — driver-only.
-- `update_assistant_permissions(_id, _permissions)` — driver-only.
-- `get_my_managed_drivers()` — assistant-only, returns active drivers + permissions.
-- `list_my_assistants()` — driver-only.
-- `log_assistant_action(_driver, _action, _entity_type, _entity_id, _metadata)` — writes audit row only if caller is active assistant for that driver. Called from a thin client wrapper around create/update/delete data mutations.
-
-## UI
-
-Driver side — new `Settings → Assistants` panel:
-- Invite form (email + permission checkboxes).
-- Pending / Active / Revoked lists with per-row Edit permissions, Resend, Revoke.
-- Plain-language explainer of what assistants can/can't do.
-
-Assistant side — new top-level entry when the user has ≥1 active delegation:
-- `/assistant` dashboard: managed-driver cards, current acting context, quick actions (Add Load / Expense / Fuel / Upload Receipt) routed into existing forms with `?as=…` preserved.
-- Pending-invite acceptance screen at `/assistant/invite/:token`.
-
-All built with existing shadcn/Tailwind components — no new design system.
-
-## Email
-
-Invite email sent via existing `send-transactional-email` edge function with a new template `driver-assistant-invite`. Link: `https://<host>/assistant/invite/<token>`.
-
-## Billing gating
-
-Phase 1: drivers with `subscriptions.tier = pro` (or admin) can invite up to **1** active assistant. Free drivers see a locked-state CTA pointing to `/pricing`. Existing `useSubscription` hook is reused; no new billing logic. Assistants pay nothing and need only a free HaulTrackerPro account.
-
-## Future-ready, not future-built
-
-`driver_assistants` is intentionally a many-to-many edge: one assistant row per (driver, assistant) pair, so a single assistant_user_id can already manage multiple drivers in Phase 1. The agency layer in Phase 2 only needs to add an `agencies` table + optional `agency_id` FK on this table — no destructive migration.
-
-## Regression protection
-
-Before edits: read existing RLS on `loads`, `expenses`, `fuel_logs`, `load_stops`, `subscriptions`, `recruiter_profiles`, `profiles`; confirm owner policies use `auth.uid() = user_id`.
-
-After edits, must pass:
-1. `tsgo` clean.
-2. `vitest run` — full 439-test suite green; new tests for permission helper, RPC eligibility, and acting-context selection.
-3. Playwright smoke (`tests/e2e/driver-journey.spec.ts`) — driver flow unchanged.
-4. Manual RLS probe via `psql`: assistant token cannot read another driver's loads, cannot read `subscriptions`, cannot call `apply_recruiter_intent`, loses all access the instant their row flips to `revoked`.
-
-## Deliverable structure
-
-Migrations (one file): tables + helper + RPCs + additive policies + grants.
-Edge function template: invite email.
-New files:
-- `src/hooks/useActingContext.ts`
-- `src/hooks/useAssistants.ts`, `src/hooks/useManagedDrivers.ts`
-- `src/components/assistants/{AssistantsPanel,InviteAssistantDialog,AssistantRow,ActingAsBanner}.tsx`
-- `src/pages/AssistantDashboard.tsx`, `src/pages/AssistantInviteAccept.tsx`
-- `src/lib/assistantPermissions.ts` (client mirror of server perm keys; UI gate only)
-- `src/test/assistantPermissions.test.ts`, `src/test/actingContext.test.ts`
-
-Modified files (surgical):
-- `src/App.tsx` — two new routes, banner mount.
-- Data hooks: `useLoads, useExpenses, useFuelLogs, useLoadStops` — swap `user.id` for `actingContext.targetUserId`.
-- `src/components/SettingsView.tsx` — add Assistants accordion section.
-
-## Open questions before I start
-
-1. **Invite delivery** — OK to reuse existing `send-transactional-email` (Resend) for the assistant invite email, same look as current transactional templates?
-2. **Plan gating threshold for Phase 1** — confirm: Pro = 1 assistant, Free = locked? Or allow Free drivers 1 assistant during rollout?
-3. **Settings access for assistants** — `manage_settings_limited` covers what exactly? My default: only Cost Profile + default pay model. Confirm or narrow.
-4. **Delete rights** — should assistants ever be allowed to delete a load/expense/fuel row, gated behind a separate `allow_destructive` per-permission flag? Default: no deletes in Phase 1; edits and creates only.
+Final reminder:  
+Build this as a production business feature, not a surface-level demo. Phase 2 must preserve Phase 1 security, keep agency membership separate from driver access, and make multi-driver assistant work clean and professional.
