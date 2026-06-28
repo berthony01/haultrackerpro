@@ -70,6 +70,7 @@ const ContentCalendarAdmin = lazy(() => import("./pages/admin/ContentCalendarAdm
 const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
 const AssistantDashboard = lazy(() => import("./pages/AssistantDashboard"));
 const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept"));
+const AssistantLimitedSettings = lazy(() => import("./pages/AssistantLimitedSettings"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
