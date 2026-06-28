@@ -8,6 +8,8 @@ import { trackPageView } from '@/lib/analytics';
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
+import { ActingContextProvider } from "@/hooks/useActingContext";
+import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Critical path — eagerly loaded
