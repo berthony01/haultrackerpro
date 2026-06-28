@@ -34,7 +34,7 @@ export default function AssistantDashboard() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Drivers who have invited you to help manage their account. Pick a driver to start
-          entering their loads, expenses, fuel, and receipts. You can switch back to your own
+          entering their loads, expenses, and fuel logs. You can switch back to your own
           account at any time.
         </p>
       </header>
