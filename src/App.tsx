@@ -269,9 +269,12 @@ const App = () => (
               {/* Dynamic published-article fallback. Registered AFTER all static /resources/* routes
                   so existing static guides always win. Published articles only — drafts are blocked by RLS. */}
               <Route path="/resources/:slug" element={<ResourceArticleDynamic />} />
+              <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
+              <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+            </ActingContextProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
