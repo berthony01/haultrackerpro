@@ -3346,6 +3346,14 @@ export type Database = {
         Returns: Json
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_agency_member: {
+        Args: { _agency_id: string; _uid: string }
+        Returns: boolean
+      }
+      is_agency_owner: {
+        Args: { _agency_id: string; _uid: string }
+        Returns: boolean
+      }
       is_application_party: {
         Args: { _application_id: string; _user_id: string }
         Returns: boolean
