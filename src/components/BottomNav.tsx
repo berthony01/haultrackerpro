@@ -26,12 +26,20 @@ import {
 } from '@/components/ui/sheet';
 import type { UserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  isAssistantPageAllowed,
+  hasPerm,
+  type AssistantPermissions,
+} from '@/lib/assistantPermissions';
 
 interface BottomNavProps {
   active: string;
   onNavigate: (page: string) => void;
   role: UserRole;
   roleLoading?: boolean;
+  /** When set, this user is acting as an assistant for a driver and nav items
+   *  are filtered to the keys the driver has granted. */
+  assistantPermissions?: AssistantPermissions | null;
 }
 
 const driverNav = [
@@ -49,10 +57,14 @@ const recruiterNav = [
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
 
-export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavProps) {
+export function BottomNav({ active, onNavigate, role, roleLoading, assistantPermissions }: BottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
-  const navItems = role === 'recruiter' ? recruiterNav : driverNav;
+  const isAssistant = !!assistantPermissions;
+  const baseNav = role === 'recruiter' ? recruiterNav : driverNav;
+  const navItems = isAssistant
+    ? baseNav.filter((i) => isAssistantPageAllowed(i.id, assistantPermissions))
+    : baseNav;
 
   const go = (page: string) => {
     setMoreOpen(false);
@@ -61,7 +73,7 @@ export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavPr
 
   type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
 
-  const driverMoreItems: MoreItem[] = [
+  const driverMoreItemsFull: MoreItem[] = [
     { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
     { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Review, approve, request changes, sign.' },
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
@@ -70,6 +82,18 @@ export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavPr
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
+
+  // Assistant "More": only items their permissions cover; never settings/contracts/prefs.
+  const driverMoreItemsAssistant: MoreItem[] = [
+    hasPerm(assistantPermissions, 'view_reports') || hasPerm(assistantPermissions, 'export_reports')
+      ? { label: 'Reports', icon: FileText, onClick: () => go('reports') } : null,
+    hasPerm(assistantPermissions, 'manage_expenses')
+      ? { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') } : null,
+    hasPerm(assistantPermissions, 'manage_fuel')
+      ? { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') } : null,
+    { label: 'Switch driver / exit', icon: UserCog, onClick: () => go('assistant_exit'), description: 'Stop acting for this driver.' },
+    { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
+  ].filter(Boolean) as MoreItem[];
 
   const recruiterMoreItems: MoreItem[] = [
     { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
@@ -81,7 +105,9 @@ export function BottomNav({ active, onNavigate, role, roleLoading }: BottomNavPr
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
-  const moreItems: MoreItem[] = role === 'recruiter' ? recruiterMoreItems : driverMoreItems;
+  const moreItems: MoreItem[] = isAssistant
+    ? driverMoreItemsAssistant
+    : role === 'recruiter' ? recruiterMoreItems : driverMoreItemsFull;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">
