@@ -107,8 +107,8 @@ describe('Phase 3 hardening — revoke_agency_delegation RPC', () => {
   });
 
   it('writes both agency_audit_log and assistant_audit_log entries', () => {
-    expect(body).toMatch(/insert into public\.agency_audit_log/);
-    expect(body).toMatch(/insert into public\.assistant_audit_log/);
+    expect(body).toMatch(/insert into public\.agency_audit_log/i);
+    expect(body).toMatch(/insert into public\.assistant_audit_log/i);
   });
 
   it('is execute-granted only to authenticated', () => {
