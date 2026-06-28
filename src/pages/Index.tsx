@@ -52,6 +52,7 @@ const DriverContractsView = lazy(() => import('@/components/contracts/DriverCont
 const RecruiterContractsView = lazy(() => import('@/components/contracts/RecruiterContractsView').then(m => ({ default: m.RecruiterContractsView })));
 import { ContractActionsCard } from '@/components/contracts/ContractActionsCard';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import AssistantBlockedNotice from '@/components/assistants/AssistantBlockedNotice';
 
 import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
