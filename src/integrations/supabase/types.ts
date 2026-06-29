@@ -299,6 +299,7 @@ export type Database = {
           id: string
           name: string
           owner_user_id: string
+          slug: string | null
           status: Database["public"]["Enums"]["agency_status"]
           updated_at: string
         }
@@ -309,6 +310,7 @@ export type Database = {
           id?: string
           name: string
           owner_user_id: string
+          slug?: string | null
           status?: Database["public"]["Enums"]["agency_status"]
           updated_at?: string
         }
@@ -319,6 +321,7 @@ export type Database = {
           id?: string
           name?: string
           owner_user_id?: string
+          slug?: string | null
           status?: Database["public"]["Enums"]["agency_status"]
           updated_at?: string
         }
@@ -389,6 +392,8 @@ export type Database = {
           driver_user_id: string
           due_date: string | null
           id: string
+          last_driver_response: string | null
+          last_driver_response_at: string | null
           priority: Database["public"]["Enums"]["agency_work_item_priority"]
           status: Database["public"]["Enums"]["agency_work_item_status"]
           title: string
@@ -406,6 +411,8 @@ export type Database = {
           driver_user_id: string
           due_date?: string | null
           id?: string
+          last_driver_response?: string | null
+          last_driver_response_at?: string | null
           priority?: Database["public"]["Enums"]["agency_work_item_priority"]
           status?: Database["public"]["Enums"]["agency_work_item_status"]
           title: string
@@ -423,6 +430,8 @@ export type Database = {
           driver_user_id?: string
           due_date?: string | null
           id?: string
+          last_driver_response?: string | null
+          last_driver_response_at?: string | null
           priority?: Database["public"]["Enums"]["agency_work_item_priority"]
           status?: Database["public"]["Enums"]["agency_work_item_status"]
           title?: string
@@ -3545,6 +3554,7 @@ export type Database = {
           id: string
           name: string
           owner_user_id: string
+          slug: string | null
           status: Database["public"]["Enums"]["agency_status"]
           updated_at: string
         }
@@ -3637,6 +3647,8 @@ export type Database = {
           driver_user_id: string
           due_date: string | null
           id: string
+          last_driver_response: string | null
+          last_driver_response_at: string | null
           priority: Database["public"]["Enums"]["agency_work_item_priority"]
           status: Database["public"]["Enums"]["agency_work_item_status"]
           title: string
@@ -3698,6 +3710,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      driver_respond_to_work_item: {
+        Args: { _id: string; _response: string }
+        Returns: string
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -3733,6 +3749,24 @@ export type Database = {
       }
       get_my_managed_drivers: { Args: never; Returns: Json[] }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
+      get_my_waiting_work_item: {
+        Args: { _id: string }
+        Returns: {
+          agency_id: string
+          agency_name: string
+          created_at: string
+          description: string
+          due_date: string
+          id: string
+          last_driver_response: string
+          last_driver_response_at: string
+          priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          status: Database["public"]["Enums"]["agency_work_item_status"]
+          title: string
+          type: Database["public"]["Enums"]["agency_work_item_type"]
+          updated_at: string
+        }[]
+      }
       get_public_resource_article: {
         Args: { _slug: string }
         Returns: {
@@ -4100,6 +4134,21 @@ export type Database = {
           status: Database["public"]["Enums"]["agency_delegation_status"]
         }[]
       }
+      list_my_waiting_work_items: {
+        Args: never
+        Returns: {
+          agency_id: string
+          agency_name: string
+          created_at: string
+          description: string
+          due_date: string
+          id: string
+          priority: Database["public"]["Enums"]["agency_work_item_priority"]
+          title: string
+          type: Database["public"]["Enums"]["agency_work_item_type"]
+          updated_at: string
+        }[]
+      }
       list_public_resource_articles: {
         Args: { _limit?: number }
         Returns: {
@@ -4182,6 +4231,7 @@ export type Database = {
         Args: { application_id: string; recruiter_note?: string }
         Returns: string
       }
+      resolve_agency_slug: { Args: { _slug: string }; Returns: string }
       respond_to_contact_request: {
         Args: { decision: string; driver_note?: string; request_id: string }
         Returns: undefined
@@ -4243,6 +4293,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_agency_slug: {
+        Args: { _agency_id: string; _slug: string }
+        Returns: string
       }
       submit_agency_client_request: {
         Args: {
@@ -4346,6 +4400,8 @@ export type Database = {
           driver_user_id: string
           due_date: string | null
           id: string
+          last_driver_response: string | null
+          last_driver_response_at: string | null
           priority: Database["public"]["Enums"]["agency_work_item_priority"]
           status: Database["public"]["Enums"]["agency_work_item_status"]
           title: string
@@ -4377,6 +4433,7 @@ export type Database = {
           id: string
           name: string
           owner_user_id: string
+          slug: string | null
           status: Database["public"]["Enums"]["agency_status"]
           updated_at: string
         }
