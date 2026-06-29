@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
 import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { useAuth } from '@/hooks/useAuth';
+import MarketingHeader from '@/components/marketing/MarketingHeader';
+
 
 const AMBER = 'hsl(25, 95%, 53%)';
 const AMBER_BRIGHT = 'hsl(25, 95%, 60%)';
