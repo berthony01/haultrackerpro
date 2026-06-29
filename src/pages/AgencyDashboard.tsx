@@ -32,6 +32,7 @@ import { ClientRequestsSection } from '@/components/agency/ClientRequestsSection
 import { ClientListSection } from '@/components/agency/ClientListSection';
 import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
 import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
+import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 
 /**
  * Private agency area. Anyone signed-in can create one personal agency profile
