@@ -52,7 +52,7 @@ export default function AgencyRequestPublic() {
         <p className="text-sm text-muted-foreground">
           You need a HaulTracker Pro driver account to send a request.
         </p>
-        <Button onClick={() => navigate(`/auth?redirect=/agency/request/${agencyId}`)}>
+        <Button onClick={() => navigate(`/auth?next=${encodeURIComponent(`/agency/request/${agencyId}`)}`)}>
           Sign in
         </Button>
       </div>
