@@ -77,6 +77,8 @@ const AgencyInviteAccept = lazy(() => import("./pages/AgencyInviteAccept"));
 const AgencyRequestPublic = lazy(() => import("./pages/AgencyRequestPublic"));
 const DriverDelegationApprovals = lazy(() => import("./pages/DriverDelegationApprovals"));
 const DriverAssistantControl = lazy(() => import("./pages/DriverAssistantControl"));
+const DriverWorkItems = lazy(() => import("./pages/DriverWorkItems"));
+const AgencySlugRedirect = lazy(() => import("./pages/AgencySlugRedirect"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
