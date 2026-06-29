@@ -58,23 +58,8 @@ export default function Recruiters() {
       />
 
 
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2">
-            <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
-            <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
-          </button>
-          <div className="flex items-center gap-1 sm:gap-3">
-            <Button variant="ghost" onClick={() => navigate('/features')} className="text-sm hidden sm:inline-flex" style={{ color: 'hsl(220, 10%, 70%)' }}>Features</Button>
-            <Button variant="ghost" onClick={() => navigate('/pricing')} className="text-sm hidden sm:inline-flex" style={{ color: 'hsl(220, 10%, 70%)' }}>Pricing</Button>
-            <Button variant="ghost" onClick={() => navigate('/auth')} className="text-sm hidden sm:inline-flex" style={{ color: 'hsl(220, 10%, 70%)' }}>Sign In</Button>
-            <Button onClick={() => navigate('/auth')} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Start Tracking Free
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <MarketingHeader />
+
 
       {/* Hero */}
       <section className="relative overflow-hidden">
