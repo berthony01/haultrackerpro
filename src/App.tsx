@@ -287,6 +287,9 @@ const App = () => (
               <Route path="/agency/request/:agencyId" element={<AgencyRequestPublic />} />
               <Route path="/driver/agency-approvals" element={<ProtectedRoute><DriverDelegationApprovals /></ProtectedRoute>} />
               <Route path="/driver/assistant-control" element={<ProtectedRoute><DriverAssistantControl /></ProtectedRoute>} />
+              <Route path="/driver/work-items" element={<ProtectedRoute><DriverWorkItems /></ProtectedRoute>} />
+              <Route path="/driver/work-items/:id" element={<ProtectedRoute><DriverWorkItems /></ProtectedRoute>} />
+              <Route path="/a/:slug" element={<AgencySlugRedirect />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
