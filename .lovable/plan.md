@@ -1,87 +1,209 @@
-# Phase 4 Strict Audit + Discoverability Pass
+# Phase 4 Cleanup + Assistant/Agency Showcase Alignment
 
-## Goal
+Two-part plan: (1) fix real product wiring gaps, (2) reposition the public-facing surface so the Driver Assistant / Agency opportunity is properly showcased — without overpromising.
 
-Verify Phase 4A/4B/4C shipped correctly with no regressions, and make the new capabilities (Driver Assistants, Agency workflow, Driver Control Center, Waiting-on-Driver work items, Agency slugs, in-app notifications for assistant/agency events) discoverable on the landing page, Features page, SEO surfaces, and sitemap. Today none of these are mentioned in marketing copy or indexed.
+## Part 1 — Product wiring fixes
 
-## Part 1 — Strict audit (read-only verification)
+1. **Driver Control Center grouping** (`src/pages/DriverAssistantControl.tsx`)
+  - Split list into three sections: Active (`status==='active'`), Pending invites (`'pending'`), Past/revoked (`'revoked' | 'expired'`).
+  - No pending row rendered under "Active".
+2. `**driver_respond_to_work_item()` notification shape** (migration)
+  - Rewrite the `create_notification` call inside the RPC to pass `user_id`, `type='agency_work_item_driver_responded'`, proper `title` ("Driver responded to a work item"), `body` ("The driver replied to: {title}"), and `payload` (`agency_id`, `work_item_id`, `driver_user_id`, `title`).
+  - Keep `SECURITY DEFINER`, `search_path=public`, existing grants.
+3. **Work queue deep links** (`src/components/agency/WorkQueueSection.tsx`)
+  - For each work item, look up whether the current user has an **active** `driver_assistants` row for that driver (new lightweight hook `useHasDriverAccess(driverUserId)` calling a new RPC `current_user_has_active_assistant_access(driver_user_id)` — pure read, security definer).
+  - If access: render buttons gated by permissions:
+    - Start managing → calls `beginActingAs(driver_user_id)` then routes to `/` (dashboard).
+    - Add load / Add expense / Add fuel → `beginActingAs` then route to the existing forms (`/?quick=load|expense|fuel`); reuse existing forms (no bypass of `applyFuelLogPolicy`).
+    - View reports / Limited settings → route to existing pages.
+  - If no access: render disabled notice "You are assigned this work item, but you do not currently have driver account access."
+  - Never pass driver_user_id to grant access; RLS remains the enforcer.
+4. **Agency request link wording**
+  - `src/lib/featureList.ts`, `src/pages/Landing.tsx`, `src/pages/Features.tsx`, any "Public Agency Request Links" copy → "Private Agency Request Links" / "Shareable request link — drivers sign in to submit a request."
 
-For each phase, verify against code + tests and produce a PASS / FAIL line item:
+## Part 2 — Showcase Driver Assistant + Agency opportunity
 
-**Phase 4A — Driver Control Center**
-- `list_my_assistants_with_source` RPC exists and is auth.uid-scoped.
-- `/driver/assistant-control` route registered + protected.
-- `useAssistantsWithSource` returns typed rows; source classification UI rule matches test invariants.
-- "End access" path correctly branches: agency-source → `revoke_agency_delegation`, direct → `revoke_assistant`.
-- Audit visibility surface present for both action types.
+5. **Homepage hero** (`src/pages/Landing.tsx`)
+  - New headline: "The trucking platform for drivers, recruiters, and back-office agencies."
+  - Subcopy describing four audiences and approval/audit model.
+  - Secondary CTA: "Build a back-office service" → if signed out `/auth?intent=assistant`, if signed in `/agency`.
+6. **Navigation**
+  - Add "Assistants & Agencies" link to top nav (desktop) → `/assistants-agencies`. Keep mobile uncluttered (single link, not a dropdown).
+7. **New near-top section on Landing** ("Turn trucking paperwork into a service business")
+  - Three cards: Driver Assistant / Back-Office Agency / Driver Control. Approval + audit + payments-outside disclaimer.
+  - Placed above the pricing strip.
+8. **New dedicated page `/assistants-agencies**` (`src/pages/AssistantsAgencies.tsx`)
+  - Sections: side hustle framing, for assistants, for agencies, driver approval protection, what you can help manage, what HaulTracker Pro doesn't do yet, payments handled outside, CTAs to `/agency` and `/auth`.
+  - Helmet meta + canonical.
+  - Add route in `src/App.tsx`. Add to `public/sitemap.xml` (or generator).
+9. **Features page** (`src/pages/Features.tsx`)
+  - Add intro paragraph above the Team & Agency Workflow category.
+  - Update SEO description.
+10. **Pricing page** (`src/pages/Pricing.tsx`)
+  - Add "Assistants & Agencies" section explaining: drivers pay subscription; assistants/agencies use the platform with approved clients; payments between driver and assistant handled outside HaulTracker Pro for now.
+    - No new plans created.
+11. **SEO**
+  - Update `index.html` description.
+    - Update Landing & Features Helmet titles/descriptions.
+    - Add meta for `/assistants-agencies`.
+    - Add `/assistants-agencies` to sitemap.
+12. **Feature list** (`src/lib/featureList.ts`)
+  - Replace "Public Agency Request Links" → "Private Agency Request Links" with accurate description.
+    - Tighten copy: "Driver-approved access", "Side-hustle/agency workflow"; remove anything implying guaranteed income or marketplace.
+13. **FAQ entries**
+  - Append the 5 Q&A items to the existing Landing FAQ (or FAQ page) using the exact answers (approval required, revocable, payments outside, no income guarantee).
 
-**Phase 4B — Notifications**
-- `notification_preferences` extended with `assistant_events` + `agency_events`.
-- `create_notification` and `notification_category` respect the new toggles.
-- Triggers exist on `driver_assistants`, `agency_client_requests`, `agency_delegation_requests`, `agency_work_items` and are `SECURITY DEFINER`.
-- `NotificationCenter.routeForNotification` resolves assistant/agency types to `/driver/assistant-control` and `/agency`, and work-item types deep-link to `/driver/work-items/:id` / `/agency?workItem=:id`.
-- `NotificationPreferencesPanel` shows both new toggles.
+## Part 3 — Tests + verification
 
-**Phase 4C — Slugs, deep links, waiting-on-driver**
-- `agency_profiles.slug` is `citext`, validated format, reserved-words guard.
-- `set_agency_slug` (owner only) + `resolve_agency_slug` RPCs present; grants correct.
-- `agency_work_items.last_driver_response` + `last_driver_response_at` columns + 7-day RLS for driver self-view after response.
-- `list_my_waiting_work_items`, `get_my_waiting_work_item`, `driver_respond_to_work_item` RPCs present and strict.
-- Routes `/a/:slug`, `/driver/work-items`, `/driver/work-items/:id` registered.
-- `AgencySlugCard` mounted in Agency Dashboard overview.
+14. **New test file** `src/test/phase4CleanupShowcase.test.tsx`
+  - Landing: includes "back-office" / "assistants" / "agencies" copy; does not say "Public Agency Request" or "guaranteed income".
+    - Features: contains "Private" request link wording.
+    - `featureList.ts`: no "public marketplace" / "guaranteed"; contains "Driver-approved" + "Private".
+    - Pricing: contains assistant/agency payment-outside disclaimer.
+    - DriverAssistantControl: pending row not rendered in Active section (smoke render with mocked hook).
+    - WorkQueueSection: deep-link buttons hidden when no active assistant access; visible when access present.
+15. **Notification regression test** (`src/test/phase4WorkItemNotification.test.ts`)
+  - Static SQL assertion: the migration file contains the correct `create_notification` arg names (title/body/payload keys).
+16. **Run + report exact results**: `bunx tsgo --noEmit`, `bunx vitest run`, `bun run build`.
 
-**Cross-cutting checks**
-- `bun run build` clean.
-- `bunx tsgo --noEmit` clean.
-- `bunx vitest run` — expect 537/537.
-- Supabase linter — no new criticals introduced by Phase 4 migrations.
-- Security memory still accurate (RPC-only writes for Phase 3 tables still hold).
+## Out of scope (explicit)
 
-Any FAIL is fixed in this same pass with the smallest possible change before moving to Part 2.
+- No Stripe Connect, no marketplace, no ratings, no new pricing tiers, no unauthenticated request submission.
+- No changes to RLS enforcement model; deep links rely on existing `driver_assistants` + `useActingContext`.
 
-## Part 2 — Discoverability + SEO showcase
+## Files touched (summary)
 
-Phase 4 added real user-visible capability but no marketing surface mentions it. Add it without touching unrelated copy.
+- Migration: rewrite `driver_respond_to_work_item`; add `current_user_has_active_assistant_access`.
+- `src/pages/DriverAssistantControl.tsx`
+- `src/components/agency/WorkQueueSection.tsx` (+ small new hook file)
+- `src/pages/Landing.tsx`, `src/pages/Features.tsx`, `src/pages/Pricing.tsx`
+- `src/pages/AssistantsAgencies.tsx` (new) + `src/App.tsx` route
+- `src/lib/featureList.ts`
+- `index.html`, `public/sitemap.xml` (or generator)
+- New tests under `src/test/`
 
-**`src/lib/featureList.ts`** — add a new category **"Team & Agency"** with entries:
-- Driver Assistants (invite, permissions, audit) — Pro
-- Driver Control Center (one place to revoke any access)
-- Agency Workspace (service packages, client requests, work queue)
-- Driver-Approved Delegation (agency access only with explicit driver approval)
-- Waiting-on-Driver work items (one-tap driver response)
-- Public agency request links (`/a/your-agency`)
-- Assistant & Agency in-app notifications
+Once approved, I'll implement, run tsgo + vitest + build, and report exact results.
 
-This auto-flows into `/features` (data-driven) and the downloadable feature sheet.
+Approved to proceed with Phase 4 Cleanup + Assistant/Agency Showcase Alignment, but apply these clarifications before implementation.
 
-**`src/pages/Landing.tsx`** — add one new section "Built for solo drivers, teams, and agencies" with three short cards (Driver / Assistant / Agency) and a CTA into `/features#team-agency`. Keep current hero and existing sections intact.
+This must be built end to end. Do not build fake CTAs, fake routes, fake query parameters, or surface-level marketing copy that is not connected to real product workflows.
 
-**`src/pages/Features.tsx`** — already data-driven; verify the new category renders cleanly and add an in-page anchor `id="team-agency"`.
+1. Auth intent clarification
 
-**`scripts/generate-sitemap.ts` + `public/sitemap.xml`** — add indexable public marketing/info routes only:
-- (no change for `/driver/*` or `/agency` dashboard routes — those are auth-gated and already in `robots.txt` disallow spirit)
-- Confirm `/features` entry still present (it is).
-- Add `Disallow: /driver` and `Disallow: /agency` and `Disallow: /a` to `public/robots.txt` so auth/redirect routes are not crawled. `/agency/request/:agencyId` and `/a/:slug` are intentionally private per-agency links.
+Do not use `/auth?intent=assistant` unless the existing auth/role-intent system already supports an assistant intent cleanly.
 
-**SEO meta**
-- `src/pages/Features.tsx` — extend `<SEOHead>` description to include "driver assistants and agency workflow" keywords (under 160 chars).
-- Add JSON-LD `FAQPage` entry on `/faq` for "Can I give my back office or agency access to my HaulTrackerPro account?" (only if `FAQ.tsx` already uses JSON-LD; otherwise skip — do not introduce new schema infra).
+If assistant intent does not exist, use a safe route such as:
 
-**Resource hub** — add a single short resource card link on the Features "Resource Hub CTA" block pointing at the new section; no new article pages created in this pass.
+- `/auth`
+- `/assistants-agencies`
+- or existing signup flow with clear next-step copy
 
-**No changes to:** pricing tiers, billing, RPC contracts, RLS, existing copy outside the additions above. UI-only marketing edits + the audit.
+Do not create a broken signup path.
 
-## Deliverable
+2. Deep-link route clarification
 
-A single PR with:
-1. A short audit report in the chat reply (PASS/FAIL per item).
-2. Any minimal fixes required by the audit.
-3. The featureList/Landing/Features/robots additions above.
-4. Re-run build + typecheck + vitest and report green.
+Do not invent `/?quick=load|expense|fuel` unless the app already supports those query params or you fully wire them end-to-end.
 
-## Technical notes
+Use the existing navigation/action pattern for opening:
 
-- `featureList.ts` drives both `/features` UI and the downloadable feature sheet — single edit, two surfaces.
-- Landing page must keep existing audience switcher (`useLandingAudience`) intact; new section renders for both audiences with audience-tinted copy.
-- Robots disallow for `/driver` and `/agency` is the right move because these are authenticated app surfaces, not marketing. `/a/:slug` is a private redirect — disallow as well.
-- No new migrations expected unless the audit surfaces a missing grant/policy.
+- Add Load
+- Add Expense
+- Add Fuel
+- View Reports
+- Limited Settings
+
+Every deep link must work in the existing assistant acting context and still rely on RLS/assistant permissions.
+
+3. Work queue access check clarification
+
+For work queue deep links, checking whether the current user has access is not enough. The UI also needs the assistant’s permissions.
+
+Use the existing `useActingContext` / `get_my_managed_drivers` permission source if possible.
+
+If adding a new RPC such as `current_user_has_active_assistant_access(driver_user_id)`, it must return:
+
+- has_access
+- permissions
+- safe driver display info if needed
+
+Avoid one RPC call per work item if possible. Prefer a batched lookup or existing managed-driver context so the work queue does not become slow for agencies with many work items.
+
+4. Fuel clarification
+
+Keep Add Fuel only if it routes to the existing fuel log workflow.
+
+Fuel logs are intentionally separate from expenses because they support gallons, price per gallon, odometer, MPG, fuel-stop analytics, and IFTA-style reporting.
+
+Do not create duplicate Fuel expense rows from the work queue. Any Add Fuel action must continue relying on the existing fuel log flow and `applyFuelLogPolicy`.
+
+5. Showcase positioning
+
+The public-facing site must clearly show that HaulTracker Pro now serves four audiences:
+
+- Drivers
+- Recruiters
+- Driver Assistants
+- Back-Office Agencies
+
+The assistant/agency opportunity should be visible on the landing page, features page, pricing page, SEO copy, FAQ, and the new `/assistants-agencies` page.
+
+Use strong but accurate language:
+
+- “Start a trucking back-office side hustle.”
+- “Offer bookkeeping-style support to drivers.”
+- “Create a back-office agency for truckers.”
+- “Manage approved driver clients.”
+- “Drivers stay in control and approve access.”
+- “Payments are handled outside HaulTracker Pro for now.”
+
+Do not say or imply:
+
+- guaranteed income
+- guaranteed clients
+- public marketplace
+- automatic access
+- HaulTracker Pro pays assistants
+- in-app assistant payments
+- no-login request submission
+
+6. Driver Control Center grouping
+
+Fix active/pending/past assistant grouping.
+
+Active assistants must only show `status === 'active'`.
+
+Pending invites must be separate.
+
+Revoked/expired assistants must be separate.
+
+Do not label pending assistants as active.
+
+7. Notification bug
+
+Fix `driver_respond_to_work_item()` so `create_notification()` receives the correct argument shape:
+
+- user_id
+- type
+- title
+- body
+- payload
+
+Add tests so this cannot regress.
+
+8. Tests and verification
+
+Add the planned tests, plus tests for:
+
+- no fake assistant auth intent if unsupported
+- no fake quick-action query params unless wired
+- work queue deep links require both active delegation and correct permissions
+- assistant/agency copy does not promise guaranteed income
+- “Private Agency Request Links” wording replaces “Public Agency Request Links”
+
+Run and report exact results:
+
+- `bunx tsgo --noEmit`
+- `bunx vitest run`
+- `bun run build`
+
+Do not mark complete unless every command passes and the product wiring plus public showcase are both correct.

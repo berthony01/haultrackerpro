@@ -19,7 +19,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ListTodo, Plus } from 'lucide-react';
+import { ListTodo, Plus, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useActingContext } from '@/hooks/useActingContext';
+import { hasPerm } from '@/lib/assistantPermissions';
 import { useToast } from '@/hooks/use-toast';
 import {
   useAgencyClients,
@@ -147,6 +150,27 @@ export function WorkQueueSection({ agencyId }: { agencyId: string }) {
 function WorkItemRowView({ item }: { item: WorkItemRow }) {
   const { update } = useWorkItemMutations();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { managedDrivers, beginActingAs } = useActingContext();
+  const delegation = managedDrivers.find((d) => d.driver_user_id === item.driver_user_id) ?? null;
+  const perms = delegation?.permissions ?? null;
+
+  const go = (page: string) => {
+    beginActingAs(item.driver_user_id);
+    navigate(`/dashboard?page=${page}`);
+  };
+
+  const links: Array<{ key: string; label: string; onClick: () => void }> = [];
+  if (delegation) {
+    links.push({ key: 'manage', label: 'Start managing', onClick: () => go('dashboard') });
+    if (hasPerm(perms, 'manage_loads')) links.push({ key: 'load', label: 'Add load', onClick: () => go('add') });
+    if (hasPerm(perms, 'manage_expenses')) links.push({ key: 'exp', label: 'Add expense', onClick: () => go('add_expense') });
+    // Fuel routes to the existing fuel-log flow (applyFuelLogPolicy reconciles totals).
+    if (hasPerm(perms, 'manage_fuel')) links.push({ key: 'fuel', label: 'Add fuel log', onClick: () => go('add_fuel') });
+    if (hasPerm(perms, 'view_reports')) links.push({ key: 'rep', label: 'View reports', onClick: () => go('reports') });
+    if (hasPerm(perms, 'manage_settings_limited')) links.push({ key: 'set', label: 'Limited settings', onClick: () => { beginActingAs(item.driver_user_id); navigate('/assistant/settings'); } });
+  }
+
   return (
     <div className="rounded-md border p-3 text-sm space-y-1">
       <div className="flex items-start justify-between gap-2">
@@ -172,7 +196,7 @@ function WorkItemRowView({ item }: { item: WorkItemRow }) {
           )}
         </div>
       </div>
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-wrap gap-2 pt-1 items-center">
         <Select
           value={item.status}
           onValueChange={async (v) => {
@@ -198,6 +222,24 @@ function WorkItemRowView({ item }: { item: WorkItemRow }) {
             ))}
           </SelectContent>
         </Select>
+
+        {delegation
+          ? links.map((l) => (
+              <Button
+                key={l.key}
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={l.onClick}
+              >
+                <ExternalLink className="h-3 w-3" /> {l.label}
+              </Button>
+            ))
+          : (
+            <p className="text-xs text-muted-foreground">
+              You're assigned this work item, but you don't currently have driver account access. Ask the driver to approve a delegation to manage their records.
+            </p>
+          )}
       </div>
     </div>
   );
