@@ -66,18 +66,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string, intendedRole?: 'driver' | 'recruiter') => {
+  const signUp = useCallback(async (email: string, password: string, displayName?: string, intendedRole?: 'driver' | 'recruiter', options?: SignUpOptions) => {
     const role = intendedRole === 'recruiter' ? 'recruiter' : 'driver';
+    const safeNext = sanitizeNextPath(options?.emailRedirectNext ?? null);
+    const emailRedirectTo = safeNext
+      ? `${window.location.origin}/auth?next=${encodeURIComponent(safeNext)}`
+      : window.location.origin;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo,
         data: { display_name: displayName, intended_role: role },
       },
     });
     return { error };
   }, []);
+
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
