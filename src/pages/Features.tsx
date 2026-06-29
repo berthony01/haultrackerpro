@@ -10,7 +10,7 @@ export default function Features() {
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Features — Truck Driver Profit, Expense & RPM Tracker | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, reports, contract clarity, parking, and driver referrals — built for owner-operators and 1099 truck drivers." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
+      <SEOHead title="Features — Truck Driver Profit, Expense, RPM & Agency Tools | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, profit, contracts, parking, referrals — plus driver assistants and agency workflow for back-office teams." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
@@ -47,7 +47,7 @@ export default function Features() {
       {/* Feature Categories */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 space-y-14">
         {featureList.map((cat) => (
-          <div key={cat.category}>
+          <div key={cat.category} id={cat.category === 'Team & Agency Workflow' ? 'team-agency' : undefined}>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
               {cat.category}
             </h2>
