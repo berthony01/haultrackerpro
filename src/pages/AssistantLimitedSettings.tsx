@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import { useActingContext } from '@/hooks/useActingContext';
 import { hasPerm } from '@/lib/assistantPermissions';
 import { CostProfileSettings } from '@/components/CostProfileSettings';

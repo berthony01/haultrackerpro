@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import {
   Card,
   CardContent,
@@ -69,9 +70,11 @@ export default function DriverAssistantControl() {
   if (loading) return null;
   if (!user) {
     return (
-      <div className="container mx-auto max-w-md px-4 py-8">
-        <p>Please sign in.</p>
-      </div>
+      <AppShell>
+        <div className="container mx-auto max-w-md px-4 py-8">
+          <p>Please sign in.</p>
+        </div>
+      </AppShell>
     );
   }
 

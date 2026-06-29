@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import { ArrowLeft, ClipboardList, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,9 +30,11 @@ export default function DriverWorkItems() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-      </div>
+      <AppShell>
+        <div className="container mx-auto px-4 py-8">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      </AppShell>
     );
   }
   if (!user) {
