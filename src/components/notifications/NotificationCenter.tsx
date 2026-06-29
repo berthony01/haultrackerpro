@@ -42,9 +42,11 @@ function routeForNotification(n: NotificationRow): string | null {
       return 'opportunities';
     default:
       if (n.type.startsWith('contract_')) return 'contracts';
-      // Phase 4B: assistant + agency notifications
+      // Phase 4B: assistant + agency notifications use absolute routes
+      // (prefixed with '/') so the handler in NotificationCenter routes
+      // them with react-router instead of the in-page page key.
       if (n.type === 'assistant_invited' || n.type === 'assistant_revoked') {
-        return 'driver-assistant-control';
+        return '/driver/assistant-control';
       }
       if (n.type === 'assistant_accepted') return 'settings';
       if (
@@ -55,14 +57,15 @@ function routeForNotification(n: NotificationRow): string | null {
         n.type === 'agency_delegation_pending' ||
         n.type === 'agency_work_item_waiting_on_driver'
       ) {
-        return 'driver-assistant-control';
+        return '/driver/assistant-control';
       }
-      if (n.type.startsWith('agency_')) return 'agency-dashboard';
+      if (n.type.startsWith('agency_')) return '/agency';
       return null;
   }
 }
 
 export function NotificationCenter({ onClose, onNavigate }: Props) {
+  const navigate = useNavigate();
   const { notifications, isLoading } = useNotificationList();
   const { markRead, markAllRead } = useNotificationActions();
   const unreadCount = notifications.reduce((n, x) => (x.read_at ? n : n + 1), 0);
@@ -70,9 +73,14 @@ export function NotificationCenter({ onClose, onNavigate }: Props) {
   const handleClick = (n: NotificationRow) => {
     if (!n.read_at) markRead.mutate(n.id);
     const route = routeForNotification(n);
-    if (route && onNavigate) {
-      onNavigate(route);
-      onClose?.();
+    if (route) {
+      if (route.startsWith('/')) {
+        navigate(route);
+        onClose?.();
+      } else if (onNavigate) {
+        onNavigate(route);
+        onClose?.();
+      }
     }
   };
 
