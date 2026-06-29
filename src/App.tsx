@@ -137,26 +137,24 @@ function PageFallback() {
   );
 }
 
-function postAuthRedirect(search: string): string {
-  try {
-    const intent = new URLSearchParams(search).get('intent');
-    if (intent === 'recruiter') return '/dashboard?page=recruiter-access';
-  } catch {}
-  return '/dashboard';
-}
+import { resolvePostAuthDestination, buildAuthUrl } from '@/lib/authNavigation';
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <PageFallback />;
-  if (user) return <Navigate to={postAuthRedirect(location.search)} replace />;
+  if (user) return <Navigate to={resolvePostAuthDestination(location.search)} replace />;
   return <>{children}</>;
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <PageFallback />;
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) {
+    const nextPath = `${location.pathname}${location.search}`;
+    return <Navigate to={buildAuthUrl(nextPath)} replace />;
+  }
   return <>{children}</>;
 }
 
@@ -164,7 +162,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <PageFallback />;
-  if (user) return <Navigate to={postAuthRedirect(location.search)} replace />;
+  if (user) return <Navigate to={resolvePostAuthDestination(location.search)} replace />;
   return <>{children}</>;
 }
 
