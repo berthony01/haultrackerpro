@@ -53,7 +53,7 @@ const TYPES: AgencyWorkItemType[] = [
 ];
 const PRIORITIES: AgencyWorkItemPriority[] = ['low', 'normal', 'high'];
 
-export function WorkQueueSection({ agencyId }: { agencyId: string }) {
+export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: string; focusedWorkItemId?: string | null }) {
   const [status, setStatus] = useState<AgencyWorkItemStatus | 'all'>('open');
   const [driverId, setDriverId] = useState<string | 'all'>('all');
   const [memberId, setMemberId] = useState<string | 'all'>('all');
@@ -65,6 +65,15 @@ export function WorkQueueSection({ agencyId }: { agencyId: string }) {
   const { data: clients } = useAgencyClients(agencyId);
   const { data: members } = useAgencyMembers(agencyId);
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Auto-scroll to a notification-deep-linked work item once it loads.
+  useEffect(() => {
+    if (!focusedWorkItemId || !items) return;
+    const el = document.getElementById(`work-item-${focusedWorkItemId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusedWorkItemId, items]);
 
   return (
     <Card>
