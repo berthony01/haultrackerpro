@@ -43,8 +43,16 @@ import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 export default function AgencyDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: agency, isLoading } = useMyAgency();
   const { managedDrivers } = useActingContext();
+
+  // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
+  const focusedWorkItemId = new URLSearchParams(location.search).get('workItem');
+  const [activeTab, setActiveTab] = useState<string>(focusedWorkItemId ? 'work' : 'overview');
+  useEffect(() => {
+    if (focusedWorkItemId) setActiveTab('work');
+  }, [focusedWorkItemId]);
 
   if (!user) {
     return (
