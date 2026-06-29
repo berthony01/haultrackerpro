@@ -45,6 +45,7 @@ export default function DriverWorkItems() {
 
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-2xl px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>

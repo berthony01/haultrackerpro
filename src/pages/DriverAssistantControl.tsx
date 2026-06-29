@@ -84,6 +84,7 @@ export default function DriverAssistantControl() {
   const pendingCount = pending?.length ?? 0;
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
       <header className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
