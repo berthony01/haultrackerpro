@@ -41,6 +41,22 @@ function routeForNotification(n: NotificationRow): string | null {
       return 'opportunities';
     default:
       if (n.type.startsWith('contract_')) return 'contracts';
+      // Phase 4B: assistant + agency notifications
+      if (n.type === 'assistant_invited' || n.type === 'assistant_revoked') {
+        return 'driver-assistant-control';
+      }
+      if (n.type === 'assistant_accepted') return 'settings';
+      if (
+        n.type === 'agency_client_request_approved' ||
+        n.type === 'agency_client_request_declined' ||
+        n.type === 'agency_client_request_cancelled' ||
+        n.type === 'agency_client_request_converted_to_client' ||
+        n.type === 'agency_delegation_pending' ||
+        n.type === 'agency_work_item_waiting_on_driver'
+      ) {
+        return 'driver-assistant-control';
+      }
+      if (n.type.startsWith('agency_')) return 'agency-dashboard';
       return null;
   }
 }
