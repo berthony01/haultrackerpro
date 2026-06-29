@@ -165,13 +165,22 @@ export function AssistantsPanel() {
               : 'Inviting assistants requires Pro.'}
           </p>
         </div>
-        {isPro ? (
-          <InviteAssistantDialog />
-        ) : (
-          <Button variant="outline" onClick={() => (window.location.href = '/pricing')}>
-            Upgrade to invite
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => (window.location.href = '/driver/assistant-control')}
+          >
+            Open control center
           </Button>
-        )}
+          {isPro ? (
+            <InviteAssistantDialog />
+          ) : (
+            <Button variant="outline" onClick={() => (window.location.href = '/pricing')}>
+              Upgrade to invite
+            </Button>
+          )}
+        </div>
       </div>
 
       {isPro && atLimit && (
