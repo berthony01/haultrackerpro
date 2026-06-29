@@ -35,9 +35,11 @@ export default function DriverWorkItems() {
     );
   }
   if (!user) {
-    navigate('/auth?redirect=/driver/work-items');
+    const target = id ? `/driver/work-items/${id}` : '/driver/work-items';
+    navigate(`/auth?next=${encodeURIComponent(target)}`);
     return null;
   }
+
 
   return (
     <div className="container mx-auto max-w-2xl px-4 py-6 space-y-6">
