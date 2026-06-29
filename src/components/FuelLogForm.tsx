@@ -57,7 +57,7 @@ export function FuelLogForm({ onSubmit, onCancel, loading, loads = [], initialDa
         </Button>
         <div>
           <h2 className="text-2xl font-black tracking-tight">{initialData ? 'Edit Fuel Log' : 'Log Fuel Purchase'}</h2>
-          <p className="text-sm text-muted-foreground">Track your fuel costs</p>
+          <p className="text-sm text-muted-foreground">Tracks gallons, MPG, and fuel-stop analytics. When a fuel log exists, the matching Fuel expense category is excluded automatically so totals aren't double-counted.</p>
         </div>
       </div>
 
