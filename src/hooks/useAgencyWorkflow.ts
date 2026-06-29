@@ -136,6 +136,23 @@ export interface AgencyPublicView {
   status: string;
 }
 
+// Phase 4C — Waiting-on-driver work items (driver-side view)
+export interface DriverWaitingWorkItem {
+  id: string;
+  agency_id: string;
+  agency_name: string;
+  title: string;
+  description: string | null;
+  type: AgencyWorkItemType;
+  priority: AgencyWorkItemPriority;
+  status?: AgencyWorkItemStatus;
+  due_date: string | null;
+  last_driver_response?: string | null;
+  last_driver_response_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ---------- Packages ----------
 export function useAgencyPackages(agencyId: string | null | undefined, opts?: { publicView?: boolean }) {
   return useQuery({
