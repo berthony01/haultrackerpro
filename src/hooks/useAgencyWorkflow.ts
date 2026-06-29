@@ -583,3 +583,83 @@ export function formatAgencyAuditAction(action: string, entity_type: string): st
   const entity = (entity_type || '').replace(/_/g, ' ');
   return `${action.replace(/_/g, ' ')} on ${entity}`;
 }
+
+// ---------- Phase 4C: Agency slugs ----------
+export function useSetAgencySlug() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { agencyId: string; slug: string | null }) => {
+      const { data, error } = await (supabase as any).rpc('set_agency_slug', {
+        _agency_id: input.agencyId,
+        _slug: input.slug ?? '',
+      });
+      if (error) throw error;
+      return data as string | null;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agency-owned'] });
+      qc.invalidateQueries({ queryKey: ['agency-public-view'] });
+    },
+  });
+}
+
+export function useResolveAgencySlug(slug: string | null | undefined) {
+  return useQuery({
+    queryKey: ['agency-slug', slug],
+    enabled: !!slug,
+    staleTime: 60_000,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await (supabase as any).rpc('resolve_agency_slug', {
+        _slug: slug,
+      });
+      if (error) throw error;
+      return (data as string) ?? null;
+    },
+  });
+}
+
+// ---------- Phase 4C: Driver waiting-on-driver workflow ----------
+export function useMyWaitingWorkItems() {
+  return useQuery({
+    queryKey: ['my-waiting-work-items'],
+    staleTime: 15_000,
+    queryFn: async (): Promise<DriverWaitingWorkItem[]> => {
+      const { data, error } = await (supabase as any).rpc('list_my_waiting_work_items');
+      if (error) throw error;
+      return (data ?? []) as DriverWaitingWorkItem[];
+    },
+  });
+}
+
+export function useMyWaitingWorkItem(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ['my-waiting-work-item', id],
+    enabled: !!id,
+    staleTime: 5_000,
+    queryFn: async (): Promise<DriverWaitingWorkItem | null> => {
+      const { data, error } = await (supabase as any).rpc('get_my_waiting_work_item', {
+        _id: id,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row ?? null) as DriverWaitingWorkItem | null;
+    },
+  });
+}
+
+export function useDriverRespondWorkItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; response: string }) => {
+      const { error } = await (supabase as any).rpc('driver_respond_to_work_item', {
+        _id: input.id,
+        _response: input.response,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['my-waiting-work-items'] });
+      qc.invalidateQueries({ queryKey: ['my-waiting-work-item', v.id] });
+    },
+  });
+}
