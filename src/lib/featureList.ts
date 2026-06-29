@@ -127,7 +127,20 @@ export const featureList: FeatureCategory[] = [
       { icon: Trash2, title: 'Complete Account Deletion', description: 'Permanently delete your account and all associated data across 18 tables in one click — loads, expenses, fuel logs, snapshots, AI insights, brokers, alerts, settings, subscription records, and your auth account. No hoops, no retention.' },
     ],
   },
+  {
+    category: 'Team & Agency Workflow',
+    features: [
+      { icon: Users, title: 'Driver Assistants', description: 'Invite a spouse, dispatcher, or back-office helper into your account with granular permissions (loads, expenses, fuel, reports, settings). Every action is logged and you can revoke access any time.', pro: true },
+      { icon: Shield, title: 'Driver Control Center', description: 'One screen at /driver/assistant-control to see every person and agency with access to your account — direct invites and agency delegations — and end any access in one tap.' },
+      { icon: Building2, title: 'Agency Workspace', description: 'Run a multi-driver back-office: publish service packages, accept private client requests, manage a shared work queue, and track every action in an agency audit log.' },
+      { icon: UserCheck, title: 'Driver-Approved Delegation', description: 'Agencies can only act on a driver\'s account after the driver explicitly approves the delegation request — and the driver can revoke it instantly. No silent access.' },
+      { icon: Bell, title: 'Waiting-on-Driver Work Items', description: 'When an agency needs driver input on a task, the driver gets an in-app notification with a one-tap response screen at /driver/work-items. No email back-and-forth.' },
+      { icon: Globe, title: 'Public Agency Request Links', description: 'Each agency gets a clean public URL (haultrackerpro.com/a/your-agency) drivers can use to request service — no login required to start the conversation.' },
+      { icon: Bell, title: 'Assistant & Agency Notifications', description: 'In-app notifications for invites, approvals, work assignments, and waiting-on-driver events. Toggle assistant and agency channels independently in your notification preferences.' },
+    ],
+  },
 ];
+
 
 export function generateFeatureMarkdown(): string {
   const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });

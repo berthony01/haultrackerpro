@@ -9,8 +9,12 @@ Disallow: /reset-password
 Disallow: /install
 Disallow: /parking
 Disallow: /updates
+Disallow: /driver
+Disallow: /agency
+Disallow: /a/
 
 # Post-submit / thank-you pages
 Disallow: /starter-kit/thanks
+
 
 Sitemap: https://haultrackerpro.com/sitemap.xml
