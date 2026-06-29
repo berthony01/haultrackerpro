@@ -81,5 +81,6 @@ export default function AssistantLimitedSettings() {
         </CardContent>
       </Card>
     </div>
+    </AppShell>
   );
 }

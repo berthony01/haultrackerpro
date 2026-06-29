@@ -60,6 +60,7 @@ export default function DriverWorkItems() {
 
       {id ? <SingleItem id={id} /> : <ListAll />}
     </div>
+    </AppShell>
   );
 }
 

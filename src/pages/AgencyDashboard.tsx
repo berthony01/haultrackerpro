@@ -121,6 +121,7 @@ export default function AgencyDashboard() {
         </Tabs>
       )}
     </div>
+    </AppShell>
   );
 }
 

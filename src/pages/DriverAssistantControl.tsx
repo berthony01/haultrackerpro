@@ -334,6 +334,7 @@ export default function DriverAssistantControl() {
         </CardContent>
       </Card>
     </div>
+    </AppShell>
   );
 }
 
