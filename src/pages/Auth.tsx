@@ -270,10 +270,26 @@ export default function Auth() {
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => setCapability(c.id)}
+                    onClick={() => {
+                      setCapability(c.id);
+                      // Sync URL so refresh / sharing preserves the chosen capability.
+                      // Recruiter keeps the legacy intent param; assistant/agency
+                      // use the canonical `next` parameter; driver clears both.
+                      const params = new URLSearchParams(location.search);
+                      params.delete('intent');
+                      params.delete('next');
+                      if (c.id === 'recruiter') params.set('intent', 'recruiter');
+                      else if (c.nextDefault) params.set('next', c.nextDefault);
+                      const qs = params.toString();
+                      navigate(
+                        { pathname: '/auth', search: qs ? `?${qs}` : '' },
+                        { replace: true },
+                      );
+                    }}
                     aria-pressed={active}
+                    aria-label={`Select ${c.label} capability`}
                     className={cn(
-                      'text-left rounded-xl border p-4 transition-all',
+                      'text-left rounded-xl border p-4 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F1115]',
                       active ? 'ring-2' : 'hover:border-white/20',
                     )}
                     style={{
