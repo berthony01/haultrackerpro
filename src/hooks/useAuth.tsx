@@ -1,15 +1,21 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeNextPath } from '@/lib/authNavigation';
 import type { User, Session } from '@supabase/supabase-js';
+
+interface SignUpOptions {
+  emailRedirectNext?: string | null;
+}
 
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, displayName?: string, intendedRole?: 'driver' | 'recruiter') => Promise<{ error: any }>;
+  signUp: (email: string, password: string, displayName?: string, intendedRole?: 'driver' | 'recruiter', options?: SignUpOptions) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
+
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -60,18 +66,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string, intendedRole?: 'driver' | 'recruiter') => {
+  const signUp = useCallback(async (email: string, password: string, displayName?: string, intendedRole?: 'driver' | 'recruiter', options?: SignUpOptions) => {
     const role = intendedRole === 'recruiter' ? 'recruiter' : 'driver';
+    const safeNext = sanitizeNextPath(options?.emailRedirectNext ?? null);
+    const emailRedirectTo = safeNext
+      ? `${window.location.origin}/auth?next=${encodeURIComponent(safeNext)}`
+      : window.location.origin;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo,
         data: { display_name: displayName, intended_role: role },
       },
     });
     return { error };
   }, []);
+
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

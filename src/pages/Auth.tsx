@@ -178,7 +178,9 @@ export default function Auth() {
     setLoading(true);
     try {
       if (mode === 'signup') {
-        const { error } = await signUp(form.email, form.password, form.name, role);
+        const { error } = await signUp(form.email, form.password, form.name, role, {
+          emailRedirectNext: effectiveNext,
+        });
         if (error) throw error;
         trackSignUp('email');
         if (!isInternalTestEmail(form.email)) {
@@ -198,6 +200,12 @@ export default function Auth() {
         const { error } = await signIn(form.email, form.password);
         if (error) throw error;
         trackLogin('email');
+        // Honor capability selection: if user picked Assistant/Agency on /auth
+        // without ?next=, route to the matching workspace. ProtectedRoute will
+        // also respect any pre-set ?next= via resolvePostAuthDestination.
+        if (effectiveNext) {
+          navigate(effectiveNext, { replace: true });
+        }
       }
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');
@@ -205,6 +213,7 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
 
   const titles: Record<Capability, { login: string; signup: string }> = {
     driver: { login: 'Welcome back, driver', signup: 'Create your driver account' },

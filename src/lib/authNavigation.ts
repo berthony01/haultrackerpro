@@ -15,22 +15,31 @@ export function isSafeInternalPath(path: string | null | undefined): boolean {
   if (!path.startsWith('/')) return false;
   if (path.startsWith('//')) return false;
   if (path.startsWith('/\\')) return false;
-  // Reject any embedded scheme like "javascript:" or "data:" or backslashes
-  // (some browsers normalize "/\\evil.com" to "//evil.com").
+  // Reject raw whitespace, control chars, or embedded scheme/backslash
   if (/[\s\x00-\x1f]/.test(path)) return false;
   if (/^\/[a-z][a-z0-9+.-]*:/i.test(path)) return false;
   if (path.includes('\\')) return false;
-  // Reject anything that decodes to a protocol or external URL
+  // Re-check after percent-decoding: attackers commonly hide whitespace,
+  // backslashes, protocol-relative slashes, or scheme-like prefixes behind
+  // encoding (e.g. /%2F%2Fevil.com, /%5Cevil.com, /%0aevil, /javascript%3A).
+  let decoded: string;
   try {
-    const decoded = decodeURIComponent(path);
-    if (decoded.startsWith('//') || /^\/?[a-z][a-z0-9+.-]*:/i.test(decoded)) {
-      return false;
-    }
+    decoded = decodeURIComponent(path);
   } catch {
     return false;
   }
+  if (decoded.length > 512) return false;
+  if (!decoded.startsWith('/')) return false;
+  // Protocol-relative after decoding (handles "/%2F%2Fevil.com" → "///evil.com")
+  if (decoded.length >= 2 && decoded[1] === '/') return false;
+  if (decoded.length >= 2 && decoded[1] === '\\') return false;
+  if (/[\s\x00-\x1f]/.test(decoded)) return false;
+  if (decoded.includes('\\')) return false;
+  // Scheme-like substring after the leading slash, e.g. "/javascript:..."
+  if (/^\/?[a-z][a-z0-9+.-]*:/i.test(decoded)) return false;
   return true;
 }
+
 
 export function sanitizeNextPath(path: string | null | undefined): string | null {
   return isSafeInternalPath(path) ? (path as string) : null;
