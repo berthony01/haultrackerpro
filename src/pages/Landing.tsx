@@ -430,6 +430,79 @@ export default function Landing() {
         </section>
 
         {/* ═══════════════════════════════════════════ */}
+        {/* 3b · TEAM & AGENCY — solo, team, agency */}
+        {/* ═══════════════════════════════════════════ */}
+        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }} id="team-agency">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+            <div className="text-center mb-10 sm:mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}>
+                <Sparkles className="h-3.5 w-3.5" /> New
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
+                Built for solo drivers, teams, and back-office agencies.
+              </h2>
+              <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
+                Run the account yourself, invite a spouse or dispatcher with granular permissions, or let a vetted agency handle the back office — with driver approval and a full audit log on every action.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {[
+                {
+                  icon: Truck,
+                  tag: 'Solo Driver',
+                  title: 'Stay in full control',
+                  bullets: ['Single sign-in, you own everything', 'One-tap Driver Control Center to see who has access', 'Revoke any access instantly'],
+                },
+                {
+                  icon: Users,
+                  tag: 'Driver + Assistant',
+                  title: 'Invite a helper',
+                  bullets: ['Granular permissions (loads, expenses, fuel, reports)', 'Every action stamped and audit-logged', 'Pro feature — invite in seconds'],
+                },
+                {
+                  icon: Briefcase,
+                  tag: 'Agency / Back-Office',
+                  title: 'Run multiple drivers',
+                  bullets: ['Service packages + private client request links', 'Driver-approved delegation, never silent access', 'Shared work queue with waiting-on-driver responses'],
+                },
+              ].map((card) => (
+                <div key={card.tag} className="rounded-2xl border p-6 flex flex-col" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                      <card.icon className="h-5 w-5" style={{ color: AMBER }} />
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>{card.tag}</span>
+                  </div>
+                  <h3 className="text-lg font-black text-white leading-tight">{card.title}</h3>
+                  <div className="mt-4 space-y-2">
+                    {card.bullets.map((b) => (
+                      <p key={b} className="text-sm flex items-start gap-2 text-white/90">
+                        <Check className="h-4 w-4 mt-0.5 shrink-0" style={{ color: GREEN }} />
+                        <span>{b}</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center">
+              <Button
+                onClick={() => navigate('/features#team-agency')}
+                variant="outline"
+                className="rounded-xl font-bold gap-2 hover:bg-transparent"
+                style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}
+              >
+                See team & agency features <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </section>
+
+
+
+        {/* ═══════════════════════════════════════════ */}
         {/* 4 · TRUST + PRICING STRIP */}
         {/* ═══════════════════════════════════════════ */}
         <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
