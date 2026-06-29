@@ -156,7 +156,7 @@ export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: st
   );
 }
 
-function WorkItemRowView({ item }: { item: WorkItemRow }) {
+function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted?: boolean }) {
   const { update } = useWorkItemMutations();
   const { toast } = useToast();
   const navigate = useNavigate();
