@@ -135,7 +135,7 @@ export const featureList: FeatureCategory[] = [
       { icon: Building2, title: 'Agency Workspace', description: 'Run a multi-driver back-office: publish service packages, accept private client requests, manage a shared work queue, and track every action in an agency audit log.' },
       { icon: UserCheck, title: 'Driver-Approved Delegation', description: 'Agencies can only act on a driver\'s account after the driver explicitly approves the delegation request — and the driver can revoke it instantly. No silent access.' },
       { icon: Bell, title: 'Waiting-on-Driver Work Items', description: 'When an agency needs driver input on a task, the driver gets an in-app notification with a one-tap response screen at /driver/work-items. No email back-and-forth.' },
-      { icon: Globe, title: 'Public Agency Request Links', description: 'Each agency gets a clean public URL (haultrackerpro.com/a/your-agency) drivers can use to request service — no login required to start the conversation.' },
+      { icon: Globe, title: 'Private Agency Request Links', description: 'Each agency gets a shareable request link (haultrackerpro.com/a/your-agency) that drivers can use to ask for help. Drivers sign in to submit the request, and submitting a request does not grant any account access on its own.' },
       { icon: Bell, title: 'Assistant & Agency Notifications', description: 'In-app notifications for invites, approvals, work assignments, and waiting-on-driver events. Toggle assistant and agency channels independently in your notification preferences.' },
     ],
   },
@@ -146,6 +146,7 @@ export function generateFeatureMarkdown(): string {
   const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   let md = `# HaulTrackerPro — Feature Overview\n`;
   md += `Generated: ${now}\n\n`;
+  md += `For drivers, recruiters, driver assistants, and back-office agencies. Driver Assistants and Agencies can use HaulTracker Pro as a side-hustle / agency workflow to manage approved driver clients. Access is always driver-approved and permission-based. HaulTracker Pro does not currently process payments between drivers and assistants or agencies, and does not guarantee income or clients.\n\n`;
   md += `---\n\n`;
 
   for (const cat of featureList) {

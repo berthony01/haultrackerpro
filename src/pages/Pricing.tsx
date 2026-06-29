@@ -520,6 +520,45 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* Assistants & Agencies */}
+      <section id="assistants-agencies" className="py-16 sm:py-24 scroll-mt-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+              Assistants &amp; <span style={{ color: 'hsl(25, 95%, 53%)' }}>Agencies</span>
+            </h2>
+            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
+              Use HaulTracker Pro to help truckers manage their back office. Drivers stay in control and approve exactly who gets access.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+              <h3 className="text-base font-black mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>How drivers pay</h3>
+              <p className="text-sm" style={{ color: 'hsl(220, 10%, 65%)' }}>
+                Drivers pay for their own HaulTracker Pro subscription (Free or Pro). That covers the driver account itself.
+              </p>
+            </div>
+            <div className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+              <h3 className="text-base font-black mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>How assistants &amp; agencies use it</h3>
+              <p className="text-sm" style={{ color: 'hsl(220, 10%, 65%)' }}>
+                Driver Assistants and Agencies can use the platform to manage approved driver clients — load entry, expenses, fuel logs, reports, and back-office work.
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 p-5 rounded-2xl border" style={{ background: 'hsl(25, 95%, 53%, 0.06)', borderColor: 'hsl(25, 95%, 53%, 0.35)' }}>
+            <h3 className="text-sm font-black mb-2" style={{ color: 'hsl(25, 95%, 60%)' }}>Payments for assistant &amp; agency services</h3>
+            <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
+              HaulTracker Pro does <b>not</b> currently process payments between drivers and assistants or agencies. Any service fees are arranged outside the platform for now. Future agency billing features may come later. HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
+            </p>
+          </div>
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+            <Button onClick={() => navigate('/assistants-agencies')} className="rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+              Explore the Assistants &amp; Agencies opportunity <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
 
       {/* Lead magnet CTA */}
       <section className="py-8" style={{ background: 'hsl(220, 20%, 8%)' }}>

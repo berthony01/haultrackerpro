@@ -79,6 +79,7 @@ const DriverDelegationApprovals = lazy(() => import("./pages/DriverDelegationApp
 const DriverAssistantControl = lazy(() => import("./pages/DriverAssistantControl"));
 const DriverWorkItems = lazy(() => import("./pages/DriverWorkItems"));
 const AgencySlugRedirect = lazy(() => import("./pages/AgencySlugRedirect"));
+const AssistantsAgencies = lazy(() => import("./pages/AssistantsAgencies"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -219,6 +220,7 @@ const App = () => (
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/recruiters" element={<Recruiters />} />
               <Route path="/about" element={<About />} />
+              <Route path="/assistants-agencies" element={<AssistantsAgencies />} />
               <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/install" element={<Install />} />

@@ -10,7 +10,7 @@ export default function Features() {
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Features — Truck Driver Profit, Expense, RPM & Agency Tools | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, profit, contracts, parking, referrals — plus driver assistants and agency workflow for back-office teams." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
+      <SEOHead title="Features — Truck Driver Profit, Expense, RPM & Back-Office Agency Tools | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, profit, contracts, parking, and referrals — plus driver assistants and a back-office agency workflow for managing approved driver clients with permission-based access." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
@@ -51,6 +51,11 @@ export default function Features() {
             <h2 className="text-xl sm:text-2xl font-black tracking-tight mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>
               {cat.category}
             </h2>
+            {cat.category === 'Team & Agency Workflow' && (
+              <p className="text-sm mb-5 max-w-3xl" style={{ color: 'hsl(220, 10%, 60%)' }}>
+                Use HaulTracker Pro as a private operating system for trucking back-office services. Drivers stay in control while assistants and agencies manage only what they are approved to manage. Submitting an agency request never grants account access — a driver must explicitly approve each delegation.
+              </p>
+            )}
             {cat.category === 'Contract Protection' && (
               <p className="text-xs mb-5 max-w-3xl" style={{ color: 'hsl(220, 10%, 50%)' }}>
                 Review recruiter-sent contracts before you approve an opportunity, sign, or get marked hired. AI contract review is informational only and does not replace reading the full agreement or speaking with a qualified attorney.

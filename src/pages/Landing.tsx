@@ -22,6 +22,8 @@ import { trackStarterKitCTAClicked } from '@/lib/analytics';
 const faqs = [
   { q: 'Is it really free?', a: 'Yes. The Free plan gives drivers unlimited load logging, expense tracking, multi-stop loads, basic smart alerts, and CSV exports — no credit card. Pro ($19.99/mo or $179.88/yr) adds AI automation, advanced insights, and the Driver Scorecard.' },
   { q: 'How do recruiters get verified?', a: 'Recruiters apply for verified access on the Recruiters page. Once approved, they can post unlimited standard opportunities, manage applicants, and track referrals. Paid recruiter plans add premium visibility, analytics, and contract workflow tools.' },
+  { q: 'Can I use HaulTracker Pro to help other drivers as a side hustle?', a: 'Yes. Driver Assistants can help one or more drivers, and Agencies can manage multiple approved driver clients. Access requires explicit driver approval, drivers can revoke at any time, and every action is audit-logged. Payments between drivers and assistants/agencies are arranged outside HaulTracker Pro for now — opportunity only, no promise of clients or income.' },
+  { q: 'Do assistants or agencies get access automatically?', a: 'No. Submitting an agency request never grants access. A driver must approve a specific delegation and choose exactly which permissions are granted (loads, expenses, fuel, reports, limited settings). Drivers can revoke instantly from the Driver Control Center.' },
   { q: 'Is my data secure?', a: 'All data is encrypted in transit and stored securely. We never sell or share your data.' },
   { q: 'How is this different from a spreadsheet?', a: 'Instant profit calculations, weekly closeouts, pay variance alerts, and exports built specifically for trucking — no formulas to maintain.' },
 ];
@@ -72,8 +74,8 @@ export default function Landing() {
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: NAVY_BG }}>
       <SEOHead
-        title="HaulTrackerPro — Honest Trucking Economics for Drivers & Recruiters"
-        description="The trucking platform where owner-operators track real profit per load and verified recruiters post real opportunities. Track loads, fuel, expenses, and RPM. Post jobs, manage applicants, track referrals. Start free."
+        title="HaulTrackerPro — Trucking Profit, Verified Jobs, and Back-Office Agency Tools"
+        description="HaulTracker Pro helps truck drivers track real profit, recruiters post verified jobs, and driver assistants or back-office agencies manage approved driver accounts with permission-based access and full audit logs."
         path="/"
         jsonLd={[
           {
@@ -115,6 +117,7 @@ export default function Landing() {
               { label: 'Pricing', href: '/pricing' },
               { label: 'Resources', href: '/resources' },
               { label: 'For Recruiters', href: '/recruiters' },
+              { label: 'Assistants & Agencies', href: '/assistants-agencies' },
               { label: 'Sign In', href: '/auth' },
             ].map((item) => (
               <Button
@@ -172,6 +175,7 @@ export default function Landing() {
                 { label: 'Pricing', href: '/pricing' },
                 { label: 'Resources', href: '/resources' },
                 { label: 'For Recruiters', href: '/recruiters' },
+                { label: 'Assistants & Agencies', href: '/assistants-agencies' },
                 { label: 'FAQ', href: '/faq' },
                 { label: 'Sign In', href: '/auth' },
               ].map((item) => (
@@ -209,21 +213,21 @@ export default function Landing() {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
               style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
             >
-              <Sparkles className="h-3.5 w-3.5" /> Built for Trucking — Drivers & Recruiters
+              <Sparkles className="h-3.5 w-3.5" /> For drivers, recruiters, assistants &amp; agencies
             </div>
             <h1
               className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] text-white max-w-4xl mx-auto"
             >
-              The honest trucking platform.{' '}
-              <span style={{ color: AMBER }}>Drivers track real profit. Recruiters post real jobs.</span>
+              Track trucking profit. Post real jobs.{' '}
+              <span style={{ color: AMBER }}>Build a back-office side hustle.</span>
             </h1>
             <p
               className="mt-6 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto"
               style={{ color: TEXT_MUTED }}
             >
-              HaulTrackerPro is one place where owner-operators see their true RPM and net profit per
-              load, and verified recruiters reach drivers who actually know their numbers. No
-              spreadsheets. No ghost applicants. No guessing.
+              Drivers track real profit per load. Recruiters post verified opportunities. Driver
+              assistants and agencies can help truckers manage loads, expenses, fuel logs, reports,
+              and back-office work — with driver-approved access and a full audit log on every action.
             </p>
 
             {/* Dual primary CTAs */}
@@ -253,6 +257,15 @@ export default function Landing() {
                 }}
               >
                 <Users className="h-5 w-5" /> Post Jobs Free as a Recruiter
+              </Button>
+              <Button
+                onClick={() => navigate('/assistants-agencies')}
+                size="lg"
+                variant="ghost"
+                className="text-base sm:text-lg font-bold rounded-xl h-14 px-6 gap-2 w-full sm:w-auto"
+                style={{ color: AMBER_BRIGHT }}
+              >
+                <Briefcase className="h-5 w-5" /> Build a Back-Office Service
               </Button>
             </div>
 
@@ -439,10 +452,14 @@ export default function Landing() {
                 <Sparkles className="h-3.5 w-3.5" /> New
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white">
-                Built for solo drivers, teams, and back-office agencies.
+                Turn trucking paperwork into a service business.
               </h2>
               <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
-                Run the account yourself, invite a spouse or dispatcher with granular permissions, or let a vetted agency handle the back office — with driver approval and a full audit log on every action.
+                Many drivers don't want to enter loads, expenses, fuel logs, and reports themselves.
+                Driver Assistants can help one driver. Agencies can manage multiple approved driver
+                clients. Drivers stay in control, access is permission-based, and every action is
+                audit-logged. Payments for assistant or agency services are arranged outside
+                HaulTracker Pro for now — opportunity only, not a promise of income.
               </p>
             </div>
 
@@ -487,14 +504,21 @@ export default function Landing() {
               ))}
             </div>
 
-            <div className="mt-8 text-center">
+            <div className="mt-8 text-center flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                onClick={() => navigate('/assistants-agencies')}
+                className="rounded-xl font-bold gap-2"
+                style={{ background: AMBER, color: 'white' }}
+              >
+                Explore the Assistants &amp; Agencies opportunity <ArrowRight className="h-4 w-4" />
+              </Button>
               <Button
                 onClick={() => navigate('/features#team-agency')}
                 variant="outline"
                 className="rounded-xl font-bold gap-2 hover:bg-transparent"
                 style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}
               >
-                See team & agency features <ArrowRight className="h-4 w-4" />
+                See team &amp; agency features <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>

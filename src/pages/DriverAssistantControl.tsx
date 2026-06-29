@@ -75,7 +75,8 @@ export default function DriverAssistantControl() {
     );
   }
 
-  const active = (assistants ?? []).filter((a) => a.status === 'active' || a.status === 'pending');
+  const active = (assistants ?? []).filter((a) => a.status === 'active');
+  const pendingInvites = (assistants ?? []).filter((a) => a.status === 'pending');
   const past = (assistants ?? []).filter((a) => a.status === 'revoked' || a.status === 'expired');
   const pendingCount = pending?.length ?? 0;
 
@@ -190,29 +191,70 @@ export default function DriverAssistantControl() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
 
-          {past.length > 0 && (
-            <details className="mt-4">
-              <summary className="text-xs text-muted-foreground cursor-pointer">
-                Show past assistants ({past.length})
-              </summary>
-              <div className="mt-2 space-y-1">
-                {past.map((a) => (
-                  <div key={a.id} className="text-xs text-muted-foreground p-2 border rounded-md">
-                    {a.invite_email} ·{' '}
-                    <Badge variant="outline" className="ml-1">
-                      {a.status}
-                    </Badge>
-                    {a.revoked_at && (
-                      <> · ended {new Date(a.revoked_at).toLocaleDateString()}</>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </details>
+      {/* Pending invites — separate from active */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-primary" />
+            Pending invites
+            {pendingInvites.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {pendingInvites.length}
+              </Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Invited assistants who haven't accepted yet. They do <b>not</b> have access until they
+            accept and you have approved any required permissions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {assistantsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : pendingInvites.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No pending invites.</p>
+          ) : (
+            <div className="space-y-2">
+              {pendingInvites.map((a) => (
+                <AssistantRow key={a.id} row={a} />
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Past / revoked */}
+      {past.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              Past assistants
+            </CardTitle>
+            <CardDescription>
+              Previously had access. None of these can act on your account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {past.map((a) => (
+                <div key={a.id} className="text-xs text-muted-foreground p-2 border rounded-md">
+                  {a.invite_email} ·{' '}
+                  <Badge variant="outline" className="ml-1">
+                    {a.status}
+                  </Badge>
+                  {a.revoked_at && (
+                    <> · ended {new Date(a.revoked_at).toLocaleDateString()}</>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submitted agency requests */}
       <Card>
