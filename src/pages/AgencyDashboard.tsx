@@ -107,7 +107,7 @@ export default function AgencyDashboard() {
             <ClientListSection agencyId={agency.id} />
           </TabsContent>
           <TabsContent value="work">
-            <WorkQueueSection agencyId={agency.id} />
+            <WorkQueueSection agencyId={agency.id} focusedWorkItemId={focusedWorkItemId} />
           </TabsContent>
           <TabsContent value="activity">
             <AgencyAuditSection agencyId={agency.id} />
