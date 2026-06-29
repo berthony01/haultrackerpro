@@ -54,14 +54,22 @@ function routeForNotification(n: NotificationRow): string | null {
         n.type === 'agency_client_request_declined' ||
         n.type === 'agency_client_request_cancelled' ||
         n.type === 'agency_client_request_converted_to_client' ||
-        n.type === 'agency_delegation_pending' ||
-        n.type === 'agency_work_item_waiting_on_driver'
+        n.type === 'agency_delegation_pending'
       ) {
         return '/driver/assistant-control';
       }
+      // Phase 4C — work item deep links
+      if (n.type === 'agency_work_item_waiting_on_driver') {
+        const wid = (n.payload as any)?.work_item_id;
+        return wid ? `/driver/work-items/${wid}` : '/driver/work-items';
+      }
+      if (n.type === 'agency_work_item_driver_responded') {
+        const wid = (n.payload as any)?.work_item_id;
+        return wid ? `/agency?workItem=${wid}` : '/agency';
+      }
       if (n.type.startsWith('agency_')) return '/agency';
       return null;
-  }
+    }
 }
 
 export function NotificationCenter({ onClose, onNavigate }: Props) {
