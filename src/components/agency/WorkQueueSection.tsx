@@ -141,7 +141,7 @@ export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: st
         ) : (
           <div className="space-y-2">
             {items.map((it) => (
-              <WorkItemRowView key={it.id} item={it} />
+              <WorkItemRowView key={it.id} item={it} highlighted={focusedWorkItemId === it.id} />
             ))}
           </div>
         )}
