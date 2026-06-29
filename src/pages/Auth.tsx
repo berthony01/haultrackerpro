@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Truck, Mail, Lock, User, Briefcase, Check } from 'lucide-react';
+import { Truck, Mail, Lock, User, Briefcase, Users, Building2, Check, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable';
@@ -13,55 +12,124 @@ import SEOHead from '@/components/SEOHead';
 import { trackSignUp, trackLogin } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { isInternalTestEmail } from '@/lib/internalTestAccounts';
+import { sanitizeNextPath, getCapabilityFromNext, type Capability } from '@/lib/authNavigation';
 
-type Role = 'driver' | 'recruiter';
+type AuthRole = 'driver' | 'recruiter';
+
+const AMBER = 'hsl(25, 95%, 53%)';
+const NAVY_BG = 'hsl(220, 20%, 8%)';
+const NAVY_SURFACE = 'hsl(220, 20%, 10%)';
+const NAVY_CARD = 'hsl(220, 22%, 12%)';
+const NAVY_BORDER = 'hsl(220, 16%, 18%)';
+const TEXT_MUTED = 'hsl(220, 10%, 65%)';
+const TEXT_DIM = 'hsl(220, 10%, 50%)';
+
+const CAPABILITIES: Array<{
+  id: Capability;
+  label: string;
+  blurb: string;
+  Icon: typeof Truck;
+  nextDefault: string | null; // null = use intent=recruiter / driver default
+}> = [
+  {
+    id: 'driver',
+    label: 'Driver',
+    blurb: 'Track loads, expenses, fuel logs, reports, and real profit.',
+    Icon: Truck,
+    nextDefault: null,
+  },
+  {
+    id: 'recruiter',
+    label: 'Recruiter / Carrier',
+    blurb: 'Post structured opportunities, manage applicants, and recruit with transparency.',
+    Icon: Briefcase,
+    nextDefault: null,
+  },
+  {
+    id: 'assistant',
+    label: 'Driver Assistant',
+    blurb: 'Help approved drivers manage trucking records and back-office tasks. Access begins through a driver invite.',
+    Icon: Users,
+    nextDefault: '/assistant',
+  },
+  {
+    id: 'agency',
+    label: 'Back-Office Agency',
+    blurb: 'Create an agency workspace to manage approved driver clients.',
+    Icon: Building2,
+    nextDefault: '/agency',
+  },
+];
 
 export default function Auth() {
   const { signIn, signUp } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', name: '' });
-  const [role, setRole] = useState<Role>(() => {
-    try {
-      const intent = new URLSearchParams(window.location.search).get('intent');
-      return intent === 'recruiter' ? 'recruiter' : 'driver';
-    } catch {
-      return 'driver';
-    }
-  });
 
-  // Keep role in sync if the query string changes
-  useEffect(() => {
-    const intent = new URLSearchParams(location.search).get('intent');
-    if (intent === 'recruiter') setRole('recruiter');
+  // Read & sanitize `next` once per location change.
+  const safeNext = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return sanitizeNextPath(params.get('next'));
   }, [location.search]);
 
-  // Persist intent to sessionStorage whenever role changes so the post-auth
-  // redirect (in App.tsx / useAuth flow) can pick it up after email confirm
-  // or OAuth round-trips.
-  const persistIntent = (r: Role) => {
-    try {
-      if (r === 'recruiter') sessionStorage.setItem('htp_auth_intent', 'recruiter');
-      else sessionStorage.removeItem('htp_auth_intent');
-    } catch {}
-  };
+  const intentParam = useMemo(() => {
+    return new URLSearchParams(location.search).get('intent');
+  }, [location.search]);
+
+  // Initial capability: derive from `next` first, then `intent=recruiter`, else driver.
+  const [capability, setCapability] = useState<Capability>(() => {
+    const c = getCapabilityFromNext(safeNext);
+    if (c) return c;
+    if (intentParam === 'recruiter') return 'recruiter';
+    return 'driver';
+  });
 
   useEffect(() => {
-    persistIntent(role);
-  }, [role]);
+    const c = getCapabilityFromNext(safeNext);
+    if (c) setCapability(c);
+    else if (intentParam === 'recruiter') setCapability('recruiter');
+  }, [safeNext, intentParam]);
 
-  const isRecruiter = role === 'recruiter';
+  // Onboarding role for handle_new_user(): only driver/recruiter are real
+  // server-side intended_roles. Assistant/Agency are capabilities, not roles —
+  // they default to 'driver' for sign-up but post-auth continuation routes
+  // them to /assistant or /agency.
+  const role: AuthRole = capability === 'recruiter' ? 'recruiter' : 'driver';
+  const isRecruiter = capability === 'recruiter';
+
+  // Persist recruiter intent for the reconciler (Google OAuth round-trip).
+  useEffect(() => {
+    try {
+      if (capability === 'recruiter') sessionStorage.setItem('htp_auth_intent', 'recruiter');
+      else sessionStorage.removeItem('htp_auth_intent');
+    } catch {}
+  }, [capability]);
+
+  // Compute effective `next` for this capability. Manual capability switch
+  // (e.g. user lands without ?next= and clicks Agency) overrides default.
+  const effectiveNext: string | null = useMemo(() => {
+    if (safeNext) return safeNext;
+    const cap = CAPABILITIES.find((c) => c.id === capability);
+    return cap?.nextDefault ?? null;
+  }, [safeNext, capability]);
 
   const handleGoogleSignIn = async () => {
     if (googleLoading || loading) return;
     setGoogleLoading(true);
-    persistIntent(role);
     try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin + (isRecruiter ? '/?intent=recruiter' : '/'),
-      });
+      // Build a redirect URL that the PublicRoute will honor after OAuth.
+      // Recruiter keeps the legacy intent param; assistant/agency/driver
+      // ride on the canonical `next` parameter.
+      const params = new URLSearchParams();
+      if (isRecruiter) params.set('intent', 'recruiter');
+      if (effectiveNext) params.set('next', effectiveNext);
+      const qs = params.toString();
+      const redirect_uri = window.location.origin + '/' + (qs ? `?${qs}` : '');
+      const result = await lovable.auth.signInWithOAuth('google', { redirect_uri });
       if (result?.error) {
         toast.error("Couldn't start Google sign-in. Please try again.");
         setGoogleLoading(false);
@@ -73,7 +141,6 @@ export default function Auth() {
     }
   };
 
-  // Common email domain typo detection.
   const DOMAIN_TYPOS: Record<string, string> = {
     'gmail.comm': 'gmail.com',
     'gmail.con': 'gmail.com',
@@ -102,29 +169,29 @@ export default function Auth() {
       if (suggested && suggested !== form.email.trim()) {
         const useFixed = window.confirm(`Did you mean ${suggested}?\n\nClick OK to use the corrected email, or Cancel to keep ${form.email}.`);
         if (useFixed) {
-          setForm(p => ({ ...p, email: suggested }));
-          // Defer actual submit to next click — user sees the correction.
+          setForm((p) => ({ ...p, email: suggested }));
           toast.info(`Email updated to ${suggested}. Click Create Account again to continue.`);
           return;
         }
       }
     }
     setLoading(true);
-    persistIntent(role);
     try {
       if (mode === 'signup') {
         const { error } = await signUp(form.email, form.password, form.name, role);
         if (error) throw error;
         trackSignUp('email');
         if (!isInternalTestEmail(form.email)) {
-          supabase.functions.invoke('send-transactional-email', {
-            body: {
-              templateName: 'lifecycle-day0',
-              recipientEmail: form.email,
-              idempotencyKey: `lifecycle-day0-${form.email.toLowerCase().trim()}`,
-              templateData: { name: form.name },
-            },
-          }).catch(() => {});
+          supabase.functions
+            .invoke('send-transactional-email', {
+              body: {
+                templateName: 'lifecycle-day0',
+                recipientEmail: form.email,
+                idempotencyKey: `lifecycle-day0-${form.email.toLowerCase().trim()}`,
+                templateData: { name: form.name },
+              },
+            })
+            .catch(() => {});
         }
         toast.success('Check your email to confirm your account!');
       } else {
@@ -139,255 +206,235 @@ export default function Auth() {
     }
   };
 
-  const title = isRecruiter
-    ? (mode === 'login' ? 'Welcome Back, Recruiter' : 'Create Your Recruiter Access Account')
-    : (mode === 'login' ? 'Welcome Back, Driver' : 'Create Your Driver Account');
+  const titles: Record<Capability, { login: string; signup: string }> = {
+    driver: { login: 'Welcome back, driver', signup: 'Create your driver account' },
+    recruiter: { login: 'Welcome back, recruiter', signup: 'Create your recruiter account' },
+    assistant: { login: 'Continue to assistant dashboard', signup: 'Create your account to assist drivers' },
+    agency: { login: 'Continue to agency workspace', signup: 'Create your agency workspace account' },
+  };
+  const title = titles[capability][mode];
 
-  const helper = isRecruiter
-    ? 'Apply for recruiter access, post structured opportunities, and manage driver requests. Recruiter accounts require approval before posting opportunities.'
-    : 'Track your real profit, manage loads, compare opportunities, and get a guided setup after sign up.';
-
-  const googleHelper = isRecruiter
-    ? "You'll continue into Recruiter Access. Posting unlocks after your account is approved."
-    : "You'll continue into the driver dashboard and a quick onboarding walkthrough.";
-
-  const driverBullets = [
-    'Real profit tracking',
-    'Load and expense management',
-    'Opportunity matching',
-    'PDF/CSV reports',
-  ];
-  const recruiterBullets = [
-    'Approved recruiter workflow',
-    'Structured opportunity posting',
-    'Driver request pipeline',
-    'Contact permission system',
-  ];
-  const bullets = isRecruiter ? recruiterBullets : driverBullets;
+  const helpers: Record<Capability, string> = {
+    driver: 'Track your real profit, manage loads, compare opportunities, and get a guided setup after sign up.',
+    recruiter: 'Apply for recruiter access, post structured opportunities, and manage driver requests. Recruiter accounts require approval before posting.',
+    assistant: 'Driver Assistant access begins through a driver invite or approved delegation. Create an account, then ask a driver to invite you. We do not auto-grant access to any driver account.',
+    agency: 'Create a personal agency workspace, publish service packages, share your private agency request link, and manage approved driver clients. We do not process service payments or guarantee income.',
+  };
+  const helper = helpers[capability];
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
-      <SEOHead title="Login | HaulTrackerPro" description="Sign in to HaulTrackerPro." path="/auth" noindex />
-      <div className="w-full max-w-5xl grid md:grid-cols-[1fr_minmax(0,420px)] gap-8 items-start">
-        {/* Side value panel (desktop) */}
-        <aside className="hidden md:block space-y-6 pt-8">
-          <div className="inline-flex items-center justify-center rounded-2xl bg-primary p-3">
-            <Truck className="h-8 w-8 text-primary-foreground" />
-          </div>
-          <h2 className="text-3xl font-black font-heading tracking-tight">
-            {isRecruiter ? 'Recruit drivers with transparency.' : 'Track real profit, not just revenue.'}
-          </h2>
-          <p className="text-muted-foreground">{helper}</p>
-          <ul className="space-y-3">
-            {bullets.map(b => (
-              <li key={b} className="flex items-start gap-2 text-sm">
-                <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                <span>{b}</span>
-              </li>
-            ))}
-          </ul>
-        </aside>
+    <div className="min-h-screen px-4 py-8" style={{ background: NAVY_BG }}>
+      <SEOHead title="Sign in | HaulTrackerPro" description="Sign in to HaulTrackerPro." path="/auth" noindex />
+      <div className="max-w-5xl mx-auto">
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-1.5 text-xs font-medium mb-6"
+          style={{ color: TEXT_DIM }}
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to home
+        </button>
 
-        <div className="w-full space-y-6">
-          {/* Brand (mobile) */}
-          <div className="text-center space-y-2 md:hidden">
-            <div className="inline-flex items-center justify-center rounded-2xl bg-primary p-3 mx-auto">
-              <Truck className="h-8 w-8 text-primary-foreground" />
-            </div>
-            <h1 className="text-3xl font-black font-heading tracking-tight">HaulTrackerPro</h1>
-          </div>
-
-          <Card className="border-2 border-primary/20 shadow-xl">
-            <CardHeader className="pb-4 space-y-4">
-              {/* Role selector */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  What are you using HaulTrackerPro for?
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRole('driver')}
-                    className={cn(
-                      'text-left rounded-lg border-2 p-3 transition-colors',
-                      role === 'driver'
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/40'
-                    )}
-                    aria-pressed={role === 'driver'}
-                  >
-                    <div className="flex items-center gap-1.5 font-semibold text-sm">
-                      <Truck className="h-4 w-4" /> Driver
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                      Track profit, loads, expenses, reports, and find better opportunities.
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('recruiter')}
-                    className={cn(
-                      'text-left rounded-lg border-2 p-3 transition-colors',
-                      role === 'recruiter'
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/40'
-                    )}
-                    aria-pressed={role === 'recruiter'}
-                  >
-                    <div className="flex items-center gap-1.5 font-semibold text-sm">
-                      <Briefcase className="h-4 w-4" /> Recruiter / Carrier
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                      Post structured opportunities, manage driver requests, and recruit with transparency.
-                    </p>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <CardTitle className="text-lg font-heading text-center">{title}</CardTitle>
-                <p className="text-xs text-center text-muted-foreground">{helper}</p>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGoogleSignIn}
-                disabled={googleLoading || loading}
-                className="w-full h-12 text-base font-semibold border-2"
+        <div className="grid md:grid-cols-[1fr_minmax(0,440px)] gap-8 items-start">
+          {/* Side panel */}
+          <aside className="space-y-6">
+            <div className="flex items-center gap-2">
+              <div
+                className="inline-flex items-center justify-center rounded-2xl p-3"
+                style={{ background: AMBER }}
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.74-6-6.1s2.7-6.1 6-6.1c1.88 0 3.14.8 3.86 1.49l2.63-2.54C16.78 3.4 14.6 2.5 12 2.5 6.76 2.5 2.5 6.76 2.5 12S6.76 21.5 12 21.5c6.94 0 9.5-4.87 9.5-9.5 0-.64-.07-1.13-.16-1.6H12z"/>
-                </svg>
-                {googleLoading ? 'Connecting...' : 'Continue with Google'}
-              </Button>
-              <p className="text-[11px] text-muted-foreground text-center mt-2">{googleHelper}</p>
-
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or continue with</span></div>
+                <Truck className="h-7 w-7 text-white" />
               </div>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {mode === 'signup' && (
-                  <div>
-                    <Label htmlFor="name" className="flex items-center gap-1.5">
-                      <User className="h-3 w-3" /> Display Name
-                    </Label>
-                    <Input
-                      id="name"
-                      placeholder="Your name"
-                      value={form.name}
-                      onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                      required
-                    />
-                    {isRecruiter ? (
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        You'll add company details after account creation. Recruiter accounts require approval before posting opportunities.
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        We'll walk you through a quick setup (pay model and your first load) right after sign up.
-                      </p>
-                    )}
-                  </div>
-                )}
-                <div>
-                  <Label htmlFor="email" className="flex items-center gap-1.5">
-                    <Mail className="h-3 w-3" /> Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder={isRecruiter ? 'recruiter@company.com' : 'driver@example.com'}
-                    value={form.email}
-                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="password" className="flex items-center gap-1.5">
-                    <Lock className="h-3 w-3" /> Password
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={form.password}
-                    onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <Button type="submit" className="w-full h-12 text-base font-bold" disabled={loading}>
-                  {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
-                </Button>
-              </form>
+              <span className="text-2xl font-black tracking-tight text-white">HaulTrackerPro</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-tight">
+              Choose how you want to start.
+            </h1>
+            <p className="text-sm" style={{ color: TEXT_MUTED }}>
+              HaulTrackerPro serves drivers, recruiters, driver assistants, and back-office agencies. Pick the
+              capability that matches what you want to do today — you can use more than one over time.
+            </p>
 
-              {mode === 'login' && (
-                <div className="mt-3 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {CAPABILITIES.map((c) => {
+                const active = capability === c.id;
+                return (
                   <button
+                    key={c.id}
                     type="button"
-                    onClick={async () => {
-                      if (!form.email) {
-                        toast.error('Enter your email first, then click Forgot password');
-                        return;
-                      }
-                      try {
-                        const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
-                          redirectTo: `${window.location.origin}/reset-password`,
-                        });
-                        if (error) throw error;
-                        toast.success('Check your email for a password reset link!');
-                      } catch (err: any) {
-                        toast.error(err.message || 'Failed to send reset email');
-                      }
+                    onClick={() => setCapability(c.id)}
+                    aria-pressed={active}
+                    className={cn(
+                      'text-left rounded-xl border p-4 transition-all',
+                      active ? 'ring-2' : 'hover:border-white/20',
+                    )}
+                    style={{
+                      background: NAVY_CARD,
+                      borderColor: active ? AMBER : NAVY_BORDER,
+                      boxShadow: active ? `0 0 0 3px hsl(25 95% 53% / 0.15)` : undefined,
                     }}
-                    className="text-xs text-muted-foreground hover:text-primary hover:underline"
                   >
-                    Forgot password?
+                    <div className="flex items-center gap-2">
+                      <c.Icon className="h-4 w-4" style={{ color: active ? AMBER : TEXT_MUTED }} />
+                      <span className="font-bold text-sm text-white">{c.label}</span>
+                    </div>
+                    <p className="text-xs mt-1.5 leading-snug" style={{ color: TEXT_MUTED }}>
+                      {c.blurb}
+                    </p>
                   </button>
+                );
+              })}
+            </div>
+
+            {effectiveNext && (
+              <div
+                className="rounded-lg border px-3 py-2 text-xs flex items-start gap-2"
+                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER, color: TEXT_MUTED }}
+              >
+                <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: AMBER }} />
+                <span>
+                  After sign-in you'll continue to{' '}
+                  <span className="font-mono text-white">{effectiveNext}</span>
+                </span>
+              </div>
+            )}
+          </aside>
+
+          {/* Auth card */}
+          <div
+            className="w-full rounded-2xl border p-6 sm:p-8 shadow-2xl backdrop-blur"
+            style={{
+              background: NAVY_CARD,
+              borderColor: NAVY_BORDER,
+              boxShadow: '0 30px 80px -20px rgba(0,0,0,0.6)',
+            }}
+          >
+            <div className="space-y-1 mb-5">
+              <h2 className="text-lg font-bold text-white text-center">{title}</h2>
+              <p className="text-xs text-center" style={{ color: TEXT_MUTED }}>
+                {helper}
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || loading}
+              className="w-full h-12 text-base font-semibold border-2 bg-white text-slate-900 hover:bg-white/90 hover:text-slate-900"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="#EA4335"
+                  d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.74-6-6.1s2.7-6.1 6-6.1c1.88 0 3.14.8 3.86 1.49l2.63-2.54C16.78 3.4 14.6 2.5 12 2.5 6.76 2.5 2.5 6.76 2.5 12S6.76 21.5 12 21.5c6.94 0 9.5-4.87 9.5-9.5 0-.64-.07-1.13-.16-1.6H12z"
+                />
+              </svg>
+              {googleLoading ? 'Connecting...' : 'Continue with Google'}
+            </Button>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" style={{ borderColor: NAVY_BORDER }} />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="px-2" style={{ background: NAVY_CARD, color: TEXT_DIM }}>
+                  or continue with
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'signup' && (
+                <div>
+                  <Label htmlFor="name" className="flex items-center gap-1.5 text-white/90">
+                    <User className="h-3 w-3" /> Display Name
+                  </Label>
+                  <Input
+                    id="name"
+                    placeholder="Your name"
+                    value={form.name}
+                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                    required
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                  />
                 </div>
               )}
+              <div>
+                <Label htmlFor="email" className="flex items-center gap-1.5 text-white/90">
+                  <Mail className="h-3 w-3" /> Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                  required
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                />
+              </div>
+              <div>
+                <Label htmlFor="password" className="flex items-center gap-1.5 text-white/90">
+                  <Lock className="h-3 w-3" /> Password
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                  required
+                  minLength={6}
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full h-12 text-base font-bold"
+                disabled={loading}
+                style={{ background: AMBER, color: 'white' }}
+              >
+                {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+              </Button>
+            </form>
 
+            {mode === 'login' && (
               <div className="mt-3 text-center">
                 <button
                   type="button"
-                  onClick={() => setMode(m => m === 'login' ? 'signup' : 'login')}
-                  className="text-sm text-primary font-semibold hover:underline"
+                  onClick={async () => {
+                    if (!form.email) {
+                      toast.error('Enter your email first, then click Forgot password');
+                      return;
+                    }
+                    try {
+                      const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
+                        redirectTo: `${window.location.origin}/reset-password`,
+                      });
+                      if (error) throw error;
+                      toast.success('Check your email for a password reset link!');
+                    } catch (err: any) {
+                      toast.error(err.message || 'Failed to send reset email');
+                    }
+                  }}
+                  className="text-xs hover:underline"
+                  style={{ color: TEXT_MUTED }}
                 >
-                  {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+                  Forgot password?
                 </button>
               </div>
+            )}
 
-              {/* Role switch footer */}
-              <div className="mt-4 pt-4 border-t border-border text-center text-xs text-muted-foreground">
-                {isRecruiter ? (
-                  <>
-                    Here to track your own loads?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setRole('driver')}
-                      className="text-primary font-semibold hover:underline"
-                    >
-                      {mode === 'login' ? 'Sign in as driver' : 'Sign up as driver'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Recruiting drivers?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setRole('recruiter')}
-                      className="text-primary font-semibold hover:underline"
-                    >
-                      {mode === 'login' ? 'Sign in as recruiter' : 'Sign up as recruiter'}
-                    </button>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => setMode((m) => (m === 'login' ? 'signup' : 'login'))}
+                className="text-sm font-semibold hover:underline"
+                style={{ color: AMBER }}
+              >
+                {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
