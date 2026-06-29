@@ -23,6 +23,8 @@ export interface NotificationPreferences {
   contact_request_events: boolean;
   contract_events: boolean;
   recruiter_status_events: boolean;
+  assistant_events: boolean;
+  agency_events: boolean;
 }
 
 const LIST_LIMIT = 30;

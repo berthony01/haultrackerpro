@@ -6,7 +6,7 @@ import { useNotificationPreferences, type NotificationPreferences } from '@/hook
 
 const DEFAULTS: Pick<
   NotificationPreferences,
-  'in_app_enabled' | 'email_enabled' | 'application_events' | 'contact_request_events' | 'contract_events' | 'recruiter_status_events'
+  'in_app_enabled' | 'email_enabled' | 'application_events' | 'contact_request_events' | 'contract_events' | 'recruiter_status_events' | 'assistant_events' | 'agency_events'
 > = {
   in_app_enabled: true,
   email_enabled: true,
@@ -14,6 +14,8 @@ const DEFAULTS: Pick<
   contact_request_events: true,
   contract_events: true,
   recruiter_status_events: true,
+  assistant_events: true,
+  agency_events: true,
 };
 
 export function NotificationPreferencesPanel() {
@@ -99,6 +101,22 @@ export function NotificationPreferencesPanel() {
           description="Recruiter profile and opportunity review decisions."
           checked={p.recruiter_status_events}
           onChange={(v) => upsert.mutate({ recruiter_status_events: v })}
+          disabled={!p.in_app_enabled}
+        />
+        <Row
+          id="np-assistant"
+          label="Assistant activity"
+          description="Invitations, acceptances, and access changes for assistants."
+          checked={p.assistant_events}
+          onChange={(v) => upsert.mutate({ assistant_events: v })}
+          disabled={!p.in_app_enabled}
+        />
+        <Row
+          id="np-agency"
+          label="Agency workflow"
+          description="Client requests, delegation decisions, and work-item updates."
+          checked={p.agency_events}
+          onChange={(v) => upsert.mutate({ agency_events: v })}
           disabled={!p.in_app_enabled}
         />
       </div>
