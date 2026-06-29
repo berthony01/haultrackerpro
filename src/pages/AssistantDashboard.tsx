@@ -279,6 +279,7 @@ export default function AssistantDashboard() {
         )}
       </section>
     </div>
+    </AppShell>
   );
 }
 
