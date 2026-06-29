@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,8 +43,16 @@ import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 export default function AgencyDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: agency, isLoading } = useMyAgency();
   const { managedDrivers } = useActingContext();
+
+  // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
+  const focusedWorkItemId = new URLSearchParams(location.search).get('workItem');
+  const [activeTab, setActiveTab] = useState<string>(focusedWorkItemId ? 'work' : 'overview');
+  useEffect(() => {
+    if (focusedWorkItemId) setActiveTab('work');
+  }, [focusedWorkItemId]);
 
   if (!user) {
     return (
@@ -77,7 +85,7 @@ export default function AgencyDashboard() {
       {!agency ? (
         <CreateAgencyCard />
       ) : (
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="flex flex-wrap">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="packages">Packages</TabsTrigger>
@@ -99,7 +107,7 @@ export default function AgencyDashboard() {
             <ClientListSection agencyId={agency.id} />
           </TabsContent>
           <TabsContent value="work">
-            <WorkQueueSection agencyId={agency.id} />
+            <WorkQueueSection agencyId={agency.id} focusedWorkItemId={focusedWorkItemId} />
           </TabsContent>
           <TabsContent value="activity">
             <AgencyAuditSection agencyId={agency.id} />

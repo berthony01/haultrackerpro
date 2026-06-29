@@ -57,11 +57,11 @@ export default function AssistantsAgencies() {
 
   const handleAgencyCTA = () => {
     if (user) navigate('/agency');
-    else navigate('/auth?intent=agency');
+    else navigate('/auth?next=%2Fagency');
   };
   const handleAssistantCTA = () => {
     if (user) navigate('/assistant');
-    else navigate('/auth?intent=assistant');
+    else navigate('/auth?next=%2Fassistant');
   };
 
   return (

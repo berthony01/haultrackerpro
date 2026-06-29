@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +53,7 @@ const TYPES: AgencyWorkItemType[] = [
 ];
 const PRIORITIES: AgencyWorkItemPriority[] = ['low', 'normal', 'high'];
 
-export function WorkQueueSection({ agencyId }: { agencyId: string }) {
+export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: string; focusedWorkItemId?: string | null }) {
   const [status, setStatus] = useState<AgencyWorkItemStatus | 'all'>('open');
   const [driverId, setDriverId] = useState<string | 'all'>('all');
   const [memberId, setMemberId] = useState<string | 'all'>('all');
@@ -65,6 +65,15 @@ export function WorkQueueSection({ agencyId }: { agencyId: string }) {
   const { data: clients } = useAgencyClients(agencyId);
   const { data: members } = useAgencyMembers(agencyId);
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Auto-scroll to a notification-deep-linked work item once it loads.
+  useEffect(() => {
+    if (!focusedWorkItemId || !items) return;
+    const el = document.getElementById(`work-item-${focusedWorkItemId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [focusedWorkItemId, items]);
 
   return (
     <Card>
@@ -132,7 +141,7 @@ export function WorkQueueSection({ agencyId }: { agencyId: string }) {
         ) : (
           <div className="space-y-2">
             {items.map((it) => (
-              <WorkItemRowView key={it.id} item={it} />
+              <WorkItemRowView key={it.id} item={it} highlighted={focusedWorkItemId === it.id} />
             ))}
           </div>
         )}
@@ -147,7 +156,7 @@ export function WorkQueueSection({ agencyId }: { agencyId: string }) {
   );
 }
 
-function WorkItemRowView({ item }: { item: WorkItemRow }) {
+function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted?: boolean }) {
   const { update } = useWorkItemMutations();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -172,7 +181,7 @@ function WorkItemRowView({ item }: { item: WorkItemRow }) {
   }
 
   return (
-    <div className="rounded-md border p-3 text-sm space-y-1">
+    <div id={`work-item-${item.id}`} className={`rounded-md border p-3 text-sm space-y-1 ${highlighted ? 'ring-2 ring-primary border-primary' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-medium truncate">{item.title}</p>
