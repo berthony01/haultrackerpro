@@ -68,14 +68,15 @@ describe('Phase 5 continuation — legacy redirect param eliminated', () => {
     expect(src).not.toMatch(/\/auth\?redirect=/);
     expect(src).toMatch(/\/auth\?next=/);
   });
-  it('no /auth?redirect= remains anywhere in src/', async () => {
+  it('no /auth?redirect= remains anywhere in src/ (outside tests)', async () => {
     const { execSync } = await import('child_process');
     const out = execSync(
-      "grep -RIn --include='*.ts' --include='*.tsx' '/auth?redirect=' src/ || true",
+      "grep -RIn --include='*.ts' --include='*.tsx' '/auth?redirect=' src/ | grep -v '/test/' || true",
       { encoding: 'utf8' },
     );
     expect(out.trim()).toBe('');
   });
+
   it('no intent=assistant or intent=agency literal remains in app code', async () => {
     const { execSync } = await import('child_process');
     const out = execSync(
