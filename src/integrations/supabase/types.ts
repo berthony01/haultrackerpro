@@ -4027,6 +4027,7 @@ export type Database = {
         }[]
       }
       list_my_assistants: { Args: never; Returns: Json[] }
+      list_my_assistants_with_source: { Args: never; Returns: Json[] }
       list_my_driver_agency_audit_log: {
         Args: { _limit?: number }
         Returns: {

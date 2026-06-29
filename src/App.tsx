@@ -76,6 +76,7 @@ const AgencyDashboard = lazy(() => import("./pages/AgencyDashboard"));
 const AgencyInviteAccept = lazy(() => import("./pages/AgencyInviteAccept"));
 const AgencyRequestPublic = lazy(() => import("./pages/AgencyRequestPublic"));
 const DriverDelegationApprovals = lazy(() => import("./pages/DriverDelegationApprovals"));
+const DriverAssistantControl = lazy(() => import("./pages/DriverAssistantControl"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -283,6 +284,7 @@ const App = () => (
               <Route path="/agency/invite/:token" element={<AgencyInviteAccept />} />
               <Route path="/agency/request/:agencyId" element={<AgencyRequestPublic />} />
               <Route path="/driver/agency-approvals" element={<ProtectedRoute><DriverDelegationApprovals /></ProtectedRoute>} />
+              <Route path="/driver/assistant-control" element={<ProtectedRoute><DriverAssistantControl /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
