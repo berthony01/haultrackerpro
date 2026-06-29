@@ -578,6 +578,7 @@ export function formatAgencyAuditAction(action: string, entity_type: string): st
     work_item_status_changed: 'changed a work item status',
     work_item_completed: 'completed a work item',
     work_item_updated: 'updated a work item',
+    work_item_driver_responded: 'replied to a waiting work item',
   };
   if (map[action]) return map[action];
   const entity = (entity_type || '').replace(/_/g, ' ');
