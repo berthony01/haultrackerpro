@@ -6,7 +6,7 @@ import { useNotificationPreferences, type NotificationPreferences } from '@/hook
 
 const DEFAULTS: Pick<
   NotificationPreferences,
-  'in_app_enabled' | 'email_enabled' | 'application_events' | 'contact_request_events' | 'contract_events' | 'recruiter_status_events'
+  'in_app_enabled' | 'email_enabled' | 'application_events' | 'contact_request_events' | 'contract_events' | 'recruiter_status_events' | 'assistant_events' | 'agency_events'
 > = {
   in_app_enabled: true,
   email_enabled: true,
@@ -14,6 +14,8 @@ const DEFAULTS: Pick<
   contact_request_events: true,
   contract_events: true,
   recruiter_status_events: true,
+  assistant_events: true,
+  agency_events: true,
 };
 
 export function NotificationPreferencesPanel() {
