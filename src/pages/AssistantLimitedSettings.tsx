@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import { useActingContext } from '@/hooks/useActingContext';
 import { hasPerm } from '@/lib/assistantPermissions';
 import { CostProfileSettings } from '@/components/CostProfileSettings';
@@ -28,6 +29,7 @@ export default function AssistantLimitedSettings() {
   }
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
       <header className="space-y-2">
         <Button
@@ -79,5 +81,6 @@ export default function AssistantLimitedSettings() {
         </CardContent>
       </Card>
     </div>
+    </AppShell>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,20 +57,25 @@ export default function AgencyDashboard() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <p>Please sign in.</p>
-      </div>
+      <AppShell>
+        <div className="container mx-auto px-4 py-8">
+          <p>Please sign in.</p>
+        </div>
+      </AppShell>
     );
   }
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      </div>
+      <AppShell>
+        <div className="container mx-auto px-4 py-8">
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        </div>
+      </AppShell>
     );
   }
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/assistant')}>
@@ -115,6 +121,7 @@ export default function AgencyDashboard() {
         </Tabs>
       )}
     </div>
+    </AppShell>
   );
 }
 

@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import { useActingContext } from '@/hooks/useActingContext';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -44,9 +45,11 @@ export default function AssistantDashboard() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <p>Please sign in to view your assistant dashboard.</p>
-      </div>
+      <AppShell>
+        <div className="container mx-auto px-4 py-8">
+          <p>Please sign in to view your assistant dashboard.</p>
+        </div>
+      </AppShell>
     );
   }
 
@@ -62,6 +65,7 @@ export default function AssistantDashboard() {
   ).size;
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
@@ -276,6 +280,7 @@ export default function AssistantDashboard() {
         )}
       </section>
     </div>
+    </AppShell>
   );
 }
 

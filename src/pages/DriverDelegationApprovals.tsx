@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,13 +31,16 @@ export default function DriverDelegationApprovals() {
   if (loading) return null;
   if (!user) {
     return (
-      <div className="container mx-auto max-w-md px-4 py-8">
-        <p>Please sign in.</p>
-      </div>
+      <AppShell>
+        <div className="container mx-auto max-w-md px-4 py-8">
+          <p>Please sign in.</p>
+        </div>
+      </AppShell>
     );
   }
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-2xl px-4 py-6 space-y-4">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
@@ -136,5 +140,6 @@ export default function DriverDelegationApprovals() {
         ))
       )}
     </div>
+    </AppShell>
   );
 }

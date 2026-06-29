@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
 import {
   Card,
   CardContent,
@@ -69,9 +70,11 @@ export default function DriverAssistantControl() {
   if (loading) return null;
   if (!user) {
     return (
-      <div className="container mx-auto max-w-md px-4 py-8">
-        <p>Please sign in.</p>
-      </div>
+      <AppShell>
+        <div className="container mx-auto max-w-md px-4 py-8">
+          <p>Please sign in.</p>
+        </div>
+      </AppShell>
     );
   }
 
@@ -81,6 +84,7 @@ export default function DriverAssistantControl() {
   const pendingCount = pending?.length ?? 0;
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
       <header className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
@@ -330,6 +334,7 @@ export default function DriverAssistantControl() {
         </CardContent>
       </Card>
     </div>
+    </AppShell>
   );
 }
 
