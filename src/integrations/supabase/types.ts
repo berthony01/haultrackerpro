@@ -1961,7 +1961,9 @@ export type Database = {
       }
       notification_preferences: {
         Row: {
+          agency_events: boolean
           application_events: boolean
+          assistant_events: boolean
           contact_request_events: boolean
           contract_events: boolean
           created_at: string
@@ -1973,7 +1975,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          agency_events?: boolean
           application_events?: boolean
+          assistant_events?: boolean
           contact_request_events?: boolean
           contract_events?: boolean
           created_at?: string
@@ -1985,7 +1989,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          agency_events?: boolean
           application_events?: boolean
+          assistant_events?: boolean
           contact_request_events?: boolean
           contract_events?: boolean
           created_at?: string
