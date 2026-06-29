@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PLANS } from '@/lib/billing/plans';
 import { trackBeginCheckout, trackPricingProfitIntelClick, trackStarterKitCTAClicked } from '@/lib/analytics';
+import MarketingHeader from '@/components/marketing/MarketingHeader';
+
 
 const freeFeatures = [
   'Unlimited load logging',
@@ -140,28 +142,8 @@ export default function Pricing() {
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead title="Pricing — Truck Driver Profit Tracker & Recruiter Tools | HaulTrackerPro" description="HaulTrackerPro pricing for owner-operators and 1099 truck drivers (Free and Pro at $19.99/mo) plus recruiter plans for verified opportunity posting, premium visibility, and recruiting tools." path="/pricing" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }])} />
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2">
-            <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
-            <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
-          </button>
-          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
-            <Button variant="ghost" onClick={() => { trackPricingProfitIntelClick(); navigate('/#profit-intelligence'); }} className="text-xs sm:text-sm px-2 sm:px-4 hidden xs:inline-flex" style={{ color: 'hsl(25, 95%, 60%)' }}>
-              <span className="hidden sm:inline">Profit Intelligence</span>
-              <span className="sm:hidden">Intel</span>
-            </Button>
-            <Button variant="ghost" onClick={() => navigate('/auth')} className="text-sm hidden sm:inline-flex" style={{ color: 'hsl(220, 10%, 70%)' }}>
-              Sign In
-            </Button>
-            <Button onClick={() => navigate('/auth')} className="text-xs sm:text-sm font-bold rounded-xl px-3 sm:px-5 whitespace-nowrap" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              <span className="hidden sm:inline">Start Tracking Free</span>
-              <span className="sm:hidden">Start Free</span>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <MarketingHeader />
+
 
       {/* Hero */}
       <section className="relative overflow-hidden">
