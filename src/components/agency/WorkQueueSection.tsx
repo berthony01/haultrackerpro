@@ -181,7 +181,7 @@ function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted
   }
 
   return (
-    <div className="rounded-md border p-3 text-sm space-y-1">
+    <div id={`work-item-${item.id}`} className={`rounded-md border p-3 text-sm space-y-1 ${highlighted ? 'ring-2 ring-primary border-primary' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-medium truncate">{item.title}</p>
