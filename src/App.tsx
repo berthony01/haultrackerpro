@@ -80,6 +80,7 @@ const DriverAssistantControl = lazy(() => import("./pages/DriverAssistantControl
 const DriverWorkItems = lazy(() => import("./pages/DriverWorkItems"));
 const AgencySlugRedirect = lazy(() => import("./pages/AgencySlugRedirect"));
 const AssistantsAgencies = lazy(() => import("./pages/AssistantsAgencies"));
+const CapabilityLauncher = lazy(() => import("./pages/CapabilityLauncher"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
