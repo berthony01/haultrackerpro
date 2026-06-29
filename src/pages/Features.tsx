@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { featureList, downloadFeatureSheet } from '@/lib/featureList';
 import SEOHead from '@/components/SEOHead';
 import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
+import MarketingHeader from '@/components/marketing/MarketingHeader';
 
 export default function Features() {
   const navigate = useNavigate();
@@ -11,18 +12,8 @@ export default function Features() {
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead title="Features — Truck Driver Profit, Expense, RPM & Back-Office Agency Tools | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, profit, contracts, parking, and referrals — plus driver assistants and a back-office agency workflow for managing approved driver clients with permission-based access." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b" style={{ background: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2">
-            <Truck className="h-6 w-6" style={{ color: 'hsl(25, 95%, 53%)' }} />
-            <span className="text-lg font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>HaulTrackerPro</span>
-          </button>
-          <Button onClick={() => navigate('/auth')} className="text-sm font-bold rounded-xl px-5" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-            Start Tracking Free
-          </Button>
-        </div>
-      </nav>
+      <MarketingHeader />
+
 
       {/* Header */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10">
