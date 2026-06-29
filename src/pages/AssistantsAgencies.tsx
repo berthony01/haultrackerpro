@@ -79,18 +79,10 @@ export default function AssistantsAgencies() {
         ]}
       />
 
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b" style={{ background: NAVY_BG, borderColor: NAVY_BORDER }}>
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
-          <button onClick={() => navigate('/')} className="flex items-center gap-2">
-            <Truck className="h-6 w-6" style={{ color: AMBER }} />
-            <span className="text-lg font-black tracking-tight text-white">HaulTrackerPro</span>
-          </button>
-          <Button onClick={handleAgencyCTA} className="text-sm font-bold rounded-xl px-5" style={{ background: AMBER, color: 'white' }}>
-            Create Agency Workspace
-          </Button>
-        </div>
-      </nav>
+      <MarketingHeader
+        primaryCta={{ label: 'Create Agency Workspace', mobileLabel: 'Agency', onClick: handleAgencyCTA }}
+      />
+
 
       <main>
         <section className="relative overflow-hidden">
