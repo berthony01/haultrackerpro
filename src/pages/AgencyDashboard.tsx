@@ -85,7 +85,7 @@ export default function AgencyDashboard() {
       {!agency ? (
         <CreateAgencyCard />
       ) : (
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="flex flex-wrap">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="packages">Packages</TabsTrigger>
