@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
 import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { useAuth } from '@/hooks/useAuth';
+import MarketingHeader from '@/components/marketing/MarketingHeader';
+
 
 export default function Recruiters() {
   const navigate = useNavigate();
