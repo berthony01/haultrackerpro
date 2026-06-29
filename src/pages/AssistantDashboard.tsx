@@ -44,9 +44,11 @@ export default function AssistantDashboard() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <p>Please sign in to view your assistant dashboard.</p>
-      </div>
+      <AppShell>
+        <div className="container mx-auto px-4 py-8">
+          <p>Please sign in to view your assistant dashboard.</p>
+        </div>
+      </AppShell>
     );
   }
 
@@ -62,6 +64,7 @@ export default function AssistantDashboard() {
   ).size;
 
   return (
+    <AppShell>
     <div className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
