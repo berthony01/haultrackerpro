@@ -27,7 +27,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useAssistantsWithSource, type AssistantWithSourceRow } from '@/hooks/useAssistantsWithSource';
 import { useToast } from '@/hooks/use-toast';
 
-function StatusBadge({ status }: { status: AssistantRow['status'] }) {
+function StatusBadge({ status }: { status: AssistantWithSourceRow["status"] }) {
   const map: Record<AssistantRow['status'], { label: string; variant: any }> = {
     pending: { label: 'Pending', variant: 'secondary' },
     active: { label: 'Active', variant: 'default' },
@@ -38,7 +38,7 @@ function StatusBadge({ status }: { status: AssistantRow['status'] }) {
   return <Badge variant={m.variant}>{m.label}</Badge>;
 }
 
-function PermissionEditor({ row }: { row: AssistantRow }) {
+function PermissionEditor({ row }: { row: AssistantWithSourceRow }) {
   const { updatePermissions } = useAssistants();
   const { toast } = useToast();
   const [perms, setPerms] = useState<AssistantPermissions>(row.permissions ?? {});
@@ -88,7 +88,7 @@ function PermissionEditor({ row }: { row: AssistantRow }) {
   );
 }
 
-function RevokeButton({ row }: { row: AssistantRow }) {
+function RevokeButton({ row }: { row: AssistantWithSourceRow }) {
   const { revoke } = useAssistants();
   const { toast } = useToast();
   return (
