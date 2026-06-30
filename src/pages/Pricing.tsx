@@ -669,18 +669,21 @@ function AssistantsAgenciesPricingSection({ navigate }: { navigate: (path: strin
                   ))}
                 </ul>
                 <p className="text-[11px] mb-4" style={{ color: 'hsl(220, 10%, 45%)' }}>{p.limitationsCopy}</p>
-                {/* No fake checkout — Phase 8 will wire Stripe. */}
+                {/* Phase 8B: route to /auth then /agency with sanitized ?plan=. */}
                 <Button
-                  onClick={() => navigate('/auth?next=%2Fagency')}
+                  onClick={() =>
+                    navigate(`/auth?next=${encodeURIComponent(`/agency?plan=${p.key}`)}`)
+                  }
                   variant="outline"
                   className="w-full rounded-xl font-bold gap-2"
                   style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
                 >
-                  Start Agency Setup <ArrowRight className="h-4 w-4" />
+                  Start Agency Billing <ArrowRight className="h-4 w-4" />
                 </Button>
                 <p className="text-[11px] text-center mt-2" style={{ color: 'hsl(220, 10%, 40%)' }}>
-                  Agency billing coming next — beta access available now
+                  You'll sign in, then start checkout from your agency dashboard.
                 </p>
+
               </div>
             );
           })}

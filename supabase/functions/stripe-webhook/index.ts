@@ -109,6 +109,155 @@ async function handleRecruiterSubscription(
   else logStep("Recruiter billing updated", { recruiterId, plan, status, legacyLimit });
 }
 
+// ---------------------------------------------------------------------------
+// Phase 8B — Agency billing branch.
+//
+// Agency events are routed here when ANY of the following are true:
+//   - session/subscription metadata billing_context === "agency"
+//   - the subscription's price ID is one of the configured agency price envs
+//   - the Stripe customer matches an existing agency_entitlements row
+//
+// This branch ONLY touches public.agency_entitlements. It never touches
+// subscriptions, profiles, or recruiter_billing_profiles. Conversely, the
+// driver and recruiter branches never touch agency_entitlements.
+// ---------------------------------------------------------------------------
+
+const AGENCY_PLAN_ENV: Record<string, string> = {
+  agency_starter: "STRIPE_AGENCY_STARTER_PRICE_ID",
+  agency_team: "STRIPE_AGENCY_TEAM_PRICE_ID",
+  agency_growth: "STRIPE_AGENCY_GROWTH_PRICE_ID",
+};
+
+function resolveAgencyPlanKey(priceId: string, metadataPlanKey?: string | null): string | null {
+  if (metadataPlanKey && AGENCY_PLAN_ENV[metadataPlanKey]) return metadataPlanKey;
+  for (const [key, envName] of Object.entries(AGENCY_PLAN_ENV)) {
+    const envPriceId = Deno.env.get(envName);
+    if (envPriceId && envPriceId === priceId) return key;
+  }
+  return null;
+}
+
+function isAgencyPriceId(priceId: string): boolean {
+  if (!priceId) return false;
+  for (const envName of Object.values(AGENCY_PLAN_ENV)) {
+    if (Deno.env.get(envName) === priceId) return true;
+  }
+  return false;
+}
+
+function mapAgencyStripeStatus(stripeStatus: string): "active" | "trialing" | "past_due" | "cancelled" {  // trial-allowlist: Stripe subscription status
+  switch (stripeStatus) {
+    case "active": return "active";
+    case "trialing": return "trialing";  // trial-allowlist: Stripe subscription status
+    case "past_due":
+    case "unpaid": return "past_due";
+    case "canceled":
+    case "incomplete_expired":
+    case "incomplete":
+    default: return "cancelled";
+  }
+}
+
+async function isAgencyContext(
+  supabaseClient: any,
+  subscription: Stripe.Subscription,
+  sessionMetadata?: Record<string, string> | null,
+): Promise<{ agency_id: string | null; matched: boolean }> {
+  const meta = { ...(sessionMetadata ?? {}), ...(subscription.metadata ?? {}) } as Record<string, string>;
+  if (meta.billing_context === "agency" && meta.agency_id) {
+    return { agency_id: meta.agency_id, matched: true };
+  }
+  const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
+  if (isAgencyPriceId(priceId)) {
+    // Try metadata first, then look up by customer
+    if (meta.agency_id) return { agency_id: meta.agency_id, matched: true };
+    const { data } = await supabaseClient
+      .from("agency_entitlements")
+      .select("agency_id")
+      .eq("stripe_customer_id", subscription.customer as string)
+      .maybeSingle();
+    if (data?.agency_id) return { agency_id: data.agency_id, matched: true };
+    return { agency_id: null, matched: true };
+  }
+  // Customer lookup fallback even without metadata or price match — agencies
+  // own a dedicated customer ID.
+  const { data } = await supabaseClient
+    .from("agency_entitlements")
+    .select("agency_id")
+    .eq("stripe_customer_id", subscription.customer as string)
+    .maybeSingle();
+  if (data?.agency_id) return { agency_id: data.agency_id, matched: true };
+  return { agency_id: null, matched: false };
+}
+
+async function handleAgencySubscription(
+  supabaseClient: any,
+  subscription: Stripe.Subscription,
+  agencyId: string,
+  sessionMetadata?: Record<string, string> | null,
+) {
+  const meta = { ...(sessionMetadata ?? {}), ...(subscription.metadata ?? {}) } as Record<string, string>;
+  const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
+  const planKey = resolveAgencyPlanKey(priceId, meta.plan_key);
+  if (!planKey) {
+    logStep("Agency event — unknown price ID, refusing to grant plan", { priceId, agencyId });
+    return;
+  }
+  const status = mapAgencyStripeStatus(subscription.status);
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null;
+
+  const { error } = await supabaseClient
+    .from("agency_entitlements")
+    .upsert(
+      {
+        agency_id: agencyId,
+        plan_key: planKey,
+        status,
+        source: "stripe",
+        stripe_customer_id: subscription.customer as string,
+        stripe_subscription_id: subscription.id,
+        current_period_end: periodEnd,
+        // Override columns intentionally left null so plan defaults apply.
+        active_client_limit: null,
+        member_limit: null,
+        service_package_limit: null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "agency_id" },
+    );
+  if (error) {
+    logStep("Agency entitlement upsert error", { error: error.message, agencyId });
+    throw new Error(`Agency entitlement upsert failed: ${error.message}`);
+  }
+  logStep("Agency entitlement updated", { agencyId, planKey, status });
+}
+
+async function handleAgencySubscriptionDeleted(
+  supabaseClient: any,
+  subscription: Stripe.Subscription,
+  agencyId: string,
+) {
+  const { error } = await supabaseClient
+    .from("agency_entitlements")
+    .update({
+      status: "cancelled",
+      stripe_subscription_id: null,
+      current_period_end: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("agency_id", agencyId);
+  if (error) {
+    logStep("Agency entitlement cancel error", { error: error.message, agencyId });
+    throw new Error(`Agency entitlement cancel failed: ${error.message}`);
+  }
+  logStep("Agency entitlement cancelled", { agencyId });
+}
+
+
+
+
 
 /** Upsert the subscriptions table row */
 async function upsertSubscription(
@@ -230,6 +379,19 @@ serve(async (req) => {
 
         const userId = session.metadata?.user_id;
         const billingType = session.metadata?.billing_type;
+        const billingContext = session.metadata?.billing_context;
+
+        // Agency checkout — handle separately, do NOT touch driver Pro / recruiter tables
+        if (billingContext === "agency" && session.subscription) {
+          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+          const { agency_id, matched } = await isAgencyContext(supabaseClient, sub, session.metadata as Record<string, string>);
+          if (matched && agency_id) {
+            await handleAgencySubscription(supabaseClient, sub, agency_id, session.metadata as Record<string, string>);
+          } else {
+            logStep("Agency checkout missing agency_id — refusing to upsert", { sessionId: session.id });
+          }
+          break;
+        }
 
         // Recruiter checkout — handle separately, do NOT touch driver Pro tables
         if (billingType === "recruiter" && session.subscription) {
@@ -240,6 +402,7 @@ serve(async (req) => {
           });
           break;
         }
+
 
         if (userId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
@@ -288,11 +451,25 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription updated", { subscriptionId: subscription.id, status: subscription.status });
 
+        // Agency billing branch — must run BEFORE driver/recruiter so we
+        // never accidentally upsert into subscriptions/profiles for an
+        // agency-only customer.
+        const agencyCtx = await isAgencyContext(supabaseClient, subscription, null);
+        if (agencyCtx.matched) {
+          if (agencyCtx.agency_id) {
+            await handleAgencySubscription(supabaseClient, subscription, agencyCtx.agency_id, null);
+          } else {
+            logStep("Agency subscription without resolvable agency_id — skipping", { subId: subscription.id });
+          }
+          break;
+        }
+
         // Recruiter billing branch
         if (subscription.metadata?.billing_type === "recruiter") {
           await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
           break;
         }
+
 
         const customerId = subscription.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
@@ -423,10 +600,23 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription deleted", { subscriptionId: subscription.id });
 
+        // Agency cancellation branch — runs before driver/recruiter so we
+        // never null-out a driver/recruiter row for an agency-only sub.
+        const agencyCtxDel = await isAgencyContext(supabaseClient, subscription, null);
+        if (agencyCtxDel.matched) {
+          if (agencyCtxDel.agency_id) {
+            await handleAgencySubscriptionDeleted(supabaseClient, subscription, agencyCtxDel.agency_id);
+          } else {
+            logStep("Agency subscription deletion without agency_id — skipping", { subId: subscription.id });
+          }
+          break;
+        }
+
         if (subscription.metadata?.billing_type === "recruiter") {
           await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
           break;
         }
+
 
         // Find user
         const { data: subRow } = await supabaseClient

@@ -1,14 +1,21 @@
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sparkles, Info, CreditCard, AlertTriangle } from 'lucide-react';
 import { useAgencyEntitlement } from '@/hooks/useAgencyEntitlement';
 import {
   ASSISTANT_AGENCY_PLANS,
+  ALL_AGENCY_PLAN_KEYS,
   effectiveLimits,
   OUTSIDE_PAYMENTS_DISCLAIMER,
+  type AssistantAgencyPlanKey,
 } from '@/lib/agencyPlans';
-import { useAgencyMembers } from '@/hooks/useAgency';
+import { useAgencyMembers, useMyAgency } from '@/hooks/useAgency';
 import { useAgencyClients, useAgencyPackages } from '@/hooks/useAgencyWorkflow';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   agencyId: string;
@@ -19,19 +26,36 @@ function fmtLimit(used: number, limit: number | null) {
   return `${used} / ${limit}`;
 }
 
+// Sanitize ?plan= against the strict agency plan allowlist. Phase 8B.
+function sanitizeAgencyPlanKey(raw: string | null | undefined): AssistantAgencyPlanKey {
+  if (raw && (ALL_AGENCY_PLAN_KEYS as string[]).includes(raw)) {
+    return raw as AssistantAgencyPlanKey;
+  }
+  return 'agency_team';
+}
+
 /**
- * Phase 7 — Plan & Limits card for the agency dashboard.
+ * Phase 8B — Plan & Limits card with real Stripe billing CTAs.
  *
- * Read-only. Reads the agency_entitlements row (falls back to manual_beta
- * Agency Starter for existing beta agencies). Shows plan, status, and
- * current usage vs limits. Does NOT trigger Stripe checkout — agency
- * billing is wired in Phase 8.
+ * - manual_beta / no Stripe customer → "Start Agency Billing" (owner only)
+ * - active / trialing → "Manage Billing"  // trial-allowlist: Stripe subscription status
+ * - past_due → warning + "Manage Billing"
+ * - cancelled → warning + "Restart Billing"
+ * - Non-owners see read-only "Only the agency owner can manage billing."
  */
 export function AgencyPlanLimitsCard({ agencyId }: Props) {
-  const { entitlement, hasRow, isLoading } = useAgencyEntitlement(agencyId);
+  const { entitlement, hasRow, isLoading, refetch } = useAgencyEntitlement(agencyId);
   const { data: members } = useAgencyMembers(agencyId);
   const { data: packages } = useAgencyPackages(agencyId);
   const { data: clients } = useAgencyClients(agencyId);
+  const { data: agency } = useMyAgency();
+  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const [busy, setBusy] = useState(false);
+
+  const isOwner = agency?.my_role === 'agency_owner';
+  const preselectedPlan = sanitizeAgencyPlanKey(searchParams.get('plan'));
+  const [selectedPlan, setSelectedPlan] = useState<AssistantAgencyPlanKey>(preselectedPlan);
 
   if (isLoading) {
     return (
@@ -64,6 +88,71 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
     cancelled: { label: 'Cancelled', tone: 'bg-muted text-muted-foreground border-border' },
   };
   const badge = statusBadge[entitlement.status];
+
+  const startCheckout = async (planKey: AssistantAgencyPlanKey) => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-agency-checkout', {
+        body: { agencyId, planKey },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error('No checkout URL returned');
+    } catch (e: any) {
+      toast({
+        title: 'Could not start agency billing',
+        description: e?.message ?? 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openPortal = async () => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('agency-customer-portal', {
+        body: { agencyId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error('No portal URL returned');
+    } catch (e: any) {
+      toast({
+        title: 'Could not open billing portal',
+        description: e?.message ?? 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const showStartCta =
+    isOwner &&
+    (entitlement.status === 'manual_beta' ||
+      entitlement.status === 'cancelled' ||
+      !entitlement.stripeSubscriptionId);
+
+  const showPortalCta =
+    isOwner &&
+    !!entitlement.stripeCustomerId &&
+    ['active', 'trialing', 'past_due'].includes(entitlement.status);  // trial-allowlist: Stripe subscription status
+
+  // Refresh entitlement when we land back from Stripe success.
+  if (typeof window !== 'undefined' && searchParams.get('billing') === 'success') {
+    // fire-and-forget; React Query handles dedup
+    setTimeout(() => refetch(), 0);
+  }
 
   return (
     <Card>
@@ -104,14 +193,90 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
           Pending invites count toward your member limit.
         </p>
 
+        {entitlement.status === 'past_due' && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Your last agency payment did not succeed. Update payment in the billing
+              portal to keep adding clients, members, and packages.
+            </span>
+          </div>
+        )}
+        {entitlement.status === 'cancelled' && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Agency billing is cancelled. You can still view your data and manage existing
+              members, but adding new clients, members, or packages is paused until billing
+              is restarted.
+            </span>
+          </div>
+        )}
+
         {!hasRow && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
             <Info className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
               Beta access — your agency workspace is open at Agency Starter limits.
-              Agency billing will be enabled in Phase 8.
+              Start agency billing any time to lock in a paid plan.
             </span>
           </div>
+        )}
+
+        {isOwner ? (
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Agency billing
+            </p>
+            {showStartCta && (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  {ALL_AGENCY_PLAN_KEYS.map((k) => {
+                    const p = ASSISTANT_AGENCY_PLANS[k];
+                    const selected = selectedPlan === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setSelectedPlan(k)}
+                        className={`rounded-md border px-2 py-2 text-left text-xs transition ${
+                          selected ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'
+                        }`}
+                      >
+                        <p className="font-semibold">{p.label}</p>
+                        <p className="text-muted-foreground">${p.monthlyPrice}/mo</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  className="w-full gap-2"
+                  disabled={busy}
+                  onClick={() => startCheckout(selectedPlan)}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  {entitlement.status === 'cancelled'
+                    ? `Restart Billing — ${ASSISTANT_AGENCY_PLANS[selectedPlan].label}`
+                    : `Start Agency Billing — ${ASSISTANT_AGENCY_PLANS[selectedPlan].label}`}
+                </Button>
+              </>
+            )}
+            {showPortalCta && (
+              <Button
+                className="w-full gap-2"
+                variant={entitlement.status === 'past_due' ? 'default' : 'outline'}
+                disabled={busy}
+                onClick={openPortal}
+              >
+                <CreditCard className="h-4 w-4" />
+                Manage Billing
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Only the agency owner can manage billing.
+          </p>
         )}
 
         <p className="text-xs text-muted-foreground">{OUTSIDE_PAYMENTS_DISCLAIMER}</p>
