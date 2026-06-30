@@ -101,8 +101,9 @@ export default function AgencyDashboard() {
             <TabsTrigger value="work">Work queue</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
-          <TabsContent value="overview">
+          <TabsContent value="overview" className="space-y-4">
             <AgencyDetailCard agency={agency} drivers={managedDrivers.length} />
+            <AgencyPlanLimitsCard agencyId={agency.id} />
           </TabsContent>
           <TabsContent value="packages">
             <ServicePackagesSection agencyId={agency.id} />
