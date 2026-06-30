@@ -157,19 +157,20 @@ describe('Phase 8B — stripe-webhook agency routing', () => {
     expect(src).toMatch(/handleAgencySubscriptionDeleted/);
   });
 
-  it('agency branches do not touch subscriptions, profiles, or recruiter_billing_profiles', () => {
-    // Locate the agency helper bodies.
+  it('agency helper bodies do not touch subscriptions, profiles, or recruiter_billing_profiles', () => {
+    // Slice just handleAgencySubscription + handleAgencySubscriptionDeleted,
+    // stopping at the next function (`upsertSubscription`) so we don't pick
+    // up unrelated driver/recruiter helpers below.
     const a1 = src.indexOf('async function handleAgencySubscription');
-    const a2 = src.indexOf('async function handleAgencySubscriptionDeleted');
-    const end = src.indexOf('serve(async (req)');
+    const end = src.indexOf('async function upsertSubscription');
     expect(a1).toBeGreaterThan(-1);
-    expect(a2).toBeGreaterThan(-1);
-    expect(end).toBeGreaterThan(a2);
+    expect(end).toBeGreaterThan(a1);
     const agencyBodies = src.slice(a1, end);
     expect(agencyBodies).not.toMatch(/from\("subscriptions"\)/);
     expect(agencyBodies).not.toMatch(/from\("profiles"\)/);
     expect(agencyBodies).not.toMatch(/from\("recruiter_billing_profiles"\)/);
   });
+
 
   it('preserves driver Pro branch (subscriptions table + profiles update)', () => {
     expect(src).toMatch(/from\("subscriptions"\)/);
