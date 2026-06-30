@@ -40,7 +40,7 @@ describe('Capability dashboards — recruiter + assistant first-class UX', () =>
 
   it('Assistant dashboard includes the agency upsell card routing to /agency', () => {
     expect(assistant).toMatch(/assistant-agency-cta/);
-    expect(assistant).toMatch(/back-office business/);
+    expect(assistant).toMatch(/manage multiple drivers as a business/);
     expect(assistant).toMatch(/navigate\('\/agency'\)/);
   });
 
