@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { PLANS } from '@/lib/billing/plans';
 import { trackBeginCheckout, trackPricingProfitIntelClick, trackStarterKitCTAClicked } from '@/lib/analytics';
 import MarketingHeader from '@/components/marketing/MarketingHeader';
+import { ASSISTANT_AGENCY_PLANS, ALL_AGENCY_PLAN_KEYS, OUTSIDE_PAYMENTS_DISCLAIMER } from '@/lib/agencyPlans';
 
 
 const freeFeatures = [
@@ -503,43 +504,8 @@ export default function Pricing() {
       </section>
 
       {/* Assistants & Agencies */}
-      <section id="assistants-agencies" className="py-16 sm:py-24 scroll-mt-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
-              Assistants &amp; <span style={{ color: 'hsl(25, 95%, 53%)' }}>Agencies</span>
-            </h2>
-            <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              Use HaulTracker Pro to help truckers manage their back office. Drivers stay in control and approve exactly who gets access.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-              <h3 className="text-base font-black mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>How drivers pay</h3>
-              <p className="text-sm" style={{ color: 'hsl(220, 10%, 65%)' }}>
-                Drivers pay for their own HaulTracker Pro subscription (Free or Pro). That covers the driver account itself.
-              </p>
-            </div>
-            <div className="p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
-              <h3 className="text-base font-black mb-2" style={{ color: 'hsl(0, 0%, 100%)' }}>How assistants &amp; agencies use it</h3>
-              <p className="text-sm" style={{ color: 'hsl(220, 10%, 65%)' }}>
-                Driver Assistants and Agencies can use the platform to manage approved driver clients — load entry, expenses, fuel logs, reports, and back-office work.
-              </p>
-            </div>
-          </div>
-          <div className="mt-6 p-5 rounded-2xl border" style={{ background: 'hsl(25, 95%, 53%, 0.06)', borderColor: 'hsl(25, 95%, 53%, 0.35)' }}>
-            <h3 className="text-sm font-black mb-2" style={{ color: 'hsl(25, 95%, 60%)' }}>Payments for assistant &amp; agency services</h3>
-            <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
-              HaulTracker Pro does <b>not</b> currently process payments between drivers and assistants or agencies. Any service fees are arranged outside the platform for now. Future agency billing features may come later. HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
-            </p>
-          </div>
-          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-            <Button onClick={() => navigate('/assistants-agencies')} className="rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Explore the Assistants &amp; Agencies opportunity <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </section>
+      <AssistantsAgenciesPricingSection navigate={navigate} />
+
 
 
       {/* Lead magnet CTA */}
@@ -621,5 +587,119 @@ export default function Pricing() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function AssistantsAgenciesPricingSection({ navigate }: { navigate: (path: string) => void }) {
+  const assistant = ASSISTANT_AGENCY_PLANS.assistant_free;
+  const agencyPlans = ALL_AGENCY_PLAN_KEYS.map((k) => ASSISTANT_AGENCY_PLANS[k]);
+
+  return (
+    <section id="assistants-agencies" className="py-16 sm:py-24 scroll-mt-24" style={{ background: 'hsl(220, 20%, 8%)' }}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-3" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: 'hsl(25, 95%, 60%)' }}>
+            Driver Assistants &amp; Back-Office Agencies
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
+            Software pricing for back-office <span style={{ color: 'hsl(25, 95%, 53%)' }}>helpers &amp; agencies</span>
+          </h2>
+          <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
+            Pricing below is for HaulTracker Pro software access only. Service payments between drivers and assistants/agencies are arranged outside the platform.
+          </p>
+        </div>
+
+        {/* Assistant — Free */}
+        <div className="mb-8 p-6 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+            <h3 className="text-lg font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>{assistant.label}</h3>
+            <div>
+              <span className="text-3xl font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>Free</span>
+              <span className="text-xs ml-2" style={{ color: 'hsl(220, 10%, 55%)' }}>no software fee</span>
+            </div>
+          </div>
+          <p className="text-sm mb-4" style={{ color: 'hsl(220, 10%, 65%)' }}>{assistant.tagline}</p>
+          <ul className="grid sm:grid-cols-2 gap-2 mb-4">
+            {assistant.publicBullets.map((b) => (
+              <li key={b} className="flex items-start gap-2 text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
+                <Check className="h-4 w-4 mt-0.5 shrink-0" style={{ color: 'hsl(152, 60%, 42%)' }} />
+                {b}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs" style={{ color: 'hsl(220, 10%, 50%)' }}>{assistant.limitationsCopy}</p>
+          <div className="mt-4">
+            <Button onClick={() => navigate('/auth?next=%2Fassistant')} variant="outline" className="rounded-xl font-bold gap-2" style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}>
+              Become a Driver Assistant <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Agency plan cards */}
+        <div className="grid sm:grid-cols-3 gap-5">
+          {agencyPlans.map((p, i) => {
+            const highlight = i === 1; // Team is the recommended middle tier
+            return (
+              <div
+                key={p.key}
+                className="p-6 rounded-2xl border relative"
+                style={{
+                  background: 'hsl(220, 20%, 10%)',
+                  borderColor: highlight ? 'hsl(25, 95%, 53%)' : 'hsl(220, 16%, 16%)',
+                  boxShadow: highlight ? '0 0 30px -8px hsl(25, 95%, 53%, 0.2), 0 0 0 1px hsl(25, 95%, 53%, 0.15)' : undefined,
+                }}
+              >
+                {highlight && (
+                  <div className="absolute -top-3 right-6 px-3 py-1 rounded-full text-[10px] font-bold" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+                    MOST POPULAR
+                  </div>
+                )}
+                <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>{p.label}</h3>
+                <p className="text-xs mb-4" style={{ color: 'hsl(220, 10%, 55%)' }}>{p.tagline}</p>
+                <div className="mb-4">
+                  <span className="text-3xl font-black" style={{ color: 'hsl(0, 0%, 100%)' }}>${p.monthlyPrice}</span>
+                  <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
+                </div>
+                <ul className="space-y-2.5 mb-4">
+                  {p.publicBullets.map((b) => (
+                    <li key={b} className="flex items-start gap-2 text-xs" style={{ color: 'hsl(220, 10%, 70%)' }}>
+                      <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: 'hsl(25, 95%, 53%)' }} />
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] mb-4" style={{ color: 'hsl(220, 10%, 45%)' }}>{p.limitationsCopy}</p>
+                {/* No fake checkout — Phase 8 will wire Stripe. */}
+                <Button
+                  onClick={() => navigate('/auth?next=%2Fagency')}
+                  variant="outline"
+                  className="w-full rounded-xl font-bold gap-2"
+                  style={{ borderColor: 'hsl(25, 95%, 53%)', color: 'hsl(25, 95%, 60%)', background: 'transparent' }}
+                >
+                  Start Agency Setup <ArrowRight className="h-4 w-4" />
+                </Button>
+                <p className="text-[11px] text-center mt-2" style={{ color: 'hsl(220, 10%, 40%)' }}>
+                  Agency billing coming next — beta access available now
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-8 p-5 rounded-2xl border" style={{ background: 'hsl(25, 95%, 53%, 0.06)', borderColor: 'hsl(25, 95%, 53%, 0.35)' }}>
+          <h3 className="text-sm font-black mb-2" style={{ color: 'hsl(25, 95%, 60%)' }}>Payments for assistant &amp; agency services</h3>
+          <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
+            HaulTracker Pro does <b>not</b> currently process payments between drivers and assistants or agencies. Service agreements and payments are handled outside the platform for now. HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
+          </p>
+          <p className="sr-only">{OUTSIDE_PAYMENTS_DISCLAIMER}</p>
+        </div>
+
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+          <Button onClick={() => navigate('/assistants-agencies')} className="rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
+            Explore the Assistants &amp; Agencies opportunity <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }

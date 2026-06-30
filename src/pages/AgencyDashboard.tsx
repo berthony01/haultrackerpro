@@ -34,6 +34,7 @@ import { ClientListSection } from '@/components/agency/ClientListSection';
 import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
 import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
 import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
+import { AgencyPlanLimitsCard } from '@/components/agency/AgencyPlanLimitsCard';
 
 /**
  * Private agency area. Anyone signed-in can create one personal agency profile
@@ -100,8 +101,9 @@ export default function AgencyDashboard() {
             <TabsTrigger value="work">Work queue</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
-          <TabsContent value="overview">
+          <TabsContent value="overview" className="space-y-4">
             <AgencyDetailCard agency={agency} drivers={managedDrivers.length} />
+            <AgencyPlanLimitsCard agencyId={agency.id} />
           </TabsContent>
           <TabsContent value="packages">
             <ServicePackagesSection agencyId={agency.id} />
