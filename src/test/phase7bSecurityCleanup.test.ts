@@ -72,7 +72,7 @@ describe('Phase 7B — limit helpers revoked from clients', () => {
           const p = path.join(dir, e.name);
           if (e.isDirectory()) return walk(p);
           if (/\.(ts|tsx)$/.test(e.name) && !p.includes('/test/') && !p.endsWith('types.ts'))
-            return read(p).match(pattern) ? [p] : [];
+            return fs.readFileSync(p, 'utf8').match(pattern) ? [p] : [];
           return [];
         });
       return walk(path.join(ROOT, 'src'));
