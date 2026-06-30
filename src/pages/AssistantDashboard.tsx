@@ -270,17 +270,17 @@ export default function AssistantDashboard() {
         )}
       </section>
 
-      {/* Assistant → Agency upsell */}
+      {/* Assistant → Agency upsell (secondary) */}
       <Card data-testid="assistant-agency-cta" className="border-dashed">
         <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-medium text-sm flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" />
-              Want to manage multiple drivers as a back-office business?
+              Want to manage multiple drivers as a business?
             </p>
             <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-              Create an Agency Workspace to organize clients, packages, and delegated work
-              in one place. You stay in full control of who you accept.
+              Create an Agency Workspace to organize clients, packages, and a team in one
+              place. Drivers still individually approve who can act on their account.
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={() => navigate('/agency')}>
