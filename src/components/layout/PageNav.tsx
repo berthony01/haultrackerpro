@@ -9,12 +9,24 @@ export interface PageNavCrumb {
   href?: string;
 }
 
+export interface PageNavHome {
+  /** Label for the home button. Defaults to "Dashboard". */
+  label?: string;
+  /** Destination route. Defaults to `/dashboard`. */
+  to?: string;
+}
+
 interface PageNavProps {
   /** Ordered breadcrumb trail. The last entry represents the current page and
    *  is rendered as plain text (no link), regardless of whether `href` is set. */
   trail?: PageNavCrumb[];
-  /** Where the "Dashboard" home button should go. Defaults to `/dashboard`. */
+  /** Where the "Dashboard" home button should go. Defaults to `/dashboard`.
+   *  Kept for backwards compatibility — prefer `home`. */
   homeHref?: string;
+  /** Override the home button label + destination. Use this on standalone
+   *  workspaces (e.g. `/agency`, `/assistant`) so the home button returns to
+   *  that workspace instead of the driver Dashboard. */
+  home?: PageNavHome;
   /** Hide the Back (history -1) button. Defaults to false. */
   hideBack?: boolean;
   className?: string;
@@ -23,19 +35,24 @@ interface PageNavProps {
 /**
  * Shared top navigation strip for standalone authenticated pages. Provides:
  *  - A Back button (`history.back`) so users can always reverse their last step.
- *  - A persistent Dashboard home button so users can return to /dashboard from
- *    any page regardless of how deep they are.
+ *  - A persistent home button so users can return to their workspace root
+ *    (driver Dashboard by default, but overridable per workspace) from any
+ *    page regardless of how deep they are.
  *  - A clickable breadcrumb trail showing where the user is and letting them
  *    jump back to any prior step.
  */
 export function PageNav({
   trail = [],
   homeHref = '/dashboard',
+  home,
   hideBack = false,
   className,
 }: PageNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const resolvedHomeTo = home?.to ?? homeHref;
+  const resolvedHomeLabel = home?.label ?? 'Dashboard';
+
 
   // React Router marks the initial history entry with key === 'default'.
   // If the user landed directly (notification deep-link, bookmark, auth
@@ -47,7 +64,7 @@ export function PageNav({
     if (hasSafeHistory) {
       navigate(-1);
     } else {
-      navigate(homeHref);
+      navigate(resolvedHomeTo);
     }
   };
 
@@ -64,7 +81,7 @@ export function PageNav({
           variant="ghost"
           size="sm"
           onClick={handleBack}
-          aria-label={hasSafeHistory ? 'Go back' : 'Back to Dashboard'}
+          aria-label={hasSafeHistory ? 'Go back' : `Back to ${resolvedHomeLabel}`}
           data-testid="pagenav-back"
           className="-ml-2 h-8 px-2 text-muted-foreground hover:text-foreground"
         >
@@ -80,11 +97,12 @@ export function PageNav({
         size="sm"
         className="h-8 px-2 text-muted-foreground hover:text-foreground"
       >
-        <Link to={homeHref} aria-label="Go to Dashboard">
+        <Link to={resolvedHomeTo} aria-label={`Go to ${resolvedHomeLabel}`}>
           <Home className="mr-1 h-4 w-4" />
-          Dashboard
+          {resolvedHomeLabel}
         </Link>
       </Button>
+
 
       {trail.length > 0 && (
         <nav aria-label="Breadcrumb" className="flex items-center gap-1 min-w-0">
