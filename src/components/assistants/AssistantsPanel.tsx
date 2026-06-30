@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useAssistants, type AssistantRow } from '@/hooks/useAssistants';
+import { useAssistants } from '@/hooks/useAssistants';
 import { InviteAssistantDialog } from './InviteAssistantDialog';
 import { MyAgencyRequestsSection } from './MyAgencyRequestsSection';
 import {
@@ -22,12 +22,13 @@ import {
   type AssistantPermissionKey,
   type AssistantPermissions,
 } from '@/lib/assistantPermissions';
-import { Shield, Users } from 'lucide-react';
+import { Shield, Users, Building2 } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAssistantsWithSource, type AssistantWithSourceRow } from '@/hooks/useAssistantsWithSource';
 import { useToast } from '@/hooks/use-toast';
 
-function StatusBadge({ status }: { status: AssistantRow['status'] }) {
-  const map: Record<AssistantRow['status'], { label: string; variant: any }> = {
+function StatusBadge({ status }: { status: AssistantWithSourceRow["status"] }) {
+  const map: Record<AssistantWithSourceRow['status'], { label: string; variant: any }> = {
     pending: { label: 'Pending', variant: 'secondary' },
     active: { label: 'Active', variant: 'default' },
     revoked: { label: 'Revoked', variant: 'outline' },
@@ -37,7 +38,7 @@ function StatusBadge({ status }: { status: AssistantRow['status'] }) {
   return <Badge variant={m.variant}>{m.label}</Badge>;
 }
 
-function PermissionEditor({ row }: { row: AssistantRow }) {
+function PermissionEditor({ row }: { row: AssistantWithSourceRow }) {
   const { updatePermissions } = useAssistants();
   const { toast } = useToast();
   const [perms, setPerms] = useState<AssistantPermissions>(row.permissions ?? {});
@@ -87,7 +88,7 @@ function PermissionEditor({ row }: { row: AssistantRow }) {
   );
 }
 
-function RevokeButton({ row }: { row: AssistantRow }) {
+function RevokeButton({ row }: { row: AssistantWithSourceRow }) {
   const { revoke } = useAssistants();
   const { toast } = useToast();
   return (
@@ -125,9 +126,11 @@ function RevokeButton({ row }: { row: AssistantRow }) {
 }
 
 export function AssistantsPanel() {
-  const { assistants, isLoading } = useAssistants();
+  // Source-aware listing distinguishes direct invites from agency-delegated rows.
+  const { data: rows = [], isLoading } = useAssistantsWithSource();
   const { isPro } = useSubscription();
 
+  const assistants = rows;
   const active = assistants.filter((a) => a.status === 'active');
   const pending = assistants.filter((a) => a.status === 'pending');
   const inactive = assistants.filter((a) => a.status === 'revoked' || a.status === 'expired');
@@ -137,7 +140,7 @@ export function AssistantsPanel() {
   // disables before the RPC errors.
   const directSlotCount = assistants.filter(
     (a) =>
-      (a as any).agency_delegation_id == null &&
+      a.source === 'direct_invite' &&
       (a.status === 'active' || a.status === 'pending'),
   ).length;
   const allowedDirectSlots = isPro ? 1 : 0;
@@ -217,6 +220,14 @@ export function AssistantsPanel() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{row.invite_email}</span>
                           <StatusBadge status={row.status} />
+                          {row.source === 'agency' ? (
+                            <Badge variant="secondary" className="gap-1">
+                              <Building2 className="h-3 w-3" />
+                              via agency{row.agency_name ? ` · ${row.agency_name}` : ''}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">direct invite</Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                           {Object.keys(row.permissions ?? {}).filter((k) => (row.permissions as any)[k]).length} permissions

@@ -145,7 +145,11 @@ export default function AgencyDashboard() {
                 </>
               )}
               <TabsContent value="work">
-                <WorkQueueSection agencyId={agency.id} focusedWorkItemId={focusedWorkItemId} />
+                <WorkQueueSection
+                  agencyId={agency.id}
+                  focusedWorkItemId={focusedWorkItemId}
+                  canManage={isOwnerOrAdmin}
+                />
               </TabsContent>
               {isOwner && (
                 <TabsContent value="activity">
@@ -175,9 +179,10 @@ function CreateAgencyCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          For people who want to manage paperwork for multiple truckers as a side hustle or
-          small business. Drivers still invite you individually — this profile just keeps your
-          business identity in one place.
+          For people who want to manage paperwork for multiple truckers as a side
+          hustle or small business. Drivers still approve each delegation before
+          anyone can access their account — this profile just keeps your business
+          identity, packages, and team in one place.
         </p>
         <div className="space-y-2">
           <Label htmlFor="ag-name">Agency name</Label>
