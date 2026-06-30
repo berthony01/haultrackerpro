@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useAssistants, type AssistantRow } from '@/hooks/useAssistants';
+import { useAssistants } from '@/hooks/useAssistants';
 import { InviteAssistantDialog } from './InviteAssistantDialog';
 import { MyAgencyRequestsSection } from './MyAgencyRequestsSection';
 import {
