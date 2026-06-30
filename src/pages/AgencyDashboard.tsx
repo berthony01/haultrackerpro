@@ -145,7 +145,11 @@ export default function AgencyDashboard() {
                 </>
               )}
               <TabsContent value="work">
-                <WorkQueueSection agencyId={agency.id} focusedWorkItemId={focusedWorkItemId} />
+                <WorkQueueSection
+                  agencyId={agency.id}
+                  focusedWorkItemId={focusedWorkItemId}
+                  canManage={isOwnerOrAdmin}
+                />
               </TabsContent>
               {isOwner && (
                 <TabsContent value="activity">
