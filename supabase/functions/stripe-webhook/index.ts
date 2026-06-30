@@ -600,10 +600,23 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription deleted", { subscriptionId: subscription.id });
 
+        // Agency cancellation branch — runs before driver/recruiter so we
+        // never null-out a driver/recruiter row for an agency-only sub.
+        const agencyCtxDel = await isAgencyContext(supabaseClient, subscription, null);
+        if (agencyCtxDel.matched) {
+          if (agencyCtxDel.agency_id) {
+            await handleAgencySubscriptionDeleted(supabaseClient, subscription, agencyCtxDel.agency_id);
+          } else {
+            logStep("Agency subscription deletion without agency_id — skipping", { subId: subscription.id });
+          }
+          break;
+        }
+
         if (subscription.metadata?.billing_type === "recruiter") {
           await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
           break;
         }
+
 
         // Find user
         const { data: subRow } = await supabaseClient
