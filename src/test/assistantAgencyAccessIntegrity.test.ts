@@ -1,32 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
-const MIGRATION = read(
-  'supabase/migrations/20260630151043_remote_schema.sql'.replace(
-    '20260630151043_remote_schema.sql',
-    // Latest cleanup migration — name is provisioned by Lovable, so look it
-    // up by content to stay resilient.
-    findCleanupMigration(),
-  ),
-);
 
 function findCleanupMigration(): string {
-  const fs = require('node:fs');
   const dir = 'supabase/migrations';
-  const files = fs.readdirSync(dir) as string[];
-  const match = files
+  const files = readdirSync(dir)
     .filter((f) => f.endsWith('.sql'))
-    .reverse()
-    .find((f) =>
-      readFileSync(join(process.cwd(), dir, f), 'utf8').includes(
-        'agency_delegation_id uuid',
-      ),
-    );
-  if (!match) throw new Error('Cleanup migration not found');
-  return match;
+    .sort()
+    .reverse();
+  for (const f of files) {
+    const txt = readFileSync(join(process.cwd(), dir, f), 'utf8');
+    if (txt.includes('agency_delegation_id uuid')) return join(dir, f);
+  }
+  throw new Error('Cleanup migration not found');
 }
+
+const MIGRATION = read(findCleanupMigration());
 
 describe('Access integrity — assistant access center copy', () => {
   const dash = read('src/pages/AssistantDashboard.tsx');
