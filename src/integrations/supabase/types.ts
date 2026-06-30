@@ -1163,6 +1163,7 @@ export type Database = {
       driver_assistants: {
         Row: {
           accepted_at: string | null
+          agency_delegation_id: string | null
           assistant_user_id: string | null
           created_at: string
           driver_user_id: string
@@ -1178,6 +1179,7 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          agency_delegation_id?: string | null
           assistant_user_id?: string | null
           created_at?: string
           driver_user_id: string
@@ -1193,6 +1195,7 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          agency_delegation_id?: string | null
           assistant_user_id?: string | null
           created_at?: string
           driver_user_id?: string
@@ -1206,7 +1209,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["assistant_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "driver_assistants_agency_delegation_id_fkey"
+            columns: ["agency_delegation_id"]
+            isOneToOne: false
+            referencedRelation: "agency_delegation_requests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       driver_opportunity_profiles: {
         Row: {

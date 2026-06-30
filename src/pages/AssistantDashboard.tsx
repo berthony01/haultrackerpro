@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Users,
-  ArrowLeft,
   ArrowRight,
   ShieldCheck,
   Inbox,
@@ -57,52 +56,29 @@ export default function AssistantDashboard() {
 
   const pendingCount = invites?.length ?? 0;
   const activeCount = managedDrivers.length;
-  const reportsCount = managedDrivers.filter((d) =>
-    hasPerm(d.permissions, 'view_reports'),
-  ).length;
-  const recentActiveCount = new Set(
-    (activity ?? [])
-      .filter((a) => Date.now() - new Date(a.created_at).getTime() < 7 * 24 * 60 * 60 * 1000)
-      .map((a) => a.driver_user_id),
-  ).size;
 
   return (
     <AppShell>
     <div className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
-      <PageNav home={{ label: 'Assistant', to: '/assistant' }} trail={[{ label: 'Assistant' }]} />
+      <PageNav home={{ label: 'Assistant', to: '/assistant' }} trail={[{ label: 'Assistant Access Center' }]} />
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
-            Assistant operations
+            Assistant Access Center
           </h1>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Manage paperwork for every driver who's invited you. Switch between drivers any
-            time from the banner that appears once you're managing one.
+            Drivers who've invited you appear here. Choose a driver to start managing their
+            paperwork — loads, expenses, fuel logs, and reports — within the permissions
+            they granted you. This isn't a separate dashboard or analytics workspace.
           </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/agency')}>
-            <Building2 className="mr-2 h-4 w-4" />
-            {agency ? agency.name : 'Set up agency'}
-          </Button>
         </div>
       </header>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={<Users className="h-4 w-4" />} label="Active drivers" value={activeCount} />
+      {/* Lightweight access summary — intentionally not dashboard-like. */}
+      <div className="grid grid-cols-2 gap-3 max-w-md">
+        <StatCard icon={<Users className="h-4 w-4" />} label="Approved drivers" value={activeCount} />
         <StatCard icon={<Inbox className="h-4 w-4" />} label="Pending invites" value={pendingCount} />
-        <StatCard
-          icon={<BarChart3 className="h-4 w-4" />}
-          label="Reports access"
-          value={reportsCount}
-        />
-        <StatCard
-          icon={<ShieldCheck className="h-4 w-4" />}
-          label="Active past 7d"
-          value={recentActiveCount}
-        />
       </div>
 
       {/* Pending invites */}
@@ -294,17 +270,17 @@ export default function AssistantDashboard() {
         )}
       </section>
 
-      {/* Assistant → Agency upsell */}
+      {/* Assistant → Agency upsell (secondary) */}
       <Card data-testid="assistant-agency-cta" className="border-dashed">
         <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-medium text-sm flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" />
-              Want to manage multiple drivers as a back-office business?
+              Want to manage multiple drivers as a business?
             </p>
             <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-              Create an Agency Workspace to organize clients, packages, and delegated work
-              in one place. You stay in full control of who you accept.
+              Create an Agency Workspace to organize clients, packages, and a team in one
+              place. Drivers still individually approve who can act on their account.
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={() => navigate('/agency')}>

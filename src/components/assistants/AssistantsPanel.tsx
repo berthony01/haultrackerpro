@@ -132,10 +132,16 @@ export function AssistantsPanel() {
   const pending = assistants.filter((a) => a.status === 'pending');
   const inactive = assistants.filter((a) => a.status === 'revoked' || a.status === 'expired');
 
-  const atLimit = isPro === false && active.length >= 1;
-  // Free plan rollout: 0 active. Pro: 1 active. Tighten or relax with plan tiers later.
-  const allowedActive = isPro ? 1 : 0;
-  const canInvite = active.length < allowedActive || (isPro && active.length + pending.length < allowedActive + 1);
+  // Server enforces: Pro = 1 direct assistant slot (active + pending combined),
+  // agency-delegated assistants don't count. Mirror that here so the button
+  // disables before the RPC errors.
+  const directSlotCount = assistants.filter(
+    (a) =>
+      (a as any).agency_delegation_id == null &&
+      (a.status === 'active' || a.status === 'pending'),
+  ).length;
+  const allowedDirectSlots = isPro ? 1 : 0;
+  const atLimit = isPro === true && directSlotCount >= allowedDirectSlots;
 
   return (
     <div className="space-y-6">
@@ -161,7 +167,7 @@ export function AssistantsPanel() {
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
             {isPro
-              ? `Pro plan: up to ${allowedActive} active assistant.`
+              ? `Pro plan: up to ${allowedDirectSlots} direct assistant. Agency-delegated helpers don't count.`
               : 'Inviting assistants requires Pro.'}
           </p>
         </div>
