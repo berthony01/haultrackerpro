@@ -28,7 +28,7 @@ import { useAssistantsWithSource, type AssistantWithSourceRow } from '@/hooks/us
 import { useToast } from '@/hooks/use-toast';
 
 function StatusBadge({ status }: { status: AssistantWithSourceRow["status"] }) {
-  const map: Record<AssistantRow['status'], { label: string; variant: any }> = {
+  const map: Record<AssistantWithSourceRow['status'], { label: string; variant: any }> = {
     pending: { label: 'Pending', variant: 'secondary' },
     active: { label: 'Active', variant: 'default' },
     revoked: { label: 'Revoked', variant: 'outline' },
