@@ -101,36 +101,60 @@ export default function AgencyDashboard() {
       {!agency ? (
         <CreateAgencyCard />
       ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="flex flex-wrap">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="packages">Packages</TabsTrigger>
-            <TabsTrigger value="requests">Requests</TabsTrigger>
-            <TabsTrigger value="clients">Clients</TabsTrigger>
-            <TabsTrigger value="work">Work queue</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-          </TabsList>
-          <TabsContent value="overview" className="space-y-4">
-            <AgencyDetailCard agency={agency} />
-            <AgencyPlanLimitsCard agencyId={agency.id} />
-          </TabsContent>
-
-          <TabsContent value="packages">
-            <ServicePackagesSection agencyId={agency.id} />
-          </TabsContent>
-          <TabsContent value="requests">
-            <ClientRequestsSection agencyId={agency.id} />
-          </TabsContent>
-          <TabsContent value="clients">
-            <ClientListSection agencyId={agency.id} />
-          </TabsContent>
-          <TabsContent value="work">
-            <WorkQueueSection agencyId={agency.id} focusedWorkItemId={focusedWorkItemId} />
-          </TabsContent>
-          <TabsContent value="activity">
-            <AgencyAuditSection agencyId={agency.id} />
-          </TabsContent>
-        </Tabs>
+        (() => {
+          const role = agency.my_role;
+          const isOwner = role === 'agency_owner';
+          const isOwnerOrAdmin = isOwner || role === 'agency_admin';
+          // Member sees only what they can act on; admins see ops; owners see all.
+          const tabs: { value: string; label: string; show: boolean }[] = [
+            { value: 'overview', label: 'Overview', show: true },
+            { value: 'packages', label: 'Packages', show: isOwnerOrAdmin },
+            { value: 'requests', label: 'Requests', show: isOwnerOrAdmin },
+            { value: 'clients', label: 'Clients', show: isOwnerOrAdmin },
+            { value: 'work', label: 'Work queue', show: true },
+            { value: 'activity', label: 'Activity', show: isOwner },
+          ].filter((t) => t.show);
+          const safeActive = tabs.some((t) => t.value === activeTab) ? activeTab : 'overview';
+          return (
+            <Tabs value={safeActive} onValueChange={setActiveTab} className="space-y-4">
+              <TabsList className="flex flex-wrap">
+                {tabs.map((t) => (
+                  <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+                ))}
+              </TabsList>
+              <TabsContent value="overview" className="space-y-4">
+                <AgencyDetailCard agency={agency} />
+                {isOwner && <AgencyPlanLimitsCard agencyId={agency.id} />}
+                {!isOwner && (
+                  <p className="text-xs text-muted-foreground">
+                    Billing and plan limits are managed by the agency owner.
+                  </p>
+                )}
+              </TabsContent>
+              {isOwnerOrAdmin && (
+                <>
+                  <TabsContent value="packages">
+                    <ServicePackagesSection agencyId={agency.id} />
+                  </TabsContent>
+                  <TabsContent value="requests">
+                    <ClientRequestsSection agencyId={agency.id} />
+                  </TabsContent>
+                  <TabsContent value="clients">
+                    <ClientListSection agencyId={agency.id} />
+                  </TabsContent>
+                </>
+              )}
+              <TabsContent value="work">
+                <WorkQueueSection agencyId={agency.id} focusedWorkItemId={focusedWorkItemId} />
+              </TabsContent>
+              {isOwner && (
+                <TabsContent value="activity">
+                  <AgencyAuditSection agencyId={agency.id} />
+                </TabsContent>
+              )}
+            </Tabs>
+          );
+        })()
       )}
     </div>
     </AppShell>
