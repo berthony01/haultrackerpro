@@ -43,9 +43,15 @@ describe('Access integrity — assistant access center copy', () => {
 describe('Access integrity — direct assistant limits in panel UI', () => {
   const panel = read('src/components/assistants/AssistantsPanel.tsx');
 
-  it('counts only direct (non agency-delegated) assistants against the slot', () => {
-    expect(panel).toMatch(/agency_delegation_id/);
+  it('uses source-aware data and counts only direct assistants against the slot', () => {
+    expect(panel).toMatch(/useAssistantsWithSource/);
+    expect(panel).toMatch(/source === 'direct_invite'/);
     expect(panel).toMatch(/Agency-delegated helpers don't count/);
+  });
+
+  it('labels rows as via agency vs direct invite', () => {
+    expect(panel).toMatch(/via agency/);
+    expect(panel).toMatch(/direct invite/);
   });
 });
 
