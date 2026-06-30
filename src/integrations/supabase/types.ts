@@ -238,6 +238,62 @@ export type Database = {
           },
         ]
       }
+      agency_entitlements: {
+        Row: {
+          active_client_limit: number | null
+          agency_id: string
+          created_at: string
+          current_period_end: string | null
+          id: string
+          member_limit: number | null
+          plan_key: string
+          service_package_limit: number | null
+          source: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active_client_limit?: number | null
+          agency_id: string
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          member_limit?: number | null
+          plan_key?: string
+          service_package_limit?: number | null
+          source?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active_client_limit?: number | null
+          agency_id?: string
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          member_limit?: number | null
+          plan_key?: string
+          service_package_limit?: number | null
+          source?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_entitlements_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "agency_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agency_members: {
         Row: {
           accepted_at: string | null
@@ -3719,6 +3775,30 @@ export type Database = {
         Returns: number
       }
       expire_stale_contact_requests: { Args: never; Returns: number }
+      get_agency_entitlement: {
+        Args: { _agency_id: string }
+        Returns: {
+          active_client_limit: number | null
+          agency_id: string
+          created_at: string
+          current_period_end: string | null
+          id: string
+          member_limit: number | null
+          plan_key: string
+          service_package_limit: number | null
+          source: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agency_entitlements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_agency_public_view: {
         Args: { _agency_id: string }
         Returns: {
