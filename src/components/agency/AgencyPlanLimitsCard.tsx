@@ -38,7 +38,7 @@ function sanitizeAgencyPlanKey(raw: string | null | undefined): AssistantAgencyP
  * Phase 8B — Plan & Limits card with real Stripe billing CTAs.
  *
  * - manual_beta / no Stripe customer → "Start Agency Billing" (owner only)
- * - active / trialing → "Manage Billing"
+ * - active / trialing → "Manage Billing"  // trial-allowlist: Stripe subscription status
  * - past_due → warning + "Manage Billing"
  * - cancelled → warning + "Restart Billing"
  * - Non-owners see read-only "Only the agency owner can manage billing."
@@ -146,7 +146,7 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
   const showPortalCta =
     isOwner &&
     !!entitlement.stripeCustomerId &&
-    ['active', 'trialing', 'past_due'].includes(entitlement.status);
+    ['active', 'trialing', 'past_due'].includes(entitlement.status);  // trial-allowlist: Stripe subscription status
 
   // Refresh entitlement when we land back from Stripe success.
   if (typeof window !== 'undefined' && searchParams.get('billing') === 'success') {

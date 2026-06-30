@@ -49,8 +49,8 @@ describe('Phase 8B — create-agency-checkout', () => {
     expect(src).toMatch(/Client-supplied price IDs are not allowed/);
   });
 
-  it('blocks restart while an active/trialing/past_due Stripe sub already exists', () => {
-    expect(src).toMatch(/"active",\s*"trialing",\s*"past_due"/);
+  it('blocks restart while an active/trialing/past_due Stripe sub already exists', () => {  // trial-allowlist: Stripe subscription status
+    expect(src).toMatch(/"active",\s*"trialing",\s*"past_due"/);  // trial-allowlist: Stripe subscription status
     expect(src).toMatch(/already has an active billing subscription/);
   });
 
@@ -130,7 +130,7 @@ describe('Phase 8B — stripe-webhook agency routing', () => {
   it('maps Stripe statuses to allowed agency statuses', () => {
     expect(src).toMatch(/mapAgencyStripeStatus/);
     expect(src).toMatch(/case\s+"active":\s*return\s+"active"/);
-    expect(src).toMatch(/case\s+"trialing":\s*return\s+"trialing"/);
+    expect(src).toMatch(/case\s+"trialing":\s*return\s+"trialing"/);  // trial-allowlist: Stripe subscription status
     expect(src).toMatch(/case\s+"past_due":/);
     expect(src).toMatch(/case\s+"canceled":/);
   });

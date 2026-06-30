@@ -108,7 +108,7 @@ serve(async (req) => {
     }
 
     // Look up existing entitlement row (Phase 7 may have a manual_beta row,
-    // or no row at all). Block when an active/trialing/past_due Stripe sub
+    // or no row at all). Block when an active/trialing/past_due Stripe sub  // trial-allowlist: Stripe subscription status
     // already exists.
     const { data: ent } = await supabaseService
       .from("agency_entitlements")
@@ -116,7 +116,7 @@ serve(async (req) => {
       .eq("agency_id", agencyId)
       .maybeSingle();
 
-    if (ent?.stripe_subscription_id && ["active", "trialing", "past_due"].includes(ent.status)) {
+    if (ent?.stripe_subscription_id && ["active", "trialing", "past_due"].includes(ent.status)) {  // trial-allowlist: Stripe subscription status
       return json({
         error: "Agency already has an active billing subscription. Use the customer portal to manage it.",
       }, 400);

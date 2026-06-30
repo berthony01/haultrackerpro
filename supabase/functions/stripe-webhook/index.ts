@@ -145,10 +145,10 @@ function isAgencyPriceId(priceId: string): boolean {
   return false;
 }
 
-function mapAgencyStripeStatus(stripeStatus: string): "active" | "trialing" | "past_due" | "cancelled" {
+function mapAgencyStripeStatus(stripeStatus: string): "active" | "trialing" | "past_due" | "cancelled" {  // trial-allowlist: Stripe subscription status
   switch (stripeStatus) {
     case "active": return "active";
-    case "trialing": return "trialing";
+    case "trialing": return "trialing";  // trial-allowlist: Stripe subscription status
     case "past_due":
     case "unpaid": return "past_due";
     case "canceled":
