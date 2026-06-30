@@ -30,16 +30,8 @@ export default function AssistantLimitedSettings() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
+      <PageNav trail={[{ label: 'Limited settings' }]} />
       <header className="space-y-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/dashboard')}
-          className="-ml-2"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-primary" />
           Limited settings
