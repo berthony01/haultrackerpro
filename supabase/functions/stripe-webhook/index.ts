@@ -451,11 +451,25 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         logStep("Subscription updated", { subscriptionId: subscription.id, status: subscription.status });
 
+        // Agency billing branch — must run BEFORE driver/recruiter so we
+        // never accidentally upsert into subscriptions/profiles for an
+        // agency-only customer.
+        const agencyCtx = await isAgencyContext(supabaseClient, subscription, null);
+        if (agencyCtx.matched) {
+          if (agencyCtx.agency_id) {
+            await handleAgencySubscription(supabaseClient, subscription, agencyCtx.agency_id, null);
+          } else {
+            logStep("Agency subscription without resolvable agency_id — skipping", { subId: subscription.id });
+          }
+          break;
+        }
+
         // Recruiter billing branch
         if (subscription.metadata?.billing_type === "recruiter") {
           await handleRecruiterSubscription(supabaseClient, subscription, subscription.metadata as Record<string, string>);
           break;
         }
+
 
         const customerId = subscription.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
