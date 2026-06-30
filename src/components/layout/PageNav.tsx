@@ -63,13 +63,16 @@ export function PageNav({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
+          aria-label={hasSafeHistory ? 'Go back' : 'Back to Dashboard'}
+          data-testid="pagenav-back"
           className="-ml-2 h-8 px-2 text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back
         </Button>
       )}
+
 
       <Button
         asChild
