@@ -247,12 +247,18 @@ describe('Phase 8B — Plan & Limits card billing UI', () => {
 describe('Phase 8B — Pricing page CTA routes', () => {
   const src = read('src/pages/Pricing.tsx');
 
-  it('routes each agency plan CTA to /auth?next=/agency?plan=<key>', () => {
+  it('routes the agency plan CTA through /auth?next=/agency?plan= (sanitized server-side)', () => {
+    // Source uses a template literal `${encodeURIComponent(`/agency?plan=${p.key}`)}`
+    // so we assert the pattern, not the encoded value.
+    expect(src).toMatch(
+      /\/auth\?next=\$\{encodeURIComponent\(`\/agency\?plan=\$\{p\.key\}`\)\}/,
+    );
+    // And every approved key must exist somewhere as a plan key in the page.
     for (const k of ALL_AGENCY_PLAN_KEYS) {
-      const encoded = encodeURIComponent(`/agency?plan=${k}`);
-      expect(src).toContain(`/auth?next=${encoded}`);
+      expect(src).toContain(k);
     }
   });
+
 
   it('still preserves the outside-payments disclaimer', () => {
     expect(src).toMatch(/OUTSIDE_PAYMENTS_DISCLAIMER/);
