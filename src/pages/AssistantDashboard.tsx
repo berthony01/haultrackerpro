@@ -293,6 +293,26 @@ export default function AssistantDashboard() {
           </div>
         )}
       </section>
+
+      {/* Assistant → Agency upsell */}
+      <Card data-testid="assistant-agency-cta" className="border-dashed">
+        <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium text-sm flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" />
+              Want to manage multiple drivers as a back-office business?
+            </p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+              Create an Agency Workspace to organize clients, packages, and delegated work
+              in one place. You stay in full control of who you accept.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => navigate('/agency')}>
+            {agency ? 'Open agency workspace' : 'Create Agency Workspace'}
+            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+          </Button>
+        </CardContent>
+      </Card>
     </div>
     </AppShell>
   );
