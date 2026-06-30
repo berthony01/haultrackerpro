@@ -53,6 +53,21 @@ const TYPES: AgencyWorkItemType[] = [
 ];
 const PRIORITIES: AgencyWorkItemPriority[] = ['low', 'normal', 'high'];
 
+const WORK_ITEM_TYPE_LABELS: Record<AgencyWorkItemType, string> = {
+  load_entry: 'Log load for client',
+  expense_entry: 'Log expense for client',
+  fuel_entry: 'Log fuel for client',
+  report_review: 'Review reports',
+  monthly_closeout: 'Monthly closeout',
+  document_followup: 'Document follow-up',
+  other: 'Other',
+};
+
+function workItemTypeLabel(t: AgencyWorkItemType): string {
+  return WORK_ITEM_TYPE_LABELS[t] ?? t.replace(/_/g, ' ');
+}
+
+
 export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: string; focusedWorkItemId?: string | null }) {
   const [status, setStatus] = useState<AgencyWorkItemStatus | 'all'>('open');
   const [driverId, setDriverId] = useState<string | 'all'>('all');
@@ -90,7 +105,13 @@ export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: st
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          These are tasks your agency owes a client — not the client's own loads,
+          expenses, or fuel records. Opening one routes you into that client's
+          account using the delegation permissions they granted you.
+        </p>
         <div className="grid grid-cols-3 gap-2">
+
           <Select value={status} onValueChange={(v) => setStatus(v as any)}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
@@ -187,7 +208,7 @@ function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted
           <p className="font-medium truncate">{item.title}</p>
           <p className="text-xs text-muted-foreground truncate">
             {item.driver_email || item.driver_user_id.slice(0, 8)} ·{' '}
-            {item.type.replace(/_/g, ' ')}
+            {workItemTypeLabel(item.type)}
           </p>
           {item.description && (
             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
@@ -324,7 +345,7 @@ function CreateWorkItemDialog({
                 <SelectContent>
                   {TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t.replace(/_/g, ' ')}
+                      {workItemTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>

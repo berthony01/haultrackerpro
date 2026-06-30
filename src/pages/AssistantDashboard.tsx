@@ -69,7 +69,7 @@ export default function AssistantDashboard() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
-      <PageNav trail={[{ label: 'Assistant' }]} />
+      <PageNav home={{ label: 'Assistant', to: '/assistant' }} trail={[{ label: 'Assistant' }]} />
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold flex items-center gap-2">

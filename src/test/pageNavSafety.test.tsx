@@ -92,7 +92,7 @@ describe('Standalone authenticated pages include PageNav and correct breadcrumbs
     { file: 'src/pages/AssistantDashboard.tsx', mustContain: ['PageNav'] },
     {
       file: 'src/pages/AgencyDashboard.tsx',
-      mustContain: ["PageNav trail={[{ label: 'Agency' }]}"],
+      mustContain: ["home={{ label: 'Agency', to: '/agency' }}"],
       // Agency breadcrumb must NOT chain through Assistant
       mustNotContain: ["label: 'Assistant', href: '/assistant' }, { label: 'Agency'"],
     },

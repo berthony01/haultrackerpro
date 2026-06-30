@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Building2, ArrowLeft, Copy, Users, ShieldCheck } from 'lucide-react';
+import { Building2, Copy, Users, ShieldCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useAgencyMembers,
@@ -28,7 +28,7 @@ import {
   useMyAgency,
 } from '@/hooks/useAgency';
 import { useToast } from '@/hooks/use-toast';
-import { useActingContext } from '@/hooks/useActingContext';
+import { useAgencyClients } from '@/hooks/useAgencyWorkflow';
 import { ServicePackagesSection } from '@/components/agency/ServicePackagesSection';
 import { ClientRequestsSection } from '@/components/agency/ClientRequestsSection';
 import { ClientListSection } from '@/components/agency/ClientListSection';
@@ -36,6 +36,7 @@ import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
 import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
 import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 import { AgencyPlanLimitsCard } from '@/components/agency/AgencyPlanLimitsCard';
+
 
 /**
  * Private agency area. Anyone signed-in can create one personal agency profile
@@ -48,7 +49,6 @@ export default function AgencyDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: agency, isLoading } = useMyAgency();
-  const { managedDrivers } = useActingContext();
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
   const focusedWorkItemId = new URLSearchParams(location.search).get('workItem');
@@ -79,13 +79,24 @@ export default function AgencyDashboard() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
-      <PageNav trail={[{ label: 'Agency' }]} />
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
+      <PageNav home={{ label: 'Agency', to: '/agency' }} trail={[{ label: 'Agency Console' }]} />
+      <header className="space-y-2 rounded-lg border border-border/60 bg-card/40 p-4">
+        <div className="flex items-center gap-2">
           <Building2 className="h-6 w-6 text-primary" />
-          Agency
-        </h1>
-      </div>
+          <h1 className="text-2xl font-semibold">Agency Console</h1>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Back-office workspace for managing client drivers. This is a separate
+          workspace from your driver Dashboard and recruiter Console — nothing
+          you do here touches your own loads, expenses, or fuel logs.
+        </p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button variant="outline" size="sm" onClick={() => navigate('/start')}>
+            Switch workspace
+          </Button>
+        </div>
+      </header>
+
 
       {!agency ? (
         <CreateAgencyCard />
@@ -100,9 +111,10 @@ export default function AgencyDashboard() {
             <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
           <TabsContent value="overview" className="space-y-4">
-            <AgencyDetailCard agency={agency} drivers={managedDrivers.length} />
+            <AgencyDetailCard agency={agency} />
             <AgencyPlanLimitsCard agencyId={agency.id} />
           </TabsContent>
+
           <TabsContent value="packages">
             <ServicePackagesSection agencyId={agency.id} />
           </TabsContent>
@@ -200,14 +212,14 @@ function CreateAgencyCard() {
 
 function AgencyDetailCard({
   agency,
-  drivers,
 }: {
   agency: NonNullable<ReturnType<typeof useMyAgency>['data']>;
-  drivers: number;
 }) {
   const { update, invite, revoke } = useAgencyMutations();
   const { data: members } = useAgencyMembers(agency.id);
+  const { data: clients } = useAgencyClients(agency.id);
   const { toast } = useToast();
+
   const [name, setName] = useState(agency.name);
   const [desc, setDesc] = useState(agency.description ?? '');
   const [email, setEmail] = useState(agency.contact_email ?? '');
@@ -284,13 +296,18 @@ function AgencyDetailCard({
 
 
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Drivers managed (you)" value={drivers} icon={<Users className="h-4 w-4" />} />
+        <Stat
+          label="Active clients"
+          value={(clients ?? []).length}
+          icon={<Users className="h-4 w-4" />}
+        />
         <Stat
           label="Active members"
           value={(members ?? []).filter((m) => m.status === 'active').length}
           icon={<ShieldCheck className="h-4 w-4" />}
         />
       </div>
+
 
       <Card>
         <CardHeader>
