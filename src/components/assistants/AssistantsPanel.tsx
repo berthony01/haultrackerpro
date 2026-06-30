@@ -22,8 +22,9 @@ import {
   type AssistantPermissionKey,
   type AssistantPermissions,
 } from '@/lib/assistantPermissions';
-import { Shield, Users } from 'lucide-react';
+import { Shield, Users, Building2 } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAssistantsWithSource, type AssistantWithSourceRow } from '@/hooks/useAssistantsWithSource';
 import { useToast } from '@/hooks/use-toast';
 
 function StatusBadge({ status }: { status: AssistantRow['status'] }) {
