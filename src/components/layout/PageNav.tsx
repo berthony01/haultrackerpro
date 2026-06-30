@@ -35,6 +35,22 @@ export function PageNav({
   className,
 }: PageNavProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // React Router marks the initial history entry with key === 'default'.
+  // If the user landed directly (notification deep-link, bookmark, auth
+  // continuation, new tab), there is no safe in-app history to pop back to,
+  // so fall back to the Dashboard instead of leaving the app.
+  const hasSafeHistory = location.key !== 'default';
+
+  const handleBack = () => {
+    if (hasSafeHistory) {
+      navigate(-1);
+    } else {
+      navigate(homeHref);
+    }
+  };
+
 
   return (
     <div
