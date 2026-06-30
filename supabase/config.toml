@@ -29,6 +29,11 @@ project_id = "pngptztxwbtozwxrtbwo"
     verify_jwt = false
   [functions.create-recruiter-checkout]
     verify_jwt = false
+  [functions.create-agency-checkout]
+    verify_jwt = false
+  [functions.agency-customer-portal]
+    verify_jwt = false
+
   [functions.recruiter-billing-portal]
     verify_jwt = false
   [functions.customer-portal]
