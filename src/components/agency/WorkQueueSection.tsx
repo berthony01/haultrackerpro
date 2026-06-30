@@ -68,14 +68,23 @@ function workItemTypeLabel(t: AgencyWorkItemType): string {
 }
 
 
-export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: string; focusedWorkItemId?: string | null }) {
+export function WorkQueueSection({
+  agencyId,
+  focusedWorkItemId,
+  canManage = false,
+}: {
+  agencyId: string;
+  focusedWorkItemId?: string | null;
+  /** Owner/admin: can create + filter by driver/member. Members: assigned-only view. */
+  canManage?: boolean;
+}) {
   const [status, setStatus] = useState<AgencyWorkItemStatus | 'all'>('open');
   const [driverId, setDriverId] = useState<string | 'all'>('all');
   const [memberId, setMemberId] = useState<string | 'all'>('all');
   const { data: items, isLoading } = useAgencyWorkItems(agencyId, {
     status: status === 'all' ? undefined : status,
-    driverId: driverId === 'all' ? undefined : driverId,
-    memberId: memberId === 'all' ? undefined : memberId,
+    driverId: canManage && driverId !== 'all' ? driverId : undefined,
+    memberId: canManage && memberId !== 'all' ? memberId : undefined,
   });
   const { data: clients } = useAgencyClients(agencyId);
   const { data: members } = useAgencyMembers(agencyId);
@@ -98,19 +107,21 @@ export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: st
             <ListTodo className="h-4 w-4 text-primary" />
             Work queue
           </CardTitle>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            New task
-          </Button>
+          {canManage && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              New task
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          These are tasks your agency owes a client — not the client's own loads,
-          expenses, or fuel records. Opening one routes you into that client's
-          account using the delegation permissions they granted you.
+          {canManage
+            ? "These are tasks your agency owes a client — not the client's own loads, expenses, or fuel records. Opening one routes you into that client's account using the delegation permissions they granted you."
+            : "You'll only see work items assigned to you. Driver account access still requires driver-approved delegation."}
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className={canManage ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-1 gap-2'}>
 
           <Select value={status} onValueChange={(v) => setStatus(v as any)}>
             <SelectTrigger className="h-8 text-xs">
@@ -125,34 +136,38 @@ export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: st
               ))}
             </SelectContent>
           </Select>
-          <Select value={driverId} onValueChange={(v) => setDriverId(v as any)}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All drivers</SelectItem>
-              {(clients ?? []).map((c) => (
-                <SelectItem key={c.driver_user_id} value={c.driver_user_id}>
-                  {c.driver_name || c.driver_email || c.driver_user_id.slice(0, 8)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={memberId} onValueChange={(v) => setMemberId(v as any)}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All members</SelectItem>
-              {(members ?? [])
-                .filter((m) => m.member_user_id)
-                .map((m) => (
-                  <SelectItem key={m.id} value={m.member_user_id!}>
-                    {m.invite_email}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          {canManage && (
+            <>
+              <Select value={driverId} onValueChange={(v) => setDriverId(v as any)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All drivers</SelectItem>
+                  {(clients ?? []).map((c) => (
+                    <SelectItem key={c.driver_user_id} value={c.driver_user_id}>
+                      {c.driver_name || c.driver_email || c.driver_user_id.slice(0, 8)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={memberId} onValueChange={(v) => setMemberId(v as any)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All members</SelectItem>
+                  {(members ?? [])
+                    .filter((m) => m.member_user_id)
+                    .map((m) => (
+                      <SelectItem key={m.id} value={m.member_user_id!}>
+                        {m.invite_email}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </div>
 
         {isLoading ? (
@@ -167,11 +182,13 @@ export function WorkQueueSection({ agencyId, focusedWorkItemId }: { agencyId: st
           </div>
         )}
 
-        <CreateWorkItemDialog
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          agencyId={agencyId}
-        />
+        {canManage && (
+          <CreateWorkItemDialog
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            agencyId={agencyId}
+          />
+        )}
       </CardContent>
     </Card>
   );
