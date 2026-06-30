@@ -142,11 +142,22 @@ export default function AssistantDashboard() {
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : managedDrivers.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center space-y-2">
-              <p className="font-medium">No active driver invitations.</p>
-              <p className="text-sm text-muted-foreground">
-                When a driver invites you and you accept, they'll appear here.
+            <CardContent className="py-8 text-center space-y-3">
+              <p className="font-medium">No approved drivers yet</p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Once a driver invites you, their account will appear here. You can help with
+                loads, expenses, fuel logs, and reports after they approve your access.
               </p>
+              <div className="flex flex-wrap justify-center gap-2 pt-1">
+                <Button size="sm" variant="outline" onClick={() => navigate('/dashboard')}>
+                  <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
+                  Go to my Dashboard
+                </Button>
+                <Button size="sm" onClick={() => navigate('/agency')}>
+                  <Building2 className="mr-1.5 h-3.5 w-3.5" />
+                  Create Agency Workspace
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
