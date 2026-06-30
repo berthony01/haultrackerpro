@@ -208,7 +208,7 @@ function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted
           <p className="font-medium truncate">{item.title}</p>
           <p className="text-xs text-muted-foreground truncate">
             {item.driver_email || item.driver_user_id.slice(0, 8)} ·{' '}
-            {item.type.replace(/_/g, ' ')}
+            {workItemTypeLabel(item.type)}
           </p>
           {item.description && (
             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
@@ -345,7 +345,7 @@ function CreateWorkItemDialog({
                 <SelectContent>
                   {TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t.replace(/_/g, ' ')}
+                      {workItemTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
