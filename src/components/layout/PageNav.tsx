@@ -1,7 +1,8 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Home, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
 
 export interface PageNavCrumb {
   label: string;
@@ -34,6 +35,22 @@ export function PageNav({
   className,
 }: PageNavProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // React Router marks the initial history entry with key === 'default'.
+  // If the user landed directly (notification deep-link, bookmark, auth
+  // continuation, new tab), there is no safe in-app history to pop back to,
+  // so fall back to the Dashboard instead of leaving the app.
+  const hasSafeHistory = location.key !== 'default';
+
+  const handleBack = () => {
+    if (hasSafeHistory) {
+      navigate(-1);
+    } else {
+      navigate(homeHref);
+    }
+  };
+
 
   return (
     <div
@@ -46,13 +63,16 @@ export function PageNav({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
+          aria-label={hasSafeHistory ? 'Go back' : 'Back to Dashboard'}
+          data-testid="pagenav-back"
           className="-ml-2 h-8 px-2 text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back
         </Button>
       )}
+
 
       <Button
         asChild
