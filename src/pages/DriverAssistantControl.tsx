@@ -122,6 +122,11 @@ export default function DriverAssistantControl() {
             You can revoke any assistant — direct or agency-delegated — at any time. Access ends
             immediately.
           </p>
+          <p className="pt-2 border-t border-primary/20 mt-2">
+            HaulTracker Pro does <b>not</b> process payments between drivers and assistants or
+            agencies. Any service payment or agreement is handled outside the platform for now. You
+            control account access and can revoke it anytime.
+          </p>
         </CardContent>
       </Card>
 
