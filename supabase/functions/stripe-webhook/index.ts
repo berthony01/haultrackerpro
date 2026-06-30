@@ -379,6 +379,19 @@ serve(async (req) => {
 
         const userId = session.metadata?.user_id;
         const billingType = session.metadata?.billing_type;
+        const billingContext = session.metadata?.billing_context;
+
+        // Agency checkout — handle separately, do NOT touch driver Pro / recruiter tables
+        if (billingContext === "agency" && session.subscription) {
+          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+          const { agency_id, matched } = await isAgencyContext(supabaseClient, sub, session.metadata as Record<string, string>);
+          if (matched && agency_id) {
+            await handleAgencySubscription(supabaseClient, sub, agency_id, session.metadata as Record<string, string>);
+          } else {
+            logStep("Agency checkout missing agency_id — refusing to upsert", { sessionId: session.id });
+          }
+          break;
+        }
 
         // Recruiter checkout — handle separately, do NOT touch driver Pro tables
         if (billingType === "recruiter" && session.subscription) {
@@ -389,6 +402,7 @@ serve(async (req) => {
           });
           break;
         }
+
 
         if (userId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
