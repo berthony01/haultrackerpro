@@ -8,7 +8,7 @@ import {
   OUTSIDE_PAYMENTS_DISCLAIMER,
 } from '@/lib/agencyPlans';
 import { useAgencyMembers } from '@/hooks/useAgency';
-import { useAgencyClients, useAgencyServicePackages } from '@/hooks/useAgencyWorkflow';
+import { useAgencyClients, useAgencyPackages } from '@/hooks/useAgencyWorkflow';
 
 interface Props {
   agencyId: string;
