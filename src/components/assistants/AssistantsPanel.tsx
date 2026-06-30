@@ -126,9 +126,11 @@ function RevokeButton({ row }: { row: AssistantRow }) {
 }
 
 export function AssistantsPanel() {
-  const { assistants, isLoading } = useAssistants();
+  // Source-aware listing distinguishes direct invites from agency-delegated rows.
+  const { data: rows = [], isLoading } = useAssistantsWithSource();
   const { isPro } = useSubscription();
 
+  const assistants = rows;
   const active = assistants.filter((a) => a.status === 'active');
   const pending = assistants.filter((a) => a.status === 'pending');
   const inactive = assistants.filter((a) => a.status === 'revoked' || a.status === 'expired');
@@ -138,7 +140,7 @@ export function AssistantsPanel() {
   // disables before the RPC errors.
   const directSlotCount = assistants.filter(
     (a) =>
-      (a as any).agency_delegation_id == null &&
+      a.source === 'direct_invite' &&
       (a.status === 'active' || a.status === 'pending'),
   ).length;
   const allowedDirectSlots = isPro ? 1 : 0;
