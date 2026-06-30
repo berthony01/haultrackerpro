@@ -99,8 +99,8 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
             <Info className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
-              Beta access — your agency workspace is open at Agency Starter limits. Agency billing
-              will be enabled in a future release.
+              Beta access — your agency workspace is open at Agency Starter limits.
+              Agency billing will be enabled in Phase 8.
             </span>
           </div>
         )}
