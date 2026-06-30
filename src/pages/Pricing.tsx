@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { PLANS } from '@/lib/billing/plans';
 import { trackBeginCheckout, trackPricingProfitIntelClick, trackStarterKitCTAClicked } from '@/lib/analytics';
 import MarketingHeader from '@/components/marketing/MarketingHeader';
+import { ASSISTANT_AGENCY_PLANS, ALL_AGENCY_PLAN_KEYS, OUTSIDE_PAYMENTS_DISCLAIMER } from '@/lib/agencyPlans';
 
 
 const freeFeatures = [
