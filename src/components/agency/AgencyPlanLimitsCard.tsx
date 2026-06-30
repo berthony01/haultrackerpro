@@ -30,7 +30,7 @@ function fmtLimit(used: number, limit: number | null) {
 export function AgencyPlanLimitsCard({ agencyId }: Props) {
   const { entitlement, hasRow, isLoading } = useAgencyEntitlement(agencyId);
   const { data: members } = useAgencyMembers(agencyId);
-  const { data: packages } = useAgencyServicePackages(agencyId);
+  const { data: packages } = useAgencyPackages(agencyId);
   const { data: clients } = useAgencyClients(agencyId);
 
   if (isLoading) {
