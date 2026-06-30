@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageNav } from '@/components/layout/PageNav';
 import {
   Card,
   CardContent,
@@ -86,11 +87,8 @@ export default function DriverAssistantControl() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
+      <PageNav trail={[{ label: 'Assistant control' }]} />
       <header className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
-        </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <ShieldCheck className="h-6 w-6 text-primary" />

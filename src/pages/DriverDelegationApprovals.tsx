@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageNav } from '@/components/layout/PageNav';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,11 +43,8 @@ export default function DriverDelegationApprovals() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-2xl px-4 py-6 space-y-4">
+      <PageNav trail={[{ label: 'Agency approvals' }]} />
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
-        </Button>
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-primary" />
           Agency approvals

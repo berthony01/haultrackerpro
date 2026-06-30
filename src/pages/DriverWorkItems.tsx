@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageNav } from '@/components/layout/PageNav';
 import { ArrowLeft, ClipboardList, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,11 +48,17 @@ export default function DriverWorkItems() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-2xl px-4 py-6 space-y-6">
+      <PageNav
+        trail={
+          id
+            ? [
+                { label: 'Agency requests', href: '/driver/work-items' },
+                { label: 'Request' },
+              ]
+            : [{ label: 'Agency requests' }]
+        }
+      />
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
-        </Button>
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <ClipboardList className="h-6 w-6 text-primary" />
           {id ? 'Agency request' : 'Agency requests'}

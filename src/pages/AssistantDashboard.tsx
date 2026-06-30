@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageNav } from '@/components/layout/PageNav';
 import { useActingContext } from '@/hooks/useActingContext';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -68,10 +69,7 @@ export default function AssistantDashboard() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
-        <ArrowLeft className="mr-1 h-4 w-4" />
-        Back
-      </Button>
+      <PageNav trail={[{ label: 'Assistant' }]} />
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold flex items-center gap-2">

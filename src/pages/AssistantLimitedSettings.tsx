@@ -1,11 +1,11 @@
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageNav } from '@/components/layout/PageNav';
 import { useActingContext } from '@/hooks/useActingContext';
 import { hasPerm } from '@/lib/assistantPermissions';
 import { CostProfileSettings } from '@/components/CostProfileSettings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock } from 'lucide-react';
 
 /**
  * Limited settings surface for an acting assistant.
@@ -19,7 +19,6 @@ import { ArrowLeft, ShieldCheck, Lock } from 'lucide-react';
  */
 export default function AssistantLimitedSettings() {
   const { actingDriver, isActingAsAssistant, permissions } = useActingContext();
-  const navigate = useNavigate();
 
   if (!isActingAsAssistant || !actingDriver) {
     return <Navigate to="/assistant" replace />;
@@ -31,16 +30,8 @@ export default function AssistantLimitedSettings() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
+      <PageNav trail={[{ label: 'Limited settings' }]} />
       <header className="space-y-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/dashboard')}
-          className="-ml-2"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-primary" />
           Limited settings
