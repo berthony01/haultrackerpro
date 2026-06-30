@@ -79,7 +79,7 @@ export default function AgencyDashboard() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-3xl px-4 py-6 space-y-6">
-      <PageNav trail={[{ label: 'Assistant', href: '/assistant' }, { label: 'Agency' }]} />
+      <PageNav trail={[{ label: 'Agency' }]} />
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <Building2 className="h-6 w-6 text-primary" />
