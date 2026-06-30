@@ -133,15 +133,42 @@ describe('Phase 7 — capability paths preserved (Phase 5/6 regression)', () => 
   });
 });
 
-describe('Phase 7 Cleanup — Plan & Limits accuracy', () => {
+describe('Phase 7C — Plan & Limits member usage accuracy', () => {
   const card = readFile('src/components/agency/AgencyPlanLimitsCard.tsx');
 
+  it('counts active + pending members toward the member limit', () => {
+    expect(card).toMatch(
+      /usedMembers\s*=\s*\(members\s*\?\?\s*\[\]\)\.filter\(\s*\(m\)\s*=>\s*m\.status\s*===\s*['"]active['"]\s*\|\|\s*m\.status\s*===\s*['"]pending['"]\s*,?\s*\)\.length/,
+    );
+  });
+
+  it('does not count revoked members in the usage filter', () => {
+    // The filter only includes active and pending; revoked is excluded.
+    const match = card.match(/m\.status\s*===\s*['"]([^'"]+)['"]/g) ?? [];
+    const statuses = match.map((s) => s.replace(/.*['"]([^'"]+)['"].*/, '$1'));
+    expect(statuses).toContain('active');
+    expect(statuses).toContain('pending');
+    expect(statuses).not.toContain('revoked');
+  });
+
   it('counts active clients from list length (not a non-existent status field)', () => {
-    // The RPC list_agency_clients() already returns only approved/active rows.
-    // Filtering on `c.status === "active"` always reported 0.
     expect(card).not.toMatch(/c\.status\s*===\s*['"]active['"]/);
     expect(card).toMatch(/usedClients\s*=\s*\(clients\s*\?\?\s*\[\]\)\.length/);
   });
+
+  it('counts only active service packages (is_active !== false)', () => {
+    expect(card).toMatch(
+      /usedPackages\s*=\s*\(packages\s*\?\?\s*\[\]\)\.filter\(\s*\(p:\s*any\)\s*=>\s*p\.is_active\s*!==\s*false\s*\)\.length/,
+    );
+  });
+
+  it('shows a helper that pending invites reserve a member seat', () => {
+    expect(card).toMatch(/Pending invites count toward your member limit/);
+  });
+});
+
+describe('Phase 7 Cleanup — Plan & Limits accuracy (legacy)', () => {
+  const card = readFile('src/components/agency/AgencyPlanLimitsCard.tsx');
 
   it('uses the in-Phase-8 messaging for beta fallback', () => {
     expect(card).toMatch(/Phase 8/);
@@ -249,5 +276,11 @@ describe('Phase 7 Cleanup — Phase 5/6 invariants still intact', () => {
     const src = readFile('src/pages/Pricing.tsx');
     expect(src).not.toMatch(/Pay Now/);
     expect(src).not.toMatch(/Subscribe Now/);
+  });
+
+  it('Agency Plan & Limits card does not render a Stripe pay/subscribe button', () => {
+    const card = readFile('src/components/agency/AgencyPlanLimitsCard.tsx');
+    expect(card).not.toMatch(/Subscribe\s*Now/);
+    expect(card).not.toMatch(/Pay\s*Now/);
   });
 });

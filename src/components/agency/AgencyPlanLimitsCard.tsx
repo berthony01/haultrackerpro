@@ -44,7 +44,12 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
 
   const plan = ASSISTANT_AGENCY_PLANS[entitlement.planKey];
   const limits = effectiveLimits(entitlement);
-  const usedMembers = (members ?? []).filter((m) => m.status === 'active').length;
+  // Server-side invite_member limit counts both pending and active members as
+  // reserving a seat. Keep the UI usage count identical so owners don't see
+  // false available capacity.
+  const usedMembers = (members ?? []).filter(
+    (m) => m.status === 'active' || m.status === 'pending',
+  ).length;
   const usedPackages = (packages ?? []).filter((p: any) => p.is_active !== false).length;
   // list_agency_clients() already returns only approved/active clients
   // (one row per driver) — count rows directly. Filtering on a non-existent
@@ -94,6 +99,10 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
             <p className="mt-1 font-semibold tabular-nums">{fmtLimit(usedPackages, limits.servicePackageLimit)}</p>
           </div>
         </div>
+
+        <p className="text-xs text-muted-foreground">
+          Pending invites count toward your member limit.
+        </p>
 
         {!hasRow && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
