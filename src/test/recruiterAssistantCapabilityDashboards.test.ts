@@ -19,9 +19,9 @@ describe('Capability dashboards — recruiter + assistant first-class UX', () =>
   });
 
   it('protects the /recruiter route behind auth (no intent= leakage)', () => {
-    const m = app.match(/path="\/recruiter"[^/]+\/>/);
-    expect(m).not.toBeNull();
-    expect(m![0]).toMatch(/ProtectedRoute/);
+    const line = app.split('\n').find((l) => l.includes('path="/recruiter"'));
+    expect(line).toBeDefined();
+    expect(line!).toMatch(/ProtectedRoute/);
     expect(app).not.toMatch(/intent=recruiter/);
     expect(app).not.toMatch(/intent=assistant/);
     expect(app).not.toMatch(/intent=agency/);
