@@ -50,7 +50,7 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
 
   const statusBadge: Record<typeof entitlement.status, { label: string; tone: string }> = {
     manual_beta: { label: 'Beta', tone: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
-    trialing: { label: 'Trial', tone: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
+    trialing: { label: 'Trial', tone: 'bg-blue-500/15 text-blue-600 border-blue-500/30' }, // trial-allowlist — Stripe subscription status, not marketing
     active: { label: 'Active', tone: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' },
     past_due: { label: 'Past due', tone: 'bg-destructive/15 text-destructive border-destructive/30' },
     cancelled: { label: 'Cancelled', tone: 'bg-muted text-muted-foreground border-border' },

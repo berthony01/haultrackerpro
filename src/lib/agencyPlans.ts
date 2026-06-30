@@ -170,7 +170,7 @@ export const ALL_AGENCY_PLAN_KEYS: AssistantAgencyPlanKey[] = [
 ];
 
 export type AgencyEntitlementStatus =
-  | 'trialing'
+  | 'trialing' // trial-allowlist — Stripe subscription status, not user-facing copy
   | 'active'
   | 'past_due'
   | 'cancelled'
