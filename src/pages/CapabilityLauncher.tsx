@@ -30,7 +30,7 @@ const TILES: Tile[] = [
     label: 'Post driver opportunities',
     blurb: 'Recruit drivers with structured, transparent listings.',
     Icon: Briefcase,
-    to: '/dashboard?page=recruiter-access',
+    to: '/recruiter',
   },
   {
     id: 'assistant',

@@ -281,6 +281,14 @@ const App = () => (
                   so existing static guides always win. Published articles only — drafts are blocked by RLS. */}
               <Route path="/resources/:slug" element={<ResourceArticleDynamic />} />
               <Route path="/start" element={<ProtectedRoute><CapabilityLauncher /></ProtectedRoute>} />
+              {/* First-class recruiter hub URL. Forwards into the existing
+                  recruiter access surface inside the dashboard shell so the
+                  hub stays a single source of truth. */}
+              <Route path="/recruiter" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access" replace /></ProtectedRoute>} />
+              <Route path="/recruiter/manage" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:manager" replace /></ProtectedRoute>} />
+              <Route path="/recruiter/applications" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:applications" replace /></ProtectedRoute>} />
+              <Route path="/recruiter/reports" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:reports" replace /></ProtectedRoute>} />
+              <Route path="/recruiter/onboarding" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:onboarding" replace /></ProtectedRoute>} />
               <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
               <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
               <Route path="/assistant/settings" element={<ProtectedRoute><AssistantLimitedSettings /></ProtectedRoute>} />
