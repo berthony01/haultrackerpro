@@ -46,7 +46,10 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
   const limits = effectiveLimits(entitlement);
   const usedMembers = (members ?? []).filter((m) => m.status === 'active').length;
   const usedPackages = (packages ?? []).filter((p: any) => p.is_active !== false).length;
-  const usedClients = (clients ?? []).filter((c: any) => c.status === 'active').length;
+  // list_agency_clients() already returns only approved/active clients
+  // (one row per driver) — count rows directly. Filtering on a non-existent
+  // `status` field used to silently report 0.
+  const usedClients = (clients ?? []).length;
 
   const statusBadge: Record<typeof entitlement.status, { label: string; tone: string }> = {
     manual_beta: { label: 'Beta', tone: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
