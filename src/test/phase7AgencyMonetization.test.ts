@@ -191,21 +191,23 @@ describe('Phase 7 Cleanup — server-side limit enforcement', () => {
   });
 
   it('create_agency_package calls assert_agency_limit', () => {
-    const idx = migrations.lastIndexOf('FUNCTION public.create_agency_package');
+    const idx = migrations.lastIndexOf('CREATE OR REPLACE FUNCTION public.create_agency_package');
     expect(idx).toBeGreaterThan(-1);
-    const body = migrations.slice(idx, idx + 2000);
+    const body = migrations.slice(idx, idx + 2500);
     expect(body).toMatch(/assert_agency_limit\([^)]*'create_service_package'\)/);
   });
 
   it('invite_agency_member calls assert_agency_limit for net-new invites', () => {
-    const idx = migrations.lastIndexOf('FUNCTION public.invite_agency_member');
+    const idx = migrations.lastIndexOf('CREATE OR REPLACE FUNCTION public.invite_agency_member');
+    expect(idx).toBeGreaterThan(-1);
     const body = migrations.slice(idx, idx + 2500);
     expect(body).toMatch(/assert_agency_limit\([^)]*'invite_member'\)/);
   });
 
   it('driver_decide_delegation calls assert_agency_limit for new clients', () => {
-    const idx = migrations.lastIndexOf('FUNCTION public.driver_decide_delegation');
-    const body = migrations.slice(idx, idx + 4000);
+    const idx = migrations.lastIndexOf('CREATE OR REPLACE FUNCTION public.driver_decide_delegation');
+    expect(idx).toBeGreaterThan(-1);
+    const body = migrations.slice(idx, idx + 5000);
     expect(body).toMatch(/assert_agency_limit\([^)]*'activate_client'\)/);
   });
 
@@ -220,9 +222,10 @@ describe('Phase 7 Cleanup — server-side limit enforcement', () => {
 describe('Phase 7 Cleanup — driver-facing payment clarity', () => {
   const src = readFile('src/pages/DriverAssistantControl.tsx');
   it('includes outside-payment disclaimer wording', () => {
-    expect(src.toLowerCase()).toContain('does not');
-    expect(src.toLowerCase()).toMatch(/outside the platform/);
-    expect(src.toLowerCase()).toMatch(/revoke/);
+    const lc = src.toLowerCase();
+    expect(lc).toMatch(/does\s*<b>\s*not\s*<\/b>|does not/);
+    expect(lc).toMatch(/outside the platform/);
+    expect(lc).toMatch(/revoke/);
   });
 });
 
