@@ -167,7 +167,7 @@ export function AssistantsPanel() {
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
             {isPro
-              ? `Pro plan: up to ${allowedActive} active assistant.`
+              ? `Pro plan: up to ${allowedDirectSlots} direct assistant. Agency-delegated helpers don't count.`
               : 'Inviting assistants requires Pro.'}
           </p>
         </div>
