@@ -46,7 +46,10 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
   const limits = effectiveLimits(entitlement);
   const usedMembers = (members ?? []).filter((m) => m.status === 'active').length;
   const usedPackages = (packages ?? []).filter((p: any) => p.is_active !== false).length;
-  const usedClients = (clients ?? []).filter((c: any) => c.status === 'active').length;
+  // list_agency_clients() already returns only approved/active clients
+  // (one row per driver) — count rows directly. Filtering on a non-existent
+  // `status` field used to silently report 0.
+  const usedClients = (clients ?? []).length;
 
   const statusBadge: Record<typeof entitlement.status, { label: string; tone: string }> = {
     manual_beta: { label: 'Beta', tone: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
@@ -96,8 +99,8 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
             <Info className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
-              Beta access — your agency workspace is open at Agency Starter limits. Agency billing
-              will be enabled in a future release.
+              Beta access — your agency workspace is open at Agency Starter limits.
+              Agency billing will be enabled in Phase 8.
             </span>
           </div>
         )}

@@ -3475,6 +3475,15 @@ export type Database = {
       }
     }
     Functions: {
+      _agency_plan_defaults: {
+        Args: { _plan_key: string }
+        Returns: {
+          active_client_limit: number
+          member_limit: number
+          service_package_limit: number
+        }[]
+      }
+      _agency_plan_label: { Args: { _plan_key: string }; Returns: string }
       accept_agency_invite: {
         Args: { _token: string }
         Returns: {
@@ -3500,6 +3509,10 @@ export type Database = {
       }
       accept_assistant_invite: { Args: { _token: string }; Returns: Json }
       apply_recruiter_intent: { Args: never; Returns: Json }
+      assert_agency_limit: {
+        Args: { _action: string; _agency_id: string }
+        Returns: undefined
+      }
       assistant_delete_load_stops: {
         Args: { _driver: string; _load_id: string }
         Returns: number
@@ -3812,6 +3825,17 @@ export type Database = {
       get_application_contract_summary: {
         Args: { _application_id: string }
         Returns: Json
+      }
+      get_effective_agency_limits: {
+        Args: { _agency_id: string }
+        Returns: {
+          active_client_limit: number
+          has_entitlement_row: boolean
+          member_limit: number
+          plan_key: string
+          service_package_limit: number
+          status: string
+        }[]
       }
       get_my_agency: {
         Args: never
