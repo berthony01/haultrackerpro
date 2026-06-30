@@ -132,3 +132,119 @@ describe('Phase 7 — capability paths preserved (Phase 5/6 regression)', () => 
     expect(header).toMatch(/assistants-agencies/);
   });
 });
+
+describe('Phase 7 Cleanup — Plan & Limits accuracy', () => {
+  const card = readFile('src/components/agency/AgencyPlanLimitsCard.tsx');
+
+  it('counts active clients from list length (not a non-existent status field)', () => {
+    // The RPC list_agency_clients() already returns only approved/active rows.
+    // Filtering on `c.status === "active"` always reported 0.
+    expect(card).not.toMatch(/c\.status\s*===\s*['"]active['"]/);
+    expect(card).toMatch(/usedClients\s*=\s*\(clients\s*\?\?\s*\[\]\)\.length/);
+  });
+
+  it('uses the in-Phase-8 messaging for beta fallback', () => {
+    expect(card).toMatch(/Phase 8/);
+  });
+});
+
+describe('Phase 7 Cleanup — entitlement visibility', () => {
+  // The migration grants every active agency member read access to the
+  // entitlement row so the dashboard cannot show a fake beta fallback
+  // while a real entitlement exists.
+  const migrations = fs
+    .readdirSync(path.join(process.cwd(), 'supabase/migrations'))
+    .map((f) => fs.readFileSync(path.join(process.cwd(), 'supabase/migrations', f), 'utf8'))
+    .join('\n');
+
+  it('latest get_agency_entitlement allows any active member, not only owner/admin', () => {
+    // Latest definition no longer restricts to ('agency_owner','agency_admin').
+    const lastIdx = migrations.lastIndexOf('FUNCTION public.get_agency_entitlement');
+    expect(lastIdx).toBeGreaterThan(-1);
+    const tail = migrations.slice(lastIdx);
+    expect(tail).not.toMatch(/agency_owner['"]?\s*,\s*['"]agency_admin/);
+  });
+
+  it('plan_key check constraint excludes assistant_free', () => {
+    const lastIdx = migrations.lastIndexOf('agency_entitlements_plan_key_check');
+    expect(lastIdx).toBeGreaterThan(-1);
+    const tail = migrations.slice(lastIdx, lastIdx + 400);
+    expect(tail).toMatch(/agency_starter/);
+    expect(tail).toMatch(/agency_team/);
+    expect(tail).toMatch(/agency_growth/);
+    expect(tail).not.toMatch(/assistant_free/);
+  });
+});
+
+describe('Phase 7 Cleanup — server-side limit enforcement', () => {
+  const migrations = fs
+    .readdirSync(path.join(process.cwd(), 'supabase/migrations'))
+    .map((f) => fs.readFileSync(path.join(process.cwd(), 'supabase/migrations', f), 'utf8'))
+    .join('\n');
+
+  it('defines assert_agency_limit helper', () => {
+    expect(migrations).toMatch(/FUNCTION public\.assert_agency_limit/);
+  });
+
+  it('defines get_effective_agency_limits helper', () => {
+    expect(migrations).toMatch(/FUNCTION public\.get_effective_agency_limits/);
+  });
+
+  it('create_agency_package calls assert_agency_limit', () => {
+    const idx = migrations.lastIndexOf('FUNCTION public.create_agency_package');
+    expect(idx).toBeGreaterThan(-1);
+    const body = migrations.slice(idx, idx + 2000);
+    expect(body).toMatch(/assert_agency_limit\([^)]*'create_service_package'\)/);
+  });
+
+  it('invite_agency_member calls assert_agency_limit for net-new invites', () => {
+    const idx = migrations.lastIndexOf('FUNCTION public.invite_agency_member');
+    const body = migrations.slice(idx, idx + 2500);
+    expect(body).toMatch(/assert_agency_limit\([^)]*'invite_member'\)/);
+  });
+
+  it('driver_decide_delegation calls assert_agency_limit for new clients', () => {
+    const idx = migrations.lastIndexOf('FUNCTION public.driver_decide_delegation');
+    const body = migrations.slice(idx, idx + 4000);
+    expect(body).toMatch(/assert_agency_limit\([^)]*'activate_client'\)/);
+  });
+
+  it('does not enforce agency limits on direct driver_assistants invites', () => {
+    // Direct driver→assistant invites live in src/hooks/useAssistants.ts /
+    // driver-assistant RPCs and must remain independent of agency limits.
+    const hook = readFile('src/hooks/useAssistants.ts');
+    expect(hook).not.toMatch(/assert_agency_limit/);
+  });
+});
+
+describe('Phase 7 Cleanup — driver-facing payment clarity', () => {
+  const src = readFile('src/pages/DriverAssistantControl.tsx');
+  it('includes outside-payment disclaimer wording', () => {
+    expect(src.toLowerCase()).toContain('does not');
+    expect(src.toLowerCase()).toMatch(/outside the platform/);
+    expect(src.toLowerCase()).toMatch(/revoke/);
+  });
+});
+
+describe('Phase 7 Cleanup — Phase 5/6 invariants still intact', () => {
+  it('auth continuation still uses `next` param sanitization', () => {
+    const auth = readFile('src/lib/authNavigation.ts');
+    expect(auth).toMatch(/sanitizeNextPath|isSafeInternalPath/);
+  });
+
+  it('AppShell wrapper is still applied to authenticated agency/assistant pages', () => {
+    for (const f of [
+      'src/pages/AgencyDashboard.tsx',
+      'src/pages/AssistantDashboard.tsx',
+      'src/pages/DriverAssistantControl.tsx',
+    ]) {
+      expect(readFile(f)).toMatch(/AppShell/);
+    }
+  });
+
+  it('Pricing page still has no fake Stripe Subscribe/Pay button', () => {
+    const src = readFile('src/pages/Pricing.tsx');
+    expect(src).not.toMatch(/Pay Now/);
+    expect(src).not.toMatch(/Subscribe Now/);
+  });
+});
