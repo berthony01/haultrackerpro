@@ -100,12 +100,14 @@ describe('Phase 7 — Pricing page contract', () => {
     expect(src).toMatch(/OUTSIDE_PAYMENTS_DISCLAIMER/);
   });
 
-  it('does NOT render a fake Pay/Subscribe button for agency plans', () => {
-    // The Phase 7 CTA is "Start Agency Setup", not a Stripe-style button.
-    expect(src).toMatch(/Start Agency Setup/);
-    // Make sure no hardcoded "Pay Now" / "Subscribe Now" CTA leaked into the agency section.
+  it('uses a real billing CTA, not a fake Pay/Subscribe button', () => {
+    // Phase 8B replaced "Start Agency Setup" with the real "Start Agency Billing"
+    // routing CTA (auth → agency dashboard, where checkout actually starts).
+    expect(src).toMatch(/Start Agency Billing/);
     expect(src).not.toMatch(/Pay Now/);
+    expect(src).not.toMatch(/Subscribe Now/);
   });
+
 
   it('does NOT guarantee clients/income on the pricing page', () => {
     expect(src.toLowerCase()).not.toMatch(/guaranteed (clients|income|customers)/);
