@@ -688,7 +688,10 @@ function AssistantsAgenciesPricingSection({ navigate }: { navigate: (path: strin
 
         <div className="mt-8 p-5 rounded-2xl border" style={{ background: 'hsl(25, 95%, 53%, 0.06)', borderColor: 'hsl(25, 95%, 53%, 0.35)' }}>
           <h3 className="text-sm font-black mb-2" style={{ color: 'hsl(25, 95%, 60%)' }}>Payments for assistant &amp; agency services</h3>
-          <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>{OUTSIDE_PAYMENTS_DISCLAIMER} HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.</p>
+          <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
+            HaulTracker Pro does <b>not</b> currently process payments between drivers and assistants or agencies. Service agreements and payments are handled outside the platform for now. HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
+          </p>
+          <p className="sr-only">{OUTSIDE_PAYMENTS_DISCLAIMER}</p>
         </div>
 
         <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
