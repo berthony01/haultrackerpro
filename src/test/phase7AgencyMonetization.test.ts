@@ -277,4 +277,11 @@ describe('Phase 7 Cleanup — Phase 5/6 invariants still intact', () => {
     expect(src).not.toMatch(/Pay Now/);
     expect(src).not.toMatch(/Subscribe Now/);
   });
+
+  it('Agency Plan & Limits card does not render a Stripe pay/subscribe button', () => {
+    const card = readFile('src/components/agency/AgencyPlanLimitsCard.tsx');
+    expect(card).not.toMatch(/Subscribe/);
+    expect(card).not.toMatch(/Pay Now/);
+    expect(card).not.toMatch(/checkout/i);
+  });
 });
