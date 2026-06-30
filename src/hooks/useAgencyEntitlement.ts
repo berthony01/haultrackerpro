@@ -1,0 +1,84 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  ASSISTANT_AGENCY_PLANS,
+  type AgencyEntitlement,
+  type AssistantAgencyPlanKey,
+  type AgencyEntitlementStatus,
+  defaultBetaEntitlement,
+  effectiveLimits,
+} from '@/lib/agencyPlans';
+
+/**
+ * Phase 7 — Read the entitlement row for an agency.
+ *
+ * Reads via the `get_agency_entitlement(_agency_id)` security-definer RPC,
+ * so callers don't need direct table access. When the agency has no
+ * entitlement row yet we fall back to a `manual_beta` Agency Starter so
+ * existing beta agencies keep working until Phase 8 wires real billing.
+ */
+export interface UseAgencyEntitlementResult {
+  entitlement: AgencyEntitlement;
+  /** True when a real DB row backs the entitlement; false for fallback. */
+  hasRow: boolean;
+  isLoading: boolean;
+  refetch: () => void;
+}
+
+interface EntitlementRow {
+  id: string;
+  agency_id: string;
+  plan_key: AssistantAgencyPlanKey;
+  status: AgencyEntitlementStatus;
+  source: 'manual' | 'stripe' | 'admin_seed';
+  active_client_limit: number | null;
+  member_limit: number | null;
+  service_package_limit: number | null;
+  current_period_end: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+}
+
+export function useAgencyEntitlement(
+  agencyId: string | null | undefined,
+): UseAgencyEntitlementResult {
+  const q = useQuery({
+    queryKey: ['agency-entitlement', agencyId],
+    enabled: !!agencyId,
+    staleTime: 60_000,
+    queryFn: async (): Promise<EntitlementRow | null> => {
+      const { data, error } = await (supabase as any).rpc(
+        'get_agency_entitlement',
+        { _agency_id: agencyId },
+      );
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row ?? null) as EntitlementRow | null;
+    },
+  });
+
+  const row = q.data;
+  const entitlement: AgencyEntitlement = row
+    ? {
+        agencyId: row.agency_id,
+        planKey: row.plan_key,
+        status: row.status,
+        source: row.source,
+        activeClientLimit: row.active_client_limit,
+        memberLimit: row.member_limit,
+        servicePackageLimit: row.service_package_limit,
+        currentPeriodEnd: row.current_period_end,
+        stripeCustomerId: row.stripe_customer_id,
+        stripeSubscriptionId: row.stripe_subscription_id,
+      }
+    : defaultBetaEntitlement(agencyId ?? '');
+
+  return {
+    entitlement,
+    hasRow: !!row,
+    isLoading: q.isLoading,
+    refetch: () => q.refetch(),
+  };
+}
+
+export { ASSISTANT_AGENCY_PLANS, effectiveLimits };
