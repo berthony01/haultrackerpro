@@ -1,0 +1,290 @@
+/**
+ * Phase 7 — Assistant/Agency monetization (capability-based, not role-based).
+ *
+ * This file is the SINGLE source of truth for assistant & agency plan
+ * definitions, public display copy, and entitlement limits. Components,
+ * hooks, edge functions, and tests must read from here — do NOT hardcode
+ * limits anywhere else.
+ *
+ * IMPORTANT
+ *  - Stripe checkout for agency plans is NOT live in Phase 7. Wiring happens
+ *    in Phase 8. Do not present "Subscribe" / "Pay" CTAs until the agency
+ *    checkout edge function exists and is verified.
+ *  - HaulTrackerPro does not process service payments between drivers and
+ *    assistants/agencies. Charges defined here are for software access only.
+ *  - assistant_free is a capability with no software fee — accepting a
+ *    driver invite is always free.
+ */
+
+export type AssistantAgencyPlanKey =
+  | 'assistant_free'
+  | 'agency_starter'
+  | 'agency_team'
+  | 'agency_growth';
+
+export interface AgencyPlanLimits {
+  /** Max agency members (including owner). null = unlimited. */
+  memberLimit: number | null;
+  /** Max active driver clients. null = unlimited. */
+  activeClientLimit: number | null;
+  /** Max active service packages. null = unlimited. */
+  servicePackageLimit: number | null;
+  workQueue: boolean;
+  privateRequestLink: boolean;
+  auditLog: boolean;
+  notifications: boolean;
+}
+
+export interface AssistantAgencyPlan {
+  key: AssistantAgencyPlanKey;
+  /** Public display name. */
+  label: string;
+  /** Short audience descriptor for cards. */
+  tagline: string;
+  /** Monthly price in USD. 0 for free plans. */
+  monthlyPrice: number;
+  /** Annual price placeholder. null = annual not exposed publicly yet. */
+  annualPrice: number | null;
+  /** Stripe price id for Phase 8 wiring. null until checkout is configured. */
+  futureStripePriceId: string | null;
+  limits: AgencyPlanLimits;
+  /** Public-facing bullet list for the pricing page. */
+  publicBullets: string[];
+  /** Disclaimer / limitation copy. */
+  limitationsCopy: string;
+}
+
+export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAgencyPlan> = {
+  assistant_free: {
+    key: 'assistant_free',
+    label: 'Driver Assistant',
+    tagline: 'Free to accept approved driver invitations',
+    monthlyPrice: 0,
+    annualPrice: 0,
+    futureStripePriceId: null,
+    limits: {
+      memberLimit: 1,
+      activeClientLimit: null, // an assistant can be invited by any number of drivers
+      servicePackageLimit: 0, // packages are an agency feature
+      workQueue: false,
+      privateRequestLink: false,
+      auditLog: true,
+      notifications: true,
+    },
+    publicBullets: [
+      'Free — no HaulTracker Pro fee just to assist a driver',
+      'Access begins only after a driver-approved delegation',
+      'Help with loads, expenses, fuel logs, and reports (per-driver permissions)',
+      'Service payments handled outside HaulTracker Pro',
+    ],
+    limitationsCopy:
+      'Driver Assistants cannot publish service packages or a private agency request link. To run a multi-driver back-office business, create an Agency Workspace.',
+  },
+  agency_starter: {
+    key: 'agency_starter',
+    label: 'Agency Starter',
+    tagline: 'Solo back-office side hustle',
+    monthlyPrice: 29,
+    annualPrice: null,
+    futureStripePriceId: null,
+    limits: {
+      memberLimit: 2,
+      activeClientLimit: 5,
+      servicePackageLimit: 3,
+      workQueue: true,
+      privateRequestLink: true,
+      auditLog: true,
+      notifications: true,
+    },
+    publicBullets: [
+      '1 agency owner + up to 2 members total',
+      'Up to 5 active driver clients',
+      'Up to 3 active service packages',
+      'Private agency request link',
+      'Client requests, work queue, audit log',
+      'Driver-approved delegation only',
+    ],
+    limitationsCopy:
+      'Software access only. HaulTracker Pro does not process service payments between you and your driver clients.',
+  },
+  agency_team: {
+    key: 'agency_team',
+    label: 'Agency Team',
+    tagline: 'Small back-office team',
+    monthlyPrice: 79,
+    annualPrice: null,
+    futureStripePriceId: null,
+    limits: {
+      memberLimit: 5,
+      activeClientLimit: 25,
+      servicePackageLimit: 25,
+      workQueue: true,
+      privateRequestLink: true,
+      auditLog: true,
+      notifications: true,
+    },
+    publicBullets: [
+      'Up to 5 agency members',
+      'Up to 25 active driver clients',
+      'Up to 25 active service packages',
+      'Shared work queue and notifications',
+      'Private agency request link',
+      'Full agency audit log',
+    ],
+    limitationsCopy:
+      'Software access only. HaulTracker Pro does not process service payments between you and your driver clients.',
+  },
+  agency_growth: {
+    key: 'agency_growth',
+    label: 'Agency Growth',
+    tagline: 'Larger back-office operations',
+    monthlyPrice: 149,
+    annualPrice: null,
+    futureStripePriceId: null,
+    limits: {
+      memberLimit: 15,
+      activeClientLimit: 100,
+      servicePackageLimit: 100,
+      workQueue: true,
+      privateRequestLink: true,
+      auditLog: true,
+      notifications: true,
+    },
+    publicBullets: [
+      'Up to 15 agency members',
+      'Up to 100 active driver clients',
+      'Up to 100 active service packages',
+      'Advanced work queue',
+      'Private agency request link',
+      'Full agency audit log',
+    ],
+    limitationsCopy:
+      'Software access only. HaulTracker Pro does not process service payments between you and your driver clients.',
+  },
+};
+
+export const ALL_AGENCY_PLAN_KEYS: AssistantAgencyPlanKey[] = [
+  'agency_starter',
+  'agency_team',
+  'agency_growth',
+];
+
+export type AgencyEntitlementStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'cancelled'
+  | 'manual_beta';
+
+export interface AgencyEntitlement {
+  agencyId: string;
+  planKey: AssistantAgencyPlanKey;
+  status: AgencyEntitlementStatus;
+  source: 'manual' | 'stripe' | 'admin_seed';
+  /** Overrides on top of plan defaults (admin/beta only). null = use plan default. */
+  activeClientLimit: number | null;
+  memberLimit: number | null;
+  servicePackageLimit: number | null;
+  currentPeriodEnd: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+}
+
+/**
+ * Safe default for agencies without an explicit entitlement row.
+ *
+ * Phase 7 ships entitlement-aware UI but does NOT lock existing beta users
+ * out. When no row exists we treat the agency as Agency Starter in
+ * `manual_beta` status — usable, with starter-level limits — until Phase 8
+ * wires real billing.
+ */
+export function defaultBetaEntitlement(agencyId: string): AgencyEntitlement {
+  return {
+    agencyId,
+    planKey: 'agency_starter',
+    status: 'manual_beta',
+    source: 'manual',
+    activeClientLimit: null,
+    memberLimit: null,
+    servicePackageLimit: null,
+    currentPeriodEnd: null,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+  };
+}
+
+/** Resolve effective limits for an entitlement, applying overrides. */
+export function effectiveLimits(ent: AgencyEntitlement): AgencyPlanLimits {
+  const plan = ASSISTANT_AGENCY_PLANS[ent.planKey];
+  return {
+    ...plan.limits,
+    activeClientLimit:
+      ent.activeClientLimit ?? plan.limits.activeClientLimit,
+    memberLimit: ent.memberLimit ?? plan.limits.memberLimit,
+    servicePackageLimit:
+      ent.servicePackageLimit ?? plan.limits.servicePackageLimit,
+  };
+}
+
+export type AgencyLimitedAction =
+  | 'create_service_package'
+  | 'invite_member'
+  | 'activate_client';
+
+/**
+ * Pure helper: does the agency have headroom for `action` given current usage?
+ *
+ * Returns { allowed, limit, used, reason }. When `limit` is null the plan
+ * is unlimited for that action.
+ */
+export function checkAgencyLimit(
+  ent: AgencyEntitlement,
+  action: AgencyLimitedAction,
+  usage: { members: number; activeClients: number; activePackages: number },
+): { allowed: boolean; limit: number | null; used: number; reason?: string } {
+  const limits = effectiveLimits(ent);
+  switch (action) {
+    case 'create_service_package': {
+      const limit = limits.servicePackageLimit;
+      const used = usage.activePackages;
+      if (limit === null) return { allowed: true, limit, used };
+      return limit > used
+        ? { allowed: true, limit, used }
+        : {
+            allowed: false,
+            limit,
+            used,
+            reason: `Your ${ASSISTANT_AGENCY_PLANS[ent.planKey].label} plan allows ${limit} active service packages.`,
+          };
+    }
+    case 'invite_member': {
+      const limit = limits.memberLimit;
+      const used = usage.members;
+      if (limit === null) return { allowed: true, limit, used };
+      return limit > used
+        ? { allowed: true, limit, used }
+        : {
+            allowed: false,
+            limit,
+            used,
+            reason: `Your ${ASSISTANT_AGENCY_PLANS[ent.planKey].label} plan allows ${limit} agency members.`,
+          };
+    }
+    case 'activate_client': {
+      const limit = limits.activeClientLimit;
+      const used = usage.activeClients;
+      if (limit === null) return { allowed: true, limit, used };
+      return limit > used
+        ? { allowed: true, limit, used }
+        : {
+            allowed: false,
+            limit,
+            used,
+            reason: `Your ${ASSISTANT_AGENCY_PLANS[ent.planKey].label} plan allows ${limit} active driver clients.`,
+          };
+    }
+  }
+}
+
+export const OUTSIDE_PAYMENTS_DISCLAIMER =
+  'HaulTracker Pro does not currently process payments between drivers and assistants or agencies. Service agreements and payments are handled outside the platform for now.';
