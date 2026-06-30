@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Users,
+  ArrowLeft,
   ArrowRight,
   ShieldCheck,
   Inbox,
@@ -67,6 +68,10 @@ export default function AssistantDashboard() {
   return (
     <AppShell>
     <div className="container mx-auto max-w-5xl px-4 py-6 space-y-6">
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
+        <ArrowLeft className="mr-1 h-4 w-4" />
+        Back
+      </Button>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold flex items-center gap-2">
