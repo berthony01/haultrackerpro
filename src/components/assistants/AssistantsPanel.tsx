@@ -220,6 +220,14 @@ export function AssistantsPanel() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{row.invite_email}</span>
                           <StatusBadge status={row.status} />
+                          {row.source === 'agency' ? (
+                            <Badge variant="secondary" className="gap-1">
+                              <Building2 className="h-3 w-3" />
+                              via agency{row.agency_name ? ` · ${row.agency_name}` : ''}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">direct invite</Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                           {Object.keys(row.permissions ?? {}).filter((k) => (row.permissions as any)[k]).length} permissions
