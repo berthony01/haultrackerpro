@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import {
+  DRIVER_PLAN_PRICE_ENV,
+  getDriverPriceAllowlist,
+  resolveOrCreateDriverStripeCustomerId,
+  DriverBillingConflictError,
+} from "../_shared/driver-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,21 +17,20 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
   console.log(`[CREATE-CHECKOUT] ${step}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
-/** Map plan keys to environment variable names for price IDs */
-const PLAN_KEY_TO_ENV: Record<string, string> = {
-  pro_monthly: "STRIPE_PRO_MONTHLY_PRICE_ID",
-  pro_yearly: "STRIPE_PRO_YEARLY_PRICE_ID",
-};
+function json(payload: unknown, status: number) {
+  return new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+const ALLOWED_ORIGINS = new Set([
+  "https://haultrackerpro.com",
+  "https://www.haultrackerpro.com",
+  "https://haultrackerpro.lovable.app",
+]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-  );
 
   try {
     logStep("Function started");
@@ -36,110 +41,100 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
 
+    // Authenticate BEFORE any service-role database operations.
+    const supabaseAnon = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
     const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
+    const { data } = await supabaseAnon.auth.getUser(token);
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    logStep("User authenticated", { userId: user.id });
+
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
 
     const body = await req.json();
-    // Support both planKey (new) and priceId (legacy)
     let priceId: string | undefined;
     const planKey = body.planKey as string | undefined;
 
     if (planKey) {
-      const envVar = PLAN_KEY_TO_ENV[planKey];
+      const envVar = DRIVER_PLAN_PRICE_ENV[planKey];
       if (!envVar) {
-        return new Response(JSON.stringify({ error: `Invalid plan key: ${planKey}` }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        });
+        return json({ error: `Invalid plan key: ${planKey}` }, 400);
       }
       priceId = Deno.env.get(envVar);
       if (!priceId) {
-        return new Response(JSON.stringify({ error: `Price ID not configured for plan: ${planKey}` }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        });
+        return json({ error: `Price ID not configured for plan: ${planKey}` }, 500);
       }
-      logStep("Resolved plan key to price ID", { planKey, priceId });
+      logStep("Resolved plan key to price ID", { planKey });
     } else if (body.priceId) {
-      // Legacy support — STRICT allowlist. Unknown price IDs are rejected
-      // (previous behavior allowed them through with only a warning, which
-      // let any Stripe price ID create a Pro checkout).
       const candidate = body.priceId as string;
-      const allowedPriceIds = Object.values(PLAN_KEY_TO_ENV)
-        .map((env) => Deno.env.get(env))
-        .filter((v): v is string => !!v);
+      const allowedPriceIds = getDriverPriceAllowlist();
       if (!allowedPriceIds.includes(candidate)) {
         logStep("Rejected unknown legacy priceId", { priceId: candidate });
-        return new Response(JSON.stringify({ error: "Invalid price ID" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        });
+        return json({ error: "Invalid price ID" }, 400);
       }
       priceId = candidate;
     }
 
     if (!priceId) {
-      return new Response(JSON.stringify({ error: "planKey or priceId is required" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
+      return json({ error: "planKey or priceId is required" }, 400);
     }
-    logStep("Price ID received", { priceId });
+    logStep("Price ID received");
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId: string | undefined;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-      logStep("Existing Stripe customer found", { customerId });
-
-      // Prevent double subscription
-      const activeSubs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
-      const trialSubs = await stripe.subscriptions.list({ customer: customerId, status: 'trialing', limit: 1 });  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-      if (activeSubs.data.length > 0 || trialSubs.data.length > 0) {  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-        logStep("User already has active/trialing subscription");  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-        return new Response(JSON.stringify({ error: "You already have an active subscription. Manage it from your account settings." }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        });
+    let customerId: string;
+    try {
+      customerId = await resolveOrCreateDriverStripeCustomerId(supabaseService, stripe, user.id, user.email);
+    } catch (e) {
+      if (e instanceof DriverBillingConflictError) {
+        logStep("Driver billing conflict — refusing checkout", { message: e.message });
+        return json({ error: "Unable to start checkout due to a billing account conflict. Please contact support." }, 409);
       }
+      throw e;
+    }
+    logStep("Resolved driver Stripe customer", { customerId });
+
+    // Prevent double subscription — checked ONLY on the dedicated driver
+    // customer, never influenced by any recruiter/agency subscription that
+    // might exist under the same email.
+    const [activeSubs, trialSubs, pastDueSubs] = await Promise.all([
+      stripe.subscriptions.list({ customer: customerId, status: "active", limit: 1 }),
+      stripe.subscriptions.list({ customer: customerId, status: "trialing", limit: 1 }),
+      stripe.subscriptions.list({ customer: customerId, status: "past_due", limit: 1 }),
+    ]);
+    if (activeSubs.data.length > 0 || trialSubs.data.length > 0 || pastDueSubs.data.length > 0) {
+      logStep("User already has a non-terminal driver subscription");
+      return json({ error: "You already have an active subscription. Manage it from your account settings." }, 400);
     }
 
-    // Validate Origin against an allowlist to prevent open-redirect via Stripe checkout URLs.
-    const ALLOWED_ORIGINS = new Set([
-      "https://haultrackerpro.com",
-      "https://www.haultrackerpro.com",
-      "https://haultrackerpro.lovable.app",
-    ]);
     const reqOrigin = req.headers.get("origin") ?? "";
     const origin = ALLOWED_ORIGINS.has(reqOrigin) ? reqOrigin : "https://haultrackerpro.com";
 
+    const metadata = { billing_context: "driver", user_id: user.id, plan_key: planKey || "legacy" };
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      customer_email: customerId ? undefined : user.email,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       success_url: `${origin}/?checkout=success`,
       cancel_url: `${origin}/pricing`,
-      metadata: { user_id: user.id, plan_key: planKey || "legacy" },
+      metadata,
+      subscription_data: { metadata },
     });
 
     logStep("Checkout session created", { sessionId: session.id });
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return json({ url: session.url }, 200);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });
-    return new Response(JSON.stringify({ error: msg }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return json({ error: "Unable to start checkout. Please try again or contact support." }, 500);
   }
 });
