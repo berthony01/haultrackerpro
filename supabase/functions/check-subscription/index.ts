@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import {
+  resolveDriverPlanKey,
+  resolveDriverStripeCustomerId,
+  DriverBillingConflictError,
+} from "../_shared/driver-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,13 +16,8 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${details ? ` - ${JSON.stringify(details)}` : ''}`);
 };
 
-/** Resolve plan_key from a Stripe price ID */
-function resolvePlanKey(priceId: string): string {
-  const monthlyPriceId = Deno.env.get("STRIPE_PRO_MONTHLY_PRICE_ID");
-  const yearlyPriceId = Deno.env.get("STRIPE_PRO_YEARLY_PRICE_ID");
-  if (priceId === monthlyPriceId) return "pro_monthly";
-  if (priceId === yearlyPriceId) return "pro_yearly";
-  return "pro_monthly";
+function json(payload: unknown, status: number) {
+  return new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
 serve(async (req) => {
@@ -25,7 +25,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
+  const supabaseService = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     { auth: { persistSession: false } }
@@ -34,15 +34,11 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Legacy: trial-expiry cron handler — no-op now that trials are removed.  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body is fine */ }
     if (body?.action === "expire_trials") {
-      logStep("expire_trials called but trials are removed — no-op");  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-      return new Response(JSON.stringify({ ok: true, deprecated: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      logStep("expire_trials called but trials are removed — no-op");
+      return json({ ok: true, deprecated: true }, 200);
     }
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -50,180 +46,154 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ subscribed: false }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return json({ subscribed: false }, 200);
     }
 
+    const supabaseAnon = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    const { data: userData, error: userError } = await supabaseAnon.auth.getUser(token);
     if (userError) {
       logStep("Auth failed, returning unsubscribed", { message: userError.message });
-      return new Response(JSON.stringify({ subscribed: false }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return json({ subscribed: false }, 200);
     }
     const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    if (!user) throw new Error("User not authenticated");
+    logStep("User authenticated", { userId: user.id });
 
-    // Check for manual override in subscriptions table first
-    const { data: existingSub } = await supabaseClient
+    // Manual override check happens first and can short-circuit below.
+    const { data: existingSub } = await supabaseService
       .from("subscriptions")
-      .select("status, plan_key")
+      .select("status, plan_key, stripe_customer_id, stripe_subscription_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
+    const { data: profile } = await supabaseService
+      .from("profiles")
+      .select("subscription_status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const hasManualOverride = existingSub?.status === "active" || profile?.subscription_status === "pro";
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 
-    if (customers.data.length === 0) {
-      logStep("No Stripe customer found");
-      // Check for manual override
-      if (existingSub?.status === "active") {
-        logStep("Manual override found in subscriptions table, preserving");
-        return new Response(JSON.stringify({ subscribed: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
+    let customerId: string | null;
+    try {
+      customerId = await resolveDriverStripeCustomerId(supabaseService, stripe, user.id);
+    } catch (e) {
+      if (e instanceof DriverBillingConflictError) {
+        logStep("Driver billing conflict detected — failing closed, preserving stored state", { message: e.message });
+        return json({ subscribed: hasManualOverride, conflict: true }, 200);
       }
-      // Also check profiles for legacy manual overrides
-      const { data: profile } = await supabaseClient
-        .from("profiles")
-        .select("subscription_status")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (profile?.subscription_status === "pro") {
-        logStep("Manual pro override found in profiles, preserving");
-        return new Response(JSON.stringify({ subscribed: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-      }
-
-      return new Response(JSON.stringify({ subscribed: false }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      throw e;
     }
 
-    const customerId = customers.data[0].id;
-    logStep("Found Stripe customer", { customerId });
+    if (!customerId) {
+      logStep("No driver Stripe customer on file");
+      if (hasManualOverride) {
+        logStep("Manual override found, preserving");
+        return json({ subscribed: true }, 200);
+      }
+      return json({ subscribed: false }, 200);
+    }
 
-    const activeSubscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 1,
-    });
+    let subscription: Stripe.Subscription | undefined;
+    if (existingSub?.stripe_subscription_id) {
+      try {
+        subscription = await stripe.subscriptions.retrieve(existingSub.stripe_subscription_id);
+      } catch (e) {
+        logStep("Stored subscription id could not be retrieved", { message: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    if (!subscription) {
+      const subs = await stripe.subscriptions.list({ customer: customerId, status: "active", limit: 1 });
+      subscription = subs.data[0];
+    }
 
-    const subscription = activeSubscriptions.data[0];
-    const hasActiveSub = !!subscription;
-    let subscriptionEnd = null;
-    let productId = null;
+    // Never treat a recruiter/agency-tagged subscription as driver entitlement.
+    if (subscription && subscription.metadata?.billing_context && subscription.metadata.billing_context !== "driver") {
+      logStep("Ignoring non-driver subscription found on driver customer", { billingContext: subscription.metadata.billing_context });
+      subscription = undefined;
+    }
 
-    if (hasActiveSub) {
+    if (subscription) {
       const priceId = subscription.items.data[0]?.price?.id || "";
-      const planKey = resolvePlanKey(priceId);
-      subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
+      const planKey = resolveDriverPlanKey(priceId);
+
+      if (subscription.status === "active" && !planKey) {
+        logStep("Active subscription uses an unrecognized price — not granting Pro", { priceId });
+        return json({ subscribed: hasManualOverride }, 200);
+      }
+
+      const hasActiveSub = subscription.status === "active";
+      const subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
       const subscriptionStart = new Date(subscription.current_period_start * 1000).toISOString();
-      const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-      const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-      productId = subscription.items.data[0].price.product;
-      const isTrial = subscription.status === "trialing";  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-      logStep("Subscription found", { subscriptionId: subscription.id, status: subscription.status, isTrial, productId, endDate: subscriptionEnd });
+      const trialStart = subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null;
+      const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
+      const productId = subscription.items.data[0]?.price?.product ?? null;
 
-      // Upsert subscriptions table
-      await supabaseClient
-        .from("subscriptions")
-        .upsert({
-          user_id: user.id,
-          stripe_customer_id: customerId,
-          stripe_subscription_id: subscription.id,
-          stripe_price_id: priceId,
-          plan_key: planKey,
-          status: subscription.status,
-          cancel_at_period_end: subscription.cancel_at_period_end,
-          current_period_start: subscriptionStart,
-          current_period_end: subscriptionEnd,
-          trial_start: trialStart,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-          trial_end: trialEnd,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
+      await supabaseService.from("subscriptions").upsert({
+        user_id: user.id,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscription.id,
+        stripe_price_id: priceId,
+        plan_key: planKey ?? "free",
+        status: subscription.status,
+        cancel_at_period_end: subscription.cancel_at_period_end,
+        current_period_start: subscriptionStart,
+        current_period_end: subscriptionEnd,
+        trial_start: trialStart,
+        trial_end: trialEnd,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
 
-      // Backward compat profiles
-      await supabaseClient.from("profiles").update({
-        subscription_status: "pro",
+      await supabaseService.from("profiles").update({
+        subscription_status: (hasActiveSub || hasManualOverride) ? "pro" : "free",
         subscription_plan: planKey,
         stripe_customer_id: customerId,
         stripe_subscription_id: subscription.id,
         subscription_expires_at: subscriptionEnd,
       }).eq("user_id", user.id);
-    } else {
-      logStep("No active subscription");
-      // Check for manual override before resetting
-      if (existingSub?.status === "active") {
-        logStep("Manual override found, preserving status");
-        return new Response(JSON.stringify({ subscribed: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-      }
-      const { data: profile } = await supabaseClient
-        .from("profiles")
-        .select("subscription_status")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (profile?.subscription_status === "pro") {
-        logStep("Manual pro override in profiles, preserving");
-        return new Response(JSON.stringify({ subscribed: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-      }
 
-      // Reset both tables
-      await supabaseClient
-        .from("subscriptions")
-        .upsert({
-          user_id: user.id,
-          stripe_customer_id: customerId,
-          plan_key: "free",
-          status: "free",
-          cancel_at_period_end: false,
-          stripe_subscription_id: null,
-          stripe_price_id: null,
-          current_period_start: null,
-          current_period_end: null,
-          trial_start: null,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-          trial_end: null,  // trial-allowlist: Stripe/back-compat field mirroring, never user-facing
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
-
-      await supabaseClient.from("profiles").update({
-        subscription_status: "free",
-        subscription_plan: null,
-        stripe_subscription_id: null,
-        subscription_expires_at: null,
-        stripe_customer_id: customerId,
-      }).eq("user_id", user.id);
+      logStep("Subscription synced", { status: subscription.status, planKey });
+      return json({ subscribed: hasActiveSub || hasManualOverride, product_id: productId, subscription_end: subscriptionEnd }, 200);
     }
 
-    return new Response(JSON.stringify({
-      subscribed: hasActiveSub,
-      product_id: productId,
-      subscription_end: subscriptionEnd,
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    if (hasManualOverride) {
+      logStep("Manual override found, preserving status despite no live Stripe subscription");
+      return json({ subscribed: true }, 200);
+    }
+
+    await supabaseService.from("subscriptions").upsert({
+      user_id: user.id,
+      stripe_customer_id: customerId,
+      plan_key: "free",
+      status: "free",
+      cancel_at_period_end: false,
+      stripe_subscription_id: null,
+      stripe_price_id: null,
+      current_period_start: null,
+      current_period_end: null,
+      trial_start: null,
+      trial_end: null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+
+    await supabaseService.from("profiles").update({
+      subscription_status: "free",
+      subscription_plan: null,
+      stripe_subscription_id: null,
+      subscription_expires_at: null,
+      stripe_customer_id: customerId,
+    }).eq("user_id", user.id);
+
+    return json({ subscribed: false }, 200);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });
-    return new Response(JSON.stringify({ error: msg }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return json({ error: "Unable to check subscription status." }, 500);
   }
 });
