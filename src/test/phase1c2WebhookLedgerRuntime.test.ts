@@ -60,8 +60,8 @@ beforeAll(async () => {
 });
 
 describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
-  it("PGlite loaded (harness MUST NOT be skipped per Phase 1C-2 acceptance)", () => {
-    expect(pglite, `PGlite must be available at ${PGLITE_ABS_PATH}`).not.toBeNull();
+  it("PGlite loaded from declared devDependency (harness MUST NOT be skipped)", () => {
+    expect(db, "PGlite must be resolvable via the declared @electric-sql/pglite package").toBeTruthy();
   });
 
   it("historical row is preserved as processed with legacy_processed", async () => {
