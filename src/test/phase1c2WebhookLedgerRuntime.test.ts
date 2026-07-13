@@ -19,8 +19,10 @@ import { createRequire } from "node:module";
 const PGLITE_ABS_PATH = "/tmp/pglite-sandbox/node_modules/@electric-sql/pglite";
 const MIGRATION_GLOB_PREFIX = "20260713"; // Phase 1C-2 migration date prefix
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyPGlite = any;
+interface AnyPGlite {
+  exec(sql: string): Promise<unknown>;
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+}
 
 async function loadPGlite(): Promise<null | { PGlite: new () => AnyPGlite }> {
   try {
