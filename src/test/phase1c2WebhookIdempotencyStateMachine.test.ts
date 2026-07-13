@@ -131,7 +131,7 @@ describe("Phase 1C-2 — idempotency state machine (Part 14, 25 cases)", () => {
     let resolveFirst!: () => void;
     const firstPromise = withIdempotency({
       ledger, eventId: "e1", eventType: "x",
-      process: () => new Promise<{result: TerminalResult; body: {received:true}}>((res) => { resolveFirst = () => res(applied); }),
+      process: () => new Promise<{result: TerminalResult; body: Record<string, unknown>}>((res) => { resolveFirst = () => res(applied); }),
     });
     // Yield to let the claim happen.
     await Promise.resolve(); await Promise.resolve();
