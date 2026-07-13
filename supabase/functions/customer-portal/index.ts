@@ -1,7 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
-import { resolveDriverStripeCustomerId, DriverBillingConflictError } from "../_shared/driver-billing.ts";
+import {
+  DRIVER_PLAN_PRICE_ENV,
+  resolveDriverStripeCustomerId,
+  DriverBillingConflictError,
+  type DriverPriceConfig,
+} from "../_shared/driver-billing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +32,11 @@ serve(async (req) => {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
+    const driverPriceConfig: DriverPriceConfig = {
+      pro_monthly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_monthly),
+      pro_yearly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_yearly),
+    };
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
 
@@ -49,7 +59,7 @@ serve(async (req) => {
 
     let customerId: string | null;
     try {
-      customerId = await resolveDriverStripeCustomerId(supabaseService, stripe, user.id);
+      customerId = await resolveDriverStripeCustomerId(supabaseService, stripe, user.id, driverPriceConfig);
     } catch (e) {
       if (e instanceof DriverBillingConflictError) {
         console.error("[customer-portal] driver billing conflict", { userId: user.id, message: e.message });

@@ -1,5 +1,14 @@
-// Phase 1A — canonical driver Stripe billing identity: Deno-environment
+// Phase 1B-1 — canonical driver Stripe billing identity: runtime-neutral
 // orchestration built on top of ./driver-billing-pure.ts.
+//
+// This module intentionally has NO dependency on the Deno global. It is
+// imported by src/test/phase1aDriverBillingResolution.test.ts under
+// Node/Vitest, so it must be fully importable and type-checkable there.
+// Callers (the Edge Function entrypoints: create-checkout, customer-portal,
+// check-subscription) are responsible for reading Deno.env themselves and
+// passing the resulting DriverPriceConfig into every function here that
+// needs plan/price information. This module never reads process-wide
+// environment state on its own.
 //
 // subscriptions.stripe_customer_id / stripe_subscription_id are the
 // canonical driver billing identifiers. profiles.stripe_customer_id /
@@ -23,6 +32,12 @@ export {
   DriverBillingConflictError,
   decideDriverCustomerResolution,
   validateDriverSubscription,
+  // Re-exported directly under their original names. These are already pure
+  // config-driven functions — no Deno-reading wrapper is needed now that
+  // every caller passes an explicit DriverPriceConfig.
+  resolveDriverPlanKeyFromConfig as resolveDriverPlanKey,
+  isDriverPriceIdInConfig as isDriverPriceId,
+  getDriverPriceAllowlistFromConfig as getDriverPriceAllowlist,
 };
 export type { DriverPriceConfig, StripeSubscriptionLike };
 
@@ -44,25 +59,6 @@ export interface StripeClientLike {
   };
 }
 
-function readDriverPriceConfig(): DriverPriceConfig {
-  return {
-    pro_monthly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_monthly),
-    pro_yearly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_yearly),
-  };
-}
-
-export function resolveDriverPlanKey(priceId: string | null | undefined): string | null {
-  return resolveDriverPlanKeyFromConfig(priceId, readDriverPriceConfig());
-}
-
-export function isDriverPriceId(priceId: string | null | undefined): boolean {
-  return isDriverPriceIdInConfig(priceId, readDriverPriceConfig());
-}
-
-export function getDriverPriceAllowlist(): string[] {
-  return getDriverPriceAllowlistFromConfig(readDriverPriceConfig());
-}
-
 async function isCustomerUsedByOtherContext(supabaseService: any, customerId: string): Promise<boolean> {
   const [{ data: recruiterRow }, { data: agencyRow }] = await Promise.all([
     supabaseService.from("recruiter_billing_profiles").select("id").eq("stripe_customer_id", customerId).maybeSingle(),
@@ -79,10 +75,18 @@ async function persistDriverCustomerId(supabaseService: any, userId: string, cus
   await supabaseService.from("profiles").update({ stripe_customer_id: customerId }).eq("user_id", userId);
 }
 
+/** Resolve (never create) the canonical driver Stripe customer id. Never
+ *  looks up Stripe by email. Throws DriverBillingConflictError — callers
+ *  must fail closed — if a stored identifier collides with a recruiter or
+ *  agency billing context, or a stored subscription does not validate as a
+ *  genuine driver subscription. `config` must be supplied by the caller
+ *  (read from Deno.env in the real Edge Function entrypoints).
+ */
 export async function resolveDriverStripeCustomerId(
   supabaseService: any,
   stripe: StripeClientLike,
   userId: string,
+  config: DriverPriceConfig,
 ): Promise<string | null> {
   const { data: subRow } = await supabaseService
     .from("subscriptions")
@@ -96,7 +100,6 @@ export async function resolveDriverStripeCustomerId(
     .maybeSingle();
 
   const decision = decideDriverCustomerResolution(subRow, profileRow);
-  const config = readDriverPriceConfig();
 
   if (decision.action === "use_existing") {
     if (await isCustomerUsedByOtherContext(supabaseService, decision.customerId)) {
@@ -110,7 +113,7 @@ export async function resolveDriverStripeCustomerId(
   if (decision.action === "derive_from_subscription") {
     const sub = await stripe.subscriptions.retrieve(decision.subscriptionId);
     const validated = validateDriverSubscription(sub as unknown as StripeSubscriptionLike, config);
-    if (!validated.valid) {
+    if (validated.valid === false) {
       throw new DriverBillingConflictError(validated.reason);
     }
     if (await isCustomerUsedByOtherContext(supabaseService, validated.customerId)) {
@@ -131,7 +134,7 @@ export async function resolveDriverStripeCustomerId(
     if (decision.requiresSubscriptionValidation) {
       const sub = await stripe.subscriptions.retrieve(decision.requiresSubscriptionValidation);
       const validated = validateDriverSubscription(sub as unknown as StripeSubscriptionLike, config);
-      if (!validated.valid) {
+      if (validated.valid === false) {
         throw new DriverBillingConflictError(validated.reason);
       }
     }
@@ -151,13 +154,20 @@ async function safelyArchiveUnusedCustomer(stripe: StripeClientLike, customerId:
   }
 }
 
+/** Resolve-or-create the canonical driver Stripe customer id. Concurrency
+ *  safe: uses a conditional ("claim only if still null") update as an
+ *  atomic compare-and-swap so two simultaneous requests cannot both persist
+ *  a customer id. The loser's unused Stripe customer is archived. `config`
+ *  must be supplied by the caller.
+ */
 export async function resolveOrCreateDriverStripeCustomerId(
   supabaseService: any,
   stripe: StripeClientLike,
   userId: string,
   userEmail: string,
+  config: DriverPriceConfig,
 ): Promise<string> {
-  const existing = await resolveDriverStripeCustomerId(supabaseService, stripe, userId);
+  const existing = await resolveDriverStripeCustomerId(supabaseService, stripe, userId, config);
   if (existing) return existing;
 
   await supabaseService
