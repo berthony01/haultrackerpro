@@ -65,7 +65,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("historical row is preserved as processed with legacy_processed", async () => {
-    if (!pglite) return;
     const r = await db.query<{ processing_status: string; result_code: string; processed_at: string }>(
       `SELECT processing_status, result_code, processed_at FROM public.stripe_webhook_events WHERE stripe_event_id = 'evt_historical_1'`,
     );
@@ -75,7 +74,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("first claim inserts a processing row with a token", async () => {
-    if (!pglite) return;
     const r = await db.query<{ result: string; claim_token: string | null; attempt: number }>(
       `SELECT * FROM public.claim_stripe_webhook_event('evt_1', 'customer.subscription.updated', 300)`,
     );
@@ -90,7 +88,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("second claim while first is unexpired returns in_progress", async () => {
-    if (!pglite) return;
     const r = await db.query<{ result: string; claim_token: string | null }>(
       `SELECT * FROM public.claim_stripe_webhook_event('evt_1', 'customer.subscription.updated', 300)`,
     );
@@ -99,7 +96,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("completion succeeds only with the active claim token", async () => {
-    if (!pglite) return;
     const active = (await db.query<{ claim_token: string }>(
       `SELECT claim_token FROM public.stripe_webhook_events WHERE stripe_event_id = 'evt_1'`,
     )).rows[0].claim_token;
@@ -122,7 +118,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("re-claim of a processed event returns already_processed", async () => {
-    if (!pglite) return;
     const r = await db.query<{ result: string }>(
       `SELECT * FROM public.claim_stripe_webhook_event('evt_1', 'customer.subscription.updated', 300)`,
     );
@@ -130,7 +125,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("failed status can be reclaimed; attempt count increments; new token", async () => {
-    if (!pglite) return;
     // Claim evt_2, then mark it failed, then reclaim.
     const c1 = (await db.query<{ result: string; claim_token: string }>(
       `SELECT * FROM public.claim_stripe_webhook_event('evt_2', 'customer.subscription.updated', 300)`,
@@ -149,7 +143,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("event-type conflict is rejected without mutating the existing row", async () => {
-    if (!pglite) return;
     const before = (await db.query<{ event_type: string; processing_status: string }>(
       `SELECT event_type, processing_status FROM public.stripe_webhook_events WHERE stripe_event_id = 'evt_1'`,
     )).rows[0];
@@ -164,7 +157,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("expired processing lease can be reclaimed", async () => {
-    if (!pglite) return;
     const claim = (await db.query<{ claim_token: string }>(
       `SELECT * FROM public.claim_stripe_webhook_event('evt_expired', 'customer.subscription.updated', 30)`,
     )).rows[0];
@@ -179,7 +171,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("stale worker cannot complete or fail after reclaim (token mismatch)", async () => {
-    if (!pglite) return;
     const staleToken = (await db.query<{ claim_token: string }>(
       `SELECT claim_token FROM public.stripe_webhook_events WHERE stripe_event_id = 'evt_expired'`,
     )).rows[0].claim_token; // this is the NEW token now
@@ -201,7 +192,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("existing unique event-id protection remains effective", async () => {
-    if (!pglite) return;
     let threw = false;
     try {
       await db.exec(`INSERT INTO public.stripe_webhook_events (stripe_event_id, event_type, processing_status, attempt_count, processing_started_at, lease_expires_at, claim_token, updated_at) VALUES ('evt_1', 'x', 'processing', 1, now(), now() + interval '5 min', gen_random_uuid(), now())`);
@@ -213,7 +203,6 @@ describe("Phase 1C-2 — Postgres runtime harness (PGlite)", () => {
   });
 
   it("anon and authenticated cannot execute the claim/complete/fail RPCs; service_role can", async () => {
-    if (!pglite) return;
     const rows = (await db.query<{ proname: string; rolname: string; has: boolean }>(
       `SELECT p.proname, r.rolname, has_function_privilege(r.rolname, p.oid, 'EXECUTE') AS has
        FROM pg_proc p CROSS JOIN pg_roles r
