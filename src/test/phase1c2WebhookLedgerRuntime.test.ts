@@ -7,33 +7,20 @@
 // lease-reclaim state machine holds at the real Postgres layer, not just
 // in the mocked orchestrator.
 //
-// PGlite is installed in a sandbox path outside the repo so
-// package.json / lockfiles remain untouched. If PGlite cannot be loaded
-// this test FAILS (Phase 1C-2 acceptance criteria disallow skipping the
-// critical runtime harness).
+// Phase 1C-3: PGlite is now a declared devDependency of the project,
+// imported normally. If installation fails the test fails — the harness
+// must never be silently skipped.
 
 import { describe, it, expect, beforeAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { createRequire } from "node:module";
+import { PGlite } from "@electric-sql/pglite";
 
-const PGLITE_ABS_PATH = "/tmp/pglite-sandbox/node_modules/@electric-sql/pglite";
 const MIGRATION_GLOB_PREFIX = "20260713"; // Phase 1C-2 migration date prefix
 
 interface AnyPGlite {
   exec(sql: string): Promise<unknown>;
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
-}
-
-async function loadPGlite(): Promise<null | { PGlite: new () => AnyPGlite }> {
-  try {
-    const req = createRequire(import.meta.url);
-    const resolved = req.resolve(path.join(PGLITE_ABS_PATH, "dist/index.js"));
-    const mod = await import(/* @vite-ignore */ resolved);
-    return mod as { PGlite: new () => AnyPGlite };
-  } catch {
-    return null;
-  }
 }
 
 function findMigration(): string {
@@ -64,13 +51,10 @@ async function primeBaseline(db: AnyPGlite) {
   await db.exec(`INSERT INTO public.stripe_webhook_events (stripe_event_id, event_type) VALUES ('evt_historical_1', 'customer.subscription.updated');`);
 }
 
-let pglite: { PGlite: new () => AnyPGlite } | null = null;
 let db: AnyPGlite;
 
 beforeAll(async () => {
-  pglite = await loadPGlite();
-  if (!pglite) return;
-  db = new pglite.PGlite();
+  db = new PGlite() as unknown as AnyPGlite;
   await primeBaseline(db);
   await db.exec(findMigration());
 });
