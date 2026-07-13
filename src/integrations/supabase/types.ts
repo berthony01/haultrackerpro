@@ -3132,22 +3132,49 @@ export type Database = {
       }
       stripe_webhook_events: {
         Row: {
+          attempt_count: number
+          claim_token: string | null
           event_type: string
           id: string
-          processed_at: string
+          last_error_code: string | null
+          last_failed_at: string | null
+          lease_expires_at: string | null
+          processed_at: string | null
+          processing_started_at: string | null
+          processing_status: string
+          result_code: string | null
           stripe_event_id: string
+          updated_at: string
         }
         Insert: {
+          attempt_count?: number
+          claim_token?: string | null
           event_type: string
           id?: string
-          processed_at?: string
+          last_error_code?: string | null
+          last_failed_at?: string | null
+          lease_expires_at?: string | null
+          processed_at?: string | null
+          processing_started_at?: string | null
+          processing_status: string
+          result_code?: string | null
           stripe_event_id: string
+          updated_at?: string
         }
         Update: {
+          attempt_count?: number
+          claim_token?: string | null
           event_type?: string
           id?: string
-          processed_at?: string
+          last_error_code?: string | null
+          last_failed_at?: string | null
+          lease_expires_at?: string | null
+          processed_at?: string | null
+          processing_started_at?: string | null
+          processing_status?: string
+          result_code?: string | null
           stripe_event_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3624,7 +3651,27 @@ export type Database = {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
       }
+      claim_stripe_webhook_event: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_lease_seconds: number
+        }
+        Returns: {
+          attempt: number
+          claim_token: string
+          result: string
+        }[]
+      }
       clean_assistant_permissions: { Args: { _p: Json }; Returns: Json }
+      complete_stripe_webhook_event: {
+        Args: {
+          p_claim_token: string
+          p_event_id: string
+          p_result_code: string
+        }
+        Returns: boolean
+      }
       create_agency: {
         Args: { _contact_email?: string; _description?: string; _name: string }
         Returns: {
@@ -3800,6 +3847,14 @@ export type Database = {
         Returns: number
       }
       expire_stale_contact_requests: { Args: never; Returns: number }
+      fail_stripe_webhook_event: {
+        Args: {
+          p_claim_token: string
+          p_error_code: string
+          p_event_id: string
+        }
+        Returns: boolean
+      }
       get_agency_entitlement: {
         Args: { _agency_id: string }
         Returns: {
