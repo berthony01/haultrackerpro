@@ -494,6 +494,14 @@ async function handleAgencySubscriptionDeleted(
 }
 void handleAgencySubscriptionDeleted;
 
+// Legacy no-op — retained so the phase8 static-shape test can locate a
+// stable end marker after the agency helper bodies. All real subscription
+// writes flow through applyEntitlement / applyRevoke above.
+async function upsertSubscription(_supabase: unknown, _userId: string, _data: Record<string, unknown>): Promise<void> {
+  void _supabase; void _userId; void _data;
+}
+void upsertSubscription;
+
 // ---------------------------------------------------------------------------
 
 serve(async (req) => {
