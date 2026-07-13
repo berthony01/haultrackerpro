@@ -6,6 +6,7 @@ import {
   getDriverPriceAllowlist,
   resolveOrCreateDriverStripeCustomerId,
   DriverBillingConflictError,
+  type DriverPriceConfig,
 } from "../_shared/driver-billing.ts";
 
 const corsHeaders = {
@@ -37,6 +38,15 @@ serve(async (req) => {
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+
+    // Read once here — this is the only place in this file that reads
+    // process-wide environment state for driver price configuration. The
+    // shared billing module receives it explicitly and never reads Deno.env
+    // itself.
+    const driverPriceConfig: DriverPriceConfig = {
+      pro_monthly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_monthly),
+      pro_yearly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_yearly),
+    };
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
@@ -74,7 +84,7 @@ serve(async (req) => {
       logStep("Resolved plan key to price ID", { planKey });
     } else if (body.priceId) {
       const candidate = body.priceId as string;
-      const allowedPriceIds = getDriverPriceAllowlist();
+      const allowedPriceIds = getDriverPriceAllowlist(driverPriceConfig);
       if (!allowedPriceIds.includes(candidate)) {
         logStep("Rejected unknown legacy priceId", { priceId: candidate });
         return json({ error: "Invalid price ID" }, 400);
@@ -91,7 +101,7 @@ serve(async (req) => {
 
     let customerId: string;
     try {
-      customerId = await resolveOrCreateDriverStripeCustomerId(supabaseService, stripe, user.id, user.email);
+      customerId = await resolveOrCreateDriverStripeCustomerId(supabaseService, stripe, user.id, user.email, driverPriceConfig);
     } catch (e) {
       if (e instanceof DriverBillingConflictError) {
         logStep("Driver billing conflict — refusing checkout", { message: e.message });

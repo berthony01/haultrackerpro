@@ -2,9 +2,11 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 import {
+  DRIVER_PLAN_PRICE_ENV,
   resolveDriverPlanKey,
   resolveDriverStripeCustomerId,
   DriverBillingConflictError,
+  type DriverPriceConfig,
 } from "../_shared/driver-billing.ts";
 
 const corsHeaders = {
@@ -33,6 +35,11 @@ serve(async (req) => {
 
   try {
     logStep("Function started");
+
+    const driverPriceConfig: DriverPriceConfig = {
+      pro_monthly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_monthly),
+      pro_yearly: Deno.env.get(DRIVER_PLAN_PRICE_ENV.pro_yearly),
+    };
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body is fine */ }
@@ -82,7 +89,7 @@ serve(async (req) => {
 
     let customerId: string | null;
     try {
-      customerId = await resolveDriverStripeCustomerId(supabaseService, stripe, user.id);
+      customerId = await resolveDriverStripeCustomerId(supabaseService, stripe, user.id, driverPriceConfig);
     } catch (e) {
       if (e instanceof DriverBillingConflictError) {
         logStep("Driver billing conflict detected — failing closed, preserving stored state", { message: e.message });
@@ -121,7 +128,7 @@ serve(async (req) => {
 
     if (subscription) {
       const priceId = subscription.items.data[0]?.price?.id || "";
-      const planKey = resolveDriverPlanKey(priceId);
+      const planKey = resolveDriverPlanKey(priceId, driverPriceConfig);
 
       if (subscription.status === "active" && !planKey) {
         logStep("Active subscription uses an unrecognized price — not granting Pro", { priceId });

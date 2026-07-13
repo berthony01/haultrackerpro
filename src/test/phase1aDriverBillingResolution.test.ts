@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   resolveDriverStripeCustomerId,
   resolveOrCreateDriverStripeCustomerId,
+  resolveDriverPlanKey,
   DriverBillingConflictError,
 } from "../../supabase/functions/_shared/driver-billing";
-import { performAccountDeletion } from "../../supabase/functions/delete-account/index";
+import { performAccountDeletion } from "../../supabase/functions/_shared/account-deletion";
 
 type Row = Record<string, any>;
 
@@ -97,6 +98,30 @@ function makeFakeStripe(seed: { customers?: Record<string, any>; subscriptions?:
 
 const DRIVER_PRICE = { id: "price_monthly_test" };
 
+// Phase 1B-1: driver price configuration is now always passed in explicitly
+// by the caller (Part 2). These tests build the config themselves — they
+// never rely on an ambient Deno global or a test-setup shim.
+const TEST_CONFIG = { pro_monthly: "price_monthly_test", pro_yearly: "price_yearly_test" };
+const OTHER_CONFIG = { pro_monthly: "price_monthly_OTHER", pro_yearly: "price_yearly_OTHER" };
+
+describe("Phase 1B-1 — runtime neutrality", () => {
+  it("driver-billing.ts and account-deletion.ts import cleanly with no ambient Deno global present", () => {
+    // If either shared module read `Deno.env` internally (the Phase 1A
+    // defect), this assertion on the ambient global would still pass or
+    // fail independently of the import — the real proof is that the two
+    // imports above at the top of this file already succeeded without a
+    // test-setup Deno shim. This assertion documents that no such shim was
+    // needed or installed.
+    expect(typeof (globalThis as any).Deno).toBe("undefined");
+  });
+
+  it("resolveDriverPlanKey has no hidden dependency on process-wide state — identical price id resolves differently under two different explicit configs", () => {
+    expect(resolveDriverPlanKey("price_monthly_test", TEST_CONFIG)).toBe("pro_monthly");
+    expect(resolveDriverPlanKey("price_monthly_test", OTHER_CONFIG)).toBeNull();
+    expect(resolveDriverPlanKey("price_monthly_OTHER", OTHER_CONFIG)).toBe("pro_monthly");
+  });
+});
+
 describe("resolveDriverStripeCustomerId — isolation across billing contexts", () => {
   it("returns only the driver's own customer even when a different customer id exists for recruiter and agency billing under the same conceptual account", async () => {
     const db = makeFakeDb({
@@ -106,7 +131,7 @@ describe("resolveDriverStripeCustomerId — isolation across billing contexts", 
       agency_entitlements: [{ agency_id: "agency-1", stripe_customer_id: "cus_agency_1" }],
     });
     const stripe = makeFakeStripe();
-    const result = await resolveDriverStripeCustomerId(db, stripe as any, "user-1");
+    const result = await resolveDriverStripeCustomerId(db, stripe as any, "user-1", TEST_CONFIG);
     expect(result).toBe("cus_driver_1");
   });
 
@@ -118,14 +143,31 @@ describe("resolveDriverStripeCustomerId — isolation across billing contexts", 
       agency_entitlements: [],
     });
     const stripe = makeFakeStripe();
-    await expect(resolveDriverStripeCustomerId(db, stripe as any, "user-2")).rejects.toBeInstanceOf(DriverBillingConflictError);
+    await expect(resolveDriverStripeCustomerId(db, stripe as any, "user-2", TEST_CONFIG)).rejects.toBeInstanceOf(DriverBillingConflictError);
   });
 
   it("returns null (never throws, never guesses) when no customer id exists anywhere", async () => {
     const db = makeFakeDb({ subscriptions: [{ user_id: "user-3" }], profiles: [{ user_id: "user-3" }] });
     const stripe = makeFakeStripe();
-    const result = await resolveDriverStripeCustomerId(db, stripe as any, "user-3");
+    const result = await resolveDriverStripeCustomerId(db, stripe as any, "user-3", TEST_CONFIG);
     expect(result).toBeNull();
+  });
+
+  it("rejects a derived subscription whose price is valid under a different config than the one passed in (proves config is actually threaded through, not hardcoded)", async () => {
+    const db = makeFakeDb({
+      subscriptions: [{ user_id: "user-3b", stripe_customer_id: null, stripe_subscription_id: "sub_3b" }],
+      profiles: [{ user_id: "user-3b" }],
+    });
+    const stripe = makeFakeStripe({ subscriptions: { sub_3b: { id: "sub_3b", status: "active", customer: "cus_3b", items: { data: [{ price: DRIVER_PRICE }] } } } });
+    // DRIVER_PRICE.id ("price_monthly_test") is only valid under TEST_CONFIG.
+    await expect(resolveDriverStripeCustomerId(db, stripe as any, "user-3b", OTHER_CONFIG)).rejects.toBeInstanceOf(DriverBillingConflictError);
+    const db2 = makeFakeDb({
+      subscriptions: [{ user_id: "user-3c", stripe_customer_id: null, stripe_subscription_id: "sub_3c" }],
+      profiles: [{ user_id: "user-3c" }],
+    });
+    const stripe2 = makeFakeStripe({ subscriptions: { sub_3c: { id: "sub_3c", status: "active", customer: "cus_3c", items: { data: [{ price: DRIVER_PRICE }] } } } });
+    const result = await resolveDriverStripeCustomerId(db2, stripe2 as any, "user-3c", TEST_CONFIG);
+    expect(result).toBe("cus_3c");
   });
 });
 
@@ -133,7 +175,7 @@ describe("resolveOrCreateDriverStripeCustomerId", () => {
   it("creates a dedicated driver customer, writes it to subscriptions, and tags it with driver metadata when none exists", async () => {
     const db = makeFakeDb({ subscriptions: [], profiles: [] });
     const stripe = makeFakeStripe();
-    const customerId = await resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-4", "driver4@example.com");
+    const customerId = await resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-4", "driver4@example.com", TEST_CONFIG);
     expect(customerId).toMatch(/^cus_fake_/);
     expect(stripe._createCalls.length).toBe(1);
     expect(stripe._createCalls[0].metadata).toEqual({ billing_context: "driver", user_id: "user-4" });
@@ -149,7 +191,7 @@ describe("resolveOrCreateDriverStripeCustomerId", () => {
       agency_entitlements: [],
     });
     const stripe = makeFakeStripe();
-    const customerId = await resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-5", "driver5@example.com");
+    const customerId = await resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-5", "driver5@example.com", TEST_CONFIG);
     expect(customerId).toBe("cus_existing");
     expect(stripe._createCalls.length).toBe(0);
   });
@@ -158,8 +200,8 @@ describe("resolveOrCreateDriverStripeCustomerId", () => {
     const db = makeFakeDb({ subscriptions: [], profiles: [] });
     const stripe = makeFakeStripe();
     const [a, b] = await Promise.all([
-      resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-6", "driver6@example.com"),
-      resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-6", "driver6@example.com"),
+      resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-6", "driver6@example.com", TEST_CONFIG),
+      resolveOrCreateDriverStripeCustomerId(db, stripe as any, "user-6", "driver6@example.com", TEST_CONFIG),
     ]);
     expect(a).toBe(b);
     const subRow = db._tables.subscriptions.find((r: any) => r.user_id === "user-6");
@@ -191,7 +233,7 @@ describe("performAccountDeletion", () => {
       cost_profile: [{ user_id: "user-7", id: "cp-1" }],
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_driver_7: { id: "sub_driver_7", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-7" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-7", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls).toContain("sub_driver_7");
     expect(db._tables.cost_profile.length).toBe(0);
@@ -208,7 +250,7 @@ describe("performAccountDeletion", () => {
         sub_recruiter_8: { id: "sub_recruiter_8", status: "active", metadata: { billing_context: "recruiter" } },
       },
     });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-8" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-8", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls.sort()).toEqual(["sub_driver_8", "sub_recruiter_8"].sort());
   });
@@ -219,7 +261,7 @@ describe("performAccountDeletion", () => {
       agency_entitlements: [{ agency_id: "agency-9", stripe_subscription_id: "sub_agency_9" }],
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_agency_9: { id: "sub_agency_9", status: "active", metadata: { billing_context: "agency" } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-9" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-9", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls).toContain("sub_agency_9");
     const ent = db._tables.agency_entitlements.find((r: any) => r.agency_id === "agency-9");
@@ -232,7 +274,7 @@ describe("performAccountDeletion", () => {
       agency_entitlements: [{ agency_id: "agency-10", stripe_subscription_id: "sub_agency_10" }],
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_agency_10: { id: "sub_agency_10", status: "active" } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-10" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-10", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls).not.toContain("sub_agency_10");
   });
@@ -244,7 +286,7 @@ describe("performAccountDeletion", () => {
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_driver_11: { id: "sub_driver_11", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
     stripe.subscriptions.cancel = async () => { throw new Error("Stripe API is down"); };
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-11" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-11", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(false);
     expect(db._tables.subscriptions.length).toBe(1);
     expect(db._tables.cost_profile.length).toBe(1);
@@ -255,7 +297,7 @@ describe("performAccountDeletion", () => {
       subscriptions: [{ user_id: "user-12", stripe_subscription_id: "sub_driver_12" }],
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_driver_12: { id: "sub_driver_12", status: "canceled", items: { data: [{ price: DRIVER_PRICE }] } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-12" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-12", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls).not.toContain("sub_driver_12");
     expect(db._tables.subscriptions.length).toBe(0);
@@ -271,7 +313,7 @@ describe("performAccountDeletion", () => {
       driver_point_events: [{ user_id: "user-13", id: "6" }],
     });
     const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-13" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-13", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
     for (const t of ["cost_profile", "parking_favorites", "parking_reports", "parking_verifications", "driver_points", "driver_point_events"]) {
       expect(db._tables[t].length).toBe(0);
@@ -284,9 +326,21 @@ describe("performAccountDeletion", () => {
       cost_profile: [{ user_id: "user-14", id: "1" }],
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_mismatch_14: { id: "sub_mismatch_14", status: "active", metadata: { billing_context: "recruiter" } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-14" });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-14", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(false);
     expect(stripe._cancelCalls).not.toContain("sub_mismatch_14");
+    expect(db._tables.cost_profile.length).toBe(1);
+  });
+
+  it("rejects a driver subscription whose price is only valid under a different config than the one passed in (proves driverPriceConfig is threaded through deletion validation, not hardcoded)", async () => {
+    const db = baseDb({
+      subscriptions: [{ user_id: "user-15", stripe_subscription_id: "sub_driver_15" }],
+      cost_profile: [{ user_id: "user-15", id: "1" }],
+    });
+    const stripe = makeFakeStripe({ subscriptions: { sub_driver_15: { id: "sub_driver_15", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-15", driverPriceConfig: OTHER_CONFIG });
+    expect(result.ok).toBe(false);
+    expect(stripe._cancelCalls).not.toContain("sub_driver_15");
     expect(db._tables.cost_profile.length).toBe(1);
   });
 });
