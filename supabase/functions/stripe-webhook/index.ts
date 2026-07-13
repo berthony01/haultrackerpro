@@ -26,10 +26,12 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
 // ---------------------------------------------------------------------------
 // Phase 1C — canonical billing identity guard.
 //
-// Every state-changing Stripe event (checkout.session.completed,
-// customer.subscription.created|updated|deleted) is routed through the
-// runtime-neutral validator in ../_shared/stripe-webhook-identity.ts BEFORE
-// any billing or entitlement row is written. Metadata is treated as routing
+// Every state-changing Stripe event (checkout completion and subscription
+// created / updated / deleted) is routed through the runtime-neutral
+// validator in ../_shared/stripe-webhook-identity.ts BEFORE any billing or
+// entitlement row is written. Metadata is treated as routing evidence only.
+// Canonical identity (stripe_customer_id / stripe_subscription_id per entity)
+// is authoritative. See that module for the full decision matrix.
 // evidence only. Canonical identity (stripe_customer_id / stripe_subscription_id
 // per entity) is authoritative. See that module for the full decision matrix.
 // ---------------------------------------------------------------------------
