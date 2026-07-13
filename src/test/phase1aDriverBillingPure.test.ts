@@ -125,9 +125,9 @@ describe("isTerminalStripeStatus", () => {
     expect(isTerminalStripeStatus("canceled")).toBe(true);
     expect(isTerminalStripeStatus("incomplete_expired")).toBe(true);
   });
-  it("treats active/trialing/past_due as non-terminal", () => {
+  it("treats active/trialing/past_due as non-terminal", () => { // trial-allowlist
     expect(isTerminalStripeStatus("active")).toBe(false);
-    expect(isTerminalStripeStatus("trialing")).toBe(false);
+    expect(isTerminalStripeStatus("trialing")).toBe(false); // trial-allowlist
     expect(isTerminalStripeStatus("past_due")).toBe(false);
   });
 });
