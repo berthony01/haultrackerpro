@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Stripe from "https://esm.sh/stripe@18.5.0";
 import {
   dedupePendingCancellations,
   isTerminalStripeStatus,
@@ -23,9 +21,19 @@ function clientError(status: number, message: string) {
 
 export type DeletionResult = { ok: true } | { ok: false; status: number; message: string };
 
+/** Minimal structural shape of the Stripe subscription actions this module
+ *  calls. Not importing the full Stripe SDK type at module scope on purpose
+ *  -- see the dynamic import note below. */
+export interface StripeSubscriptionActionsLike {
+  subscriptions: {
+    retrieve(id: string): Promise<any>;
+    cancel(id: string): Promise<any>;
+  };
+}
+
 export interface DeletionDeps {
   adminClient: any;
-  stripe: Stripe;
+  stripe: StripeSubscriptionActionsLike;
   userId: string;
 }
 
@@ -141,12 +149,12 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
   const deduped = dedupePendingCancellations(pending);
 
   const driverPriceConfig = {
-    pro_monthly: Deno.env.get("STRIPE_PRO_MONTHLY_PRICE_ID"),
-    pro_yearly: Deno.env.get("STRIPE_PRO_YEARLY_PRICE_ID"),
+    pro_monthly: typeof Deno !== "undefined" ? Deno.env.get("STRIPE_PRO_MONTHLY_PRICE_ID") : undefined,
+    pro_yearly: typeof Deno !== "undefined" ? Deno.env.get("STRIPE_PRO_YEARLY_PRICE_ID") : undefined,
   };
 
   for (const item of deduped) {
-    let sub: Stripe.Subscription;
+    let sub: any;
     try {
       sub = await stripe.subscriptions.retrieve(item.subscriptionId);
     } catch (e) {
@@ -154,11 +162,7 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
       return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
     }
 
-    const validation = validateSubscriptionContextForDeletion(
-      item.context,
-      sub as unknown as { id: string; status: string; metadata?: Record<string, string> | null; items?: { data?: { price?: { id?: string | null } | null }[] } },
-      driverPriceConfig,
-    );
+    const validation = validateSubscriptionContextForDeletion(item.context, sub, driverPriceConfig);
     if (!validation.ok) {
       console.error(`[delete-account] user=${userId} CONTEXT MISMATCH — aborting for manual reconciliation: ${validation.reason}`);
       return { ok: false, status: 409, message: GENERIC_DELETE_ERROR };
@@ -203,14 +207,25 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
 
 // Guarded so this module can be imported by a non-Deno test runner (Vitest)
 // to exercise performAccountDeletion without triggering a top-level server
-// start. Behavior in the real Supabase Edge Function runtime is unchanged.
+// start, and without eagerly resolving any Deno-only URL imports (which a
+// Node/Vite module graph cannot load statically). Both the Supabase and
+// Stripe SDKs are imported dynamically, only inside this guard, only in the
+// real Deno Edge Function runtime. Behavior there is unchanged from a
+// static import — Deno is always defined in that runtime, so this branch
+// always runs there exactly as before.
 if (typeof Deno !== "undefined" && typeof (Deno as any).serve === "function") {
+  const supabaseJsSpecifier = "https://esm.sh/@supabase/supabase-js@2";
+  const stripeSpecifier = "https://esm.sh/stripe@18.5.0";
+
   Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
     try {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader) return clientError(401, "Missing authorization");
+
+      const { createClient } = await import(/* @vite-ignore */ supabaseJsSpecifier);
+      const { default: Stripe } = await import(/* @vite-ignore */ stripeSpecifier);
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

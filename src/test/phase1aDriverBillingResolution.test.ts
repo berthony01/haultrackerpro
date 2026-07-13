@@ -6,13 +6,6 @@ import {
 } from "../../supabase/functions/_shared/driver-billing";
 import { performAccountDeletion } from "../../supabase/functions/delete-account/index";
 
-// ---------------------------------------------------------------------------
-// Minimal, purpose-built fakes. These are NOT meant to be a general Supabase/
-// Stripe SDK replacement — they implement exactly the call shapes used by
-// driver-billing.ts / delete-account/index.ts, and are awaitable at every
-// step the real supabase-js client is, via a thenable Query class.
-// ---------------------------------------------------------------------------
-
 type Row = Record<string, any>;
 
 function makeFakeDb(seed: Record<string, Row[]> = {}) {
@@ -46,7 +39,7 @@ function makeFakeDb(seed: Record<string, Row[]> = {}) {
       update(p: Row) { mode = "update"; patch = p; return builder; },
       eq(col: string, val: any) { filters.push((r) => r[col] === val); return builder; },
       in(col: string, vals: any[]) { filters.push((r) => vals.includes(r[col])); return builder; },
-      is(col: string, val: any) { filters.push((r) => r[col] === val); return builder; },
+      is(col: string, val: any) { filters.push((r) => (r[col] ?? null) === val); return builder; },
       async maybeSingle() { single = true; return exec(); },
       async upsert(row: Row, opts: { onConflict: string; ignoreDuplicates?: boolean }) {
         const key = opts.onConflict;
@@ -101,6 +94,8 @@ function makeFakeStripe(seed: { customers?: Record<string, any>; subscriptions?:
     },
   };
 }
+
+const DRIVER_PRICE = { id: "price_monthly_test" };
 
 describe("resolveDriverStripeCustomerId — isolation across billing contexts", () => {
   it("returns only the driver's own customer even when a different customer id exists for recruiter and agency billing under the same conceptual account", async () => {
@@ -169,9 +164,6 @@ describe("resolveOrCreateDriverStripeCustomerId", () => {
     expect(a).toBe(b);
     const subRow = db._tables.subscriptions.find((r: any) => r.user_id === "user-6");
     expect(subRow.stripe_customer_id).toBe(a);
-    // Both attempts created a Stripe customer (unavoidable — the claim race
-    // happens after creation), but only one is ever persisted as canonical;
-    // the loser must have been archived (deleted) rather than left dangling.
     const nonDeleted = Object.values(stripe._customers).filter((c: any) => !c.deleted);
     expect(nonDeleted.length).toBe(1);
     expect((nonDeleted[0] as any).id).toBe(a);
@@ -198,7 +190,7 @@ describe("performAccountDeletion", () => {
       subscriptions: [{ user_id: "user-7", stripe_subscription_id: "sub_driver_7" }],
       cost_profile: [{ user_id: "user-7", id: "cp-1" }],
     });
-    const stripe = makeFakeStripe({ subscriptions: { sub_driver_7: { id: "sub_driver_7", status: "active" } } });
+    const stripe = makeFakeStripe({ subscriptions: { sub_driver_7: { id: "sub_driver_7", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
     const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-7" });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls).toContain("sub_driver_7");
@@ -212,7 +204,7 @@ describe("performAccountDeletion", () => {
     });
     const stripe = makeFakeStripe({
       subscriptions: {
-        sub_driver_8: { id: "sub_driver_8", status: "active" },
+        sub_driver_8: { id: "sub_driver_8", status: "active", items: { data: [{ price: DRIVER_PRICE }] } },
         sub_recruiter_8: { id: "sub_recruiter_8", status: "active", metadata: { billing_context: "recruiter" } },
       },
     });
@@ -250,7 +242,7 @@ describe("performAccountDeletion", () => {
       subscriptions: [{ user_id: "user-11", stripe_subscription_id: "sub_driver_11" }],
       cost_profile: [{ user_id: "user-11", id: "cp-11" }],
     });
-    const stripe = makeFakeStripe({ subscriptions: { sub_driver_11: { id: "sub_driver_11", status: "active" } } });
+    const stripe = makeFakeStripe({ subscriptions: { sub_driver_11: { id: "sub_driver_11", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
     stripe.subscriptions.cancel = async () => { throw new Error("Stripe API is down"); };
     const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-11" });
     expect(result.ok).toBe(false);
@@ -262,7 +254,7 @@ describe("performAccountDeletion", () => {
     const db = baseDb({
       subscriptions: [{ user_id: "user-12", stripe_subscription_id: "sub_driver_12" }],
     });
-    const stripe = makeFakeStripe({ subscriptions: { sub_driver_12: { id: "sub_driver_12", status: "canceled" } } });
+    const stripe = makeFakeStripe({ subscriptions: { sub_driver_12: { id: "sub_driver_12", status: "canceled", items: { data: [{ price: DRIVER_PRICE }] } } } });
     const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-12" });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls).not.toContain("sub_driver_12");
@@ -291,9 +283,6 @@ describe("performAccountDeletion", () => {
       subscriptions: [{ user_id: "user-14", stripe_subscription_id: "sub_mismatch_14" }],
       cost_profile: [{ user_id: "user-14", id: "1" }],
     });
-    // Tagged recruiter in Stripe even though it's stored on the driver
-    // subscriptions row — this must never be canceled/deleted through, it
-    // must stop the whole deletion.
     const stripe = makeFakeStripe({ subscriptions: { sub_mismatch_14: { id: "sub_mismatch_14", status: "active", metadata: { billing_context: "recruiter" } } } });
     const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-14" });
     expect(result.ok).toBe(false);
