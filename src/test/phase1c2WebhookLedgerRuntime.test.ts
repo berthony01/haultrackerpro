@@ -1,3 +1,4 @@
+// @vitest-environment node
 // Phase 1C-2 — Real Postgres runtime harness for the webhook ledger.
 //
 // Applies the EXACT production migration (SQL file on disk) into an
