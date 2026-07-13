@@ -19,13 +19,15 @@ import { createRequire } from "node:module";
 const PGLITE_ABS_PATH = "/tmp/pglite-sandbox/node_modules/@electric-sql/pglite";
 const MIGRATION_GLOB_PREFIX = "20260713"; // Phase 1C-2 migration date prefix
 
-async function loadPGlite(): Promise<null | typeof import("@electric-sql/pglite")> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPGlite = any;
+
+async function loadPGlite(): Promise<null | { PGlite: new () => AnyPGlite }> {
   try {
-    // Absolute-path dynamic import so we never touch project node_modules.
     const req = createRequire(import.meta.url);
     const resolved = req.resolve(path.join(PGLITE_ABS_PATH, "dist/index.js"));
     const mod = await import(/* @vite-ignore */ resolved);
-    return mod as typeof import("@electric-sql/pglite");
+    return mod as { PGlite: new () => AnyPGlite };
   } catch {
     return null;
   }
@@ -34,22 +36,14 @@ async function loadPGlite(): Promise<null | typeof import("@electric-sql/pglite"
 function findMigration(): string {
   const dir = path.join(process.cwd(), "supabase/migrations");
   const files = fs.readdirSync(dir).filter((f) => f.startsWith(MIGRATION_GLOB_PREFIX) && f.endsWith(".sql"));
-  // The Phase 1C-2 migration is the newest one starting with 20260713 that
-  // contains the RPC name — pick deterministically.
   for (const f of files.sort().reverse()) {
     const body = fs.readFileSync(path.join(dir, f), "utf8");
-    if (body.includes("claim_stripe_webhook_event")) {
-      return body;
-    }
+    if (body.includes("claim_stripe_webhook_event")) return body;
   }
   throw new Error("Phase 1C-2 migration not found on disk");
 }
 
-/** Prime PGlite with the baseline table shape the migration expects,
- *  matching the original 20260630-era CREATE TABLE for
- *  public.stripe_webhook_events. This mirrors the pre-existing production
- *  schema; the migration then evolves it into the state machine. */
-async function primeBaseline(db: import("@electric-sql/pglite").PGlite) {
+async function primeBaseline(db: AnyPGlite) {
   await db.exec(`
     CREATE EXTENSION IF NOT EXISTS pgcrypto;
     CREATE ROLE anon NOLOGIN;
@@ -64,12 +58,11 @@ async function primeBaseline(db: import("@electric-sql/pglite").PGlite) {
     ALTER TABLE public.stripe_webhook_events ENABLE ROW LEVEL SECURITY;
     GRANT ALL ON public.stripe_webhook_events TO service_role;
   `);
-  // Seed one historical row so we can prove it's preserved as `processed`.
   await db.exec(`INSERT INTO public.stripe_webhook_events (stripe_event_id, event_type) VALUES ('evt_historical_1', 'customer.subscription.updated');`);
 }
 
-let pglite: typeof import("@electric-sql/pglite") | null = null;
-let db: import("@electric-sql/pglite").PGlite;
+let pglite: { PGlite: new () => AnyPGlite } | null = null;
+let db: AnyPGlite;
 
 beforeAll(async () => {
   pglite = await loadPGlite();
