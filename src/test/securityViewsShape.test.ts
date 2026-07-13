@@ -127,19 +127,34 @@ describe('Phase 26 security RPCs', () => {
   });
 
   it('delete-account never leaks raw DB error messages or table names to clients', () => {
-    const src = readFileSync(
+    // Phase 1B-1: the generic client-facing error message now lives in the
+    // shared, Deno-neutral account-deletion module (GENERIC_DELETE_ERROR),
+    // imported by the thin Edge Function adapter rather than duplicated as a
+    // literal in the adapter itself. Check both: the adapter never leaks raw
+    // DB errors/table names and imports the shared constant; the shared
+    // module defines the exact generic client-safe copy.
+    const adapterSrc = readFileSync(
       resolve(__dirname, '../../supabase/functions/delete-account/index.ts'),
+      'utf8',
+    );
+    const sharedSrc = readFileSync(
+      resolve(__dirname, '../../supabase/functions/_shared/account-deletion.ts'),
       'utf8',
     );
     // No interpolation of the dynamic table name or supabase error.message into
     // a client-facing JSON response.
-    expect(src).not.toMatch(/Failed to delete from \$\{table\}/);
-    expect(src).not.toMatch(/error:\s*`Failed to delete from \$\{table\}/);
-    expect(src).not.toMatch(/error:\s*deleteError\.message/);
-    // Generic client-safe copy is present.
-    expect(src).toMatch(/Account deletion failed\. Please contact support\./);
-    // Server-side logging is preserved.
-    expect(src).toMatch(/console\.error\(/);
+    expect(adapterSrc).not.toMatch(/Failed to delete from \$\{table\}/);
+    expect(adapterSrc).not.toMatch(/error:\s*`Failed to delete from \$\{table\}/);
+    expect(adapterSrc).not.toMatch(/error:\s*deleteError\.message/);
+    // The adapter imports the single source of truth for the generic message
+    // rather than hardcoding its own copy.
+    expect(adapterSrc).toMatch(/GENERIC_DELETE_ERROR/);
+    // Generic client-safe copy is present at its source of truth.
+    expect(sharedSrc).toMatch(/Account deletion failed\. Please contact support\./);
+    // Server-side logging is preserved (in both the adapter and the shared
+    // orchestration module).
+    expect(adapterSrc).toMatch(/console\.error\(/);
+    expect(sharedSrc).toMatch(/console\.error\(/);
   });
 });
 

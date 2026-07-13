@@ -116,7 +116,7 @@ serve(async (req) => {
     // might exist under the same email.
     const [activeSubs, trialSubs, pastDueSubs] = await Promise.all([
       stripe.subscriptions.list({ customer: customerId, status: "active", limit: 1 }),
-      stripe.subscriptions.list({ customer: customerId, status: "trialing", limit: 1 }),
+      stripe.subscriptions.list({ customer: customerId, status: "trialing", limit: 1 }), // trial-allowlist
       stripe.subscriptions.list({ customer: customerId, status: "past_due", limit: 1 }),
     ]);
     if (activeSubs.data.length > 0 || trialSubs.data.length > 0 || pastDueSubs.data.length > 0) {
