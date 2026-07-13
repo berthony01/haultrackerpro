@@ -1,84 +1,149 @@
-// Phase 1C — focused diagnostic for the idempotency-retry behavior of the
-// stripe-webhook edge function.
+// Phase 1C-2 — DEF-23 regression.
 //
-// Behavior under test (documented in supabase/functions/stripe-webhook/index.ts
-// around the "Idempotency" block):
-//   1. Ledger insert runs BEFORE business logic.
-//   2. If the ledger insert succeeds and business logic then throws, the
-//      handler returns 500 so Stripe retries.
-//   3. On retry, the ledger insert reports 23505 unique_violation and the
-//      handler returns { received: true, duplicate: true } WITHOUT
-//      reprocessing the event.
+// Before Phase 1C-2, the webhook inserted the ledger row BEFORE business
+// processing. A crash/throw after the insert caused Stripe's retry to be
+// swallowed by the unique_violation duplicate check — the event was
+// silently discarded.
 //
-// That means once the ledger insert has succeeded, a subsequent business-
-// logic failure results in the event being permanently skipped when Stripe
-// retries — the retry is discarded as a duplicate. This is the exact risk
-// described in Part 14. This test PROVES that behavior; it does NOT change
-// idempotency. Phase 1C-2 will fix it separately.
+// This test now drives the SAME `withIdempotency` orchestration used by
+// the real edge function (see supabase/functions/_shared/stripe-webhook-idempotency.ts)
+// and proves the corrected behavior: a transient failure after claim moves
+// the event to `failed`, and Stripe's retry successfully processes it.
+//
+// The 25-case orchestration matrix lives in
+// phase1c2WebhookIdempotencyStateMachine.test.ts; the real-Postgres
+// runtime harness lives in phase1c2WebhookLedgerRuntime.test.ts.
 
 import { describe, it, expect } from "vitest";
+import { withIdempotency, type LedgerClient, type ClaimResult, type TerminalResult }
+  from "../../supabase/functions/_shared/stripe-webhook-idempotency.ts";
 
-// Simulator of the exact ledger + business-logic control flow used by the
-// current webhook (see index.ts lines ~331–372 and the switch body). We do
-// not reach into the edge-function file directly here because it imports
-// `https://deno.land/...` at the top; instead we mirror the same control
-// flow verbatim so the assertion holds against the real code path.
+// In-memory ledger that mirrors the Postgres claim/complete/fail semantics:
+// atomic claim, event-type conflict guard, expired-lease reclaim, and
+// claim-token stale-worker protection.
+type Row = {
+  eventType: string;
+  status: "processing" | "processed" | "failed";
+  attempt: number;
+  token: string | null;
+  leaseExpiresAt: number | null;
+  resultCode: TerminalResult | null;
+  lastErrorCode: string | null;
+};
 
-async function runWebhookOnce(deps: {
-  eventId: string;
-  ledger: Set<string>;
-  processedEventIds: Set<string>;
-  processBusinessLogic: () => Promise<void>;
-}): Promise<{ status: number; body: Record<string, unknown> }> {
-  const { eventId, ledger, processedEventIds, processBusinessLogic } = deps;
+function createMemoryLedger(now: () => number = Date.now): LedgerClient & { _rows: Map<string, Row> } {
+  const rows = new Map<string, Row>();
+  let tokenSeq = 0;
+  const nextToken = () => `tok_${++tokenSeq}`;
 
-  // --- Idempotency insert -------------------------------------------------
-  if (ledger.has(eventId)) {
-    // Postgres would return code "23505" — same branch as the real handler.
-    return { status: 200, body: { received: true, duplicate: true } };
-  }
-  ledger.add(eventId);
-
-  // --- Business logic -----------------------------------------------------
-  try {
-    await processBusinessLogic();
-    processedEventIds.add(eventId);
-    return { status: 200, body: { received: true } };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { status: 500, body: { error: msg } };
-  }
+  return {
+    _rows: rows,
+    async claim(eventId, eventType, leaseSeconds): Promise<ClaimResult> {
+      const existing = rows.get(eventId);
+      const t = now();
+      if (!existing) {
+        const token = nextToken();
+        rows.set(eventId, {
+          eventType, status: "processing", attempt: 1, token,
+          leaseExpiresAt: t + leaseSeconds * 1000,
+          resultCode: null, lastErrorCode: null,
+        });
+        return { kind: "claimed", claimToken: token, attempt: 1 };
+      }
+      if (existing.eventType !== eventType) return { kind: "event_type_conflict" };
+      if (existing.status === "processed") return { kind: "already_processed" };
+      if (existing.status === "processing" && (existing.leaseExpiresAt ?? 0) > t) {
+        return { kind: "in_progress" };
+      }
+      // failed OR expired-processing → reclaim
+      const token = nextToken();
+      existing.status = "processing";
+      existing.attempt += 1;
+      existing.token = token;
+      existing.leaseExpiresAt = t + leaseSeconds * 1000;
+      existing.lastErrorCode = null;
+      return { kind: "claimed", claimToken: token, attempt: existing.attempt };
+    },
+    async complete(eventId, claimToken, result) {
+      const r = rows.get(eventId);
+      if (!r || r.status !== "processing" || r.token !== claimToken) return false;
+      r.status = "processed";
+      r.token = null;
+      r.leaseExpiresAt = null;
+      r.resultCode = result;
+      r.lastErrorCode = null;
+      return true;
+    },
+    async fail(eventId, claimToken, errorCode) {
+      const r = rows.get(eventId);
+      if (!r || r.status !== "processing" || r.token !== claimToken) return false;
+      r.status = "failed";
+      r.token = null;
+      r.leaseExpiresAt = null;
+      r.lastErrorCode = errorCode;
+      return true;
+    },
+  };
 }
 
-describe("Phase 1C — idempotency retry diagnostic (informational, does NOT fix)", () => {
-  it("proves: first request 500, retry is silently swallowed as duplicate without reprocessing", async () => {
-    const ledger = new Set<string>();
-    const processed = new Set<string>();
-    let calls = 0;
-
-    // First delivery: business logic throws AFTER ledger insert.
-    const first = await runWebhookOnce({
-      eventId: "evt_1",
-      ledger, processedEventIds: processed,
-      processBusinessLogic: async () => { calls++; throw new Error("transient DB failure"); },
+describe("Phase 1C-2 — DEF-23 regression (retry-safe idempotency)", () => {
+  it("first delivery: transient failure after claim → status=failed, response=500 retryable", async () => {
+    const ledger = createMemoryLedger();
+    let processedCount = 0;
+    const first = await withIdempotency({
+      ledger, eventId: "evt_1", eventType: "customer.subscription.updated",
+      process: async () => { processedCount++; throw new Error("transient DB failure"); },
     });
     expect(first.status).toBe(500);
-    expect(processed.has("evt_1")).toBe(false);
-    // Ledger has been polluted with a not-yet-processed event id:
-    expect(ledger.has("evt_1")).toBe(true);
+    expect(first.kind).toBe("transient_failure");
+    expect(processedCount).toBe(1);
+    // Row exists in `failed` state — NOT `processed`.
+    expect(ledger._rows.get("evt_1")?.status).toBe("failed");
+  });
 
-    // Stripe retries the identical event. In the current implementation the
-    // retry sees the ledger row and returns duplicate:true WITHOUT running
-    // business logic.
-    const second = await runWebhookOnce({
-      eventId: "evt_1",
-      ledger, processedEventIds: processed,
-      processBusinessLogic: async () => { calls++; /* would succeed this time */ },
+  it("retry after failure: DEF-23 fixed — event is reprocessed and succeeds", async () => {
+    const ledger = createMemoryLedger();
+    let processedCount = 0;
+
+    // Delivery 1 — transient failure.
+    await withIdempotency({
+      ledger, eventId: "evt_1", eventType: "customer.subscription.updated",
+      process: async () => { processedCount++; throw new Error("transient"); },
     });
+    expect(ledger._rows.get("evt_1")?.status).toBe("failed");
+
+    // Delivery 2 — Stripe retries. Under the old code this was swallowed as
+    // a duplicate WITHOUT reprocessing. Under Phase 1C-2 the failed row is
+    // reclaimed, business logic runs again, and the event is applied.
+    const second = await withIdempotency({
+      ledger, eventId: "evt_1", eventType: "customer.subscription.updated",
+      process: async () => { processedCount++; return { result: "applied", body: { received: true } }; },
+    });
+    expect(second.kind).toBe("ok");
     expect(second.status).toBe(200);
-    expect(second.body).toEqual({ received: true, duplicate: true });
-    // *** The retry did not reprocess: this is the defect ***
-    expect(calls).toBe(1);
-    expect(processed.has("evt_1")).toBe(false);
+    expect(processedCount).toBe(2);
+    const row = ledger._rows.get("evt_1")!;
+    expect(row.status).toBe("processed");
+    expect(row.resultCode).toBe("applied");
+    expect(row.attempt).toBe(2);
+  });
+
+  it("post-success duplicate delivery returns terminal duplicate and does NOT rerun business logic", async () => {
+    const ledger = createMemoryLedger();
+    let processedCount = 0;
+
+    const first = await withIdempotency({
+      ledger, eventId: "evt_1", eventType: "customer.subscription.updated",
+      process: async () => { processedCount++; return { result: "applied", body: { received: true } }; },
+    });
+    expect(first.kind).toBe("ok");
+
+    const dup = await withIdempotency({
+      ledger, eventId: "evt_1", eventType: "customer.subscription.updated",
+      process: async () => { processedCount++; return { result: "applied", body: { received: true } }; },
+    });
+    expect(dup.kind).toBe("duplicate");
+    expect(dup.status).toBe(200);
+    expect(processedCount).toBe(1);
   });
 });
