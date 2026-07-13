@@ -48,7 +48,7 @@ function findMigration(): string {
 
 async function primeBaseline(db: AnyPGlite) {
   await db.exec(`
-    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+    -- gen_random_uuid is available in core Postgres 13+; no extension needed in PGlite.
     CREATE ROLE anon NOLOGIN;
     CREATE ROLE authenticated NOLOGIN;
     CREATE ROLE service_role NOLOGIN;
