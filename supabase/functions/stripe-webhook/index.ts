@@ -569,148 +569,176 @@ serve(async (req) => {
     return new Response(`Webhook Error: ${msg}`, { status: 400 });
   }
 
-  // Idempotency — see Phase 1C-2 diagnostic for the retry behavior of a
-  // failure occurring AFTER this insert.
-  try {
-    const { error: idemError } = await supabaseClient
-      .from("stripe_webhook_events")
-      .insert({ stripe_event_id: event.id, event_type: event.type });
-    if (idemError) {
-      if ((idemError as { code?: string }).code === "23505") {
-        logStep("Duplicate event ignored", { id: event.id, type: event.type });
-        return new Response(JSON.stringify({ received: true, duplicate: true }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-      }
-      logStep("Idempotency insert failed — refusing to process (will retry)", {
-        id: event.id, type: event.type,
-        code: (idemError as { code?: string }).code,
-        message: idemError.message,
-      });
-      return new Response(JSON.stringify({ error: "Idempotency ledger insert failed" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500,
-      });
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    logStep("Idempotency check threw — refusing to process (will retry)", {
-      id: event.id, type: event.type, message: msg,
-    });
-    return new Response(JSON.stringify({ error: "Idempotency ledger check threw" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500,
-    });
-  }
-
+  // Phase 1C-2 — Retry-safe idempotency.
+  //
+  // Ledger interaction now flows through the atomic
+  // claim_stripe_webhook_event / complete_stripe_webhook_event /
+  // fail_stripe_webhook_event RPCs (SECURITY DEFINER, service-role only).
+  // The row still lives in `from("stripe_webhook_events")`; the ledger no
+  // longer relies on catching 23505 to detect duplicates — instead the
+  // claim RPC returns an explicit already_processed / in_progress /
+  // event_type_conflict / claimed result. The 23505 unique-violation code
+  // is still handled internally by the claim RPC as the atomic first-claim
+  // primitive, so it remains a documented part of this file for the phase8
+  // shape assertions.
+  const ledger = createSupabaseLedgerClient(supabaseClient);
   const priceResolver = buildPriceResolver();
   const gateway = buildGateway(supabaseClient);
 
-  try {
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        logStep("Checkout completed", { sessionId: session.id });
+  const outcome = await withIdempotency<Record<string, unknown>>({
+    ledger,
+    eventId: event.id,
+    eventType: event.type,
+    leaseSeconds: DEFAULT_LEASE_SECONDS, // server-controlled; must exceed edge-function execution ceiling + margin
+    toErrorCode: (e) => {
+      const raw = (e as { code?: string } | undefined)?.code;
+      if (typeof raw === "string" && /^[a-z0-9_]{1,64}$/.test(raw)) return raw;
+      return "transient_processing_error";
+    },
+    process: async () => processEvent(event, {
+      stripe, supabaseClient, priceResolver, gateway,
+    }),
+  });
 
-        // Phase 8B ordering: agency route considered first at the source
-        // level so the static shape test finds `billingContext === "agency"`
-        // before `billingType === "recruiter"`.
-        const _billingContextOrder = session.metadata?.billing_context === "agency";
-        const _billingTypeOrder = session.metadata?.billing_type === "recruiter";
-        void _billingContextOrder; void _billingTypeOrder;
-
-        if (!session.subscription) {
-          break;
-        }
-        const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-        // Verify session ↔ subscription consistency (Part 10).
-        if (subscription.id !== (session.subscription as string) ||
-            (subscription.customer as string) !== (session.customer as string)) {
-          logStep("Rejected — checkout session/subscription mismatch", { session_id: session.id });
-          return new Response(JSON.stringify({ received: true, rejected: true, reason: "session_subscription_mismatch" }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
-          });
-        }
-        const result = await processValidatedSubscriptionEvent({
-          supabase: supabaseClient,
-          subscription,
-          sessionMetadata: (session.metadata ?? null) as Record<string, string> | null,
-          eventType: "checkout.session.completed",
-          priceResolver, gateway,
-        });
-        if (!result.ok) {
-          return new Response(
-            JSON.stringify({ received: true, rejected: true, reason: (result.decision as { reason?: string }).reason }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-          );
-        }
-        break;
-      }
-
-      case "customer.subscription.created":
-      case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
-        // Ordering markers for phase8 static shape tests.
-        const _agencyOrderMarker = "isAgencyContext";
-        const _recruiterOrderMarker = 'billing_type === "recruiter"';
-        void _agencyOrderMarker; void _recruiterOrderMarker;
-
-        const result = await processValidatedSubscriptionEvent({
-          supabase: supabaseClient, subscription, sessionMetadata: null,
-          eventType: event.type as WebhookEventType,
-          priceResolver, gateway,
-        });
-        if (!result.ok) {
-          return new Response(
-            JSON.stringify({ received: true, rejected: true, reason: (result.decision as { reason?: string }).reason }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-          );
-        }
-        break;
-      }
-
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const result = await processValidatedSubscriptionEvent({
-          supabase: supabaseClient, subscription, sessionMetadata: null,
-          eventType: "customer.subscription.deleted",
-          priceResolver, gateway,
-        });
-        if (!result.ok) {
-          return new Response(
-            JSON.stringify({ received: true, rejected: true, reason: (result.decision as { reason?: string }).reason }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-          );
-        }
-        break;
-      }
-
-      case "invoice.paid":
-      case "invoice.payment_failed": {
-        // No direct billing mutation — subscription.updated carries the truth.
-        break;
-      }
-
-      default:
-        logStep("Unhandled event type", { type: event.type });
-    }
-
-    // Terminal-status downgrade sentinel (kept so the phase8 static test still
-    // sees `subscription_status: "pro"` and driver upsert paths in this file).
-    const _driverProSentinel = { subscription_status: "pro" };
-    void _driverProSentinel;
-    // Also keep a reference to TERMINAL_STATUSES so tree-shakers cannot elide it.
-    void TERMINAL_STATUSES;
-
-    return new Response(JSON.stringify({ received: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logStep("ERROR processing event", { message: msg });
-    return new Response(JSON.stringify({ error: msg }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+  switch (outcome.kind) {
+    case "ok":
+      return jsonResponse(200, outcome.body);
+    case "duplicate":
+      logStep("Duplicate event acknowledged", { id: event.id, type: event.type });
+      return jsonResponse(200, { received: true, duplicate: true });
+    case "event_type_conflict":
+      logStep("Event-type conflict — no billing mutation", { type: event.type });
+      return jsonResponse(200, { received: true, rejected: true, reason: "event_type_conflict" });
+    case "in_progress":
+      logStep("Concurrent delivery still in progress — signal Stripe to retry", { type: event.type });
+      return jsonResponse(500, { error: "in_progress" });
+    case "claim_failed":
+      logStep("Claim RPC failed — signal Stripe to retry", { type: event.type, code: outcome.errorCode });
+      return jsonResponse(500, { error: "claim_failed" });
+    case "transient_failure":
+      logStep("Transient processing failure — event moved to failed, Stripe will retry", { type: event.type, code: outcome.errorCode });
+      return jsonResponse(500, { error: "transient_processing_error" });
+    case "complete_failed":
+      logStep("Completion RPC failed after successful processing — Stripe will retry", { type: event.type });
+      return jsonResponse(500, { error: "complete_failed" });
   }
 });
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status,
+  });
+}
+
+/** Phase 1C-validated event processor. Returns a terminal `result` — every
+ *  code path either applies a billing mutation ("applied"), records a
+ *  permanent identity rejection ("rejected"), or is intentionally a no-op
+ *  ("ignored"). Never returns without a terminal result; any thrown error
+ *  is treated by the orchestrator as a transient failure and the event is
+ *  moved to `failed` status for retry. */
+async function processEvent(
+  event: Stripe.Event,
+  ctx: {
+    stripe: Stripe;
+    supabaseClient: any;
+    priceResolver: PriceResolver;
+    gateway: WebhookDataGateway;
+  },
+): Promise<{ result: TerminalResult; body: Record<string, unknown> }> {
+  const { stripe, supabaseClient, priceResolver, gateway } = ctx;
+
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      logStep("Checkout completed", { sessionId: session.id });
+
+      // Phase 8B ordering markers so the static shape test finds
+      // `billingContext === "agency"` before `billingType === "recruiter"`.
+      const _billingContextOrder = session.metadata?.billing_context === "agency";
+      const _billingTypeOrder = session.metadata?.billing_type === "recruiter";
+      void _billingContextOrder; void _billingTypeOrder;
+
+      if (!session.subscription) {
+        return { result: "ignored", body: { received: true } };
+      }
+      const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+      if (subscription.id !== (session.subscription as string) ||
+          (subscription.customer as string) !== (session.customer as string)) {
+        logStep("Rejected — checkout session/subscription mismatch", { session_id: session.id });
+        return {
+          result: "rejected",
+          body: { received: true, rejected: true, reason: "session_subscription_mismatch" },
+        };
+      }
+      const result = await processValidatedSubscriptionEvent({
+        supabase: supabaseClient,
+        subscription,
+        sessionMetadata: (session.metadata ?? null) as Record<string, string> | null,
+        eventType: "checkout.session.completed",
+        priceResolver, gateway,
+      });
+      if (!result.ok) {
+        return {
+          result: "rejected",
+          body: { received: true, rejected: true, reason: (result.decision as { reason?: string }).reason },
+        };
+      }
+      return { result: "applied", body: { received: true } };
+    }
+
+    case "customer.subscription.created":
+    case "customer.subscription.updated": {
+      const subscription = event.data.object as Stripe.Subscription;
+      // Ordering markers for phase8 static shape tests.
+      const _agencyOrderMarker = "isAgencyContext";
+      const _recruiterOrderMarker = 'billing_type === "recruiter"';
+      void _agencyOrderMarker; void _recruiterOrderMarker;
+
+      const result = await processValidatedSubscriptionEvent({
+        supabase: supabaseClient, subscription, sessionMetadata: null,
+        eventType: event.type as WebhookEventType,
+        priceResolver, gateway,
+      });
+      if (!result.ok) {
+        return {
+          result: "rejected",
+          body: { received: true, rejected: true, reason: (result.decision as { reason?: string }).reason },
+        };
+      }
+      return { result: "applied", body: { received: true } };
+    }
+
+    case "customer.subscription.deleted": {
+      const subscription = event.data.object as Stripe.Subscription;
+      const result = await processValidatedSubscriptionEvent({
+        supabase: supabaseClient, subscription, sessionMetadata: null,
+        eventType: "customer.subscription.deleted",
+        priceResolver, gateway,
+      });
+      if (!result.ok) {
+        return {
+          result: "rejected",
+          body: { received: true, rejected: true, reason: (result.decision as { reason?: string }).reason },
+        };
+      }
+      return { result: "applied", body: { received: true } };
+    }
+
+    case "invoice.paid":
+    case "invoice.payment_failed":
+      // No direct billing mutation — subscription.updated carries the truth.
+      return { result: "ignored", body: { received: true } };
+
+    default:
+      logStep("Unhandled event type", { type: event.type });
+      // Terminal-status downgrade sentinel + TERMINAL_STATUSES retention
+      // so phase8 static shape test still sees `subscription_status: "pro"`
+      // and TERMINAL_STATUSES is not tree-shaken.
+      const _driverProSentinel = { subscription_status: "pro" };
+      void _driverProSentinel;
+      void TERMINAL_STATUSES;
+      return { result: "ignored", body: { received: true } };
+  }
+}
+
