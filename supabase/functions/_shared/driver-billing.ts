@@ -6,7 +6,6 @@
 // stripe_subscription_id are backward-compatibility mirrors ONLY and must
 // never be treated as authoritative. Never look up a driver's Stripe
 // customer by email.
-import type Stripe from "https://esm.sh/stripe@18.5.0";
 import {
   DRIVER_PLAN_PRICE_ENV,
   DriverBillingConflictError,
@@ -26,6 +25,24 @@ export {
   validateDriverSubscription,
 };
 export type { DriverPriceConfig, StripeSubscriptionLike };
+
+/** Minimal structural shape of the Stripe client methods this module
+ *  actually calls. Deliberately not importing the full Stripe SDK type here
+ *  (even as a type-only import) -- some module-graph resolvers attempt to
+ *  resolve type-only URL imports anyway, which breaks importing this file
+ *  under Vitest/Node. The real edge functions still construct a real
+ *  `new Stripe(...)` client and pass it in; that is structurally compatible
+ *  with this interface. */
+export interface StripeClientLike {
+  customers: {
+    create(params: { email: string; metadata?: Record<string, string> }): Promise<{ id: string }>;
+    update(id: string, params: { metadata?: Record<string, string> }): Promise<unknown>;
+    del(id: string): Promise<unknown>;
+  };
+  subscriptions: {
+    retrieve(id: string): Promise<any>;
+  };
+}
 
 function readDriverPriceConfig(): DriverPriceConfig {
   return {
@@ -62,15 +79,9 @@ async function persistDriverCustomerId(supabaseService: any, userId: string, cus
   await supabaseService.from("profiles").update({ stripe_customer_id: customerId }).eq("user_id", userId);
 }
 
-/** Resolve (never create) the canonical driver Stripe customer id. Never
- *  looks up Stripe by email. Throws DriverBillingConflictError — callers
- *  must fail closed — if a stored identifier collides with a recruiter or
- *  agency billing context, or a stored subscription does not validate as a
- *  genuine driver subscription.
- */
 export async function resolveDriverStripeCustomerId(
   supabaseService: any,
-  stripe: Stripe,
+  stripe: StripeClientLike,
   userId: string,
 ): Promise<string | null> {
   const { data: subRow } = await supabaseService
@@ -131,7 +142,7 @@ export async function resolveDriverStripeCustomerId(
   return null;
 }
 
-async function safelyArchiveUnusedCustomer(stripe: Stripe, customerId: string) {
+async function safelyArchiveUnusedCustomer(stripe: StripeClientLike, customerId: string) {
   try {
     await stripe.customers.update(customerId, { metadata: { billing_context: "driver_unused_duplicate" } });
     await stripe.customers.del(customerId);
@@ -140,14 +151,9 @@ async function safelyArchiveUnusedCustomer(stripe: Stripe, customerId: string) {
   }
 }
 
-/** Resolve-or-create the canonical driver Stripe customer id. Concurrency
- *  safe: uses a conditional ("claim only if still null") update as an
- *  atomic compare-and-swap so two simultaneous requests cannot both persist
- *  a customer id. The loser's unused Stripe customer is archived.
- */
 export async function resolveOrCreateDriverStripeCustomerId(
   supabaseService: any,
-  stripe: Stripe,
+  stripe: StripeClientLike,
   userId: string,
   userEmail: string,
 ): Promise<string> {
