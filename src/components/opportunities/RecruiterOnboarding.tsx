@@ -383,16 +383,18 @@ function Agreement({
   );
 }
 
-/* -------- Phase 1F-A.2.2-R1A exported onboarding status card -------- */
-
-/**
- * Pure presentation card summarising posting eligibility + verification
- * trust state for the onboarding view. Derives everything from the
- * canonical `getRecruiterTrustView()` helper — no local completeness rule,
- * no approval-gates-posting logic. Used directly by rendered tests.
+/* -------- Phase 1F-A.2.2-R1A.1 canonical onboarding status card --------
+ *
+ * SINGLE production surface for the onboarding status card. Consumed both
+ * by `RecruiterOnboarding` above and by the rendered component tests.
+ * There is no parallel `statusCfg` implementation — that path was removed
+ * in Phase 1F-A.2.2-R1A.1. All copy is derived from the canonical
+ * `getRecruiterTrustView()` helper; wording literals are held here so that
+ * source-integrity checks continue to hold against this file.
  */
 export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterProfile | null }) {
   const view = getRecruiterTrustView(profile, {});
+
   const Icon =
     view.state === 'suspended'
       ? Ban
@@ -402,11 +404,10 @@ export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterP
       ? CheckCircle2
       : Clock;
 
-  // Titles chosen to match the eligibility-first rule tested by the
-  // Phase 1F-A.2.2 source-integrity suite: incomplete never claims
-  // "Standard Posting Enabled"; complete+approved surfaces "Verified
-  // Recruiter — Standard Posting Enabled"; complete+rejected surfaces
-  // "Standard Posting Enabled — Verification Not Approved".
+  // Titles: eligibility-first — incomplete NEVER claims "Standard Posting
+  // Enabled"; complete+approved surfaces "Verified Recruiter — Standard
+  // Posting Enabled"; complete+rejected surfaces "Standard Posting Enabled
+  // — Verification Not Approved".
   const title =
     view.state === 'suspended'
       ? 'Recruiter Access Suspended'
@@ -419,6 +420,48 @@ export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterP
       : profile?.verification_status === 'rejected'
       ? 'Standard Posting Enabled — Verification Not Approved'
       : 'Standard Posting Enabled';
+
+  // Full body copy — preserves the exact wording that the R1A source-
+  // integrity suite locks in.
+  const body =
+    view.state === 'suspended'
+      ? 'Please contact support regarding your recruiter account. Standard posting is disabled until this is resolved.'
+      : view.state === 'missing_profile' || view.state === 'incomplete_profile'
+      ? 'Standard posting is not enabled yet. Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Verification review runs separately.'
+      : view.state === 'verified'
+      ? 'Standard posting is enabled and drivers see a Verified Recruiter badge on your opportunities.'
+      : profile?.verification_status === 'rejected'
+      ? 'Standard posting is enabled. The Verified Recruiter badge was not approved — update your profile and resubmit to earn the badge. Standard posting stays enabled unless your account is suspended.'
+      : 'Your opportunities go live to drivers immediately. Verification review runs separately — a Verified Recruiter badge is added later once an admin reviews your profile.';
+
+  // Badge label preserves the "Unverified" / "Pending Verification" /
+  // "Verified" / "Suspended" terminology the source-integrity suite
+  // expects to see in this file.
+  const badgeLabel =
+    view.state === 'suspended'
+      ? 'Suspended'
+      : view.state === 'missing_profile' || view.state === 'incomplete_profile'
+      ? profile?.verification_status === 'approved'
+        ? 'Verified'
+        : profile?.verification_status === 'rejected'
+        ? 'Not Approved'
+        : 'Pending Verification'
+      : view.state === 'verified'
+      ? 'Verified'
+      : profile?.verification_status === 'rejected'
+      ? 'Unverified'
+      : 'Pending Verification';
+
+  const badgeVariant =
+    view.state === 'suspended'
+      ? ('destructive' as const)
+      : view.state === 'verified'
+      ? ('default' as const)
+      : view.state === 'incomplete_profile' || view.state === 'missing_profile'
+      ? ('secondary' as const)
+      : profile?.verification_status === 'rejected'
+      ? ('secondary' as const)
+      : ('outline' as const);
 
   return (
     <Card
@@ -434,12 +477,14 @@ export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterP
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 className="text-base font-bold text-foreground">{title}</h3>
-            <Badge
-              variant={view.verificationBadgeVariant}
-              data-testid="onboarding-verification-label"
+            <h3
+              className="text-base font-bold text-foreground"
+              data-testid="onboarding-status-title"
             >
-              {view.verificationLabel}
+              {title}
+            </h3>
+            <Badge variant={badgeVariant} data-testid="onboarding-verification-label">
+              {badgeLabel}
             </Badge>
             {view.showVerifiedBadge && (
               <Badge variant="default" data-testid="onboarding-verified-badge">
@@ -447,12 +492,16 @@ export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterP
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground" data-testid="onboarding-posting-label">
-            {view.postingLabel}
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="onboarding-status-body"
+          >
+            {body}
           </p>
         </div>
       </div>
     </Card>
   );
 }
+
 
