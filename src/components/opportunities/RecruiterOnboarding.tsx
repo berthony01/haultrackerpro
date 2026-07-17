@@ -20,11 +20,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useRecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
+import { useRecruiterProfile, type RecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
 import {
   POSTING_TERMS_VERSION,
   hasAcceptedPostingTerms,
   describeRecruiterEligibility,
+  getRecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
 
 interface Props {
@@ -455,3 +456,77 @@ function Agreement({
     </label>
   );
 }
+
+/* -------- Phase 1F-A.2.2-R1A exported onboarding status card -------- */
+
+/**
+ * Pure presentation card summarising posting eligibility + verification
+ * trust state for the onboarding view. Derives everything from the
+ * canonical `getRecruiterTrustView()` helper — no local completeness rule,
+ * no approval-gates-posting logic. Used directly by rendered tests.
+ */
+export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterProfile | null }) {
+  const view = getRecruiterTrustView(profile, {});
+  const Icon =
+    view.state === 'suspended'
+      ? Ban
+      : view.state === 'incomplete_profile' || view.state === 'missing_profile'
+      ? AlertTriangle
+      : view.state === 'verified'
+      ? CheckCircle2
+      : Clock;
+
+  // Titles chosen to match the eligibility-first rule tested by the
+  // Phase 1F-A.2.2 source-integrity suite: incomplete never claims
+  // "Standard Posting Enabled"; complete+approved surfaces "Verified
+  // Recruiter — Standard Posting Enabled"; complete+rejected surfaces
+  // "Standard Posting Enabled — Verification Not Approved".
+  const title =
+    view.state === 'suspended'
+      ? 'Recruiter Access Suspended'
+      : view.state === 'missing_profile'
+      ? 'Finish your recruiter setup'
+      : view.state === 'incomplete_profile'
+      ? 'Finish your recruiter profile'
+      : view.state === 'verified'
+      ? 'Verified Recruiter — Standard Posting Enabled'
+      : profile?.verification_status === 'rejected'
+      ? 'Standard Posting Enabled — Verification Not Approved'
+      : 'Standard Posting Enabled';
+
+  return (
+    <Card
+      className="p-5 border-border/60"
+      data-testid="recruiter-onboarding-status"
+      data-state={view.state}
+      data-can-post={view.canPost ? 'true' : 'false'}
+      data-verified={view.isVerified ? 'true' : 'false'}
+    >
+      <div className="flex items-start gap-4">
+        <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h3 className="text-base font-bold text-foreground">{title}</h3>
+            <Badge
+              variant={view.verificationBadgeVariant}
+              data-testid="onboarding-verification-label"
+            >
+              {view.verificationLabel}
+            </Badge>
+            {view.showVerifiedBadge && (
+              <Badge variant="default" data-testid="onboarding-verified-badge">
+                Verified Recruiter
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground" data-testid="onboarding-posting-label">
+            {view.postingLabel}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+

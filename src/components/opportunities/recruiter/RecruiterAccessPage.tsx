@@ -31,7 +31,11 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useUserRole } from '@/hooks/useUserRole';
 import { RecruiterBillingPanel } from '../RecruiterBillingPanel';
-import { describeRecruiterEligibility } from '@/lib/opportunities/recruiterEligibility';
+import {
+  describeRecruiterEligibility,
+  getRecruiterTrustView,
+  type RecruiterTrustView,
+} from '@/lib/opportunities/recruiterEligibility';
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
 // helper — this file MUST NOT reimplement completeness. `active_billing`
@@ -204,12 +208,11 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               <Truck className="h-32 w-32 text-primary" strokeWidth={1} />
             </div>
             <div className="relative space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="text-sm font-bold text-foreground">Recruiting Snapshot</h3>
-                <Badge variant="outline" className="capitalize text-[10px]">
-                  {state.replace('_', ' ')}
-                </Badge>
+                <RecruiterTrustStatus profile={profile} intentRecruiter={!!intentRecruiter} />
               </div>
+
               <div className="grid grid-cols-2 gap-2.5">
                 <SnapshotStat label="Active Opportunities" value={snapshot.activeOpps} loading={oppsLoading} />
                 <SnapshotStat label="New Driver Requests" value={snapshot.newReq} loading={isLoadingRecruiter} />
@@ -802,3 +805,114 @@ function HowItWorks() {
     </Card>
   );
 }
+
+/* ---------------- Phase 1F-A.2.2-R1A exported presentation ---------------- */
+
+/**
+ * Visible trust badge shown in the Recruiter Access hero. Renders both the
+ * posting-eligibility label and the verification/trust label. When the
+ * recruiter is verified it also renders an explicit "Verified Recruiter"
+ * affirmation. Pure — derives everything from `getRecruiterTrustView()`.
+ */
+export function RecruiterTrustStatus({
+  profile,
+  intentRecruiter,
+}: {
+  profile: RecruiterProfile | null;
+  intentRecruiter?: boolean;
+}) {
+  const view = getRecruiterTrustView(profile, { intentRecruiter });
+  return (
+    <div
+      className="flex items-center gap-1.5 flex-wrap"
+      data-testid="recruiter-trust-status"
+      data-state={view.state}
+      data-can-post={view.canPost ? 'true' : 'false'}
+      data-verified={view.isVerified ? 'true' : 'false'}
+    >
+      <Badge
+        variant={view.canPost ? 'default' : 'outline'}
+        className="text-[10px]"
+        data-testid="recruiter-posting-label"
+      >
+        {view.postingLabel}
+      </Badge>
+      <Badge
+        variant={view.verificationBadgeVariant}
+        className="text-[10px]"
+        data-testid="recruiter-verification-label"
+      >
+        {view.verificationLabel}
+      </Badge>
+      {view.showVerifiedBadge && (
+        <Badge
+          variant="default"
+          className="text-[10px] gap-1"
+          data-testid="recruiter-verified-badge"
+        >
+          <ShieldCheck className="h-3 w-3" /> Verified Recruiter
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Test-focused controls surface: renders the trust status alongside the
+ * Post / Manage / View Requests primary actions with the exact
+ * enabled/disabled behavior the real page uses. Billing does not gate
+ * standard posting — the disabled state is driven entirely by canonical
+ * eligibility.
+ */
+export function RecruiterAccessControls({
+  profile,
+  isBillingActive: _isBillingActive,
+  intentRecruiter,
+  onPost,
+  onManage,
+  onApplications,
+}: {
+  profile: RecruiterProfile | null;
+  isBillingActive: boolean;
+  intentRecruiter?: boolean;
+  onPost: () => void;
+  onManage: () => void;
+  onApplications: () => void;
+}) {
+  const view = getRecruiterTrustView(profile, { intentRecruiter });
+  const disabled = !view.canPost;
+  return (
+    <div className="space-y-3" data-testid="recruiter-access-controls">
+      <RecruiterTrustStatus profile={profile} intentRecruiter={intentRecruiter} />
+      <div className="flex gap-2 flex-wrap">
+        <Button
+          size="sm"
+          onClick={onPost}
+          disabled={disabled}
+          data-testid="controls-post"
+        >
+          Post an Opportunity
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onManage}
+          disabled={disabled}
+          data-testid="controls-manage"
+        >
+          Manage Opportunities
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onApplications}
+          disabled={disabled}
+          data-testid="controls-applications"
+        >
+          View Driver Requests
+        </Button>
+      </div>
+    </div>
+  );
+}
+

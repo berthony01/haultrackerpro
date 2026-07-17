@@ -12,7 +12,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
-import { describeRecruiterEligibility } from '@/lib/opportunities/recruiterEligibility';
+import {
+  describeRecruiterEligibility,
+  getRecruiterTrustView,
+} from '@/lib/opportunities/recruiterEligibility';
 
 function makeProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfile {
   return {
@@ -189,3 +192,53 @@ describe('RecruiterOnboarding — statusCfg wording is eligibility-first', () =>
     expect(body).toMatch(/standard posting eligibility[\s\S]{0,120}(verification|Verified Recruiter)/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1F-A.2.2-R1A — pure trust view derived from canonical eligibility.
+// ---------------------------------------------------------------------------
+describe('getRecruiterTrustView — visible trust invariants', () => {
+  const complete = (o: Partial<RecruiterProfile> = {}) => ({
+    id: 'rp-1', user_id: 'u-1',
+    recruiter_name: 'Alice', company_name: 'Acme',
+    recruiter_email: 'alice@acme.example',
+    dot_number: '1234567', mc_number: null,
+    hiring_states: [], equipment_types: [], driver_types_hired: [],
+    status: 'active', verification_status: 'pending',
+    posting_terms_accepted_at: '2026-07-17T00:00:00Z',
+    posting_terms_version: '2026-07-17.v1',
+    legacy_terms_grandfathered_at: null,
+    ...o,
+  } as unknown as RecruiterProfile);
+
+  it('showVerifiedBadge TRUE only for complete + approved (not suspended)', () => {
+    expect(getRecruiterTrustView(complete({ verification_status: 'approved' })).showVerifiedBadge).toBe(true);
+    expect(getRecruiterTrustView(complete({ verification_status: 'pending' })).showVerifiedBadge).toBe(false);
+    expect(getRecruiterTrustView(complete({ verification_status: 'rejected' })).showVerifiedBadge).toBe(false);
+    expect(getRecruiterTrustView(complete({ status: 'suspended', verification_status: 'approved' })).showVerifiedBadge).toBe(false);
+    expect(getRecruiterTrustView(complete({ company_name: '', verification_status: 'approved' })).showVerifiedBadge).toBe(false);
+    expect(getRecruiterTrustView(null).showVerifiedBadge).toBe(false);
+  });
+
+  it('postingLabel says "not enabled" for missing / incomplete, "suspended" for suspended', () => {
+    expect(getRecruiterTrustView(null).postingLabel).toMatch(/not enabled/i);
+    expect(getRecruiterTrustView(complete({ company_name: '' })).postingLabel).toMatch(/not enabled/i);
+    expect(getRecruiterTrustView(complete({ status: 'suspended' })).postingLabel).toMatch(/suspended/i);
+  });
+
+  it('postingLabel is exactly "Standard posting enabled" for complete + non-suspended', () => {
+    for (const v of ['pending', 'rejected', 'approved'] as const) {
+      expect(getRecruiterTrustView(complete({ verification_status: v })).postingLabel).toBe(
+        'Standard posting enabled',
+      );
+    }
+  });
+
+  it('verificationLabel distinguishes pending / rejected / approved / suspended / missing', () => {
+    expect(getRecruiterTrustView(complete({ verification_status: 'pending' })).verificationLabel).toMatch(/Pending Verification/i);
+    expect(getRecruiterTrustView(complete({ verification_status: 'rejected' })).verificationLabel).toMatch(/Verification Not Approved/i);
+    expect(getRecruiterTrustView(complete({ verification_status: 'approved' })).verificationLabel).toMatch(/Verified Recruiter/);
+    expect(getRecruiterTrustView(complete({ status: 'suspended' })).verificationLabel).toMatch(/Suspended/i);
+    expect(getRecruiterTrustView(null).verificationLabel).toMatch(/Not submitted/i);
+  });
+});
+
