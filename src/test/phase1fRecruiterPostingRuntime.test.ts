@@ -34,18 +34,27 @@ interface AnyPGlite {
 
 function findPhase1FA1Migration(): string {
   const dir = path.join(process.cwd(), "supabase/migrations");
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort().reverse();
-  for (const f of files) {
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const base = files.find((f) => {
     const body = fs.readFileSync(path.join(dir, f), "utf8");
-    if (
+    return (
       body.includes("current_user_can_manage_recruiter_opportunities") &&
       body.includes("recruiter_profile_can_manage_opportunities")
-    ) {
-      return body;
-    }
-  }
-  throw new Error("Phase 1F-A.1 migration not found on disk");
+    );
+  });
+  if (!base) throw new Error("Phase 1F-A.1 migration not found on disk");
+  // Concatenate the Phase 1F-A.1 migration with every later migration that
+  // amends any of the RPCs / triggers the harness exercises, so the harness
+  // reflects the current database state.
+  const idx = files.indexOf(base);
+  const relevant =
+    /request_driver_contact|recruiter_can_post|list_driver_visible_opportunities|create_driver_referral_safe|recruiter_profile_can_manage_opportunities|current_user_can_manage_recruiter_opportunities|opportunities_guard|opportunities_billing_guard|recruiter_profile_guard/;
+  const later = files
+    .slice(idx + 1)
+    .filter((f) => relevant.test(fs.readFileSync(path.join(dir, f), "utf8")));
+  return [base, ...later].map((f) => fs.readFileSync(path.join(dir, f), "utf8")).join("\n\n");
 }
+
 
 const RECR_A_USER = "11111111-1111-1111-1111-111111111111";
 const RECR_B_USER = "22222222-2222-2222-2222-222222222222";
