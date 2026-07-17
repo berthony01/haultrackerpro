@@ -112,15 +112,15 @@ const sampleOpportunity = {
 } as never;
 
 function mockManager(opportunities: unknown[]) {
-  (useRecruiterProfile as unknown as vi.Mock).mockReturnValue({
+  vi.mocked(useRecruiterProfile).mockReturnValue({
     profile: eligibleProfile,
     isLoading: false,
     isApproved: false,
     isVerified: false,
     canPost: true,
     refetch: vi.fn(),
-  });
-  (useRecruiterOpportunities as unknown as vi.Mock).mockReturnValue({
+  } as never);
+  vi.mocked(useRecruiterOpportunities).mockReturnValue({
     opportunities,
     isLoading: false,
     isError: false,
