@@ -31,6 +31,7 @@ function makeProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfil
     posting_terms_accepted_at: '2026-07-17T00:00:00Z',
     posting_terms_version: '2026-07-17.v1',
     legacy_terms_grandfathered_at: null,
+    ...overrides,
   } as unknown as RecruiterProfile;
 }
 
