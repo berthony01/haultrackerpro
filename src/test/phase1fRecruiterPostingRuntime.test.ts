@@ -313,8 +313,8 @@ beforeAll(async () => {
       FOR EACH ROW EXECUTE FUNCTION public.opportunities_billing_guard();
     -- Reproduce the live production state: TWO redundant BEFORE INSERT OR
     -- UPDATE triggers bound to recruiter_profile_guard(). Phase 1F-A.2.2
-    -- must drop `trg_recruiter_profiles_guard` and preserve
-    -- `recruiter_profile_guard`.
+    -- must drop trg_recruiter_profiles_guard and preserve
+    -- recruiter_profile_guard.
     CREATE TRIGGER recruiter_profile_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
       FOR EACH ROW EXECUTE FUNCTION public.recruiter_profile_guard();
     CREATE TRIGGER trg_recruiter_profiles_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
