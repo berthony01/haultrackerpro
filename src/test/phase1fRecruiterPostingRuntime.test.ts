@@ -1,26 +1,26 @@
 // @vitest-environment node
-// Phase 1F-A.1 — Schema-faithful, real-RLS runtime harness.
+// Phase 1F-A.1 + 1F-A.2 — Schema-faithful, real-RLS runtime harness.
 //
-// Applies the actual production Phase 1F-A.1 migration SQL from disk into
-// an in-process PGlite instance and drives it under real Postgres roles
-// (anon / authenticated / service_role) with per-user JWT claims fed via
-// `request.jwt.claim.sub`. auth.uid() is defined to read that GUC and
-// is_admin() reads an admin allowlist table — no boolean mock. Every
-// case that exercises RLS runs under `SET LOCAL ROLE authenticated`.
+// Applies the production Phase 1F-A.1 migration AND the two Phase 1F-A.2
+// migration files (in exact file order) into an in-process PGlite instance
+// and drives it under real Postgres roles (anon / authenticated /
+// service_role) with per-user JWT claims fed via `request.jwt.claim.sub`.
 //
-// Proves:
-//   * Canonical eligibility (name + company + valid email + DOT/MC +
-//     accepted-or-grandfathered consent + neither suspension).
-//   * Real RLS on opportunities uses the canonical rule for INSERT/UPDATE.
-//   * Both triggers (opportunities_guard + opportunities_billing_guard)
-//     enforce eligibility on drafts and active posts.
-//   * list_driver_visible_opportunities returns unverified-but-complete
-//     recruiters' active opportunities to drivers, and hides suspended /
-//     incomplete / non-eligible ones.
-//   * anon cannot execute recruiter_can_post nor the profile-scoped helper.
-//   * Cross-recruiter writes are blocked; recruiter_id cannot be reassigned.
-//   * Client-set featured / view_count / admin_review_status cannot be
-//     self-elevated.
+// Phase 1F-A.2 additions this harness proves:
+//   * Final privilege matrix, obsolete `recruiter_can_post` dropped.
+//   * Two-line PUBLIC/anon correction on `list_driver_visible_opportunities`
+//     is genuinely exercised (baseline seeds the pre-1F-A.2 PUBLIC grant).
+//   * `driver_can_access_opportunity` gates both direct SELECT and driver
+//     application INSERT; marketplace RPC agrees with direct SELECT;
+//     saved-opportunity nested visibility flips off with suspension.
+//   * Recruiter application listing and update authorization use the
+//     canonical current-user helper; cross-recruiter blocked.
+//   * `accept_recruiter_posting_terms` — server-stamped, exact version,
+//     idempotent repeat, anon/incomplete/suspended denials, no cross-profile
+//     effect, legacy grandfathered preserved.
+//   * Direct consent forgery (INSERT/UPDATE of `posting_terms_*`,
+//     `legacy_terms_grandfathered_at`) blocked outside the sanctioned RPC.
+//   * Profile UPDATE denied for status='suspended' AND verification='suspended'.
 
 import { describe, it, expect, beforeAll } from "vitest";
 import * as fs from "node:fs";
@@ -32,6 +32,13 @@ interface AnyPGlite {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
+// Both applied Phase 1F-A.2 files by name — asserted immutable by the
+// Stage 2A decision. They MUST be applied in this exact order.
+const PHASE_1F_A2_FILES = [
+  "20260717185620_7efcb752-08f0-46b5-aaad-593e410aa818.sql",
+  "20260717185659_ecf497ad-ec79-4178-bfba-b0e9e7e18d4f.sql",
+];
+
 function findPhase1FA1Migration(): string {
   const dir = path.join(process.cwd(), "supabase/migrations");
   const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
@@ -39,20 +46,39 @@ function findPhase1FA1Migration(): string {
     const body = fs.readFileSync(path.join(dir, f), "utf8");
     return (
       body.includes("current_user_can_manage_recruiter_opportunities") &&
-      body.includes("recruiter_profile_can_manage_opportunities")
+      body.includes("recruiter_profile_can_manage_opportunities") &&
+      // Skip 1F-A.2 files which also reference those names but only replace them.
+      !PHASE_1F_A2_FILES.includes(f)
     );
   });
   if (!base) throw new Error("Phase 1F-A.1 migration not found on disk");
   // Concatenate the Phase 1F-A.1 migration with every later migration that
-  // amends any of the RPCs / triggers the harness exercises, so the harness
-  // reflects the current database state.
+  // amends any of the RPCs / triggers the harness exercises, EXCLUDING the
+  // two Phase 1F-A.2 files (appended separately below in exact file order
+  // so the two-line correction lands second).
   const idx = files.indexOf(base);
   const relevant =
     /request_driver_contact|recruiter_can_post|list_driver_visible_opportunities|create_driver_referral_safe|recruiter_profile_can_manage_opportunities|current_user_can_manage_recruiter_opportunities|opportunities_guard|opportunities_billing_guard|recruiter_profile_guard/;
-  const later = files
+  const between = files
     .slice(idx + 1)
-    .filter((f) => relevant.test(fs.readFileSync(path.join(dir, f), "utf8")));
-  return [base, ...later].map((f) => fs.readFileSync(path.join(dir, f), "utf8")).join("\n\n");
+    .filter(
+      (f) =>
+        !PHASE_1F_A2_FILES.includes(f) &&
+        relevant.test(fs.readFileSync(path.join(dir, f), "utf8")),
+    );
+  const parts = [base, ...between].map((f) => fs.readFileSync(path.join(dir, f), "utf8"));
+  return parts.join("\n\n");
+}
+
+function loadPhase1FA2Migrations(): string {
+  const dir = path.join(process.cwd(), "supabase/migrations");
+  return PHASE_1F_A2_FILES.map((f) => {
+    const p = path.join(dir, f);
+    if (!fs.existsSync(p)) {
+      throw new Error(`Phase 1F-A.2 migration file missing: ${f}`);
+    }
+    return fs.readFileSync(p, "utf8");
+  }).join("\n\n");
 }
 
 
@@ -110,10 +136,12 @@ beforeAll(async () => {
     GRANT anon, authenticated, service_role TO CURRENT_USER;
 
     CREATE SCHEMA IF NOT EXISTS auth;
+    GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
     CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
       LANGUAGE sql STABLE AS $$
         SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
     $$;
+    GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 
     CREATE TABLE public.admin_users (user_id uuid PRIMARY KEY);
 
@@ -151,7 +179,7 @@ beforeAll(async () => {
       USING (user_id = auth.uid());
     CREATE POLICY rp_owner_insert ON public.recruiter_profiles FOR INSERT TO authenticated
       WITH CHECK (user_id = auth.uid());
-    CREATE POLICY rp_owner_update ON public.recruiter_profiles FOR UPDATE TO authenticated
+    CREATE POLICY "Recruiter updates own profile if not suspended" ON public.recruiter_profiles FOR UPDATE TO authenticated
       USING (user_id = auth.uid() AND status <> 'suspended')
       WITH CHECK (user_id = auth.uid());
 
@@ -166,9 +194,26 @@ beforeAll(async () => {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       recruiter_id uuid NOT NULL REFERENCES public.recruiter_profiles(id),
       title text NOT NULL,
+      company_name text,
+      hiring_city text,
       hiring_state text,
       driver_type text,
       route_type text,
+      trailer_type text,
+      deadhead_paid boolean,
+      lease_payment numeric,
+      insurance_deductions numeric,
+      maintenance_deductions numeric,
+      other_deductions numeric,
+      escrow_amount numeric,
+      escrow_required boolean,
+      estimated_weekly_gross numeric,
+      flat_weekly_pay numeric,
+      cpm numeric,
+      percentage_pay numeric,
+      estimated_weekly_miles numeric,
+      estimated_loaded_miles numeric,
+      estimated_deadhead_miles numeric,
       status text NOT NULL DEFAULT 'draft',
       admin_review_status text NOT NULL DEFAULT 'pending',
       featured boolean NOT NULL DEFAULT false,
@@ -181,7 +226,9 @@ beforeAll(async () => {
     ALTER TABLE public.opportunities ENABLE ROW LEVEL SECURITY;
     CREATE POLICY opp_admin_all ON public.opportunities TO authenticated
       USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
-    CREATE POLICY opp_public_read ON public.opportunities FOR SELECT TO authenticated
+    -- Named to match production policy that Phase 1F-A.2 DROPs and re-creates
+    -- with the canonical driver_can_access_opportunity gate.
+    CREATE POLICY "Authenticated view approved active opportunities" ON public.opportunities FOR SELECT TO authenticated
       USING (status = 'active' AND admin_review_status = 'approved');
     CREATE POLICY opp_owner_read ON public.opportunities FOR SELECT TO authenticated
       USING (EXISTS (SELECT 1 FROM public.recruiter_profiles rp
@@ -206,13 +253,38 @@ beforeAll(async () => {
       FOR EACH ROW EXECUTE FUNCTION public.recruiter_profile_guard();
 
     -- Legacy driver-visible RPC that migration will replace.
+    -- IMPORTANT: baseline grants EXECUTE to PUBLIC so anon inherits access.
+    -- Phase 1F-A.2 file 1 only revokes from anon, which is insufficient;
+    -- file 2's REVOKE FROM PUBLIC is what actually strips anon. Granting
+    -- PUBLIC here genuinely exercises the two-file correction sequence.
     CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities(
       _state text DEFAULT NULL, _driver_type text DEFAULT NULL, _route_type text DEFAULT NULL
     ) RETURNS SETOF public.opportunities
       LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
       SELECT * FROM public.opportunities WHERE false
     $$;
+    GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) TO PUBLIC;
     GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) TO authenticated;
+
+    CREATE TABLE public.driver_opportunity_profiles (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL,
+      full_name text,
+      city text,
+      state text,
+      cdl_class text,
+      years_experience integer,
+      preferred_driver_type text,
+      preferred_route_type text,
+      endorsements text[],
+      trailer_experience text[],
+      min_weekly_gross numeric,
+      min_weekly_net numeric,
+      min_effective_rpm numeric,
+      allow_verified_recruiter_contact boolean NOT NULL DEFAULT false,
+      contact_preference text
+    );
+    GRANT SELECT, INSERT, UPDATE ON public.driver_opportunity_profiles TO authenticated;
 
     CREATE TABLE public.opportunity_applications (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -231,7 +303,7 @@ beforeAll(async () => {
     );
     GRANT SELECT, INSERT, UPDATE ON public.opportunity_applications TO authenticated;
     ALTER TABLE public.opportunity_applications ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY oa_driver_insert ON public.opportunity_applications FOR INSERT TO authenticated
+    CREATE POLICY "Driver inserts own application" ON public.opportunity_applications FOR INSERT TO authenticated
       WITH CHECK (driver_user_id = auth.uid()
                   AND EXISTS (SELECT 1 FROM public.opportunities o
                               WHERE o.id = opportunity_id AND o.recruiter_id = opportunity_applications.recruiter_id
@@ -264,6 +336,23 @@ beforeAll(async () => {
       recruiter_note text,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    GRANT SELECT, INSERT, UPDATE ON public.recruiter_contact_requests TO authenticated;
+    ALTER TABLE public.recruiter_contact_requests ENABLE ROW LEVEL SECURITY;
+
+    -- saved_opportunities — used by 1F-A.2 nested-visibility case to prove
+    -- that a driver's previously-saved opp becomes invisible when the
+    -- recruiter loses eligibility.
+    CREATE TABLE public.saved_opportunities (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      driver_user_id uuid NOT NULL,
+      opportunity_id uuid NOT NULL REFERENCES public.opportunities(id),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (driver_user_id, opportunity_id)
+    );
+    GRANT SELECT, INSERT, DELETE ON public.saved_opportunities TO authenticated;
+    ALTER TABLE public.saved_opportunities ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY so_owner_all ON public.saved_opportunities TO authenticated
+      USING (driver_user_id = auth.uid()) WITH CHECK (driver_user_id = auth.uid());
 
     -- Legacy stubs migration will replace.
     CREATE OR REPLACE FUNCTION public.create_driver_referral_safe(
@@ -281,10 +370,18 @@ beforeAll(async () => {
       SELECT gen_random_uuid()
     $$;
     GRANT EXECUTE ON FUNCTION public.request_driver_contact(uuid,text) TO authenticated;
+
+    -- list_recruiter_applications_safe legacy stub (replaced by 1F-A.2).
+    CREATE OR REPLACE FUNCTION public.list_recruiter_applications_safe(_recruiter_id uuid)
+      RETURNS SETOF jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+      SELECT NULL::jsonb WHERE false
+    $$;
+    GRANT EXECUTE ON FUNCTION public.list_recruiter_applications_safe(uuid) TO authenticated;
   `);
 
-  // Apply the actual production Phase 1F-A.1 migration.
+  // Apply Phase 1F-A.1 first, then the two Phase 1F-A.2 files in file order.
   await db.exec(findPhase1FA1Migration());
+  await db.exec(loadPhase1FA2Migrations());
 
   // Seed the admin user + recruiter profiles as the outer superuser
   // (bypasses RLS / triggers) so we can control the initial state.
@@ -582,16 +679,17 @@ describe("Phase 1F-A.1 — driver visibility RPC", () => {
   });
 });
 
-describe("Phase 1F-A.1 — function privileges", () => {
-  it("29. anon cannot execute recruiter_can_post", async () => {
-    const r = await db.query<{ b: boolean }>(
-      `SELECT has_function_privilege('anon','public.recruiter_can_post(uuid)','EXECUTE') b`);
-    expect(r.rows[0].b).toBe(false);
+describe("Phase 1F-A.1/A.2 — function privileges", () => {
+  it("29. recruiter_can_post has been dropped by 1F-A.2", async () => {
+    const r = await db.query<{ n: number }>(
+      `SELECT count(*)::int n FROM pg_proc
+       WHERE pronamespace='public'::regnamespace AND proname='recruiter_can_post'`);
+    expect(r.rows[0].n).toBe(0);
   });
-  it("30. authenticated cannot execute recruiter_can_post", async () => {
-    const r = await db.query<{ b: boolean }>(
-      `SELECT has_function_privilege('authenticated','public.recruiter_can_post(uuid)','EXECUTE') b`);
-    expect(r.rows[0].b).toBe(false);
+  it("30. calling recruiter_can_post from any role errors (function absent)", async () => {
+    await expect(
+      db.query(`SELECT public.recruiter_can_post('00000000-0000-0000-0000-000000000000'::uuid)`),
+    ).rejects.toThrow();
   });
   it("31. anon cannot execute recruiter_profile_can_manage_opportunities", async () => {
     const r = await db.query<{ b: boolean }>(
@@ -603,23 +701,29 @@ describe("Phase 1F-A.1 — function privileges", () => {
       `SELECT has_function_privilege('anon','public.current_user_can_manage_recruiter_opportunities(uuid)','EXECUTE') b`);
     expect(r.rows[0].b).toBe(false);
   });
-  it("33. authenticated CAN execute both new helpers", async () => {
+  it("33. authenticated CAN execute current-user helper; profile-scoped helper is service_role-only", async () => {
     const a = await db.query<{ b: boolean }>(
       `SELECT has_function_privilege('authenticated','public.recruiter_profile_can_manage_opportunities(uuid)','EXECUTE') b`);
     const c = await db.query<{ b: boolean }>(
       `SELECT has_function_privilege('authenticated','public.current_user_can_manage_recruiter_opportunities(uuid)','EXECUTE') b`);
-    expect(a.rows[0].b).toBe(true);
+    const s = await db.query<{ b: boolean }>(
+      `SELECT has_function_privilege('service_role','public.recruiter_profile_can_manage_opportunities(uuid)','EXECUTE') b`);
+    expect(a.rows[0].b).toBe(false);
     expect(c.rows[0].b).toBe(true);
+    expect(s.rows[0].b).toBe(true);
   });
   it("34. all changed SECURITY DEFINER functions have pinned search_path", async () => {
     const r = await db.query<{ proname: string; cfg: string[] | null }>(
       `SELECT proname, proconfig cfg FROM pg_proc
        WHERE pronamespace='public'::regnamespace
-         AND proname IN ('recruiter_can_post','recruiter_profile_can_manage_opportunities',
+         AND proname IN ('recruiter_profile_can_manage_opportunities',
                          'current_user_can_manage_recruiter_opportunities',
+                         'driver_can_access_opportunity',
+                         'accept_recruiter_posting_terms',
                          'opportunities_guard','opportunities_billing_guard',
                          'list_driver_visible_opportunities','create_driver_referral_safe',
-                         'request_driver_contact','recruiter_profile_guard')`);
+                         'request_driver_contact','recruiter_profile_guard',
+                         'list_recruiter_applications_safe')`);
     for (const row of r.rows) {
       expect(row.cfg?.some((c) => c.startsWith("search_path=")), `${row.proname} missing search_path`).toBe(true);
     }
@@ -694,3 +798,453 @@ describe("Phase 1F-A.1 — standard application/referral/contact pipeline", () =
     expect(r.rows[0].status).toBe("pending");
   });
 });
+
+// ============================================================================
+// Phase 1F-A.2 — Recruiter Authorization Closure
+// ============================================================================
+
+describe("Phase 1F-A.2 — final privilege matrix", () => {
+  it("41. driver_can_access_opportunity: anon NO, authenticated YES, service_role YES", async () => {
+    const rows = await db.query<{ role: string; b: boolean }>(
+      `SELECT rolname role,
+              has_function_privilege(rolname,'public.driver_can_access_opportunity(uuid,uuid)','EXECUTE') b
+         FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')
+         ORDER BY rolname`);
+    const map = Object.fromEntries(rows.rows.map((r) => [r.role, r.b]));
+    expect(map).toEqual({ anon: false, authenticated: true, service_role: true });
+  });
+  it("42. accept_recruiter_posting_terms: anon NO, authenticated YES, service_role YES", async () => {
+    const rows = await db.query<{ role: string; b: boolean }>(
+      `SELECT rolname role,
+              has_function_privilege(rolname,'public.accept_recruiter_posting_terms(text)','EXECUTE') b
+         FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')
+         ORDER BY rolname`);
+    const map = Object.fromEntries(rows.rows.map((r) => [r.role, r.b]));
+    expect(map).toEqual({ anon: false, authenticated: true, service_role: true });
+  });
+  it("43. list_driver_visible_opportunities: anon NO (two-line PUBLIC correction lands)", async () => {
+    const r = await db.query<{ b: boolean }>(
+      `SELECT has_function_privilege('anon','public.list_driver_visible_opportunities(text,text,text)','EXECUTE') b`);
+    expect(r.rows[0].b).toBe(false);
+    const a = await db.query<{ b: boolean }>(
+      `SELECT has_function_privilege('authenticated','public.list_driver_visible_opportunities(text,text,text)','EXECUTE') b`);
+    expect(a.rows[0].b).toBe(true);
+  });
+});
+
+describe("Phase 1F-A.2 — driver_can_access_opportunity gate", () => {
+  let eligibleOppId: string;
+  beforeAll(async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'AccessGate','active','approved', now()) RETURNING id`, [recrAId]);
+    eligibleOppId = r.rows[0].id;
+  });
+
+  it("44. returns true for eligible recruiter + active + approved (authenticated caller)", async () => {
+    let ok = false;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ b: boolean }>(
+        `SELECT public.driver_can_access_opportunity($1,$2) b`, [eligibleOppId, recrAId]);
+      ok = r.rows[0].b;
+    });
+    expect(ok).toBe(true);
+  });
+  it("45. returns false when recruiter is suspended", async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`, [recrAId]);
+    let ok = true;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ b: boolean }>(
+        `SELECT public.driver_can_access_opportunity($1,$2) b`, [eligibleOppId, recrAId]);
+      ok = r.rows[0].b;
+    });
+    expect(ok).toBe(false);
+    await db.query(`UPDATE public.recruiter_profiles SET status='active' WHERE id=$1`, [recrAId]);
+  });
+  it("46. returns false when opportunity paused", async () => {
+    await db.query(`UPDATE public.opportunities SET status='paused' WHERE id=$1`, [eligibleOppId]);
+    let ok = true;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ b: boolean }>(
+        `SELECT public.driver_can_access_opportunity($1,$2) b`, [eligibleOppId, recrAId]);
+      ok = r.rows[0].b;
+    });
+    expect(ok).toBe(false);
+    await db.query(`UPDATE public.opportunities SET status='active' WHERE id=$1`, [eligibleOppId]);
+  });
+  it("47. returns false when auth.uid() is NULL (no session)", async () => {
+    // Call raw as superuser but with cleared jwt sub.
+    await db.exec("BEGIN");
+    try {
+      await db.exec(`SELECT set_config('request.jwt.claim.sub','',true);`);
+      const r = await db.query<{ b: boolean }>(
+        `SELECT public.driver_can_access_opportunity($1,$2) b`, [eligibleOppId, recrAId]);
+      expect(r.rows[0].b).toBe(false);
+    } finally {
+      await db.exec("ROLLBACK");
+    }
+  });
+});
+
+describe("Phase 1F-A.2 — direct SELECT + marketplace RPC agreement", () => {
+  let eligOpp: string;
+  let ineligOpp: string;
+  beforeAll(async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='approved' WHERE id=$1`, [suspendedRpId]);
+    const e = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'DS-Eligible','active','approved', now()) RETURNING id`, [recrAId]);
+    eligOpp = e.rows[0].id;
+    const i = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'DS-WillSuspend','active','approved', now()) RETURNING id`, [suspendedRpId]);
+    ineligOpp = i.rows[0].id;
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`, [suspendedRpId]);
+  });
+
+  it("48. direct SELECT: eligible opp visible to driver", async () => {
+    let count = 0;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ id: string }>(`SELECT id FROM public.opportunities WHERE id=$1`, [eligOpp]);
+      count = r.rows.length;
+    });
+    expect(count).toBe(1);
+  });
+  it("49. direct SELECT: ineligible (suspended recruiter) opp hidden", async () => {
+    let count = 999;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ id: string }>(`SELECT id FROM public.opportunities WHERE id=$1`, [ineligOpp]);
+      count = r.rows.length;
+    });
+    expect(count).toBe(0);
+  });
+  it("50. marketplace RPC agrees with direct SELECT (eligible visible, ineligible hidden)", async () => {
+    let ids: string[] = [];
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ id: string }>(
+        `SELECT id FROM public.list_driver_visible_opportunities(NULL,NULL,NULL)`);
+      ids = r.rows.map((x) => x.id);
+    });
+    expect(ids).toContain(eligOpp);
+    expect(ids).not.toContain(ineligOpp);
+  });
+  it("51. saved_opportunities nested visibility: saved opp becomes hidden after suspension", async () => {
+    // Driver saves the eligible opp.
+    await asUser(DRIVER_USER, async () => {
+      await db.query(
+        `INSERT INTO public.saved_opportunities (driver_user_id, opportunity_id) VALUES ($1,$2)
+         ON CONFLICT DO NOTHING`,
+        [DRIVER_USER, eligOpp],
+      );
+    });
+    let joined: number = -1;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ n: number }>(
+        `SELECT count(*)::int n FROM public.saved_opportunities so
+           JOIN public.opportunities o ON o.id = so.opportunity_id
+          WHERE so.driver_user_id = auth.uid() AND o.id = $1`, [eligOpp]);
+      joined = r.rows[0].n;
+    });
+    expect(joined).toBe(1);
+    // Suspend the recruiter and verify the nested JOIN drops to zero.
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`, [recrAId]);
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ n: number }>(
+        `SELECT count(*)::int n FROM public.saved_opportunities so
+           JOIN public.opportunities o ON o.id = so.opportunity_id
+          WHERE so.driver_user_id = auth.uid() AND o.id = $1`, [eligOpp]);
+      joined = r.rows[0].n;
+    });
+    expect(joined).toBe(0);
+    await db.query(`UPDATE public.recruiter_profiles SET status='active' WHERE id=$1`, [recrAId]);
+  });
+});
+
+describe("Phase 1F-A.2 — driver application INSERT / recruiter pipeline auth", () => {
+  let eligOpp: string;
+  let ineligOpp: string;
+  let appOnEligible: string;
+  beforeAll(async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='approved' WHERE id=$1`, [suspendedRpId]);
+    const e = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'App-Eligible','active','approved', now()) RETURNING id`, [recrAId]);
+    eligOpp = e.rows[0].id;
+    const i = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'App-Suspended','active','approved', now()) RETURNING id`, [suspendedRpId]);
+    ineligOpp = i.rows[0].id;
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`, [suspendedRpId]);
+  });
+
+  it("52. driver INSERT allowed against eligible recruiter opp (known id)", async () => {
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ id: string }>(
+        `INSERT INTO public.opportunity_applications (opportunity_id, recruiter_id, driver_user_id)
+         VALUES ($1,$2,$3) RETURNING id`, [eligOpp, recrAId, DRIVER_USER]);
+      appOnEligible = r.rows[0].id;
+    });
+    expect(appOnEligible).toBeTruthy();
+  });
+  it("53. driver INSERT denied against suspended recruiter opp (known id)", async () => {
+    await expect(asUser(DRIVER_USER, async () => {
+      await db.query(
+        `INSERT INTO public.opportunity_applications (opportunity_id, recruiter_id, driver_user_id)
+         VALUES ($1,$2,$3)`, [ineligOpp, suspendedRpId, DRIVER_USER]);
+    })).rejects.toThrow();
+  });
+  it("54. driver INSERT denied when opp admin_review_status='rejected'", async () => {
+    const rej = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status)
+       VALUES ($1,'App-Rejected','active','rejected') RETURNING id`, [recrAId]);
+    await expect(asUser(DRIVER_USER, async () => {
+      await db.query(
+        `INSERT INTO public.opportunity_applications (opportunity_id, recruiter_id, driver_user_id)
+         VALUES ($1,$2,$3)`, [rej.rows[0].id, recrAId, DRIVER_USER]);
+    })).rejects.toThrow();
+  });
+  it("55. list_recruiter_applications_safe rejects non-owner", async () => {
+    await expect(asUser(RECR_B_USER, async () => {
+      await db.query(`SELECT public.list_recruiter_applications_safe($1)`, [recrAId]);
+    })).rejects.toThrow();
+  });
+  it("56. list_recruiter_applications_safe returns rows for eligible owner", async () => {
+    let n = -1;
+    await asUser(RECR_A_USER, async () => {
+      const r = await db.query<{ x: unknown }>(
+        `SELECT public.list_recruiter_applications_safe($1) x`, [recrAId]);
+      n = r.rows.length;
+    });
+    expect(n).toBeGreaterThan(0);
+  });
+  it("57. UPDATE application status denied to non-owner recruiter", async () => {
+    await asUser(RECR_B_USER, async () => {
+      await db.query(
+        `UPDATE public.opportunity_applications SET status='reviewed' WHERE id=$1`,
+        [appOnEligible],
+      );
+    });
+    const r = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appOnEligible]);
+    expect(r.rows[0].status).not.toBe("reviewed");
+  });
+  it("58. UPDATE application status allowed for eligible owner", async () => {
+    await asUser(RECR_A_USER, async () => {
+      await db.query(
+        `UPDATE public.opportunity_applications SET status='reviewed' WHERE id=$1`,
+        [appOnEligible],
+      );
+    });
+    const r = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appOnEligible]);
+    expect(r.rows[0].status).toBe("reviewed");
+  });
+  it("59. contact-request SELECT scoped to owner (rcr_recruiter_select)", async () => {
+    await db.query(
+      `INSERT INTO public.recruiter_contact_requests (application_id, recruiter_user_id, driver_user_id, status)
+       VALUES ($1,$2,$3,'pending')`, [appOnEligible, RECR_A_USER, DRIVER_USER]);
+    let ownerN = -1;
+    let strangerN = -1;
+    await asUser(RECR_A_USER, async () => {
+      const r = await db.query(`SELECT id FROM public.recruiter_contact_requests WHERE application_id=$1`, [appOnEligible]);
+      ownerN = r.rows.length;
+    });
+    await asUser(RECR_B_USER, async () => {
+      const r = await db.query(`SELECT id FROM public.recruiter_contact_requests WHERE application_id=$1`, [appOnEligible]);
+      strangerN = r.rows.length;
+    });
+    expect(ownerN).toBeGreaterThan(0);
+    expect(strangerN).toBe(0);
+  });
+});
+
+describe("Phase 1F-A.2 — referrals gate on canonical eligibility", () => {
+  let refOpp: string;
+  beforeAll(async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'Referral-target','active','approved', now()) RETURNING id`, [recrAId]);
+    refOpp = r.rows[0].id;
+  });
+
+  it("60. create_driver_referral_safe succeeds while recruiter eligible", async () => {
+    let id: string | null = null;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ id: string }>(
+        `SELECT public.create_driver_referral_safe($1,$2,'Jane','jane@x.example','555-0100','note') id`,
+        [refOpp, recrAId]);
+      id = r.rows[0].id;
+    });
+    expect(id).toBeTruthy();
+  });
+  it("61. create_driver_referral_safe fails after recruiter suspension", async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`, [recrAId]);
+    await expect(asUser(DRIVER_USER, async () => {
+      await db.query(
+        `SELECT public.create_driver_referral_safe($1,$2,'Ken','ken@x.example','555-0101','n')`,
+        [refOpp, recrAId]);
+    })).rejects.toThrow();
+    await db.query(`UPDATE public.recruiter_profiles SET status='active' WHERE id=$1`, [recrAId]);
+  });
+});
+
+describe("Phase 1F-A.2 — recruiter profile UPDATE denial (both suspension states)", () => {
+  it("62. UPDATE denied when status='suspended'", async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended', verification_status='approved' WHERE id=$1`, [suspendedRpId]);
+    await asUser(SUSPENDED_USER, async () => {
+      await db.query(`UPDATE public.recruiter_profiles SET recruiter_name='Should Not' WHERE id=$1`, [suspendedRpId]);
+    });
+    const r = await db.query<{ recruiter_name: string }>(
+      `SELECT recruiter_name FROM public.recruiter_profiles WHERE id=$1`, [suspendedRpId]);
+    expect(r.rows[0].recruiter_name).not.toBe("Should Not");
+  });
+  it("63. UPDATE denied when verification_status='suspended'", async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='suspended' WHERE id=$1`, [suspendedRpId]);
+    await asUser(SUSPENDED_USER, async () => {
+      await db.query(`UPDATE public.recruiter_profiles SET recruiter_name='Also Not' WHERE id=$1`, [suspendedRpId]);
+    });
+    const r = await db.query<{ recruiter_name: string }>(
+      `SELECT recruiter_name FROM public.recruiter_profiles WHERE id=$1`, [suspendedRpId]);
+    expect(r.rows[0].recruiter_name).not.toBe("Also Not");
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended', verification_status='approved' WHERE id=$1`, [suspendedRpId]);
+  });
+});
+
+describe("Phase 1F-A.2 — direct consent forgery prevention", () => {
+  it("64. non-admin INSERT with posting_terms_accepted_at is stripped by guard", async () => {
+    const NEW_USER = "88888888-8888-8888-8888-888888888888";
+    let stampedId: string | null = null;
+    await asUser(NEW_USER, async () => {
+      const r = await db.query<{ id: string; ts: string | null; leg: string | null }>(
+        `INSERT INTO public.recruiter_profiles
+           (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+            posting_terms_accepted_at, posting_terms_version, legacy_terms_grandfathered_at)
+         VALUES ($1,'Ivy','Ico','ivy@i.example','999888', now(), '2026-07-17.v1', now())
+         RETURNING id, posting_terms_accepted_at ts, legacy_terms_grandfathered_at leg`,
+        [NEW_USER]);
+      stampedId = r.rows[0].id;
+      expect(r.rows[0].ts).toBeNull();
+      expect(r.rows[0].leg).toBeNull();
+    });
+    expect(stampedId).toBeTruthy();
+  });
+  it("65. non-admin UPDATE cannot self-set posting_terms_accepted_at without the RPC", async () => {
+    await asUser(NO_CONSENT_USER, async () => {
+      await db.query(
+        `UPDATE public.recruiter_profiles SET posting_terms_accepted_at=now(), posting_terms_version='2026-07-17.v1' WHERE id=$1`,
+        [noConsentRpId]);
+    });
+    const r = await db.query<{ ts: string | null; v: string | null }>(
+      `SELECT posting_terms_accepted_at ts, posting_terms_version v FROM public.recruiter_profiles WHERE id=$1`,
+      [noConsentRpId]);
+    expect(r.rows[0].ts).toBeNull();
+    expect(r.rows[0].v).toBeNull();
+  });
+});
+
+describe("Phase 1F-A.2 — accept_recruiter_posting_terms RPC", () => {
+  const CLEAN_USER = "99999999-9999-9999-9999-999999999999";
+  const OTHER_USER = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  let cleanRpId: string;
+  let otherRpId: string;
+
+  beforeAll(async () => {
+    // Two eligible-but-not-yet-consented profiles.
+    const c = await db.query<{ id: string }>(
+      `INSERT INTO public.recruiter_profiles
+         (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+          status, verification_status)
+       VALUES ($1,'Cleo','Cco','cleo@c.example','321321','active','pending')
+       RETURNING id`, [CLEAN_USER]);
+    cleanRpId = c.rows[0].id;
+    const o = await db.query<{ id: string }>(
+      `INSERT INTO public.recruiter_profiles
+         (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+          status, verification_status)
+       VALUES ($1,'Otto','Oco','otto@o.example','747474','active','pending')
+       RETURNING id`, [OTHER_USER]);
+    otherRpId = o.rows[0].id;
+  });
+
+  it("66. rejects wrong version", async () => {
+    await expect(asUser(CLEAN_USER, async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('9999-01-01.v9')`);
+    })).rejects.toThrow();
+  });
+  it("67. stamps timestamp visible in DB for correct version", async () => {
+    let returned: string | null = null;
+    await asUser(CLEAN_USER, async () => {
+      const r = await db.query<{ ts: string }>(
+        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1') ts`);
+      returned = r.rows[0].ts;
+    });
+    expect(returned).toBeTruthy();
+    const r = await db.query<{ ts: string | null; v: string | null }>(
+      `SELECT posting_terms_accepted_at ts, posting_terms_version v
+         FROM public.recruiter_profiles WHERE id=$1`, [cleanRpId]);
+    expect(r.rows[0].ts).not.toBeNull();
+    expect(r.rows[0].v).toBe("2026-07-17.v1");
+  });
+  it("68. idempotent — repeat returns identical timestamp, no drift", async () => {
+    let first: string | null = null;
+    let second: string | null = null;
+    await asUser(CLEAN_USER, async () => {
+      const r1 = await db.query<{ ts: string }>(
+        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1') ts`);
+      first = r1.rows[0].ts;
+      const r2 = await db.query<{ ts: string }>(
+        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1') ts`);
+      second = r2.rows[0].ts;
+    });
+    // pg driver returns Date objects; compare by ISO value, not identity.
+    expect(new Date(first!).toISOString()).toBe(new Date(second!).toISOString());
+  });
+  it("69. rejects anon caller", async () => {
+    await expect(asAnon(async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')`);
+    })).rejects.toThrow();
+  });
+  it("70. rejects incomplete profile", async () => {
+    await expect(asUser(INCOMPLETE_USER, async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')`);
+    })).rejects.toThrow();
+  });
+  it("71. rejects suspended profile (both status flavors)", async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended', verification_status='approved' WHERE id=$1`, [suspendedRpId]);
+    await expect(asUser(SUSPENDED_USER, async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')`);
+    })).rejects.toThrow();
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='suspended' WHERE id=$1`, [suspendedRpId]);
+    await expect(asUser(SUSPENDED_USER, async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')`);
+    })).rejects.toThrow();
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended', verification_status='approved' WHERE id=$1`, [suspendedRpId]);
+  });
+  it("72. does not affect other users' profiles (no cross-write)", async () => {
+    const before = await db.query<{ ts: string | null }>(
+      `SELECT posting_terms_accepted_at ts FROM public.recruiter_profiles WHERE id=$1`, [otherRpId]);
+    await asUser(CLEAN_USER, async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')`);
+    });
+    const after = await db.query<{ ts: string | null }>(
+      `SELECT posting_terms_accepted_at ts FROM public.recruiter_profiles WHERE id=$1`, [otherRpId]);
+    expect(after.rows[0].ts).toBe(before.rows[0].ts);
+  });
+  it("73. legacy-grandfathered profile is eligible without RPC call", async () => {
+    // Give NO_CONSENT_USER a legacy grandfather (admin-side raw update).
+    await db.query(
+      `UPDATE public.recruiter_profiles SET legacy_terms_grandfathered_at=now() WHERE id=$1`,
+      [noConsentRpId]);
+    const r = await db.query<{ b: boolean }>(
+      `SELECT public.recruiter_profile_can_manage_opportunities($1) b`, [noConsentRpId]);
+    expect(r.rows[0].b).toBe(true);
+    await db.query(
+      `UPDATE public.recruiter_profiles SET legacy_terms_grandfathered_at=NULL WHERE id=$1`,
+      [noConsentRpId]);
+  });
+});
+
