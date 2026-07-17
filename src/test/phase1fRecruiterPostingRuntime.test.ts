@@ -1455,13 +1455,19 @@ describe("Phase 1F-A.2.1A-R1 — column privileges on recruiter_profiles", () =>
     expect(after.rows[0].b).toBe(true);
   });
 
-  it("79b. candidate fixture SQL contains no GRANT ... TO service_role", async () => {
-    // Guard the fixture text itself against re-broadening of service_role.
+  it("79b. candidate fixture SQL contains no table/column GRANT to service_role", async () => {
+    // Guard the fixture text itself against re-broadening of service_role
+    // TABLE or COLUMN privileges. GRANT EXECUTE on a function is a
+    // separate mechanism and is explicitly allowed.
     const fixtureSrc = require('node:fs').readFileSync(
       require('node:path').resolve(process.cwd(), 'src/test/fixtures/phase1fa21ServerTermsRepair.sql'),
       'utf8',
     );
-    expect(fixtureSrc).not.toMatch(/GRANT[\s\S]*?TO\s+service_role/i);
+    // Match GRANT <privilege-list> [ON ... TABLE?] ... TO service_role,
+    // but NOT `GRANT EXECUTE ON FUNCTION ... TO ..., service_role`.
+    expect(fixtureSrc).not.toMatch(
+      /GRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[\s\S]*?TO[\s\S]*?service_role/i,
+    );
   });
 
   it("80. ordinary authenticated owner update still succeeds", async () => {
