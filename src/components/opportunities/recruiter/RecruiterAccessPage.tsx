@@ -31,9 +31,12 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useUserRole } from '@/hooks/useUserRole';
 import { RecruiterBillingPanel } from '../RecruiterBillingPanel';
+import { describeRecruiterEligibility } from '@/lib/opportunities/recruiterEligibility';
 
-// Phase 1F-A: state machine — profile completeness + suspension gate posting.
-// Admin verification (`isVerified`) is a trust badge only, tracked separately.
+// Phase 1F-A.2.2: presentation state derived from the canonical eligibility
+// helper — this file MUST NOT reimplement completeness. `active_billing`
+// vs `active_no_billing` only alters PREMIUM presentation; posting access
+// is decided entirely by canonical eligibility.
 type RecruiterState =
   | 'none'
   | 'incomplete'
@@ -41,22 +44,16 @@ type RecruiterState =
   | 'active_no_billing'
   | 'active_billing';
 
-function isNonEmpty(v: unknown): boolean {
-  return typeof v === 'string' && v.trim().length > 0;
-}
-
 function resolveState(
   profile: RecruiterProfile | null,
   isBillingActive: boolean,
-): RecruiterState {
-  if (!profile) return 'none';
-  if (profile.status === 'suspended' || profile.verification_status === 'suspended') return 'suspended';
-  const complete =
-    isNonEmpty(profile.recruiter_name) &&
-    isNonEmpty(profile.company_name) &&
-    isNonEmpty(profile.recruiter_email);
-  if (!complete) return 'incomplete';
-  return isBillingActive ? 'active_billing' : 'active_no_billing';
+  intentRecruiter: boolean,
+): { state: RecruiterState; canPost: boolean } {
+  const e = describeRecruiterEligibility(profile, { intentRecruiter });
+  if (e.state === 'missing_profile') return { state: 'none', canPost: false };
+  if (e.state === 'suspended') return { state: 'suspended', canPost: false };
+  if (e.state === 'incomplete_profile') return { state: 'incomplete', canPost: false };
+  return { state: isBillingActive ? 'active_billing' : 'active_no_billing', canPost: e.canPost };
 }
 
 interface Props {
@@ -77,7 +74,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const howRef = useRef<HTMLDivElement | null>(null);
   const onboardingRef = useRef<HTMLDivElement | null>(null);
 
-  const state = resolveState(profile, isBillingActive);
+  const { state, canPost } = resolveState(profile, isBillingActive, !!intentRecruiter);
   const apps = recruiterApplications;
 
   const snapshot = useMemo(() => {
@@ -115,8 +112,8 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
 
   const recentPosts = useMemo(() => opportunities.slice(0, 5), [opportunities]);
 
-  // Approved/verified recruiters can post unlimited standard opportunities — billing is only for premium tools.
-  const canPost = state === 'active_billing' || state === 'active_no_billing';
+  // Phase 1F-A.2.2: `canPost` is the canonical eligibility signal derived
+  // from describeRecruiterEligibility(). Billing NEVER gates standard posting.
   const postDisabled = !canPost;
 
   const handlePost = () => {
@@ -255,7 +252,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   {state === 'incomplete'
-                    ? 'Add your recruiter name, company name, and recruiter email to your profile. Standard posting unlocks the moment those are saved.'
+                    ? 'Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Standard posting unlocks the moment those are saved.'
                     : intentRecruiter
                     ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter application to start posting.'
                     : 'Submit your recruiter information. Standard posting unlocks as soon as your profile is complete — no admin approval needed to post.'}
@@ -378,7 +375,7 @@ function StateCard({
 
   const cfg =
     state === 'incomplete'
-      ? { Icon: AlertTriangle, title: 'Finish your recruiter profile', body: 'Add your recruiter name, company name, and recruiter email. Standard posting unlocks as soon as your profile is complete.', tone: 'bg-amber-500/10 border-amber-500/30 text-amber-400', cta: { label: 'Complete Profile', onClick: onOpenOnboarding } }
+      ? { Icon: AlertTriangle, title: 'Finish your recruiter profile', body: 'Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Standard posting unlocks as soon as your profile is complete.', tone: 'bg-amber-500/10 border-amber-500/30 text-amber-400', cta: { label: 'Complete Profile', onClick: onOpenOnboarding } }
       : state === 'suspended'
       ? { Icon: Ban, title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: null }
       : state === 'active_no_billing'
