@@ -208,12 +208,11 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               <Truck className="h-32 w-32 text-primary" strokeWidth={1} />
             </div>
             <div className="relative space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="text-sm font-bold text-foreground">Recruiting Snapshot</h3>
-                <Badge variant="outline" className="capitalize text-[10px]">
-                  {state.replace('_', ' ')}
-                </Badge>
+                <RecruiterTrustStatus profile={profile} intentRecruiter={!!intentRecruiter} />
               </div>
+
               <div className="grid grid-cols-2 gap-2.5">
                 <SnapshotStat label="Active Opportunities" value={snapshot.activeOpps} loading={oppsLoading} />
                 <SnapshotStat label="New Driver Requests" value={snapshot.newReq} loading={isLoadingRecruiter} />
