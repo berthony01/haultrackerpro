@@ -1200,7 +1200,8 @@ describe("Phase 1F-A.2 — accept_recruiter_posting_terms RPC", () => {
         `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1') ts`);
       second = r2.rows[0].ts;
     });
-    expect(first).toBe(second);
+    // pg driver returns Date objects; compare by ISO value, not identity.
+    expect(new Date(first!).toISOString()).toBe(new Date(second!).toISOString());
   });
   it("69. rejects anon caller", async () => {
     await expect(asAnon(async () => {
