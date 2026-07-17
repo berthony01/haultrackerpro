@@ -133,7 +133,7 @@ function mockManager(opportunities: unknown[]) {
     createOpportunity: { mutate: vi.fn(), isPending: false },
     updateOpportunity: { mutate: vi.fn(), isPending: false },
     setStatus: { mutate: vi.fn(), isPending: false },
-  });
+  } as never);
 }
 
 beforeEach(() => {
