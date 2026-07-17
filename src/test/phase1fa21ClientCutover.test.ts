@@ -146,6 +146,7 @@ beforeEach(() => {
   rpcNextError = null;
   rpcNextData = '2026-07-17T00:00:00Z';
   currentProfile = null;
+  insertedIdCounter = 0;
 });
 
 describe('Phase 1F-A.2.1A-R1 client cutover', () => {
