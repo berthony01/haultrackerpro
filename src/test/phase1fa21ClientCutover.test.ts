@@ -120,17 +120,16 @@ vi.mock('@tanstack/react-query', async () => {
   return { useMutation, useQuery, useQueryClient };
 });
 
+let refStore: { current: unknown } | null = null;
+function resetRefStore() { refStore = null; }
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
-  const refs = new WeakMap<object, { current: unknown }>();
-  const refKey: object = { k: 'known-profile-id' };
   return {
     ...actual,
     useEffect: () => undefined,
     useRef: <T,>(initial: T) => {
-      let r = refs.get(refKey);
-      if (!r) { r = { current: initial as unknown }; refs.set(refKey, r); }
-      return r as { current: T };
+      if (!refStore) refStore = { current: initial as unknown };
+      return refStore as { current: T };
     },
   };
 });
