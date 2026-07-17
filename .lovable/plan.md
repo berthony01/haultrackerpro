@@ -1,80 +1,97 @@
-## Phase 1F-A — Recruiter Immediate Standard Posting Authorization
+## Phase 1F-A.1 — Recruiter Posting Authorization and Driver Visibility Correction
 
-### Difficulty & risk
-Medium-high. Server-authoritative permission change touching triggers + RLS-adjacent guards. Narrow scope: one migration, four client files, tests. No billing, no schema redesign, no data rewrite.
+### Difficulty / Risk
+**High complexity, high importance.** Touches: RLS on `opportunities`, three trigger functions, four SECURITY DEFINER driver/recruiter RPCs, one narrow schema change on `recruiter_profiles`, onboarding form, eligibility helper, and a real-RLS PGlite runtime harness. Live data risk: **low** (1 recruiter profile, already approved; 0 active opps under unverified recruiters). Blast radius contained if migration is scoped strictly.
 
-### Starting state (verified)
-- HEAD: `c2bc1fb2` (Phase 1E), clean tree.
-- Baseline: 872/872 passing (per prior turn).
-- `recruiter_profiles.verification_status` domain: `pending|approved|rejected|suspended` (default `pending`).
-- Onboarding form (`RecruiterOnboarding.tsx`) required fields: `recruiter_name`, `company_name`, `recruiter_email`. All others optional.
-- Server gates found requiring `verification_status='approved'`:
-  1. `public.opportunities_guard()` — sets `admin_review_status='pending'` unless approved, blocking public visibility.
-  2. `public.opportunities_billing_guard()` — raises `42501` on active insert/update unless approved.
-- Client gates: `useRecruiterOpportunities.requireApproved`, `describeRecruiterBlock` (pending/rejected → block), `RecruiterAccessPage` state machine (`pending`/`rejected` treated as pre-post gates).
-- Live data: 1 recruiter (already approved/active), 1 active/approved opportunity, 3 closed/pending. No incomplete or suspended rows — safe.
+### Pre-Edit Live Map (recorded)
+- HEAD: `0bc7d51...` (baseline).
+- `recruiter_profiles`: 1 row (verification=approved, status=active). Complete under new rule: 1.
+- `opportunities`: 4 total (1 active/approved, 3 closed/pending). 0 active opps owned by unverified recruiters. 0 orphaned.
+- **Defects confirmed:**
+  1. `list_driver_visible_opportunities` still filters `rp.verification_status='approved'`.
+  2. `create_driver_referral_safe` still filters `rp.verification_status='approved'`.
+  3. `request_driver_contact` still requires `rp.verification_status='approved'`.
+  4. `recruiter_can_post(uuid)` has `EXECUTE` for `anon` — anonymous eligibility enumeration.
+  5. Opportunity INSERT/UPDATE policies use `is_recruiter_owner` (owner + not-suspended only) — no completeness check, no verification-suspended check.
+  6. `opportunities_billing_guard` only fires on transition to active; incomplete recruiter can still insert drafts.
+  7. Completeness rule missing DOT/MC and agreement persistence.
+  8. `list_recruiter_applications_safe` already permits unverified (checks only both-suspension) — OK.
 
-### Canonical rule (server + client)
-A recruiter may create/edit/publish/pause/reactivate/close standard opportunities when:
-- `recruiter_profiles` row exists for `auth.uid()`
-- `recruiter_name`, `company_name`, `recruiter_email` are non-empty (matches onboarding required fields)
+### Canonical Server Eligibility Rule
+A recruiter profile is eligible to manage standard opportunities iff:
+- `recruiter_name`, `company_name`, `recruiter_email` all non-empty trimmed
+- `recruiter_email` matches a stable server-side pattern (`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+- at least one of `dot_number` / `mc_number` non-empty
+- `posting_terms_accepted_at IS NOT NULL` (or grandfathered via `legacy_terms_grandfathered_at`)
 - `status <> 'suspended'` AND `verification_status <> 'suspended'`
 
-Verification `approved` no longer gates posting — it only awards the Verified badge.
+### Consent Persistence Design
+Add two narrow columns on `recruiter_profiles`:
+- `posting_terms_accepted_at timestamptz NULL`
+- `posting_terms_version text NULL` (client stamps `'2026-07-17.v1'`)
 
-### Changes
+`recruiter_profile_guard` extended so:
+- Non-admin **INSERT**: if `posting_terms_accepted_at` provided, it stays (server trusts the client's stamp because the row is theirs and the checkbox gate is enforced client-side + eligibility gate enforced server-side). Otherwise NULL.
+- Non-admin **UPDATE**: only monotonic — cannot clear once set; version updates allowed.
 
-**1. Migration** (one, narrow)
-- Add SECURITY DEFINER helper `public.recruiter_can_post(_user_id uuid) returns boolean` with pinned `search_path=public`. Encodes the rule above.
-- `CREATE OR REPLACE` `public.opportunities_guard()`:
-  - Eligibility becomes `recruiter_can_post(auth.uid())` on the row's owner.
-  - INSERT: `admin_review_status := 'approved'` when eligible + owner match; `published_at := now()` when active + eligible. Ineligible insert falls through with `pending` (billing_guard will still reject active).
-  - UPDATE: unchanged rejection→pending re-review path.
-- `CREATE OR REPLACE` `public.opportunities_billing_guard()`:
-  - Replace the approved-verification requirement with `recruiter_can_post(auth.uid())` scoped to owner.
-  - Error message updated: "Complete your recruiter profile to publish opportunities." (removed "verified").
-- No RLS policy edits needed (ownership + suspension already covered via existing `is_recruiter_owner` + `recruiter_profile_guard`).
-- No data rewrite. No column changes.
+### Legacy Grandfathering
+Add `legacy_terms_grandfathered_at timestamptz NULL`. In the migration, backfill `legacy_terms_grandfathered_at = now()` **only** for rows created before the migration timestamp (`WHERE created_at < now()`). Live count affected: **1 row**. Future direct inserts get neither timestamp unless the client sets `posting_terms_accepted_at`, so no auto-consent leak.
 
-**2. Client**
-- `src/lib/opportunities/recruiterEligibility.ts` (NEW): pure helper `describeRecruiterEligibility(profile, {intentRecruiter})` returning `{ state: 'missing_profile'|'incomplete_profile'|'suspended'|'active_unverified'|'verified', canPost, isVerified, title, body, cta? }`.
-- `src/lib/opportunities/describeRecruiterBlock.ts`: reuse the new helper; drop "approved unlocks posting" / "one business day" copy; pending & rejected now return `reason: 'ok'` (non-blocking) with badge omitted.
-- `src/hooks/opportunities/useRecruiterProfile.ts`: expose `canPost` and `isVerified` in addition to `isApproved` (kept for back-compat with badge-only readers).
-- `src/hooks/opportunities/useRecruiterOpportunities.ts`: `requireApproved` → `requireCanPost` using new helper; error text updated.
-- `src/components/opportunities/RecruiterOpportunityManager.tsx`: uses `canPost` gate; block copy from helper.
-- `src/components/opportunities/recruiter/RecruiterAccessPage.tsx`: state machine collapses `pending`/`rejected` (non-suspended, completed) into `active_unverified`. Verified badge only for `verified`. Removes "Approval is required to post" copy.
+### Eligibility Helpers
+Add:
+- `public.recruiter_profile_can_manage_opportunities(_recruiter_id uuid) → boolean` — SECURITY DEFINER, pinned search_path, checks the full canonical rule + accepted-or-grandfathered consent. `REVOKE ALL FROM PUBLIC`; `GRANT EXECUTE TO authenticated, service_role` (used by RLS `WITH CHECK`).
+- `public.current_user_can_manage_recruiter_opportunities(_recruiter_id uuid) → boolean` — SECURITY DEFINER, uses `auth.uid()`, verifies profile ownership + eligibility. `GRANT EXECUTE TO authenticated, service_role`.
+- Keep `is_recruiter_owner` (still used elsewhere) but stop relying on it for opportunity writes.
+- **Lock down** `recruiter_can_post(uuid)`: `REVOKE ALL FROM PUBLIC, anon, authenticated`; keep for `service_role` only. All internal callers routed through the two new helpers.
 
-**3. Tests**
-- `src/test/phase1fRecruiterEligibility.test.ts` (~15 cases): pure helper matrix (missing/incomplete/pending/rejected/approved/suspended/status-suspended/verification-suspended, badge logic, copy scanner for forbidden phrases like "approved profiles unlock posting", "must be approved", "one business day").
-- `src/test/phase1fRecruiterPostingRuntime.test.ts` (PGlite, ~10 cases): boots exact migration + prior recruiter_profiles/opportunities DDL, sets `request.jwt.claim.sub`, asserts:
-  - pending recruiter INSERT active → succeeds, `admin_review_status='approved'`.
-  - rejected (not suspended) recruiter INSERT active → succeeds, `admin_review_status='approved'`.
-  - approved recruiter → succeeds.
-  - suspended (via status OR verification_status) → billing_guard raises.
-  - incomplete profile (empty company_name) → billing_guard raises.
-  - missing profile → RLS/ownership blocks.
-  - recruiter A cannot INSERT/UPDATE recruiter B's opportunity.
-  - client-set `featured=true` on INSERT is overwritten to false unless admin.
-  - UPDATE by suspended recruiter → billing_guard raises on reactivation.
-  - Admin update to `admin_review_status='rejected'` still works.
+### RLS Policy Changes on `public.opportunities`
+Drop and recreate:
+- `Recruiter inserts own opportunities` — `WITH CHECK current_user_can_manage_recruiter_opportunities(recruiter_id)`
+- `Recruiter updates own opportunities` — `USING` and `WITH CHECK` both use `current_user_can_manage_recruiter_opportunities(recruiter_id)`
+- `Recruiter views own opportunities` — unchanged (view is allowed for owned rows regardless of eligibility so recruiters see their own drafts even if consent lapses).
 
-### Files touched (expected diff)
-```
-supabase/migrations/<timestamp>_phase1f_recruiter_posting.sql   (NEW)
-src/lib/opportunities/recruiterEligibility.ts                    (NEW)
-src/lib/opportunities/describeRecruiterBlock.ts                  (edit)
-src/hooks/opportunities/useRecruiterProfile.ts                   (edit)
-src/hooks/opportunities/useRecruiterOpportunities.ts             (edit)
-src/components/opportunities/RecruiterOpportunityManager.tsx     (edit)
-src/components/opportunities/recruiter/RecruiterAccessPage.tsx   (edit)
-src/test/phase1fRecruiterEligibility.test.ts                     (NEW)
-src/test/phase1fRecruiterPostingRuntime.test.ts                  (NEW)
-.lovable/plan.md                                                 (edit)
-```
-Not touched: any Stripe/billing/webhook/checkout/email/Dispatcher/Driver/Agency/Assistant file, package.json, lockfiles, unrelated RLS.
+### Trigger Changes
+- `opportunities_billing_guard`: now also blocks INSERT of a draft when caller is non-admin and not eligible (defense in depth alongside RLS). Message unchanged.
+- `opportunities_guard`: retain moderation-field control. Continue to set `admin_review_status='approved'` for eligible non-admin INSERTs (marketplace visibility), `pending` otherwise. `featured` and `view_count` remain server-controlled. Rejected→edit → `pending` retained.
+- `recruiter_profile_guard`: extended to allow non-admin to set/preserve `posting_terms_accepted_at`/`_version` monotonically; block clearing/backdating; admin unrestricted.
 
-### Verification
-`bunx tsc -p tsconfig.app.json --noEmit`, `bunx tsc -p tsconfig.node.json --noEmit`, targeted vitest, full vitest, `bun run build`. DEF-04 and DEF-23 regression tests must remain green. Baseline 872 → 872 + ~25 new.
+### Driver Visibility & Pipeline RPC Changes
+- `list_driver_visible_opportunities`: drop `rp.verification_status='approved'`; replace with `public.recruiter_profile_can_manage_opportunities(rp.id)`. Keep `o.status='active' AND o.admin_review_status='approved'`. Filters/ordering unchanged.
+- `create_driver_referral_safe`: replace `rp.verification_status='approved'` with the profile eligibility helper.
+- `request_driver_contact`: replace `_rp.verification_status='approved'` with eligibility helper (still checks both-suspension). Contact-request consent flow (driver approves) unchanged.
+- `list_recruiter_applications_safe`: unchanged (already permits unverified).
+- `opportunity_applications` "Driver inserts own application" policy: unchanged (already checks only `o.status='active' AND o.admin_review_status='approved'`, which is now correctly gated by the trigger for eligible recruiters).
 
-### Stop conditions honored
-No schema redesign, no data rewrite, no billing changes, no form redesign, no dependency changes.
+### Verified Badge
+Untouched. `OpportunityCard`, `RecruiterAccessPage`, admin panels continue to key exclusively off `verification_status='approved'`. New `isVerified` in `useRecruiterProfile` unchanged.
+
+### Client Changes
+- **`RecruiterOnboarding.tsx`**: stamp `posting_terms_accepted_at=now().toISOString()` and `posting_terms_version='2026-07-17.v1'` in the upsert payload; do **not** auto-check agreements on load for legacy rows without consent (check only if `posting_terms_accepted_at` or `legacy_terms_grandfathered_at` is set); status copy: approved no longer says "will soon be able to create" — say "Verified Recruiter badge added. Standard posting is enabled." Pending: "Standard posting is enabled. A Verified Recruiter badge is added after admin review." Rejected: "Verification was not approved. Standard posting remains enabled unless suspended; update your info and resubmit for the badge."
+- **`recruiterEligibility.ts`**: extend `isProfileComplete` to include DOT-or-MC + valid email + accepted-or-grandfathered consent. Single source of truth reused by `useRecruiterProfile.canPost`.
+- **`useRecruiterProfile.ts`**: derive `canPost` via `describeRecruiterEligibility` to remove duplicated logic.
+- **Types**: regenerated after migration.
+
+### Files touched (diff control)
+- **new migration**: `supabase/migrations/<ts>_phase1f_a1_recruiter_authorization.sql`
+- `src/components/opportunities/RecruiterOnboarding.tsx`
+- `src/lib/opportunities/recruiterEligibility.ts`
+- `src/hooks/opportunities/useRecruiterProfile.ts`
+- `src/integrations/supabase/types.ts` (auto-regenerated)
+- `src/test/phase1fRecruiterEligibility.test.ts` (extend)
+- `src/test/phase1fRecruiterPostingRuntime.test.ts` (rewrite to real RLS roles + real RPC)
+- `src/test/phase1eRecruiterOnboardingContinuity.test.ts` (adjust copy assertions if any regress)
+- `.lovable/plan.md`
+
+### Runtime Test Harness (PGlite)
+Applies the actual migration SQL after seeding a schema-faithful baseline: `anon`, `authenticated`, `service_role`, per-user JWT claims via `request.jwt.claims`, real `auth.uid()` from JWT, real `RLS`. Tests run under `SET LOCAL ROLE authenticated` with `SET LOCAL request.jwt.claims`. Cases 1–40 exactly as spec'd. Includes DEF-04 & DEF-23 regression files run untouched.
+
+### Verification Commands (all mandatory)
+`bun install --frozen-lockfile`, both `bunx tsc -p tsconfig.{app,node}.json --noEmit`, `bunx vitest run` (targeted then full), `bun run build`, DEF-04/DEF-23 test files.
+
+### STOP Conditions Honored
+Only these public functions change: `recruiter_can_post`, `opportunities_guard`, `opportunities_billing_guard`, `list_driver_visible_opportunities`, `create_driver_referral_safe`, `request_driver_contact`, `recruiter_profile_guard` (extension), plus the two new helpers. No Stripe, billing, checkout, webhook, email, account-deletion, dispatcher, agency, or assistant code touched. No package.json / lockfile change (PGlite already present from Phase 1C-3).
+
+### Acceptance Path
+All 40 runtime cases + client tests must pass; `verification_status` counts unchanged; opportunity counts unchanged; anon has no eligibility RPC; both tsc pass; full vitest green (expected 904 + new cases); build green.
+
+Proceeding to implementation on approval.
