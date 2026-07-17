@@ -2821,7 +2821,10 @@ export type Database = {
           equipment_types: string[]
           hiring_states: string[]
           id: string
+          legacy_terms_grandfathered_at: string | null
           mc_number: string | null
+          posting_terms_accepted_at: string | null
+          posting_terms_version: string | null
           recruiter_email: string | null
           recruiter_name: string
           recruiter_phone: string | null
@@ -2846,7 +2849,10 @@ export type Database = {
           equipment_types?: string[]
           hiring_states?: string[]
           id?: string
+          legacy_terms_grandfathered_at?: string | null
           mc_number?: string | null
+          posting_terms_accepted_at?: string | null
+          posting_terms_version?: string | null
           recruiter_email?: string | null
           recruiter_name: string
           recruiter_phone?: string | null
@@ -2871,7 +2877,10 @@ export type Database = {
           equipment_types?: string[]
           hiring_states?: string[]
           id?: string
+          legacy_terms_grandfathered_at?: string | null
           mc_number?: string | null
+          posting_terms_accepted_at?: string | null
+          posting_terms_version?: string | null
           recruiter_email?: string | null
           recruiter_name?: string
           recruiter_phone?: string | null
@@ -3810,6 +3819,10 @@ export type Database = {
         }
         Returns: string
       }
+      current_user_can_manage_recruiter_opportunities: {
+        Args: { _recruiter_id: string }
+        Returns: boolean
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -4398,6 +4411,10 @@ export type Database = {
         Returns: boolean
       }
       recruiter_plan_limit: { Args: { _plan: string }; Returns: number }
+      recruiter_profile_can_manage_opportunities: {
+        Args: { _recruiter_id: string }
+        Returns: boolean
+      }
       referral_status_rank: { Args: { _s: string }; Returns: number }
       request_driver_contact: {
         Args: { application_id: string; recruiter_note?: string }
