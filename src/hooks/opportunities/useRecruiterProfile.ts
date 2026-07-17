@@ -68,18 +68,46 @@ export function useRecruiterProfile() {
   }, [user, qc]);
 
 
-  const upsertProfile = useMutation({
-    mutationFn: async (data: RecruiterProfileUpsert) => {
-      if (!user) throw new Error('Not authenticated');
-      // Phase 1F-A.2.1A: never send protected consent columns.
-      const safe = { ...data } as Record<string, unknown>;
-      delete safe.posting_terms_accepted_at;
-      delete safe.posting_terms_version;
-      delete safe.legacy_terms_grandfathered_at;
+  // Phase 1F-A.2.1A-R1: shared ordinary-profile persistence. NEVER uses
+  // Postgres ON CONFLICT DO UPDATE — such a payload includes user_id and
+  // would require UPDATE privilege on user_id, which the fixture revokes.
+  // Instead this branches on the currently-known profile id: UPDATE
+  // existing, INSERT missing. user_id is never present in any UPDATE payload.
+
+  async function persistOrdinaryProfile(input: RecruiterProfileUpsert): Promise<void> {
+    if (!user) throw new Error('Not authenticated');
+    // Defensively strip every protected column even if a caller sneaks one in.
+    const safe = { ...input } as Record<string, unknown>;
+    delete safe.posting_terms_accepted_at;
+    delete safe.posting_terms_version;
+    delete safe.legacy_terms_grandfathered_at;
+    delete safe.user_id;
+    delete safe.id;
+    delete safe.created_at;
+
+    const existingId = profileQuery.data?.id ?? null;
+    if (existingId) {
       const { error } = await supabase
         .from('recruiter_profiles')
-        .upsert({ ...(safe as RecruiterProfileUpsert), user_id: user.id }, { onConflict: 'user_id' });
+        .update(safe as never)
+        .eq('id', existingId)
+        .eq('user_id', user.id);
       if (error) throw error;
+      return;
+    }
+    const { error } = await supabase
+      .from('recruiter_profiles')
+      .insert({ ...(safe as RecruiterProfileUpsert), user_id: user.id } as never);
+    if (error) throw error;
+  }
+
+  // Ordinary-save API preserved for callers that only need to persist
+  // profile fields (no consent stamping). Implemented via the shared branch
+  // so it also never issues a client-side upsert. Protected columns stripped.
+
+  const upsertProfile = useMutation({
+    mutationFn: async (data: RecruiterProfileUpsert) => {
+      await persistOrdinaryProfile(data);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recruiter_profile'] });
@@ -87,28 +115,28 @@ export function useRecruiterProfile() {
     },
   });
 
-  // Phase 1F-A.2.1A: single mutation that saves ordinary profile fields
-  // and then, when the caller intends to stamp consent, calls the
-  // server-authoritative RPC. If the RPC fails the mutation fails.
+  // Phase 1F-A.2.1A-R1: combined onboarding mutation ALWAYS calls the
+  // server-authoritative terms RPC after ordinary fields save. Callers no
+  // longer pass acceptTerms — the UI already requires all three agreements
+  // before submit, and the RPC is idempotent for already-accepted rows.
+  // If ordinary save succeeds and the RPC fails we surface a controlled
+  // partial-save error so the UI can tell the user what happened.
   const saveRecruiterProfile = useMutation({
     mutationFn: async (
-      args: { data: RecruiterProfileUpsert; acceptTerms: boolean },
-    ): Promise<{ acceptedAt: string | null }> => {
-      if (!user) throw new Error('Not authenticated');
-      const safe = { ...args.data } as Record<string, unknown>;
-      delete safe.posting_terms_accepted_at;
-      delete safe.posting_terms_version;
-      delete safe.legacy_terms_grandfathered_at;
-      const { error: upsertErr } = await supabase
-        .from('recruiter_profiles')
-        .upsert({ ...(safe as RecruiterProfileUpsert), user_id: user.id }, { onConflict: 'user_id' });
-      if (upsertErr) throw upsertErr;
-      if (!args.acceptTerms) return { acceptedAt: null };
-      const { data, error: rpcErr } = await (supabase as unknown as {
+      data: RecruiterProfileUpsert,
+    ): Promise<{ acceptedAt: string }> => {
+      await persistOrdinaryProfile(data);
+      const { data: rpcData, error: rpcErr } = await (supabase as unknown as {
         rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: string | null; error: Error | null }>;
       }).rpc('accept_recruiter_posting_terms', { _version: POSTING_TERMS_VERSION });
-      if (rpcErr) throw rpcErr;
-      return { acceptedAt: (data as string | null) ?? null };
+      if (rpcErr) {
+        const controlled = new Error(
+          'Recruiter profile details were saved, but posting terms could not be accepted. Please retry.',
+        ) as Error & { cause?: unknown };
+        controlled.cause = rpcErr;
+        throw controlled;
+      }
+      return { acceptedAt: (rpcData as string | null) ?? '' };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recruiter_profile'] });

@@ -108,6 +108,17 @@ let recrBId: string;
 let incompleteRpId: string;
 let suspendedRpId: string;
 let noConsentRpId: string;
+// Phase 1F-A.2.1A-R1: pre-fixture accepted sentinel — seeded AFTER the two
+// Phase 1F-A.2 migrations but BEFORE the candidate fixture. Case 88 asserts
+// its exact timestamp/version remain unchanged.
+let sentinelPreFixtureId: string;
+let sentinelPreFixtureTs: string;
+const SENTINEL_USER = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+const SENTINEL_TS = "2025-01-01T12:34:56Z";
+const SENTINEL_VERSION = "2026-07-17.v1";
+// Pre-fixture snapshot of service_role UPDATE privilege on the table.
+let serviceRoleUpdateBefore: boolean;
+
 
 /** Run a block as an authenticated user with a JWT sub claim. */
 async function asUser(uid: string, fn: () => Promise<void>) {
@@ -188,6 +199,9 @@ beforeAll(async () => {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
     GRANT SELECT, INSERT, UPDATE ON public.recruiter_profiles TO authenticated;
+    -- Baseline mirrors production: service_role has full DML on the table.
+    -- The Phase 1F-A.2.1A candidate fixture must NOT broaden this.
+    GRANT SELECT, INSERT, UPDATE, DELETE ON public.recruiter_profiles TO service_role;
     ALTER TABLE public.recruiter_profiles ENABLE ROW LEVEL SECURITY;
     CREATE POLICY rp_admin_all ON public.recruiter_profiles TO authenticated
       USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
@@ -398,20 +412,40 @@ beforeAll(async () => {
   // Apply Phase 1F-A.1 first, then the two Phase 1F-A.2 files in file order.
   await db.exec(findPhase1FA1Migration());
   await db.exec(loadPhase1FA2Migrations());
+
+  // Admin seed + admin JWT claim must land BEFORE seeding any recruiter
+  // profile so the recruiter_profile_guard() trigger takes the admin bypass
+  // branch during seeding. (asUser()/asAnon() override this per-tx.)
+  await db.query(`INSERT INTO public.admin_users(user_id) VALUES ($1)`, [ADMIN_USER]);
+  await db.exec(`SELECT set_config('request.jwt.claim.sub', '${ADMIN_USER}', false);`);
+
+  // Phase 1F-A.2.1A-R1: capture pre-fixture live invariants that the
+  // candidate corrective SQL MUST NOT alter.
+  const srBefore = await db.query<{ b: boolean }>(
+    `SELECT has_table_privilege('service_role','public.recruiter_profiles','UPDATE') b`,
+  );
+  serviceRoleUpdateBefore = srBefore.rows[0].b;
+
+  // Seed one accepted-terms sentinel profile BEFORE the fixture runs so
+  // case 88 can prove the fixture never rewrites pre-existing accepted rows.
+  const sentinel = await db.query<{ id: string }>(
+    `INSERT INTO public.recruiter_profiles
+       (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+        status, verification_status, posting_terms_accepted_at, posting_terms_version)
+     VALUES ($1,'Sentinel','Sco','sentinel@s.example','555111',
+             'active','pending', $2::timestamptz, $3)
+     RETURNING id`,
+    [SENTINEL_USER, SENTINEL_TS, SENTINEL_VERSION],
+  );
+  sentinelPreFixtureId = sentinel.rows[0].id;
+  sentinelPreFixtureTs = SENTINEL_TS;
+
   // Then the Phase 1F-A.2.1A local candidate corrective fixture (NOT a
   // production migration). Applied after the two immutable 1F-A.2 files
   // so we exercise the exact post-live sequence Stage 1F-A.2.1B will run.
   await db.exec(loadPhase1FA21Fixture());
 
-  // Seed the admin user + recruiter profiles as the outer superuser
-  // (bypasses RLS / triggers) so we can control the initial state.
-  await db.query(`INSERT INTO public.admin_users(user_id) VALUES ($1)`, [ADMIN_USER]);
-  // Pin the outer session JWT sub to the admin user so every raw db.query()
-  // done outside asUser() takes the admin branch of triggers (bypass), while
-  // asUser()/asAnon() override the claim inside their transactions via SET
-  // LOCAL. This gives us superuser-equivalent seed control without disabling
-  // triggers and without ever weakening the RLS/trigger enforcement we test.
-  await db.exec(`SELECT set_config('request.jwt.claim.sub', '${ADMIN_USER}', false);`);
+
 
 
   const a = await db.query<{ id: string }>(
@@ -1341,22 +1375,33 @@ describe("Phase 1F-A.2 — accept_recruiter_posting_terms RPC", () => {
 // Stage 1F-A.2.1B will apply live: Phase 1F-A.1 → both 1F-A.2 files
 // (immutable) → fixture.
 
-describe("Phase 1F-A.2.1A — column privileges on recruiter_profiles", () => {
-  it("75. authenticated has NO table-level UPDATE grant (only column subset)", async () => {
-    // Probe a protected column: authenticated must NOT have UPDATE.
-    const cP = await db.query<{ b: boolean }>(
-      `SELECT has_column_privilege('authenticated','public.recruiter_profiles','posting_terms_accepted_at','UPDATE') b`);
-    expect(cP.rows[0].b).toBe(false);
-    // Probe an ordinary column: authenticated MUST have UPDATE.
-    const cO = await db.query<{ b: boolean }>(
-      `SELECT has_column_privilege('authenticated','public.recruiter_profiles','recruiter_name','UPDATE') b`);
-    expect(cO.rows[0].b).toBe(true);
+describe("Phase 1F-A.2.1A-R1 — column privileges on recruiter_profiles", () => {
+  it("75. authenticated has NO table-level UPDATE ACL entry on recruiter_profiles", async () => {
+    // Directly inspect information_schema — no table-level UPDATE grant to
+    // authenticated may exist. This is the strong version of the assertion
+    // that mere has_table_privilege probes can't make (they can be false
+    // by column-only inheritance).
+    const r = await db.query<{ n: number }>(
+      `SELECT count(*)::int n
+         FROM information_schema.role_table_grants
+        WHERE table_schema = 'public'
+          AND table_name = 'recruiter_profiles'
+          AND grantee = 'authenticated'
+          AND privilege_type = 'UPDATE'`);
+    expect(r.rows[0].n).toBe(0);
+    // Cross-check via has_table_privilege as well.
+    const t = await db.query<{ b: boolean }>(
+      `SELECT has_table_privilege('authenticated','public.recruiter_profiles','UPDATE') b`);
+    expect(t.rows[0].b).toBe(false);
   });
 
-  it("76. authenticated CAN update every ordinary/moderation column category", async () => {
+  it("76. authenticated CAN update every packet-allowed column (full matrix)", async () => {
+    // Full packet-authorized list; adding the previously-missing company_*.
     const cols = [
       "recruiter_name","recruiter_email","recruiter_phone",
-      "company_name","company_website","dot_number","mc_number",
+      "company_name","company_website","company_phone",
+      "company_address","company_city","company_state",
+      "dot_number","mc_number",
       "hiring_states","equipment_types","driver_types_hired",
       "verification_status","status","admin_notes","verified_at","verified_by","updated_at",
     ];
@@ -1379,21 +1424,50 @@ describe("Phase 1F-A.2.1A — column privileges on recruiter_profiles", () => {
     }
   });
 
-  it("78. anon has NO UPDATE privilege on any recruiter_profiles column", async () => {
-    const cols = [
-      "recruiter_name","posting_terms_accepted_at","status","legacy_terms_grandfathered_at",
-    ];
-    for (const c of cols) {
+  it("78. anon has ZERO UPDATE privileges on ANY recruiter_profiles column (dynamic sweep)", async () => {
+    // Dynamically enumerate every column and prove anon has no UPDATE on
+    // any of them — including columns the harness didn't hardcode.
+    const all = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='recruiter_profiles'
+        ORDER BY column_name`);
+    expect(all.rows.length).toBeGreaterThan(15);
+    for (const row of all.rows) {
       const r = await db.query<{ b: boolean }>(
-        `SELECT has_column_privilege('anon','public.recruiter_profiles',$1,'UPDATE') b`, [c]);
-      expect(r.rows[0].b, `anon MUST NOT have UPDATE on ${c}`).toBe(false);
+        `SELECT has_column_privilege('anon','public.recruiter_profiles',$1,'UPDATE') b`,
+        [row.column_name]);
+      expect(r.rows[0].b, `anon MUST NOT have UPDATE on ${row.column_name}`).toBe(false);
     }
+    // And no ACL row for anon UPDATE at the table level either.
+    const g = await db.query<{ n: number }>(
+      `SELECT count(*)::int n FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='recruiter_profiles'
+          AND grantee='anon' AND privilege_type='UPDATE'`);
+    expect(g.rows[0].n).toBe(0);
   });
 
-  it("79. service_role retains full UPDATE on recruiter_profiles", async () => {
-    const r = await db.query<{ b: boolean }>(
+  it("79. service_role UPDATE privilege is UNCHANGED by the candidate fixture", async () => {
+    const after = await db.query<{ b: boolean }>(
       `SELECT has_table_privilege('service_role','public.recruiter_profiles','UPDATE') b`);
-    expect(r.rows[0].b).toBe(true);
+    // Before and after must match; the fixture must not have broadened
+    // service_role's grants.
+    expect(after.rows[0].b).toBe(serviceRoleUpdateBefore);
+    expect(after.rows[0].b).toBe(true);
+  });
+
+  it("79b. candidate fixture SQL contains no table/column GRANT to service_role", async () => {
+    // Guard the fixture text itself against re-broadening of service_role
+    // TABLE or COLUMN privileges. GRANT EXECUTE on a function is a
+    // separate mechanism and is explicitly allowed. Strip SQL line comments
+    // first so descriptive `-- ...` lines don't false-positive.
+    const raw = require('node:fs').readFileSync(
+      require('node:path').resolve(process.cwd(), 'src/test/fixtures/phase1fa21ServerTermsRepair.sql'),
+      'utf8',
+    );
+    const stripped = raw.replace(/--[^\n]*/g, '');
+    expect(stripped).not.toMatch(
+      /\bGRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[^;]*?\bTO\b[^;]*?\bservice_role\b/i,
+    );
   });
 
   it("80. ordinary authenticated owner update still succeeds", async () => {
@@ -1522,14 +1596,47 @@ describe("Phase 1F-A.2.1A — exploit closure and RPC integrity", () => {
     })).rejects.toThrow();
   });
 
-  it("88. existing accepted rows are not rewritten by the candidate fixture", async () => {
-    // Alice/Bob were stamped in beforeAll before the fixture applied.
-    // The fixture's REPLACE of RPC/trigger must not have UPDATEd rows.
+  it("88. pre-existing accepted rows (seeded BEFORE fixture) retain exact timestamp/version", async () => {
+    // sentinelPreFixtureId was inserted after both 1F-A.2 migrations but
+    // BEFORE loadPhase1FA21Fixture(). The candidate SQL must not have
+    // rewritten its posting_terms_* values.
     const r = await db.query<{ v: string | null; ts: string | null }>(
       `SELECT posting_terms_version v, posting_terms_accepted_at ts
-         FROM public.recruiter_profiles WHERE id=$1`, [recrBId]);
-    expect(r.rows[0].v).toBe("2026-07-17.v1");
-    expect(r.rows[0].ts).not.toBeNull();
+         FROM public.recruiter_profiles WHERE id=$1`, [sentinelPreFixtureId]);
+    expect(r.rows[0].v).toBe(SENTINEL_VERSION);
+    expect(new Date(r.rows[0].ts!).toISOString()).toBe(
+      new Date(sentinelPreFixtureTs).toISOString(),
+    );
+  });
+
+  it("88b. legitimate ordinary UPDATE succeeds while conflict-upsert with user_id in the update set is rejected", async () => {
+    // Under the fixture, an ordinary column UPDATE by the owner still works…
+    await asUser(RECR_A_USER, async () => {
+      await db.query(
+        `UPDATE public.recruiter_profiles SET recruiter_name='Alice R1' WHERE id=$1`,
+        [recrAId]);
+    });
+    const chk = await db.query<{ n: string }>(
+      `SELECT recruiter_name n FROM public.recruiter_profiles WHERE id=$1`, [recrAId]);
+    expect(chk.rows[0].n).toBe('Alice R1');
+
+    // …but the legacy INSERT ... ON CONFLICT (user_id) DO UPDATE ... SET
+    // recruiter_name=..., user_id=... shape — the exact payload the removed
+    // .upsert({ ..., user_id }, { onConflict: 'user_id' }) call would send —
+    // must fail because it needs UPDATE on user_id, which is revoked.
+    let threw = false;
+    try {
+      await asUser(RECR_A_USER, async () => {
+        await db.query(
+          `INSERT INTO public.recruiter_profiles (user_id, recruiter_name, company_name, recruiter_email, dot_number)
+           VALUES ($1,'Conflict','Cx','conf@x.example','000000')
+           ON CONFLICT (user_id) DO UPDATE SET
+             recruiter_name = EXCLUDED.recruiter_name,
+             user_id = EXCLUDED.user_id`,
+          [RECR_A_USER]);
+      });
+    } catch { threw = true; }
+    expect(threw).toBe(true);
   });
 });
 
