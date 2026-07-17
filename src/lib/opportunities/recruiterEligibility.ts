@@ -18,15 +18,53 @@ export interface RecruiterEligibility {
   cta?: string;
 }
 
+/** Current posting-terms version stamped by the onboarding form. */
+export const POSTING_TERMS_VERSION = '2026-07-17.v1';
+
 function isNonEmpty(v: unknown): boolean {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
 /**
- * Phase 1F-A: canonical recruiter posting rule.
+ * Client-side email validation aligned with the server pattern.
+ * Rejects empty/whitespace, missing @, missing domain suffix.
+ */
+export function isValidRecruiterEmail(v: unknown): boolean {
+  if (typeof v !== 'string') return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+}
+
+/** True iff the profile has stamped or been grandfathered into posting terms. */
+export function hasAcceptedPostingTerms(profile: RecruiterProfile | null): boolean {
+  if (!profile) return false;
+  const anyProfile = profile as unknown as Record<string, unknown>;
+  return (
+    typeof anyProfile.posting_terms_accepted_at === 'string' ||
+    typeof anyProfile.legacy_terms_grandfathered_at === 'string'
+  );
+}
+
+/**
+ * Canonical client-side profile completeness. Mirrors the server rule in
+ * public.recruiter_profile_can_manage_opportunities.
+ */
+export function isProfileCompleteForPosting(profile: RecruiterProfile | null): boolean {
+  if (!profile) return false;
+  return (
+    isNonEmpty(profile.recruiter_name) &&
+    isNonEmpty(profile.company_name) &&
+    isValidRecruiterEmail(profile.recruiter_email) &&
+    (isNonEmpty(profile.dot_number) || isNonEmpty(profile.mc_number)) &&
+    hasAcceptedPostingTerms(profile)
+  );
+}
+
+/**
+ * Phase 1F-A.1: canonical recruiter posting rule.
  *
  * A recruiter can post standard opportunities as soon as their profile is
- * complete and their account is not suspended. Admin verification is a
+ * complete (name + company + valid email + DOT or MC + accepted posting
+ * terms) and their account is not suspended. Admin verification is a
  * trust badge only — it does NOT gate posting.
  */
 export function describeRecruiterEligibility(
@@ -58,18 +96,13 @@ export function describeRecruiterEligibility(
     };
   }
 
-  const complete =
-    isNonEmpty(profile.recruiter_name) &&
-    isNonEmpty(profile.company_name) &&
-    isNonEmpty(profile.recruiter_email);
-
-  if (!complete) {
+  if (!isProfileCompleteForPosting(profile)) {
     return {
       state: 'incomplete_profile',
       canPost: false,
       isVerified: false,
       title: 'Finish your recruiter profile',
-      body: 'Add your recruiter name, company name, and recruiter email to your profile. Posting unlocks the moment those are saved.',
+      body: 'Add your recruiter name, company name, a valid recruiter email, a DOT or MC number, and accept the posting terms. Posting unlocks the moment those are saved.',
       cta: 'Complete Profile',
     };
   }
@@ -85,7 +118,6 @@ export function describeRecruiterEligibility(
   }
 
   // pending or rejected (non-suspended): standard posting is fully enabled.
-  // Verification is a trust badge only.
   return {
     state: 'active_unverified',
     canPost: true,

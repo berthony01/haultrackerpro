@@ -136,13 +136,11 @@ export function useRecruiterProfile() {
     profile.status === 'active';
   const isSuspended =
     !!profile && (profile.status === 'suspended' || profile.verification_status === 'suspended');
-  // Phase 1F-A: canonical posting rule — profile complete AND not suspended.
-  // Admin verification is NOT required.
-  const isProfileComplete =
-    !!profile &&
-    typeof profile.recruiter_name === 'string' && profile.recruiter_name.trim().length > 0 &&
-    typeof profile.company_name === 'string' && profile.company_name.trim().length > 0 &&
-    typeof profile.recruiter_email === 'string' && profile.recruiter_email.trim().length > 0;
+  // Phase 1F-A.1: derive canPost via the single canonical helper so client
+  // and server share one definition of "complete".
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { isProfileCompleteForPosting } = require('@/lib/opportunities/recruiterEligibility') as typeof import('@/lib/opportunities/recruiterEligibility');
+  const isProfileComplete = isProfileCompleteForPosting(profile);
   const canPost = !!profile && !isSuspended && isProfileComplete;
   const isVerified =
     !!profile && profile.verification_status === 'approved' && profile.status === 'active';
