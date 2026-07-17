@@ -81,6 +81,18 @@ function loadPhase1FA2Migrations(): string {
   }).join("\n\n");
 }
 
+// Phase 1F-A.2.1A local candidate corrective SQL. Not a migration.
+const PHASE_1F_A21_FIXTURE = path.join(
+  process.cwd(),
+  "src/test/fixtures/phase1fa21ServerTermsRepair.sql",
+);
+function loadPhase1FA21Fixture(): string {
+  if (!fs.existsSync(PHASE_1F_A21_FIXTURE)) {
+    throw new Error(`Phase 1F-A.2.1A fixture missing: ${PHASE_1F_A21_FIXTURE}`);
+  }
+  return fs.readFileSync(PHASE_1F_A21_FIXTURE, "utf8");
+}
+
 
 const RECR_A_USER = "11111111-1111-1111-1111-111111111111";
 const RECR_B_USER = "22222222-2222-2222-2222-222222222222";
