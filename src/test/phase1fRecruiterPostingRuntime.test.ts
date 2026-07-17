@@ -1375,22 +1375,33 @@ describe("Phase 1F-A.2 — accept_recruiter_posting_terms RPC", () => {
 // Stage 1F-A.2.1B will apply live: Phase 1F-A.1 → both 1F-A.2 files
 // (immutable) → fixture.
 
-describe("Phase 1F-A.2.1A — column privileges on recruiter_profiles", () => {
-  it("75. authenticated has NO table-level UPDATE grant (only column subset)", async () => {
-    // Probe a protected column: authenticated must NOT have UPDATE.
-    const cP = await db.query<{ b: boolean }>(
-      `SELECT has_column_privilege('authenticated','public.recruiter_profiles','posting_terms_accepted_at','UPDATE') b`);
-    expect(cP.rows[0].b).toBe(false);
-    // Probe an ordinary column: authenticated MUST have UPDATE.
-    const cO = await db.query<{ b: boolean }>(
-      `SELECT has_column_privilege('authenticated','public.recruiter_profiles','recruiter_name','UPDATE') b`);
-    expect(cO.rows[0].b).toBe(true);
+describe("Phase 1F-A.2.1A-R1 — column privileges on recruiter_profiles", () => {
+  it("75. authenticated has NO table-level UPDATE ACL entry on recruiter_profiles", async () => {
+    // Directly inspect information_schema — no table-level UPDATE grant to
+    // authenticated may exist. This is the strong version of the assertion
+    // that mere has_table_privilege probes can't make (they can be false
+    // by column-only inheritance).
+    const r = await db.query<{ n: number }>(
+      `SELECT count(*)::int n
+         FROM information_schema.role_table_grants
+        WHERE table_schema = 'public'
+          AND table_name = 'recruiter_profiles'
+          AND grantee = 'authenticated'
+          AND privilege_type = 'UPDATE'`);
+    expect(r.rows[0].n).toBe(0);
+    // Cross-check via has_table_privilege as well.
+    const t = await db.query<{ b: boolean }>(
+      `SELECT has_table_privilege('authenticated','public.recruiter_profiles','UPDATE') b`);
+    expect(t.rows[0].b).toBe(false);
   });
 
-  it("76. authenticated CAN update every ordinary/moderation column category", async () => {
+  it("76. authenticated CAN update every packet-allowed column (full matrix)", async () => {
+    // Full packet-authorized list; adding the previously-missing company_*.
     const cols = [
       "recruiter_name","recruiter_email","recruiter_phone",
-      "company_name","company_website","dot_number","mc_number",
+      "company_name","company_website","company_phone",
+      "company_address","company_city","company_state",
+      "dot_number","mc_number",
       "hiring_states","equipment_types","driver_types_hired",
       "verification_status","status","admin_notes","verified_at","verified_by","updated_at",
     ];
@@ -1413,21 +1424,44 @@ describe("Phase 1F-A.2.1A — column privileges on recruiter_profiles", () => {
     }
   });
 
-  it("78. anon has NO UPDATE privilege on any recruiter_profiles column", async () => {
-    const cols = [
-      "recruiter_name","posting_terms_accepted_at","status","legacy_terms_grandfathered_at",
-    ];
-    for (const c of cols) {
+  it("78. anon has ZERO UPDATE privileges on ANY recruiter_profiles column (dynamic sweep)", async () => {
+    // Dynamically enumerate every column and prove anon has no UPDATE on
+    // any of them — including columns the harness didn't hardcode.
+    const all = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='recruiter_profiles'
+        ORDER BY column_name`);
+    expect(all.rows.length).toBeGreaterThan(15);
+    for (const row of all.rows) {
       const r = await db.query<{ b: boolean }>(
-        `SELECT has_column_privilege('anon','public.recruiter_profiles',$1,'UPDATE') b`, [c]);
-      expect(r.rows[0].b, `anon MUST NOT have UPDATE on ${c}`).toBe(false);
+        `SELECT has_column_privilege('anon','public.recruiter_profiles',$1,'UPDATE') b`,
+        [row.column_name]);
+      expect(r.rows[0].b, `anon MUST NOT have UPDATE on ${row.column_name}`).toBe(false);
     }
+    // And no ACL row for anon UPDATE at the table level either.
+    const g = await db.query<{ n: number }>(
+      `SELECT count(*)::int n FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='recruiter_profiles'
+          AND grantee='anon' AND privilege_type='UPDATE'`);
+    expect(g.rows[0].n).toBe(0);
   });
 
-  it("79. service_role retains full UPDATE on recruiter_profiles", async () => {
-    const r = await db.query<{ b: boolean }>(
+  it("79. service_role UPDATE privilege is UNCHANGED by the candidate fixture", async () => {
+    const after = await db.query<{ b: boolean }>(
       `SELECT has_table_privilege('service_role','public.recruiter_profiles','UPDATE') b`);
-    expect(r.rows[0].b).toBe(true);
+    // Before and after must match; the fixture must not have broadened
+    // service_role's grants.
+    expect(after.rows[0].b).toBe(serviceRoleUpdateBefore);
+    expect(after.rows[0].b).toBe(true);
+  });
+
+  it("79b. candidate fixture SQL contains no GRANT ... TO service_role", async () => {
+    // Guard the fixture text itself against re-broadening of service_role.
+    const fixtureSrc = require('node:fs').readFileSync(
+      require('node:path').resolve(process.cwd(), 'src/test/fixtures/phase1fa21ServerTermsRepair.sql'),
+      'utf8',
+    );
+    expect(fixtureSrc).not.toMatch(/GRANT[\s\S]*?TO\s+service_role/i);
   });
 
   it("80. ordinary authenticated owner update still succeeds", async () => {
