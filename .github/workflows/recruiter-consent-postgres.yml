@@ -1,5 +1,6 @@
 name: Recruiter Consent — Postgres 16 Concurrency Gate
 
+# Verification branch marker: this comment intentionally triggers a pull-request run.
 on:
   push:
     paths:
