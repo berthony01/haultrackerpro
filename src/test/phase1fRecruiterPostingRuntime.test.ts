@@ -1590,14 +1590,47 @@ describe("Phase 1F-A.2.1A — exploit closure and RPC integrity", () => {
     })).rejects.toThrow();
   });
 
-  it("88. existing accepted rows are not rewritten by the candidate fixture", async () => {
-    // Alice/Bob were stamped in beforeAll before the fixture applied.
-    // The fixture's REPLACE of RPC/trigger must not have UPDATEd rows.
+  it("88. pre-existing accepted rows (seeded BEFORE fixture) retain exact timestamp/version", async () => {
+    // sentinelPreFixtureId was inserted after both 1F-A.2 migrations but
+    // BEFORE loadPhase1FA21Fixture(). The candidate SQL must not have
+    // rewritten its posting_terms_* values.
     const r = await db.query<{ v: string | null; ts: string | null }>(
       `SELECT posting_terms_version v, posting_terms_accepted_at ts
-         FROM public.recruiter_profiles WHERE id=$1`, [recrBId]);
-    expect(r.rows[0].v).toBe("2026-07-17.v1");
-    expect(r.rows[0].ts).not.toBeNull();
+         FROM public.recruiter_profiles WHERE id=$1`, [sentinelPreFixtureId]);
+    expect(r.rows[0].v).toBe(SENTINEL_VERSION);
+    expect(new Date(r.rows[0].ts!).toISOString()).toBe(
+      new Date(sentinelPreFixtureTs).toISOString(),
+    );
+  });
+
+  it("88b. legitimate ordinary UPDATE succeeds while conflict-upsert with user_id in the update set is rejected", async () => {
+    // Under the fixture, an ordinary column UPDATE by the owner still works…
+    await asUser(RECR_A_USER, async () => {
+      await db.query(
+        `UPDATE public.recruiter_profiles SET recruiter_name='Alice R1' WHERE id=$1`,
+        [recrAId]);
+    });
+    const chk = await db.query<{ n: string }>(
+      `SELECT recruiter_name n FROM public.recruiter_profiles WHERE id=$1`, [recrAId]);
+    expect(chk.rows[0].n).toBe('Alice R1');
+
+    // …but the legacy INSERT ... ON CONFLICT (user_id) DO UPDATE ... SET
+    // recruiter_name=..., user_id=... shape — the exact payload the removed
+    // .upsert({ ..., user_id }, { onConflict: 'user_id' }) call would send —
+    // must fail because it needs UPDATE on user_id, which is revoked.
+    let threw = false;
+    try {
+      await asUser(RECR_A_USER, async () => {
+        await db.query(
+          `INSERT INTO public.recruiter_profiles (user_id, recruiter_name, company_name, recruiter_email, dot_number)
+           VALUES ($1,'Conflict','Cx','conf@x.example','000000')
+           ON CONFLICT (user_id) DO UPDATE SET
+             recruiter_name = EXCLUDED.recruiter_name,
+             user_id = EXCLUDED.user_id`,
+          [RECR_A_USER]);
+      });
+    } catch { threw = true; }
+    expect(threw).toBe(true);
   });
 });
 
