@@ -243,13 +243,12 @@ describe('Phase 28 PII access control hardening', () => {
 
 describe('Phase 28C final scanner cleanup + write-path hardening', () => {
   function loadPhase28C(): string {
-    // Anchor on a token unique to the original Phase 28C migration — Phase 1F-A.1
-    // later redefined create_driver_referral_safe, so that marker is no longer
-    // exclusive. submit_lead_magnet_signup is defined only in Phase 28C.
+    // Anchor on a DROP statement unique to the Phase 28C write-path lockdown.
     return loadMigrationContaining(
-      'CREATE OR REPLACE FUNCTION public.submit_lead_magnet_signup',
+      'DROP POLICY IF EXISTS "Driver inserts own referral" ON public.driver_referrals',
     );
   }
+
 
   // Phase 1F-A.1 redefined create_driver_referral_safe to drop the recruiter
   // admin-verification gate (verification is a badge, not a posting gate) and
