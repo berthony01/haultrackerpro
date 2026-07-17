@@ -303,7 +303,7 @@ beforeAll(async () => {
     );
     GRANT SELECT, INSERT, UPDATE ON public.opportunity_applications TO authenticated;
     ALTER TABLE public.opportunity_applications ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY oa_driver_insert ON public.opportunity_applications FOR INSERT TO authenticated
+    CREATE POLICY "Driver inserts own application" ON public.opportunity_applications FOR INSERT TO authenticated
       WITH CHECK (driver_user_id = auth.uid()
                   AND EXISTS (SELECT 1 FROM public.opportunities o
                               WHERE o.id = opportunity_id AND o.recruiter_id = opportunity_applications.recruiter_id
