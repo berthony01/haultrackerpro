@@ -129,3 +129,109 @@ export function describeRecruiterEligibility(
     body: 'Your standard opportunities go live to drivers right away. A Verified Recruiter badge is added later once an admin reviews your profile.',
   };
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1F-A.2.2-R1A — pure presentation view derived from canonical
+// eligibility. Used by BOTH RecruiterAccessPage's visible trust badge and
+// the RecruiterOnboarding status card, plus rendered tests. Never
+// reimplements completeness; delegates to describeRecruiterEligibility().
+// ---------------------------------------------------------------------------
+export type RecruiterTrustBadgeVariant =
+  | 'default'
+  | 'secondary'
+  | 'outline'
+  | 'destructive';
+
+export interface RecruiterTrustView {
+  /** Canonical eligibility state. */
+  state: RecruiterEligibilityState;
+  /** True iff standard posting is enabled right now. */
+  canPost: boolean;
+  /** True iff admin has awarded the Verified Recruiter trust badge. */
+  isVerified: boolean;
+  /** Short label describing posting eligibility (visible in the UI). */
+  postingLabel: string;
+  /** Short label describing verification / trust state (visible in the UI). */
+  verificationLabel: string;
+  /** Badge variant to use for the verification label. */
+  verificationBadgeVariant: RecruiterTrustBadgeVariant;
+  /** True iff the "Verified Recruiter" affirmation should render. */
+  showVerifiedBadge: boolean;
+}
+
+export function getRecruiterTrustView(
+  profile: RecruiterProfile | null,
+  opts: { intentRecruiter?: boolean } = {},
+): RecruiterTrustView {
+  const e = describeRecruiterEligibility(profile, opts);
+
+  if (e.state === 'missing_profile') {
+    return {
+      state: e.state,
+      canPost: false,
+      isVerified: false,
+      postingLabel: 'Setup required — standard posting not enabled',
+      verificationLabel: 'Not submitted',
+      verificationBadgeVariant: 'outline',
+      showVerifiedBadge: false,
+    };
+  }
+
+  if (e.state === 'suspended') {
+    return {
+      state: e.state,
+      canPost: false,
+      isVerified: false,
+      postingLabel: 'Recruiter access suspended',
+      verificationLabel: 'Suspended',
+      verificationBadgeVariant: 'destructive',
+      showVerifiedBadge: false,
+    };
+  }
+
+  if (e.state === 'incomplete_profile') {
+    const v = profile?.verification_status;
+    const verificationLabel =
+      v === 'approved'
+        ? 'Verified'
+        : v === 'rejected'
+        ? 'Verification Not Approved'
+        : 'Pending Verification';
+    return {
+      state: e.state,
+      canPost: false,
+      isVerified: false,
+      postingLabel: 'Finish your recruiter profile — standard posting not enabled',
+      verificationLabel,
+      verificationBadgeVariant: 'secondary',
+      showVerifiedBadge: false,
+    };
+  }
+
+  if (e.state === 'verified') {
+    return {
+      state: e.state,
+      canPost: true,
+      isVerified: true,
+      postingLabel: 'Standard posting enabled',
+      verificationLabel: 'Verified Recruiter',
+      verificationBadgeVariant: 'default',
+      showVerifiedBadge: true,
+    };
+  }
+
+  // active_unverified: complete + pending or rejected (not suspended).
+  const v = profile?.verification_status;
+  const verificationLabel =
+    v === 'rejected' ? 'Verification Not Approved' : 'Pending Verification';
+  return {
+    state: e.state,
+    canPost: true,
+    isVerified: false,
+    postingLabel: 'Standard posting enabled',
+    verificationLabel,
+    verificationBadgeVariant: v === 'rejected' ? 'secondary' : 'outline',
+    showVerifiedBadge: false,
+  };
+}
+
