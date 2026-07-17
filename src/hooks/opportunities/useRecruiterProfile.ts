@@ -4,10 +4,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
-import { isProfileCompleteForPosting } from '@/lib/opportunities/recruiterEligibility';
+import { isProfileCompleteForPosting, POSTING_TERMS_VERSION } from '@/lib/opportunities/recruiterEligibility';
 
 export type RecruiterProfile = Tables<'recruiter_profiles'>;
-export type RecruiterProfileUpsert = Omit<TablesInsert<'recruiter_profiles'>, 'user_id'>;
+// Phase 1F-A.2.1A: protected consent + moderation columns are stripped
+// from client-side upserts. `posting_terms_accepted_at`, `posting_terms_version`,
+// and `legacy_terms_grandfathered_at` are server-stamped only via the
+// `accept_recruiter_posting_terms` SECURITY DEFINER RPC. Direct writes are
+// blocked by PostgreSQL column privileges, not by trigger/GUC trust.
+export type RecruiterProfileUpsert = Omit<
+  TablesInsert<'recruiter_profiles'>,
+  | 'user_id'
+  | 'posting_terms_accepted_at'
+  | 'posting_terms_version'
+  | 'legacy_terms_grandfathered_at'
+>;
 
 export function useRecruiterProfile() {
   const { user } = useAuth();
