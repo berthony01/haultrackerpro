@@ -1800,6 +1800,72 @@ describe("Phase 1F-A.2.1A — recruiter pipeline denial matrix", () => {
     expect(r.rows[0].s).not.toBe("reviewed");
   });
 
+  it("98b. Recruiter application status UPDATE denied for STATUS-suspended owner", async () => {
+    // Seed opp+app under suspendedRpId while eligible (active/pending),
+    // then flip status→'suspended' and prove owner UPDATE fails/zero-rows.
+    await db.query(
+      `UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`,
+      [suspendedRpId]);
+    const o = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'SS-App','active','approved', now()) RETURNING id`, [suspendedRpId]);
+    const app = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunity_applications (opportunity_id, recruiter_id, driver_user_id, status)
+       VALUES ($1,$2,$3,'submitted') RETURNING id`,
+      [o.rows[0].id, suspendedRpId, DRIVER_USER]);
+    // Flip to status-suspended
+    await db.query(
+      `UPDATE public.recruiter_profiles SET status='suspended', verification_status='approved' WHERE id=$1`,
+      [suspendedRpId]);
+    // Owner attempts UPDATE under authenticated JWT
+    await asUser(SUSPENDED_USER, async () => {
+      try {
+        await db.query(
+          `UPDATE public.opportunity_applications SET status='reviewed' WHERE id=$1`,
+          [app.rows[0].id]);
+      } catch {
+        // permission-denied acceptable; the assertion below is authoritative
+      }
+    });
+    const r = await db.query<{ s: string }>(
+      `SELECT status s FROM public.opportunity_applications WHERE id=$1`, [app.rows[0].id]);
+    expect(r.rows[0].s).toBe("submitted");
+    // Restore fixture baseline for later cases.
+    await db.query(
+      `UPDATE public.recruiter_profiles SET status='active', verification_status='suspended' WHERE id=$1`,
+      [suspendedRpId]);
+  });
+
+  it("98c. Recruiter application status UPDATE denied for VERIFICATION-suspended owner", async () => {
+    await db.query(
+      `UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`,
+      [suspendedRpId]);
+    const o = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'VS-App','active','approved', now()) RETURNING id`, [suspendedRpId]);
+    const app = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunity_applications (opportunity_id, recruiter_id, driver_user_id, status)
+       VALUES ($1,$2,$3,'submitted') RETURNING id`,
+      [o.rows[0].id, suspendedRpId, DRIVER_USER]);
+    await db.query(
+      `UPDATE public.recruiter_profiles SET status='active', verification_status='suspended' WHERE id=$1`,
+      [suspendedRpId]);
+    await asUser(SUSPENDED_USER, async () => {
+      try {
+        await db.query(
+          `UPDATE public.opportunity_applications SET status='reviewed' WHERE id=$1`,
+          [app.rows[0].id]);
+      } catch {
+        // permission-denied acceptable
+      }
+    });
+    const r = await db.query<{ s: string }>(
+      `SELECT status s FROM public.opportunity_applications WHERE id=$1`, [app.rows[0].id]);
+    expect(r.rows[0].s).toBe("submitted");
+    // Fixture baseline already active+suspended; leave as-is for subsequent cases.
+  });
+
+
   it("99. contact-request SELECT disappears after Recruiter loses eligibility", async () => {
     // seed app+contact request under recrA
     await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
