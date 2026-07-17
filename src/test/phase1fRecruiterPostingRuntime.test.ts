@@ -1,26 +1,26 @@
 // @vitest-environment node
-// Phase 1F-A.1 — Schema-faithful, real-RLS runtime harness.
+// Phase 1F-A.1 + 1F-A.2 — Schema-faithful, real-RLS runtime harness.
 //
-// Applies the actual production Phase 1F-A.1 migration SQL from disk into
-// an in-process PGlite instance and drives it under real Postgres roles
-// (anon / authenticated / service_role) with per-user JWT claims fed via
-// `request.jwt.claim.sub`. auth.uid() is defined to read that GUC and
-// is_admin() reads an admin allowlist table — no boolean mock. Every
-// case that exercises RLS runs under `SET LOCAL ROLE authenticated`.
+// Applies the production Phase 1F-A.1 migration AND the two Phase 1F-A.2
+// migration files (in exact file order) into an in-process PGlite instance
+// and drives it under real Postgres roles (anon / authenticated /
+// service_role) with per-user JWT claims fed via `request.jwt.claim.sub`.
 //
-// Proves:
-//   * Canonical eligibility (name + company + valid email + DOT/MC +
-//     accepted-or-grandfathered consent + neither suspension).
-//   * Real RLS on opportunities uses the canonical rule for INSERT/UPDATE.
-//   * Both triggers (opportunities_guard + opportunities_billing_guard)
-//     enforce eligibility on drafts and active posts.
-//   * list_driver_visible_opportunities returns unverified-but-complete
-//     recruiters' active opportunities to drivers, and hides suspended /
-//     incomplete / non-eligible ones.
-//   * anon cannot execute recruiter_can_post nor the profile-scoped helper.
-//   * Cross-recruiter writes are blocked; recruiter_id cannot be reassigned.
-//   * Client-set featured / view_count / admin_review_status cannot be
-//     self-elevated.
+// Phase 1F-A.2 additions this harness proves:
+//   * Final privilege matrix, obsolete `recruiter_can_post` dropped.
+//   * Two-line PUBLIC/anon correction on `list_driver_visible_opportunities`
+//     is genuinely exercised (baseline seeds the pre-1F-A.2 PUBLIC grant).
+//   * `driver_can_access_opportunity` gates both direct SELECT and driver
+//     application INSERT; marketplace RPC agrees with direct SELECT;
+//     saved-opportunity nested visibility flips off with suspension.
+//   * Recruiter application listing and update authorization use the
+//     canonical current-user helper; cross-recruiter blocked.
+//   * `accept_recruiter_posting_terms` — server-stamped, exact version,
+//     idempotent repeat, anon/incomplete/suspended denials, no cross-profile
+//     effect, legacy grandfathered preserved.
+//   * Direct consent forgery (INSERT/UPDATE of `posting_terms_*`,
+//     `legacy_terms_grandfathered_at`) blocked outside the sanctioned RPC.
+//   * Profile UPDATE denied for status='suspended' AND verification='suspended'.
 
 import { describe, it, expect, beforeAll } from "vitest";
 import * as fs from "node:fs";
@@ -32,6 +32,13 @@ interface AnyPGlite {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
+// Both applied Phase 1F-A.2 files by name — asserted immutable by the
+// Stage 2A decision. They MUST be applied in this exact order.
+const PHASE_1F_A2_FILES = [
+  "20260717185620_7efcb752-08f0-46b5-aaad-593e410aa818.sql",
+  "20260717185659_ecf497ad-ec79-4178-bfba-b0e9e7e18d4f.sql",
+];
+
 function findPhase1FA1Migration(): string {
   const dir = path.join(process.cwd(), "supabase/migrations");
   const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
@@ -39,20 +46,39 @@ function findPhase1FA1Migration(): string {
     const body = fs.readFileSync(path.join(dir, f), "utf8");
     return (
       body.includes("current_user_can_manage_recruiter_opportunities") &&
-      body.includes("recruiter_profile_can_manage_opportunities")
+      body.includes("recruiter_profile_can_manage_opportunities") &&
+      // Skip 1F-A.2 files which also reference those names but only replace them.
+      !PHASE_1F_A2_FILES.includes(f)
     );
   });
   if (!base) throw new Error("Phase 1F-A.1 migration not found on disk");
   // Concatenate the Phase 1F-A.1 migration with every later migration that
-  // amends any of the RPCs / triggers the harness exercises, so the harness
-  // reflects the current database state.
+  // amends any of the RPCs / triggers the harness exercises, EXCLUDING the
+  // two Phase 1F-A.2 files (appended separately below in exact file order
+  // so the two-line correction lands second).
   const idx = files.indexOf(base);
   const relevant =
     /request_driver_contact|recruiter_can_post|list_driver_visible_opportunities|create_driver_referral_safe|recruiter_profile_can_manage_opportunities|current_user_can_manage_recruiter_opportunities|opportunities_guard|opportunities_billing_guard|recruiter_profile_guard/;
-  const later = files
+  const between = files
     .slice(idx + 1)
-    .filter((f) => relevant.test(fs.readFileSync(path.join(dir, f), "utf8")));
-  return [base, ...later].map((f) => fs.readFileSync(path.join(dir, f), "utf8")).join("\n\n");
+    .filter(
+      (f) =>
+        !PHASE_1F_A2_FILES.includes(f) &&
+        relevant.test(fs.readFileSync(path.join(dir, f), "utf8")),
+    );
+  const parts = [base, ...between].map((f) => fs.readFileSync(path.join(dir, f), "utf8"));
+  return parts.join("\n\n");
+}
+
+function loadPhase1FA2Migrations(): string {
+  const dir = path.join(process.cwd(), "supabase/migrations");
+  return PHASE_1F_A2_FILES.map((f) => {
+    const p = path.join(dir, f);
+    if (!fs.existsSync(p)) {
+      throw new Error(`Phase 1F-A.2 migration file missing: ${f}`);
+    }
+    return fs.readFileSync(p, "utf8");
+  }).join("\n\n");
 }
 
 
