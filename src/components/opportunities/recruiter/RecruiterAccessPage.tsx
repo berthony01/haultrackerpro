@@ -377,14 +377,12 @@ function StateCard({
   if (state === 'active_billing') return null;
 
   const cfg =
-    state === 'pending'
-      ? { Icon: Clock, title: 'Recruiter Profile Submitted', body: 'Your recruiter profile is currently under review. You can preview the recruiter tools below, but posting is disabled until approval.', tone: 'bg-amber-500/10 border-amber-500/30 text-amber-400', cta: null }
-      : state === 'rejected'
-      ? { Icon: AlertTriangle, title: 'Recruiter Profile Needs Attention', body: 'Please review your recruiter information and resubmit for approval.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: { label: 'Update & Resubmit', onClick: onOpenOnboarding } }
+    state === 'incomplete'
+      ? { Icon: AlertTriangle, title: 'Finish your recruiter profile', body: 'Add your recruiter name, company name, and recruiter email. Standard posting unlocks as soon as your profile is complete.', tone: 'bg-amber-500/10 border-amber-500/30 text-amber-400', cta: { label: 'Complete Profile', onClick: onOpenOnboarding } }
       : state === 'suspended'
       ? { Icon: Ban, title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: null }
       : state === 'active_no_billing'
-      ? { Icon: Sparkles, title: "Standard posting enabled — post unlimited standard opportunities", body: 'Standard posting is included with your recruiter account. Upgrade only to unlock premium recruiting tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
+      ? { Icon: Sparkles, title: 'Standard posting enabled — post unlimited standard opportunities', body: 'Standard posting is included with your recruiter account. Upgrade only to unlock premium recruiting tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
       : null;
 
   if (!cfg) return null;
@@ -396,11 +394,6 @@ function StateCard({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-foreground">{cfg.title}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{cfg.body}</p>
-          {state === 'rejected' && (
-            <p className="text-xs text-foreground mt-2 rounded-md bg-background/40 p-2 border border-border/40">
-              Contact support for details on this decision.
-            </p>
-          )}
 
           {cfg.cta && (
             <Button size="sm" variant="outline" className="mt-3" onClick={cfg.cta.onClick}>
