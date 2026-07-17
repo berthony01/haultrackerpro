@@ -747,22 +747,31 @@ describe("Phase 1F-A.1/A.2 — function privileges", () => {
 });
 
 describe("Phase 1F-A.1 — recruiter_profile_guard consent monotonicity", () => {
-  it("35. non-admin cannot clear posting_terms_accepted_at via UPDATE", async () => {
-    await asUser(RECR_A_USER, async () => {
-      await db.query(`UPDATE public.recruiter_profiles SET posting_terms_accepted_at=NULL WHERE id=$1`, [recrAId]);
-    });
+  it("35. non-admin cannot clear posting_terms_accepted_at via UPDATE (column-privilege denial or unchanged)", async () => {
+    let threw = false;
+    try {
+      await asUser(RECR_A_USER, async () => {
+        await db.query(`UPDATE public.recruiter_profiles SET posting_terms_accepted_at=NULL WHERE id=$1`, [recrAId]);
+      });
+    } catch { threw = true; }
     const r = await db.query<{ ts: string | null }>(
       `SELECT posting_terms_accepted_at ts FROM public.recruiter_profiles WHERE id=$1`, [recrAId]);
     expect(r.rows[0].ts).not.toBeNull();
+    // Diagnostic — should throw under column-privilege enforcement.
+    void threw;
   });
 
-  it("36. non-admin cannot self-grandfather (legacy_terms_grandfathered_at)", async () => {
-    await asUser(NO_CONSENT_USER, async () => {
-      await db.query(`UPDATE public.recruiter_profiles SET legacy_terms_grandfathered_at=now() WHERE id=$1`, [noConsentRpId]);
-    });
+  it("36. non-admin cannot self-grandfather legacy_terms_grandfathered_at (column-privilege denial or unchanged)", async () => {
+    let threw = false;
+    try {
+      await asUser(NO_CONSENT_USER, async () => {
+        await db.query(`UPDATE public.recruiter_profiles SET legacy_terms_grandfathered_at=now() WHERE id=$1`, [noConsentRpId]);
+      });
+    } catch { threw = true; }
     const r = await db.query<{ ts: string | null }>(
       `SELECT legacy_terms_grandfathered_at ts FROM public.recruiter_profiles WHERE id=$1`, [noConsentRpId]);
     expect(r.rows[0].ts).toBeNull();
+    void threw;
   });
 });
 
