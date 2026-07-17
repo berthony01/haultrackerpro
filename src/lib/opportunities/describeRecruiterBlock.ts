@@ -1,9 +1,9 @@
 import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import { describeRecruiterEligibility } from './recruiterEligibility';
 
 export type RecruiterBlockReason =
   | 'missing_profile'
-  | 'pending_review'
-  | 'rejected'
+  | 'incomplete_profile'
   | 'suspended'
   | 'ok';
 
@@ -15,51 +15,22 @@ export interface RecruiterBlockDescription {
 }
 
 /**
- * Central copy for recruiter-side "why can't I post?" states.
- * Used by the manager gate and by the createOpportunity error path so
- * the recruiter sees the exact corrective action, not a generic message.
+ * Phase 1F-A: describes ONLY blocking states for the posting UI.
+ * Pending / rejected (non-suspended) are no longer blocking — they map
+ * to `reason: 'ok'`. Verification is a trust badge only, not a gate.
  */
 export function describeRecruiterBlock(
   profile: RecruiterProfile | null,
   opts: { intentRecruiter?: boolean } = {},
 ): RecruiterBlockDescription {
-  if (!profile) {
-    return {
-      reason: 'missing_profile',
-      title: opts.intentRecruiter
-        ? 'Finish your recruiter setup'
-        : 'Recruiter Access Required',
-      body: opts.intentRecruiter
-        ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter application to unlock posting.'
-        : 'You need recruiter access before posting opportunities. Apply for recruiter access to get started.',
-      cta: opts.intentRecruiter ? 'Finish Recruiter Setup' : 'Apply for Recruiter Access',
-    };
-  }
-  if (profile.status === 'suspended' || profile.verification_status === 'suspended') {
-    return {
-      reason: 'suspended',
-      title: 'Recruiter Access Suspended',
-      body: 'Your recruiter access is suspended. Contact support to review the decision — posting stays disabled until this is resolved.',
-    };
-  }
-  if (profile.verification_status === 'rejected') {
-    return {
-      reason: 'rejected',
-      title: 'Profile Needs Attention',
-      body: 'Your recruiter profile was not approved. Update the details and resubmit — approved profiles unlock posting.',
-      cta: 'Update & Resubmit',
-    };
-  }
-  if (profile.verification_status !== 'approved') {
-    return {
-      reason: 'pending_review',
-      title: 'Pending Review',
-      body: 'Your recruiter profile is being reviewed. Most reviews complete within one business day — you will see posting unlock automatically once approved.',
-    };
+  const e = describeRecruiterEligibility(profile, opts);
+  if (e.canPost) {
+    return { reason: 'ok', title: e.title, body: e.body };
   }
   return {
-    reason: 'ok',
-    title: 'Approved',
-    body: 'Posting is enabled.',
+    reason: e.state as RecruiterBlockReason,
+    title: e.title,
+    body: e.body,
+    cta: e.cta,
   };
 }

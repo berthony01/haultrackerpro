@@ -1,31 +1,24 @@
 /**
  * Phase 1E — Recruiter Onboarding Continuity
  *
- * Executable tests for the D-01 remediation:
- *   - describeRecruiterBlock returns the correct reason/copy for every
- *     recruiter state (missing profile, pending, rejected, suspended, ok),
- *     and specifically distinguishes "signed up as recruiter but missing
- *     profile" from a generic "no access" case.
- *   - The shared block description is what feeds the Manager gate and
- *     the RecruiterAccessPage hub copy, so all three surfaces agree.
+ * Updated for Phase 1F-A: standard posting unlocks the moment the
+ * recruiter's profile is complete and the account is not suspended.
+ * Verification is a trust badge only, so pending / rejected are no
+ * longer blocking reasons.
  */
 import { describe, it, expect } from 'vitest';
-import {
-  describeRecruiterBlock,
-} from '@/lib/opportunities/describeRecruiterBlock';
+import { describeRecruiterBlock } from '@/lib/opportunities/describeRecruiterBlock';
 import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
 const baseProfile: RecruiterProfile = {
   id: '00000000-0000-0000-0000-000000000001',
   user_id: '00000000-0000-0000-0000-0000000000aa',
+  recruiter_name: 'Alice Recruiter',
   company_name: 'Acme Freight',
-  contact_name: null,
-  contact_email: null,
-  contact_phone: null,
-  website: null,
-  mc_number: null,
-  dot_number: null,
+  recruiter_email: 'alice@acme.example',
   hiring_states: ['TX'],
+  equipment_types: [],
+  driver_types_hired: [],
   verification_status: 'approved',
   status: 'active',
   admin_notes: null,
@@ -40,7 +33,7 @@ describe('describeRecruiterBlock', () => {
     const r = describeRecruiterBlock(null);
     expect(r.reason).toBe('missing_profile');
     expect(r.title).toMatch(/Recruiter Access/i);
-    expect(r.body).toMatch(/apply for recruiter access/i);
+    expect(r.body).toMatch(/recruiter application/i);
   });
 
   it('returns missing_profile with "finish setup" copy when intent is recruiter', () => {
@@ -51,17 +44,14 @@ describe('describeRecruiterBlock', () => {
     expect(r.cta).toMatch(/Finish Recruiter Setup/i);
   });
 
-  it('returns pending_review when verification is pending', () => {
+  it('Phase 1F-A: pending verification with complete profile is NON-blocking (ok)', () => {
     const r = describeRecruiterBlock({ ...baseProfile, verification_status: 'pending' });
-    expect(r.reason).toBe('pending_review');
-    expect(r.title).toMatch(/Pending Review/i);
-    expect(r.body).toMatch(/one business day/i);
+    expect(r.reason).toBe('ok');
   });
 
-  it('returns rejected with a resubmit CTA', () => {
+  it('Phase 1F-A: rejected verification with complete profile is NON-blocking (ok)', () => {
     const r = describeRecruiterBlock({ ...baseProfile, verification_status: 'rejected' });
-    expect(r.reason).toBe('rejected');
-    expect(r.cta).toMatch(/Update & Resubmit/i);
+    expect(r.reason).toBe('ok');
   });
 
   it('returns suspended when status is suspended', () => {
@@ -83,10 +73,14 @@ describe('describeRecruiterBlock', () => {
     expect(r.reason).toBe('ok');
   });
 
-  it('never leaks an approved reason when verification is not approved', () => {
-    (['pending', 'rejected', 'suspended'] as const).forEach((s) => {
-      const r = describeRecruiterBlock({ ...baseProfile, verification_status: s });
-      expect(r.reason).not.toBe('ok');
+  it('Phase 1F-A invariant: suspended is ALWAYS blocking regardless of verification', () => {
+    (['pending', 'approved', 'rejected'] as const).forEach((v) => {
+      const r = describeRecruiterBlock({
+        ...baseProfile,
+        status: 'suspended',
+        verification_status: v,
+      });
+      expect(r.reason).toBe('suspended');
     });
   });
 });
