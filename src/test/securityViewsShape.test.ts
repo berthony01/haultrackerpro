@@ -470,17 +470,20 @@ describe('Phase 28B scanner reconciliation + opportunity board hardening', () =>
     expect(body).toMatch(/NEW\.contact_preference = 'in_app'/);
   });
 
-  it('list_driver_visible_opportunities filters by approved recruiter and never exposes recruiter PII', () => {
-    const sql = loadPhase28B();
+  it('list_driver_visible_opportunities gates on canonical recruiter eligibility and never exposes recruiter PII', () => {
+    const sql = loadDriverVisibleOppsCurrent();
     const body = extractFunctionBody(
       sql,
       'list_driver_visible_opportunities(\n  _state text DEFAULT NULL,\n  _driver_type text DEFAULT NULL,\n  _route_type text DEFAULT NULL\n)',
     );
     expect(body).toMatch(/SECURITY DEFINER/);
-    expect(body).toMatch(/rp\.verification_status = 'approved'/);
-    expect(body).toMatch(/rp\.status <> 'suspended'/);
+    // Phase 1F-A.1: recruiter admin-verification is a badge, not a driver-visibility
+    // gate. Eligibility flows through the canonical helper instead.
+    expect(body).toMatch(/recruiter_profile_can_manage_opportunities/);
+    expect(body).not.toMatch(/rp\.verification_status = 'approved'/);
     expect(body).toMatch(/o\.status = 'active'/);
     expect(body).toMatch(/o\.admin_review_status = 'approved'/);
+
     // Returns SETOF opportunities (base table) — recruiter PII columns are not
     // on opportunities, so no recruiter contact / admin fields can leak.
     expect(body).toMatch(/RETURNS SETOF public\.opportunities/);
