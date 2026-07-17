@@ -29,6 +29,7 @@ import { useRecruiterProfile, type RecruiterProfile } from '@/hooks/opportunitie
 import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunities/useRecruiterBilling';
 import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
+import { useUserRole } from '@/hooks/useUserRole';
 import { RecruiterBillingPanel } from '../RecruiterBillingPanel';
 
 type RecruiterState =
@@ -62,6 +63,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const { isBillingActive, plan, status, isLoading: billingLoading } = useRecruiterBilling();
   const { opportunities, isLoading: oppsLoading } = useRecruiterOpportunities();
   const { recruiterApplications, isLoadingRecruiter } = useOpportunityApplications({ recruiterId: profile?.id ?? undefined });
+  const { intentRecruiter } = useUserRole();
 
   const billingRef = useRef<HTMLDivElement | null>(null);
   const howRef = useRef<HTMLDivElement | null>(null);
