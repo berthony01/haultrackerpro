@@ -136,10 +136,12 @@ beforeAll(async () => {
     GRANT anon, authenticated, service_role TO CURRENT_USER;
 
     CREATE SCHEMA IF NOT EXISTS auth;
+    GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
     CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
       LANGUAGE sql STABLE AS $$
         SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
     $$;
+    GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 
     CREATE TABLE public.admin_users (user_id uuid PRIMARY KEY);
 
