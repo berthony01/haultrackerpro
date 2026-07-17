@@ -69,10 +69,11 @@ export function useRecruiterProfile() {
 
 
   // Phase 1F-A.2.1A-R1: shared ordinary-profile persistence. NEVER uses
-  // .upsert() — an ON CONFLICT DO UPDATE payload that includes user_id would
-  // require UPDATE privilege on user_id, which the fixture revokes. Instead
-  // this branches on the currently-known profile id: UPDATE existing, INSERT
-  // missing. user_id is never present in any UPDATE payload.
+  // Postgres ON CONFLICT DO UPDATE — such a payload includes user_id and
+  // would require UPDATE privilege on user_id, which the fixture revokes.
+  // Instead this branches on the currently-known profile id: UPDATE
+  // existing, INSERT missing. user_id is never present in any UPDATE payload.
+
   async function persistOrdinaryProfile(input: RecruiterProfileUpsert): Promise<void> {
     if (!user) throw new Error('Not authenticated');
     // Defensively strip every protected column even if a caller sneaks one in.
