@@ -31,7 +31,11 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useUserRole } from '@/hooks/useUserRole';
 import { RecruiterBillingPanel } from '../RecruiterBillingPanel';
-import { describeRecruiterEligibility } from '@/lib/opportunities/recruiterEligibility';
+import {
+  describeRecruiterEligibility,
+  getRecruiterTrustView,
+  type RecruiterTrustView,
+} from '@/lib/opportunities/recruiterEligibility';
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
 // helper — this file MUST NOT reimplement completeness. `active_billing`
