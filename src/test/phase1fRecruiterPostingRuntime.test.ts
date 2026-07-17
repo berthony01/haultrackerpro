@@ -1157,17 +1157,21 @@ describe("Phase 1F-A.2 — direct consent forgery prevention", () => {
     });
     expect(stampedId).toBeTruthy();
   });
-  it("65. non-admin UPDATE cannot self-set posting_terms_accepted_at without the RPC", async () => {
-    await asUser(NO_CONSENT_USER, async () => {
-      await db.query(
-        `UPDATE public.recruiter_profiles SET posting_terms_accepted_at=now(), posting_terms_version='2026-07-17.v1' WHERE id=$1`,
-        [noConsentRpId]);
-    });
+  it("65. non-admin UPDATE cannot self-set posting_terms_accepted_at without the RPC (column-privilege denial or unchanged)", async () => {
+    let threw = false;
+    try {
+      await asUser(NO_CONSENT_USER, async () => {
+        await db.query(
+          `UPDATE public.recruiter_profiles SET posting_terms_accepted_at=now(), posting_terms_version='2026-07-17.v1' WHERE id=$1`,
+          [noConsentRpId]);
+      });
+    } catch { threw = true; }
     const r = await db.query<{ ts: string | null; v: string | null }>(
       `SELECT posting_terms_accepted_at ts, posting_terms_version v FROM public.recruiter_profiles WHERE id=$1`,
       [noConsentRpId]);
     expect(r.rows[0].ts).toBeNull();
     expect(r.rows[0].v).toBeNull();
+    void threw;
   });
 });
 
