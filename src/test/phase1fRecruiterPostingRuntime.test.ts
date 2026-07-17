@@ -1458,15 +1458,15 @@ describe("Phase 1F-A.2.1A-R1 — column privileges on recruiter_profiles", () =>
   it("79b. candidate fixture SQL contains no table/column GRANT to service_role", async () => {
     // Guard the fixture text itself against re-broadening of service_role
     // TABLE or COLUMN privileges. GRANT EXECUTE on a function is a
-    // separate mechanism and is explicitly allowed.
-    const fixtureSrc = require('node:fs').readFileSync(
+    // separate mechanism and is explicitly allowed. Strip SQL line comments
+    // first so descriptive `-- ...` lines don't false-positive.
+    const raw = require('node:fs').readFileSync(
       require('node:path').resolve(process.cwd(), 'src/test/fixtures/phase1fa21ServerTermsRepair.sql'),
       'utf8',
     );
-    // Match GRANT <privilege-list> [ON ... TABLE?] ... TO service_role,
-    // but NOT `GRANT EXECUTE ON FUNCTION ... TO ..., service_role`.
-    expect(fixtureSrc).not.toMatch(
-      /GRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[^;]*?TO[^;]*?service_role/i,
+    const stripped = raw.replace(/--[^\n]*/g, '');
+    expect(stripped).not.toMatch(
+      /\bGRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[^;]*?\bTO\b[^;]*?\bservice_role\b/i,
     );
   });
 
