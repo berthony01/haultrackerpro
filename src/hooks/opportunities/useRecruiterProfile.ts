@@ -74,19 +74,35 @@ export function useRecruiterProfile() {
   // Instead this branches on the currently-known profile id: UPDATE
   // existing, INSERT missing. user_id is never present in any UPDATE payload.
 
-  // Phase 1F-A.2.1A-R3: retry-safe known-profile-id ref. Kept in sync with
-  // profileQuery.data?.id but ALSO stamped immediately after a successful
-  // INSERT so a partial-save retry (INSERT ok, RPC failed) uses UPDATE on
-  // the second attempt instead of another INSERT (which would violate the
-  // recruiter_profiles.user_id UNIQUE constraint).
-  const knownProfileIdRef = useRef<string | null>(null);
+  // Phase 1F-A.2.1A-R4: retry-safe known-profile ref, USER-BOUND. Stores
+  // { userId, profileId } and is only trusted when userId matches the
+  // currently-authenticated user. If the hook's authenticated identity
+  // changes (sign-out, account switch), any previously-cached profile id
+  // is dropped so a new user can never UPDATE another user's row.
+  const knownProfileRef = useRef<{ userId: string; profileId: string } | null>(null);
   useEffect(() => {
+    if (!user) {
+      knownProfileRef.current = null;
+      return;
+    }
+    // Drop any ref that belonged to a different user before syncing from
+    // the current query result.
+    if (knownProfileRef.current && knownProfileRef.current.userId !== user.id) {
+      knownProfileRef.current = null;
+    }
     const id = profileQuery.data?.id ?? null;
-    if (id) knownProfileIdRef.current = id;
-  }, [profileQuery.data?.id]);
+    if (id) knownProfileRef.current = { userId: user.id, profileId: id };
+  }, [user, profileQuery.data?.id]);
 
   async function persistOrdinaryProfile(input: RecruiterProfileUpsert): Promise<void> {
     if (!user) throw new Error('Not authenticated');
+    // Synchronous guard: never trust a cached id that isn't bound to the
+    // currently-authenticated user (defense against a stale ref on a hook
+    // instance that outlived a user switch, e.g. if useEffect hasn't yet run).
+    if (knownProfileRef.current && knownProfileRef.current.userId !== user.id) {
+      knownProfileRef.current = null;
+    }
+
     // Defensively strip every protected column even if a caller sneaks one in.
     const safe = { ...input } as Record<string, unknown>;
     delete safe.posting_terms_accepted_at;
@@ -96,7 +112,13 @@ export function useRecruiterProfile() {
     delete safe.id;
     delete safe.created_at;
 
-    const existingId = knownProfileIdRef.current ?? profileQuery.data?.id ?? null;
+    const boundId =
+      knownProfileRef.current?.userId === user.id
+        ? knownProfileRef.current.profileId
+        : null;
+    const queryId = profileQuery.data?.id ?? null;
+    const existingId = boundId ?? queryId;
+
     if (existingId) {
       const { error } = await supabase
         .from('recruiter_profiles')
@@ -112,8 +134,31 @@ export function useRecruiterProfile() {
       .select('id')
       .single();
     if (error) throw error;
-    const insertedId = (inserted as { id?: string } | null)?.id ?? null;
-    if (insertedId) knownProfileIdRef.current = insertedId;
+    let insertedId = (inserted as { id?: string } | null)?.id ?? null;
+
+    // Phase 1F-A.2.1A-R4: never proceed to terms acceptance without a
+    // confirmed profile id. If the INSERT response is missing an id,
+    // attempt a safe caller-owned recovery via the same RPC the query
+    // path uses. Any arbitrary or unowned id is refused.
+    if (!insertedId) {
+      const { data: recRows, error: recErr } = await (supabase as unknown as {
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: Array<Record<string, unknown>> | null; error: Error | null }>;
+      }).rpc('get_my_recruiter_profile_safe', {});
+      if (!recErr) {
+        const rows = (recRows ?? []) as Array<{ id?: string }>;
+        const candidate = rows[0]?.id ?? null;
+        if (candidate) insertedId = candidate;
+      }
+    }
+    if (!insertedId) {
+      throw new Error(
+        'Recruiter profile was saved but its ID could not be confirmed. Please retry.',
+      );
+    }
+    knownProfileRef.current = { userId: user.id, profileId: insertedId };
   }
 
   // Ordinary-save API preserved for callers that only need to persist
