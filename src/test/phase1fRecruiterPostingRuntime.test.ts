@@ -188,6 +188,9 @@ beforeAll(async () => {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
     GRANT SELECT, INSERT, UPDATE ON public.recruiter_profiles TO authenticated;
+    -- Baseline mirrors production: service_role has full DML on the table.
+    -- The Phase 1F-A.2.1A candidate fixture must NOT broaden this.
+    GRANT SELECT, INSERT, UPDATE, DELETE ON public.recruiter_profiles TO service_role;
     ALTER TABLE public.recruiter_profiles ENABLE ROW LEVEL SECURITY;
     CREATE POLICY rp_admin_all ON public.recruiter_profiles TO authenticated
       USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
