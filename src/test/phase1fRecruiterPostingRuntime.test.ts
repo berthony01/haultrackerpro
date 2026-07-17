@@ -1466,7 +1466,7 @@ describe("Phase 1F-A.2.1A-R1 — column privileges on recruiter_profiles", () =>
     // Match GRANT <privilege-list> [ON ... TABLE?] ... TO service_role,
     // but NOT `GRANT EXECUTE ON FUNCTION ... TO ..., service_role`.
     expect(fixtureSrc).not.toMatch(
-      /GRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[\s\S]*?TO[\s\S]*?service_role/i,
+      /GRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[^;]*?TO[^;]*?service_role/i,
     );
   });
 
