@@ -309,4 +309,45 @@ describe('Phase 1F-A.2.1A-R1 client cutover', () => {
     expect(resubmitIdx).toBeGreaterThan(onSuccessIdx);
     expect(resubmitIdx).toBeLessThan(onErrorIdx);
   });
+
+  it('42. R3 partial-save retry: INSERT-then-RPC-fail, then retry UPDATEs (no second INSERT) and RPC succeeds', async () => {
+    // A. First call: INSERT succeeds, RPC fails → controlled partial-save Error, no invalidation.
+    currentProfile = null;
+    rpcNextError = new Error('boom rpc 1');
+    const hook = useRecruiterProfile();
+    let caughtA: unknown = null;
+    try {
+      await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+    } catch (e) {
+      caughtA = e;
+    }
+    expect(caughtA).toBeInstanceOf(Error);
+    expect((caughtA as Error).message).toMatch(
+      /Recruiter profile details were saved, but posting terms could not be accepted\. Please retry\./,
+    );
+    expect(insertCalls.length).toBe(1);
+    expect(updateCalls.length).toBe(0);
+    expect(rpcCalls.length).toBe(1);
+    expect(invalidateCalls.length).toBe(0);
+
+    // B. Retry on the SAME hook instance. currentProfile is still null (the
+    // useQuery mock has not refetched), so only the internal knownProfileIdRef
+    // can steer the second attempt to UPDATE instead of a second INSERT.
+    rpcNextError = null;
+    rpcNextData = '2026-07-17T00:00:00Z';
+    await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+    expect(insertCalls.length).toBe(1); // still exactly one INSERT overall
+    expect(updateCalls.length).toBe(1); // retry took the UPDATE path
+    expect(rpcCalls.length).toBe(2);
+    // UPDATE filters must scope by the inserted id AND the caller user_id.
+    const filters = Object.fromEntries(updateCalls[0].filters);
+    expect(filters.id).toBe('inserted-rp-1');
+    expect(filters.user_id).toBe('client-user-1');
+    // Invalidation only after the successful retry.
+    const keys = invalidateCalls
+      .map((c) => (c[0] as { queryKey?: unknown[] })?.queryKey?.[0])
+      .filter(Boolean);
+    expect(keys).toContain('recruiter_profile');
+    expect(keys).toContain('user-role-recruiter-check');
+  });
 });
