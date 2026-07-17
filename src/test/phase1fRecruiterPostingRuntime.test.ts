@@ -1957,37 +1957,112 @@ describe("Phase 1F-A.2.1A — recruiter pipeline denial matrix", () => {
     expect(email).toBeNull();
   });
 
-  it("100c. Email released when preference flips to 'email'; phone becomes null (same approved request)", async () => {
-    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+  it("100c. Production-faithful email release: driver submits app under authenticated with pref='email'; guard scrubs phone; RPC releases email", async () => {
+    // Install the production snapshot guard trigger (from migration
+    // 20260529005635) so submitting the application under the driver's real
+    // authenticated role actually exercises the guard — no admin/superuser
+    // re-stamping of application snapshots afterwards.
+    await db.exec(`
+      CREATE OR REPLACE FUNCTION public.opportunity_applications_contact_snapshot_guard()
+       RETURNS trigger
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+       SET search_path TO 'public'
+      AS $$
+      DECLARE
+        _allowed boolean := false;
+        _pref text;
+      BEGIN
+        IF public.is_admin(auth.uid())
+           OR current_setting('request.jwt.claim.role', true) = 'service_role'
+        THEN
+          RETURN NEW;
+        END IF;
+        IF NEW.driver_profile_id IS NOT NULL THEN
+          SELECT COALESCE(dop.allow_verified_recruiter_contact, false), dop.contact_preference
+            INTO _allowed, _pref
+            FROM public.driver_opportunity_profiles dop
+           WHERE dop.id = NEW.driver_profile_id;
+        END IF;
+        IF NOT _allowed THEN
+          NEW.driver_phone_snapshot := NULL;
+          NEW.driver_email_snapshot := NULL;
+        ELSE
+          IF _pref <> 'phone' THEN NEW.driver_phone_snapshot := NULL; END IF;
+          IF _pref <> 'email' THEN NEW.driver_email_snapshot := NULL; END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+      DROP TRIGGER IF EXISTS trg_oa_contact_snapshot_guard ON public.opportunity_applications;
+      CREATE TRIGGER trg_oa_contact_snapshot_guard
+        BEFORE INSERT OR UPDATE ON public.opportunity_applications
+        FOR EACH ROW EXECUTE FUNCTION public.opportunity_applications_contact_snapshot_guard();
+    `);
+
+    // Fresh driver identity so this case is fully isolated from 100/100b.
     const drvUid = "10c10c10-0000-0000-0000-000000000003";
+    // Recruiter eligible.
+    await db.query(
+      `UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`,
+      [recrAId],
+    );
+    // Driver profile created BEFORE application, allow=true, pref='email'.
     const dop = await db.query<{ id: string }>(
-      `INSERT INTO public.driver_opportunity_profiles (user_id, full_name, allow_verified_recruiter_contact, contact_preference)
-       VALUES ($1,'DrvEmail',true,'phone') RETURNING id`, [drvUid]);
+      `INSERT INTO public.driver_opportunity_profiles
+         (user_id, full_name, allow_verified_recruiter_contact, contact_preference)
+       VALUES ($1,'DrvEmail',true,'email') RETURNING id`,
+      [drvUid],
+    );
+    const dopId = dop.rows[0].id;
+    // Active + admin-approved opportunity under the eligible Recruiter.
     const o = await db.query<{ id: string }>(
-      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
-       VALUES ($1,'RelEmail','active','approved', now()) RETURNING id`, [recrAId]);
-    const app = await db.query<{ id: string }>(
-      `INSERT INTO public.opportunity_applications
-         (opportunity_id, recruiter_id, driver_user_id, driver_profile_id, driver_phone_snapshot, driver_email_snapshot)
-       VALUES ($1,$2,$3,$4,'555-2222','emailer@x.example') RETURNING id`,
-      [o.rows[0].id, recrAId, drvUid, dop.rows[0].id]);
-    const targetAppId = app.rows[0].id;
+      `INSERT INTO public.opportunities
+         (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'RelEmail','active','approved', now()) RETURNING id`,
+      [recrAId],
+    );
+    const oppId = o.rows[0].id;
+
+    // Submit application AS THE DRIVER under authenticated role, supplying
+    // both phone and email snapshots. Guard must preserve email, scrub phone.
+    let targetAppId = '';
+    await asUser(drvUid, async () => {
+      const app = await db.query<{ id: string }>(
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id, recruiter_id, driver_user_id, driver_profile_id,
+            driver_phone_snapshot, driver_email_snapshot)
+         VALUES ($1,$2,$3,$4,'555-2222','emailer@x.example') RETURNING id`,
+        [oppId, recrAId, drvUid, dopId],
+      );
+      targetAppId = app.rows[0].id;
+    });
+
+    // Prove the guard actually ran on the driver-submitted row.
+    const stored = await db.query<{ p: string | null; e: string | null }>(
+      `SELECT driver_phone_snapshot p, driver_email_snapshot e
+         FROM public.opportunity_applications WHERE id=$1`,
+      [targetAppId],
+    );
+    expect(stored.rows[0].p).toBeNull();
+    expect(stored.rows[0].e).toBe('emailer@x.example');
+
+    // Seed an approved recruiter contact request via the existing authorized
+    // test setup (same pattern as 100b).
     await db.query(
-      `INSERT INTO public.recruiter_contact_requests (application_id, recruiter_user_id, driver_user_id, status)
-       VALUES ($1,$2,$3,'approved')`, [targetAppId, RECR_A_USER, drvUid]);
-    // Flip preference to 'email' (this may re-scrub snapshots; re-stamp email
-    // snapshot afterwards to model the app pathway that keeps a valid email).
-    await db.query(
-      `UPDATE public.driver_opportunity_profiles SET contact_preference='email' WHERE id=$1`,
-      [dop.rows[0].id]);
-    await db.query(
-      `UPDATE public.opportunity_applications SET driver_email_snapshot='emailer@x.example', driver_phone_snapshot=NULL WHERE id=$1`,
-      [targetAppId]);
+      `INSERT INTO public.recruiter_contact_requests
+         (application_id, recruiter_user_id, driver_user_id, status)
+       VALUES ($1,$2,$3,'approved')`,
+      [targetAppId, RECR_A_USER, drvUid],
+    );
+
+    // Eligible Recruiter calls the safe RPC — email released, phone null.
     let phone: string | null = 'SENTINEL';
     let email: string | null = 'SENTINEL';
     await asUser(RECR_A_USER, async () => {
-      const r = await db.query<{ x: { id: string; driver_phone_snapshot: string | null; driver_email_snapshot: string | null } }>(
-        `SELECT public.list_recruiter_applications_safe($1) x`, [recrAId]);
+      const r = await db.query<{
+        x: { id: string; driver_phone_snapshot: string | null; driver_email_snapshot: string | null };
+      }>(`SELECT public.list_recruiter_applications_safe($1) x`, [recrAId]);
       const hit = r.rows.find((row) => row.x?.id === targetAppId)?.x;
       expect(hit, "target application must be returned by safe RPC").toBeDefined();
       phone = hit!.driver_phone_snapshot;
