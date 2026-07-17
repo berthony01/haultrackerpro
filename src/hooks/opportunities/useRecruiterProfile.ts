@@ -103,7 +103,8 @@ export function useRecruiterProfile() {
 
   // Ordinary-save API preserved for callers that only need to persist
   // profile fields (no consent stamping). Implemented via the shared branch
-  // so it also never issues .upsert(). Protected columns are stripped.
+  // so it also never issues a client-side upsert. Protected columns stripped.
+
   const upsertProfile = useMutation({
     mutationFn: async (data: RecruiterProfileUpsert) => {
       await persistOrdinaryProfile(data);
