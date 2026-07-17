@@ -402,10 +402,22 @@ describe('Phase 28A direct base-table PII access closures', () => {
 
 describe('Phase 28B scanner reconciliation + opportunity board hardening', () => {
   function loadPhase28B(): string {
+    // Anchor on a token unique to the original Phase 28B migration. Phase 1F-A.1
+    // later redefined list_driver_visible_opportunities, so that marker is no
+    // longer exclusive. The contact-snapshot guard trigger is defined only in 28B.
     return loadMigrationContaining(
-      'CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities',
+      'CREATE OR REPLACE FUNCTION public.opportunity_applications_contact_snapshot_guard',
     );
   }
+
+  // Phase 1F-A.1 redefined list_driver_visible_opportunities. Load whichever
+  // migration currently owns the canonical eligibility helper.
+  function loadDriverVisibleOppsCurrent(): string {
+    return loadMigrationContaining(
+      'recruiter_profile_can_manage_opportunities',
+    );
+  }
+
 
   it('defensively drops all driver-facing SELECT policies on driver_referrals', () => {
     const sql = loadPhase28B();
