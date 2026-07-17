@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) TO authenticated, service_role;
