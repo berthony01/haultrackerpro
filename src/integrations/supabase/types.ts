@@ -4392,6 +4392,7 @@ export type Database = {
         Args: { application_id: string; note?: string; response_type: string }
         Returns: string
       }
+      recruiter_can_post: { Args: { _user_id: string }; Returns: boolean }
       recruiter_has_priority_plan: {
         Args: { _recruiter_id: string }
         Returns: boolean
