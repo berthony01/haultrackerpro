@@ -381,4 +381,94 @@ describe('Phase 1F-A.2.1A-R1 client cutover', () => {
     expect(keys).toContain('recruiter_profile');
     expect(keys).toContain('user-role-recruiter-check');
   });
+
+  it('43. R4 user-switch: User A known id must NEVER be used to UPDATE for User B (missing profile → INSERT)', async () => {
+    // Step 1: User A saves → INSERT succeeds, RPC succeeds. Ref is stamped
+    // to { userId: A, profileId: inserted-rp-1 }.
+    authState.userId = 'user-A';
+    currentProfile = null;
+    const hookA = useRecruiterProfile();
+    await hookA.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+    expect(insertCalls.length).toBe(1);
+    expect(updateCalls.length).toBe(0);
+    expect(rpcCalls.filter((c) => c.fn === 'accept_recruiter_posting_terms').length).toBe(1);
+
+    // Step 2: authenticated identity switches to User B (no profile). The
+    // ref still holds User A's data at this instant; the hook's synchronous
+    // user-binding guard MUST drop it and take INSERT for User B.
+    authState.userId = 'user-B';
+    currentProfile = null;
+    const hookB = useRecruiterProfile();
+    await hookB.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+
+    // Exactly one additional INSERT for User B (two total). No UPDATE.
+    expect(insertCalls.length).toBe(2);
+    expect(updateCalls.length).toBe(0);
+    // User B's INSERT payload carries user-B, never user-A.
+    const bInsert = insertCalls[1];
+    expect(bInsert.payload.user_id).toBe('user-B');
+    // No UPDATE was ever attempted with User A's id.
+    expect(
+      updateCalls.some((u) => Object.fromEntries(u.filters).id === 'inserted-rp-1'),
+    ).toBe(false);
+    // The terms RPC ran a SECOND time — only AFTER User B's ordinary save.
+    const termsCalls = rpcCalls.filter((c) => c.fn === 'accept_recruiter_posting_terms');
+    expect(termsCalls.length).toBe(2);
+  });
+
+  it('44. R4 missing-ID recovery success: INSERT returns no id, safe RPC finds owned id, terms RPC then succeeds; retry uses UPDATE with recovered id', async () => {
+    authState.userId = 'client-user-1';
+    currentProfile = null;
+    insertReturnsEmpty = true;
+    safeProfileRpcRows = [{ id: 'recovered-rp-9' }];
+    const hook = useRecruiterProfile();
+    await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+
+    // Exactly one INSERT; recovery RPC called; then terms RPC called.
+    expect(insertCalls.length).toBe(1);
+    const recovery = rpcCalls.filter((c) => c.fn === 'get_my_recruiter_profile_safe');
+    const terms = rpcCalls.filter((c) => c.fn === 'accept_recruiter_posting_terms');
+    expect(recovery.length).toBe(1);
+    expect(terms.length).toBe(1);
+    // Recovery precedes terms.
+    expect(rpcCalls.findIndex((c) => c.fn === 'get_my_recruiter_profile_safe'))
+      .toBeLessThan(rpcCalls.findIndex((c) => c.fn === 'accept_recruiter_posting_terms'));
+    // Success invalidation happened.
+    const keys = invalidateCalls
+      .map((c) => (c[0] as { queryKey?: unknown[] })?.queryKey?.[0])
+      .filter(Boolean);
+    expect(keys).toContain('recruiter_profile');
+
+    // Retry on same hook must use UPDATE with the recovered id — not a new INSERT.
+    await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+    expect(insertCalls.length).toBe(1); // still exactly one INSERT overall
+    expect(updateCalls.length).toBe(1);
+    const filters = Object.fromEntries(updateCalls[0].filters);
+    expect(filters.id).toBe('recovered-rp-9');
+    expect(filters.user_id).toBe('client-user-1');
+  });
+
+  it('45. R4 missing-ID recovery failure: INSERT returns no id, safe RPC finds nothing, throws controlled error; terms RPC not called; no success invalidation', async () => {
+    authState.userId = 'client-user-1';
+    currentProfile = null;
+    insertReturnsEmpty = true;
+    safeProfileRpcRows = [];
+    const hook = useRecruiterProfile();
+    let caught: unknown = null;
+    try {
+      await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toMatch(
+      /Recruiter profile was saved but its ID could not be confirmed\. Please retry\./,
+    );
+    // INSERT and recovery ran; terms RPC never invoked.
+    expect(insertCalls.length).toBe(1);
+    expect(rpcCalls.some((c) => c.fn === 'get_my_recruiter_profile_safe')).toBe(true);
+    expect(rpcCalls.some((c) => c.fn === 'accept_recruiter_posting_terms')).toBe(false);
+    // No success invalidation.
+    expect(invalidateCalls.length).toBe(0);
+  });
 });
