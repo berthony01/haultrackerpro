@@ -1,94 +1,28 @@
-name: Phase 1F-B.1 Recruiter Form Gate
+name: Phase 1F-B.1 Cleanup
 
 on:
   pull_request:
     paths:
       - '.github/workflows/phase1fb1-correction.yml'
-      - 'scripts/phase1fb1_patch.py'
-      - 'src/components/opportunities/RecruiterOpportunityForm.tsx'
-      - 'src/components/opportunities/RecruiterOpportunityManager.tsx'
-      - 'src/test/recruiterOpportunityFormConsolidation.test.tsx'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  phase1fb1:
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      VITE_SUPABASE_URL: https://phase1fb1-test.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: phase1fb1-isolated-test-key
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Apply narrow production patch
+      - name: Remove temporary verification files
         run: |
-          if grep -q "let advancedTouched = false" src/components/opportunities/RecruiterOpportunityForm.tsx; then
-            python3 scripts/phase1fb1_patch.py
-          else
-            echo "Phase 1F-B.1 production patch already applied"
-          fi
-
-      - name: Commit patched production files to verification branch
-        run: |
-          if git diff --quiet; then
-            echo "No production patch commit needed"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/components/opportunities/RecruiterOpportunityForm.tsx src/components/opportunities/RecruiterOpportunityManager.tsx
-            git commit -m "Correct Phase 1F-B form behavior and manager copy"
-            git push origin HEAD:${{ github.head_ref || github.ref_name }}
-          fi
-
-      - name: Install dependencies from frozen lockfile
-        run: bun install --frozen-lockfile
-
-      - name: Typecheck app
-        run: bunx tsc -p tsconfig.app.json --noEmit
-
-      - name: Typecheck node
-        run: bunx tsc -p tsconfig.node.json --noEmit
-
-      - name: Focused Phase 1F-B.1 tests
-        run: bunx vitest run src/test/recruiterOpportunityFormConsolidation.test.tsx
-
-      - name: Existing Phase 1F authorization and rendered tests
-        run: bunx vitest run src/test/phase1fRecruiterEligibility.test.ts src/test/phase1fa22CanonicalEligibility.test.ts src/test/phase1fa22R1aRenderedTrustState.test.tsx
-
-      - name: DEF-04
-        run: bunx vitest run src/test/phase1cWebhookIdentityValidator.test.ts
-
-      - name: DEF-23
-        run: bunx vitest run src/test/phase1cWebhookIdempotencyRetry.test.ts src/test/phase1c2WebhookIdempotencyStateMachine.test.ts
-
-      - name: Full test suite
-        id: full_suite
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          bunx vitest run 2>&1 | tee phase1fb1-full-suite.log
-
-      - name: Upload full-suite log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase1fb1-full-suite-log
-          path: phase1fb1-full-suite.log
-          if-no-files-found: error
-
-      - name: Enforce full-suite result
-        if: steps.full_suite.outcome != 'success'
-        run: exit 1
-
-      - name: Production build
-        run: bun run build
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/phase1fb1-correction.yml
+          git rm -f scripts/phase1fb1_*
+          git commit -m "Remove temporary Phase 1F-B.1 verification files"
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}
