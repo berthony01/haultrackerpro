@@ -247,20 +247,22 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-bold text-foreground mb-1">
-                  {state === 'rejected'
-                    ? 'Update & Resubmit Your Recruiter Profile'
+                  {state === 'incomplete'
+                    ? 'Finish your recruiter profile'
                     : intentRecruiter
                     ? 'Finish Your Recruiter Setup'
                     : 'Apply for Recruiter Access'}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {state === 'none' && intentRecruiter
-                    ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter application to unlock posting.'
-                    : 'Submit your recruiter information for review. Approved recruiters can post structured opportunities, review qualified drivers, and request contact permission.'}
+                  {state === 'incomplete'
+                    ? 'Add your recruiter name, company name, and recruiter email to your profile. Standard posting unlocks the moment those are saved.'
+                    : intentRecruiter
+                    ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter application to start posting.'
+                    : 'Submit your recruiter information. Standard posting unlocks as soon as your profile is complete — no admin approval needed to post.'}
                 </p>
                 <Button onClick={onOpenOnboarding} data-testid="finish-recruiter-setup-cta">
-                  {state === 'rejected'
-                    ? 'Update & Resubmit'
+                  {state === 'incomplete'
+                    ? 'Complete Profile'
                     : intentRecruiter
                     ? 'Finish Recruiter Setup'
                     : 'Start Application'}{' '}
