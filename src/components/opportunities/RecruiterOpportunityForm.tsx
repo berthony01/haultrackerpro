@@ -1,23 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+// Phase 1F-B — Unified Recruiter Opportunity Form.
+//
+// One production form used for both creating and editing opportunities.
+// Replaces the old five-step wizard + separate Quick-Post form. All existing
+// opportunity fields, current authorization rules, publish/draft semantics,
+// AI paste behavior, and the shared financial calculator are preserved.
+
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  ArrowLeft, Briefcase, DollarSign, Home, ShieldCheck, Save, Lock, Send,
-  Truck, ChevronRight, Eye, Lock as LockIcon, CheckCircle2, AlertTriangle,
-  Info, MapPin, HelpCircle, Sparkles,
+  ArrowLeft, Save, Send, Sparkles, ChevronDown, ChevronUp,
+  AlertTriangle, Info, DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -26,18 +26,14 @@ import {
   type OpportunityInsert,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
-import { calculateOpportunityFinancials, profitScoreLabel } from '@/lib/opportunities/opportunityProfit';
+import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { splitBenefits, joinBenefits } from '@/lib/opportunities/benefitsFormat';
 import { PasteOpportunityDialog, type ExtractedOpportunity } from './PasteOpportunityDialog';
 
 interface Props {
   initial?: Opportunity | null;
-  /** Optional pre-filled values used when creating new (e.g. handoff from Quick Post). */
-  seed?: Partial<OpportunityInsert> | null;
   onBack: () => void;
   onSaved: () => void;
-  canSubmitForReview?: boolean;
-  submitBlockReason?: string | null;
 }
 
 const DEADHEAD_OPTIONS = ['unspecified', 'paid', 'unpaid'] as const;
@@ -67,7 +63,6 @@ const FUEL_PAID_BY = ['Company', 'Driver', 'Split', 'Not Disclosed'];
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'];
 
 interface FormState {
-  // basic
   title: string;
   company_name: string;
   hiring_city: string;
@@ -77,7 +72,6 @@ interface FormState {
   route_type: string;
   trailer_type: string;
   description: string;
-  // pay
   pay_model: string;
   cpm: string;
   percentage_pay: string;
@@ -97,18 +91,14 @@ interface FormState {
   lease_payment: string;
   maintenance_deductions: string;
   other_deductions: string;
-  // lifestyle
   home_time: string;
   forced_dispatch: Tribool;
   pets_allowed: Tribool;
   riders_allowed: Tribool;
   equipment_year: string;
-  benefits: string;          // requirements (Step 4)
-  typical_lanes: string;     // lanes (Step 2) — serialized into benefits column
-  // confirm
+  benefits: string;        // Additional Requirements
+  typical_lanes: string;   // stored serialized inside benefits column
   transparency_confirmed: boolean;
-  confirm_drivers_see_intel: boolean;
-  confirm_misleading_removed: boolean;
 }
 
 const EMPTY: FormState = {
@@ -123,10 +113,9 @@ const EMPTY: FormState = {
   lease_payment: '', maintenance_deductions: '', other_deductions: '',
   home_time: '', forced_dispatch: 'unspecified', pets_allowed: 'unspecified',
   riders_allowed: 'unspecified', equipment_year: '', benefits: '', typical_lanes: '',
-  transparency_confirmed: false, confirm_drivers_see_intel: false, confirm_misleading_removed: false,
+  transparency_confirmed: false,
 };
 
-// Friendlier labels for validation errors (D5 fix).
 const FIELD_LABELS: Record<string, string> = {
   cpm: 'CPM rate',
   percentage_pay: 'Percentage pay',
@@ -156,99 +145,95 @@ const boolToDh = (b: boolean | null | undefined): DhOpt =>
   b === true ? 'paid' : b === false ? 'unpaid' : 'unspecified';
 const splitList = (s: string) => s.split(',').map((p) => p.trim()).filter(Boolean);
 
-const STEPS = [
-  { id: 1, title: 'Job Basics', short: 'Tell drivers the basics about this opportunity.', icon: Briefcase, tint: 'bg-primary/10 text-primary' },
-  { id: 2, title: 'Route & Equipment', short: 'Tell drivers about the routes, equipment, and expectations.', icon: Truck, tint: 'bg-sky-500/10 text-sky-400' },
-  { id: 3, title: 'Pay & Deductions', short: 'Provide clear pay details and list any known deductions.', icon: DollarSign, tint: 'bg-amber-500/10 text-amber-400' },
-  { id: 4, title: 'Home Time & Requirements', short: 'Set expectations for home time and driver requirements.', icon: Home, tint: 'bg-violet-500/10 text-violet-400' },
-  { id: 5, title: 'Transparency Review', short: 'Review your opportunity for accuracy and transparency.', icon: ShieldCheck, tint: 'bg-emerald-500/10 text-emerald-400' },
-];
+/** Advanced-detail fields that live behind the collapsible section. */
+function hasAdvancedData(f: FormState): boolean {
+  return (
+    !!f.hiring_states.trim() ||
+    !!f.typical_lanes.trim() ||
+    !!f.estimated_loaded_miles ||
+    !!f.estimated_deadhead_miles ||
+    f.deadhead_paid !== 'unspecified' ||
+    !!f.detention_pay.trim() ||
+    !!f.layover_pay.trim() ||
+    !!f.sign_on_bonus ||
+    !!f.fuel_paid_by.trim() ||
+    !!f.insurance_deductions ||
+    !!f.escrow_required ||
+    !!f.escrow_amount ||
+    !!f.lease_payment ||
+    !!f.maintenance_deductions ||
+    !!f.other_deductions ||
+    !!f.home_time.trim() ||
+    f.forced_dispatch !== 'unspecified' ||
+    f.pets_allowed !== 'unspecified' ||
+    f.riders_allowed !== 'unspecified' ||
+    !!f.equipment_year.trim() ||
+    !!f.benefits.trim()
+  );
+}
 
-export function RecruiterOpportunityForm({
-  initial, seed, onBack, onSaved, canSubmitForReview = true, submitBlockReason,
-}: Props) {
+export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile } = useRecruiterProfile();
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [step, setStep] = useState(1);
+  const [optionalOpen, setOptionalOpen] = useState<boolean>(false);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const initializedRef = useRef(false);
 
-
+  // Hydrate from `initial` on edit; otherwise prefill company_name from profile.
   useEffect(() => {
-    if (!initial) {
-      // Prefill from Quick Post seed (if handed off) then recruiter profile company name.
-      if (seed) {
-        const split = splitBenefits(seed.benefits ?? null);
-        setForm((f) => ({
-          ...f,
-          title: seed.title ?? f.title,
-          company_name: seed.company_name ?? f.company_name,
-          hiring_city: seed.hiring_city ?? f.hiring_city,
-          hiring_state: seed.hiring_state ?? f.hiring_state,
-          hiring_states: (seed.hiring_states ?? []).join(', ') || f.hiring_states,
-          driver_type: seed.driver_type ?? f.driver_type,
-          route_type: seed.route_type ?? f.route_type,
-          trailer_type: seed.trailer_type ?? f.trailer_type,
-          description: seed.description ?? f.description,
-          pay_model: seed.pay_model ?? f.pay_model,
-          cpm: seed.cpm != null ? String(seed.cpm) : f.cpm,
-          percentage_pay: seed.percentage_pay != null ? String(seed.percentage_pay) : f.percentage_pay,
-          flat_weekly_pay: seed.flat_weekly_pay != null ? String(seed.flat_weekly_pay) : f.flat_weekly_pay,
-          estimated_weekly_gross: seed.estimated_weekly_gross != null ? String(seed.estimated_weekly_gross) : f.estimated_weekly_gross,
-          estimated_weekly_miles: seed.estimated_weekly_miles != null ? String(seed.estimated_weekly_miles) : f.estimated_weekly_miles,
-          home_time: seed.home_time ?? f.home_time,
-          typical_lanes: split.typical_lanes || f.typical_lanes,
-          benefits: split.requirements || f.benefits,
-          transparency_confirmed: seed.transparency_confirmed ?? f.transparency_confirmed,
-          confirm_drivers_see_intel: seed.transparency_confirmed ?? f.confirm_drivers_see_intel,
-          confirm_misleading_removed: seed.transparency_confirmed ?? f.confirm_misleading_removed,
-        }));
-      } else if (profile?.company_name) {
-        setForm((f) => f.company_name ? f : { ...f, company_name: profile.company_name ?? '' });
-      }
+    if (initializedRef.current) return;
+    if (initial) {
+      const split = splitBenefits(initial.benefits);
+      const next: FormState = {
+        title: initial.title ?? '',
+        company_name: initial.company_name ?? '',
+        hiring_city: initial.hiring_city ?? '',
+        hiring_state: initial.hiring_state ?? '',
+        hiring_states: (initial.hiring_states ?? []).join(', '),
+        driver_type: initial.driver_type ?? '',
+        route_type: initial.route_type ?? '',
+        trailer_type: initial.trailer_type ?? '',
+        description: initial.description ?? '',
+        pay_model: initial.pay_model ?? '',
+        cpm: initial.cpm?.toString() ?? '',
+        percentage_pay: initial.percentage_pay?.toString() ?? '',
+        flat_weekly_pay: initial.flat_weekly_pay?.toString() ?? '',
+        estimated_weekly_gross: initial.estimated_weekly_gross?.toString() ?? '',
+        estimated_weekly_miles: initial.estimated_weekly_miles?.toString() ?? '',
+        estimated_loaded_miles: initial.estimated_loaded_miles?.toString() ?? '',
+        estimated_deadhead_miles: initial.estimated_deadhead_miles?.toString() ?? '',
+        deadhead_paid: boolToDh(initial.deadhead_paid),
+        detention_pay: initial.detention_pay ?? '',
+        layover_pay: initial.layover_pay ?? '',
+        sign_on_bonus: initial.sign_on_bonus?.toString() ?? '',
+        fuel_paid_by: initial.fuel_paid_by ?? '',
+        insurance_deductions: initial.insurance_deductions?.toString() ?? '',
+        escrow_required: !!initial.escrow_required,
+        escrow_amount: initial.escrow_amount?.toString() ?? '',
+        lease_payment: initial.lease_payment?.toString() ?? '',
+        maintenance_deductions: initial.maintenance_deductions?.toString() ?? '',
+        other_deductions: initial.other_deductions?.toString() ?? '',
+        home_time: initial.home_time ?? '',
+        forced_dispatch: boolToTri(initial.forced_dispatch),
+        pets_allowed: boolToTri(initial.pets_allowed),
+        riders_allowed: boolToTri(initial.riders_allowed),
+        equipment_year: initial.equipment_year ?? '',
+        benefits: split.requirements,
+        typical_lanes: split.typical_lanes,
+        transparency_confirmed: !!initial.transparency_confirmed,
+      };
+      setForm(next);
+      setOptionalOpen(hasAdvancedData(next));
+      initializedRef.current = true;
       return;
     }
-    setForm({
-      title: initial.title ?? '',
-      company_name: initial.company_name ?? '',
-      hiring_city: initial.hiring_city ?? '',
-      hiring_state: initial.hiring_state ?? '',
-      hiring_states: (initial.hiring_states ?? []).join(', '),
-      driver_type: initial.driver_type ?? '',
-      route_type: initial.route_type ?? '',
-      trailer_type: initial.trailer_type ?? '',
-      description: initial.description ?? '',
-      pay_model: initial.pay_model ?? '',
-      cpm: initial.cpm?.toString() ?? '',
-      percentage_pay: initial.percentage_pay?.toString() ?? '',
-      flat_weekly_pay: initial.flat_weekly_pay?.toString() ?? '',
-      estimated_weekly_gross: initial.estimated_weekly_gross?.toString() ?? '',
-      estimated_weekly_miles: initial.estimated_weekly_miles?.toString() ?? '',
-      estimated_loaded_miles: initial.estimated_loaded_miles?.toString() ?? '',
-      estimated_deadhead_miles: initial.estimated_deadhead_miles?.toString() ?? '',
-      deadhead_paid: boolToDh(initial.deadhead_paid),
-      detention_pay: initial.detention_pay ?? '',
-      layover_pay: initial.layover_pay ?? '',
-      sign_on_bonus: initial.sign_on_bonus?.toString() ?? '',
-      fuel_paid_by: initial.fuel_paid_by ?? '',
-      insurance_deductions: initial.insurance_deductions?.toString() ?? '',
-      escrow_required: !!initial.escrow_required,
-      escrow_amount: initial.escrow_amount?.toString() ?? '',
-      lease_payment: initial.lease_payment?.toString() ?? '',
-      maintenance_deductions: initial.maintenance_deductions?.toString() ?? '',
-      other_deductions: initial.other_deductions?.toString() ?? '',
-      home_time: initial.home_time ?? '',
-      forced_dispatch: boolToTri(initial.forced_dispatch),
-      pets_allowed: boolToTri(initial.pets_allowed),
-      riders_allowed: boolToTri(initial.riders_allowed),
-      equipment_year: initial.equipment_year ?? '',
-      benefits: splitBenefits(initial.benefits).requirements,
-      typical_lanes: splitBenefits(initial.benefits).typical_lanes,
-      transparency_confirmed: !!initial.transparency_confirmed,
-      confirm_drivers_see_intel: !!initial.transparency_confirmed,
-      confirm_misleading_removed: !!initial.transparency_confirmed,
-    });
-  }, [initial, profile, seed]);
+    // Create mode — company_name prefill only
+    if (profile?.company_name) {
+      setForm((f) => (f.company_name ? f : { ...f, company_name: profile.company_name ?? '' }));
+    }
+    initializedRef.current = true;
+  }, [initial, profile]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -260,7 +245,6 @@ export function RecruiterOpportunityForm({
     'maintenance_deductions','other_deductions',
   ], []);
 
-  // Derived: financials preview using the same calculator
   const financials = useMemo(() => calculateOpportunityFinancials({
     estimated_weekly_gross: numOrNull(form.estimated_weekly_gross),
     flat_weekly_pay: numOrNull(form.flat_weekly_pay),
@@ -277,33 +261,6 @@ export function RecruiterOpportunityForm({
     maintenance_deductions: numOrNull(form.maintenance_deductions),
     other_deductions: numOrNull(form.other_deductions),
   }), [form]);
-
-  // Opportunity strength score (UI-only completeness guidance)
-  const strength = useMemo(() => {
-    const checks = [
-      !!form.title.trim(),
-      !!form.company_name.trim(),
-      !!form.route_type.trim(),
-      !!form.trailer_type.trim(),
-      !!(form.estimated_weekly_gross || form.cpm || form.flat_weekly_pay || form.percentage_pay),
-      !!form.estimated_weekly_miles,
-      form.deadhead_paid !== 'unspecified',
-      !!form.home_time.trim(),
-      !!(form.insurance_deductions || form.escrow_amount || form.lease_payment || form.maintenance_deductions || form.other_deductions || form.fuel_paid_by),
-      form.transparency_confirmed && form.confirm_drivers_see_intel && form.confirm_misleading_removed,
-    ];
-    const pct = Math.round((checks.filter(Boolean).length / checks.length) * 100);
-    let label = 'Incomplete';
-    if (pct >= 80) label = 'Great';
-    else if (pct >= 60) label = 'Good';
-    else if (pct >= 40) label = 'Needs More Detail';
-    const suggestions: string[] = [];
-    if (!form.detention_pay) suggestions.push('Consider adding detention pay details');
-    if (!form.sign_on_bonus) suggestions.push('Add sign-on bonus (if available)');
-    if (!form.equipment_year) suggestions.push('List equipment year range');
-    if (form.deadhead_paid === 'unspecified') suggestions.push('Disclose deadhead pay');
-    return { pct, label, suggestions };
-  }, [form]);
 
   const validate = (mode: 'draft' | 'submit'): string | null => {
     if (!form.title.trim()) return 'Title is required.';
@@ -326,9 +283,7 @@ export function RecruiterOpportunityForm({
         !!numOrNull(form.flat_weekly_pay) ||
         !!numOrNull(form.percentage_pay);
       if (!hasPay) return 'Provide at least one pay value (weekly gross, CPM, flat weekly, or percentage).';
-      if (!form.transparency_confirmed || !form.confirm_drivers_see_intel || !form.confirm_misleading_removed) {
-        return 'Please confirm all transparency checkboxes to submit.';
-      }
+      if (!form.transparency_confirmed) return 'Please confirm the transparency statement to publish.';
     }
     return null;
   };
@@ -368,8 +323,7 @@ export function RecruiterOpportunityForm({
     equipment_year: form.equipment_year.trim() || null,
     benefits: joinBenefits({ typical_lanes: form.typical_lanes, requirements: form.benefits }) || null,
     description: form.description.trim() || null,
-    transparency_confirmed:
-      form.transparency_confirmed && form.confirm_drivers_see_intel && form.confirm_misleading_removed,
+    transparency_confirmed: form.transparency_confirmed,
     status: mode === 'submit' ? 'active' : 'draft',
   });
 
@@ -390,38 +344,36 @@ export function RecruiterOpportunityForm({
   };
 
   const pending = createOpportunity.isPending || updateOpportunity.isPending;
-  const isLastStep = step === STEPS.length;
 
-  const handleNext = () => {
-    if (step < STEPS.length) setStep(step + 1);
-  };
-
-  // Merge AI-extracted fields into form state without overwriting non-empty values the
-  // recruiter has already typed. Strings replace empty strings; numbers replace ''
-  // strings; booleans replace the 'unspecified' tribool/dh sentinels.
+  // Paste-to-autofill merges without overwriting fields the recruiter already typed.
+  // If it fills anything advanced, expand the optional section.
   const handleExtracted = (data: ExtractedOpportunity) => {
+    let advancedTouched = false;
     setForm((f) => {
       const next = { ...f };
-      const setStr = (k: keyof FormState, v?: string) => {
-        if (v && typeof v === 'string' && !(next[k] as string)) (next[k] as string) = v;
+      const setStr = (k: keyof FormState, v?: string, advanced = false) => {
+        if (v && typeof v === 'string' && !(next[k] as string)) {
+          (next[k] as string) = v;
+          if (advanced) advancedTouched = true;
+        }
       };
-      const setNum = (k: keyof FormState, v?: number) => {
+      const setNum = (k: keyof FormState, v?: number, advanced = false) => {
         if (typeof v === 'number' && Number.isFinite(v) && !(next[k] as string)) {
           (next[k] as string) = String(v);
+          if (advanced) advancedTouched = true;
         }
       };
       const setTri = (k: 'forced_dispatch' | 'pets_allowed' | 'riders_allowed', v?: boolean) => {
         if (typeof v === 'boolean' && next[k] === 'unspecified') {
           next[k] = v ? 'yes' : 'no';
+          advancedTouched = true;
         }
       };
+      // Essentials
       setStr('title', data.title);
       setStr('company_name', data.company_name);
       setStr('hiring_city', data.hiring_city);
       setStr('hiring_state', data.hiring_state);
-      if (Array.isArray(data.hiring_states) && data.hiring_states.length && !next.hiring_states) {
-        next.hiring_states = data.hiring_states.join(', ');
-      }
       setStr('driver_type', data.driver_type);
       setStr('route_type', data.route_type);
       setStr('trailer_type', data.trailer_type);
@@ -432,35 +384,55 @@ export function RecruiterOpportunityForm({
       setNum('flat_weekly_pay', data.flat_weekly_pay);
       setNum('estimated_weekly_gross', data.estimated_weekly_gross);
       setNum('estimated_weekly_miles', data.estimated_weekly_miles);
-      setNum('estimated_loaded_miles', data.estimated_loaded_miles);
-      setNum('estimated_deadhead_miles', data.estimated_deadhead_miles);
+      // Advanced
+      if (Array.isArray(data.hiring_states) && data.hiring_states.length && !next.hiring_states) {
+        next.hiring_states = data.hiring_states.join(', ');
+        advancedTouched = true;
+      }
+      setNum('estimated_loaded_miles', data.estimated_loaded_miles, true);
+      setNum('estimated_deadhead_miles', data.estimated_deadhead_miles, true);
       if (typeof data.deadhead_paid === 'boolean' && next.deadhead_paid === 'unspecified') {
         next.deadhead_paid = data.deadhead_paid ? 'paid' : 'unpaid';
+        advancedTouched = true;
       }
-      setStr('detention_pay', data.detention_pay);
-      setStr('layover_pay', data.layover_pay);
-      setNum('sign_on_bonus', data.sign_on_bonus);
-      setStr('fuel_paid_by', data.fuel_paid_by);
-      setNum('insurance_deductions', data.insurance_deductions);
-      if (typeof data.escrow_required === 'boolean') next.escrow_required = next.escrow_required || data.escrow_required;
-      setNum('escrow_amount', data.escrow_amount);
-      setNum('lease_payment', data.lease_payment);
-      setNum('maintenance_deductions', data.maintenance_deductions);
-      setNum('other_deductions', data.other_deductions);
-      setStr('home_time', data.home_time);
+      setStr('detention_pay', data.detention_pay, true);
+      setStr('layover_pay', data.layover_pay, true);
+      setNum('sign_on_bonus', data.sign_on_bonus, true);
+      setStr('fuel_paid_by', data.fuel_paid_by, true);
+      setNum('insurance_deductions', data.insurance_deductions, true);
+      if (typeof data.escrow_required === 'boolean' && !next.escrow_required && data.escrow_required) {
+        next.escrow_required = true;
+        advancedTouched = true;
+      }
+      setNum('escrow_amount', data.escrow_amount, true);
+      setNum('lease_payment', data.lease_payment, true);
+      setNum('maintenance_deductions', data.maintenance_deductions, true);
+      setNum('other_deductions', data.other_deductions, true);
+      setStr('home_time', data.home_time, true);
       setTri('forced_dispatch', data.forced_dispatch);
       setTri('pets_allowed', data.pets_allowed);
       setTri('riders_allowed', data.riders_allowed);
-      setStr('equipment_year', data.equipment_year);
-      setStr('typical_lanes', data.typical_lanes);
-      setStr('benefits', data.requirements ?? data.benefits);
+      setStr('equipment_year', data.equipment_year, true);
+      setStr('typical_lanes', data.typical_lanes, true);
+      setStr('benefits', data.requirements ?? data.benefits, true);
       return next;
     });
+    if (advancedTouched) setOptionalOpen(true);
   };
 
+  const showCpm = form.pay_model === 'cpm' || form.pay_model === 'mixed';
+  const showPct = form.pay_model === 'percentage' || form.pay_model === 'mixed';
+  const showFlat = form.pay_model === 'flat_weekly' || form.pay_model === 'salary' || form.pay_model === 'mixed';
+
+  const warnings: string[] = [];
+  if (financials.hasUnpaidDeadhead) warnings.push('Deadhead appears unpaid.');
+  if (financials.hasUnknownDeadheadPay) warnings.push('Deadhead pay is not disclosed.');
+  if (financials.hasLeaseRisk) warnings.push('Lease payment detected — drivers will see this.');
+  if (financials.hasHighDeductionRisk) warnings.push('High deductions may significantly reduce take-home pay.');
+  if (financials.missingPayData) warnings.push('Pay data is incomplete.');
 
   return (
-    <div className="animate-fade-in pb-32">
+    <div className="animate-fade-in pb-16" data-testid="recruiter-opportunity-form">
       {/* Header */}
       <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
@@ -468,13 +440,14 @@ export function RecruiterOpportunityForm({
             onClick={onBack}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground mb-3"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Recruiter Access
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
           </button>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-            {initial ? 'Edit Trucking Opportunity' : 'Post a Trucking Opportunity'}
+            {initial ? 'Edit Opportunity' : 'Post Opportunity'}
           </h1>
           <p className="text-sm text-muted-foreground max-w-2xl mt-1">
-            Create a structured opportunity that helps drivers understand pay, route, deadhead, deductions, and real earning potential.
+            Share the essentials so drivers can compare pay, route, and take-home honestly.
+            Only the required fields are marked. Extra detail helps you attract better matches.
           </p>
           <div className="mt-3">
             <Button
@@ -484,28 +457,9 @@ export function RecruiterOpportunityForm({
               disabled={pending}
               className="bg-primary text-primary-foreground hover:bg-primary/90 border border-primary shadow-sm"
             >
-              <Sparkles className="h-4 w-4" /> Paste opportunity to auto-fill
+              <Sparkles className="h-4 w-4" /> Paste to auto-fill
             </Button>
           </div>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Button variant="outline" onClick={() => save('draft')} disabled={pending}>
-            <Save className="h-4 w-4" /> Save Draft
-          </Button>
-          {isLastStep ? (
-            <Button
-              onClick={() => save('submit')}
-              disabled={pending || !canSubmitForReview}
-              title={submitBlockReason ?? undefined}
-            >
-              {!canSubmitForReview && <Lock className="h-4 w-4 mr-1" />}
-              <Send className="h-4 w-4" /> Publish Opportunity
-            </Button>
-          ) : (
-            <Button onClick={handleNext}>
-              Save &amp; Continue <ChevronRight className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </div>
 
@@ -515,706 +469,313 @@ export function RecruiterOpportunityForm({
         onExtracted={handleExtracted}
       />
 
+      {/* Essentials */}
+      <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="essentials-section">
+        <SectionHeader title="Essentials" subtitle="The core details drivers need to evaluate this opportunity." />
 
-      {/* Step progress */}
-      <StepProgress current={step} onStepClick={setStep} />
-
-      {/* Main grid: form + sticky preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 mt-6">
-        <div className="space-y-4 min-w-0">
-          {STEPS.map((s) => {
-            const isActive = step === s.id;
-            if (!isActive) {
-              return (
-                <CollapsedSectionCard
-                  key={s.id}
-                  step={s}
-                  onClick={() => setStep(s.id)}
-                />
-              );
-            }
-            return (
-              <Card key={s.id} className="p-5 sm:p-6 border-border/60 bg-card/60 backdrop-blur">
-                <div className="mb-5">
-                  <p className="text-[11px] uppercase tracking-[0.18em] font-semibold text-muted-foreground">
-                    Section {s.id} of {STEPS.length}
-                  </p>
-                  <h2 className="text-xl sm:text-2xl font-black text-foreground mt-1">{s.title}</h2>
-                  <p className="text-sm text-muted-foreground mt-1">{s.short}</p>
-                </div>
-
-                {s.id === 1 && <Step1 form={form} set={set} />}
-                {s.id === 2 && <Step2 form={form} set={set} />}
-                {s.id === 3 && <Step3 form={form} set={set} />}
-                {s.id === 4 && <Step4 form={form} set={set} />}
-                {s.id === 5 && (
-                  <Step5
-                    form={form}
-                    set={set}
-                    financials={financials}
-                  />
-                )}
-
-                {/* Step nav */}
-                <div className="mt-6 flex items-center justify-between gap-3 pt-5 border-t border-border/40">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setStep(Math.max(1, step - 1))}
-                    disabled={step === 1}
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Previous
-                  </Button>
-                  {isLastStep ? (
-                    <Button
-                      onClick={() => save('submit')}
-                      disabled={pending || !canSubmitForReview}
-                      title={submitBlockReason ?? undefined}
-                    >
-                      {!canSubmitForReview && <Lock className="h-4 w-4 mr-1" />}
-                      <Send className="h-4 w-4" /> Publish Opportunity
-                    </Button>
-                  ) : (
-                    <Button onClick={handleNext}>
-                      Save &amp; Continue <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-
-          {/* Why transparency matters */}
-          <Card className="p-4 border-border/60 bg-sky-500/5 border-sky-500/20">
-            <div className="flex gap-3">
-              <div className="rounded-lg bg-sky-500/15 text-sky-400 p-2 shrink-0 self-start">
-                <Info className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-foreground">Why Transparency Matters</h4>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  Drivers value honest, accurate information. Opportunities with complete pay, miles, and home time details receive more requests and higher quality applications.
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Sticky preview */}
-        <aside className="lg:sticky lg:top-4 self-start space-y-4">
-          <DriverPreviewPanel form={form} financials={financials} />
-          <OpportunityStrengthPanel pct={strength.pct} label={strength.label} suggestions={strength.suggestions} />
-          {!canSubmitForReview && submitBlockReason && (
-            <Card className="p-4 border-border/60 bg-amber-500/5 border-amber-500/30">
-              <div className="flex gap-2">
-                <LockIcon className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-muted-foreground">{submitBlockReason}</p>
-              </div>
-            </Card>
-          )}
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-/* ================= Step Progress ================= */
-
-function StepProgress({ current, onStepClick }: { current: number; onStepClick: (n: number) => void }) {
-  return (
-    <div className="relative">
-      <div className="grid grid-cols-5 gap-2">
-        {STEPS.map((s, i) => {
-          const isActive = s.id === current;
-          const isComplete = s.id < current;
-          return (
-            <button
-              key={s.id}
-              onClick={() => onStepClick(s.id)}
-              className="group flex flex-col items-center text-center gap-2"
-            >
-              <div className="relative w-full flex items-center justify-center">
-                {i > 0 && (
-                  <span
-                    className={`absolute left-0 right-1/2 top-1/2 -translate-y-1/2 h-px ${
-                      isComplete || isActive ? 'bg-primary/60' : 'bg-border/60'
-                    }`}
-                  />
-                )}
-                {i < STEPS.length - 1 && (
-                  <span
-                    className={`absolute left-1/2 right-0 top-1/2 -translate-y-1/2 h-px ${
-                      isComplete ? 'bg-primary/60' : 'bg-border/60'
-                    }`}
-                  />
-                )}
-                <span
-                  className={`relative z-10 h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-primary'
-                      : isComplete
-                        ? 'bg-primary/20 text-primary border border-primary/40'
-                        : 'bg-muted/30 text-muted-foreground border border-border/60'
-                  }`}
-                >
-                  {isComplete ? <CheckCircle2 className="h-4 w-4" /> : s.id}
-                </span>
-              </div>
-              <span
-                className={`text-[11px] sm:text-xs font-semibold leading-tight ${
-                  isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
-                }`}
-              >
-                {s.title}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function CollapsedSectionCard({
-  step, onClick,
-}: { step: typeof STEPS[number]; onClick: () => void }) {
-  const Icon = step.icon;
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left group"
-    >
-      <Card className="p-4 sm:p-5 border-border/60 bg-card/40 hover:bg-card/70 hover:border-primary/40 transition-all">
-        <div className="flex items-center gap-4">
-          <div className={`rounded-xl p-2.5 ${step.tint} shrink-0`}>
-            <Icon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-[0.18em] font-semibold text-muted-foreground">
-              Section {step.id} of {STEPS.length}
-            </p>
-            <h3 className="text-base font-bold text-foreground truncate">{step.title}</h3>
-            <p className="text-xs text-muted-foreground truncate">{step.short}</p>
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary shrink-0" />
-        </div>
-      </Card>
-    </button>
-  );
-}
-
-/* ================= Step 1: Job Basics ================= */
-
-function Step1({
-  form, set,
-}: { form: FormState; set: <K extends keyof FormState>(k: K, v: FormState[K]) => void }) {
-  return (
-    <div className="space-y-5">
-      <Field label="Opportunity Title" required count={`${form.title.length}/100`}>
-        <Input
-          value={form.title}
-          onChange={(e) => set('title', e.target.value.slice(0, 100))}
-          placeholder="Example: Regional Dry Van Driver Needed"
-        />
-      </Field>
-
-      <Field label="Company Name" required helper="This will appear to drivers.">
-        <Input
-          value={form.company_name}
-          onChange={(e) => set('company_name', e.target.value)}
-          placeholder="ABC Logistics LLC"
-        />
-      </Field>
-
-      <Field label="Hiring Type" required>
-        <div className="flex flex-wrap gap-2">
-          {HIRING_TYPES.map((h) => {
-            const selected = form.driver_type === h.value;
-            return (
-              <button
-                key={h.value}
-                type="button"
-                onClick={() => set('driver_type', h.value)}
-                className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                  selected
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
-                }`}
-              >
-                {h.label}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
-
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-4">
-        <Field label="Route Type" required>
-          <Select value={form.route_type || 'unset'} onValueChange={(v) => set('route_type', v === 'unset' ? '' : v)}>
-            <SelectTrigger><SelectValue placeholder="Select route type" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unset">Not set</SelectItem>
-              {ROUTE_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Hiring Location" required>
+        <Field label="Opportunity Title" required count={`${form.title.length}/100`}>
           <Input
-            value={form.hiring_city}
-            onChange={(e) => set('hiring_city', e.target.value)}
-            placeholder="Dallas"
+            value={form.title}
+            onChange={(e) => set('title', e.target.value.slice(0, 100))}
+            placeholder="Example: Regional Dry Van Driver Needed"
           />
         </Field>
-        <Field label="State">
-          <Select value={form.hiring_state || 'unset'} onValueChange={(v) => set('hiring_state', v === 'unset' ? '' : v)}>
-            <SelectTrigger className="w-[100px]"><SelectValue placeholder="TX" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unset">—</SelectItem>
-              {US_STATES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
 
-      <Field label="Hiring States" helper="Comma-separated (e.g. TX, OK, AR, LA)">
-        <Input
-          value={form.hiring_states}
-          onChange={(e) => set('hiring_states', e.target.value)}
-          placeholder="Select states you are hiring in"
-        />
-      </Field>
-
-      <Field label="Short Opportunity Summary" required count={`${form.description.length}/500`}>
-        <Textarea
-          rows={4}
-          value={form.description}
-          onChange={(e) => set('description', e.target.value.slice(0, 500))}
-          placeholder="Briefly describe the opportunity, lanes, and what drivers can expect."
-        />
-      </Field>
-    </div>
-  );
-}
-
-/* ================= Step 2: Route & Equipment ================= */
-
-function Step2({
-  form, set,
-}: { form: FormState; set: <K extends keyof FormState>(k: K, v: FormState[K]) => void }) {
-  return (
-    <div className="space-y-5">
-      <Field label="Trailer Type" required>
-        <div className="flex flex-wrap gap-2">
-          {TRAILER_TYPES.map((t) => {
-            const selected = form.trailer_type === t;
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => set('trailer_type', t)}
-                className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                  selected
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
-                }`}
-              >
-                {t}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
-
-      <Field label="Typical Lanes" helper={'One per line — example: "Dallas, TX → Houston, TX"'}>
-        <Textarea
-          rows={3}
-          value={form.typical_lanes}
-          onChange={(e) => set('typical_lanes', e.target.value)}
-          placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
-        />
-      </Field>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <NumField label="Estimated Weekly Miles" value={form.estimated_weekly_miles} onChange={(v) => set('estimated_weekly_miles', v)} />
-        <NumField label="Loaded Miles" value={form.estimated_loaded_miles} onChange={(v) => set('estimated_loaded_miles', v)} />
-        <NumField label="Deadhead Miles" value={form.estimated_deadhead_miles} onChange={(v) => set('estimated_deadhead_miles', v)} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Field label="Deadhead Paid?">
-          <Select value={form.deadhead_paid} onValueChange={(v) => set('deadhead_paid', v as DhOpt)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unspecified">Not Disclosed</SelectItem>
-              <SelectItem value="paid">Yes</SelectItem>
-              <SelectItem value="unpaid">No</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <TriField label="Forced Dispatch?" value={form.forced_dispatch} onChange={(v) => set('forced_dispatch', v)} />
-        <TriField label="Pets Allowed?" value={form.pets_allowed} onChange={(v) => set('pets_allowed', v)} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TriField label="Riders Allowed?" value={form.riders_allowed} onChange={(v) => set('riders_allowed', v)} />
-        <Field label="Equipment Year / Truck Info">
+        <Field label="Company Name" required helper="Shown to drivers.">
           <Input
-            value={form.equipment_year}
-            onChange={(e) => set('equipment_year', e.target.value)}
-            placeholder="Example: 2020–2024 Freightliner Cascadia"
+            value={form.company_name}
+            onChange={(e) => set('company_name', e.target.value)}
+            placeholder="ABC Logistics LLC"
           />
         </Field>
-      </div>
-    </div>
-  );
-}
 
-/* ================= Step 3: Pay & Deductions ================= */
-
-function Step3({
-  form, set,
-}: { form: FormState; set: <K extends keyof FormState>(k: K, v: FormState[K]) => void }) {
-  const showCpm = form.pay_model === 'cpm' || form.pay_model === 'mixed';
-  const showPct = form.pay_model === 'percentage' || form.pay_model === 'mixed';
-  const showFlat = form.pay_model === 'flat_weekly' || form.pay_model === 'salary' || form.pay_model === 'mixed';
-
-  return (
-    <div className="space-y-5">
-      <Field label="Pay Model" required>
-        <div className="flex flex-wrap gap-2">
-          {PAY_MODELS.map((p) => {
-            const selected = form.pay_model === p.value;
-            return (
-              <button
-                key={p.value}
-                type="button"
-                onClick={() => set('pay_model', p.value)}
-                className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                  selected
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
-                }`}
-              >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {showCpm && (
-          <CpmField
-            value={form.cpm}
-            onChange={(v) => set('cpm', v)}
-            weeklyMiles={form.estimated_weekly_miles}
+        <Field label="Hiring Type" required>
+          <ChipRow
+            value={form.driver_type}
+            onChange={(v) => set('driver_type', v)}
+            options={HIRING_TYPES}
           />
-        )}
-        {showPct && <NumField label="Percentage Pay (%)" value={form.percentage_pay} onChange={(v) => set('percentage_pay', v)} />}
-        {showFlat && <NumField label="Flat Weekly Pay ($)" value={form.flat_weekly_pay} onChange={(v) => set('flat_weekly_pay', v)} />}
-        <NumField label="Est. Weekly Gross ($)" value={form.estimated_weekly_gross} onChange={(v) => set('estimated_weekly_gross', v)} />
-        <Field label="Fuel Paid By">
-          <Select value={form.fuel_paid_by || 'unset'} onValueChange={(v) => set('fuel_paid_by', v === 'unset' ? '' : v)}>
-            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unset">Not Disclosed</SelectItem>
-              {FUEL_PAID_BY.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-            </SelectContent>
-          </Select>
         </Field>
-        <NumField label="Sign-On Bonus ($)" value={form.sign_on_bonus} onChange={(v) => set('sign_on_bonus', v)} />
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Detention Pay">
-          <Input value={form.detention_pay} onChange={(e) => set('detention_pay', e.target.value)} placeholder="Example: $25/hr after 2 hrs" />
-        </Field>
-        <Field label="Layover Pay">
-          <Input value={form.layover_pay} onChange={(e) => set('layover_pay', e.target.value)} placeholder="Example: $150/day" />
-        </Field>
-      </div>
-
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Known Deductions</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <NumField label="Insurance Deduction" value={form.insurance_deductions} onChange={(v) => set('insurance_deductions', v)} />
-          <NumField label="Escrow Amount" value={form.escrow_amount} onChange={(v) => set('escrow_amount', v)} />
-          <NumField label="Lease Payment" value={form.lease_payment} onChange={(v) => set('lease_payment', v)} />
-          <NumField label="Maintenance Deduction" value={form.maintenance_deductions} onChange={(v) => set('maintenance_deductions', v)} />
-          <NumField label="Other Deductions" value={form.other_deductions} onChange={(v) => set('other_deductions', v)} />
-          <Field label="Escrow Required?">
-            <label className="flex items-center gap-2 pt-2">
-              <Checkbox checked={form.escrow_required} onCheckedChange={(v) => set('escrow_required', !!v)} />
-              <span className="text-sm">Yes, escrow required</span>
-            </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Route Type" required>
+            <Select value={form.route_type || 'unset'} onValueChange={(v) => set('route_type', v === 'unset' ? '' : v)}>
+              <SelectTrigger><SelectValue placeholder="Select route type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset">Select…</SelectItem>
+                {ROUTE_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Trailer Type" required>
+            <Select value={form.trailer_type || 'unset'} onValueChange={(v) => set('trailer_type', v === 'unset' ? '' : v)}>
+              <SelectTrigger><SelectValue placeholder="Select trailer type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset">Select…</SelectItem>
+                {TRAILER_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
         </div>
-      </div>
 
-      <Card className="p-4 border-primary/20 bg-primary/5">
-        <div className="flex gap-3">
-          <HelpCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            HaulTrackerPro uses these numbers to estimate gross, net, RPM, deadhead impact, deductions, and driver-facing Profit Intelligence. Be accurate. Misleading opportunities may be removed.
-          </p>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-4">
+          <Field label="Hiring City" helper="Optional — helps drivers see where you're hiring.">
+            <Input
+              value={form.hiring_city}
+              onChange={(e) => set('hiring_city', e.target.value)}
+              placeholder="Dallas"
+            />
+          </Field>
+          <Field label="State">
+            <Select value={form.hiring_state || 'unset'} onValueChange={(v) => set('hiring_state', v === 'unset' ? '' : v)}>
+              <SelectTrigger><SelectValue placeholder="TX" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unset">—</SelectItem>
+                {US_STATES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
         </div>
-      </Card>
-    </div>
-  );
-}
 
-/* ================= Step 4: Home Time & Requirements ================= */
-
-function Step4({
-  form, set,
-}: { form: FormState; set: <K extends keyof FormState>(k: K, v: FormState[K]) => void }) {
-  return (
-    <div className="space-y-5">
-      <Field label="Home Time">
-        <Input
-          value={form.home_time}
-          onChange={(e) => set('home_time', e.target.value)}
-          placeholder="Example: Home weekly, every 2 weeks, weekends home"
-        />
-      </Field>
-
-      <Field label="Additional Requirements" helper="Experience, CDL class, endorsements, MVR/drug test, background — describe what you require.">
-        <Textarea
-          rows={5}
-          value={form.benefits}
-          onChange={(e) => set('benefits', e.target.value)}
-          placeholder={'Example:\n• 1 year OTR experience\n• Class A CDL\n• Hazmat preferred\n• Clean MVR last 3 years'}
-        />
-      </Field>
-
-      <Card className="p-3 border-border/60 bg-muted/20">
-        <p className="text-[11px] text-muted-foreground">
-          Tip: Adding clear requirements reduces unqualified driver requests and improves your response rate.
-        </p>
-      </Card>
-    </div>
-  );
-}
-
-/* ================= Step 5: Transparency Review ================= */
-
-function Step5({
-  form, set, financials,
-}: {
-  form: FormState;
-  set: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
-  financials: ReturnType<typeof calculateOpportunityFinancials>;
-}) {
-  const warnings: string[] = [];
-  if (financials.hasUnpaidDeadhead) warnings.push('Deadhead appears unpaid.');
-  if (financials.hasUnknownDeadheadPay) warnings.push('Deadhead pay is not disclosed.');
-  if (financials.hasLeaseRisk) warnings.push('Lease payment detected — drivers will see this.');
-  if (financials.hasHighDeductionRisk) warnings.push('High deductions may significantly reduce take-home pay.');
-  if (financials.missingPayData) warnings.push('Pay data is incomplete.');
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-4 border-border/60">
-          <h4 className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-3">Opportunity Summary</h4>
-          <ReviewRow label="Title" value={form.title || '—'} />
-          <ReviewRow label="Company" value={form.company_name || '—'} />
-          <ReviewRow label="Route Type" value={form.route_type || '—'} />
-          <ReviewRow label="Trailer Type" value={form.trailer_type || '—'} />
-          <ReviewRow label="Hiring Location" value={[form.hiring_city, form.hiring_state].filter(Boolean).join(', ') || '—'} />
-          <ReviewRow label="Hiring States" value={form.hiring_states || '—'} />
-        </Card>
-        <Card className="p-4 border-border/60">
-          <h4 className="text-xs uppercase tracking-wider font-bold text-muted-foreground mb-3">Pay Preview</h4>
-          <ReviewRow label="Est. Weekly Gross" value={fmtUsd(financials.estimatedGross)} />
-          <ReviewRow label="Est. Weekly Net" value={fmtUsd(financials.estimatedNet)} />
-          <ReviewRow label="Effective RPM" value={financials.effectiveRpm != null ? `$${financials.effectiveRpm.toFixed(2)}` : '—'} />
-          <ReviewRow label="Net RPM" value={financials.netRpm != null ? `$${financials.netRpm.toFixed(2)}` : '—'} />
-          <ReviewRow label="Deadhead %" value={financials.deadheadPercentage != null ? `${financials.deadheadPercentage.toFixed(1)}%` : '—'} />
-          <ReviewRow label="Known Deductions" value={fmtUsd(financials.totalKnownDeductions)} />
-        </Card>
-      </div>
-
-      {warnings.length > 0 && (
-        <Card className="p-4 border-amber-500/30 bg-amber-500/5">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
-            <h4 className="text-sm font-bold text-foreground">Transparency Warnings</h4>
+        {/* Pay */}
+        <div className="pt-2">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="h-4 w-4 text-amber-400" />
+            <h3 className="text-sm font-bold text-foreground">Pay</h3>
           </div>
-          <ul className="space-y-1 text-xs text-muted-foreground list-disc pl-5">
-            {warnings.map((w) => <li key={w}>{w}</li>)}
-          </ul>
-        </Card>
-      )}
 
-      <Card className="p-4 border-border/60 space-y-3">
-        <h4 className="text-sm font-bold text-foreground">Recruiter Confirmation</h4>
-        <ConfirmCheck
-          checked={form.transparency_confirmed}
-          onChange={(v) => set('transparency_confirmed', v)}
-          label="I confirm this opportunity information is accurate."
-        />
-        <ConfirmCheck
-          checked={form.confirm_misleading_removed}
-          onChange={(v) => set('confirm_misleading_removed', v)}
-          label="I understand misleading opportunities may be removed."
-        />
-        <ConfirmCheck
-          checked={form.confirm_drivers_see_intel}
-          onChange={(v) => set('confirm_drivers_see_intel', v)}
-          label="I understand drivers will see estimated Profit Intelligence based on the information provided."
-        />
-      </Card>
-    </div>
-  );
-}
+          <Field label="Pay Model" required>
+            <ChipRow
+              value={form.pay_model}
+              onChange={(v) => set('pay_model', v)}
+              options={PAY_MODELS}
+            />
+          </Field>
 
-function ConfirmCheck({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <label className="flex items-start gap-3 cursor-pointer">
-      <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} className="mt-0.5" />
-      <span className="text-sm text-foreground leading-snug">{label}</span>
-    </label>
-  );
-}
+          {!form.pay_model && (
+            <div className="mt-3 rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground flex items-start gap-2">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>Pick a pay model to reveal the matching rate fields.</span>
+            </div>
+          )}
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-border/30 last:border-0">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-xs font-semibold text-foreground truncate max-w-[60%] text-right">{value}</span>
-    </div>
-  );
-}
-
-/* ================= Driver Preview Panel ================= */
-
-function DriverPreviewPanel({
-  form, financials,
-}: { form: FormState; financials: ReturnType<typeof calculateOpportunityFinancials> }) {
-  const lane = form.hiring_city && form.hiring_state ? `${form.hiring_city}, ${form.hiring_state}` : '—';
-  const states = form.hiring_states ? form.hiring_states : '—';
-  const scoreInfo = profitScoreLabel(financials.profitScore);
-  const toneMap: Record<typeof scoreInfo.tone, string> = {
-    success: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    primary: 'bg-primary/15 text-primary border-primary/30',
-    warn: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    destructive: 'bg-red-500/15 text-red-400 border-red-500/30',
-  };
-
-  return (
-    <Card className="p-4 border-border/60 bg-card/60 backdrop-blur">
-      <div className="flex items-center gap-2 mb-1">
-        <Eye className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-bold text-foreground">Driver Preview</h3>
-      </div>
-      <p className="text-[11px] text-muted-foreground mb-4">
-        This is how drivers will see your opportunity.
-      </p>
-
-      <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/15">
-          New Opportunity
-        </Badge>
-        <h4 className="text-base font-black text-foreground mt-2 truncate">
-          {form.title || 'Untitled Opportunity'}
-        </h4>
-        <p className="text-xs text-muted-foreground">{form.company_name || 'Your Company'}</p>
-
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {form.route_type && <Badge variant="outline" className="text-[10px]">{form.route_type}</Badge>}
-          {form.trailer_type && <Badge variant="outline" className="text-[10px]">{form.trailer_type}</Badge>}
-          {form.driver_type && (
-            <Badge variant="outline" className="text-[10px] capitalize">
-              {HIRING_TYPES.find((h) => h.value === form.driver_type)?.label ?? form.driver_type}
-            </Badge>
+          {form.pay_model && (
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {showCpm && (
+                <CpmField
+                  value={form.cpm}
+                  onChange={(v) => set('cpm', v)}
+                  weeklyMiles={form.estimated_weekly_miles}
+                />
+              )}
+              {showPct && <NumField label="Percentage Pay (%)" value={form.percentage_pay} onChange={(v) => set('percentage_pay', v)} />}
+              {showFlat && <NumField label="Flat Weekly Pay ($)" value={form.flat_weekly_pay} onChange={(v) => set('flat_weekly_pay', v)} />}
+              <NumField label="Est. Weekly Gross ($)" value={form.estimated_weekly_gross} onChange={(v) => set('estimated_weekly_gross', v)} />
+              <NumField label="Est. Weekly Miles" value={form.estimated_weekly_miles} onChange={(v) => set('estimated_weekly_miles', v)} />
+            </div>
           )}
         </div>
 
-        <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="h-3 w-3" /> {lane}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <MapPin className="h-3 w-3" /> Hiring in: {states}
-          </div>
-        </div>
+        <Field label="Short Description" count={`${form.description.length}/500`} helper="Optional but recommended — a couple of sentences goes a long way.">
+          <Textarea
+            rows={3}
+            value={form.description}
+            onChange={(e) => set('description', e.target.value.slice(0, 500))}
+            placeholder="Briefly describe the opportunity, lanes, and what drivers can expect."
+          />
+        </Field>
+      </Card>
 
-        <div className="mt-4 pt-3 border-t border-border/30">
-          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">Earnings Preview</p>
-          <PreviewRow label="Est. Weekly Gross" value={fmtUsd(financials.estimatedGross)} tone="success" />
-          <PreviewRow label="Est. Weekly Net" value={fmtUsd(financials.estimatedNet)} tone="success" />
-          <PreviewRow label="Est. Weekly Miles" value={financials.estimatedWeeklyMiles?.toLocaleString() ?? '—'} />
-          <PreviewRow label="Est. Deadhead" value={financials.estimatedDeadheadMiles != null ? `${financials.estimatedDeadheadMiles} mi` : '—'} />
-          <PreviewRow label="Effective RPM" value={financials.effectiveRpm != null ? `$${financials.effectiveRpm.toFixed(2)}` : '—'} />
-          <div className="flex items-center justify-between py-1.5">
-            <span className="text-xs text-muted-foreground">Profit Score</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${toneMap[scoreInfo.tone]}`}>
-              {scoreInfo.label}
-            </span>
+      {/* Optional details (collapsible) */}
+      <Card className="mt-5 border-border/60" data-testid="optional-details-section" data-open={optionalOpen ? 'true' : 'false'}>
+        <button
+          type="button"
+          onClick={() => setOptionalOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/20 rounded-lg transition-colors"
+          data-testid="optional-details-toggle"
+          aria-expanded={optionalOpen}
+        >
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-foreground">Optional details</h3>
+            <p className="text-xs text-muted-foreground">
+              Lanes, deductions, home time, requirements — all optional but they build driver trust.
+            </p>
           </div>
-        </div>
+          {optionalOpen
+            ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+            : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+        </button>
 
-        <div className="mt-3 pt-3 border-t border-border/30">
-          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">What Drivers Will See</p>
-          <ul className="text-[11px] text-muted-foreground space-y-1">
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-400" /> Pay &amp; Deductions</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-400" /> Route &amp; Deadhead</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-400" /> Home Time</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-400" /> Requirements</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-emerald-400" /> Company Info</li>
-          </ul>
-          <div className="mt-3 rounded-md bg-muted/20 border border-border/40 px-2.5 py-2 flex items-center gap-2">
-            <LockIcon className="h-3 w-3 text-muted-foreground shrink-0" />
-            <p className="text-[10px] text-muted-foreground">Contact info shared after approved request.</p>
+        {optionalOpen && (
+          <div className="px-5 pb-6 space-y-5 border-t border-border/40 pt-5" data-testid="optional-details-body">
+            <Field label="Hiring States" helper="Comma-separated (example: TX, OK, AR, LA)">
+              <Input
+                value={form.hiring_states}
+                onChange={(e) => set('hiring_states', e.target.value)}
+                placeholder="TX, OK, AR"
+              />
+            </Field>
+
+            <Field label="Typical Lanes" helper={'One per line — example: "Dallas, TX → Houston, TX"'}>
+              <Textarea
+                rows={3}
+                value={form.typical_lanes}
+                onChange={(e) => set('typical_lanes', e.target.value)}
+                placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
+              />
+            </Field>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <NumField label="Loaded Miles" value={form.estimated_loaded_miles} onChange={(v) => set('estimated_loaded_miles', v)} />
+              <NumField label="Deadhead Miles" value={form.estimated_deadhead_miles} onChange={(v) => set('estimated_deadhead_miles', v)} />
+              <Field label="Deadhead Paid?">
+                <Select value={form.deadhead_paid} onValueChange={(v) => set('deadhead_paid', v as DhOpt)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unspecified">Not disclosed</SelectItem>
+                    <SelectItem value="paid">Yes</SelectItem>
+                    <SelectItem value="unpaid">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <TriField label="Forced Dispatch?" value={form.forced_dispatch} onChange={(v) => set('forced_dispatch', v)} />
+              <TriField label="Pets Allowed?" value={form.pets_allowed} onChange={(v) => set('pets_allowed', v)} />
+              <TriField label="Riders Allowed?" value={form.riders_allowed} onChange={(v) => set('riders_allowed', v)} />
+            </div>
+
+            <Field label="Equipment Year / Truck Info">
+              <Input
+                value={form.equipment_year}
+                onChange={(e) => set('equipment_year', e.target.value)}
+                placeholder="Example: 2020–2024 Freightliner Cascadia"
+              />
+            </Field>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Detention Pay">
+                <Input value={form.detention_pay} onChange={(e) => set('detention_pay', e.target.value)} placeholder="Example: $25/hr after 2 hrs" />
+              </Field>
+              <Field label="Layover Pay">
+                <Input value={form.layover_pay} onChange={(e) => set('layover_pay', e.target.value)} placeholder="Example: $150/day" />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <NumField label="Sign-On Bonus ($)" value={form.sign_on_bonus} onChange={(v) => set('sign_on_bonus', v)} />
+              <Field label="Fuel Paid By">
+                <Select value={form.fuel_paid_by || 'unset'} onValueChange={(v) => set('fuel_paid_by', v === 'unset' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unset">Not disclosed</SelectItem>
+                    {FUEL_PAID_BY.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Home Time">
+                <Input
+                  value={form.home_time}
+                  onChange={(e) => set('home_time', e.target.value)}
+                  placeholder="Home weekly, every 2 weeks"
+                />
+              </Field>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Deductions</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <NumField label="Insurance Deduction" value={form.insurance_deductions} onChange={(v) => set('insurance_deductions', v)} />
+                <NumField label="Escrow Amount" value={form.escrow_amount} onChange={(v) => set('escrow_amount', v)} />
+                <NumField label="Lease Payment" value={form.lease_payment} onChange={(v) => set('lease_payment', v)} />
+                <NumField label="Maintenance Deduction" value={form.maintenance_deductions} onChange={(v) => set('maintenance_deductions', v)} />
+                <NumField label="Other Deductions" value={form.other_deductions} onChange={(v) => set('other_deductions', v)} />
+                <Field label="Escrow Required?">
+                  <label className="flex items-center gap-2 pt-2">
+                    <Checkbox checked={form.escrow_required} onCheckedChange={(v) => set('escrow_required', !!v)} />
+                    <span className="text-sm">Yes, escrow required</span>
+                  </label>
+                </Field>
+              </div>
+            </div>
+
+            <Field label="Additional Requirements" helper="Experience, CDL class, endorsements, MVR/drug test, background.">
+              <Textarea
+                rows={4}
+                value={form.benefits}
+                onChange={(e) => set('benefits', e.target.value)}
+                placeholder={'Example:\n• 1 year OTR experience\n• Class A CDL\n• Clean MVR last 3 years'}
+              />
+            </Field>
           </div>
+        )}
+      </Card>
+
+      {/* Summary + warnings */}
+      <Card className="mt-5 p-5 border-border/60" data-testid="earnings-summary">
+        <h3 className="text-sm font-bold text-foreground mb-3">Earnings Summary</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <SummaryStat label="Est. Weekly Gross" value={fmtUsd(financials.estimatedGross)} />
+          <SummaryStat label="Est. Weekly Net" value={fmtUsd(financials.estimatedNet)} />
+          <SummaryStat label="Effective RPM" value={financials.effectiveRpm != null ? `$${financials.effectiveRpm.toFixed(2)}` : '—'} />
+          <SummaryStat label="Deadhead %" value={financials.deadheadPercentage != null ? `${financials.deadheadPercentage.toFixed(1)}%` : '—'} />
         </div>
+        {warnings.length > 0 && (
+          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+              <h4 className="text-xs font-bold text-foreground">Heads up</h4>
+            </div>
+            <ul className="space-y-1 text-xs text-muted-foreground list-disc pl-5">
+              {warnings.map((w) => <li key={w}>{w}</li>)}
+            </ul>
+          </div>
+        )}
+      </Card>
+
+      {/* Transparency confirmation */}
+      <Card className="mt-5 p-5 border-border/60" data-testid="transparency-confirmation">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <Checkbox
+            checked={form.transparency_confirmed}
+            onCheckedChange={(v) => set('transparency_confirmed', !!v)}
+            className="mt-0.5"
+            aria-label="Transparency confirmation"
+          />
+          <span className="text-sm text-foreground leading-snug">
+            I confirm this opportunity is accurate. Drivers will see the pay, miles, deductions, and
+            estimated Profit Intelligence based on the information I provide.
+          </span>
+        </label>
+      </Card>
+
+      {/* Actions */}
+      <div
+        className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3"
+        data-testid="form-actions"
+      >
+        <Button variant="outline" onClick={() => save('draft')} disabled={pending}>
+          <Save className="h-4 w-4" /> Save Draft
+        </Button>
+        <Button onClick={() => save('submit')} disabled={pending}>
+          <Send className="h-4 w-4" /> Publish Opportunity
+        </Button>
       </div>
-    </Card>
-  );
-}
-
-function PreviewRow({ label, value, tone }: { label: string; value: string; tone?: 'success' }) {
-  return (
-    <div className="flex items-center justify-between py-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className={`text-xs font-bold ${tone === 'success' ? 'text-emerald-400' : 'text-foreground'}`}>{value}</span>
     </div>
   );
 }
 
-function OpportunityStrengthPanel({ pct, label, suggestions }: { pct: number; label: string; suggestions: string[] }) {
+/* ================= Small presentational primitives ================= */
+
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <Card className="p-4 border-border/60 bg-card/60 backdrop-blur">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold text-foreground">Opportunity Strength</h3>
-        <span className="text-sm font-black text-primary">{pct}%</span>
-      </div>
-      <Progress value={pct} className="h-2 mb-2" />
-      <p className="text-[11px] text-muted-foreground mb-3">
-        {pct >= 80
-          ? 'Great job! Your opportunity is very transparent.'
-          : pct >= 60
-            ? 'Good — adding more detail will improve driver response.'
-            : pct >= 40
-              ? 'Needs more detail to attract qualified drivers.'
-              : 'Incomplete — fill in more sections to publish a strong opportunity.'}
-      </p>
-      {suggestions.length > 0 && (
-        <>
-          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-            Suggestions to Improve
-          </p>
-          <ul className="space-y-1 text-[11px] text-muted-foreground list-disc pl-4">
-            {suggestions.slice(0, 4).map((s) => <li key={s}>{s}</li>)}
-          </ul>
-        </>
-      )}
-      <p className="text-[10px] text-muted-foreground/70 mt-3">Status: <span className="font-semibold text-foreground">{label}</span></p>
-    </Card>
+    <div>
+      <h2 className="text-lg font-black text-foreground">{title}</h2>
+      <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+    </div>
   );
 }
-
-/* ================= Field primitives ================= */
 
 function Field({
   label, required, helper, count, children,
@@ -1253,12 +814,6 @@ function NumField({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
-/**
- * Specialized CPM input with a $ adornment, a helper showing the expected
- * format ("$/mile — example: 0.65"), a live "≈ $X/week at Y miles" hint
- * using the recruiter's own weekly-miles input, and a sanity warning if the
- * value looks like cents instead of dollars (e.g. 65 instead of 0.65).
- */
 function CpmField({
   value, onChange, weeklyMiles,
 }: { value: string; onChange: (v: string) => void; weeklyMiles: string }) {
@@ -1298,7 +853,6 @@ function CpmField({
   );
 }
 
-
 function TriField({ label, value, onChange }: { label: string; value: Tribool; onChange: (v: Tribool) => void }) {
   return (
     <Field label={label}>
@@ -1311,6 +865,45 @@ function TriField({ label, value, onChange }: { label: string; value: Tribool; o
         </SelectContent>
       </Select>
     </Field>
+  );
+}
+
+function ChipRow({
+  value, onChange, options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => {
+        const selected = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+              selected
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-card/40 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{label}</p>
+      <p className="text-sm font-black text-foreground mt-0.5">{value}</p>
+    </div>
   );
 }
 
