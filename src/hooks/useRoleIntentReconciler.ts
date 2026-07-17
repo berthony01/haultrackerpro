@@ -41,18 +41,16 @@ export function useRoleIntentReconciler() {
       if (urlIntent === 'recruiter') recruiterIntent = true;
     } catch {}
 
-    if (!recruiterIntent) {
-      ranForUser.current = user.id;
-      return;
-    }
-
     ranForUser.current = user.id;
+
+    // Phase 1E: even without a fresh hint, verify server-side once per
+    // session. The RPC is SECURITY DEFINER and idempotent — it only
+    // flips intent for fresh signups or existing recruiters, so calling
+    // it for every session is safe and closes the gap where an OAuth
+    // recruiter lost the sessionStorage hint on tab close.
     (async () => {
       let applied = false;
       try {
-        // Server-authoritative: the RPC runs SECURITY DEFINER, validates
-        // auth.uid(), and only flips intended_role for genuine new signups
-        // (or existing recruiters). Returns { applied, reason }.
         const { data, error } = await supabase.rpc('apply_recruiter_intent');
         if (error) {
           // Transient failure — allow retry on next mount, don't flip UI.
@@ -68,9 +66,11 @@ export function useRoleIntentReconciler() {
       // Clear the session hint regardless of outcome so we don't loop on
       // an ineligible driver. If they later complete the real recruiter
       // application, that flow will set intended_role server-side.
-      try {
-        sessionStorage.removeItem('htp_auth_intent');
-      } catch {}
+      if (recruiterIntent) {
+        try {
+          sessionStorage.removeItem('htp_auth_intent');
+        } catch {}
+      }
       if (applied) {
         queryClient.invalidateQueries({ queryKey: ['user-role-profile-intent', user.id] });
         queryClient.invalidateQueries({ queryKey: ['user-role-recruiter-check', user.id] });

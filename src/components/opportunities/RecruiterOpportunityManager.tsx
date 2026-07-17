@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import { useUserRole } from '@/hooks/useUserRole';
+import { describeRecruiterBlock } from '@/lib/opportunities/describeRecruiterBlock';
 import {
   useRecruiterOpportunities,
   type Opportunity,
