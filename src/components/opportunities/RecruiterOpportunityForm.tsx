@@ -172,6 +172,93 @@ function hasAdvancedData(f: FormState): boolean {
   );
 }
 
+
+function mergeExtractedOpportunity(
+  current: FormState,
+  data: ExtractedOpportunity,
+): { nextForm: FormState; advancedFilled: boolean } {
+  const next = { ...current };
+  let advancedFilled = false;
+
+  const fillString = (key: keyof FormState, value?: string, advanced = false) => {
+    if (typeof value !== 'string' || !value.trim()) return;
+    const existing = next[key];
+    if (typeof existing === 'string' && !existing.trim()) {
+      (next[key] as string) = value;
+      if (advanced) advancedFilled = true;
+    }
+  };
+  const fillNumber = (key: keyof FormState, value?: number, advanced = false) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    if (next[key] === '') {
+      (next[key] as string) = String(value);
+      if (advanced) advancedFilled = true;
+    }
+  };
+  const fillTriState = (
+    key: 'forced_dispatch' | 'pets_allowed' | 'riders_allowed',
+    value?: boolean,
+  ) => {
+    if (typeof value === 'boolean' && next[key] === 'unspecified') {
+      next[key] = value ? 'yes' : 'no';
+      advancedFilled = true;
+    }
+  };
+
+  fillString('title', data.title);
+  fillString('company_name', data.company_name);
+  fillString('hiring_city', data.hiring_city);
+  fillString('hiring_state', data.hiring_state);
+  fillString('driver_type', data.driver_type);
+  fillString('route_type', data.route_type);
+  fillString('trailer_type', data.trailer_type);
+  fillString('description', data.description);
+  fillString('pay_model', data.pay_model);
+  fillNumber('cpm', data.cpm);
+  fillNumber('percentage_pay', data.percentage_pay);
+  fillNumber('flat_weekly_pay', data.flat_weekly_pay);
+  fillNumber('estimated_weekly_gross', data.estimated_weekly_gross);
+  fillNumber('estimated_weekly_miles', data.estimated_weekly_miles);
+
+  if (Array.isArray(data.hiring_states) && data.hiring_states.length && !next.hiring_states.trim()) {
+    next.hiring_states = data.hiring_states.join(', ');
+    advancedFilled = true;
+  }
+  fillNumber('estimated_loaded_miles', data.estimated_loaded_miles, true);
+  fillNumber('estimated_deadhead_miles', data.estimated_deadhead_miles, true);
+  if (typeof data.deadhead_paid === 'boolean' && next.deadhead_paid === 'unspecified') {
+    next.deadhead_paid = data.deadhead_paid ? 'paid' : 'unpaid';
+    advancedFilled = true;
+  }
+  fillString('detention_pay', data.detention_pay, true);
+  fillString('layover_pay', data.layover_pay, true);
+  fillNumber('sign_on_bonus', data.sign_on_bonus, true);
+  fillString('fuel_paid_by', data.fuel_paid_by, true);
+  fillNumber('insurance_deductions', data.insurance_deductions, true);
+  if (data.escrow_required === true && !next.escrow_required) {
+    next.escrow_required = true;
+    advancedFilled = true;
+  }
+  fillNumber('escrow_amount', data.escrow_amount, true);
+  fillNumber('lease_payment', data.lease_payment, true);
+  fillNumber('maintenance_deductions', data.maintenance_deductions, true);
+  fillNumber('other_deductions', data.other_deductions, true);
+  fillString('home_time', data.home_time, true);
+  fillTriState('forced_dispatch', data.forced_dispatch);
+  fillTriState('pets_allowed', data.pets_allowed);
+  fillTriState('riders_allowed', data.riders_allowed);
+  fillString('equipment_year', data.equipment_year, true);
+  fillString('typical_lanes', data.typical_lanes, true);
+  const requirements = data.requirements?.trim()
+    ? data.requirements
+    : data.benefits?.trim()
+      ? data.benefits
+      : undefined;
+  fillString('benefits', requirements, true);
+
+  return { nextForm: next, advancedFilled };
+}
+
 export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile } = useRecruiterProfile();
@@ -180,10 +267,10 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const [pasteOpen, setPasteOpen] = useState(false);
   const initializedRef = useRef(false);
 
-  // Hydrate from `initial` on edit; otherwise prefill company_name from profile.
+  // Edit hydration runs once. Create-mode company prefill remains responsive to late profile data.
   useEffect(() => {
-    if (initializedRef.current) return;
     if (initial) {
+      if (initializedRef.current) return;
       const split = splitBenefits(initial.benefits);
       const next: FormState = {
         title: initial.title ?? '',
@@ -228,11 +315,11 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       initializedRef.current = true;
       return;
     }
-    // Create mode — company_name prefill only
     if (profile?.company_name) {
-      setForm((f) => (f.company_name ? f : { ...f, company_name: profile.company_name ?? '' }));
+      setForm((current) => current.company_name
+        ? current
+        : { ...current, company_name: profile.company_name ?? '' });
     }
-    initializedRef.current = true;
   }, [initial, profile]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
@@ -345,79 +432,11 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
   const pending = createOpportunity.isPending || updateOpportunity.isPending;
 
-  // Paste-to-autofill merges without overwriting fields the recruiter already typed.
-  // If it fills anything advanced, expand the optional section.
+  // Paste-to-autofill is computed synchronously so advanced expansion is deterministic.
   const handleExtracted = (data: ExtractedOpportunity) => {
-    let advancedTouched = false;
-    setForm((f) => {
-      const next = { ...f };
-      const setStr = (k: keyof FormState, v?: string, advanced = false) => {
-        if (v && typeof v === 'string' && !(next[k] as string)) {
-          (next[k] as string) = v;
-          if (advanced) advancedTouched = true;
-        }
-      };
-      const setNum = (k: keyof FormState, v?: number, advanced = false) => {
-        if (typeof v === 'number' && Number.isFinite(v) && !(next[k] as string)) {
-          (next[k] as string) = String(v);
-          if (advanced) advancedTouched = true;
-        }
-      };
-      const setTri = (k: 'forced_dispatch' | 'pets_allowed' | 'riders_allowed', v?: boolean) => {
-        if (typeof v === 'boolean' && next[k] === 'unspecified') {
-          next[k] = v ? 'yes' : 'no';
-          advancedTouched = true;
-        }
-      };
-      // Essentials
-      setStr('title', data.title);
-      setStr('company_name', data.company_name);
-      setStr('hiring_city', data.hiring_city);
-      setStr('hiring_state', data.hiring_state);
-      setStr('driver_type', data.driver_type);
-      setStr('route_type', data.route_type);
-      setStr('trailer_type', data.trailer_type);
-      setStr('description', data.description);
-      setStr('pay_model', data.pay_model);
-      setNum('cpm', data.cpm);
-      setNum('percentage_pay', data.percentage_pay);
-      setNum('flat_weekly_pay', data.flat_weekly_pay);
-      setNum('estimated_weekly_gross', data.estimated_weekly_gross);
-      setNum('estimated_weekly_miles', data.estimated_weekly_miles);
-      // Advanced
-      if (Array.isArray(data.hiring_states) && data.hiring_states.length && !next.hiring_states) {
-        next.hiring_states = data.hiring_states.join(', ');
-        advancedTouched = true;
-      }
-      setNum('estimated_loaded_miles', data.estimated_loaded_miles, true);
-      setNum('estimated_deadhead_miles', data.estimated_deadhead_miles, true);
-      if (typeof data.deadhead_paid === 'boolean' && next.deadhead_paid === 'unspecified') {
-        next.deadhead_paid = data.deadhead_paid ? 'paid' : 'unpaid';
-        advancedTouched = true;
-      }
-      setStr('detention_pay', data.detention_pay, true);
-      setStr('layover_pay', data.layover_pay, true);
-      setNum('sign_on_bonus', data.sign_on_bonus, true);
-      setStr('fuel_paid_by', data.fuel_paid_by, true);
-      setNum('insurance_deductions', data.insurance_deductions, true);
-      if (typeof data.escrow_required === 'boolean' && !next.escrow_required && data.escrow_required) {
-        next.escrow_required = true;
-        advancedTouched = true;
-      }
-      setNum('escrow_amount', data.escrow_amount, true);
-      setNum('lease_payment', data.lease_payment, true);
-      setNum('maintenance_deductions', data.maintenance_deductions, true);
-      setNum('other_deductions', data.other_deductions, true);
-      setStr('home_time', data.home_time, true);
-      setTri('forced_dispatch', data.forced_dispatch);
-      setTri('pets_allowed', data.pets_allowed);
-      setTri('riders_allowed', data.riders_allowed);
-      setStr('equipment_year', data.equipment_year, true);
-      setStr('typical_lanes', data.typical_lanes, true);
-      setStr('benefits', data.requirements ?? data.benefits, true);
-      return next;
-    });
-    if (advancedTouched) setOptionalOpen(true);
+    const { nextForm, advancedFilled } = mergeExtractedOpportunity(form, data);
+    setForm(nextForm);
+    if (advancedFilled) setOptionalOpen(true);
   };
 
   const showCpm = form.pay_model === 'cpm' || form.pay_model === 'mixed';
@@ -478,6 +497,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
             value={form.title}
             onChange={(e) => set('title', e.target.value.slice(0, 100))}
             placeholder="Example: Regional Dry Van Driver Needed"
+            aria-label="Opportunity Title"
           />
         </Field>
 
@@ -486,6 +506,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
             value={form.company_name}
             onChange={(e) => set('company_name', e.target.value)}
             placeholder="ABC Logistics LLC"
+            aria-label="Company Name"
           />
         </Field>
 
@@ -500,7 +521,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Route Type" required>
             <Select value={form.route_type || 'unset'} onValueChange={(v) => set('route_type', v === 'unset' ? '' : v)}>
-              <SelectTrigger><SelectValue placeholder="Select route type" /></SelectTrigger>
+              <SelectTrigger aria-label="Route Type"><SelectValue placeholder="Select route type" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="unset">Select…</SelectItem>
                 {ROUTE_TYPES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
@@ -509,7 +530,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
           </Field>
           <Field label="Trailer Type" required>
             <Select value={form.trailer_type || 'unset'} onValueChange={(v) => set('trailer_type', v === 'unset' ? '' : v)}>
-              <SelectTrigger><SelectValue placeholder="Select trailer type" /></SelectTrigger>
+              <SelectTrigger aria-label="Trailer Type"><SelectValue placeholder="Select trailer type" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="unset">Select…</SelectItem>
                 {TRAILER_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -524,11 +545,12 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
               value={form.hiring_city}
               onChange={(e) => set('hiring_city', e.target.value)}
               placeholder="Dallas"
+              aria-label="Hiring City"
             />
           </Field>
           <Field label="State">
             <Select value={form.hiring_state || 'unset'} onValueChange={(v) => set('hiring_state', v === 'unset' ? '' : v)}>
-              <SelectTrigger><SelectValue placeholder="TX" /></SelectTrigger>
+              <SelectTrigger aria-label="State"><SelectValue placeholder="TX" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="unset">—</SelectItem>
                 {US_STATES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
@@ -582,6 +604,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
             value={form.description}
             onChange={(e) => set('description', e.target.value.slice(0, 500))}
             placeholder="Briefly describe the opportunity, lanes, and what drivers can expect."
+            aria-label="Short Description"
           />
         </Field>
       </Card>
@@ -613,6 +636,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 value={form.hiring_states}
                 onChange={(e) => set('hiring_states', e.target.value)}
                 placeholder="TX, OK, AR"
+                aria-label="Hiring States"
               />
             </Field>
 
@@ -622,6 +646,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 value={form.typical_lanes}
                 onChange={(e) => set('typical_lanes', e.target.value)}
                 placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
+                aria-label="Typical Lanes"
               />
             </Field>
 
@@ -630,7 +655,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
               <NumField label="Deadhead Miles" value={form.estimated_deadhead_miles} onChange={(v) => set('estimated_deadhead_miles', v)} />
               <Field label="Deadhead Paid?">
                 <Select value={form.deadhead_paid} onValueChange={(v) => set('deadhead_paid', v as DhOpt)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Deadhead Paid?"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unspecified">Not disclosed</SelectItem>
                     <SelectItem value="paid">Yes</SelectItem>
@@ -651,15 +676,16 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 value={form.equipment_year}
                 onChange={(e) => set('equipment_year', e.target.value)}
                 placeholder="Example: 2020–2024 Freightliner Cascadia"
+                aria-label="Equipment Year / Truck Info"
               />
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Detention Pay">
-                <Input value={form.detention_pay} onChange={(e) => set('detention_pay', e.target.value)} placeholder="Example: $25/hr after 2 hrs" />
+                <Input value={form.detention_pay} onChange={(e) => set('detention_pay', e.target.value)} placeholder="Example: $25/hr after 2 hrs" aria-label="Detention Pay" />
               </Field>
               <Field label="Layover Pay">
-                <Input value={form.layover_pay} onChange={(e) => set('layover_pay', e.target.value)} placeholder="Example: $150/day" />
+                <Input value={form.layover_pay} onChange={(e) => set('layover_pay', e.target.value)} placeholder="Example: $150/day" aria-label="Layover Pay" />
               </Field>
             </div>
 
@@ -667,7 +693,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
               <NumField label="Sign-On Bonus ($)" value={form.sign_on_bonus} onChange={(v) => set('sign_on_bonus', v)} />
               <Field label="Fuel Paid By">
                 <Select value={form.fuel_paid_by || 'unset'} onValueChange={(v) => set('fuel_paid_by', v === 'unset' ? '' : v)}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectTrigger aria-label="Fuel Paid By"><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unset">Not disclosed</SelectItem>
                     {FUEL_PAID_BY.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
@@ -679,6 +705,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                   value={form.home_time}
                   onChange={(e) => set('home_time', e.target.value)}
                   placeholder="Home weekly, every 2 weeks"
+                  aria-label="Home Time"
                 />
               </Field>
             </div>
@@ -693,7 +720,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 <NumField label="Other Deductions" value={form.other_deductions} onChange={(v) => set('other_deductions', v)} />
                 <Field label="Escrow Required?">
                   <label className="flex items-center gap-2 pt-2">
-                    <Checkbox checked={form.escrow_required} onCheckedChange={(v) => set('escrow_required', !!v)} />
+                    <Checkbox checked={form.escrow_required} onCheckedChange={(v) => set('escrow_required', !!v)} aria-label="Escrow Required?" />
                     <span className="text-sm">Yes, escrow required</span>
                   </label>
                 </Field>
@@ -706,6 +733,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 value={form.benefits}
                 onChange={(e) => set('benefits', e.target.value)}
                 placeholder={'Example:\n• 1 year OTR experience\n• Class A CDL\n• Clean MVR last 3 years'}
+                aria-label="Additional Requirements"
               />
             </Field>
           </div>
@@ -807,6 +835,7 @@ function NumField({ label, value, onChange }: { label: string; value: string; on
         type="number"
         inputMode="decimal"
         min={0}
+        aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -843,6 +872,7 @@ function CpmField({
           step="0.01"
           min={0}
           max={5}
+          aria-label="CPM Rate ($/mi)"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0.65"
@@ -857,7 +887,7 @@ function TriField({ label, value, onChange }: { label: string; value: Tribool; o
   return (
     <Field label={label}>
       <Select value={value} onValueChange={(v) => onChange(v as Tribool)}>
-        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem value="unspecified">Not disclosed</SelectItem>
           <SelectItem value="yes">Yes</SelectItem>
