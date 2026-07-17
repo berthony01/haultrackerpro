@@ -194,9 +194,26 @@ beforeAll(async () => {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       recruiter_id uuid NOT NULL REFERENCES public.recruiter_profiles(id),
       title text NOT NULL,
+      company_name text,
+      hiring_city text,
       hiring_state text,
       driver_type text,
       route_type text,
+      trailer_type text,
+      deadhead_paid boolean,
+      lease_payment numeric,
+      insurance_deductions numeric,
+      maintenance_deductions numeric,
+      other_deductions numeric,
+      escrow_amount numeric,
+      escrow_required boolean,
+      estimated_weekly_gross numeric,
+      flat_weekly_pay numeric,
+      cpm numeric,
+      percentage_pay numeric,
+      estimated_weekly_miles numeric,
+      estimated_loaded_miles numeric,
+      estimated_deadhead_miles numeric,
       status text NOT NULL DEFAULT 'draft',
       admin_review_status text NOT NULL DEFAULT 'pending',
       featured boolean NOT NULL DEFAULT false,
@@ -209,7 +226,9 @@ beforeAll(async () => {
     ALTER TABLE public.opportunities ENABLE ROW LEVEL SECURITY;
     CREATE POLICY opp_admin_all ON public.opportunities TO authenticated
       USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
-    CREATE POLICY opp_public_read ON public.opportunities FOR SELECT TO authenticated
+    -- Named to match production policy that Phase 1F-A.2 DROPs and re-creates
+    -- with the canonical driver_can_access_opportunity gate.
+    CREATE POLICY "Authenticated view approved active opportunities" ON public.opportunities FOR SELECT TO authenticated
       USING (status = 'active' AND admin_review_status = 'approved');
     CREATE POLICY opp_owner_read ON public.opportunities FOR SELECT TO authenticated
       USING (EXISTS (SELECT 1 FROM public.recruiter_profiles rp
