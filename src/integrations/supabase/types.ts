@@ -3555,6 +3555,10 @@ export type Database = {
         }
       }
       accept_assistant_invite: { Args: { _token: string }; Returns: Json }
+      accept_recruiter_posting_terms: {
+        Args: { _version: string }
+        Returns: string
+      }
       apply_recruiter_intent: { Args: never; Returns: Json }
       assert_agency_limit: {
         Args: { _action: string; _agency_id: string }
@@ -3825,6 +3829,10 @@ export type Database = {
       }
       delete_email: {
         Args: { message_id: number; queue_name: string }
+        Returns: boolean
+      }
+      driver_can_access_opportunity: {
+        Args: { _opportunity_id: string; _recruiter_id: string }
         Returns: boolean
       }
       driver_decide_delegation: {
@@ -4405,7 +4413,6 @@ export type Database = {
         Args: { application_id: string; note?: string; response_type: string }
         Returns: string
       }
-      recruiter_can_post: { Args: { _user_id: string }; Returns: boolean }
       recruiter_has_priority_plan: {
         Args: { _recruiter_id: string }
         Returns: boolean
