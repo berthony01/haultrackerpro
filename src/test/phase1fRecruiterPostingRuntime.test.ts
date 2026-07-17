@@ -81,16 +81,20 @@ function loadPhase1FA2Migrations(): string {
   }).join("\n\n");
 }
 
-// Phase 1F-A.2.1A local candidate corrective SQL. Not a migration.
-const PHASE_1F_A21_FIXTURE = path.join(
-  process.cwd(),
-  "src/test/fixtures/phase1fa21ServerTermsRepair.sql",
-);
-function loadPhase1FA21Fixture(): string {
-  if (!fs.existsSync(PHASE_1F_A21_FIXTURE)) {
-    throw new Error(`Phase 1F-A.2.1A fixture missing: ${PHASE_1F_A21_FIXTURE}`);
-  }
-  return fs.readFileSync(PHASE_1F_A21_FIXTURE, "utf8");
+// Phase 1F-A.2.1B production migration — discovered directly under
+// supabase/migrations by its unique corrective header token. The runtime
+// harness applies it after the two immutable Phase 1F-A.2 files so this
+// test exercises the exact post-live migration sequence.
+function loadPhase1FA21BMigration(): { path: string; sql: string } {
+  const dir = path.join(process.cwd(), "supabase/migrations");
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const match = files.find((f) => {
+    const body = fs.readFileSync(path.join(dir, f), "utf8");
+    return body.includes("Phase 1F-A.2.1B") && body.includes("Server-terms authorization repair");
+  });
+  if (!match) throw new Error("Phase 1F-A.2.1B production migration not found under supabase/migrations");
+  const p = path.join(dir, match);
+  return { path: p, sql: fs.readFileSync(p, "utf8") };
 }
 
 
@@ -443,7 +447,7 @@ beforeAll(async () => {
   // Then the Phase 1F-A.2.1A local candidate corrective fixture (NOT a
   // production migration). Applied after the two immutable 1F-A.2 files
   // so we exercise the exact post-live sequence Stage 1F-A.2.1B will run.
-  await db.exec(loadPhase1FA21Fixture());
+  await db.exec(loadPhase1FA21BMigration().sql);
 
 
 
@@ -1455,15 +1459,12 @@ describe("Phase 1F-A.2.1A-R1 — column privileges on recruiter_profiles", () =>
     expect(after.rows[0].b).toBe(true);
   });
 
-  it("79b. candidate fixture SQL contains no table/column GRANT to service_role", async () => {
-    // Guard the fixture text itself against re-broadening of service_role
-    // TABLE or COLUMN privileges. GRANT EXECUTE on a function is a
-    // separate mechanism and is explicitly allowed. Strip SQL line comments
-    // first so descriptive `-- ...` lines don't false-positive.
-    const raw = require('node:fs').readFileSync(
-      require('node:path').resolve(process.cwd(), 'src/test/fixtures/phase1fa21ServerTermsRepair.sql'),
-      'utf8',
-    );
+  it("79b. Phase 1F-A.2.1B migration contains no table/column GRANT to service_role", async () => {
+    // Guard the production migration text itself against re-broadening of
+    // service_role TABLE or COLUMN privileges. GRANT EXECUTE on a function
+    // is a separate mechanism and is explicitly allowed. Strip SQL line
+    // comments first so descriptive `-- ...` lines don't false-positive.
+    const raw = loadPhase1FA21BMigration().sql;
     const stripped = raw.replace(/--[^\n]*/g, '');
     expect(stripped).not.toMatch(
       /\bGRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[^;]*?\bTO\b[^;]*?\bservice_role\b/i,

@@ -1,20 +1,18 @@
--- Phase 1F-A.2.1A — LOCAL FIXTURE (candidate corrective SQL).
+-- Phase 1F-A.2.1B — Server-terms authorization repair (DEF-GUC-Bypass).
 --
--- This file is applied by the PGlite runtime harness ONLY. It is not a
--- production migration and MUST NOT be moved under supabase/migrations
--- until Stage 1F-A.2.1B applies it live.
+-- Repairs Phase 1F-A.2's reliance on the client-settable custom GUC
+-- `app.accept_posting_terms`. Any authenticated caller could `set_config`
+-- that GUC and directly UPDATE their `posting_terms_*` columns with
+-- forged values, bypassing the sanctioned RPC.
 --
--- Purpose: repair DEF-GUC-Bypass in Phase 1F-A.2. The live
--- recruiter_profile_guard() trusts the client-settable custom GUC
--- app.accept_posting_terms; any authenticated caller can set the GUC
--- and directly UPDATE their posting_terms_* columns with forged values.
---
--- Repair strategy: PostgreSQL column privileges as the authorization
+-- Repair strategy: PostgreSQL column privileges are the authorization
 -- boundary. Direct authenticated UPDATE on posting_terms_accepted_at /
 -- posting_terms_version / legacy_terms_grandfathered_at is denied at
 -- grant-check time (before triggers run). The SECURITY DEFINER RPC
 -- accept_recruiter_posting_terms() runs with the definer's privileges
--- and remains the only authorized path to stamp consent.
+-- and remains the only authorized path to stamp consent. The
+-- recruiter_profile_guard() trigger is replaced with a no-GUC
+-- implementation that never overwrites posting_terms_* on UPDATE.
 
 -- =========================================================================
 -- 1. Column privileges on public.recruiter_profiles
@@ -27,7 +25,7 @@ REVOKE UPDATE ON public.recruiter_profiles FROM authenticated;
 
 -- Step 2: explicitly revoke UPDATE on every protected column from every
 -- non-service_role grantee. This guarantees no stale column-level grant
--- from an earlier migration survives the fixture.
+-- from an earlier migration survives.
 REVOKE UPDATE (
   id,
   user_id,
@@ -55,7 +53,7 @@ REVOKE UPDATE (
 
 -- Step 3: grant UPDATE on the allowed ordinary/moderation columns to
 -- authenticated. service_role privileges are intentionally NOT modified
--- here — the fixture must not broaden any grant to service_role.
+-- here — this migration must not broaden any grant to service_role.
 GRANT UPDATE (
   recruiter_name,
   recruiter_email,
