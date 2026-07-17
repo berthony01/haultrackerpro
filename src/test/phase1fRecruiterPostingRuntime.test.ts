@@ -412,10 +412,33 @@ beforeAll(async () => {
   // Apply Phase 1F-A.1 first, then the two Phase 1F-A.2 files in file order.
   await db.exec(findPhase1FA1Migration());
   await db.exec(loadPhase1FA2Migrations());
+
+  // Phase 1F-A.2.1A-R1: capture pre-fixture live invariants that the
+  // candidate corrective SQL MUST NOT alter.
+  const srBefore = await db.query<{ b: boolean }>(
+    `SELECT has_table_privilege('service_role','public.recruiter_profiles','UPDATE') b`,
+  );
+  serviceRoleUpdateBefore = srBefore.rows[0].b;
+
+  // Seed one accepted-terms sentinel profile BEFORE the fixture runs so
+  // case 88 can prove the fixture never rewrites pre-existing accepted rows.
+  const sentinel = await db.query<{ id: string }>(
+    `INSERT INTO public.recruiter_profiles
+       (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+        status, verification_status, posting_terms_accepted_at, posting_terms_version)
+     VALUES ($1,'Sentinel','Sco','sentinel@s.example','555111',
+             'active','pending', $2::timestamptz, $3)
+     RETURNING id`,
+    [SENTINEL_USER, SENTINEL_TS, SENTINEL_VERSION],
+  );
+  sentinelPreFixtureId = sentinel.rows[0].id;
+  sentinelPreFixtureTs = SENTINEL_TS;
+
   // Then the Phase 1F-A.2.1A local candidate corrective fixture (NOT a
   // production migration). Applied after the two immutable 1F-A.2 files
   // so we exercise the exact post-live sequence Stage 1F-A.2.1B will run.
   await db.exec(loadPhase1FA21Fixture());
+
 
   // Seed the admin user + recruiter profiles as the outer superuser
   // (bypasses RLS / triggers) so we can control the initial state.
