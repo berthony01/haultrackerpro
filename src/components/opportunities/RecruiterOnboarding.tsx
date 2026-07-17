@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useRecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
+import { POSTING_TERMS_VERSION, hasAcceptedPostingTerms } from '@/lib/opportunities/recruiterEligibility';
 
 interface Props {
   onBack: () => void;
@@ -101,9 +102,13 @@ export function RecruiterOnboarding({ onBack }: Props) {
         equipment_types: (profile.equipment_types ?? []).join(', '),
         driver_types_hired: (profile.driver_types_hired ?? []).join(', '),
       });
-      setAgree1(true);
-      setAgree2(true);
-      setAgree3(true);
+      // Only auto-check the agreement boxes if the recruiter has previously
+      // accepted (or been grandfathered). New/legacy-unconsented rows must
+      // explicitly re-confirm before we stamp posting_terms_accepted_at.
+      const alreadyAccepted = hasAcceptedPostingTerms(profile);
+      setAgree1(alreadyAccepted);
+      setAgree2(alreadyAccepted);
+      setAgree3(alreadyAccepted);
     }
   }, [profile]);
 
@@ -129,26 +134,26 @@ export function RecruiterOnboarding({ onBack }: Props) {
     }
     if (v === 'approved') {
       return {
-        title: 'Recruiter Access Approved',
-        text: 'You will soon be able to create opportunities and manage driver requests.',
-        badge: 'Approved',
+        title: 'Verified Recruiter',
+        text: 'Standard posting is enabled and drivers see a Verified Recruiter badge on your opportunities.',
+        badge: 'Verified',
         variant: 'default' as const,
         Icon: CheckCircle2,
       };
     }
     if (v === 'rejected') {
       return {
-        title: 'Recruiter Profile Needs Attention',
-        text: 'Please review your recruiter information and contact support if needed.',
-        badge: 'Needs Attention',
+        title: 'Verification Not Approved',
+        text: 'Standard posting remains enabled unless your account is suspended. Update your profile and resubmit to earn the Verified Recruiter badge.',
+        badge: 'Unverified',
         variant: 'secondary' as const,
         Icon: AlertTriangle,
       };
     }
     return {
-      title: 'Recruiter Profile Submitted',
-      text: 'Your recruiter profile is currently under review.',
-      badge: 'Pending Review',
+      title: 'Standard Posting Enabled',
+      text: 'Your opportunities go live to drivers immediately. A Verified Recruiter badge is added later once an admin reviews your profile.',
+      badge: 'Pending Verification',
       variant: 'outline' as const,
       Icon: Clock,
     };
