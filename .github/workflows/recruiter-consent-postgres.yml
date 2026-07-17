@@ -1,0 +1,65 @@
+name: Recruiter Consent — Postgres 16 Concurrency Gate
+
+on:
+  push:
+    paths:
+      - '.github/workflows/recruiter-consent-postgres.yml'
+      - 'src/test/phase1fa22R1bPostgresConcurrency.test.ts'
+      - 'supabase/migrations/20260717222023_r1b_consent_pair_integrity.sql'
+      - 'package.json'
+      - 'bun.lockb'
+  pull_request:
+    paths:
+      - '.github/workflows/recruiter-consent-postgres.yml'
+      - 'src/test/phase1fa22R1bPostgresConcurrency.test.ts'
+      - 'supabase/migrations/20260717222023_r1b_consent_pair_integrity.sql'
+      - 'package.json'
+      - 'bun.lockb'
+
+jobs:
+  recruiter-consent-postgres:
+    name: Real Postgres 16 — accept_recruiter_posting_terms
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: r1b
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d r1b"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/r1b
+      R1B_REQUIRE_POSTGRES: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Wait for Postgres readiness
+        run: |
+          for i in {1..30}; do
+            if bunx --package=pg node -e "const {Client}=require('pg');const c=new Client({connectionString:process.env.DATABASE_URL});c.connect().then(()=>c.end()).then(()=>process.exit(0)).catch(()=>process.exit(1))"; then
+              echo "postgres reachable"; exit 0
+            fi
+            sleep 1
+          done
+          echo "postgres did not become ready"; exit 1
+
+      - name: Run R1B real-Postgres concurrency + consent-pair test
+        run: bunx vitest run src/test/phase1fa22R1bPostgresConcurrency.test.ts --reporter=verbose
