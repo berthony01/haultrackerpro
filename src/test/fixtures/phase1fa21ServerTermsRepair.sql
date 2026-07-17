@@ -19,10 +19,43 @@
 -- =========================================================================
 -- 1. Column privileges on public.recruiter_profiles
 -- =========================================================================
+-- Step 1: strip table-level UPDATE from PUBLIC / anon / authenticated so any
+-- future write must be authorized column-by-column.
 REVOKE UPDATE ON public.recruiter_profiles FROM PUBLIC;
 REVOKE UPDATE ON public.recruiter_profiles FROM anon;
 REVOKE UPDATE ON public.recruiter_profiles FROM authenticated;
 
+-- Step 2: explicitly revoke UPDATE on every protected column from every
+-- non-service_role grantee. This guarantees no stale column-level grant
+-- from an earlier migration survives the fixture.
+REVOKE UPDATE (
+  id,
+  user_id,
+  created_at,
+  posting_terms_accepted_at,
+  posting_terms_version,
+  legacy_terms_grandfathered_at
+) ON public.recruiter_profiles FROM PUBLIC;
+REVOKE UPDATE (
+  id,
+  user_id,
+  created_at,
+  posting_terms_accepted_at,
+  posting_terms_version,
+  legacy_terms_grandfathered_at
+) ON public.recruiter_profiles FROM anon;
+REVOKE UPDATE (
+  id,
+  user_id,
+  created_at,
+  posting_terms_accepted_at,
+  posting_terms_version,
+  legacy_terms_grandfathered_at
+) ON public.recruiter_profiles FROM authenticated;
+
+-- Step 3: grant UPDATE on the allowed ordinary/moderation columns to
+-- authenticated. service_role privileges are intentionally NOT modified
+-- here — the fixture must not broaden any grant to service_role.
 GRANT UPDATE (
   recruiter_name,
   recruiter_email,
@@ -45,9 +78,6 @@ GRANT UPDATE (
   verified_by,
   updated_at
 ) ON public.recruiter_profiles TO authenticated;
-
--- service_role retains full table-level UPDATE (never revoked here).
-GRANT ALL ON public.recruiter_profiles TO service_role;
 
 -- =========================================================================
 -- 2. accept_recruiter_posting_terms(text) — no GUC, UPDATE ... RETURNING
