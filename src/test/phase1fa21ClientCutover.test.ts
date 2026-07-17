@@ -35,9 +35,21 @@ let insertNextError: Error | null = null;
 let rpcNextError: Error | null = null;
 let rpcNextData: string | null = '2026-07-17T00:00:00Z';
 let insertedIdCounter = 0;
+// Phase 1F-A.2.1A-R4: allow tests to simulate a successful INSERT whose
+// response omits the profile id, so the recovery path can be exercised.
+let insertReturnsEmpty = false;
+// Phase 1F-A.2.1A-R4: mock data/error for the safe caller-owned recovery
+// RPC (get_my_recruiter_profile_safe).
+let safeProfileRpcRows: Array<{ id: string }> | null = [];
+let safeProfileRpcError: Error | null = null;
 
 // Controls whether useQuery reports an existing profile.
 let currentProfile: { id: string } | null = null;
+
+// Phase 1F-A.2.1A-R4: mutable authenticated identity so tests can simulate
+// a user switch on the same hook lifecycle. `vi.hoisted` is required
+// because `vi.mock` factories run before top-level statements.
+const authState = vi.hoisted(() => ({ userId: 'client-user-1' as string | null }));
 
 vi.mock('@/integrations/supabase/client', () => {
   const from = (table: string) => ({
@@ -62,8 +74,10 @@ vi.mock('@/integrations/supabase/client', () => {
       const err = insertNextError;
       insertNextError = null;
       const nextId = `inserted-rp-${++insertedIdCounter}`;
-      // Support both bare-await (legacy upsertProfile) and .select('id').single()
-      const bare = Promise.resolve({ data: err ? null : { id: nextId }, error: err });
+      const returnEmpty = insertReturnsEmpty;
+      insertReturnsEmpty = false;
+      const data = err ? null : (returnEmpty ? {} : { id: nextId });
+      const bare = Promise.resolve({ data, error: err });
       return {
         select: (_cols: string) => ({
           single: () => bare,
@@ -79,6 +93,9 @@ vi.mock('@/integrations/supabase/client', () => {
   });
   const rpc = (fn: string, args: Record<string, unknown>) => {
     rpcCalls.push({ fn, args });
+    if (fn === 'get_my_recruiter_profile_safe') {
+      return Promise.resolve({ data: safeProfileRpcRows, error: safeProfileRpcError });
+    }
     const err = rpcNextError;
     const data = rpcNextData;
     rpcNextError = null;
@@ -88,7 +105,7 @@ vi.mock('@/integrations/supabase/client', () => {
 });
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'client-user-1' } }),
+  useAuth: () => ({ user: authState.userId ? { id: authState.userId } : null }),
 }));
 vi.mock('@/hooks/useAdmin', () => ({ useAdmin: () => ({ isAdmin: false }) }));
 
