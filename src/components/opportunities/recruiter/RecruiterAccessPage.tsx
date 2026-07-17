@@ -32,13 +32,18 @@ import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunity
 import { useUserRole } from '@/hooks/useUserRole';
 import { RecruiterBillingPanel } from '../RecruiterBillingPanel';
 
+// Phase 1F-A: state machine — profile completeness + suspension gate posting.
+// Admin verification (`isVerified`) is a trust badge only, tracked separately.
 type RecruiterState =
   | 'none'
-  | 'pending'
-  | 'rejected'
+  | 'incomplete'
   | 'suspended'
-  | 'approved_no_billing'
-  | 'approved_active';
+  | 'active_no_billing'
+  | 'active_billing';
+
+function isNonEmpty(v: unknown): boolean {
+  return typeof v === 'string' && v.trim().length > 0;
+}
 
 function resolveState(
   profile: RecruiterProfile | null,
@@ -46,9 +51,12 @@ function resolveState(
 ): RecruiterState {
   if (!profile) return 'none';
   if (profile.status === 'suspended' || profile.verification_status === 'suspended') return 'suspended';
-  if (profile.verification_status === 'rejected') return 'rejected';
-  if (profile.verification_status !== 'approved') return 'pending';
-  return isBillingActive ? 'approved_active' : 'approved_no_billing';
+  const complete =
+    isNonEmpty(profile.recruiter_name) &&
+    isNonEmpty(profile.company_name) &&
+    isNonEmpty(profile.recruiter_email);
+  if (!complete) return 'incomplete';
+  return isBillingActive ? 'active_billing' : 'active_no_billing';
 }
 
 interface Props {
