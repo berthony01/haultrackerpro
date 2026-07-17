@@ -24,7 +24,7 @@ const HISTORICAL_VERSION = "2025-legacy.v1";
 // ESM-safe absolute paths for the exact repository migration files.
 const R1B_MIGRATION_PATH = fileURLToPath(
   new URL(
-    "../../supabase/migrations/20260717222023_r1b_consent_pair_integrity.sql",
+    "../../supabase/migrations/20260717223452_ff4257ea-d71a-4cca-881b-3f5ab5d7011a.sql",
     import.meta.url,
   ),
 );
