@@ -124,67 +124,6 @@ export function RecruiterOnboarding({ onBack }: Props) {
   const isRejected = profile?.verification_status === 'rejected';
   const allAgreed = agree1 && agree2 && agree3;
 
-  // Phase 1F-A.2.2: derive status presentation from the canonical
-  // eligibility helper FIRST, then layer verification as a trust
-  // distinction. Incomplete/suspended profiles must NEVER be told
-  // standard posting is enabled — no matter their verification status.
-  const statusCfg = useMemo(() => {
-    if (!profile) return null;
-    const eligibility = describeRecruiterEligibility(profile, {});
-    const v = profile.verification_status;
-
-    if (eligibility.state === 'suspended') {
-      return {
-        title: 'Recruiter Access Suspended',
-        text: 'Please contact support regarding your recruiter account. Standard posting is disabled until this is resolved.',
-        badge: 'Suspended',
-        variant: 'destructive' as const,
-        Icon: Ban,
-      };
-    }
-
-    if (eligibility.state === 'incomplete_profile') {
-      // Incomplete profile: verification badge is irrelevant — posting is NOT enabled.
-      const verificationLabel =
-        v === 'approved' ? 'Verified' :
-        v === 'rejected' ? 'Not Approved' :
-        'Pending Verification';
-      return {
-        title: 'Finish your recruiter profile',
-        text: 'Standard posting is not enabled yet. Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Verification review runs separately.',
-        badge: verificationLabel,
-        variant: 'secondary' as const,
-        Icon: AlertTriangle,
-      };
-    }
-
-    // Complete + not suspended → standard posting is enabled.
-    if (v === 'approved') {
-      return {
-        title: 'Verified Recruiter — Standard Posting Enabled',
-        text: 'Standard posting is enabled and drivers see a Verified Recruiter badge on your opportunities.',
-        badge: 'Verified',
-        variant: 'default' as const,
-        Icon: CheckCircle2,
-      };
-    }
-    if (v === 'rejected') {
-      return {
-        title: 'Standard Posting Enabled — Verification Not Approved',
-        text: 'Standard posting is enabled. The Verified Recruiter badge was not approved — update your profile and resubmit to earn the badge. Standard posting stays enabled unless your account is suspended.',
-        badge: 'Unverified',
-        variant: 'secondary' as const,
-        Icon: AlertTriangle,
-      };
-    }
-    return {
-      title: 'Standard Posting Enabled',
-      text: 'Your opportunities go live to drivers immediately. Verification review runs separately — a Verified Recruiter badge is added later once an admin reviews your profile.',
-      badge: 'Pending Verification',
-      variant: 'outline' as const,
-      Icon: Clock,
-    };
-  }, [profile]);
 
   const validate = (): string | null => {
     if (!form.recruiter_name.trim()) return 'Recruiter name is required.';
