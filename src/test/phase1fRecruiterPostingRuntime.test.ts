@@ -108,6 +108,17 @@ let recrBId: string;
 let incompleteRpId: string;
 let suspendedRpId: string;
 let noConsentRpId: string;
+// Phase 1F-A.2.1A-R1: pre-fixture accepted sentinel — seeded AFTER the two
+// Phase 1F-A.2 migrations but BEFORE the candidate fixture. Case 88 asserts
+// its exact timestamp/version remain unchanged.
+let sentinelPreFixtureId: string;
+let sentinelPreFixtureTs: string;
+const SENTINEL_USER = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+const SENTINEL_TS = "2025-01-01T12:34:56Z";
+const SENTINEL_VERSION = "2026-07-17.v1";
+// Pre-fixture snapshot of service_role UPDATE privilege on the table.
+let serviceRoleUpdateBefore: boolean;
+
 
 /** Run a block as an authenticated user with a JWT sub claim. */
 async function asUser(uid: string, fn: () => Promise<void>) {
