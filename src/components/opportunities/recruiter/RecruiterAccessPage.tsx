@@ -645,29 +645,26 @@ function NextSteps({
   onPost: () => void;
   onApplications: () => void;
 }) {
-  const profileDone = state !== 'none';
-  const approved = state === 'active_billing' || state === 'active_no_billing';
+  // Phase 1F-A: "Get approved" is no longer a posting prerequisite —
+  // it's replaced by "Complete your recruiter profile", which is what
+  // actually unlocks standard posting.
+  const profileComplete = state === 'active_billing' || state === 'active_no_billing';
 
   const steps = [
     {
       label: 'Complete recruiter profile',
-      done: profileDone,
-      onClick: profileDone ? undefined : onOpenOnboarding,
-    },
-    {
-      label: 'Get approved',
-      done: approved,
-      onClick: undefined,
+      done: profileComplete,
+      onClick: profileComplete ? undefined : onOpenOnboarding,
     },
     {
       label: 'Post your first opportunity',
       done: hasPosts,
-      onClick: hasPosts || !approved ? undefined : onPost,
+      onClick: hasPosts || !profileComplete ? undefined : onPost,
     },
     {
       label: 'Review driver requests',
       done: hasApps,
-      onClick: hasApps && approved ? onApplications : undefined,
+      onClick: hasApps && profileComplete ? onApplications : undefined,
     },
     {
       label: 'Improve response rate',
