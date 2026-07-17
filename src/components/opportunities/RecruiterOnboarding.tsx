@@ -20,11 +20,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useRecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
+import { useRecruiterProfile, type RecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
 import {
   POSTING_TERMS_VERSION,
   hasAcceptedPostingTerms,
   describeRecruiterEligibility,
+  getRecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
 
 interface Props {
