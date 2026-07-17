@@ -1342,14 +1342,15 @@ describe("Phase 1F-A.2 — accept_recruiter_posting_terms RPC", () => {
 // (immutable) → fixture.
 
 describe("Phase 1F-A.2.1A — column privileges on recruiter_profiles", () => {
-  it("75. authenticated has NO table-level UPDATE grant", async () => {
-    const r = await db.query<{ b: boolean }>(
-      `SELECT has_table_privilege('authenticated','public.recruiter_profiles','UPDATE') b`);
-    expect(r.rows[0].b).toBe(true); // any column grant satisfies table-level probe
-    // Verify no *bare* table grant remains: probe a protected column.
+  it("75. authenticated has NO table-level UPDATE grant (only column subset)", async () => {
+    // Probe a protected column: authenticated must NOT have UPDATE.
     const cP = await db.query<{ b: boolean }>(
       `SELECT has_column_privilege('authenticated','public.recruiter_profiles','posting_terms_accepted_at','UPDATE') b`);
     expect(cP.rows[0].b).toBe(false);
+    // Probe an ordinary column: authenticated MUST have UPDATE.
+    const cO = await db.query<{ b: boolean }>(
+      `SELECT has_column_privilege('authenticated','public.recruiter_profiles','recruiter_name','UPDATE') b`);
+    expect(cO.rows[0].b).toBe(true);
   });
 
   it("76. authenticated CAN update every ordinary/moderation column category", async () => {
