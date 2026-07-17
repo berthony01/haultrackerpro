@@ -1246,5 +1246,57 @@ describe("Phase 1F-A.2 — accept_recruiter_posting_terms RPC", () => {
       `UPDATE public.recruiter_profiles SET legacy_terms_grandfathered_at=NULL WHERE id=$1`,
       [noConsentRpId]);
   });
+  it("74. GUC bypass: authenticated set_config('app.accept_posting_terms',true) + direct UPDATE must NOT persist forged consent", async () => {
+    // Baseline: NO_CONSENT_USER owns a complete profile with NULL consent.
+    const before = await db.query<{ ts: string | null; v: string | null }>(
+      `SELECT posting_terms_accepted_at ts, posting_terms_version v
+         FROM public.recruiter_profiles WHERE id=$1`, [noConsentRpId]);
+    expect(before.rows[0].ts).toBeNull();
+
+    const FORGED_TS = "2099-01-01T00:00:00Z";
+    const ACCEPTED_VERSION = "2026-07-17.v1";
+
+    // Attempt the exploit inside a single authenticated transaction:
+    //   1. set the trusted GUC directly (no RPC)
+    //   2. UPDATE own row stamping a forged future timestamp + accepted version
+    let updateThrew = false;
+    try {
+      await asUser(NO_CONSENT_USER, async () => {
+        await db.query(`SELECT set_config('app.accept_posting_terms','true',true)`);
+        await db.query(
+          `UPDATE public.recruiter_profiles
+             SET posting_terms_accepted_at=$1::timestamptz,
+                 posting_terms_version=$2
+           WHERE id=$3`,
+          [FORGED_TS, ACCEPTED_VERSION, noConsentRpId]);
+      });
+    } catch {
+      updateThrew = true;
+    }
+
+    // Secure contract: the forged values must NOT persist, regardless of
+    // whether the UPDATE raised or silently no-op'd.
+    const after = await db.query<{ ts: string | null; v: string | null }>(
+      `SELECT posting_terms_accepted_at ts, posting_terms_version v
+         FROM public.recruiter_profiles WHERE id=$1`, [noConsentRpId]);
+
+    // Diagnostic breadcrumb for the report:
+    // eslint-disable-next-line no-console
+    console.log("[GUC-BYPASS-DIAG]", {
+      updateThrew,
+      stored_ts: after.rows[0].ts,
+      stored_version: after.rows[0].v,
+    });
+
+    expect(after.rows[0].ts).toBeNull();
+    expect(after.rows[0].v).toBeNull();
+
+    // And the profile must still be ineligible (no legacy grandfather).
+    const elig = await db.query<{ b: boolean }>(
+      `SELECT public.recruiter_profile_can_manage_opportunities($1) b`,
+      [noConsentRpId]);
+    expect(elig.rows[0].b).toBe(false);
+  });
 });
+
 
