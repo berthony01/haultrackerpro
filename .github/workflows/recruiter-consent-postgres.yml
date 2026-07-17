@@ -1,5 +1,6 @@
 name: Recruiter Consent — Postgres 16 Concurrency Gate
 
+# Final verification marker for the reconciled live-recorded migration path.
 on:
   push:
     paths:
