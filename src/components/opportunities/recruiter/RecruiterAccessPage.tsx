@@ -116,18 +116,18 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const recentPosts = useMemo(() => opportunities.slice(0, 5), [opportunities]);
 
   // Approved/verified recruiters can post unlimited standard opportunities — billing is only for premium tools.
-  const canPost = state === 'approved_active' || state === 'approved_no_billing';
+  const canPost = state === 'active_billing' || state === 'active_no_billing';
   const postDisabled = !canPost;
 
   const handlePost = () => {
-    if (state === 'none' || state === 'rejected') {
+    if (state === 'none' || state === 'incomplete') {
       // Don't silently open the recruiter-application form from a "Post" button —
       // it looks like the post-opportunity form. Scroll to the explicit
       // "Apply for Recruiter Access" card instead.
       onboardingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    if (state === 'pending' || state === 'suspended') return;
+    if (state === 'suspended') return;
     onManage();
   };
 
@@ -159,7 +159,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
             size="sm"
             onClick={handlePost}
             disabled={postDisabled}
-            title={postDisabled ? 'Get approved as a recruiter to post opportunities.' : undefined}
+            title={postDisabled ? 'Finish your recruiter profile to post opportunities.' : undefined}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <PlusCircle className="h-4 w-4" /> Post an Opportunity
@@ -190,7 +190,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                 Find reliable drivers. <span className="text-primary">Faster.</span>
               </h2>
               <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-xl">
-                HaulTrackerPro helps approved recruiters post structured opportunities,
+                HaulTrackerPro helps recruiters post structured opportunities,
                 review qualified drivers, and manage your hiring pipeline with clarity and control.
               </p>
             </div>
@@ -238,7 +238,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       />
 
       {/* Onboarding entry (only when missing or rejected) */}
-      {(state === 'none' || state === 'rejected') && (
+      {(state === 'none' || state === 'incomplete') && (
         <div ref={onboardingRef}>
           <Card className="p-5 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
             <div className="flex items-start gap-4">
@@ -273,7 +273,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       )}
 
       {/* Approved layout */}
-      {(state === 'approved_active' || state === 'approved_no_billing') && (
+      {(state === 'active_billing' || state === 'active_no_billing') && (
         <div className="grid lg:grid-cols-[1.5fr_1fr] gap-6">
           {/* Left column */}
           <div className="space-y-6">
@@ -320,7 +320,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       )}
 
       {/* Full billing panel (anchor) */}
-      {(state === 'approved_active' || state === 'approved_no_billing') && (
+      {(state === 'active_billing' || state === 'active_no_billing') && (
         <div ref={billingRef} className="scroll-mt-6">
           <RecruiterBillingPanel />
         </div>
@@ -372,7 +372,7 @@ function StateCard({
   onOpenOnboarding: () => void;
   onChoosePlan: () => void;
 }) {
-  if (state === 'approved_active') return null;
+  if (state === 'active_billing') return null;
 
   const cfg =
     state === 'pending'
@@ -381,8 +381,8 @@ function StateCard({
       ? { Icon: AlertTriangle, title: 'Recruiter Profile Needs Attention', body: 'Please review your recruiter information and resubmit for approval.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: { label: 'Update & Resubmit', onClick: onOpenOnboarding } }
       : state === 'suspended'
       ? { Icon: Ban, title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: null }
-      : state === 'approved_no_billing'
-      ? { Icon: Sparkles, title: "You're approved — post unlimited standard opportunities", body: 'Standard posting is included for verified recruiters. Upgrade only to unlock premium recruiting tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
+      : state === 'active_no_billing'
+      ? { Icon: Sparkles, title: "Standard posting enabled — post unlimited standard opportunities", body: 'Standard posting is included with your recruiter account. Upgrade only to unlock premium recruiting tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
       : null;
 
   if (!cfg) return null;
@@ -651,7 +651,7 @@ function NextSteps({
   onApplications: () => void;
 }) {
   const profileDone = state !== 'none';
-  const approved = state === 'approved_active' || state === 'approved_no_billing';
+  const approved = state === 'active_billing' || state === 'active_no_billing';
 
   const steps = [
     {
@@ -681,8 +681,8 @@ function NextSteps({
     },
     {
       label: 'Unlock premium recruiting tools (optional)',
-      done: state === 'approved_active',
-      onClick: state === 'approved_active' ? undefined : onChoosePlan,
+      done: state === 'active_billing',
+      onClick: state === 'active_billing' ? undefined : onChoosePlan,
     },
   ];
 
@@ -734,7 +734,7 @@ function BillingSummary({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-foreground">Premium recruiting tools (optional)</p>
             <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-              Standard posting is already included with your verified recruiter account. Upgrade to unlock priority placement, featured visibility, reports, and other premium recruiting tools.
+              Standard posting is already included with your recruiter account. Upgrade to unlock priority placement, featured visibility, reports, and other premium recruiting tools.
             </p>
             <Button size="sm" onClick={onManagePlan}>See Premium Plans</Button>
           </div>
@@ -753,7 +753,7 @@ function BillingSummary({
       <div className="space-y-2 text-sm">
         <Row label="Plan" value={RECRUITER_PLAN_LABELS[plan]} />
         <Row label="Premium status" value={status} />
-        <Row label="Standard posting" value="Unlimited after verification" />
+        <Row label="Standard posting" value="Unlimited on your recruiter account" />
         <Row label="Premium tools" value="Based on your current plan" />
         <Row label="Priority placement" value={priorityPlacement} />
       </div>
@@ -776,7 +776,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function HowItWorks() {
   const steps = [
     { n: 1, title: 'Apply for recruiter access', body: 'Submit your recruiter profile for review.' },
-    { n: 2, title: 'Post structured opportunities', body: 'Once approved, post unlimited standard opportunities — drivers see real pay clarity, route info, and your hiring intent.' },
+    { n: 2, title: 'Post structured opportunities', body: 'Post unlimited standard opportunities as soon as your recruiter profile is complete — drivers see real pay clarity, route info, and your hiring intent.' },
     { n: 3, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
     { n: 4, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },
     { n: 5, title: 'Manage your hiring pipeline', body: 'Move drivers through the structured hiring pipeline with clarity.' },
@@ -808,7 +808,7 @@ function HowItWorks() {
       </div>
       <p className="text-[11px] text-muted-foreground mt-4 flex items-start gap-1.5">
         <Info className="h-3 w-3 mt-0.5 shrink-0" />
-        Driver interest and hiring outcomes are not guaranteed. Approval is required to post; paid plans are optional and unlock premium recruiting tools.
+        Driver interest and hiring outcomes are not guaranteed. Paid plans are optional and unlock premium recruiting tools. Admins may still remove posts that violate policy.
       </p>
     </Card>
   );
