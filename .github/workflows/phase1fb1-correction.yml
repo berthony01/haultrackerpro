@@ -17,6 +17,9 @@ jobs:
   phase1fb1:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      VITE_SUPABASE_URL: https://phase1fb1-test.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: phase1fb1-isolated-test-key
     steps:
       - uses: actions/checkout@v4
         with:
