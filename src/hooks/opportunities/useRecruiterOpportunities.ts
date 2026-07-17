@@ -16,7 +16,7 @@ export type OpportunityUpdate = Omit<
 
 export function useRecruiterOpportunities() {
   const { user } = useAuth();
-  const { profile, isApproved } = useRecruiterProfile();
+  const { profile, isApproved, canPost, isVerified } = useRecruiterProfile();
   const qc = useQueryClient();
 
   const recruiterId = profile?.id ?? null;
@@ -36,9 +36,11 @@ export function useRecruiterOpportunities() {
     enabled: !!user && !!recruiterId,
   });
 
-  const requireApproved = () => {
-    if (!isApproved || !recruiterId) {
-      throw new Error('Recruiter must be approved to manage opportunities.');
+  // Phase 1F-A: posting requires a complete, non-suspended profile.
+  // Admin verification is NOT required.
+  const requireCanPost = () => {
+    if (!canPost || !recruiterId) {
+      throw new Error('Complete your recruiter profile to post opportunities.');
     }
   };
 
@@ -49,7 +51,7 @@ export function useRecruiterOpportunities() {
 
   const createOpportunity = useMutation({
     mutationFn: async (data: OpportunityInsert) => {
-      requireApproved();
+      requireCanPost();
       const { error } = await supabase
         .from('opportunities')
         .insert({ ...data, recruiter_id: recruiterId! });
@@ -60,7 +62,7 @@ export function useRecruiterOpportunities() {
 
   const updateOpportunity = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: OpportunityUpdate }) => {
-      requireApproved();
+      requireCanPost();
       const { error } = await supabase
         .from('opportunities')
         .update(data)
@@ -73,7 +75,7 @@ export function useRecruiterOpportunities() {
 
   const setStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: 'active' | 'paused' | 'closed' | 'draft' }) => {
-      requireApproved();
+      requireCanPost();
       const { error } = await supabase
         .from('opportunities')
         .update({ status })
@@ -92,6 +94,8 @@ export function useRecruiterOpportunities() {
     refetch: listQuery.refetch,
     recruiterId,
     isApproved,
+    canPost,
+    isVerified,
     createOpportunity,
     updateOpportunity,
     setStatus,

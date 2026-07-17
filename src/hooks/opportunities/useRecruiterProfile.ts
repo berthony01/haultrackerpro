@@ -128,18 +128,33 @@ export function useRecruiterProfile() {
   });
 
   const profile = profileQuery.data ?? null;
+  // Legacy: verification-approved AND active status. Kept for callers
+  // that gate the Verified badge only. Do NOT use to gate posting.
   const isApproved =
     !!profile &&
     profile.verification_status === 'approved' &&
     profile.status === 'active';
   const isSuspended =
     !!profile && (profile.status === 'suspended' || profile.verification_status === 'suspended');
+  // Phase 1F-A: canonical posting rule — profile complete AND not suspended.
+  // Admin verification is NOT required.
+  const isProfileComplete =
+    !!profile &&
+    typeof profile.recruiter_name === 'string' && profile.recruiter_name.trim().length > 0 &&
+    typeof profile.company_name === 'string' && profile.company_name.trim().length > 0 &&
+    typeof profile.recruiter_email === 'string' && profile.recruiter_email.trim().length > 0;
+  const canPost = !!profile && !isSuspended && isProfileComplete;
+  const isVerified =
+    !!profile && profile.verification_status === 'approved' && profile.status === 'active';
 
   return {
     profile,
     isLoading: profileQuery.isLoading,
     isApproved,
     isSuspended,
+    canPost,
+    isVerified,
+    isProfileComplete,
     upsertProfile,
     approveRecruiter,
     rejectRecruiter,
