@@ -77,7 +77,7 @@ const isUrlish = (v: string) => {
 };
 
 export function RecruiterOnboarding({ onBack }: Props) {
-  const { profile, isLoading, isSuspended, upsertProfile } = useRecruiterProfile();
+  const { profile, isLoading, isSuspended, saveRecruiterProfile } = useRecruiterProfile();
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [agree1, setAgree1] = useState(false);
