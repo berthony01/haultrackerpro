@@ -12,7 +12,6 @@ import {
   PlayCircle,
   XCircle,
   AlertTriangle,
-  
   Ban,
   ShieldCheck,
   Inbox,
@@ -29,16 +28,14 @@ import {
   type Opportunity,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
-import { RecruiterQuickPostForm } from './RecruiterQuickPostForm';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
-import type { OpportunityInsert } from '@/hooks/opportunities/useRecruiterOpportunities';
 
 interface Props {
   onBack: () => void;
 }
 
-type View = 'list' | 'quick' | 'edit' | 'referrals';
+type View = 'list' | 'form' | 'referrals';
 
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
@@ -48,7 +45,6 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
 
   const [view, setView] = useState<View>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
-  const [seed, setSeed] = useState<Partial<OpportunityInsert> | null>(null);
 
   if (profileLoading) {
     return (
@@ -59,9 +55,6 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   }
 
-  // Gating states — Phase 1F-A: only suspended / missing / incomplete
-  // block posting. Pending or rejected (non-suspended) recruiters may
-  // post standard opportunities immediately.
   const block = describeRecruiterBlock(profile, { intentRecruiter });
   if (block.reason !== 'ok') {
     const Icon =
@@ -73,27 +66,12 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     return <Gate onBack={onBack} title={block.title} body={block.body} Icon={Icon} />;
   }
 
-  // Verified recruiters can submit unlimited standard opportunities.
-  // Approval/suspension gating is already enforced above; billing is only for premium tools.
-  if (view === 'quick') {
-    return (
-      <RecruiterQuickPostForm
-        onBack={() => { setView('list'); setSeed(null); }}
-        onSaved={() => { setView('list'); setSeed(null); refetch(); }}
-        onSwitchToDetailed={(values) => { setSeed(values); setEditing(null); setView('edit'); }}
-      />
-    );
-  }
-
-  if (view === 'edit') {
+  if (view === 'form') {
     return (
       <RecruiterOpportunityForm
         initial={editing}
-        seed={editing ? null : seed}
-        onBack={() => { setView('list'); setEditing(null); setSeed(null); }}
-        onSaved={() => { setView('list'); setEditing(null); setSeed(null); refetch(); }}
-        canSubmitForReview={true}
-        submitBlockReason={null}
+        onBack={() => { setView('list'); setEditing(null); }}
+        onSaved={() => { setView('list'); setEditing(null); refetch(); }}
       />
     );
   }
@@ -117,6 +95,8 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   };
 
+  const openCreate = () => { setEditing(null); setView('form'); };
+  const openEdit = (o: Opportunity) => { setEditing(o); setView('form'); };
   const canActivate = true;
 
   return (
@@ -137,7 +117,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               Create and manage your trucking opportunities. Verified recruiter posts go live to drivers immediately.
             </p>
           </div>
-          <Button onClick={() => { setEditing(null); setSeed(null); setView('quick'); }} className="shrink-0">
+          <Button onClick={openCreate} className="shrink-0" data-testid="post-opportunity-cta">
             <Plus className="h-4 w-4" /> Post Opportunity
           </Button>
         </div>
@@ -174,7 +154,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
           <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
             Create your first opportunity to start connecting with serious drivers.
           </p>
-          <Button onClick={() => { setEditing(null); setSeed(null); setView('quick'); }}>
+          <Button onClick={openCreate} data-testid="empty-state-cta">
             <Plus className="h-4 w-4" /> Create Opportunity
           </Button>
         </Card>
@@ -184,7 +164,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
             <OpportunityRow
               key={o.id}
               o={o}
-              onEdit={() => { setEditing(o); setView('edit'); }}
+              onEdit={() => openEdit(o)}
               onPause={() => handleStatus(o.id, 'paused')}
               onActivate={() => handleStatus(o.id, 'active')}
               onClose={() => handleStatus(o.id, 'closed')}
