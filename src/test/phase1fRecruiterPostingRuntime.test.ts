@@ -280,6 +280,13 @@ beforeAll(async () => {
   // Seed the admin user + recruiter profiles as the outer superuser
   // (bypasses RLS / triggers) so we can control the initial state.
   await db.query(`INSERT INTO public.admin_users(user_id) VALUES ($1)`, [ADMIN_USER]);
+  // Pin the outer session JWT sub to the admin user so every raw db.query()
+  // done outside asUser() takes the admin branch of triggers (bypass), while
+  // asUser()/asAnon() override the claim inside their transactions via SET
+  // LOCAL. This gives us superuser-equivalent seed control without disabling
+  // triggers and without ever weakening the RLS/trigger enforcement we test.
+  await db.exec(`SELECT set_config('request.jwt.claim.sub', '${ADMIN_USER}', false);`);
+
 
   const a = await db.query<{ id: string }>(
     `INSERT INTO public.recruiter_profiles
