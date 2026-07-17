@@ -658,16 +658,17 @@ describe("Phase 1F-A.1 — driver visibility RPC", () => {
   });
 });
 
-describe("Phase 1F-A.1 — function privileges", () => {
-  it("29. anon cannot execute recruiter_can_post", async () => {
-    const r = await db.query<{ b: boolean }>(
-      `SELECT has_function_privilege('anon','public.recruiter_can_post(uuid)','EXECUTE') b`);
-    expect(r.rows[0].b).toBe(false);
+describe("Phase 1F-A.1/A.2 — function privileges", () => {
+  it("29. recruiter_can_post has been dropped by 1F-A.2", async () => {
+    const r = await db.query<{ n: number }>(
+      `SELECT count(*)::int n FROM pg_proc
+       WHERE pronamespace='public'::regnamespace AND proname='recruiter_can_post'`);
+    expect(r.rows[0].n).toBe(0);
   });
-  it("30. authenticated cannot execute recruiter_can_post", async () => {
-    const r = await db.query<{ b: boolean }>(
-      `SELECT has_function_privilege('authenticated','public.recruiter_can_post(uuid)','EXECUTE') b`);
-    expect(r.rows[0].b).toBe(false);
+  it("30. calling recruiter_can_post from any role errors (function absent)", async () => {
+    await expect(
+      db.query(`SELECT public.recruiter_can_post('00000000-0000-0000-0000-000000000000'::uuid)`),
+    ).rejects.toThrow();
   });
   it("31. anon cannot execute recruiter_profile_can_manage_opportunities", async () => {
     const r = await db.query<{ b: boolean }>(
@@ -679,23 +680,29 @@ describe("Phase 1F-A.1 — function privileges", () => {
       `SELECT has_function_privilege('anon','public.current_user_can_manage_recruiter_opportunities(uuid)','EXECUTE') b`);
     expect(r.rows[0].b).toBe(false);
   });
-  it("33. authenticated CAN execute both new helpers", async () => {
+  it("33. authenticated CAN execute current-user helper; profile-scoped helper is service_role-only", async () => {
     const a = await db.query<{ b: boolean }>(
       `SELECT has_function_privilege('authenticated','public.recruiter_profile_can_manage_opportunities(uuid)','EXECUTE') b`);
     const c = await db.query<{ b: boolean }>(
       `SELECT has_function_privilege('authenticated','public.current_user_can_manage_recruiter_opportunities(uuid)','EXECUTE') b`);
-    expect(a.rows[0].b).toBe(true);
+    const s = await db.query<{ b: boolean }>(
+      `SELECT has_function_privilege('service_role','public.recruiter_profile_can_manage_opportunities(uuid)','EXECUTE') b`);
+    expect(a.rows[0].b).toBe(false);
     expect(c.rows[0].b).toBe(true);
+    expect(s.rows[0].b).toBe(true);
   });
   it("34. all changed SECURITY DEFINER functions have pinned search_path", async () => {
     const r = await db.query<{ proname: string; cfg: string[] | null }>(
       `SELECT proname, proconfig cfg FROM pg_proc
        WHERE pronamespace='public'::regnamespace
-         AND proname IN ('recruiter_can_post','recruiter_profile_can_manage_opportunities',
+         AND proname IN ('recruiter_profile_can_manage_opportunities',
                          'current_user_can_manage_recruiter_opportunities',
+                         'driver_can_access_opportunity',
+                         'accept_recruiter_posting_terms',
                          'opportunities_guard','opportunities_billing_guard',
                          'list_driver_visible_opportunities','create_driver_referral_safe',
-                         'request_driver_contact','recruiter_profile_guard')`);
+                         'request_driver_contact','recruiter_profile_guard',
+                         'list_recruiter_applications_safe')`);
     for (const row of r.rows) {
       expect(row.cfg?.some((c) => c.startsWith("search_path=")), `${row.proname} missing search_path`).toBe(true);
     }
