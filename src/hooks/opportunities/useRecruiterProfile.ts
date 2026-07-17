@@ -130,9 +130,8 @@ export function useRecruiterProfile() {
       if (rpcErr) {
         const controlled = new Error(
           'Recruiter profile details were saved, but posting terms could not be accepted. Please retry.',
-          // Preserve original where supported.
-          { cause: rpcErr } as ErrorOptions,
-        );
+        ) as Error & { cause?: unknown };
+        controlled.cause = rpcErr;
         throw controlled;
       }
       return { acceptedAt: (rpcData as string | null) ?? '' };
