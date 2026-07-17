@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,7 +25,35 @@ export function useRecruiterProfile() {
       return (rows[0] ?? null) as RecruiterProfile | null;
     },
     enabled: !!user,
+    // Phase 1E: pick up admin approval / status changes without a hard reload.
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
+
+  // Phase 1E: realtime subscription so a recruiter sees approval flip
+  // immediately when an admin updates their recruiter_profiles row.
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`recruiter_profile:${user.id}`)
+      .on(
+        'postgres_changes' as never,
+        {
+          event: '*',
+          schema: 'public',
+          table: 'recruiter_profiles',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ['recruiter_profile', user.id] });
+          qc.invalidateQueries({ queryKey: ['user-role-recruiter-check', user.id] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, qc]);
 
 
   const upsertProfile = useMutation({
