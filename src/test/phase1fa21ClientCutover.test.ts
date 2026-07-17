@@ -34,6 +34,7 @@ let updateNextError: Error | null = null;
 let insertNextError: Error | null = null;
 let rpcNextError: Error | null = null;
 let rpcNextData: string | null = '2026-07-17T00:00:00Z';
+let insertedIdCounter = 0;
 
 // Controls whether useQuery reports an existing profile.
 let currentProfile: { id: string } | null = null;
@@ -60,7 +61,15 @@ vi.mock('@/integrations/supabase/client', () => {
       insertCalls.push({ table, payload });
       const err = insertNextError;
       insertNextError = null;
-      return Promise.resolve({ error: err });
+      const nextId = `inserted-rp-${++insertedIdCounter}`;
+      // Support both bare-await (legacy upsertProfile) and .select('id').single()
+      const bare = Promise.resolve({ data: err ? null : { id: nextId }, error: err });
+      return {
+        select: (_cols: string) => ({
+          single: () => bare,
+        }),
+        then: (res: (r: unknown) => unknown) => bare.then(res),
+      };
     },
     upsert: (payload: Record<string, unknown>, opts: unknown) => {
       // Should never be reached under R1. Recorded so tests can assert absence.
