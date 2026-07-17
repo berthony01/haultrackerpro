@@ -198,6 +198,7 @@ export function useRecruiterProfile() {
     isVerified,
     isProfileComplete,
     upsertProfile,
+    saveRecruiterProfile,
     approveRecruiter,
     rejectRecruiter,
     suspendRecruiter,
