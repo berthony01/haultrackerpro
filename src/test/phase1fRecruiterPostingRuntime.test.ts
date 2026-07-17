@@ -311,7 +311,13 @@ beforeAll(async () => {
       FOR EACH ROW EXECUTE FUNCTION public.opportunities_guard();
     CREATE TRIGGER trg_opp_billing BEFORE INSERT OR UPDATE ON public.opportunities
       FOR EACH ROW EXECUTE FUNCTION public.opportunities_billing_guard();
-    CREATE TRIGGER trg_rp_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
+    -- Reproduce the live production state: TWO redundant BEFORE INSERT OR
+    -- UPDATE triggers bound to recruiter_profile_guard(). Phase 1F-A.2.2
+    -- must drop `trg_recruiter_profiles_guard` and preserve
+    -- `recruiter_profile_guard`.
+    CREATE TRIGGER recruiter_profile_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
+      FOR EACH ROW EXECUTE FUNCTION public.recruiter_profile_guard();
+    CREATE TRIGGER trg_recruiter_profiles_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
       FOR EACH ROW EXECUTE FUNCTION public.recruiter_profile_guard();
 
     -- Legacy driver-visible RPC that migration will replace.
