@@ -206,23 +206,10 @@ export function RecruiterOnboarding({ onBack }: Props) {
         </div>
       </Card>
 
-      {/* Status state card (only when profile exists) */}
-      {statusCfg && (
-        <Card className="p-5 border-border/60">
-          <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
-              <statusCfg.Icon className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h3 className="text-base font-bold text-foreground">{statusCfg.title}</h3>
-                <Badge variant={statusCfg.variant}>{statusCfg.badge}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">{statusCfg.text}</p>
-            </div>
-          </div>
-        </Card>
-      )}
+      {/* Status state card (only when profile exists) — canonical
+          RecruiterOnboardingStatusCard is the single production surface. */}
+      {profile && <RecruiterOnboardingStatusCard profile={profile} />}
+
 
       {isLoading && !profile ? (
         <Card className="p-6 border-border/60">
