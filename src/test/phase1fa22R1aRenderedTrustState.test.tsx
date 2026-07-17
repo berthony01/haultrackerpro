@@ -224,7 +224,7 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
       renderPage();
       expect(topPostButton()).toBeDisabled();
       // Real StateCard for incomplete surfaces the required-fields copy.
-      expect(screen.getByText(/Finish your recruiter profile/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Finish your recruiter profile/i)[0]).toBeInTheDocument();
       // Trust badge exposes canonical state to the DOM.
       expect(trustStatus().getAttribute('data-state')).toBe('incomplete_profile');
       expect(
@@ -273,7 +273,7 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     installHooks({ profile: makeProfile({ status: 'suspended' }) });
     renderPage();
     expect(topPostButton()).toBeDisabled();
-    expect(screen.getByText(/Recruiter Access Suspended/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Recruiter Access Suspended/i)[0]).toBeInTheDocument();
     // Production hides the ToolsGrid outside of active_* states.
     expect(screen.queryByText('Your Recruiting Tools')).toBeNull();
   });
@@ -284,7 +284,7 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     });
     renderPage();
     expect(topPostButton()).toBeDisabled();
-    expect(screen.getByText(/Recruiter Access Suspended/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Recruiter Access Suspended/i)[0]).toBeInTheDocument();
     expect(screen.queryByText('Your Recruiting Tools')).toBeNull();
   });
 
