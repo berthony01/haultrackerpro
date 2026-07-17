@@ -106,8 +106,10 @@ function makeProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfil
     verified_at: null,
     created_at: '2026-07-17T00:00:00Z',
     updated_at: '2026-07-17T00:00:00Z',
+    ...overrides,
   } as unknown as RecruiterProfile;
 }
+
 
 const incomplete = (overrides: Partial<RecruiterProfile> = {}) =>
   makeProfile({ company_name: '', ...overrides });
