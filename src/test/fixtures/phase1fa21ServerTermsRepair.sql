@@ -47,6 +47,7 @@ GRANT UPDATE (
 ) ON public.recruiter_profiles TO authenticated;
 
 -- service_role retains full table-level UPDATE (never revoked here).
+GRANT ALL ON public.recruiter_profiles TO service_role;
 
 -- =========================================================================
 -- 2. accept_recruiter_posting_terms(text) — no GUC, UPDATE ... RETURNING
