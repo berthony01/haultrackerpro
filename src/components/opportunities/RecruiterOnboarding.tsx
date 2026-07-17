@@ -362,7 +362,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
                   <Button variant="outline" onClick={onBack}>Cancel</Button>
                   <Button
                     onClick={handleSave}
-                    disabled={upsertProfile.isPending || isSuspended}
+                    disabled={saveRecruiterProfile.isPending || isSuspended}
                   >
                     <Save className="h-4 w-4" />
                     {isSuspended
