@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { isProfileCompleteForPosting } from '@/lib/opportunities/recruiterEligibility';
 
 export type RecruiterProfile = Tables<'recruiter_profiles'>;
 export type RecruiterProfileUpsert = Omit<TablesInsert<'recruiter_profiles'>, 'user_id'>;
@@ -138,8 +139,6 @@ export function useRecruiterProfile() {
     !!profile && (profile.status === 'suspended' || profile.verification_status === 'suspended');
   // Phase 1F-A.1: derive canPost via the single canonical helper so client
   // and server share one definition of "complete".
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { isProfileCompleteForPosting } = require('@/lib/opportunities/recruiterEligibility') as typeof import('@/lib/opportunities/recruiterEligibility');
   const isProfileComplete = isProfileCompleteForPosting(profile);
   const canPost = !!profile && !isSuspended && isProfileComplete;
   const isVerified =

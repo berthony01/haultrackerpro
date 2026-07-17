@@ -1,4 +1,7 @@
-import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import type { Tables } from '@/integrations/supabase/types';
+
+// Kept for existing imports of `RecruiterProfile` from this module.
+export type RecruiterProfile = Tables<'recruiter_profiles'>;
 
 export type RecruiterEligibilityState =
   | 'missing_profile'
