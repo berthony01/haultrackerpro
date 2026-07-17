@@ -81,16 +81,20 @@ function loadPhase1FA2Migrations(): string {
   }).join("\n\n");
 }
 
-// Phase 1F-A.2.1A local candidate corrective SQL. Not a migration.
-const PHASE_1F_A21_FIXTURE = path.join(
-  process.cwd(),
-  "src/test/fixtures/phase1fa21ServerTermsRepair.sql",
-);
-function loadPhase1FA21Fixture(): string {
-  if (!fs.existsSync(PHASE_1F_A21_FIXTURE)) {
-    throw new Error(`Phase 1F-A.2.1A fixture missing: ${PHASE_1F_A21_FIXTURE}`);
-  }
-  return fs.readFileSync(PHASE_1F_A21_FIXTURE, "utf8");
+// Phase 1F-A.2.1B production migration — discovered directly under
+// supabase/migrations by its unique corrective header token. The runtime
+// harness applies it after the two immutable Phase 1F-A.2 files so this
+// test exercises the exact post-live migration sequence.
+function loadPhase1FA21BMigration(): { path: string; sql: string } {
+  const dir = path.join(process.cwd(), "supabase/migrations");
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const match = files.find((f) => {
+    const body = fs.readFileSync(path.join(dir, f), "utf8");
+    return body.includes("Phase 1F-A.2.1B") && body.includes("Server-terms authorization repair");
+  });
+  if (!match) throw new Error("Phase 1F-A.2.1B production migration not found under supabase/migrations");
+  const p = path.join(dir, match);
+  return { path: p, sql: fs.readFileSync(p, "utf8") };
 }
 
 
