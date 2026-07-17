@@ -74,6 +74,17 @@ export function useRecruiterProfile() {
   // Instead this branches on the currently-known profile id: UPDATE
   // existing, INSERT missing. user_id is never present in any UPDATE payload.
 
+  // Phase 1F-A.2.1A-R3: retry-safe known-profile-id ref. Kept in sync with
+  // profileQuery.data?.id but ALSO stamped immediately after a successful
+  // INSERT so a partial-save retry (INSERT ok, RPC failed) uses UPDATE on
+  // the second attempt instead of another INSERT (which would violate the
+  // recruiter_profiles.user_id UNIQUE constraint).
+  const knownProfileIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = profileQuery.data?.id ?? null;
+    if (id) knownProfileIdRef.current = id;
+  }, [profileQuery.data?.id]);
+
   async function persistOrdinaryProfile(input: RecruiterProfileUpsert): Promise<void> {
     if (!user) throw new Error('Not authenticated');
     // Defensively strip every protected column even if a caller sneaks one in.
@@ -85,7 +96,7 @@ export function useRecruiterProfile() {
     delete safe.id;
     delete safe.created_at;
 
-    const existingId = profileQuery.data?.id ?? null;
+    const existingId = knownProfileIdRef.current ?? profileQuery.data?.id ?? null;
     if (existingId) {
       const { error } = await supabase
         .from('recruiter_profiles')
@@ -95,10 +106,14 @@ export function useRecruiterProfile() {
       if (error) throw error;
       return;
     }
-    const { error } = await supabase
+    const { data: inserted, error } = await supabase
       .from('recruiter_profiles')
-      .insert({ ...(safe as RecruiterProfileUpsert), user_id: user.id } as never);
+      .insert({ ...(safe as RecruiterProfileUpsert), user_id: user.id } as never)
+      .select('id')
+      .single();
     if (error) throw error;
+    const insertedId = (inserted as { id?: string } | null)?.id ?? null;
+    if (insertedId) knownProfileIdRef.current = insertedId;
   }
 
   // Ordinary-save API preserved for callers that only need to persist
