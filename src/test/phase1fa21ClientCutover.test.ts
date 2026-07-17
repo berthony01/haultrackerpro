@@ -122,7 +122,17 @@ vi.mock('@tanstack/react-query', async () => {
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
-  return { ...actual, useEffect: () => undefined };
+  const refs = new WeakMap<object, { current: unknown }>();
+  const refKey: object = { k: 'known-profile-id' };
+  return {
+    ...actual,
+    useEffect: () => undefined,
+    useRef: <T,>(initial: T) => {
+      let r = refs.get(refKey);
+      if (!r) { r = { current: initial as unknown }; refs.set(refKey, r); }
+      return r as { current: T };
+    },
+  };
 });
 
 // eslint-disable-next-line import/first
