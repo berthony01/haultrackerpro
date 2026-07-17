@@ -173,6 +173,10 @@ beforeEach(() => {
   rpcNextData = '2026-07-17T00:00:00Z';
   currentProfile = null;
   insertedIdCounter = 0;
+  insertReturnsEmpty = false;
+  safeProfileRpcRows = [];
+  safeProfileRpcError = null;
+  authState.userId = 'client-user-1';
   resetRefStore();
 });
 
