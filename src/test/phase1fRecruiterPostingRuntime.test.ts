@@ -179,7 +179,7 @@ beforeAll(async () => {
       USING (user_id = auth.uid());
     CREATE POLICY rp_owner_insert ON public.recruiter_profiles FOR INSERT TO authenticated
       WITH CHECK (user_id = auth.uid());
-    CREATE POLICY rp_owner_update ON public.recruiter_profiles FOR UPDATE TO authenticated
+    CREATE POLICY "Recruiter updates own profile if not suspended" ON public.recruiter_profiles FOR UPDATE TO authenticated
       USING (user_id = auth.uid() AND status <> 'suspended')
       WITH CHECK (user_id = auth.uid());
 
