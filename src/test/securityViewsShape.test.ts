@@ -27,12 +27,14 @@ function extractFunctionBody(sql: string, fnName: string): string {
   const marker = `CREATE OR REPLACE FUNCTION public.${fnName}`;
   const start = sql.indexOf(marker);
   if (start < 0) throw new Error(`Function ${fnName} not found`);
-  // Take everything up to the closing `$$;` of the function body.
+  // Take everything up to the closing dollar-quoted terminator of the body.
+  // Migrations use `$$;` or named tags like `$function$;` / `$body$;`.
   const tail = sql.slice(start);
-  const end = tail.indexOf('$$;');
-  if (end < 0) throw new Error(`Function ${fnName} body not terminated`);
-  return tail.slice(0, end);
+  const m = tail.match(/\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$\s*;/);
+  if (!m || m.index === undefined) throw new Error(`Function ${fnName} body not terminated`);
+  return tail.slice(0, m.index);
 }
+
 
 describe('Phase 26 security RPCs', () => {
   it('list_my_driver_referrals omits referred_driver_email/phone/note and scopes to auth.uid()', () => {
