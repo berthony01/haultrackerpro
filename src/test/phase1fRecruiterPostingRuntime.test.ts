@@ -97,6 +97,34 @@ function loadPhase1FA21BMigration(): { path: string; sql: string } {
   return { path: p, sql: fs.readFileSync(p, "utf8") };
 }
 
+// Phase 1F-A.2.2 corrective SQL — prefer the production migration file if
+// it has already been promoted; otherwise fall back to the local candidate
+// fixture. The token "Phase 1F-A.2.2" is unique and never appears in
+// earlier migrations. After live promotion the fixture is removed and this
+// resolves only against supabase/migrations/.
+function loadPhase1FA22Sql(): { source: string; sql: string } {
+  const dir = path.join(process.cwd(), "supabase/migrations");
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const match = files.find((f) => {
+    const body = fs.readFileSync(path.join(dir, f), "utf8");
+    return body.includes("Phase 1F-A.2.2") &&
+           body.includes("accept_recruiter_posting_terms") &&
+           body.includes("DROP TRIGGER IF EXISTS trg_recruiter_profiles_guard");
+  });
+  if (match) {
+    const p = path.join(dir, match);
+    return { source: p, sql: fs.readFileSync(p, "utf8") };
+  }
+  const fixturePath = path.join(
+    process.cwd(),
+    "src/test/fixtures/phase1fa22AcceptanceIdempotency.sql",
+  );
+  if (!fs.existsSync(fixturePath)) {
+    throw new Error("Phase 1F-A.2.2 SQL not found (neither migration nor fixture present)");
+  }
+  return { source: fixturePath, sql: fs.readFileSync(fixturePath, "utf8") };
+}
+
 
 const RECR_A_USER = "11111111-1111-1111-1111-111111111111";
 const RECR_B_USER = "22222222-2222-2222-2222-222222222222";
@@ -283,7 +311,13 @@ beforeAll(async () => {
       FOR EACH ROW EXECUTE FUNCTION public.opportunities_guard();
     CREATE TRIGGER trg_opp_billing BEFORE INSERT OR UPDATE ON public.opportunities
       FOR EACH ROW EXECUTE FUNCTION public.opportunities_billing_guard();
-    CREATE TRIGGER trg_rp_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
+    -- Reproduce the live production state: TWO redundant BEFORE INSERT OR
+    -- UPDATE triggers bound to recruiter_profile_guard(). Phase 1F-A.2.2
+    -- must drop trg_recruiter_profiles_guard and preserve
+    -- recruiter_profile_guard.
+    CREATE TRIGGER recruiter_profile_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
+      FOR EACH ROW EXECUTE FUNCTION public.recruiter_profile_guard();
+    CREATE TRIGGER trg_recruiter_profiles_guard BEFORE INSERT OR UPDATE ON public.recruiter_profiles
       FOR EACH ROW EXECUTE FUNCTION public.recruiter_profile_guard();
 
     -- Legacy driver-visible RPC that migration will replace.
@@ -501,6 +535,10 @@ beforeAll(async () => {
     [NO_CONSENT_USER],
   );
   noConsentRpId = nc.rows[0].id;
+
+  // Phase 1F-A.2.2: apply the acceptance-idempotency + duplicate-trigger
+  // cleanup last so the harness exercises the exact post-live sequence.
+  await db.exec(loadPhase1FA22Sql().sql);
 });
 
 describe("Phase 1F-A.1 — canonical eligibility (SQL helper)", () => {
@@ -2098,4 +2136,169 @@ describe("Phase 1F-A.2.1A — referral eligibility denial matrix", () => {
     })).rejects.toThrow();
   });
 });
+
+describe("Phase 1F-A.2.2 — acceptance idempotency + duplicate-guard-trigger cleanup", () => {
+  const FRESH_USER = "aa000000-0000-0000-0000-0000000000a2";
+  let freshRpId: string;
+
+  it("200. one canonical BEFORE INSERT OR UPDATE guard trigger remains", async () => {
+    const r = await db.query<{ tgname: string }>(
+      `SELECT tgname FROM pg_trigger
+       WHERE tgrelid='public.recruiter_profiles'::regclass
+         AND NOT tgisinternal
+         AND tgfoid='public.recruiter_profile_guard()'::regprocedure
+       ORDER BY tgname`,
+    );
+    expect(r.rows.map((x) => x.tgname)).toEqual(["recruiter_profile_guard"]);
+  });
+
+  it("201. accept_recruiter_posting_terms — anon rejected", async () => {
+    await expect(asAnon(async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')`);
+    })).rejects.toThrow();
+  });
+
+  it("202. unsupported version rejected without side effects", async () => {
+    // Seed a fresh no-consent complete profile.
+    const r = await db.query<{ id: string }>(
+      `INSERT INTO public.recruiter_profiles
+         (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+          status, verification_status)
+       VALUES ($1,'Fresh','Fco','fresh@f.example','9999999','active','pending')
+       RETURNING id`, [FRESH_USER]);
+    freshRpId = r.rows[0].id;
+    await expect(asUser(FRESH_USER, async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('bogus-version')`);
+    })).rejects.toThrow();
+    const after = await db.query<{ ts: string | null }>(
+      `SELECT posting_terms_accepted_at ts FROM public.recruiter_profiles WHERE id=$1`,
+      [freshRpId]);
+    expect(after.rows[0].ts).toBeNull();
+  });
+
+  it("203. first acceptance stamps a timestamp under the caller", async () => {
+    let ts1: string | null = null;
+    await asUser(FRESH_USER, async () => {
+      const r = await db.query<{ t: string }>(
+        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')::text t`);
+      ts1 = r.rows[0].t;
+    });
+    expect(ts1).not.toBeNull();
+    const row = await db.query<{ ts: string; v: string }>(
+      `SELECT posting_terms_accepted_at::text ts, posting_terms_version v
+       FROM public.recruiter_profiles WHERE id=$1`, [freshRpId]);
+    expect(new Date(row.rows[0].ts).getTime()).toBe(new Date(ts1!).getTime());
+    expect(row.rows[0].v).toBe('2026-07-17.v1');
+  });
+
+  it("204. later same-version retry returns the ORIGINAL timestamp (no forward move)", async () => {
+    const before = await db.query<{ ts: string }>(
+      `SELECT posting_terms_accepted_at::text ts FROM public.recruiter_profiles WHERE id=$1`,
+      [freshRpId]);
+    const original = before.rows[0].ts;
+    await new Promise((r) => setTimeout(r, 10));
+    let ts2: string | null = null;
+    await asUser(FRESH_USER, async () => {
+      const r = await db.query<{ t: string }>(
+        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')::text t`);
+      ts2 = r.rows[0].t;
+    });
+    expect(new Date(ts2!).getTime()).toBe(new Date(original).getTime());
+    const after = await db.query<{ ts: string }>(
+      `SELECT posting_terms_accepted_at::text ts FROM public.recruiter_profiles WHERE id=$1`,
+      [freshRpId]);
+    expect(new Date(after.rows[0].ts).getTime()).toBe(new Date(original).getTime());
+  });
+
+  it("205. rapid retries within one session preserve one stable original timestamp", async () => {
+    // Distinct fresh user so this test is not contaminated by 203.
+    const CONC_USER = "bb000000-0000-0000-0000-0000000000b2";
+    const seed = await db.query<{ id: string }>(
+      `INSERT INTO public.recruiter_profiles
+         (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+          status, verification_status)
+       VALUES ($1,'Conc','Cco','conc@c.example','1010101','active','pending')
+       RETURNING id`, [CONC_USER]);
+    const cid = seed.rows[0].id;
+
+    // Run several retries in one committed session — the first commit
+    // persists the stamp, every later call must observe it and return the
+    // same value (COALESCE first-write-wins branch).
+    const stamps: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      await asUser(CONC_USER, async () => {
+        const r = await db.query<{ t: string }>(
+          `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')::text t`);
+        stamps.push(r.rows[0].t);
+      });
+    }
+    const uniqueMs = Array.from(new Set(stamps.map((s) => new Date(s).getTime())));
+    expect(uniqueMs.length).toBe(1);
+    const stored = await db.query<{ ts: string }>(
+      `SELECT posting_terms_accepted_at::text ts FROM public.recruiter_profiles WHERE id=$1`,
+      [cid]);
+    expect(new Date(stored.rows[0].ts).getTime()).toBe(uniqueMs[0]);
+  });
+
+  it("206. historical DIFFERENT-version consent is NEVER overwritten", async () => {
+    const HIST_USER = "cc000000-0000-0000-0000-0000000000c2";
+    const seed = await db.query<{ id: string; ts: string }>(
+      `INSERT INTO public.recruiter_profiles
+         (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+          status, verification_status,
+          posting_terms_accepted_at, posting_terms_version)
+       VALUES ($1,'Hist','Hco','hist@h.example','2020202','active','pending',
+               '2024-01-01T00:00:00Z','2023-legacy.v0')
+       RETURNING id, posting_terms_accepted_at::text ts`, [HIST_USER]);
+    const rpid = seed.rows[0].id;
+    const originalTs = seed.rows[0].ts;
+    await expect(asUser(HIST_USER, async () => {
+      await db.query(`SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')`);
+    })).rejects.toThrow(/version mismatch/i);
+    const after = await db.query<{ ts: string; v: string }>(
+      `SELECT posting_terms_accepted_at::text ts, posting_terms_version v
+       FROM public.recruiter_profiles WHERE id=$1`, [rpid]);
+    expect(new Date(after.rows[0].ts).getTime()).toBe(new Date(originalTs).getTime());
+    expect(after.rows[0].v).toBe('2023-legacy.v0');
+  });
+
+  it("207. sentinel pre-fixture accepted row is still unchanged (grandfather + accept preserved)", async () => {
+    const r = await db.query<{ ts: string; v: string }>(
+      `SELECT posting_terms_accepted_at ts, posting_terms_version v
+       FROM public.recruiter_profiles WHERE id=$1`, [sentinelPreFixtureId]);
+    expect(new Date(r.rows[0].ts).toISOString()).toBe(new Date(sentinelPreFixtureTs).toISOString());
+    expect(r.rows[0].v).toBe(SENTINEL_VERSION);
+  });
+
+  it("208. protected consent columns remain non-writable to authenticated", async () => {
+    for (const col of ['posting_terms_accepted_at', 'posting_terms_version', 'legacy_terms_grandfathered_at']) {
+      const r = await db.query<{ b: boolean }>(
+        `SELECT has_column_privilege('authenticated','public.recruiter_profiles',$1,'UPDATE') b`,
+        [col]);
+      expect(r.rows[0].b, `${col} must remain non-updatable by authenticated`).toBe(false);
+    }
+  });
+
+  it("209. accept RPC remains SECURITY DEFINER with pinned search_path", async () => {
+    const r = await db.query<{ psec: boolean; cfg: string[] | null }>(
+      `SELECT prosecdef psec, proconfig cfg FROM pg_proc
+       WHERE pronamespace='public'::regnamespace
+         AND proname='accept_recruiter_posting_terms'`);
+    expect(r.rows[0].psec).toBe(true);
+    expect(r.rows[0].cfg?.some((c) => c.startsWith('search_path='))).toBe(true);
+  });
+
+  it("210. accept RPC EXECUTE remains authenticated+service_role only", async () => {
+    const anon = await db.query<{ b: boolean }>(
+      `SELECT has_function_privilege('anon','public.accept_recruiter_posting_terms(text)','EXECUTE') b`);
+    const auth = await db.query<{ b: boolean }>(
+      `SELECT has_function_privilege('authenticated','public.accept_recruiter_posting_terms(text)','EXECUTE') b`);
+    const svc = await db.query<{ b: boolean }>(
+      `SELECT has_function_privilege('service_role','public.accept_recruiter_posting_terms(text)','EXECUTE') b`);
+    expect(anon.rows[0].b).toBe(false);
+    expect(auth.rows[0].b).toBe(true);
+    expect(svc.rows[0].b).toBe(true);
+  });
+});
+
 
