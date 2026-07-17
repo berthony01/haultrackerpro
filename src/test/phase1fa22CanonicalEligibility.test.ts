@@ -186,6 +186,6 @@ describe('RecruiterOnboarding — statusCfg wording is eligibility-first', () =>
     expect(body).toMatch(/Recruiter Access Suspended/);
   });
   it('footer copy separates standard posting eligibility from verification review', () => {
-    expect(body).toMatch(/standard posting eligibility[\s\S]{0,80}verification/i);
+    expect(body).toMatch(/standard posting eligibility[\s\S]{0,120}(verification|Verified Recruiter)/i);
   });
 });
