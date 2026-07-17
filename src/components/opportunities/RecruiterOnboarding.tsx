@@ -182,13 +182,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
       toast.error(err);
       return;
     }
-    // Phase 1F-A.1: persist the recruiter's acceptance of all three
-    // agreements so the server-side eligibility rule can confirm consent.
-    // Once set, the server trigger prevents this timestamp from being
-    // cleared or backdated by a non-admin caller.
-    const existingAcceptedAt = (profile as unknown as { posting_terms_accepted_at?: string | null } | null)
-      ?.posting_terms_accepted_at ?? null;
-    const acceptedAtIso = existingAcceptedAt ?? new Date().toISOString();
+    // Phase 1F-A.2.1A: the browser never stamps consent. We send only
+    // ordinary profile fields, then call the SECURITY DEFINER RPC via the
+    // combined mutation to stamp posting_terms_* server-side.
     const payload: RecruiterProfileUpsert = {
       recruiter_name: form.recruiter_name.trim(),
       recruiter_email: form.recruiter_email.trim() || null,
@@ -204,24 +200,25 @@ export function RecruiterOnboarding({ onBack }: Props) {
       hiring_states: splitList(form.hiring_states),
       equipment_types: splitList(form.equipment_types),
       driver_types_hired: splitList(form.driver_types_hired),
-      posting_terms_accepted_at: acceptedAtIso,
-      posting_terms_version: POSTING_TERMS_VERSION,
-    } as RecruiterProfileUpsert;
-    upsertProfile.mutate(payload, {
-      onSuccess: async () => {
-        if (isRejected && profile) {
-          const { error } = await supabase.rpc('resubmit_recruiter_profile', { profile_id: profile.id });
-          if (error) {
-            toast.error(error.message);
-            return;
+    };
+    saveRecruiterProfile.mutate(
+      { data: payload, acceptTerms: allAgreed },
+      {
+        onSuccess: async () => {
+          if (isRejected && profile) {
+            const { error } = await supabase.rpc('resubmit_recruiter_profile', { profile_id: profile.id });
+            if (error) {
+              toast.error(error.message);
+              return;
+            }
+            toast.success('Recruiter profile resubmitted for review.');
+          } else {
+            toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
           }
-          toast.success('Recruiter profile resubmitted for review.');
-        } else {
-          toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
-        }
+        },
+        onError: (e: Error) => toast.error(e.message),
       },
-      onError: (e: Error) => toast.error(e.message),
-    });
+    );
   };
 
   return (
