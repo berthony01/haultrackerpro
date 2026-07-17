@@ -172,3 +172,70 @@ describe('Recruiter-facing copy — no stale approval-blocks-posting language', 
     });
   }
 });
+
+describe('Phase 1F-A.1 — expanded canonical completeness rule', () => {
+  it('MC alone (no DOT) satisfies the authority requirement', () => {
+    const e = describeRecruiterEligibility(
+      baseProfile({ dot_number: null, mc_number: 'MC-987654' }),
+    );
+    expect(e.canPost).toBe(true);
+  });
+
+  it('missing BOTH DOT and MC → incomplete', () => {
+    const e = describeRecruiterEligibility(
+      baseProfile({ dot_number: null, mc_number: null }),
+    );
+    expect(e.state).toBe('incomplete_profile');
+    expect(e.canPost).toBe(false);
+  });
+
+  it('invalid email (no @) → incomplete', () => {
+    const e = describeRecruiterEligibility(
+      baseProfile({ recruiter_email: 'alice.acme.example' }),
+    );
+    expect(e.state).toBe('incomplete_profile');
+  });
+
+  it('invalid email (no domain suffix) → incomplete', () => {
+    const e = describeRecruiterEligibility(
+      baseProfile({ recruiter_email: 'alice@example' }),
+    );
+    expect(e.state).toBe('incomplete_profile');
+  });
+
+  it('missing consent (no accepted_at, no grandfather) → incomplete', () => {
+    const e = describeRecruiterEligibility(
+      baseProfile({
+        posting_terms_accepted_at: null as unknown as string,
+        legacy_terms_grandfathered_at: null as unknown as string,
+      }),
+    );
+    expect(e.state).toBe('incomplete_profile');
+    expect(e.canPost).toBe(false);
+  });
+
+  it('legacy grandfathered (no accepted_at) → eligible', () => {
+    const e = describeRecruiterEligibility(
+      baseProfile({
+        posting_terms_accepted_at: null as unknown as string,
+        legacy_terms_grandfathered_at: '2026-07-17T00:00:00Z',
+      }),
+    );
+    expect(e.canPost).toBe(true);
+  });
+
+  it('Verified badge stays approved-only regardless of eligibility', () => {
+    const pending = describeRecruiterEligibility(
+      baseProfile({ verification_status: 'pending' }),
+    );
+    expect(pending.canPost).toBe(true);
+    expect(pending.isVerified).toBe(false);
+
+    const rejected = describeRecruiterEligibility(
+      baseProfile({ verification_status: 'rejected' }),
+    );
+    expect(rejected.canPost).toBe(true);
+    expect(rejected.isVerified).toBe(false);
+  });
+});
+
