@@ -245,6 +245,26 @@ beforeAll(async () => {
     GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) TO PUBLIC;
     GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) TO authenticated;
 
+    CREATE TABLE public.driver_opportunity_profiles (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL,
+      full_name text,
+      city text,
+      state text,
+      cdl_class text,
+      years_experience integer,
+      preferred_driver_type text,
+      preferred_route_type text,
+      endorsements text[],
+      trailer_experience text[],
+      min_weekly_gross numeric,
+      min_weekly_net numeric,
+      min_effective_rpm numeric,
+      allow_verified_recruiter_contact boolean NOT NULL DEFAULT false,
+      contact_preference text
+    );
+    GRANT SELECT, INSERT, UPDATE ON public.driver_opportunity_profiles TO authenticated;
+
     CREATE TABLE public.opportunity_applications (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       opportunity_id uuid NOT NULL REFERENCES public.opportunities(id),
@@ -295,6 +315,23 @@ beforeAll(async () => {
       recruiter_note text,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    GRANT SELECT, INSERT, UPDATE ON public.recruiter_contact_requests TO authenticated;
+    ALTER TABLE public.recruiter_contact_requests ENABLE ROW LEVEL SECURITY;
+
+    -- saved_opportunities — used by 1F-A.2 nested-visibility case to prove
+    -- that a driver's previously-saved opp becomes invisible when the
+    -- recruiter loses eligibility.
+    CREATE TABLE public.saved_opportunities (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      driver_user_id uuid NOT NULL,
+      opportunity_id uuid NOT NULL REFERENCES public.opportunities(id),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (driver_user_id, opportunity_id)
+    );
+    GRANT SELECT, INSERT, DELETE ON public.saved_opportunities TO authenticated;
+    ALTER TABLE public.saved_opportunities ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY so_owner_all ON public.saved_opportunities TO authenticated
+      USING (driver_user_id = auth.uid()) WITH CHECK (driver_user_id = auth.uid());
 
     -- Legacy stubs migration will replace.
     CREATE OR REPLACE FUNCTION public.create_driver_referral_safe(
@@ -312,10 +349,18 @@ beforeAll(async () => {
       SELECT gen_random_uuid()
     $$;
     GRANT EXECUTE ON FUNCTION public.request_driver_contact(uuid,text) TO authenticated;
+
+    -- list_recruiter_applications_safe legacy stub (replaced by 1F-A.2).
+    CREATE OR REPLACE FUNCTION public.list_recruiter_applications_safe(_recruiter_id uuid)
+      RETURNS SETOF jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+      SELECT NULL::jsonb WHERE false
+    $$;
+    GRANT EXECUTE ON FUNCTION public.list_recruiter_applications_safe(uuid) TO authenticated;
   `);
 
-  // Apply the actual production Phase 1F-A.1 migration.
+  // Apply Phase 1F-A.1 first, then the two Phase 1F-A.2 files in file order.
   await db.exec(findPhase1FA1Migration());
+  await db.exec(loadPhase1FA2Migrations());
 
   // Seed the admin user + recruiter profiles as the outer superuser
   // (bypasses RLS / triggers) so we can control the initial state.
