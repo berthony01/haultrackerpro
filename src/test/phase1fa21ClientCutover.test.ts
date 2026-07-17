@@ -1,30 +1,71 @@
 /**
- * Phase 1F-A.2.1A — Client cutover for server-authoritative terms.
+ * Phase 1F-A.2.1A-R1 — Client cutover for server-authoritative terms.
  *
- * Cases 32-37 from the Stage 1F-A.2.1A test contract.
- * These tests verify the client can no longer forge or short-circuit
- * consent stamping. All actual privilege enforcement lives in the
- * database (see phase1fRecruiterPostingRuntime.test.ts). These cases
- * cover the client contract only.
+ * Fully re-authored under the R1 remediation contract:
+ *   - No `.upsert()` remains in useRecruiterProfile.ts.
+ *   - Existing profile → UPDATE (no user_id in payload).
+ *   - Missing profile  → INSERT (with user_id).
+ *   - Combined onboarding mutation always calls the terms RPC.
+ *   - Ordinary-save success + RPC failure yields a controlled partial-save
+ *     Error and NEITHER recruiter query key invalidates.
+ *   - Query invalidation only happens after ordinary save + RPC both succeed.
+ *   - `resubmit_recruiter_profile` is invoked only from the combined
+ *     mutation's success path, never before it, never on error.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-// Hoisted supabase mock ---------------------------------------------------
+// ---------------------------------------------------------------------------
+// Mutable state for the mocks
+// ---------------------------------------------------------------------------
+type UpdateCall = { table: string; payload: Record<string, unknown>; filters: Array<[string, unknown]> };
+type InsertCall = { table: string; payload: Record<string, unknown> };
 type UpsertCall = { table: string; payload: Record<string, unknown>; opts: unknown };
 type RpcCall = { fn: string; args: Record<string, unknown> };
+
+const updateCalls: UpdateCall[] = [];
+const insertCalls: InsertCall[] = [];
 const upsertCalls: UpsertCall[] = [];
 const rpcCalls: RpcCall[] = [];
-let upsertNextError: Error | null = null;
+const invalidateCalls: unknown[][] = [];
+
+let updateNextError: Error | null = null;
+let insertNextError: Error | null = null;
 let rpcNextError: Error | null = null;
 let rpcNextData: string | null = '2026-07-17T00:00:00Z';
 
+// Controls whether useQuery reports an existing profile.
+let currentProfile: { id: string } | null = null;
+
 vi.mock('@/integrations/supabase/client', () => {
   const from = (table: string) => ({
-    upsert: (payload: Record<string, unknown>, opts: unknown) => {
-      upsertCalls.push({ table, payload, opts });
-      const err = upsertNextError;
-      upsertNextError = null;
+    update: (payload: Record<string, unknown>) => {
+      const filters: Array<[string, unknown]> = [];
+      const chain = {
+        eq(col: string, v: unknown) {
+          filters.push([col, v]);
+          return chain;
+        },
+        then(res: (r: { error: Error | null }) => unknown) {
+          updateCalls.push({ table, payload, filters });
+          const err = updateNextError;
+          updateNextError = null;
+          return Promise.resolve({ error: err }).then(res);
+        },
+      };
+      return chain;
+    },
+    insert: (payload: Record<string, unknown>) => {
+      insertCalls.push({ table, payload });
+      const err = insertNextError;
+      insertNextError = null;
       return Promise.resolve({ error: err });
+    },
+    upsert: (payload: Record<string, unknown>, opts: unknown) => {
+      // Should never be reached under R1. Recorded so tests can assert absence.
+      upsertCalls.push({ table, payload, opts });
+      return Promise.resolve({ error: null });
     },
   });
   const rpc = (fn: string, args: Record<string, unknown>) => {
@@ -36,22 +77,40 @@ vi.mock('@/integrations/supabase/client', () => {
   };
   return { supabase: { from, rpc } };
 });
+
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'client-user-1' } }),
 }));
 vi.mock('@/hooks/useAdmin', () => ({ useAdmin: () => ({ isAdmin: false }) }));
 
-// Only useMutation surfaces are exercised; provide a lightweight stand-in
-// so we don't need a real QueryClientProvider.
+// useMutation stand-in that runs onSuccess / onError like the real API.
 vi.mock('@tanstack/react-query', async () => {
-  const useMutation = (opts: { mutationFn: (v: unknown) => Promise<unknown> }) => ({
-    mutateAsync: (v: unknown) => opts.mutationFn(v),
+  const useMutation = (opts: {
+    mutationFn: (v: unknown) => Promise<unknown>;
+    onSuccess?: (r: unknown) => void;
+    onError?: (e: unknown) => void;
+  }) => ({
+    async mutateAsync(v: unknown) {
+      try {
+        const r = await opts.mutationFn(v);
+        opts.onSuccess?.(r);
+        return r;
+      } catch (e) {
+        opts.onError?.(e);
+        throw e;
+      }
+    },
     isPending: false,
   });
-  const useQuery = () => ({ data: null, isLoading: false });
-  const useQueryClient = () => ({ invalidateQueries: () => undefined });
+  const useQuery = () => ({ data: currentProfile, isLoading: false });
+  const useQueryClient = () => ({
+    invalidateQueries: (spec: unknown) => {
+      invalidateCalls.push([spec]);
+    },
+  });
   return { useMutation, useQuery, useQueryClient };
 });
+
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
   return { ...actual, useEffect: () => undefined };
@@ -68,77 +127,173 @@ const baseData = {
 } as const;
 
 beforeEach(() => {
+  updateCalls.length = 0;
+  insertCalls.length = 0;
   upsertCalls.length = 0;
   rpcCalls.length = 0;
-  upsertNextError = null;
+  invalidateCalls.length = 0;
+  updateNextError = null;
+  insertNextError = null;
   rpcNextError = null;
   rpcNextData = '2026-07-17T00:00:00Z';
+  currentProfile = null;
 });
 
-describe('Phase 1F-A.2.1A client cutover', () => {
-  it('32. saveRecruiterProfile upsert payload never contains posting_terms_* / legacy_terms_grandfathered_at', async () => {
+describe('Phase 1F-A.2.1A-R1 client cutover', () => {
+  it('32. missing profile → INSERT (never UPDATE, never UPSERT); payload includes user_id and strips protected', async () => {
+    currentProfile = null;
     const hook = useRecruiterProfile();
     await hook.saveRecruiterProfile.mutateAsync({
-      data: {
-        ...baseData,
-        // Even if a caller sneaks these in, the mutation must strip them.
-        posting_terms_accepted_at: '2099-01-01T00:00:00Z',
-        posting_terms_version: 'forged',
-        legacy_terms_grandfathered_at: '2099-01-01T00:00:00Z',
-      } as unknown as Parameters<typeof hook.saveRecruiterProfile.mutateAsync>[0]['data'],
-      acceptTerms: true,
-    });
-    expect(upsertCalls.length).toBe(1);
-    const p = upsertCalls[0].payload;
+      ...baseData,
+      // sneak protected fields in via cast; they must be stripped
+      posting_terms_accepted_at: '2099-01-01T00:00:00Z',
+      posting_terms_version: 'forged',
+      legacy_terms_grandfathered_at: '2099-01-01T00:00:00Z',
+    } as unknown as Parameters<typeof hook.saveRecruiterProfile.mutateAsync>[0]);
+    expect(insertCalls.length).toBe(1);
+    expect(updateCalls.length).toBe(0);
+    expect(upsertCalls.length).toBe(0);
+    const p = insertCalls[0].payload;
+    expect(p.user_id).toBe('client-user-1');
     expect(p).not.toHaveProperty('posting_terms_accepted_at');
     expect(p).not.toHaveProperty('posting_terms_version');
     expect(p).not.toHaveProperty('legacy_terms_grandfathered_at');
-    expect(p.user_id).toBe('client-user-1');
   });
 
-  it('33. legacy upsertProfile also strips protected columns', async () => {
+  it('33. existing profile → UPDATE scoped by id + user_id (never INSERT, never UPSERT); payload excludes user_id and protected fields', async () => {
+    currentProfile = { id: 'existing-rp-1' };
     const hook = useRecruiterProfile();
-    await hook.upsertProfile.mutateAsync({
+    await hook.saveRecruiterProfile.mutateAsync({
       ...baseData,
       posting_terms_accepted_at: '2099-01-01T00:00:00Z',
       posting_terms_version: 'forged',
-    } as unknown as Parameters<typeof hook.upsertProfile.mutateAsync>[0]);
-    const p = upsertCalls[0].payload;
+      legacy_terms_grandfathered_at: '2099-01-01T00:00:00Z',
+    } as unknown as Parameters<typeof hook.saveRecruiterProfile.mutateAsync>[0]);
+    expect(updateCalls.length).toBe(1);
+    expect(insertCalls.length).toBe(0);
+    expect(upsertCalls.length).toBe(0);
+    const p = updateCalls[0].payload;
+    expect(p).not.toHaveProperty('user_id');
+    expect(p).not.toHaveProperty('id');
+    expect(p).not.toHaveProperty('created_at');
     expect(p).not.toHaveProperty('posting_terms_accepted_at');
     expect(p).not.toHaveProperty('posting_terms_version');
+    expect(p).not.toHaveProperty('legacy_terms_grandfathered_at');
+    const filters = Object.fromEntries(updateCalls[0].filters);
+    expect(filters.id).toBe('existing-rp-1');
+    expect(filters.user_id).toBe('client-user-1');
   });
 
-  it('34. when acceptTerms=true, saveRecruiterProfile calls RPC with correct version', async () => {
+  it('34. legacy upsertProfile API also branches to UPDATE/INSERT and NEVER calls .upsert()', async () => {
+    currentProfile = { id: 'existing-rp-2' };
     const hook = useRecruiterProfile();
-    await hook.saveRecruiterProfile.mutateAsync({ data: { ...baseData }, acceptTerms: true });
+    await hook.upsertProfile.mutateAsync({ ...baseData } as never);
+    expect(updateCalls.length).toBe(1);
+    expect(upsertCalls.length).toBe(0);
+    // Missing profile path
+    updateCalls.length = 0;
+    currentProfile = null;
+    await hook.upsertProfile.mutateAsync({ ...baseData } as never);
+    expect(insertCalls.length).toBe(1);
+    expect(upsertCalls.length).toBe(0);
+  });
+
+  it('35. combined saveRecruiterProfile ALWAYS calls the terms RPC with pinned version', async () => {
+    currentProfile = null;
+    const hook = useRecruiterProfile();
+    await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
     expect(rpcCalls.length).toBe(1);
     expect(rpcCalls[0].fn).toBe('accept_recruiter_posting_terms');
     expect(rpcCalls[0].args._version).toBe('2026-07-17.v1');
   });
 
-  it('35. when acceptTerms=false, RPC is not called', async () => {
-    const hook = useRecruiterProfile();
-    const r = await hook.saveRecruiterProfile.mutateAsync({ data: { ...baseData }, acceptTerms: false });
-    expect(rpcCalls.length).toBe(0);
-    expect(r.acceptedAt).toBeNull();
-  });
-
-  it('36. upsert failure aborts mutation and RPC is never invoked', async () => {
-    upsertNextError = new Error('upsert boom');
+  it('36. ordinary save failure aborts mutation; RPC never invoked; no query invalidation', async () => {
+    currentProfile = null;
+    insertNextError = new Error('insert boom');
     const hook = useRecruiterProfile();
     await expect(
-      hook.saveRecruiterProfile.mutateAsync({ data: { ...baseData }, acceptTerms: true }),
+      hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never),
     ).rejects.toThrow(/boom/);
     expect(rpcCalls.length).toBe(0);
+    expect(invalidateCalls.length).toBe(0);
   });
 
-  it('37. RPC failure surfaces as mutation error (no silent success)', async () => {
+  it('37. RPC failure after ordinary save yields controlled partial-save Error and NO invalidation', async () => {
+    currentProfile = { id: 'existing-rp-3' };
     rpcNextError = new Error('version mismatch');
     const hook = useRecruiterProfile();
-    await expect(
-      hook.saveRecruiterProfile.mutateAsync({ data: { ...baseData }, acceptTerms: true }),
-    ).rejects.toThrow(/version mismatch/);
-    expect(upsertCalls.length).toBe(1);
+    let caught: unknown = null;
+    try {
+      await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toMatch(
+      /Recruiter profile details were saved, but posting terms could not be accepted\. Please retry\./,
+    );
+    expect(((caught as Error & { cause?: unknown }).cause as Error).message).toBe('version mismatch');
+    expect(updateCalls.length).toBe(1);
     expect(rpcCalls.length).toBe(1);
+    expect(invalidateCalls.length).toBe(0);
+  });
+
+  it('38. successful save + RPC invalidates BOTH recruiter query keys (exactly once each)', async () => {
+    currentProfile = null;
+    const hook = useRecruiterProfile();
+    await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
+    const keys = invalidateCalls
+      .map((c) => (c[0] as { queryKey?: unknown[] })?.queryKey?.[0])
+      .filter(Boolean);
+    expect(keys).toContain('recruiter_profile');
+    expect(keys).toContain('user-role-recruiter-check');
+  });
+
+  it('39. useRecruiterProfile source contains no .upsert( call on recruiter_profiles', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../hooks/opportunities/useRecruiterProfile.ts'),
+      'utf8',
+    );
+    // No .upsert( anywhere in the hook (guards against reintroduction).
+    expect(src).not.toMatch(/\.upsert\(/);
+    // Explicit assertion: UPDATE path exists, INSERT path exists.
+    expect(src).toMatch(/\.update\(/);
+    expect(src).toMatch(/\.insert\(/);
+  });
+
+  it('40. RecruiterOnboarding calls saveRecruiterProfile with only ordinary data (no acceptTerms arg)', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../components/opportunities/RecruiterOnboarding.tsx'),
+      'utf8',
+    );
+    expect(src).not.toMatch(/acceptTerms\s*:/);
+    // Called with payload as the first arg (not the { data, acceptTerms } shape).
+    expect(src).toMatch(/saveRecruiterProfile\.mutate\(\s*payload/);
+  });
+
+  it('41. resubmit_recruiter_profile is invoked only inside the combined mutation onSuccess path', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../components/opportunities/RecruiterOnboarding.tsx'),
+      'utf8',
+    );
+    // The literal must appear exactly once and inside an onSuccess callback
+    // hung on the saveRecruiterProfile.mutate call.
+    const occurrences = src.match(/resubmit_recruiter_profile/g) ?? [];
+    expect(occurrences.length).toBe(1);
+    // Isolate the saveRecruiterProfile.mutate(...) options block; the
+    // resubmit call must live inside its onSuccess and be strictly after
+    // the mutate invocation.
+    const mutateIdx = src.indexOf('saveRecruiterProfile.mutate(');
+    const resubmitIdx = src.indexOf('resubmit_recruiter_profile');
+    expect(mutateIdx).toBeGreaterThan(-1);
+    expect(resubmitIdx).toBeGreaterThan(mutateIdx);
+    // The onSuccess containing the resubmit call must reference the RPC
+    // through supabase.rpc; onError must NOT contain the resubmit call.
+    const onSuccessIdx = src.indexOf('onSuccess:', mutateIdx);
+    const onErrorIdx = src.indexOf('onError:', mutateIdx);
+    expect(onSuccessIdx).toBeGreaterThan(-1);
+    expect(onErrorIdx).toBeGreaterThan(-1);
+    expect(resubmitIdx).toBeGreaterThan(onSuccessIdx);
+    expect(resubmitIdx).toBeLessThan(onErrorIdx);
   });
 });
