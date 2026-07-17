@@ -1459,15 +1459,12 @@ describe("Phase 1F-A.2.1A-R1 — column privileges on recruiter_profiles", () =>
     expect(after.rows[0].b).toBe(true);
   });
 
-  it("79b. candidate fixture SQL contains no table/column GRANT to service_role", async () => {
-    // Guard the fixture text itself against re-broadening of service_role
-    // TABLE or COLUMN privileges. GRANT EXECUTE on a function is a
-    // separate mechanism and is explicitly allowed. Strip SQL line comments
-    // first so descriptive `-- ...` lines don't false-positive.
-    const raw = require('node:fs').readFileSync(
-      require('node:path').resolve(process.cwd(), 'src/test/fixtures/phase1fa21ServerTermsRepair.sql'),
-      'utf8',
-    );
+  it("79b. Phase 1F-A.2.1B migration contains no table/column GRANT to service_role", async () => {
+    // Guard the production migration text itself against re-broadening of
+    // service_role TABLE or COLUMN privileges. GRANT EXECUTE on a function
+    // is a separate mechanism and is explicitly allowed. Strip SQL line
+    // comments first so descriptive `-- ...` lines don't false-positive.
+    const raw = loadPhase1FA21BMigration().sql;
     const stripped = raw.replace(/--[^\n]*/g, '');
     expect(stripped).not.toMatch(
       /\bGRANT\s+(?:ALL|SELECT|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)[^;]*?\bTO\b[^;]*?\bservice_role\b/i,
