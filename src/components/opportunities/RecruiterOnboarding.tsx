@@ -201,24 +201,21 @@ export function RecruiterOnboarding({ onBack }: Props) {
       equipment_types: splitList(form.equipment_types),
       driver_types_hired: splitList(form.driver_types_hired),
     };
-    saveRecruiterProfile.mutate(
-      { data: payload, acceptTerms: allAgreed },
-      {
-        onSuccess: async () => {
-          if (isRejected && profile) {
-            const { error } = await supabase.rpc('resubmit_recruiter_profile', { profile_id: profile.id });
-            if (error) {
-              toast.error(error.message);
-              return;
-            }
-            toast.success('Recruiter profile resubmitted for review.');
-          } else {
-            toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
+    saveRecruiterProfile.mutate(payload, {
+      onSuccess: async () => {
+        if (isRejected && profile) {
+          const { error } = await supabase.rpc('resubmit_recruiter_profile', { profile_id: profile.id });
+          if (error) {
+            toast.error(error.message);
+            return;
           }
-        },
-        onError: (e: Error) => toast.error(e.message),
+          toast.success('Recruiter profile resubmitted for review.');
+        } else {
+          toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
+        }
       },
-    );
+      onError: (e: Error) => toast.error(e.message),
+    });
   };
 
   return (
