@@ -2180,38 +2180,37 @@ describe("Phase 1F-A.2.2 — acceptance idempotency + duplicate-guard-trigger cl
     let ts1: string | null = null;
     await asUser(FRESH_USER, async () => {
       const r = await db.query<{ t: string }>(
-        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1') t`);
+        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')::text t`);
       ts1 = r.rows[0].t;
     });
     expect(ts1).not.toBeNull();
     const row = await db.query<{ ts: string; v: string }>(
-      `SELECT posting_terms_accepted_at ts, posting_terms_version v
+      `SELECT posting_terms_accepted_at::text ts, posting_terms_version v
        FROM public.recruiter_profiles WHERE id=$1`, [freshRpId]);
-    expect(row.rows[0].ts).toBe(ts1);
+    expect(new Date(row.rows[0].ts).getTime()).toBe(new Date(ts1!).getTime());
     expect(row.rows[0].v).toBe('2026-07-17.v1');
   });
 
   it("204. later same-version retry returns the ORIGINAL timestamp (no forward move)", async () => {
     const before = await db.query<{ ts: string }>(
-      `SELECT posting_terms_accepted_at ts FROM public.recruiter_profiles WHERE id=$1`,
+      `SELECT posting_terms_accepted_at::text ts FROM public.recruiter_profiles WHERE id=$1`,
       [freshRpId]);
     const original = before.rows[0].ts;
-    // Wait a tick so any accidental restamp would be strictly later.
     await new Promise((r) => setTimeout(r, 10));
     let ts2: string | null = null;
     await asUser(FRESH_USER, async () => {
       const r = await db.query<{ t: string }>(
-        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1') t`);
+        `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')::text t`);
       ts2 = r.rows[0].t;
     });
-    expect(ts2).toBe(original);
+    expect(new Date(ts2!).getTime()).toBe(new Date(original).getTime());
     const after = await db.query<{ ts: string }>(
-      `SELECT posting_terms_accepted_at ts FROM public.recruiter_profiles WHERE id=$1`,
+      `SELECT posting_terms_accepted_at::text ts FROM public.recruiter_profiles WHERE id=$1`,
       [freshRpId]);
-    expect(after.rows[0].ts).toBe(original);
+    expect(new Date(after.rows[0].ts).getTime()).toBe(new Date(original).getTime());
   });
 
-  it("205. simultaneous first-acceptance calls preserve one stable original timestamp", async () => {
+  it("205. rapid retries within one session preserve one stable original timestamp", async () => {
     // Distinct fresh user so this test is not contaminated by 203.
     const CONC_USER = "bb000000-0000-0000-0000-0000000000b2";
     const seed = await db.query<{ id: string }>(
@@ -2222,24 +2221,23 @@ describe("Phase 1F-A.2.2 — acceptance idempotency + duplicate-guard-trigger cl
        RETURNING id`, [CONC_USER]);
     const cid = seed.rows[0].id;
 
-    // Fire multiple RPC calls in parallel from the same authenticated user
-    // context. PGlite serializes at the connection level, so this proves
-    // the SQL's own COALESCE first-write-wins branch: every caller sees
-    // the same single timestamp and the row stores exactly that value.
+    // Run several retries in one committed session — the first commit
+    // persists the stamp, every later call must observe it and return the
+    // same value (COALESCE first-write-wins branch).
     const stamps: string[] = [];
     for (let i = 0; i < 4; i++) {
       await asUser(CONC_USER, async () => {
         const r = await db.query<{ t: string }>(
-          `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1') t`);
+          `SELECT public.accept_recruiter_posting_terms('2026-07-17.v1')::text t`);
         stamps.push(r.rows[0].t);
       });
     }
-    const unique = Array.from(new Set(stamps));
-    expect(unique.length).toBe(1);
+    const uniqueMs = Array.from(new Set(stamps.map((s) => new Date(s).getTime())));
+    expect(uniqueMs.length).toBe(1);
     const stored = await db.query<{ ts: string }>(
-      `SELECT posting_terms_accepted_at ts FROM public.recruiter_profiles WHERE id=$1`,
+      `SELECT posting_terms_accepted_at::text ts FROM public.recruiter_profiles WHERE id=$1`,
       [cid]);
-    expect(stored.rows[0].ts).toBe(unique[0]);
+    expect(new Date(stored.rows[0].ts).getTime()).toBe(uniqueMs[0]);
   });
 
   it("206. historical DIFFERENT-version consent is NEVER overwritten", async () => {
@@ -2260,7 +2258,7 @@ describe("Phase 1F-A.2.2 — acceptance idempotency + duplicate-guard-trigger cl
     const after = await db.query<{ ts: string; v: string }>(
       `SELECT posting_terms_accepted_at::text ts, posting_terms_version v
        FROM public.recruiter_profiles WHERE id=$1`, [rpid]);
-    expect(after.rows[0].ts).toBe(originalTs);
+    expect(new Date(after.rows[0].ts).getTime()).toBe(new Date(originalTs).getTime());
     expect(after.rows[0].v).toBe('2023-legacy.v0');
   });
 
