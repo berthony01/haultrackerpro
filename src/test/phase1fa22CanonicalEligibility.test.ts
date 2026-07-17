@@ -111,11 +111,16 @@ describe('Source integrity — one canonical completeness rule', () => {
     const body = readFileSync(resolve(process.cwd(), rel), 'utf8');
 
     it(`${rel} consumes canonical eligibility helper`, () => {
+      // getRecruiterTrustView is a pure delegator over
+      // describeRecruiterEligibility, so consuming it satisfies the
+      // "single canonical completeness rule" invariant.
       const usesHelper =
         body.includes('describeRecruiterEligibility') ||
+        body.includes('getRecruiterTrustView') ||
         body.includes('isProfileCompleteForPosting');
       expect(usesHelper, `${rel} must consume canonical eligibility`).toBe(true);
     });
+
 
     it(`${rel} does not declare a local isNonEmpty helper`, () => {
       const hasIsNonEmpty = /function\s+isNonEmpty\b/.test(body);

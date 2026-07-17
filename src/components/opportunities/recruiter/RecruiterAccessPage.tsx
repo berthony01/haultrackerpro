@@ -857,62 +857,10 @@ export function RecruiterTrustStatus({
   );
 }
 
-/**
- * Test-focused controls surface: renders the trust status alongside the
- * Post / Manage / View Requests primary actions with the exact
- * enabled/disabled behavior the real page uses. Billing does not gate
- * standard posting — the disabled state is driven entirely by canonical
- * eligibility.
- */
-export function RecruiterAccessControls({
-  profile,
-  isBillingActive: _isBillingActive,
-  intentRecruiter,
-  onPost,
-  onManage,
-  onApplications,
-}: {
-  profile: RecruiterProfile | null;
-  isBillingActive: boolean;
-  intentRecruiter?: boolean;
-  onPost: () => void;
-  onManage: () => void;
-  onApplications: () => void;
-}) {
-  const view = getRecruiterTrustView(profile, { intentRecruiter });
-  const disabled = !view.canPost;
-  return (
-    <div className="space-y-3" data-testid="recruiter-access-controls">
-      <RecruiterTrustStatus profile={profile} intentRecruiter={intentRecruiter} />
-      <div className="flex gap-2 flex-wrap">
-        <Button
-          size="sm"
-          onClick={onPost}
-          disabled={disabled}
-          data-testid="controls-post"
-        >
-          Post an Opportunity
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onManage}
-          disabled={disabled}
-          data-testid="controls-manage"
-        >
-          Manage Opportunities
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onApplications}
-          disabled={disabled}
-          data-testid="controls-applications"
-        >
-          View Driver Requests
-        </Button>
-      </div>
-    </div>
-  );
-}
+// Phase 1F-A.2.2-R1A.1: the previous test-only `RecruiterAccessControls`
+// duplicate surface was removed. Rendered tests must exercise the real
+// `RecruiterAccessPage` (with narrow hook mocks) and assert against the
+// real Post button, real trust badges (via `RecruiterTrustStatus` above),
+// and real ToolCard visibility/enabled state.
+
 
