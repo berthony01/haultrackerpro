@@ -29,6 +29,7 @@ import { useRecruiterProfile, type RecruiterProfile } from '@/hooks/opportunitie
 import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunities/useRecruiterBilling';
 import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
+import { useUserRole } from '@/hooks/useUserRole';
 import { RecruiterBillingPanel } from '../RecruiterBillingPanel';
 
 type RecruiterState =
@@ -62,6 +63,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const { isBillingActive, plan, status, isLoading: billingLoading } = useRecruiterBilling();
   const { opportunities, isLoading: oppsLoading } = useRecruiterOpportunities();
   const { recruiterApplications, isLoadingRecruiter } = useOpportunityApplications({ recruiterId: profile?.id ?? undefined });
+  const { intentRecruiter } = useUserRole();
 
   const billingRef = useRef<HTMLDivElement | null>(null);
   const howRef = useRef<HTMLDivElement | null>(null);
@@ -237,14 +239,24 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-bold text-foreground mb-1">
-                  {state === 'rejected' ? 'Update & Resubmit Your Recruiter Profile' : 'Apply for Recruiter Access'}
+                  {state === 'rejected'
+                    ? 'Update & Resubmit Your Recruiter Profile'
+                    : intentRecruiter
+                    ? 'Finish Your Recruiter Setup'
+                    : 'Apply for Recruiter Access'}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Submit your recruiter information for review. Approved recruiters can post
-                  structured opportunities, review qualified drivers, and request contact permission.
+                  {state === 'none' && intentRecruiter
+                    ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter application to unlock posting.'
+                    : 'Submit your recruiter information for review. Approved recruiters can post structured opportunities, review qualified drivers, and request contact permission.'}
                 </p>
-                <Button onClick={onOpenOnboarding}>
-                  {state === 'rejected' ? 'Update & Resubmit' : 'Start Application'} <ArrowRight className="h-4 w-4" />
+                <Button onClick={onOpenOnboarding} data-testid="finish-recruiter-setup-cta">
+                  {state === 'rejected'
+                    ? 'Update & Resubmit'
+                    : intentRecruiter
+                    ? 'Finish Recruiter Setup'
+                    : 'Start Application'}{' '}
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>

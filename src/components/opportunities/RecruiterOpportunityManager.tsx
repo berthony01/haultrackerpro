@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+import { useUserRole } from '@/hooks/useUserRole';
+import { describeRecruiterBlock } from '@/lib/opportunities/describeRecruiterBlock';
 import {
   useRecruiterOpportunities,
   type Opportunity,
@@ -40,6 +42,7 @@ type View = 'list' | 'quick' | 'edit' | 'referrals';
 
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
+  const { intentRecruiter } = useUserRole();
   const { opportunities, isLoading, setStatus, refetch } = useRecruiterOpportunities();
   const billing = useRecruiterBilling();
 
@@ -56,18 +59,20 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   }
 
-  // Gating states
-  if (!profile) return <Gate onBack={onBack} title="Recruiter Access Required" body="You need recruiter access before posting opportunities." Icon={ShieldCheck} />;
-  const v = profile.verification_status;
-  const s = profile.status;
-  if (s === 'suspended' || v === 'suspended') {
-    return <Gate onBack={onBack} title="Recruiter Access Suspended" body="Recruiter access suspended. Contact support." Icon={Ban} />;
-  }
-  if (v === 'rejected') {
-    return <Gate onBack={onBack} title="Profile Needs Attention" body="Your recruiter profile needs attention before posting." Icon={AlertTriangle} />;
-  }
-  if (v !== 'approved') {
-    return <Gate onBack={onBack} title="Pending Review" body="Your recruiter profile is pending review." Icon={Clock} />;
+  // Gating states — Phase 1E: sourced from describeRecruiterBlock so the
+  // manager, the hub, and the createOpportunity error path all agree on
+  // the same wording/reason.
+  const block = describeRecruiterBlock(profile, { intentRecruiter });
+  if (block.reason !== 'ok') {
+    const Icon =
+      block.reason === 'suspended'
+        ? Ban
+        : block.reason === 'rejected'
+        ? AlertTriangle
+        : block.reason === 'pending_review'
+        ? Clock
+        : ShieldCheck;
+    return <Gate onBack={onBack} title={block.title} body={block.body} Icon={Icon} />;
   }
 
   // Verified recruiters can submit unlimited standard opportunities.

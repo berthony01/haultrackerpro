@@ -1,471 +1,155 @@
-# Phase 1C-2 — Stripe Webhook Retry-Safe Idempotency (DEF-05)
 
-## Difficulty & risk
+# Recruiter Signup → Post Opportunity: Read-Only Diagnostic Audit
 
-- Complexity: medium. Single edge function + one migration + tests.
-- Risk: high — this is the sole billing write path. A regression here silently loses billing events.
-- Mitigation: state transitions live in atomic SECURITY DEFINER RPCs (Postgres serializes them); the edge function becomes a thin orchestrator around the Phase 1C validator; behavior proved by both mocked-adapter tests AND a real PGlite runtime harness.
+## 1. Executive conclusion
+**PARTIALLY WORKING.** The wiring is intact end-to-end and does succeed for an approved recruiter (1 approved recruiter, 1 active/approved opportunity + 3 closed/pending live). But live data shows **2 users with `profiles.intended_role='recruiter'` and only 1 has a matching `recruiter_profiles` row** — exactly one stuck account with signup intent that never became a recruiter profile. That user cannot see or use the posting form (UI gate + RLS insert both fail-closed). This matches the reported symptom.
 
-## Preflight findings (live)
+No P0 code defects were confirmed. The most likely user-visible cause is an onboarding path that did not create the `recruiter_profiles` row for at least one user (OAuth reconciliation or unfinished onboarding submission). Secondary risk: even after a recruiter_profiles row exists, `verification_status` starts as `pending` and posting is blocked until an admin approves.
 
-- HEAD contains full Phase 1C output: `_shared/stripe-webhook-identity.ts`, rewritten `stripe-webhook/index.ts`, and both Phase 1C test files.
-- `public.stripe_webhook_events`: columns `id`, `stripe_event_id`, `event_type`, `processed_at`. Unique index on `stripe_event_id`. RLS enabled, zero policies. **0 rows**, 0 nulls, 0 dupes.
-- No historical replay concern. Migration is greenfield-safe.
+## 2. Baseline
+- HEAD: `f50f133e7baffe498c48d44e4f264f0015edc528` ("Fixed PGlite import path"). Working tree clean.
+- No changes since Phase 1C-3 / final gate review.
+- Build & deployment status: last verified PASS in prior gate review; no code changed this turn.
 
-## Root cause of DEF-05
+## 3. Signup → posting flow (verified against current code + DB)
 
-Ledger row is inserted *before* business logic. Any post-insert failure returns 500, Stripe retries, the unique constraint fires 23505, and the handler swallows the retry as a duplicate. The ledger has no state to distinguish "inserted" from "successfully processed".
-
-## Files to change (expected boundary)
-
-1. **New migration** `supabase/migrations/<ts>_stripe_webhook_events_state_machine.sql` — evolve table + add 3 RPCs.
-2. **New** `supabase/functions/_shared/stripe-webhook-idempotency.ts` — runtime-neutral orchestration + typed ledger-client interface.
-3. **Edit** `supabase/functions/stripe-webhook/index.ts` — route every event through claim → process → complete/fail; centralize terminal responses.
-4. **Edit** `src/test/phase1cWebhookIdempotencyRetry.test.ts` — convert from documenting-defect to regression proving the fix.
-5. **New** `src/test/phase1c2WebhookIdempotencyStateMachine.test.ts` — full 25-case orchestration coverage.
-6. **New** `src/test/phase1c2WebhookLedgerRuntime.test.ts` — PGlite runtime harness for the migration + RPCs.
-7. `.lovable/plan.md` — recorded automatically.
-
-No changes to: pricing, checkout, account deletion, recruiter/agency capability, RLS on any other table, Dispatcher Pro, package.json, or lockfiles beyond a devDependency for `@electric-sql/pglite` if strictly required (checked first: if not already present, keep the harness Postgres-optional and gate it behind availability rather than adding a lock entry).
-
-## Migration design
-
-Evolve `public.stripe_webhook_events`:
-
-```sql
-ALTER TABLE public.stripe_webhook_events
-  ALTER COLUMN processed_at DROP NOT NULL,
-  ADD COLUMN processing_status text NOT NULL DEFAULT 'processed',
-  ADD COLUMN attempt_count integer NOT NULL DEFAULT 1,
-  ADD COLUMN processing_started_at timestamptz,
-  ADD COLUMN lease_expires_at timestamptz,
-  ADD COLUMN claim_token uuid,
-  ADD COLUMN result_code text,
-  ADD COLUMN last_failed_at timestamptz,
-  ADD COLUMN last_error_code text,
-  ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
-
-ALTER TABLE public.stripe_webhook_events
-  ADD CONSTRAINT stripe_webhook_events_status_ck
-    CHECK (processing_status IN ('processing','processed','failed')),
-  ADD CONSTRAINT stripe_webhook_events_attempt_ck
-    CHECK (attempt_count >= 1),
-  ADD CONSTRAINT stripe_webhook_events_processing_ck
-    CHECK (processing_status <> 'processing'
-           OR (claim_token IS NOT NULL AND lease_expires_at IS NOT NULL)),
-  ADD CONSTRAINT stripe_webhook_events_processed_ck
-    CHECK (processing_status <> 'processed' OR processed_at IS NOT NULL);
-
-CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_status_lease
-  ON public.stripe_webhook_events (processing_status, lease_expires_at)
-  WHERE processing_status = 'processing';
+```
+Email signup / OAuth
+  → handle_new_user trigger (public schema) creates profiles row,
+     persists auth metadata.intended_role → profiles.intended_role
+  → useRoleIntentReconciler (client)  ─── if intended_role='recruiter'
+     → RPC public.apply_recruiter_intent() (SECURITY DEFINER, authenticated only)
+        (eligibility-gated version, migration 20260619173227) upserts
+        recruiter_profiles row when eligible
+  → useUserRole / useRecruiterProfile picks up new profile
+  → RecruiterAccessRoute renders RecruiterAccessPage (hub)
+  → RecruiterOnboarding form (recruiter_profiles upsert)  ─── RLS:
+     "Recruiter inserts own profile" WITH CHECK (auth.uid()=user_id)
+  → BEFORE INSERT/UPDATE trigger recruiter_profile_guard()
+     locks verification_status/verified_at/verified_by/status to admins
+     (non-admin edits pinned; safe self-resubmit rejected→pending only)
+  → Admin review flips verification_status='approved', status='active'
+  → RecruiterOpportunityManager gates UI on
+     verification_status==='approved' && status==='active' (client)
+  → RecruiterQuickPostForm.buildPayload() → useRecruiterOpportunities
+     .createOpportunity → insert into public.opportunities
+       RLS "Recruiter inserts own opportunities":
+         WITH CHECK is_recruiter_owner(auth.uid(), recruiter_id)
+       BEFORE INSERT trigger trg_opportunities_guard:
+         forces admin_review_status = approved iff owner is approved,
+         else 'pending'; view_count=0; published_at conditional
+       BEFORE INSERT trigger trg_opportunities_billing_guard:
+         if NEW.status='active' AND not admin,
+         requires recruiter_profiles row with verification_status='approved'
+         AND status<>'suspended' — else RAISE 42501
+         "Recruiter must be verified and active to post opportunities."
 ```
 
-Historical rows (currently 0) default to `processing_status='processed'` with existing `processed_at` preserved — never replayed.
+## 4. Posting eligibility rules (server-authoritative)
+- Row-level: `is_recruiter_owner(auth.uid(), recruiter_id)` — recruiter row must exist, belong to caller, not suspended.
+- Trigger `opportunities_billing_guard`: only blocks when `NEW.status='active'`. Quick Post form sends `status:'active'`, so pending recruiters are always blocked at active-post time.
+- Trigger `opportunities_guard`: overrides `admin_review_status` server-side (never trusts client); recruiters cannot self-approve.
+- `opportunities` CHECK constraints: `status ∈ {draft,active,paused,closed,removed}`, `admin_review_status ∈ {pending,approved,rejected,flagged}`, `pay_model ∈ {cpm,percentage,flat_weekly,salary,mixed,other}`.
+- NOT NULL: `recruiter_id`, `title`, `company_name`, `hiring_states` (default `{}`), plus `status`/`admin_review_status`/`featured`/`view_count`.
+- Client-side gates in `RecruiterOpportunityManager` block the form UI unless `profile.verification_status==='approved'` and `profile.status==='active'`. Suspended/rejected/pending each render their own gate page.
+- No plan/billing/trial condition affects standard posting — capability layer only gates premium tools (`useRecruiterBilling.capabilities`).
+
+## 5. Complete blocking-condition register
+| # | Condition | Layer | Symptom |
+|---|-----------|-------|---------|
+| B1 | No `recruiter_profiles` row for caller | UI + RLS | UI shows "Recruiter Access Required"; direct API insert fails RLS |
+| B2 | `verification_status='pending'` | UI + billing_guard | UI shows "Pending Review"; if bypassed, 42501 on active insert |
+| B3 | `verification_status='rejected'` | UI | "Profile Needs Attention" gate |
+| B4 | `status='suspended'` or `verification_status='suspended'` | UI + billing_guard + is_recruiter_owner | "Access Suspended" gate; RLS insert denied |
+| B5 | Client sends `status:'active'` while unapproved | billing_guard | 42501 raised (currently unreachable behind UI gate but is the last line of defense) |
+| B6 | `user_id` mismatch between recruiter row and caller | RLS insert + owner check | Silent RLS "new row violates row-level security policy" |
+| B7 | `recruiter_id` malformed / stale from React Query | RLS + FK | RLS deny or FK violation |
+| B8 | `hiring_states` accidentally set to null (client currently sends `[]` or `[state]`) | NOT NULL constraint | Insert fails |
+| B9 | `pay_model` value outside enum (e.g. free-text) | CHECK | 23514 |
+| B10 | Attempt to change `admin_review_status`/`featured`/`view_count`/`published_at` from client | opportunities_guard | Silently overwritten (not an error, but confuses tests) |
+| B11 | Attempt by recruiter to update another recruiter's opportunity | RLS UPDATE | Denied |
+| B12 | Onboarding form saved but `recruiter_profile_guard` rejected forbidden field change | trigger | Trigger error surfaced as toast |
+| B13 | `apply_recruiter_intent` never invoked (OAuth path where reconciler didn't run) | client | No recruiter_profiles row → B1 |
+| B14 | Stale `useRecruiterProfile` cache after admin approval | React Query | UI still shows pending until refetch/refresh |
+| B15 | `createOpportunity.onError` surfaces raw Supabase error string — usable, but generic `Recruiter must be approved to manage opportunities.` from hook can mask the real cause when `isApproved` is false client-side | UI copy | Users don't know what to fix |
+
+## 6. Live read-only findings (counts only, no PII)
+- `recruiter_profiles` by state: **1 row — approved/active. Zero pending, zero rejected, zero suspended.**
+- Recruiter profiles missing `company_name`: **0**.
+- Recruiter profiles with empty `hiring_states`: **0**.
+- `profiles.intended_role='recruiter'`: **2** users.
+- Users with `intended_role='recruiter'` AND a matching `recruiter_profiles` row: **1**.
+- **→ Delta: 1 user signed up as a recruiter but has no recruiter_profiles row.** This is the reproducible stuck-account signature.
+- Opportunities by (status, admin_review_status): **active/approved: 1, closed/pending: 3.**
+- Orphaned opportunities (no matching recruiter): **0**.
+- Approved recruiters missing owner (`user_id`): **0**.
+- Recruiter/customer/subscription integrity checks from prior Phase 1D preflight: still 0 collisions.
+- Triggers active: `trg_opportunities_guard`, `trg_opportunities_billing_guard`, `trg_opportunities_set_featured`, `trg_opportunities_updated_at`, `trg_notify_opportunity_reviewed` on opportunities; `recruiter_profile_guard`, `trg_recruiter_profiles_guard`, `trg_recruiter_profiles_updated_at`, `trg_notify_recruiter_profile_status` on recruiter_profiles. RLS enabled on both tables; policies as reported in section 4.
+
+No live inconsistency requiring repair. No auto-rewrite performed.
+
+## 7. Reproduction / verification results (no writes)
+| Scenario | Result | Evidence |
+|---|---|---|
+| 1. New recruiter signup | PASS (structural) | handle_new_user + apply_recruiter_intent wired; profile creation confirmed for 1 of 2 intended recruiters |
+| 2. Recruiter onboarding | PARTIAL | 1 stuck user with intent but no recruiter_profiles row (see §6) — root cause is either OAuth reconciler not firing or user never submitted onboarding form |
+| 3. Approved recruiter creates standard opportunity | PASS | 1 approved recruiter has active/approved opportunity live |
+| 4. Approved recruiter publishes/activates | PASS | Same row is `status=active, admin_review_status=approved` |
+| 5. Pending recruiter blocked message | PASS | UI `Gate` component renders "Pending Review" (RecruiterOpportunityManager.tsx L69) |
+| 6. Suspended recruiter blocked | PASS | UI gate + `is_recruiter_owner` excludes suspended + billing_guard requires non-suspended |
+| 7. Edit/pause own opportunity | PASS | RLS "Recruiter updates own opportunities" using + with-check on `is_recruiter_owner` |
+| 8. Cannot modify another recruiter's opportunity | PASS | Same RLS |
+| 9. Standard posting available free/verified | PASS | Verified via code (`useRecruiterBilling` capability layer gates only premium tools; posting is verified-access only) |
+| 10. Errors explain corrective action | PARTIAL | `billing_guard` message is clear ("Recruiter must be verified and active…"); B15 client-side generic error can mislead |
+
+No new tests added. No production writes made.
+
+## 8. Root cause of the reported problem (ranked)
+Because the exact reporter's account/email was not supplied, ranking by likelihood given live data + code:
+
+1. **[Highest, matches live data] The reporter has `profiles.intended_role='recruiter'` but no `recruiter_profiles` row.** Either (a) they signed up via Google/OAuth and `useRoleIntentReconciler` never called `apply_recruiter_intent` in this session, or (b) they opened the onboarding form but never submitted it. UI shows "Recruiter Access Required" and Post Opportunity is not reachable. Confirmed by count delta (2 intended, 1 profile).
+2. **[High] The reporter completed onboarding but is still `verification_status='pending'`.** Admin approval hasn't happened. UI shows "Pending Review" — no post path available. Not reproduced in current live data (0 pending) but the flow requires admin review as a hard gate.
+3. **[Medium] Stale client cache** after admin approval: `useRecruiterProfile` React Query key `['recruiter_profile', user?.id]` may not refetch until sign-out/sign-in; the user could be approved server-side but blocked client-side.
+4. **[Low] Silent RLS denial** from a user_id/recruiter_id mismatch caused by a manual admin patch (0 mismatches live — not currently occurring but the failure mode exists).
+
+## 9. Defect register
+| ID | Sev | Location | Evidence | Recommended narrow fix |
+|---|---|---|---|---|
+| D-01 | **P1** | Recruiter onboarding path (`apply_recruiter_intent` + `useRoleIntentReconciler`) | Live: 2 intended, 1 profile — 1 user stuck | (a) Ensure `apply_recruiter_intent` runs on every authenticated session start for `intended_role='recruiter'`, and (b) auto-navigate stuck users into RecruiterOnboarding when profile is missing but intent is set. Also surface a diagnostic on the hub: "Finish setting up your recruiter profile to post". No schema change. |
+| D-02 | **P2** | Approval visibility | Admin approves in DB → recruiter UI does not immediately reflect it | Invalidate/refetch `['recruiter_profile']` on focus + on realtime `postgres_changes` for recruiter_profiles owned by user. Client-only. |
+| D-03 | **P3** | `RecruiterOpportunityManager` gate copy | "Pending Review" doesn't state ETA or contact path | Add support-contact line and expected review window. UI copy only. |
+| D-04 | **P3** | `useRecruiterOpportunities.requireApproved` throws generic string (B15) | Users see "Recruiter must be approved to manage opportunities." instead of specific reason (missing row vs pending vs suspended) | Route the client through a small `describeRecruiterBlock(profile)` helper. UI-only. |
+| D-05 | **P3** | Client-side `RecruiterQuickPostForm.buildPayload` sends `status:'active'` unconditionally | If gates are ever bypassed by a code path we haven't audited, billing_guard fires 42501 which is fine, but a friendlier UI would draft first | Consider `status:'draft'` unless recruiter explicitly clicks "Publish". Non-blocking. |
+
+No P0 defects. No migration required. All fixes are code-only.
+
+## 10. Gate impact
+- **Does NOT introduce new billing regression.** Phase 1C/1C-2/1D webhook + Recruiter checkout invariants are untouched.
+- **Does affect** the final Driver/Recruiter production-readiness gate because Recruiter onboarding shows a real user-visible stuck state (D-01). Recommend the gate not be re-declared PASS until D-01 is remediated.
+- **Dispatcher Pro:** remains blocked (unchanged); this audit does not affect that gate independently.
+
+## 11. Recommended next remediation phase
+**Phase 1E — Recruiter Onboarding Continuity (P1, code-only, no migration).** Scope:
+1. Guarantee `apply_recruiter_intent` fires whenever an authenticated recruiter-intent session lands, including OAuth callback and cold-load.
+2. `RecruiterAccessPage` shows an explicit "Finish recruiter setup" CTA whenever `profiles.intended_role='recruiter'` and no `recruiter_profiles` row exists.
+3. `useRecruiterProfile` refetch on window focus + realtime channel on `recruiter_profiles` for the current user (D-02).
+4. Small `describeRecruiterBlock()` helper for accurate blocked-state copy (D-03/D-04).
+5. Executable tests: reconciler runs on OAuth-only session; missing-profile hub path shows CTA; stale approval refetches; unauthorized insert still fails RLS.
+
+Files expected to change (in build mode, when approved):
+- `src/hooks/useRoleIntentReconciler.ts`
+- `src/hooks/opportunities/useRecruiterProfile.ts`
+- `src/components/opportunities/recruiter/RecruiterAccessPage.tsx`
+- `src/components/opportunities/RecruiterOpportunityManager.tsx` (copy only)
+- `src/lib/opportunities/describeRecruiterBlock.ts` (new)
+- `src/test/phase1eRecruiterOnboardingContinuity.test.ts` (new)
+
+Out of scope: any DB schema change, RLS/trigger change, billing change, admin-review workflow change, capability change, Dispatcher Pro.
+
+## 12. Verification-only actions completed this run
+- Git HEAD confirmed clean at `f50f133e…`.
+- Read-only SQL: schema, RLS policies, triggers, constraints, function bodies (`opportunities_guard`, `opportunities_billing_guard`, `is_recruiter_owner`), and count queries on `recruiter_profiles`, `opportunities`, `profiles`.
+- File reads: `RecruiterOpportunityManager.tsx`, `RecruiterQuickPostForm.tsx`, `RecruiterAccessRoute.tsx`, `useRecruiterOpportunities.ts`, `useRecruiterProfile.ts`, `useRecruiterBilling.ts`.
+- **No code, DB rows, migrations, Stripe objects, or configuration were changed.**
 
-### `public.claim_stripe_webhook_event(p_event_id text, p_event_type text, p_lease_seconds int)`
-
-SECURITY DEFINER, `SET search_path = public`, execute revoked from PUBLIC/anon/authenticated, granted to service_role. Bounded lease (30..900s, default 300). Returns `TABLE(result text, claim_token uuid, attempt integer)` where `result IN ('claimed','already_processed','in_progress','event_type_conflict')`.
-
-Body performs `INSERT ... ON CONFLICT (stripe_event_id) DO NOTHING` then a single `UPDATE ... WHERE stripe_event_id=$1 AND (status='failed' OR (status='processing' AND lease_expires_at < now()))` returning the new token/attempt. If insert wins → `claimed`. Otherwise re-`SELECT ... FOR UPDATE` and branch on current state → `already_processed` / `in_progress` / `event_type_conflict`. Postgres row lock serializes concurrent claims.
-
-### `public.complete_stripe_webhook_event(p_event_id text, p_claim_token uuid, p_result_code text)`
-
-Only transitions `processing → processed` **AND** `claim_token = p_claim_token`. Sets `processed_at=now()`, `result_code`, clears `claim_token`, `lease_expires_at`. Returns boolean. Accepts `result_code IN ('applied','rejected','ignored')`.
-
-### `public.fail_stripe_webhook_event(p_event_id text, p_claim_token uuid, p_error_code text)`
-
-Only `processing → failed` AND matching token. Clears lease + token, sets `last_failed_at`, `last_error_code`. Attempt count preserved. Returns boolean. `p_error_code` truncated/validated to `^[a-z0-9_]{1,64}$`.
-
-Stale-worker protection is intrinsic: token mismatch → no rows updated → returns false.
-
-## Orchestration module (`_shared/stripe-webhook-idempotency.ts`)
-
-```ts
-export type ClaimResult =
-  | { kind: 'claimed'; claimToken: string; attempt: number }
-  | { kind: 'already_processed' }
-  | { kind: 'in_progress' }
-  | { kind: 'event_type_conflict' };
-
-export type TerminalResult = 'applied' | 'rejected' | 'ignored';
-
-export interface LedgerClient {
-  claim(eventId: string, eventType: string, leaseSeconds: number): Promise<ClaimResult>;
-  complete(eventId: string, token: string, result: TerminalResult): Promise<boolean>;
-  fail(eventId: string, token: string, errorCode: string): Promise<boolean>;
-}
-
-export async function withIdempotency<T>(deps: {
-  ledger: LedgerClient;
-  eventId: string;
-  eventType: string;
-  leaseSeconds?: number; // clamped 30..900, default 300
-  process: (ctx: { attempt: number }) => Promise<{ result: TerminalResult; body: T }>;
-}): Promise<
-  | { kind: 'ok'; status: 200; body: T; result: TerminalResult }
-  | { kind: 'duplicate'; status: 200 }
-  | { kind: 'in_progress'; status: 409 }
-  | { kind: 'conflict'; status: 200 }              // event_type_conflict, safe log
-  | { kind: 'transient_failure'; status: 500; errorCode: string }
-  | { kind: 'complete_failed'; status: 500 }
-  | { kind: 'claim_failed'; status: 500 }
->;
-```
-
-Handler contract: if `process` throws → call `fail`, return 500. If `process` resolves → call `complete`; on `false` return 500 (do NOT claim success). All state-changing branches inside the real webhook return by wrapping in `withIdempotency`.
-
-## Webhook handler changes
-
-- Replace the pre-check `insert into stripe_webhook_events` + business switch with a single `withIdempotency` wrap around the Phase 1C-validated processor.
-- Processor returns `{ result: 'applied' | 'rejected' | 'ignored', body }`:
-  - Successful mutations → `applied`
-  - Identity/type/checkout mismatches (Phase 1C rejections) → `rejected` (existing safe response body preserved)
-  - `invoice.*`, unhandled types, no-op branches → `ignored`
-- Phase 1C validator, canonical routing, cross-context checks, log shapes: unchanged.
-
-## Testing
-
-### `phase1cWebhookIdempotencyRetry.test.ts` (rewritten)
-
-Now proves: first call transient-fails → status `failed`; retry re-processes and succeeds. Uses the same `withIdempotency` + fake `LedgerClient` the real handler uses.
-
-### `phase1c2WebhookIdempotencyStateMachine.test.ts`
-
-All 25 cases from Part 14 against an in-memory `LedgerClient` that mirrors the Postgres semantics (token, lease, attempt counter, status).
-
-### `phase1c2WebhookLedgerRuntime.test.ts`
-
-PGlite harness: apply the migration verbatim, then drive `claim/complete/fail` through actual SQL. Verifies serialization, token stale-guard, lease reclaim, historical-row preservation, and privilege revocation. If `@electric-sql/pglite` is not resolvable at test time, the test is skipped with a loud `console.warn` — but preflight will install it as a devDependency first (single, narrowly justified dep; no lock rewrite otherwise).
-
-### Preserved
-
-Existing `phase1cWebhookIdentityValidator.test.ts` and DEF-04 exploit assertions unchanged. Full suite must remain ≥ 827 + new tests.
-
-## Verification
-
-- `bunx tsc -p tsconfig.app.json --noEmit`
-- `bunx tsc -p tsconfig.node.json --noEmit`
-- `bunx vitest run`
-- `bun run build`
-- Post-migration DB inspection: schema, RPC definitions, `has_function_privilege`, RLS state, historical count = 0 (unchanged).
-
-## Stop-and-report triggers
-
-Historical rows appear during migration; duplicate event IDs; Phase 1C must change; scope extends beyond ledger + orchestration + tests; DEF-04 becomes reachable; unrelated tests break.
-
-## Final report
-
-Will include all 40 required items, live post-migration ledger snapshot, DEF-04/DEF-05 regression status, and Dispatcher Pro gate = **blocked** pending final driver/recruiter readiness review.
-
-Lovable, the Phase 1C-2 plan is approved in principle, but incorporate the following corrections before implementation. Continue directly after updating the plan. Do not ask for another approval unless the scope expands, a migration beyond the webhook ledger is required, or a live-data inconsistency is discovered.
-
-1. Rename the newly confirmed webhook retry defect.
-
-The original production-readiness audit already assigned DEF-05 to the recruiter duplicate-subscription guard issue.
-
-Do not reuse DEF-05.
-
-Record the Stripe webhook retry/silent-drop defect as:
-
-DEF-23 — Stripe webhook event can be permanently skipped after a post-ledger transient failure.
-
-Keep the phase name Phase 1C-2 unchanged.
-
-2. Do not default future webhook rows to `processed`.
-
-The proposed migration currently uses:
-
-`processing_status text NOT NULL DEFAULT 'processed'`
-
-That is acceptable only as a temporary migration backfill mechanism for historical rows, not as the continuing default for new rows.
-
-Required migration sequence:
-
-- Add the new columns initially without unsafe terminal defaults where necessary.
-
-- Explicitly backfill existing historical rows as `processed`.
-
-- Preserve their existing `processed_at`.
-
-- Assign a historical result such as `legacy_processed` if needed.
-
-- After backfill, ensure new event rows cannot accidentally become terminal merely through a direct insert.
-
-- The claim RPC must explicitly insert:
-
-  - `processing_status = 'processing'`
-
-  - `attempt_count = 1`
-
-  - `processing_started_at = now()`
-
-  - `lease_expires_at`
-
-  - a new `claim_token`
-
-  - `processed_at = null`
-
-  - `result_code = null`
-
-- Drop any inherited `processed_at DEFAULT now()` if it would automatically populate processing rows.
-
-Prefer no default for `processing_status`, so all valid new rows must be established through the claim RPC.
-
-3. Strengthen the state consistency constraints.
-
-In addition to the planned constraints, enforce equivalent rules:
-
-- `processing` requires:
-
-  - non-null claim token
-
-  - non-null processing start
-
-  - non-null lease expiration
-
-  - null processed timestamp
-
-- `processed` requires:
-
-  - non-null processed timestamp
-
-  - non-null permitted terminal result code
-
-  - null active claim token
-
-  - null active lease
-
-- `failed` requires:
-
-  - non-null last-failed timestamp
-
-  - non-null sanitized error code
-
-  - null active claim token
-
-  - null active lease
-
-  - null processed timestamp
-
-Historical rows may use a narrowly defined `legacy_processed` terminal result. Do not weaken all terminal result validation merely to support historical data.
-
-4. Check event-type conflicts before reclaiming an existing row.
-
-The planned claim flow must not reclaim a failed or expired row before confirming that its stored `event_type` equals the incoming `p_event_type`.
-
-Otherwise, the same Stripe event ID could be reclaimed under a different event type.
-
-Required behavior:
-
-- Insert the new event explicitly as `processing`.
-
-- On conflict, lock the existing row.
-
-- Compare stored and incoming event types first.
-
-- If they differ, return `event_type_conflict`.
-
-- Do not update status, attempt count, token, lease, timestamps, or result fields.
-
-- Only after event-type equality is proven may a failed or expired claim be reclaimed.
-
-Keep the entire decision inside one atomic SECURITY DEFINER function and transaction.
-
-5. Protect business processing from stale workers, not only ledger completion.
-
-A claim token that is checked only during `complete` and `fail` prevents an old worker from changing the ledger, but it does not automatically prevent that old worker from performing billing writes after its lease expires and another worker reclaims the event.
-
-Use one of these safe approaches:
-
-Preferred narrow approach:
-
-- Determine the actual maximum execution duration of the deployed Edge Function environment.
-
-- Use a server-controlled lease that is longer than that execution ceiling plus a safety margin.
-
-- Do not accept lease duration from the webhook request.
-
-- Ensure an old invocation cannot still be executing when the lease becomes reclaimable.
-
-If that guarantee cannot be established from the current environment:
-
-- Add a narrowly scoped claim-renewal RPC and renew the lease before expensive external calls and before billing mutation.
-
-- Every renewal must require the active claim token.
-
-- A failed renewal must stop business processing before billing mutation.
-
-Do not claim stale-worker protection is complete merely because stale completion and failure updates are blocked.
-
-6. Add the missing completion-failure retry scenario.
-
-The plan tests failure during business processing, but it must also test:
-
-1. Claim succeeds.
-
-2. Billing processing succeeds.
-
-3. Ledger completion fails or its response is lost.
-
-4. Handler returns 500.
-
-5. Stripe retries.
-
-6. The event is processed safely without duplicating or corrupting billing state.
-
-Because this system provides at-least-once processing, every webhook branch must be safe when executed again after its earlier business mutation may already have succeeded.
-
-Add explicit assertions that retry does not:
-
-- create duplicate billing records
-
-- replace canonical identities
-
-- grant duplicate entitlements
-
-- undo cancellation
-
-- create duplicate side effects
-
-- regress DEF-04
-
-If any current webhook side effect is not safely repeatable, stop and report it as a separate defect rather than hiding it in this phase.
-
-7. Do not allow the required PGlite runtime test to skip.
-
-The plan currently says the PGlite test may skip with a warning if the package is unavailable.
-
-That is not acceptable for Phase 1C-2 PASS.
-
-Use one of these approaches:
-
-- Run PGlite through a temporary isolated sandbox dependency without modifying `package.json` or lockfiles.
-
-- Or, with explicit narrow justification, add it as a development dependency and include the resulting package changes in the declared scope.
-
-Preferred approach: temporary sandbox installation, so production dependency files remain untouched.
-
-If the real Postgres/PGlite migration and RPC harness cannot run, classify Phase 1C-2 as UNCONFIRMED or FAIL. Do not skip the critical runtime test and still declare PASS.
-
-8. Execute the exact migration and RPC definitions in the runtime harness.
-
-The PGlite harness must apply the actual migration file created for production.
-
-Do not manually recreate a simplified version of:
-
-- the table
-
-- constraints
-
-- claim RPC
-
-- completion RPC
-
-- failure RPC
-
-- privilege grants
-
-The runtime result must prove the exact production SQL.
-
-A mocked or in-memory `LedgerClient` remains useful for orchestration tests, but it cannot replace the real Postgres state-machine test.
-
-9. Clarify claim and retry response behavior.
-
-For an unexpired `in_progress` claim:
-
-- Return a retryable non-2xx response.
-
-- Prefer a generic 500 unless there is a documented reason to use 409.
-
-- Do not return `{duplicate:true}`.
-
-- Do not mark the event failed.
-
-- Do not steal the active claim.
-
-For `already_processed`:
-
-- Return 200 duplicate success.
-
-- Do not rerun business logic.
-
-For `event_type_conflict`:
-
-- Perform zero billing mutation.
-
-- Do not modify the original ledger row.
-
-- Return a controlled permanent response.
-
-- Log only a stable reason code.
-
-10. Keep the function security strict.
-
-All three RPCs must:
-
-- be SECURITY DEFINER
-
-- use schema-qualified object names
-
-- use a pinned safe search path
-
-- revoke execution from PUBLIC, anon, and authenticated
-
-- grant execution only to service_role
-
-- validate input lengths
-
-- reject empty event IDs and event types
-
-- clamp the lease internally
-
-- sanitize error/result codes
-
-- never return full Stripe identifiers in errors
-
-After migration, verify privileges using `has_function_privilege` for anon, authenticated, and service_role.
-
-11. Preserve Phase 1C exactly.
-
-The new idempotency wrapper must surround the existing Phase 1C processor.
-
-Do not duplicate or rewrite its identity rules.
-
-The exact DEF-04 exploit must still be rejected through the production-used handler path after the idempotency change.
-
-12. Update the final acceptance criteria.
-
-Phase 1C-2 may be marked PASS only when:
-
-- DEF-23 is fixed.
-
-- Failed events can be reclaimed and processed.
-
-- Expired leases can be reclaimed.
-
-- Unexpired leases cannot be stolen.
-
-- Stale workers cannot mutate billing after a reclaim.
-
-- Completion failure followed by retry is safe.
-
-- Permanent rejections are terminally recorded before returning 200.
-
-- The exact production migration and RPCs pass a real PGlite/Postgres runtime test.
-
-- No critical runtime test is skipped.
-
-- DEF-04 remains fixed.
-
-- All existing and new tests pass.
-
-- Both TypeScript projects pass.
-
-- Production build passes.
-
-- Historical ledger rows are preserved and not replayed.
-
-- No unrelated behavior changes.
-
-Continue with the narrow implementation after incorporating these corrections.
+Approve to proceed with Phase 1E (or share the reporter's account email so root cause can be pinned to exact case 1 vs case 2 before we build).
