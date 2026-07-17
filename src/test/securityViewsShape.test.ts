@@ -255,9 +255,10 @@ describe('Phase 28C final scanner cleanup + write-path hardening', () => {
   // route eligibility through recruiter_profile_can_manage_opportunities.
   function loadDriverReferralSafeCurrent(): string {
     return loadMigrationContaining(
-      'recruiter_profile_can_manage_opportunities',
+      'CREATE OR REPLACE FUNCTION public.create_driver_referral_safe',
     );
   }
+
 
   it('drops driver UPDATE policy on driver_referrals', () => {
     const sql = loadPhase28C();
