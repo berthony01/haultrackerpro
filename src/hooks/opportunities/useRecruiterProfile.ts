@@ -126,8 +126,6 @@ export function useRecruiterProfile() {
         .eq('id', existingId)
         .eq('user_id', user.id);
       if (error) throw error;
-      // Re-bind (or bind for the first time) to the current user.
-      knownProfileRef.current = { userId: user.id, profileId: existingId };
       return;
     }
     const { data: inserted, error } = await supabase
