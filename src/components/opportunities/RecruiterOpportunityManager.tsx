@@ -59,18 +59,16 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   }
 
-  // Gating states — Phase 1E: sourced from describeRecruiterBlock so the
-  // manager, the hub, and the createOpportunity error path all agree on
-  // the same wording/reason.
+  // Gating states — Phase 1F-A: only suspended / missing / incomplete
+  // block posting. Pending or rejected (non-suspended) recruiters may
+  // post standard opportunities immediately.
   const block = describeRecruiterBlock(profile, { intentRecruiter });
   if (block.reason !== 'ok') {
     const Icon =
       block.reason === 'suspended'
         ? Ban
-        : block.reason === 'rejected'
+        : block.reason === 'incomplete_profile'
         ? AlertTriangle
-        : block.reason === 'pending_review'
-        ? Clock
         : ShieldCheck;
     return <Gate onBack={onBack} title={block.title} body={block.body} Icon={Icon} />;
   }
