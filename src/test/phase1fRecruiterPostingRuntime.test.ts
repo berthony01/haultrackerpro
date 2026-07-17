@@ -447,7 +447,7 @@ beforeAll(async () => {
   // Then the Phase 1F-A.2.1A local candidate corrective fixture (NOT a
   // production migration). Applied after the two immutable 1F-A.2 files
   // so we exercise the exact post-live sequence Stage 1F-A.2.1B will run.
-  await db.exec(loadPhase1FA21Fixture());
+  await db.exec(loadPhase1FA21BMigration().sql);
 
 
 
