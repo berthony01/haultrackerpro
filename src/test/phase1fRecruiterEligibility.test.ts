@@ -20,11 +20,16 @@ function baseProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfil
     recruiter_name: 'Alice Recruiter',
     company_name: 'Acme Freight',
     recruiter_email: 'alice@acme.example',
+    dot_number: '1234567',
+    mc_number: null,
     hiring_states: [],
     equipment_types: [],
     driver_types_hired: [],
     status: 'active',
     verification_status: 'pending',
+    posting_terms_accepted_at: '2026-07-17T00:00:00Z',
+    posting_terms_version: '2026-07-17.v1',
+    legacy_terms_grandfathered_at: null,
     // Fields present on the type but irrelevant to eligibility — cast is fine
     // because the helper only reads the properties listed above.
     ...overrides,

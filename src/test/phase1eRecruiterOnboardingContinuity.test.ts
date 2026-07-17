@@ -16,6 +16,8 @@ const baseProfile: RecruiterProfile = {
   recruiter_name: 'Alice Recruiter',
   company_name: 'Acme Freight',
   recruiter_email: 'alice@acme.example',
+  dot_number: '1234567',
+  mc_number: null,
   hiring_states: ['TX'],
   equipment_types: [],
   driver_types_hired: [],
@@ -26,6 +28,9 @@ const baseProfile: RecruiterProfile = {
   verified_by: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
+  posting_terms_accepted_at: new Date().toISOString(),
+  posting_terms_version: '2026-07-17.v1',
+  legacy_terms_grandfathered_at: null,
 } as unknown as RecruiterProfile;
 
 describe('describeRecruiterBlock', () => {
