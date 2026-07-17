@@ -1,8 +1,0 @@
-Remove before merge:
-.github/workflows/phase1fb1-correction.yml
-scripts/phase1fb1_patch.py
-scripts/phase1fb1_patch.README.md
-scripts/phase1fb1_test_plan.md
-scripts/phase1fb1_trigger.txt
-scripts/phase1fb1_notes.txt
-scripts/phase1fb1_cleanup_list.txt
