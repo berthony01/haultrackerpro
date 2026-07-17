@@ -12,7 +12,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
-import { describeRecruiterEligibility } from '@/lib/opportunities/recruiterEligibility';
+import {
+  describeRecruiterEligibility,
+  getRecruiterTrustView,
+} from '@/lib/opportunities/recruiterEligibility';
 
 function makeProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfile {
   return {
