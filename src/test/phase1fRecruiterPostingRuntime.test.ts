@@ -232,12 +232,17 @@ beforeAll(async () => {
       FOR EACH ROW EXECUTE FUNCTION public.recruiter_profile_guard();
 
     -- Legacy driver-visible RPC that migration will replace.
+    -- IMPORTANT: baseline grants EXECUTE to PUBLIC so anon inherits access.
+    -- Phase 1F-A.2 file 1 only revokes from anon, which is insufficient;
+    -- file 2's REVOKE FROM PUBLIC is what actually strips anon. Granting
+    -- PUBLIC here genuinely exercises the two-file correction sequence.
     CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities(
       _state text DEFAULT NULL, _driver_type text DEFAULT NULL, _route_type text DEFAULT NULL
     ) RETURNS SETOF public.opportunities
       LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
       SELECT * FROM public.opportunities WHERE false
     $$;
+    GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) TO PUBLIC;
     GRANT EXECUTE ON FUNCTION public.list_driver_visible_opportunities(text,text,text) TO authenticated;
 
     CREATE TABLE public.opportunity_applications (
