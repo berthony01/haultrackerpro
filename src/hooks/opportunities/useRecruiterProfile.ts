@@ -71,10 +71,44 @@ export function useRecruiterProfile() {
   const upsertProfile = useMutation({
     mutationFn: async (data: RecruiterProfileUpsert) => {
       if (!user) throw new Error('Not authenticated');
+      // Phase 1F-A.2.1A: never send protected consent columns.
+      const safe = { ...data } as Record<string, unknown>;
+      delete safe.posting_terms_accepted_at;
+      delete safe.posting_terms_version;
+      delete safe.legacy_terms_grandfathered_at;
       const { error } = await supabase
         .from('recruiter_profiles')
-        .upsert({ ...data, user_id: user.id }, { onConflict: 'user_id' });
+        .upsert({ ...(safe as RecruiterProfileUpsert), user_id: user.id }, { onConflict: 'user_id' });
       if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recruiter_profile'] });
+      qc.invalidateQueries({ queryKey: ['user-role-recruiter-check'] });
+    },
+  });
+
+  // Phase 1F-A.2.1A: single mutation that saves ordinary profile fields
+  // and then, when the caller intends to stamp consent, calls the
+  // server-authoritative RPC. If the RPC fails the mutation fails.
+  const saveRecruiterProfile = useMutation({
+    mutationFn: async (
+      args: { data: RecruiterProfileUpsert; acceptTerms: boolean },
+    ): Promise<{ acceptedAt: string | null }> => {
+      if (!user) throw new Error('Not authenticated');
+      const safe = { ...args.data } as Record<string, unknown>;
+      delete safe.posting_terms_accepted_at;
+      delete safe.posting_terms_version;
+      delete safe.legacy_terms_grandfathered_at;
+      const { error: upsertErr } = await supabase
+        .from('recruiter_profiles')
+        .upsert({ ...(safe as RecruiterProfileUpsert), user_id: user.id }, { onConflict: 'user_id' });
+      if (upsertErr) throw upsertErr;
+      if (!args.acceptTerms) return { acceptedAt: null };
+      const { data, error: rpcErr } = await (supabase as unknown as {
+        rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: string | null; error: Error | null }>;
+      }).rpc('accept_recruiter_posting_terms', { _version: POSTING_TERMS_VERSION });
+      if (rpcErr) throw rpcErr;
+      return { acceptedAt: (data as string | null) ?? null };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recruiter_profile'] });
