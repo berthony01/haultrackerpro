@@ -241,8 +241,20 @@ describe('Phase 28 PII access control hardening', () => {
 
 describe('Phase 28C final scanner cleanup + write-path hardening', () => {
   function loadPhase28C(): string {
+    // Anchor on a token unique to the original Phase 28C migration — Phase 1F-A.1
+    // later redefined create_driver_referral_safe, so that marker is no longer
+    // exclusive. submit_lead_magnet_signup is defined only in Phase 28C.
     return loadMigrationContaining(
-      'CREATE OR REPLACE FUNCTION public.create_driver_referral_safe',
+      'CREATE OR REPLACE FUNCTION public.submit_lead_magnet_signup',
+    );
+  }
+
+  // Phase 1F-A.1 redefined create_driver_referral_safe to drop the recruiter
+  // admin-verification gate (verification is a badge, not a posting gate) and
+  // route eligibility through recruiter_profile_can_manage_opportunities.
+  function loadDriverReferralSafeCurrent(): string {
+    return loadMigrationContaining(
+      'recruiter_profile_can_manage_opportunities',
     );
   }
 
@@ -256,8 +268,8 @@ describe('Phase 28C final scanner cleanup + write-path hardening', () => {
     expect(sql).toMatch(/DROP POLICY IF EXISTS "Driver inserts own referral" ON public\.driver_referrals/);
   });
 
-  it('create_driver_referral_safe is SECURITY DEFINER, validates approved opportunity, returns only id', () => {
-    const sql = loadPhase28C();
+  it('create_driver_referral_safe is SECURITY DEFINER, gates on canonical recruiter eligibility, returns only id', () => {
+    const sql = loadDriverReferralSafeCurrent();
     const body = extractFunctionBody(
       sql,
       'create_driver_referral_safe(\n  _opportunity_id uuid,\n  _recruiter_id uuid,\n  _referred_driver_name text DEFAULT NULL,\n  _referred_driver_email text DEFAULT NULL,\n  _referred_driver_phone text DEFAULT NULL,\n  _referred_driver_note text DEFAULT NULL\n)',
@@ -265,10 +277,14 @@ describe('Phase 28C final scanner cleanup + write-path hardening', () => {
     expect(body).toMatch(/SECURITY DEFINER/);
     expect(body).toMatch(/RETURNS uuid/);
     expect(body).toMatch(/admin_review_status = 'approved'/);
-    expect(body).toMatch(/verification_status = 'approved'/);
+    // Phase 1F-A.1: recruiter admin-verification is a badge, not a posting gate.
+    // Eligibility is enforced through the canonical helper instead.
+    expect(body).toMatch(/recruiter_profile_can_manage_opportunities/);
+    expect(body).not.toMatch(/verification_status = 'approved'/);
     expect(body).toMatch(/referring_driver_id/);
     expect(body).toMatch(/auth\.uid\(\)/);
   });
+
 
   it('useDriverReferrals create uses the safe RPC (no direct insert)', () => {
     const src = readFileSync(
