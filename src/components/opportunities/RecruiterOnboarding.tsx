@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,13 +24,13 @@ import { useRecruiterProfile, type RecruiterProfile, type RecruiterProfileUpsert
 import {
   POSTING_TERMS_VERSION,
   hasAcceptedPostingTerms,
-  describeRecruiterEligibility,
   getRecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
 
 interface Props {
   onBack: () => void;
 }
+
 
 type FormState = {
   recruiter_name: string;
