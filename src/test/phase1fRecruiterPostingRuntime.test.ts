@@ -1895,11 +1895,13 @@ describe("Phase 1F-A.2.1A — recruiter pipeline denial matrix", () => {
     await db.query(`UPDATE public.recruiter_profiles SET status='active' WHERE id=$1`, [recrAId]);
   });
 
-  it("100. Driver phone/email masked until approval + preferences satisfied", async () => {
+  it("100. Driver contact PII masked before approval + preferences (target-app scoped)", async () => {
     await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+    // Fresh isolated driver profile so we control prefs precisely.
+    const drvUid = "10a10a10-0000-0000-0000-000000000001";
     const dop = await db.query<{ id: string }>(
       `INSERT INTO public.driver_opportunity_profiles (user_id, full_name, allow_verified_recruiter_contact, contact_preference)
-       VALUES ($1,'Drv',false,'phone') RETURNING id`, [DRIVER_USER]);
+       VALUES ($1,'DrvMask',false,'phone') RETURNING id`, [drvUid]);
     const o = await db.query<{ id: string }>(
       `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
        VALUES ($1,'Mask','active','approved', now()) RETURNING id`, [recrAId]);
@@ -1907,23 +1909,94 @@ describe("Phase 1F-A.2.1A — recruiter pipeline denial matrix", () => {
       `INSERT INTO public.opportunity_applications
          (opportunity_id, recruiter_id, driver_user_id, driver_profile_id, driver_phone_snapshot, driver_email_snapshot)
        VALUES ($1,$2,$3,$4,'555-0000','drv@x.example') RETURNING id`,
-      [o.rows[0].id, recrAId, DRIVER_USER, dop.rows[0].id]);
-    // No approval yet + prefs not opted-in → both masked
-    let phones: (string | null)[] = [];
-    let emails: (string | null)[] = [];
+      [o.rows[0].id, recrAId, drvUid, dop.rows[0].id]);
+    const targetAppId = app.rows[0].id;
+    let phone: string | null = 'SENTINEL';
+    let email: string | null = 'SENTINEL';
     await asUser(RECR_A_USER, async () => {
-      const r = await db.query<{ x: { driver_phone_snapshot: string | null; driver_email_snapshot: string | null } }>(
+      const r = await db.query<{ x: { id: string; driver_phone_snapshot: string | null; driver_email_snapshot: string | null } }>(
         `SELECT public.list_recruiter_applications_safe($1) x`, [recrAId]);
-      for (const row of r.rows) {
-        phones.push(row.x?.driver_phone_snapshot ?? null);
-        emails.push(row.x?.driver_email_snapshot ?? null);
-      }
+      const hit = r.rows.find((row) => row.x?.id === targetAppId)?.x;
+      expect(hit, "target application must be returned by safe RPC").toBeDefined();
+      phone = hit!.driver_phone_snapshot;
+      email = hit!.driver_email_snapshot;
     });
-    // Every row for this recruiter must have both masked (opts not set).
-    expect(phones.every((p) => p === null)).toBe(true);
-    expect(emails.every((e) => e === null)).toBe(true);
-    void app;
+    expect(phone).toBeNull();
+    expect(email).toBeNull();
   });
+
+  it("100b. Phone released when consent+approval+contact_preference='phone'; email stays null", async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+    const drvUid = "10b10b10-0000-0000-0000-000000000002";
+    const dop = await db.query<{ id: string }>(
+      `INSERT INTO public.driver_opportunity_profiles (user_id, full_name, allow_verified_recruiter_contact, contact_preference)
+       VALUES ($1,'DrvPhone',true,'phone') RETURNING id`, [drvUid]);
+    const o = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'RelPhone','active','approved', now()) RETURNING id`, [recrAId]);
+    const app = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunity_applications
+         (opportunity_id, recruiter_id, driver_user_id, driver_profile_id, driver_phone_snapshot, driver_email_snapshot)
+       VALUES ($1,$2,$3,$4,'555-1111','pmail@x.example') RETURNING id`,
+      [o.rows[0].id, recrAId, drvUid, dop.rows[0].id]);
+    const targetAppId = app.rows[0].id;
+    await db.query(
+      `INSERT INTO public.recruiter_contact_requests (application_id, recruiter_user_id, driver_user_id, status)
+       VALUES ($1,$2,$3,'approved')`, [targetAppId, RECR_A_USER, drvUid]);
+    let phone: string | null = 'SENTINEL';
+    let email: string | null = 'SENTINEL';
+    await asUser(RECR_A_USER, async () => {
+      const r = await db.query<{ x: { id: string; driver_phone_snapshot: string | null; driver_email_snapshot: string | null } }>(
+        `SELECT public.list_recruiter_applications_safe($1) x`, [recrAId]);
+      const hit = r.rows.find((row) => row.x?.id === targetAppId)?.x;
+      expect(hit, "target application must be returned by safe RPC").toBeDefined();
+      phone = hit!.driver_phone_snapshot;
+      email = hit!.driver_email_snapshot;
+    });
+    expect(phone).toBe('555-1111');
+    expect(email).toBeNull();
+  });
+
+  it("100c. Email released when preference flips to 'email'; phone becomes null (same approved request)", async () => {
+    await db.query(`UPDATE public.recruiter_profiles SET status='active', verification_status='pending' WHERE id=$1`, [recrAId]);
+    const drvUid = "10c10c10-0000-0000-0000-000000000003";
+    const dop = await db.query<{ id: string }>(
+      `INSERT INTO public.driver_opportunity_profiles (user_id, full_name, allow_verified_recruiter_contact, contact_preference)
+       VALUES ($1,'DrvEmail',true,'phone') RETURNING id`, [drvUid]);
+    const o = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1,'RelEmail','active','approved', now()) RETURNING id`, [recrAId]);
+    const app = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunity_applications
+         (opportunity_id, recruiter_id, driver_user_id, driver_profile_id, driver_phone_snapshot, driver_email_snapshot)
+       VALUES ($1,$2,$3,$4,'555-2222','emailer@x.example') RETURNING id`,
+      [o.rows[0].id, recrAId, drvUid, dop.rows[0].id]);
+    const targetAppId = app.rows[0].id;
+    await db.query(
+      `INSERT INTO public.recruiter_contact_requests (application_id, recruiter_user_id, driver_user_id, status)
+       VALUES ($1,$2,$3,'approved')`, [targetAppId, RECR_A_USER, drvUid]);
+    // Flip preference to 'email' (this may re-scrub snapshots; re-stamp email
+    // snapshot afterwards to model the app pathway that keeps a valid email).
+    await db.query(
+      `UPDATE public.driver_opportunity_profiles SET contact_preference='email' WHERE id=$1`,
+      [dop.rows[0].id]);
+    await db.query(
+      `UPDATE public.opportunity_applications SET driver_email_snapshot='emailer@x.example', driver_phone_snapshot=NULL WHERE id=$1`,
+      [targetAppId]);
+    let phone: string | null = 'SENTINEL';
+    let email: string | null = 'SENTINEL';
+    await asUser(RECR_A_USER, async () => {
+      const r = await db.query<{ x: { id: string; driver_phone_snapshot: string | null; driver_email_snapshot: string | null } }>(
+        `SELECT public.list_recruiter_applications_safe($1) x`, [recrAId]);
+      const hit = r.rows.find((row) => row.x?.id === targetAppId)?.x;
+      expect(hit, "target application must be returned by safe RPC").toBeDefined();
+      phone = hit!.driver_phone_snapshot;
+      email = hit!.driver_email_snapshot;
+    });
+    expect(email).toBe('emailer@x.example');
+    expect(phone).toBeNull();
+  });
+
 });
 
 describe("Phase 1F-A.2.1A — referral eligibility denial matrix", () => {
