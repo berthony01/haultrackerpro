@@ -125,7 +125,9 @@ export function describeRecruiterEligibility(
     state: 'active_unverified',
     canPost: true,
     isVerified: false,
-    title: 'Standard posting enabled',
+    title: profile.verification_status === 'rejected'
+      ? 'Standard posting enabled — Verification Not Approved'
+      : 'Standard posting enabled',
     body: 'Your standard opportunities go live to drivers right away. A Verified Recruiter badge is added later once an admin reviews your profile.',
   };
 }
