@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { isProfileCompleteForPosting } from '@/lib/opportunities/recruiterEligibility';
 
 export type RecruiterProfile = Tables<'recruiter_profiles'>;
 export type RecruiterProfileUpsert = Omit<TablesInsert<'recruiter_profiles'>, 'user_id'>;
@@ -136,13 +137,9 @@ export function useRecruiterProfile() {
     profile.status === 'active';
   const isSuspended =
     !!profile && (profile.status === 'suspended' || profile.verification_status === 'suspended');
-  // Phase 1F-A: canonical posting rule — profile complete AND not suspended.
-  // Admin verification is NOT required.
-  const isProfileComplete =
-    !!profile &&
-    typeof profile.recruiter_name === 'string' && profile.recruiter_name.trim().length > 0 &&
-    typeof profile.company_name === 'string' && profile.company_name.trim().length > 0 &&
-    typeof profile.recruiter_email === 'string' && profile.recruiter_email.trim().length > 0;
+  // Phase 1F-A.1: derive canPost via the single canonical helper so client
+  // and server share one definition of "complete".
+  const isProfileComplete = isProfileCompleteForPosting(profile);
   const canPost = !!profile && !isSuspended && isProfileComplete;
   const isVerified =
     !!profile && profile.verification_status === 'approved' && profile.status === 'active';

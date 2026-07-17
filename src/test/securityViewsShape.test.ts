@@ -27,12 +27,14 @@ function extractFunctionBody(sql: string, fnName: string): string {
   const marker = `CREATE OR REPLACE FUNCTION public.${fnName}`;
   const start = sql.indexOf(marker);
   if (start < 0) throw new Error(`Function ${fnName} not found`);
-  // Take everything up to the closing `$$;` of the function body.
+  // Take everything up to the closing dollar-quoted terminator of the body.
+  // Migrations use `$$;` or named tags like `$function$;` / `$body$;`.
   const tail = sql.slice(start);
-  const end = tail.indexOf('$$;');
-  if (end < 0) throw new Error(`Function ${fnName} body not terminated`);
-  return tail.slice(0, end);
+  const m = tail.match(/\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$\s*;/);
+  if (!m || m.index === undefined) throw new Error(`Function ${fnName} body not terminated`);
+  return tail.slice(0, m.index);
 }
+
 
 describe('Phase 26 security RPCs', () => {
   it('list_my_driver_referrals omits referred_driver_email/phone/note and scopes to auth.uid()', () => {
@@ -241,8 +243,19 @@ describe('Phase 28 PII access control hardening', () => {
 
 describe('Phase 28C final scanner cleanup + write-path hardening', () => {
   function loadPhase28C(): string {
+    // Anchor on a DROP statement unique to the Phase 28C write-path lockdown.
     return loadMigrationContaining(
-      'CREATE OR REPLACE FUNCTION public.create_driver_referral_safe',
+      'DROP POLICY IF EXISTS "Driver inserts own referral" ON public.driver_referrals',
+    );
+  }
+
+
+  // Phase 1F-A.1 redefined create_driver_referral_safe to drop the recruiter
+  // admin-verification gate (verification is a badge, not a posting gate) and
+  // route eligibility through recruiter_profile_can_manage_opportunities.
+  function loadDriverReferralSafeCurrent(): string {
+    return loadMigrationContaining(
+      'recruiter_profile_can_manage_opportunities',
     );
   }
 
@@ -256,8 +269,8 @@ describe('Phase 28C final scanner cleanup + write-path hardening', () => {
     expect(sql).toMatch(/DROP POLICY IF EXISTS "Driver inserts own referral" ON public\.driver_referrals/);
   });
 
-  it('create_driver_referral_safe is SECURITY DEFINER, validates approved opportunity, returns only id', () => {
-    const sql = loadPhase28C();
+  it('create_driver_referral_safe is SECURITY DEFINER, gates on canonical recruiter eligibility, returns only id', () => {
+    const sql = loadDriverReferralSafeCurrent();
     const body = extractFunctionBody(
       sql,
       'create_driver_referral_safe(\n  _opportunity_id uuid,\n  _recruiter_id uuid,\n  _referred_driver_name text DEFAULT NULL,\n  _referred_driver_email text DEFAULT NULL,\n  _referred_driver_phone text DEFAULT NULL,\n  _referred_driver_note text DEFAULT NULL\n)',
@@ -265,10 +278,14 @@ describe('Phase 28C final scanner cleanup + write-path hardening', () => {
     expect(body).toMatch(/SECURITY DEFINER/);
     expect(body).toMatch(/RETURNS uuid/);
     expect(body).toMatch(/admin_review_status = 'approved'/);
-    expect(body).toMatch(/verification_status = 'approved'/);
+    // Phase 1F-A.1: recruiter admin-verification is a badge, not a posting gate.
+    // Eligibility is enforced through the canonical helper instead.
+    expect(body).toMatch(/recruiter_profile_can_manage_opportunities/);
+    expect(body).not.toMatch(/verification_status = 'approved'/);
     expect(body).toMatch(/referring_driver_id/);
     expect(body).toMatch(/auth\.uid\(\)/);
   });
+
 
   it('useDriverReferrals create uses the safe RPC (no direct insert)', () => {
     const src = readFileSync(
@@ -386,10 +403,22 @@ describe('Phase 28A direct base-table PII access closures', () => {
 
 describe('Phase 28B scanner reconciliation + opportunity board hardening', () => {
   function loadPhase28B(): string {
+    // Anchor on a token unique to the original Phase 28B migration. Phase 1F-A.1
+    // later redefined list_driver_visible_opportunities, so that marker is no
+    // longer exclusive. The contact-snapshot guard trigger is defined only in 28B.
     return loadMigrationContaining(
-      'CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities',
+      'CREATE OR REPLACE FUNCTION public.opportunity_applications_contact_snapshot_guard',
     );
   }
+
+  // Phase 1F-A.1 redefined list_driver_visible_opportunities. Load whichever
+  // migration currently owns the canonical eligibility helper.
+  function loadDriverVisibleOppsCurrent(): string {
+    return loadMigrationContaining(
+      'recruiter_profile_can_manage_opportunities',
+    );
+  }
+
 
   it('defensively drops all driver-facing SELECT policies on driver_referrals', () => {
     const sql = loadPhase28B();
@@ -442,17 +471,20 @@ describe('Phase 28B scanner reconciliation + opportunity board hardening', () =>
     expect(body).toMatch(/NEW\.contact_preference = 'in_app'/);
   });
 
-  it('list_driver_visible_opportunities filters by approved recruiter and never exposes recruiter PII', () => {
-    const sql = loadPhase28B();
+  it('list_driver_visible_opportunities gates on canonical recruiter eligibility and never exposes recruiter PII', () => {
+    const sql = loadDriverVisibleOppsCurrent();
     const body = extractFunctionBody(
       sql,
       'list_driver_visible_opportunities(\n  _state text DEFAULT NULL,\n  _driver_type text DEFAULT NULL,\n  _route_type text DEFAULT NULL\n)',
     );
     expect(body).toMatch(/SECURITY DEFINER/);
-    expect(body).toMatch(/rp\.verification_status = 'approved'/);
-    expect(body).toMatch(/rp\.status <> 'suspended'/);
+    // Phase 1F-A.1: recruiter admin-verification is a badge, not a driver-visibility
+    // gate. Eligibility flows through the canonical helper instead.
+    expect(body).toMatch(/recruiter_profile_can_manage_opportunities/);
+    expect(body).not.toMatch(/rp\.verification_status = 'approved'/);
     expect(body).toMatch(/o\.status = 'active'/);
     expect(body).toMatch(/o\.admin_review_status = 'approved'/);
+
     // Returns SETOF opportunities (base table) — recruiter PII columns are not
     // on opportunities, so no recruiter contact / admin fields can leak.
     expect(body).toMatch(/RETURNS SETOF public\.opportunities/);
