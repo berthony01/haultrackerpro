@@ -182,6 +182,13 @@ export function RecruiterOnboarding({ onBack }: Props) {
       toast.error(err);
       return;
     }
+    // Phase 1F-A.1: persist the recruiter's acceptance of all three
+    // agreements so the server-side eligibility rule can confirm consent.
+    // Once set, the server trigger prevents this timestamp from being
+    // cleared or backdated by a non-admin caller.
+    const existingAcceptedAt = (profile as unknown as { posting_terms_accepted_at?: string | null } | null)
+      ?.posting_terms_accepted_at ?? null;
+    const acceptedAtIso = existingAcceptedAt ?? new Date().toISOString();
     const payload: RecruiterProfileUpsert = {
       recruiter_name: form.recruiter_name.trim(),
       recruiter_email: form.recruiter_email.trim() || null,
@@ -197,7 +204,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
       hiring_states: splitList(form.hiring_states),
       equipment_types: splitList(form.equipment_types),
       driver_types_hired: splitList(form.driver_types_hired),
-    };
+      posting_terms_accepted_at: acceptedAtIso,
+      posting_terms_version: POSTING_TERMS_VERSION,
+    } as RecruiterProfileUpsert;
     upsertProfile.mutate(payload, {
       onSuccess: async () => {
         if (isRejected && profile) {
