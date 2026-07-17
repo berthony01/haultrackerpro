@@ -186,17 +186,20 @@ describe('Phase 1F-A.2.1A-R1 client cutover', () => {
 
   it('34. legacy upsertProfile API also branches to UPDATE/INSERT and NEVER calls .upsert()', async () => {
     currentProfile = { id: 'existing-rp-2' };
-    const hook = useRecruiterProfile();
-    await hook.upsertProfile.mutateAsync({ ...baseData } as never);
+    const existingHook = useRecruiterProfile();
+    await existingHook.upsertProfile.mutateAsync({ ...baseData } as never);
     expect(updateCalls.length).toBe(1);
     expect(upsertCalls.length).toBe(0);
-    // Missing profile path
+    // Missing profile path — must re-invoke the hook after changing
+    // currentProfile so the useQuery mock re-reads its value.
     updateCalls.length = 0;
     currentProfile = null;
-    await hook.upsertProfile.mutateAsync({ ...baseData } as never);
+    const missingHook = useRecruiterProfile();
+    await missingHook.upsertProfile.mutateAsync({ ...baseData } as never);
     expect(insertCalls.length).toBe(1);
     expect(upsertCalls.length).toBe(0);
   });
+
 
   it('35. combined saveRecruiterProfile ALWAYS calls the terms RPC with pinned version', async () => {
     currentProfile = null;
