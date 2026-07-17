@@ -416,9 +416,10 @@ describe('Phase 28B scanner reconciliation + opportunity board hardening', () =>
   // migration currently owns the canonical eligibility helper.
   function loadDriverVisibleOppsCurrent(): string {
     return loadMigrationContaining(
-      'recruiter_profile_can_manage_opportunities',
+      'CREATE OR REPLACE FUNCTION public.list_driver_visible_opportunities',
     );
   }
+
 
 
   it('defensively drops all driver-facing SELECT policies on driver_referrals', () => {
