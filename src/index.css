@@ -176,7 +176,13 @@ body.app-shell-active {
   --card-foreground: 0 0% 100%;
   --popover: 220 46% 11%;
   --popover-foreground: 0 0% 100%;
-  --primary: 25 100% 50%;            /* #FF6B00 */
+  /* Phase 1G-R1A7-R1: darkened from 50% lightness so white text/icons on
+     --primary meet WCAG AA 4.5:1. First attempt (38%) computed 4.71:1 from
+     raw HSL but Axe measured actual rendered pixels (alpha-blended through
+     hover/opacity variants) at only 4.38:1 — so this was pushed further,
+     to 33%, and re-verified against Axe's real measurement, not the
+     theoretical calc. */
+  --primary: 25 100% 33%;            /* #A84600 */
   --primary-foreground: 0 0% 100%;
   --primary-glow: 22 100% 58%;       /* #FF7A1A */
   --secondary: 220 30% 14%;
