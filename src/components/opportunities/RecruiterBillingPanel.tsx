@@ -200,12 +200,37 @@ export function RecruiterBillingPanel() {
           data-testid="recruiter-billing-status"
           className={
             statusMessage.kind === 'error'
-              ? 'text-xs text-destructive'
-              : 'text-xs text-muted-foreground'
+              ? 'text-xs text-destructive space-y-2'
+              : 'text-xs text-muted-foreground space-y-2'
           }
         >
-          {statusMessage.text}
+          <p className="break-words">{statusMessage.text}</p>
+          {statusMessage.fallbackUrl && (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              data-testid="recruiter-billing-fallback"
+            >
+              <a
+                href={statusMessage.fallbackUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {statusMessage.fallbackLabel ?? 'Continue'}
+              </a>
+            </Button>
+          )}
         </div>
+      )}
+
+      {subscriptionStatusCopy && (
+        <p
+          data-testid="recruiter-subscription-status-copy"
+          className="text-xs text-muted-foreground break-words"
+        >
+          {subscriptionStatusCopy}
+        </p>
       )}
 
       <Card className="p-4 border-border/60 bg-muted/20 space-y-3">
