@@ -128,9 +128,12 @@ export function RecruiterBillingPanel() {
         <div className="grid sm:grid-cols-2 gap-2 text-xs text-foreground">
           <AccessRow
             label="Standard opportunity posting"
-            value="Unlimited for verified recruiters"
+            value="Unlocked by completing your recruiter profile"
           />
-          <AccessRow label="Listing review" value="Admin-reviewed for driver trust" />
+          <AccessRow
+            label="Verified Recruiter badge"
+            value="Optional trust signal added after verification"
+          />
           <AccessRow
             label="Current plan"
             value={
@@ -143,14 +146,15 @@ export function RecruiterBillingPanel() {
             label="Premium features"
             value={
               <span className="text-muted-foreground">
-                {isBillingActive ? 'Unlocked by your plan' : 'Based on paid plan'}
+                {isBillingActive ? 'Unlocked by your plan' : 'Included with paid plans'}
               </span>
             }
           />
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Standard posting is based on recruiter approval. Premium features are based on your paid plan.
+          Standard posting is unlocked by completing your recruiter profile. Verification adds a Verified Recruiter badge. Premium recruiting tools are included with paid plans.
         </p>
+
       </Card>
 
       {/* Free Verified card */}
