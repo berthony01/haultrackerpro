@@ -6,6 +6,7 @@ import {
   HTP_META_NAME,
   HTP_SHA_REGEX,
   createVersionArtifact,
+  injectBuildShaMeta,
   resolveBuildSha,
 } from "../../vite/htpBuildShaPlugin";
 
@@ -13,7 +14,6 @@ const PANEL_SRC = readFileSync(
   path.resolve(process.cwd(), "src/components/opportunities/RecruiterBillingPanel.tsx"),
   "utf8",
 );
-
 
 const TEST_SHA = "0123456789abcdef0123456789abcdef01234567";
 const TEST_SHA_UPPER = TEST_SHA.toUpperCase();
@@ -28,10 +28,13 @@ describe("Phase 1G-R1A4 · RecruiterBillingPanel copy", () => {
     expect(PANEL_SRC).toMatch(/post standard opportunities/i);
     expect(PANEL_SRC).toMatch(/Verified Recruiter badge/);
     expect(PANEL_SRC).toMatch(/premium recruiting tools/i);
+    expect(PANEL_SRC).toContain("Standard Access");
+    expect(PANEL_SRC).toContain("not verification or payment");
   });
 
   it.each([
     "Unlimited for verified recruiters",
+    "Unlimited standard opportunity posts",
     "Verified recruiters can post",
     "recruiter profile is approved",
     "Admin-reviewed",
@@ -41,6 +44,8 @@ describe("Phase 1G-R1A4 · RecruiterBillingPanel copy", () => {
     "unlock premium recruiting tools",
     "Based on paid plan",
     "Listing review",
+    "Free Verified",
+    "FREE_VERIFIED_PERKS",
   ])("does not contain misleading phrase %j", (needle) => {
     expect(PANEL_SRC).not.toContain(needle);
   });
@@ -150,6 +155,21 @@ describe("Phase 1G-R1A4 · createVersionArtifact", () => {
     expect(metaContent).toBe(TEST_SHA);
     expect(parsed.sha).toBe(metaContent);
     expect(payload.sha).toBe(TEST_SHA);
+  });
+
+  it("normalizes invalid direct artifact input to unknown", () => {
+    const artifact = createVersionArtifact("not-a-sha", builtAt);
+    expect(artifact.payload.sha).toBe("unknown");
+    expect(artifact.metaHtml).toContain('content="unknown"');
+  });
+
+  it("removes stale build meta tags before injecting exactly one current tag", () => {
+    const original = `<html><head><meta name="${HTP_META_NAME}" content="${OTHER_SHA}"><title>HTP</title></head><body /></html>`;
+    const result = injectBuildShaMeta(original, metaHtml);
+    const matches = result.match(new RegExp(`name="${HTP_META_NAME}"`, "g")) ?? [];
+    expect(matches).toHaveLength(1);
+    expect(result).toContain(metaHtml);
+    expect(result).not.toContain(OTHER_SHA);
   });
 
   it("artifacts contain no dummy secret markers or unrelated env values", () => {

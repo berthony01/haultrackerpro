@@ -10,6 +10,11 @@ on:
       - 'supabase/functions/_shared/recruiter-checkout.ts'
       - 'supabase/functions/create-recruiter-checkout/index.ts'
       - 'src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts'
+      - 'src/components/opportunities/RecruiterBillingPanel.tsx'
+      - 'src/test/phase1gR1A4BuildShaAndCopy.test.ts'
+      - 'src/test/phase1gR1A4BillingCopyRendered.test.tsx'
+      - 'vite/htpBuildShaPlugin.ts'
+      - 'vite.config.ts'
   workflow_dispatch:
 
 jobs:
@@ -35,8 +40,8 @@ jobs:
 
     env:
       RECRUITER_CHECKOUT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recruiter_checkout
-      VITE_SUPABASE_URL: https://phase1g-r1a3-test.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: phase1g-r1a3-isolated-test-key
+      VITE_SUPABASE_URL: https://phase1g-r1a4-test.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: phase1g-r1a4-isolated-test-key
 
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +89,9 @@ jobs:
       - name: Run focused Recruiter Checkout orchestrator suite
         run: bunx vitest run src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts
 
+      - name: Run focused A4 copy and build-version suites
+        run: bunx vitest run src/test/phase1gR1A4BuildShaAndCopy.test.ts src/test/phase1gR1A4BillingCopyRendered.test.tsx
+
       - name: Typecheck application
         run: bunx tsc -p tsconfig.app.json --noEmit
 
@@ -104,7 +112,6 @@ jobs:
         env:
           HTP_BUILD_SHA: ${{ github.sha }}
 
-
       - name: Verify build version manifest and meta
         run: |
           set -euo pipefail
@@ -113,50 +120,39 @@ jobs:
           const path = require('node:path');
 
           const versionPath = path.join('dist', 'version.json');
-          if (!fs.existsSync(versionPath)) {
-            console.error('dist/version.json missing');
-            process.exit(1);
-          }
+          if (!fs.existsSync(versionPath)) throw new Error('dist/version.json missing');
+
           const raw = fs.readFileSync(versionPath, 'utf8');
           const parsed = JSON.parse(raw);
-
           const keys = Object.keys(parsed).sort();
           if (JSON.stringify(keys) !== JSON.stringify(['app', 'builtAt', 'sha'])) {
-            console.error('unexpected version.json keys:', keys);
-            process.exit(1);
+            throw new Error(`unexpected version.json keys: ${keys.join(',')}`);
           }
-          if (parsed.app !== 'haultrackerpro') {
-            console.error('bad app:', parsed.app);
-            process.exit(1);
-          }
-          if (!/^[0-9a-f]{40}$/i.test(parsed.sha)) {
-            console.error('bad sha shape:', parsed.sha);
-            process.exit(1);
-          }
+          if (parsed.app !== 'haultrackerpro') throw new Error(`bad app: ${parsed.app}`);
+          if (!/^[0-9a-f]{40}$/i.test(parsed.sha)) throw new Error(`bad sha shape: ${parsed.sha}`);
+
           const expected = (process.env.GITHUB_SHA || '').toLowerCase();
           if (parsed.sha.toLowerCase() !== expected) {
-            console.error('sha mismatch. json:', parsed.sha, 'expected:', expected);
-            process.exit(1);
+            throw new Error(`sha mismatch: ${parsed.sha} != ${expected}`);
           }
-          if (Number.isNaN(new Date(parsed.builtAt).getTime())) {
-            console.error('bad builtAt:', parsed.builtAt);
-            process.exit(1);
+          if (new Date(parsed.builtAt).toISOString() !== parsed.builtAt) {
+            throw new Error(`bad builtAt: ${parsed.builtAt}`);
           }
 
           const indexHtml = fs.readFileSync(path.join('dist', 'index.html'), 'utf8');
           const matches = indexHtml.match(/<meta\s+name="htp-build-sha"\s+content="([^"]+)"\s*\/?\s*>/g) || [];
           if (matches.length !== 1) {
-            console.error('expected exactly one htp-build-sha meta tag, got', matches.length);
-            process.exit(1);
+            throw new Error(`expected one htp-build-sha meta tag, got ${matches.length}`);
           }
           const metaSha = matches[0].match(/content="([^"]+)"/)[1];
           if (metaSha.toLowerCase() !== expected) {
-            console.error('meta sha mismatch. meta:', metaSha, 'expected:', expected);
-            process.exit(1);
+            throw new Error(`meta sha mismatch: ${metaSha} != ${expected}`);
           }
 
-          console.log('version.json OK; sha=' + parsed.sha + ' builtAt=' + parsed.builtAt);
-          NODE
-        env:
-          HTP_BUILD_SHA: ${{ github.sha }}
+          const publicArtifacts = `${raw}\n${indexHtml.match(/<meta\s+name="htp-build-sha"[^>]*>/)?.[0] || ''}`;
+          for (const forbidden of ['STRIPE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'postgresql://']) {
+            if (publicArtifacts.includes(forbidden)) throw new Error(`forbidden marker: ${forbidden}`);
+          }
 
+          console.log(`version proof OK; sha=${parsed.sha} builtAt=${parsed.builtAt}`);
+          NODE
