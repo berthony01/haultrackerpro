@@ -302,6 +302,8 @@ async function createFreshApp(
   }
   await asOwner(db);
   return { driverId, appId: rows.rows[0].application_id, recruiterProfileId };
+}
+
 
 const APPLY_ARGS = (key: string, message: string | null, consent = true) =>
   `$1::uuid, '${key}', ${message === null ? 'NULL' : `'${message.replace(/'/g, "''")}'`}, true, true, true, 'phone', ${consent ? 'true' : 'false'}`;
