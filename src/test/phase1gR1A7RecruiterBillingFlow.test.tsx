@@ -375,9 +375,8 @@ describe('rapid double click', () => {
 
 describe('server in_progress state', () => {
   it('locks all plan buttons and shows Check Status disabled during cooldown', async () => {
-    vi.useFakeTimers();
     supabaseMocks.invoke.mockResolvedValueOnce(invokeError(409, 'in_progress'));
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     renderPanel();
     await user.click(screen.getByRole('button', { name: /Choose Starter/i }));
     await waitFor(() =>
@@ -389,12 +388,11 @@ describe('server in_progress state', () => {
     for (const p of ['starter', 'growth', 'fleet']) {
       expect(screen.getByTestId(`recruiter-plan-button-${p}`)).toBeDisabled();
     }
-    const cs = screen.getByTestId('recruiter-billing-check-status');
-    expect(cs).toBeDisabled();
+    expect(screen.getByTestId('recruiter-billing-check-status')).toBeDisabled();
   });
 
   it('enables Check Status after cooldown and refetches on click', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     supabaseMocks.invoke.mockResolvedValueOnce(invokeError(409, 'in_progress'));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPanel();
