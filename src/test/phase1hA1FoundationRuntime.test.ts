@@ -266,6 +266,43 @@ async function asAuthenticated(db: AnyPGlite, uid: string) {
   await db.exec(`RESET ROLE; SET ROLE authenticated; SET request.jwt.claim.sub = '${uid}';`);
 }
 
+// Create an ephemeral Driver + completed profile + fresh formal application
+// for a given opportunity/recruiter. Used to add non-destructive fixtures to
+// offer-boundary tests instead of deleting historical offer rows.
+let _freshSeq = 0;
+async function createFreshApp(
+  db: AnyPGlite,
+  slug: string,
+  opportunityId: string,
+  recruiterProfileId: string,
+): Promise<{ driverId: string; appId: string; recruiterProfileId: string }> {
+  _freshSeq += 1;
+  const seq = String(_freshSeq).padStart(4, '0');
+  // Deterministic v4-shaped uuid using the slug + seq.
+  const suffix = (slug + '000000000000').replace(/[^a-f0-9]/gi, '0').slice(0, 12).toLowerCase();
+  const driverId = `f${seq.padStart(7, '0')}-fafa-4fff-8fff-${suffix.padEnd(12, '0')}`;
+  const email = `fresh-${slug}-${seq}@driver.test`;
+  await asOwner(db);
+  await db.exec(
+    `INSERT INTO auth.users(id,email) VALUES ('${driverId}','${email}') ON CONFLICT DO NOTHING;
+     INSERT INTO public.driver_opportunity_profiles(user_id, full_name, email, phone, profile_completed)
+       VALUES ('${driverId}','Fresh ${slug}','${email}','555-9${seq.slice(-3)}', true)
+       ON CONFLICT DO NOTHING;`,
+  );
+  await asAuthenticated(db, driverId);
+  const key = `fresh-${slug}-${seq}-apply-key`.padEnd(12, 'x');
+  const rows = await db.query<{ application_id: string; result_code: string }>(
+    `SELECT * FROM public.submit_opportunity_application(
+       $1::uuid, $2, 'fresh apply', true, true, true, 'email', true
+     )`,
+    [opportunityId, key],
+  );
+  if (rows.rows[0].result_code !== 'created' || !rows.rows[0].application_id) {
+    throw new Error(`createFreshApp failed: ${JSON.stringify(rows.rows[0])}`);
+  }
+  await asOwner(db);
+  return { driverId, appId: rows.rows[0].application_id, recruiterProfileId };
+
 const APPLY_ARGS = (key: string, message: string | null, consent = true) =>
   `$1::uuid, '${key}', ${message === null ? 'NULL' : `'${message.replace(/'/g, "''")}'`}, true, true, true, 'phone', ${consent ? 'true' : 'false'}`;
 
