@@ -46,6 +46,9 @@ function assertSubmissionSuccess(row: SubmissionResult | null | undefined): Subm
   return row;
 }
 
+// Restored alias (item 3). Consumers import the row shape as
+// `OpportunityApplication`. Insert shape stays separate.
+export type OpportunityApplication = Tables<'opportunity_applications'>;
 export type OpportunityApplicationInsert = Omit<TablesInsert<'opportunity_applications'>, 'driver_user_id'>;
 
 export type RecruiterApplicationStatus =
