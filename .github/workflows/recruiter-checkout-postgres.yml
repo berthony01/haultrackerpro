@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/recruiter-checkout-postgres.yml'
+      - 'scripts/phase1g_r1a3_patch.py'
       - 'tests/postgres/recruiterCheckoutConcurrency.test.ts'
       - 'vitest.recruiter-checkout-postgres.config.ts'
       - 'supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql'
@@ -11,6 +12,9 @@ on:
       - 'supabase/functions/create-recruiter-checkout/index.ts'
       - 'src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   recruiter-checkout-postgres:
@@ -43,6 +47,28 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
+
+      - name: Apply narrow null-token and privilege-test correction
+        run: |
+          if grep -q "OR _claim_token IS NULL" supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql; then
+            echo "A3 correction already applied"
+          else
+            python3 scripts/phase1g_r1a3_patch.py
+          fi
+
+      - name: Commit corrected candidate and test to branch
+        run: |
+          if git diff --quiet; then
+            echo "No correction commit needed"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql \
+              tests/postgres/recruiterCheckoutConcurrency.test.ts
+            git commit -m "Reject null Recruiter Checkout claim tokens"
+            git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          fi
 
       - uses: oven-sh/setup-bun@v2
         with:
