@@ -125,10 +125,21 @@ export function deriveRecruiterBillingUiState(
 }
 
 /** True iff, in this state, the user is allowed to click a plan button
- *  and start a new checkout. All other states MUST leave plan buttons
- *  disabled. */
+ *  and start a new checkout. Blocking sub states (active/trialing/past_due/
+ *  unpaid/incomplete/paused/unknown), operation states, and gating states
+ *  (loading/missing/suspended/ineligible/support_required) leave plan
+ *  buttons disabled. Canceled, incomplete_expired, retryable_error, and
+ *  eligible_idle all permit a fresh checkout. */
 export function canStartCheckout(state: RecruiterBillingUiState): boolean {
-  return state.kind === 'eligible_idle';
+  switch (state.kind) {
+    case 'eligible_idle':
+    case 'sub_canceled':
+    case 'sub_incomplete_expired':
+    case 'retryable_error':
+      return true;
+    default:
+      return false;
+  }
 }
 
 /** True iff, in this state, "Manage Billing" is a meaningful action for
