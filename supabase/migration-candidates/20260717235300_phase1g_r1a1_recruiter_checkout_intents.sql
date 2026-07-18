@@ -302,6 +302,7 @@ BEGIN
 
   IF v_row.state <> 'processing'
      OR v_row.claim_token IS NULL
+     OR _claim_token IS NULL
      OR v_row.claim_token <> _claim_token
      OR v_row.lease_expires_at IS NULL
      OR v_row.lease_expires_at <= v_now THEN
@@ -424,6 +425,7 @@ BEGIN
 
   IF v_row.state <> 'processing'
      OR v_row.claim_token IS NULL
+     OR _claim_token IS NULL
      OR v_row.claim_token <> _claim_token
      OR v_row.lease_expires_at IS NULL
      OR v_row.lease_expires_at <= v_now THEN
@@ -487,6 +489,7 @@ BEGIN
   -- Full lease safety: state must still be processing with a live matching lease.
   IF v_row.state <> 'processing'
      OR v_row.claim_token IS NULL
+     OR _claim_token IS NULL
      OR v_row.claim_token <> _claim_token
      OR v_row.lease_expires_at IS NULL
      OR v_row.lease_expires_at <= v_now THEN
