@@ -200,7 +200,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       const explicitConsent = (data as unknown as { contact_sharing_consent?: boolean })
         .contact_sharing_consent === true;
       const callerKey = (data as unknown as { idempotency_key?: string }).idempotency_key;
-      const key = stableKey(data.opportunity_id, 'request_info', callerKey);
+      const key = store.acquire('request_info', data.opportunity_id, callerKey);
       const { data: rpcData, error } = await (supabase as any).rpc('submit_request_info', {
         _opportunity_id: data.opportunity_id,
         _idempotency_key: key,
@@ -213,6 +213,10 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSettled: (_d, _e, vars) => {
+      const callerKey = (vars as unknown as { idempotency_key?: string }).idempotency_key;
+      store.release('request_info', vars.opportunity_id, callerKey);
+    },
   });
 
   const withdrawApplication = useMutation({
