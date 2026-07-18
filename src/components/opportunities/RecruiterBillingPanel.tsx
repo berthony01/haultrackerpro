@@ -160,12 +160,13 @@ export function RecruiterBillingPanel() {
       {/* Free Verified card */}
       <Card className="p-4 border-border/60">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-bold text-foreground">Verified Recruiter Access</h3>
+          <h3 className="text-sm font-bold text-foreground">Included with your Recruiter Profile</h3>
           {!isBillingActive && <Badge variant="default">Current</Badge>}
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Free · Included once your recruiter profile is approved.
+          Free · Available once your recruiter profile is complete.
         </p>
+
         <ul className="space-y-1">
           {FREE_VERIFIED_PERKS.map((perk, i) => (
             <PerkItem key={i} perk={perk} />
