@@ -390,13 +390,14 @@ class StripeFake implements StripeGateway {
       throw new Error("stripe transient");
     }
     const id = this.nextId("cs");
-    const session: StripeSessionLike = {
+    const base: StripeSessionLike = {
       id, status: "open",
       url: `https://checkout.stripe.example/${id}`,
       customer: input.customerId,
       expires_at: input.expiresAt,
       metadata: { ...input.metadata },
     };
+    const session = this.sessionCreateMutator ? this.sessionCreateMutator(base) : base;
     this.sessions.set(id, session);
     this.sessionIdemp.set(input.idempotencyKey, id);
     this.createdSessions.push(id);
