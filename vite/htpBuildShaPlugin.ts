@@ -62,11 +62,22 @@ export interface VersionArtifact {
 }
 
 export function createVersionArtifact(sha: string, builtAt: string): VersionArtifact {
-  const payload = { app: HTP_APP_NAME, sha, builtAt };
+  const normalizedSha = normalizeCandidate(sha) ?? "unknown";
+  const payload = { app: HTP_APP_NAME, sha: normalizedSha, builtAt };
   const json = JSON.stringify(payload, null, 2);
-  const safeSha = sha.replace(/"/g, "");
-  const metaHtml = `<meta name="${HTP_META_NAME}" content="${safeSha}">`;
+  const metaHtml = `<meta name="${HTP_META_NAME}" content="${normalizedSha}">`;
   return { json, metaHtml, payload };
+}
+
+export function injectBuildShaMeta(html: string, metaHtml: string): string {
+  const existing = new RegExp(
+    `<meta\\s+[^>]*name=["']${HTP_META_NAME}["'][^>]*>\\s*`,
+    "gi",
+  );
+  const cleaned = html.replace(existing, "");
+  return cleaned.includes("</head>")
+    ? cleaned.replace("</head>", `  ${metaHtml}\n</head>`)
+    : `${metaHtml}\n${cleaned}`;
 }
 
 export function htpBuildShaPlugin(): Plugin {
@@ -78,8 +89,7 @@ export function htpBuildShaPlugin(): Plugin {
     name: "htp-build-sha",
     apply: "build",
     configResolved(config) {
-      // Only emit during a real production build. Test/dev never write files.
-      active = config.command === "build" && config.mode !== "development";
+      active = config.command === "build" && config.mode === "production";
     },
     buildStart() {
       if (!active) return;
@@ -90,16 +100,8 @@ export function htpBuildShaPlugin(): Plugin {
       order: "post",
       handler(html) {
         if (!active) return html;
-        return {
-          html,
-          tags: [
-            {
-              tag: "meta",
-              attrs: { name: HTP_META_NAME, content: sha },
-              injectTo: "head",
-            },
-          ],
-        };
+        const { metaHtml } = createVersionArtifact(sha, builtAt);
+        return injectBuildShaMeta(html, metaHtml);
       },
     },
     generateBundle() {
