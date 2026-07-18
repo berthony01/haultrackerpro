@@ -133,13 +133,15 @@ CREATE OR REPLACE FUNCTION public.claim_recruiter_checkout_intent(
   _plan         text
 )
 RETURNS TABLE (
-  outcome              text,
-  intent_id            uuid,
-  claim_token          uuid,
-  generation           integer,
-  checkout_url         text,
-  checkout_expires_at  timestamptz,
-  reason               text
+  outcome                     text,
+  intent_id                   uuid,
+  claim_token                 uuid,
+  generation                  integer,
+  checkout_url                text,
+  checkout_expires_at         timestamptz,
+  stripe_customer_id          text,
+  stripe_checkout_session_id  text,
+  reason                      text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -167,14 +169,16 @@ BEGIN
     outcome := 'not_owner'; reason := 'recruiter_ownership_mismatch'; RETURN NEXT; RETURN;
   END IF;
 
+  -- Suspension check runs BEFORE the approved-verification check.
+  IF v_prof.status = 'suspended' OR v_prof.verification_status = 'suspended' THEN
+    outcome := 'not_eligible'; reason := 'account_suspended'; RETURN NEXT; RETURN;
+  END IF;
+
   -- Eligibility uses real columns only.
   IF COALESCE(v_prof.verification_status,'') <> 'approved' THEN
     outcome := 'not_eligible'; reason := 'verification_not_approved'; RETURN NEXT; RETURN;
   END IF;
 
-  IF v_prof.status = 'suspended' OR v_prof.verification_status = 'suspended' THEN
-    outcome := 'not_eligible'; reason := 'account_suspended'; RETURN NEXT; RETURN;
-  END IF;
 
   SELECT * INTO v_row FROM public.recruiter_checkout_intents
     WHERE recruiter_id = _recruiter_id FOR UPDATE;
@@ -203,6 +207,9 @@ BEGIN
     generation := v_row.generation;
     checkout_url := v_row.checkout_url;
     checkout_expires_at := v_row.checkout_expires_at;
+    stripe_customer_id := v_row.stripe_customer_id;
+    stripe_checkout_session_id := v_row.stripe_checkout_session_id;
+    -- claim_token intentionally NULL: only 'claimed' issues a token.
     RETURN NEXT; RETURN;
   END IF;
 
@@ -213,9 +220,12 @@ BEGIN
     outcome := 'in_progress';
     intent_id := v_row.id;
     generation := v_row.generation;
+    stripe_customer_id := v_row.stripe_customer_id;
     reason := 'active_lease';
+    -- claim_token intentionally NULL: only 'claimed' issues a token.
     RETURN NEXT; RETURN;
   END IF;
+
 
   -- Generation matrix for all remaining (claimable) branches:
   --   expired processing + same plan   → keep generation
@@ -251,7 +261,9 @@ BEGIN
   intent_id := v_row.id;
   claim_token := v_new_token;
   generation := v_row.generation;
+  stripe_customer_id := v_row.stripe_customer_id;
   RETURN NEXT; RETURN;
+
 END;
 $$;
 
@@ -332,15 +344,27 @@ BEGIN
   END IF;
 
   IF v_current_customer IS NULL THEN
-    INSERT INTO public.recruiter_billing_profiles
-      (recruiter_id, user_id, stripe_customer_id)
-    VALUES
-      (v_row.recruiter_id, v_row.user_id, _customer_id)
-    ON CONFLICT (recruiter_id) DO UPDATE
-      SET stripe_customer_id = EXCLUDED.stripe_customer_id
-      WHERE public.recruiter_billing_profiles.stripe_customer_id IS NULL
-        AND public.recruiter_billing_profiles.user_id = EXCLUDED.user_id;
+    -- Narrow SQLSTATE 23505 handler scoped ONLY to the canonical
+    -- recruiter_billing_profiles insert/upsert. A concurrent identity
+    -- race is surfaced as a structured customer_conflict/
+    -- billing_identity_unique_conflict outcome — never as a raw DB
+    -- error and never with constraint names exposed to the caller.
+    BEGIN
+      INSERT INTO public.recruiter_billing_profiles
+        (recruiter_id, user_id, stripe_customer_id)
+      VALUES
+        (v_row.recruiter_id, v_row.user_id, _customer_id)
+      ON CONFLICT (recruiter_id) DO UPDATE
+        SET stripe_customer_id = EXCLUDED.stripe_customer_id
+        WHERE public.recruiter_billing_profiles.stripe_customer_id IS NULL
+          AND public.recruiter_billing_profiles.user_id = EXCLUDED.user_id;
+    EXCEPTION WHEN unique_violation THEN
+      outcome := 'customer_conflict';
+      reason  := 'billing_identity_unique_conflict';
+      RETURN NEXT; RETURN;
+    END;
 
+    -- Post-write ownership verification is preserved.
     IF NOT EXISTS (
       SELECT 1 FROM public.recruiter_billing_profiles
        WHERE recruiter_id = v_row.recruiter_id
