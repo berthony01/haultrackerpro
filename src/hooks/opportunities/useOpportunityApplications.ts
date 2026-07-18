@@ -71,6 +71,23 @@ const APPLICATION_SELECT_RECRUITER = '*, opportunities:opportunity_id(id,title,c
 export function useOpportunityApplications(opts: { recruiterId?: string } = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  // Stable per-(opportunity_id, type) idempotency keys, established outside
+  // the mutation function so a retry of the same submission reuses the exact
+  // key. A caller may still supply its own key; when it does, we preserve it.
+  const idempotencyKeysRef = useRef<Map<string, string>>(new Map());
+  const stableKey = (opportunityId: string, kind: 'apply' | 'request_info', caller?: string) => {
+    const mapKey = `${kind}:${opportunityId}`;
+    if (caller && caller.length >= 8) {
+      idempotencyKeysRef.current.set(mapKey, caller);
+      return caller;
+    }
+    const existing = idempotencyKeysRef.current.get(mapKey);
+    if (existing) return existing;
+    const generated = crypto.randomUUID();
+    idempotencyKeysRef.current.set(mapKey, generated);
+    return generated;
+  };
+
 
   // Driver: own applications (with limited related opportunity context)
   const driverQuery = useQuery({
