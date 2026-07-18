@@ -8,6 +8,12 @@ import {
   isRecruiterPaidPlanActive,
   resolveRecruiterCapabilityTier,
 } from '@/lib/recruiterCapabilities';
+import {
+  isSafeStripeCheckoutUrl,
+  parseCheckoutError,
+  RECRUITER_CHECKOUT_MESSAGES,
+  type ParsedCheckoutError,
+} from '@/lib/opportunities/recruiterCheckoutMessages';
 
 export type RecruiterBilling = Tables<'recruiter_billing_profiles'>;
 export type RecruiterPlan = 'none' | 'starter' | 'growth' | 'fleet';
