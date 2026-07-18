@@ -193,7 +193,7 @@ ALTER TABLE public.opportunity_offers
     )
   ),
   ADD CONSTRAINT opportunity_offers_sent_expiry_chk CHECK (
-    status <> 'sent'
+    status = 'draft'
     OR (
       sent_at IS NOT NULL
       AND expires_at IS NOT NULL
