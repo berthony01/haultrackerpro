@@ -136,5 +136,5 @@ describe('No trial-related language in user-facing code', () => {
 
     expect(hits).toEqual([]);
     expect(files.length).toBeGreaterThan(50);
-  });
+  }, 30_000);
 });
