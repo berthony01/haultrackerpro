@@ -102,8 +102,6 @@ export const RECRUITER_ACTION_LABEL: Record<RecruiterTransition, string> = {
   waiting_documents: 'Waiting on Docs',
   interviewing: 'Move to Interview',
   offer_sent: 'Send Offer',
-  onboarding: 'Start Onboarding',
-  hired: 'Hire',
   rejected: 'Reject',
 };
 
