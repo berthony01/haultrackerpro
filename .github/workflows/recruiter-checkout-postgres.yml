@@ -165,3 +165,43 @@ jobs:
 
           console.log(`version proof OK; sha=${parsed.sha} builtAt=${parsed.builtAt}`);
           NODE
+
+      - name: Install Playwright Chromium (with system dependencies)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run recruiter-billing Playwright + Axe suite
+        id: recruiter_billing_e2e
+        continue-on-error: true
+        env:
+          HTP_BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -o pipefail
+          bunx playwright test --config=playwright.recruiter-billing.config.ts --reporter=list 2>&1 | tee recruiter-billing-e2e.log
+
+      - name: Upload recruiter-billing E2E log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recruiter-billing-e2e-log
+          path: recruiter-billing-e2e.log
+          if-no-files-found: error
+
+      - name: Upload recruiter-billing Playwright + Axe HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recruiter-billing-playwright-report
+          path: playwright-report-recruiter-billing/
+          if-no-files-found: warn
+
+      - name: Upload recruiter-billing responsive screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recruiter-billing-test-results
+          path: test-results/recruiter-billing/
+          if-no-files-found: warn
+
+      - name: Enforce recruiter-billing E2E suite result
+        if: steps.recruiter_billing_e2e.outcome != 'success'
+        run: exit 1
