@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - '.github/workflows/recruiter-checkout-postgres.yml'
+      - 'build/htpBuildVersion.ts'
+      - 'vite.config.ts'
+      - 'src/components/opportunities/RecruiterBillingPanel.tsx'
+      - 'src/test/phase1gR1A4BuildProof.test.tsx'
       - 'tests/postgres/recruiterCheckoutConcurrency.test.ts'
       - 'vitest.recruiter-checkout-postgres.config.ts'
       - 'supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql'
@@ -35,8 +39,8 @@ jobs:
 
     env:
       RECRUITER_CHECKOUT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recruiter_checkout
-      VITE_SUPABASE_URL: https://phase1g-r1a3-test.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: phase1g-r1a3-isolated-test-key
+      VITE_SUPABASE_URL: https://phase1g-r1a4-test.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: phase1g-r1a4-isolated-test-key
 
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +88,9 @@ jobs:
       - name: Run focused Recruiter Checkout orchestrator suite
         run: bunx vitest run src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts
 
+      - name: Run focused build-proof and Recruiter billing-copy suite
+        run: bunx vitest run src/test/phase1gR1A4BuildProof.test.tsx
+
       - name: Typecheck application
         run: bunx tsc -p tsconfig.app.json --noEmit
 
@@ -101,3 +108,22 @@ jobs:
 
       - name: Build production application
         run: bun run build
+
+      - name: Verify public build version artifacts
+        run: |
+          bun -e '
+            import { readFileSync } from "node:fs";
+            const version = JSON.parse(readFileSync("dist/version.json", "utf8"));
+            const html = readFileSync("dist/index.html", "utf8");
+            const expectedSha = process.env.GITHUB_SHA?.toLowerCase();
+            const keys = Object.keys(version).sort();
+            if (JSON.stringify(keys) !== JSON.stringify(["app", "builtAt", "sha"])) throw new Error(`Unexpected version keys: ${keys.join(",")}`);
+            if (version.app !== "haultrackerpro") throw new Error("Unexpected app name");
+            if (!/^[0-9a-f]{40}$/.test(version.sha)) throw new Error("Invalid build SHA");
+            if (version.sha !== expectedSha) throw new Error(`Build SHA mismatch: ${version.sha} != ${expectedSha}`);
+            if (new Date(version.builtAt).toISOString() !== version.builtAt) throw new Error("Invalid builtAt timestamp");
+            const escaped = version.sha.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const matches = html.match(new RegExp(`<meta name="htp-build-sha" content="${escaped}">`, "g")) ?? [];
+            if (matches.length !== 1) throw new Error(`Expected one matching build meta tag, found ${matches.length}`);
+            if ((html.match(/name="htp-build-sha"/g) ?? []).length !== 1) throw new Error("Duplicate build SHA meta tag");
+          '
