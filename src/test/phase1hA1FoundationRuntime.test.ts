@@ -397,43 +397,86 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     expect(dup.rows[0].result_code).toBe('duplicate_same_type');
   });
 
-  it('blank/oversized idempotency keys are rejected by both RPCs', async () => {
+  it('blank/oversized idempotency keys return invalid_input (both RPCs)', async () => {
     await asAuthenticated(db, IDS.driverB);
-    await expect(
-      db.query(`SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('', 'x', true)})`, [IDS.opportunity]),
-    ).rejects.toThrow(/invalid idempotency_key/);
-    await expect(
-      db.query(`SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('short', 'x', true)})`, [IDS.opportunity]),
-    ).rejects.toThrow(/invalid idempotency_key/);
+    let r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('', 'x', true)})`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('invalid_input');
+    r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('short', 'x', true)})`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('invalid_input');
     const tooLong = 'k'.repeat(300);
-    await expect(
-      db.query(`SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS(tooLong, 'x', true)})`, [IDS.opportunity]),
-    ).rejects.toThrow(/invalid idempotency_key/);
+    r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS(tooLong, 'x', true)})`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('invalid_input');
 
-    await expect(
-      db.query(`SELECT * FROM public.submit_request_info($1::uuid, '   ', 'q', 'email', false)`, [IDS.opportunity]),
-    ).rejects.toThrow(/invalid idempotency_key/);
+    r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, '   ', 'q', 'email', false)`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('invalid_input');
   });
 
-  it('required attestations and preferred_contact_method are enforced for formal apply', async () => {
+  it('missing attestations / bad contact method return invalid_input for formal apply', async () => {
     await asAuthenticated(db, IDS.driverB);
+    let r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application($1::uuid, 'attest-key-1x', 'x', false, true, true, 'phone', false)`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('invalid_input');
+    r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application($1::uuid, 'attest-key-2x', 'x', true, true, true, 'carrier-pigeon', false)`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('invalid_input');
+  });
+
+  it('oversized message (>4000) / question (>2000) are rejected, not truncated', async () => {
+    await asAuthenticated(db, IDS.driverB);
+    const bigMsg = 'x'.repeat(4001);
+    const bigQ = 'q'.repeat(2001);
+    const r1 = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application($1::uuid, 'msg-oversize-key', $2, true, true, true, 'phone', false)`,
+      [IDS.opportunity, bigMsg],
+    );
+    expect(r1.rows[0].result_code).toBe('invalid_input');
+    const r2 = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, 'q-oversize-key', $2, 'email', false)`,
+      [IDS.opportunity, bigQ],
+    );
+    expect(r2.rows[0].result_code).toBe('invalid_input');
+  });
+
+  it('consent state DB constraint: true requires timestamp; false requires nulls', async () => {
+    await asOwner(db);
+    // consent=true with no timestamp → CHECK fires
     await expect(
       db.query(
-        `SELECT * FROM public.submit_opportunity_application($1::uuid, 'attest-key-1', 'x', false, true, true, 'phone', false)`,
-        [IDS.opportunity],
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id,driver_user_id,recruiter_id,application_type,status,contact_sharing_consent)
+         VALUES ($1,$2,$3,'request_info','new', true)`,
+        [IDS.opportunity, IDS.driverA, IDS.recruiterProfile],
       ),
-    ).rejects.toThrow(/required attestations missing/);
+    ).rejects.toThrow(/opportunity_applications_consent_state_chk/);
+    // consent=false with non-null email snapshot → CHECK fires
     await expect(
       db.query(
-        `SELECT * FROM public.submit_opportunity_application($1::uuid, 'attest-key-2', 'x', true, true, true, 'carrier-pigeon', false)`,
-        [IDS.opportunity],
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id,driver_user_id,recruiter_id,application_type,status,contact_sharing_consent,driver_email_snapshot)
+         VALUES ($1,$2,$3,'request_info','new', false, 'leaked@x')`,
+        [IDS.opportunity, IDS.driverA, IDS.recruiterProfile],
       ),
-    ).rejects.toThrow(/invalid preferred_contact_method/);
+    ).rejects.toThrow(/opportunity_applications_consent_state_chk/);
   });
 
   it('formal apply CHECK constraint blocks service-role bypass of snapshot invariants', async () => {
     await asOwner(db);
-    // submitted_at NOT NULL but snapshot_version=0 → CHECK fires
     await expect(
       db.query(
         `INSERT INTO public.opportunity_applications
@@ -443,7 +486,6 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
         [IDS.opportunity, IDS.driverB, IDS.recruiterProfile],
       ),
     ).rejects.toThrow(/opportunity_applications_formal_apply_chk/);
-    // submitted_at NOT NULL but idempotency_key too short
     await expect(
       db.query(
         `INSERT INTO public.opportunity_applications
@@ -456,15 +498,12 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
   });
 
   it('contact PII is NULL when consent is false and only from own profile when true', async () => {
-    await asOwner(db);
-    // Test consent=false via submit_request_info (does not conflict with existing apply row)
-    // Actually driverB already may not have request_info. Use driverB inquiry:
-    // Clean isolated inquiry uniqueness — use existing driverB.
     await asAuthenticated(db, IDS.driverB);
-    const infoNoConsent = await db.query<{ application_id: string }>(
+    const infoNoConsent = await db.query<{ application_id: string; result_code: string }>(
       `SELECT * FROM public.submit_request_info($1::uuid, 'info-noc-1', 'Please share details', 'email', false)`,
       [IDS.opportunity],
     );
+    expect(infoNoConsent.rows[0].result_code).toBe('created');
     const noc = await db.query<{ email: string | null; phone: string | null; consent: boolean }>(
       `SELECT driver_email_snapshot AS email, driver_phone_snapshot AS phone, contact_sharing_consent AS consent
          FROM public.opportunity_applications WHERE id=$1`,
@@ -475,48 +514,105 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     expect(noc.rows[0].consent).toBe(false);
   });
 
-  it('submit_request_info requires nonempty question and valid preferred_contact_method', async () => {
+  it('submit_request_info returns question_required and invalid_input result codes', async () => {
     await asAuthenticated(db, IDS.driverA);
-    await expect(
-      db.query(`SELECT * FROM public.submit_request_info($1::uuid, 'info-blank-1', '   ', 'email', false)`, [IDS.opportunity]),
-    ).rejects.toThrow(/question is required/);
-    await expect(
-      db.query(`SELECT * FROM public.submit_request_info($1::uuid, 'info-bad-method-1', 'q', 'fax', false)`, [IDS.opportunity]),
-    ).rejects.toThrow(/invalid preferred_contact_method/);
+    let r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, 'info-blank-1', '   ', 'email', false)`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('question_required');
+    r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, 'info-bad-method-1', 'q', 'fax', false)`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('invalid_input');
   });
 
-  it('self-application to your own opportunity is blocked (apply and request_info)', async () => {
-    // Recruiter user is also the profile owner. They also need a driver profile to reach the deeper checks;
-    // however the self-application check runs before the profile requirement, so we can assert directly.
+  it('self-application to your own opportunity returns self_opportunity (apply and request_info)', async () => {
     await asOwner(db);
     await db.exec(`INSERT INTO public.driver_opportunity_profiles(user_id,profile_completed) VALUES ('${IDS.recruiterUser}', true);`);
     await asAuthenticated(db, IDS.recruiterUser);
-    await expect(
-      db.query(`SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('self-apply-key-1', 'self', true)})`, [IDS.opportunity]),
-    ).rejects.toThrow(/cannot apply to your own opportunity/);
-    await expect(
-      db.query(`SELECT * FROM public.submit_request_info($1::uuid, 'self-info-key-1', 'q?', 'email', false)`, [IDS.opportunity]),
-    ).rejects.toThrow(/cannot inquire about your own opportunity/);
+    const a = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('self-apply-key-1', 'self', true)})`,
+      [IDS.opportunity],
+    );
+    expect(a.rows[0].result_code).toBe('self_opportunity');
+    const b = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, 'self-info-key-1', 'q?', 'email', false)`,
+      [IDS.opportunity],
+    );
+    expect(b.rows[0].result_code).toBe('self_opportunity');
   });
 
-  it('paused / unapproved / suspended-recruiter opportunities are refused', async () => {
+  it('paused / unapproved / inactive / removed / closed / suspended-recruiter opportunities return opportunity_unavailable', async () => {
     await asAuthenticated(db, IDS.driverB);
-    await expect(
-      db.query(`SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('paused-key-1', 'x', true)})`, [IDS.pausedOpportunity]),
-    ).rejects.toThrow(/not accepting applications/);
-    await expect(
-      db.query(`SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('unapproved-key-1', 'x', true)})`, [IDS.unapprovedOpportunity]),
-    ).rejects.toThrow(/not accepting applications/);
+    let r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('paused-key-1', 'x', true)})`,
+      [IDS.pausedOpportunity],
+    );
+    expect(r.rows[0].result_code).toBe('opportunity_unavailable');
+    r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('unapproved-key-1', 'x', true)})`,
+      [IDS.unapprovedOpportunity],
+    );
+    expect(r.rows[0].result_code).toBe('opportunity_unavailable');
 
+    // Cycle the primary opportunity through inactive/removed/closed (item 6).
+    for (const s of ['inactive', 'removed', 'closed'] as const) {
+      await asOwner(db);
+      await db.exec(`UPDATE public.opportunities SET status='${s}' WHERE id='${IDS.opportunity}';`);
+      await asAuthenticated(db, IDS.driverB);
+      const rr = await db.query<{ result_code: string }>(
+        `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS(`status-${s}-key-1`, 'x', true)})`,
+        [IDS.opportunity],
+      );
+      expect(rr.rows[0].result_code).toBe('opportunity_unavailable');
+    }
     await asOwner(db);
+    await db.exec(`UPDATE public.opportunities SET status='active' WHERE id='${IDS.opportunity}';`);
+
     await db.exec(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id='${IDS.recruiterProfile}';`);
     await asAuthenticated(db, IDS.driverB);
-    await expect(
-      db.query(`SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('suspended-key-1', 'x', true)})`, [IDS.opportunity]),
-    ).rejects.toThrow(/not accepting applications/);
+    r = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('suspended-key-1', 'x', true)})`,
+      [IDS.opportunity],
+    );
+    expect(r.rows[0].result_code).toBe('opportunity_unavailable');
     await asOwner(db);
     await db.exec(`UPDATE public.recruiter_profiles SET status='active' WHERE id='${IDS.recruiterProfile}';`);
   });
+
+  it('authenticated admin cannot force onboarding or hired via ordinary UPDATE path (item 1)', async () => {
+    await asOwner(db);
+    // Redefine is_admin to make the current user "admin" for this test.
+    await db.exec(`
+      CREATE OR REPLACE FUNCTION public.is_admin(_uid uuid) RETURNS boolean
+        LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+        AS $$ SELECT _uid = '${IDS.recruiterUser}'::uuid $$;
+    `);
+    const app = await db.query<{ id: string }>(
+      `SELECT id FROM public.opportunity_applications
+        WHERE driver_user_id=$1 AND opportunity_id=$2 AND application_type='apply' LIMIT 1`,
+      [IDS.driverA, IDS.opportunity],
+    );
+    await asAuthenticated(db, IDS.recruiterUser);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='onboarding' WHERE id=$1`, [app.rows[0].id]),
+    ).rejects.toThrow(/Only server-authorized workflow|Illegal application status/);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [app.rows[0].id]),
+    ).rejects.toThrow(/Only server-authorized workflow|Illegal application status/);
+    // Admin cannot mutate immutable submission/identity fields either.
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET submission_snapshot='{"tampered":true}'::jsonb WHERE id=$1`, [app.rows[0].id]),
+    ).rejects.toThrow(/submission_snapshot is immutable/);
+    await asOwner(db);
+    await db.exec(`
+      CREATE OR REPLACE FUNCTION public.is_admin(_uid uuid) RETURNS boolean
+        LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ SELECT false $$;
+    `);
+  });
+
 
   it('cross-driver isolation — driverA cannot see driverB applications; recruiter A cannot see recruiter B applications', async () => {
     await asAuthenticated(db, IDS.driverB);
