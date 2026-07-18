@@ -153,9 +153,11 @@ CREATE TABLE IF NOT EXISTS public.opportunity_offers (
       AND sent_snapshot <> '{}'::jsonb
     )
   ),
-  -- Sent offers must expire in [+24h, +30d] relative to sent_at
+  -- Every non-draft state (sent, accepted, declined, expired, canceled,
+  -- superseded) must carry sent_at plus an expires_at bounded within
+  -- [sent_at + 24h, sent_at + 30d]. Draft stays flexible.
   CONSTRAINT opportunity_offers_sent_expiry_chk CHECK (
-    status <> 'sent'
+    status = 'draft'
     OR (
       sent_at IS NOT NULL
       AND expires_at IS NOT NULL
