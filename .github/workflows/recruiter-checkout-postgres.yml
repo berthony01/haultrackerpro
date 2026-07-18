@@ -101,3 +101,62 @@ jobs:
 
       - name: Build production application
         run: bun run build
+        env:
+          HTP_BUILD_SHA: ${{ github.sha }}
+
+
+      - name: Verify build version manifest and meta
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const versionPath = path.join('dist', 'version.json');
+          if (!fs.existsSync(versionPath)) {
+            console.error('dist/version.json missing');
+            process.exit(1);
+          }
+          const raw = fs.readFileSync(versionPath, 'utf8');
+          const parsed = JSON.parse(raw);
+
+          const keys = Object.keys(parsed).sort();
+          if (JSON.stringify(keys) !== JSON.stringify(['app', 'builtAt', 'sha'])) {
+            console.error('unexpected version.json keys:', keys);
+            process.exit(1);
+          }
+          if (parsed.app !== 'haultrackerpro') {
+            console.error('bad app:', parsed.app);
+            process.exit(1);
+          }
+          if (!/^[0-9a-f]{40}$/i.test(parsed.sha)) {
+            console.error('bad sha shape:', parsed.sha);
+            process.exit(1);
+          }
+          const expected = (process.env.GITHUB_SHA || '').toLowerCase();
+          if (parsed.sha.toLowerCase() !== expected) {
+            console.error('sha mismatch. json:', parsed.sha, 'expected:', expected);
+            process.exit(1);
+          }
+          if (Number.isNaN(new Date(parsed.builtAt).getTime())) {
+            console.error('bad builtAt:', parsed.builtAt);
+            process.exit(1);
+          }
+
+          const indexHtml = fs.readFileSync(path.join('dist', 'index.html'), 'utf8');
+          const matches = indexHtml.match(/<meta\s+name="htp-build-sha"\s+content="([^"]+)"\s*\/?\s*>/g) || [];
+          if (matches.length !== 1) {
+            console.error('expected exactly one htp-build-sha meta tag, got', matches.length);
+            process.exit(1);
+          }
+          const metaSha = matches[0].match(/content="([^"]+)"/)[1];
+          if (metaSha.toLowerCase() !== expected) {
+            console.error('meta sha mismatch. meta:', metaSha, 'expected:', expected);
+            process.exit(1);
+          }
+
+          console.log('version.json OK; sha=' + parsed.sha + ' builtAt=' + parsed.builtAt);
+          NODE
+        env:
+          HTP_BUILD_SHA: ${{ github.sha }}
+
