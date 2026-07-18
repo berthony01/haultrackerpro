@@ -13,6 +13,8 @@ export type RecruiterApplicationStatus =
   | 'waiting_documents'
   | 'interviewing'
   | 'offer_sent'
+  // Phase 1H-A1 — non-terminal onboarding stage before hired.
+  | 'onboarding'
   | 'hired'
   | 'rejected';
 
@@ -68,12 +70,84 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
   });
 
 
+  // Formal apply — whitelisted attestations only, no client-supplied identity/PII.
+  const submitApplication = useMutation({
+    mutationFn: async (args: {
+      opportunity_id: string;
+      idempotency_key: string;
+      message?: string | null;
+      availability_confirmed: boolean;
+      requirements_confirmed: boolean;
+      truth_attestation: boolean;
+      preferred_contact_method: 'phone' | 'email' | 'sms' | 'in_app';
+      contact_sharing_consent: boolean;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await (supabase as any).rpc('submit_opportunity_application', {
+        _opportunity_id: args.opportunity_id,
+        _idempotency_key: args.idempotency_key,
+        _message: args.message ?? null,
+        _availability_confirmed: args.availability_confirmed,
+        _requirements_confirmed: args.requirements_confirmed,
+        _truth_attestation: args.truth_attestation,
+        _preferred_contact_method: args.preferred_contact_method,
+        _contact_sharing_consent: args.contact_sharing_consent,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+  });
+
+  // Driver-initiated question — required question text and preferred contact method.
+  const submitRequestInfo = useMutation({
+    mutationFn: async (args: {
+      opportunity_id: string;
+      idempotency_key: string;
+      question: string;
+      preferred_contact_method: 'phone' | 'email' | 'sms' | 'in_app';
+      contact_sharing_consent: boolean;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await (supabase as any).rpc('submit_request_info', {
+        _opportunity_id: args.opportunity_id,
+        _idempotency_key: args.idempotency_key,
+        _question: args.question,
+        _preferred_contact_method: args.preferred_contact_method,
+        _contact_sharing_consent: args.contact_sharing_consent,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+  });
+
+  // Back-compat façade for legacy `createApplication.mutate(...)` callsites.
+  // Fails closed for unsupported application_type values; callers must migrate
+  // to the dedicated submit* mutations for whitelisted attestation input.
+  // Back-compat façade preserving the useMutation callback contract
+  // (`.mutate(data, { onSuccess, onError })`). Fails closed for unsupported
+  // application_type values — no silent misrouting.
   const createApplication = useMutation({
     mutationFn: async (data: OpportunityApplicationInsert) => {
       if (!user) throw new Error('Not authenticated');
-      const { error } = await supabase
-        .from('opportunity_applications')
-        .insert({ ...data, driver_user_id: user.id });
+      if (data.application_type === 'apply') {
+        throw new Error('Formal apply requires the submitApplication mutation with whitelisted attestations.');
+      }
+      if (data.application_type !== 'request_info') {
+        throw new Error(`Unsupported application_type: ${String(data.application_type)}`);
+      }
+      const preferred = ((data as unknown as { preferred_contact_method?: string })
+        .preferred_contact_method as 'phone' | 'email' | 'sms' | 'in_app' | undefined) ?? 'in_app';
+      const explicitConsent = (data as unknown as { contact_sharing_consent?: boolean })
+        .contact_sharing_consent === true;
+      const key = (data as unknown as { idempotency_key?: string }).idempotency_key
+        ?? crypto.randomUUID();
+      const { error } = await (supabase as any).rpc('submit_request_info', {
+        _opportunity_id: data.opportunity_id,
+        _idempotency_key: key,
+        _question: data.message ?? '',
+        _preferred_contact_method: preferred,
+        _contact_sharing_consent: explicitConsent,
+      });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
@@ -137,6 +211,8 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     refetchRecruiter: recruiterQuery.refetch,
     // Mutations
     createApplication,
+    submitApplication,
+    submitRequestInfo,
     withdrawApplication,
     updateApplicationStatus,
     recordDriverResponse,
