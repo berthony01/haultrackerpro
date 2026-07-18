@@ -401,7 +401,7 @@ BEGIN
      AND opportunity_id = _opportunity_id
      AND application_type = _application_type
      AND (_application_type = 'request_info'
-          OR status NOT IN ('rejected','withdrawn'))
+          OR opportunity_applications.status NOT IN ('rejected','withdrawn'))
    LIMIT 1;
 
   IF FOUND THEN
