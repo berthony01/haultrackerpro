@@ -308,6 +308,10 @@ class StripeFake implements StripeGateway {
   failNextListSubs = 0;
   failNextCreateSession = 0;
   failNextRetrieveCustomer = 0;
+  // Narrow mutation hook: transforms the session about to be returned/stored
+  // by createSession. Used to prove the orchestrator rejects malformed
+  // Stripe returns without duplicating orchestrator logic.
+  sessionCreateMutator: ((s: StripeSessionLike) => StripeSessionLike) | null = null;
   // Search injection: exact-metadata search returns these when set
   metadataSearchOverride: StripeCustomerRecord[] | null = null;
   // Email-only lookalike customers to prove they are ignored
