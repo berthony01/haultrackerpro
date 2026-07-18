@@ -82,21 +82,31 @@ export function RecruiterBillingPanel() {
     isLoading,
     startCheckout,
     openPortal,
+    prepareTab,
     refresh,
   } = useRecruiterBilling();
 
-  // Phase 1G-R1A7: aria-live status region. Complements sonner toasts with
-  // an assistive-tech-friendly announcement anchored to the billing card.
+  // Track which plan is currently being prepared so we only show the spinner
+  // on the clicked button (not all plan buttons at once).
+  const [pendingPlan, setPendingPlan] = useState<PaidPlan | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
     kind: 'success' | 'error' | 'info';
     text: string;
+    fallbackUrl?: string;
+    fallbackLabel?: string;
   } | null>(null);
 
   const handleUpgrade = (p: PaidPlan) => {
-    if (startCheckout.isPending) return; // hard client-side dedupe on rapid clicks
+    if (startCheckout.isPending) return;
+    // Open the popup SYNCHRONOUSLY inside this click gesture so browsers do
+    // not block it. The hook navigates it to the validated URL after the
+    // server responds, or closes it and surfaces a fallback if blocked.
+    prepareTab();
+    setPendingPlan(p);
     setStatusMessage({ kind: 'info', text: 'Preparing secure checkout…' });
     startCheckout.mutate(p, {
       onSuccess: () => {
+        setPendingPlan(null);
         setStatusMessage({
           kind: 'success',
           text: 'Opening checkout in a new tab.',
@@ -104,14 +114,22 @@ export function RecruiterBillingPanel() {
         toast.success('Opening checkout in a new tab…');
       },
       onError: (e: Error) => {
-        setStatusMessage({ kind: 'error', text: e.message });
-        toast.error(e.message);
+        setPendingPlan(null);
+        const err = e as RecruiterCheckoutFailure;
+        setStatusMessage({
+          kind: 'error',
+          text: err.message,
+          fallbackUrl: err.fallbackUrl,
+          fallbackLabel: 'Continue to secure checkout',
+        });
+        toast.error(err.message);
       },
     });
   };
 
   const handlePortal = () => {
     if (openPortal.isPending) return;
+    prepareTab();
     openPortal.mutate(undefined, {
       onSuccess: () => {
         setStatusMessage({
@@ -121,8 +139,14 @@ export function RecruiterBillingPanel() {
         toast.success('Opening billing portal…');
       },
       onError: (e: Error) => {
-        setStatusMessage({ kind: 'error', text: e.message });
-        toast.error(e.message);
+        const err = e as RecruiterCheckoutFailure;
+        setStatusMessage({
+          kind: 'error',
+          text: err.message,
+          fallbackUrl: err.fallbackUrl,
+          fallbackLabel: 'Open billing portal',
+        });
+        toast.error(err.message);
       },
     });
   };
@@ -130,6 +154,11 @@ export function RecruiterBillingPanel() {
   const currentPlanLabel = isBillingActive
     ? RECRUITER_PLAN_LABELS[plan]
     : 'Standard Access';
+
+  // Per-status accurate copy: past_due/unpaid/incomplete/paused/canceled
+  // must NOT say "you already have an active recruiter subscription".
+  const subscriptionStatusCopy =
+    (billing && RECRUITER_SUBSCRIPTION_STATUS_MESSAGES[status]) || null;
 
   return (
     <Card
