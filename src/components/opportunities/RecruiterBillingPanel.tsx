@@ -315,10 +315,10 @@ export function RecruiterBillingPanel() {
                 className="w-full"
                 variant={isCurrent ? 'outline' : 'default'}
                 disabled={startCheckout.isPending || isCurrent}
-                aria-busy={startCheckout.isPending || undefined}
+                aria-busy={pendingPlan === p.key || undefined}
                 onClick={() => handleUpgrade(p.key)}
               >
-                {startCheckout.isPending ? (
+                {pendingPlan === p.key ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     <span>Preparing…</span>
