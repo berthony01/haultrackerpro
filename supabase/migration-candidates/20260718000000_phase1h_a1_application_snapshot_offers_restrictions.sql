@@ -289,7 +289,7 @@ CREATE INDEX IF NOT EXISTS idx_marketplace_user_restrictions_user
   ON public.marketplace_user_restrictions(user_id);
 CREATE INDEX IF NOT EXISTS idx_marketplace_user_restrictions_active
   ON public.marketplace_user_restrictions(user_id, scope)
-  WHERE ends_at IS NULL OR ends_at > now();
+  WHERE ends_at IS NULL;
 
 -- Server helper: is a user currently blocked from marketplace actions?
 CREATE OR REPLACE FUNCTION public.user_is_marketplace_blocked(_user_id uuid, _scope text)
