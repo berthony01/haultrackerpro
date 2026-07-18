@@ -472,12 +472,12 @@ DROP FUNCTION IF EXISTS public.submit_request_info(uuid, text, text);
 CREATE OR REPLACE FUNCTION public.submit_opportunity_application(
   _opportunity_id            uuid,
   _idempotency_key           text,
-  _message                   text DEFAULT NULL,
-  _availability_confirmed    boolean DEFAULT false,
-  _requirements_confirmed    boolean DEFAULT false,
-  _truth_attestation         boolean DEFAULT false,
-  _preferred_contact_method  text DEFAULT NULL,
-  _contact_sharing_consent   boolean DEFAULT false
+  _message                   text,
+  _availability_confirmed    boolean,
+  _requirements_confirmed    boolean,
+  _truth_attestation         boolean,
+  _preferred_contact_method  text,
+  _contact_sharing_consent   boolean
 )
 RETURNS TABLE (
   application_id     uuid,
@@ -495,49 +495,60 @@ DECLARE
   v_new_id        uuid;
   v_snapshot      jsonb;
   v_profile       public.driver_opportunity_profiles%ROWTYPE;
-  v_message       text := NULLIF(btrim(left(coalesce(_message, ''), 4000)), '');
+  v_message       text;
   v_method        text := lower(coalesce(_preferred_contact_method, ''));
   v_email_snap    text;
   v_phone_snap    text;
+  v_consent_at    timestamptz;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '28000';
   END IF;
+
+  -- Explicit bounded message (item 4). Reject oversized instead of truncating.
+  IF _message IS NOT NULL AND char_length(_message) > 4000 THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
+  END IF;
+  v_message := NULLIF(btrim(coalesce(_message, '')), '');
 
   -- Idempotency key contract (item 4): bounded nonempty.
   IF _idempotency_key IS NULL
      OR btrim(_idempotency_key) = ''
      OR char_length(_idempotency_key) < 8
      OR char_length(_idempotency_key) > 200 THEN
-    RAISE EXCEPTION 'invalid idempotency_key' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
   -- Whitelisted attestations required (item 5).
   IF NOT (_availability_confirmed AND _requirements_confirmed AND _truth_attestation) THEN
-    RAISE EXCEPTION 'required attestations missing' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
   IF v_method NOT IN ('phone','email','sms','in_app') THEN
-    RAISE EXCEPTION 'invalid preferred_contact_method' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
+  END IF;
+
+  IF _contact_sharing_consent IS NULL THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
   IF public.user_is_marketplace_blocked(v_uid, 'applications') THEN
-    RAISE EXCEPTION 'driver is restricted from submitting applications' USING ERRCODE = '42501';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'restricted'::text; RETURN;
   END IF;
 
   SELECT o.recruiter_id INTO v_recruiter_id FROM public.opportunities o WHERE o.id = _opportunity_id;
   IF v_recruiter_id IS NULL THEN
-    RAISE EXCEPTION 'opportunity not found' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'opportunity_unavailable'::text; RETURN;
   END IF;
 
-  -- Self-application block (item 7).
+  -- Self-application block (item 7 previous pass).
   IF EXISTS (SELECT 1 FROM public.recruiter_profiles rp
              WHERE rp.id = v_recruiter_id AND rp.user_id = v_uid) THEN
-    RAISE EXCEPTION 'cannot apply to your own opportunity' USING ERRCODE = '42501';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'self_opportunity'::text; RETURN;
   END IF;
 
   IF NOT public.driver_can_access_opportunity(_opportunity_id, v_recruiter_id) THEN
-    RAISE EXCEPTION 'opportunity is not accepting applications' USING ERRCODE = '42501';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'opportunity_unavailable'::text; RETURN;
   END IF;
 
   SELECT * INTO v_profile
@@ -545,7 +556,7 @@ BEGIN
    WHERE dop.user_id = v_uid AND dop.profile_completed = true
    LIMIT 1;
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'completed driver opportunity profile required' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'profile_required'::text; RETURN;
   END IF;
 
   v_snapshot := public.build_application_submission_snapshot(
@@ -559,13 +570,14 @@ BEGIN
     )
   );
   IF v_snapshot IS NULL OR v_snapshot = '{}'::jsonb THEN
-    RAISE EXCEPTION 'server application snapshot could not be built' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'profile_required'::text; RETURN;
   END IF;
 
   -- Contact PII only from authenticated Driver-owned profile, only with consent.
   IF _contact_sharing_consent THEN
     v_email_snap := v_profile.email;
     v_phone_snap := v_profile.phone;
+    v_consent_at := now();
   END IF;
 
   PERFORM pg_advisory_xact_lock(
@@ -608,7 +620,7 @@ BEGIN
     v_profile.id, 'apply', 'new',
     v_snapshot, 1, _idempotency_key,
     v_method, v_email_snap, v_phone_snap,
-    _contact_sharing_consent, CASE WHEN _contact_sharing_consent THEN now() ELSE NULL END,
+    _contact_sharing_consent, v_consent_at,
     v_message, now()
   )
   RETURNING id INTO v_new_id;
@@ -625,7 +637,7 @@ CREATE OR REPLACE FUNCTION public.submit_request_info(
   _idempotency_key           text,
   _question                  text,
   _preferred_contact_method  text,
-  _contact_sharing_consent   boolean DEFAULT false
+  _contact_sharing_consent   boolean
 )
 RETURNS TABLE (
   application_id     uuid,
@@ -642,10 +654,11 @@ DECLARE
   v_existing      public.opportunity_applications%ROWTYPE;
   v_new_id        uuid;
   v_profile       public.driver_opportunity_profiles%ROWTYPE;
-  v_question      text := NULLIF(btrim(left(coalesce(_question, ''), 2000)), '');
+  v_question      text;
   v_method        text := lower(coalesce(_preferred_contact_method, ''));
   v_email_snap    text;
   v_phone_snap    text;
+  v_consent_at    timestamptz;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '28000';
@@ -655,34 +668,44 @@ BEGIN
      OR btrim(_idempotency_key) = ''
      OR char_length(_idempotency_key) < 8
      OR char_length(_idempotency_key) > 200 THEN
-    RAISE EXCEPTION 'invalid idempotency_key' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
-  IF v_question IS NULL OR char_length(v_question) < 1 THEN
-    RAISE EXCEPTION 'question is required' USING ERRCODE = '22023';
+  -- Reject oversized question (item 4). Documented max is 2,000 chars.
+  IF _question IS NOT NULL AND char_length(_question) > 2000 THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
+  END IF;
+  v_question := NULLIF(btrim(coalesce(_question, '')), '');
+
+  IF v_question IS NULL THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'question_required'::text; RETURN;
   END IF;
 
   IF v_method NOT IN ('phone','email','sms','in_app') THEN
-    RAISE EXCEPTION 'invalid preferred_contact_method' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
+  END IF;
+
+  IF _contact_sharing_consent IS NULL THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
   IF public.user_is_marketplace_blocked(v_uid, 'messaging') THEN
-    RAISE EXCEPTION 'driver is restricted from messaging recruiters' USING ERRCODE = '42501';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'restricted'::text; RETURN;
   END IF;
 
   SELECT o.recruiter_id INTO v_recruiter_id FROM public.opportunities o WHERE o.id = _opportunity_id;
   IF v_recruiter_id IS NULL THEN
-    RAISE EXCEPTION 'opportunity not found' USING ERRCODE = '22023';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'opportunity_unavailable'::text; RETURN;
   END IF;
 
-  -- Self-inquiry block (item 7).
+  -- Self-inquiry block.
   IF EXISTS (SELECT 1 FROM public.recruiter_profiles rp
              WHERE rp.id = v_recruiter_id AND rp.user_id = v_uid) THEN
-    RAISE EXCEPTION 'cannot inquire about your own opportunity' USING ERRCODE = '42501';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'self_opportunity'::text; RETURN;
   END IF;
 
   IF NOT public.driver_can_access_opportunity(_opportunity_id, v_recruiter_id) THEN
-    RAISE EXCEPTION 'opportunity is not accepting requests' USING ERRCODE = '42501';
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'opportunity_unavailable'::text; RETURN;
   END IF;
 
   SELECT * INTO v_profile FROM public.driver_opportunity_profiles dop WHERE dop.user_id = v_uid LIMIT 1;
@@ -690,6 +713,7 @@ BEGIN
   IF _contact_sharing_consent AND v_profile.user_id IS NOT NULL THEN
     v_email_snap := v_profile.email;
     v_phone_snap := v_profile.phone;
+    v_consent_at := now();
   END IF;
 
   PERFORM pg_advisory_xact_lock(
@@ -731,7 +755,7 @@ BEGIN
     v_profile.id, 'request_info', 'new',
     '{}'::jsonb, 0, _idempotency_key,
     v_method, v_email_snap, v_phone_snap,
-    _contact_sharing_consent, CASE WHEN _contact_sharing_consent THEN now() ELSE NULL END,
+    _contact_sharing_consent, v_consent_at,
     v_question
   )
   RETURNING id INTO v_new_id;
