@@ -112,6 +112,7 @@ export const RECRUITER_PIPELINE_GROUPS: { key: string; label: string; statuses: 
   { key: 'docs', label: 'Waiting Docs', statuses: ['waiting_documents'] },
   { key: 'interview', label: 'Interviewing', statuses: ['interviewing'] },
   { key: 'offer', label: 'Offer Sent', statuses: ['offer_sent'] },
+  { key: 'onboarding', label: 'Onboarding', statuses: ['onboarding'] },
   { key: 'closed', label: 'Closed', statuses: ['hired', 'rejected', 'withdrawn'] },
 ];
 
