@@ -77,7 +77,9 @@ export default defineConfig(({ mode }) => ({
       devOptions: { enabled: false },
       injectRegister: false,
     }),
+    htpBuildShaPlugin(),
   ].filter(Boolean),
+
   build: {
     rollupOptions: {
       output: {
