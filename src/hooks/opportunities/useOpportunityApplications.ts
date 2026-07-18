@@ -3,6 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import {
+  createIdempotencyStore,
+  type IdempotencyStore,
+} from '@/lib/opportunities/submissionIdempotency';
+
 
 // Phase 1H-A1 — public-safe RPC outcome contract. Kept local until A2/A3
 // expand generated types coverage. Any business-outcome result_code other
