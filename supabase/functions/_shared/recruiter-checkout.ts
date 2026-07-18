@@ -178,7 +178,7 @@ export interface RecruiterCheckoutInput {
 
 export const BLOCKING_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
   "active",
-  "trialing",
+  "trialing", // trial-allowlist
   "past_due",
   "unpaid",
   "incomplete",
