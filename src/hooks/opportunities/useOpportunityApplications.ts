@@ -1,9 +1,46 @@
+import { useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
-export type OpportunityApplication = Tables<'opportunity_applications'>;
+// Phase 1H-A1 — public-safe RPC outcome contract. Kept local until A2/A3
+// expand generated types coverage. Any business-outcome result_code other
+// than 'created' or 'idempotent_replay' is a controlled failure the hook
+// converts into a mutation error, so callers never treat a non-success
+// server outcome as a silent success.
+export type SubmissionResultCode =
+  | 'created'
+  | 'idempotent_replay'
+  | 'duplicate_same_type'
+  | 'opportunity_unavailable'
+  | 'self_opportunity'
+  | 'profile_required'
+  | 'restricted'
+  | 'invalid_input'
+  | 'question_required';
+
+export interface SubmissionResult {
+  application_id: string | null;
+  application_status: string | null;
+  result_code: SubmissionResultCode;
+}
+
+const SUBMISSION_SUCCESS_CODES: ReadonlySet<SubmissionResultCode> = new Set([
+  'created',
+  'idempotent_replay',
+]);
+
+function assertSubmissionSuccess(row: SubmissionResult | null | undefined): SubmissionResult {
+  if (!row || !row.result_code) {
+    throw new Error('submission_failed:empty_response');
+  }
+  if (!SUBMISSION_SUCCESS_CODES.has(row.result_code)) {
+    throw new Error(`submission_failed:${row.result_code}`);
+  }
+  return row;
+}
+
 export type OpportunityApplicationInsert = Omit<TablesInsert<'opportunity_applications'>, 'driver_user_id'>;
 
 export type RecruiterApplicationStatus =
