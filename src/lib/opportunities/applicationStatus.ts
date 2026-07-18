@@ -16,10 +16,14 @@ export type ApplicationStatus =
   // Legacy — kept for safety on any stale rows
   | 'contacted';
 
+// Recruiters may only select transitions they are authorized to make from the
+// ordinary update path. onboarding/hired are workflow-only stages driven by
+// future dedicated RPCs (A3+); they are never recruiter-initiated actions.
 export type RecruiterTransition = Exclude<
   ApplicationStatus,
-  'new' | 'withdrawn' | 'contacted'
+  'new' | 'withdrawn' | 'contacted' | 'onboarding' | 'hired'
 >;
+
 
 const STATUS_RANK: Record<string, number> = {
   new: 1,
