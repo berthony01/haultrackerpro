@@ -54,7 +54,8 @@ import { ContractActionsCard } from '@/components/contracts/ContractActionsCard'
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import AssistantBlockedNotice from '@/components/assistants/AssistantBlockedNotice';
 
-import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
+import { Truck, LogOut, X, Route, Users, TrendingUp, Shield } from 'lucide-react';
+import { useAdmin } from '@/hooks/useAdmin';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { normalizeLegacyEditStops } from '@/lib/stopNormalization';
