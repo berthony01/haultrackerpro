@@ -138,7 +138,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       contact_sharing_consent: boolean;
     }): Promise<SubmissionResult> => {
       if (!user) throw new Error('Not authenticated');
-      const key = stableKey(args.opportunity_id, 'apply', args.idempotency_key);
+      const key = store.acquire('apply', args.opportunity_id, args.idempotency_key);
       const { data, error } = await (supabase as any).rpc('submit_opportunity_application', {
         _opportunity_id: args.opportunity_id,
         _idempotency_key: key,
@@ -154,6 +154,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSettled: (_d, _e, args) => store.release('apply', args.opportunity_id, args.idempotency_key),
   });
 
   // Driver-initiated question — required question text and preferred contact method.
