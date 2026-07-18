@@ -277,7 +277,7 @@ describe('Phase 1H-A1 — foundation candidate migration (PGlite)', () => {
   it('Category 1: submit_opportunity_application(apply) creates exactly one formal application with a captured snapshot', async () => {
     await asUser(db, IDS.driverA);
     const snap = { form_version: 1, full_name: 'Ada Driver', cdl_class: 'A', endorsements: ['H'], years_experience: 5, message: 'Interested' };
-    const r = await db.query<{ application_id: string; status: string; result_code: string }>(
+    const r = await db.query<{ application_id: string; application_status: string; result_code: string }>(
       `SELECT * FROM public.submit_opportunity_application(
          $1::uuid, 'apply', $2::jsonb, 1, 'cat1-key-1', 'email', 'ada@test', NULL, 'Interested')`,
       [IDS.opportunity, JSON.stringify(snap)],
