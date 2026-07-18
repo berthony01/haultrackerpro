@@ -1,9 +1,46 @@
+import { useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
-export type OpportunityApplication = Tables<'opportunity_applications'>;
+// Phase 1H-A1 — public-safe RPC outcome contract. Kept local until A2/A3
+// expand generated types coverage. Any business-outcome result_code other
+// than 'created' or 'idempotent_replay' is a controlled failure the hook
+// converts into a mutation error, so callers never treat a non-success
+// server outcome as a silent success.
+export type SubmissionResultCode =
+  | 'created'
+  | 'idempotent_replay'
+  | 'duplicate_same_type'
+  | 'opportunity_unavailable'
+  | 'self_opportunity'
+  | 'profile_required'
+  | 'restricted'
+  | 'invalid_input'
+  | 'question_required';
+
+export interface SubmissionResult {
+  application_id: string | null;
+  application_status: string | null;
+  result_code: SubmissionResultCode;
+}
+
+const SUBMISSION_SUCCESS_CODES: ReadonlySet<SubmissionResultCode> = new Set([
+  'created',
+  'idempotent_replay',
+]);
+
+function assertSubmissionSuccess(row: SubmissionResult | null | undefined): SubmissionResult {
+  if (!row || !row.result_code) {
+    throw new Error('submission_failed:empty_response');
+  }
+  if (!SUBMISSION_SUCCESS_CODES.has(row.result_code)) {
+    throw new Error(`submission_failed:${row.result_code}`);
+  }
+  return row;
+}
+
 export type OpportunityApplicationInsert = Omit<TablesInsert<'opportunity_applications'>, 'driver_user_id'>;
 
 export type RecruiterApplicationStatus =
@@ -13,6 +50,8 @@ export type RecruiterApplicationStatus =
   | 'waiting_documents'
   | 'interviewing'
   | 'offer_sent'
+  // Phase 1H-A1 — non-terminal onboarding stage before hired.
+  | 'onboarding'
   | 'hired'
   | 'rejected';
 
@@ -32,6 +71,23 @@ const APPLICATION_SELECT_RECRUITER = '*, opportunities:opportunity_id(id,title,c
 export function useOpportunityApplications(opts: { recruiterId?: string } = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  // Stable per-(opportunity_id, type) idempotency keys, established outside
+  // the mutation function so a retry of the same submission reuses the exact
+  // key. A caller may still supply its own key; when it does, we preserve it.
+  const idempotencyKeysRef = useRef<Map<string, string>>(new Map());
+  const stableKey = (opportunityId: string, kind: 'apply' | 'request_info', caller?: string) => {
+    const mapKey = `${kind}:${opportunityId}`;
+    if (caller && caller.length >= 8) {
+      idempotencyKeysRef.current.set(mapKey, caller);
+      return caller;
+    }
+    const existing = idempotencyKeysRef.current.get(mapKey);
+    if (existing) return existing;
+    const generated = crypto.randomUUID();
+    idempotencyKeysRef.current.set(mapKey, generated);
+    return generated;
+  };
+
 
   // Driver: own applications (with limited related opportunity context)
   const driverQuery = useQuery({
@@ -68,18 +124,94 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
   });
 
 
-  const createApplication = useMutation({
-    mutationFn: async (data: OpportunityApplicationInsert) => {
+  // Formal apply — whitelisted attestations only, no client-supplied identity/PII.
+  const submitApplication = useMutation({
+    mutationFn: async (args: {
+      opportunity_id: string;
+      idempotency_key?: string;
+      message?: string | null;
+      availability_confirmed: boolean;
+      requirements_confirmed: boolean;
+      truth_attestation: boolean;
+      preferred_contact_method: 'phone' | 'email' | 'sms' | 'in_app';
+      contact_sharing_consent: boolean;
+    }): Promise<SubmissionResult> => {
       if (!user) throw new Error('Not authenticated');
-      const { error } = await supabase
-        .from('opportunity_applications')
-        .insert({ ...data, driver_user_id: user.id });
+      const key = stableKey(args.opportunity_id, 'apply', args.idempotency_key);
+      const { data, error } = await (supabase as any).rpc('submit_opportunity_application', {
+        _opportunity_id: args.opportunity_id,
+        _idempotency_key: key,
+        _message: args.message ?? null,
+        _availability_confirmed: args.availability_confirmed,
+        _requirements_confirmed: args.requirements_confirmed,
+        _truth_attestation: args.truth_attestation,
+        _preferred_contact_method: args.preferred_contact_method,
+        _contact_sharing_consent: args.contact_sharing_consent,
+      });
       if (error) throw error;
+      const row = Array.isArray(data) ? (data[0] as SubmissionResult | undefined) : (data as SubmissionResult | undefined);
+      return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
   });
 
-  // Driver withdraws own request via SECURITY DEFINER RPC
+  // Driver-initiated question — required question text and preferred contact method.
+  const submitRequestInfo = useMutation({
+    mutationFn: async (args: {
+      opportunity_id: string;
+      idempotency_key?: string;
+      question: string;
+      preferred_contact_method: 'phone' | 'email' | 'sms' | 'in_app';
+      contact_sharing_consent: boolean;
+    }): Promise<SubmissionResult> => {
+      if (!user) throw new Error('Not authenticated');
+      const key = stableKey(args.opportunity_id, 'request_info', args.idempotency_key);
+      const { data, error } = await (supabase as any).rpc('submit_request_info', {
+        _opportunity_id: args.opportunity_id,
+        _idempotency_key: key,
+        _question: args.question,
+        _preferred_contact_method: args.preferred_contact_method,
+        _contact_sharing_consent: args.contact_sharing_consent,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? (data[0] as SubmissionResult | undefined) : (data as SubmissionResult | undefined);
+      return assertSubmissionSuccess(row ?? null);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+  });
+
+  // Back-compat façade for legacy `createApplication.mutate(...)` callsites.
+  // Fails closed for unsupported application_type values (no silent misrouting)
+  // and reuses the same per-opportunity stable idempotency key across retries.
+  const createApplication = useMutation({
+    mutationFn: async (data: OpportunityApplicationInsert): Promise<SubmissionResult> => {
+      if (!user) throw new Error('Not authenticated');
+      if (data.application_type === 'apply') {
+        throw new Error('Formal apply requires the submitApplication mutation with whitelisted attestations.');
+      }
+      if (data.application_type !== 'request_info') {
+        throw new Error(`Unsupported application_type: ${String(data.application_type)}`);
+      }
+      const preferred = ((data as unknown as { preferred_contact_method?: string })
+        .preferred_contact_method as 'phone' | 'email' | 'sms' | 'in_app' | undefined) ?? 'in_app';
+      const explicitConsent = (data as unknown as { contact_sharing_consent?: boolean })
+        .contact_sharing_consent === true;
+      const callerKey = (data as unknown as { idempotency_key?: string }).idempotency_key;
+      const key = stableKey(data.opportunity_id, 'request_info', callerKey);
+      const { data: rpcData, error } = await (supabase as any).rpc('submit_request_info', {
+        _opportunity_id: data.opportunity_id,
+        _idempotency_key: key,
+        _question: data.message ?? '',
+        _preferred_contact_method: preferred,
+        _contact_sharing_consent: explicitConsent,
+      });
+      if (error) throw error;
+      const row = Array.isArray(rpcData) ? (rpcData[0] as SubmissionResult | undefined) : (rpcData as SubmissionResult | undefined);
+      return assertSubmissionSuccess(row ?? null);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+  });
+
   const withdrawApplication = useMutation({
     mutationFn: async (applicationId: string) => {
       const { error } = await supabase.rpc('withdraw_opportunity_application', {
@@ -137,6 +269,8 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     refetchRecruiter: recruiterQuery.refetch,
     // Mutations
     createApplication,
+    submitApplication,
+    submitRequestInfo,
     withdrawApplication,
     updateApplicationStatus,
     recordDriverResponse,

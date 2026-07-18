@@ -8,16 +8,22 @@ export type ApplicationStatus =
   | 'waiting_documents'
   | 'interviewing'
   | 'offer_sent'
+  // Phase 1H-A1 — new non-terminal stage between offer_sent and hired.
+  | 'onboarding'
   | 'hired'
   | 'rejected'
   | 'withdrawn'
   // Legacy — kept for safety on any stale rows
   | 'contacted';
 
+// Recruiters may only select transitions they are authorized to make from the
+// ordinary update path. onboarding/hired are workflow-only stages driven by
+// future dedicated RPCs (A3+); they are never recruiter-initiated actions.
 export type RecruiterTransition = Exclude<
   ApplicationStatus,
-  'new' | 'withdrawn' | 'contacted'
+  'new' | 'withdrawn' | 'contacted' | 'onboarding' | 'hired'
 >;
+
 
 const STATUS_RANK: Record<string, number> = {
   new: 1,
@@ -28,9 +34,10 @@ const STATUS_RANK: Record<string, number> = {
   waiting_documents: 5,
   interviewing: 6,
   offer_sent: 7,
-  hired: 8,
-  rejected: 8,
-  withdrawn: 8,
+  onboarding: 8,
+  hired: 9,
+  rejected: 9,
+  withdrawn: 9,
 };
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -42,6 +49,7 @@ export const STATUS_LABEL: Record<string, string> = {
   waiting_documents: 'Waiting on Documents',
   interviewing: 'Interviewing',
   offer_sent: 'Offer Sent',
+  onboarding: 'Onboarding',
   hired: 'Hired',
   rejected: 'Rejected',
   withdrawn: 'Withdrawn',
@@ -56,6 +64,7 @@ export const STATUS_BADGE_CLASS: Record<string, string> = {
   waiting_documents: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   interviewing: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   offer_sent: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+  onboarding: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   hired: 'bg-green-500/15 text-green-400 border-green-500/30',
   rejected: 'bg-red-500/15 text-red-400 border-red-500/30',
   withdrawn: 'bg-muted text-muted-foreground border-border',
@@ -75,7 +84,10 @@ const RECRUITER_NEXT: Record<string, RecruiterTransition[]> = {
   call_scheduled: ['waiting_documents', 'interviewing', 'rejected'],
   waiting_documents: ['interviewing', 'rejected'],
   interviewing: ['offer_sent', 'rejected'],
-  offer_sent: ['hired', 'rejected'],
+  // Phase 1H-A1 remediation: recruiters cannot select onboarding or hired.
+  // Onboarding is reserved for future driver offer-acceptance workflow.
+  offer_sent: ['rejected'],
+  onboarding: ['rejected'],
 };
 
 export function getAllowedRecruiterTransitions(currentStatus: string): RecruiterTransition[] {
@@ -90,7 +102,6 @@ export const RECRUITER_ACTION_LABEL: Record<RecruiterTransition, string> = {
   waiting_documents: 'Waiting on Docs',
   interviewing: 'Move to Interview',
   offer_sent: 'Send Offer',
-  hired: 'Hire',
   rejected: 'Reject',
 };
 
@@ -103,6 +114,7 @@ export const RECRUITER_PIPELINE_GROUPS: { key: string; label: string; statuses: 
   { key: 'docs', label: 'Waiting Docs', statuses: ['waiting_documents'] },
   { key: 'interview', label: 'Interviewing', statuses: ['interviewing'] },
   { key: 'offer', label: 'Offer Sent', statuses: ['offer_sent'] },
+  { key: 'onboarding', label: 'Onboarding', statuses: ['onboarding'] },
   { key: 'closed', label: 'Closed', statuses: ['hired', 'rejected', 'withdrawn'] },
 ];
 
@@ -117,7 +129,7 @@ export const DRIVER_PIPELINE_GROUPS: { key: string; label: string; statuses: str
   {
     key: 'interview',
     label: 'Interviewing & Offers',
-    statuses: ['interviewing', 'offer_sent'],
+    statuses: ['interviewing', 'offer_sent', 'onboarding'],
   },
   { key: 'closed', label: 'Closed', statuses: ['hired', 'rejected', 'withdrawn'] },
 ];
