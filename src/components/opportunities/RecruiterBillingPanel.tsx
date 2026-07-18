@@ -65,11 +65,11 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
 
 const FREE_VERIFIED_PERKS: PerkLabel[] = [
   'Unlimited standard opportunity posts',
-  'Admin-reviewed listings',
   'Basic applicant inbox',
   'Standard marketplace placement',
-  'Verified recruiter profile',
+  'Optional Verified Recruiter badge after verification',
 ];
+
 
 export function RecruiterBillingPanel() {
   const {
