@@ -46,8 +46,13 @@ export function useRecruiterProfile() {
   // immediately when an admin updates their recruiter_profiles row.
   useEffect(() => {
     if (!user) return;
+    // Use a per-mount unique channel topic so StrictMode's double-invoke
+    // (or any stale channel cached by realtime-js under the same topic)
+    // can never return an already-subscribed channel, which would make
+    // `.on('postgres_changes', ...)` throw "cannot add callbacks after subscribe()".
+    const topic = `recruiter_profile:${user.id}:${Math.random().toString(36).slice(2)}`;
     const channel = supabase
-      .channel(`recruiter_profile:${user.id}`)
+      .channel(topic)
       .on(
         'postgres_changes' as never,
         {
