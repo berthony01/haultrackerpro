@@ -78,6 +78,7 @@ const Index = () => {
   
   const { role, isLoading: roleLoading } = useUserRole();
   const { effectiveRole, setViewMode, canSwitch } = useViewMode();
+  const { isAdmin } = useAdmin();
   const isRecruiterView = effectiveRole === 'recruiter';
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
