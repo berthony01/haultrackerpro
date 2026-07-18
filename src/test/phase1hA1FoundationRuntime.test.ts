@@ -971,6 +971,161 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
       [appId, IDS.opportunity, freshDriver, IDS.recruiterProfile],
     );
     expect(draft.rows[0].id).toBeTruthy();
+
+    // Valid 24h and 30d boundaries accepted for every non-draft state, each on
+    // its own fresh application to avoid deleting historical offer rows and
+    // to respect the one-sent-per-app unique index.
+    for (const s of NON_DRAFT) {
+      const a24 = await createFreshApp(db, `pd-${s}-24`, IDS.opportunity, IDS.recruiterProfile);
+      const ok24 = await db.query<{ id: string; status: string }>(
+        `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
+         VALUES ($1,$2,$3,$4,$5::text,now(),now()+interval '24 hours','{"v":1}'::jsonb,1) RETURNING id, status`,
+        [a24.appId, IDS.opportunity, a24.driverId, IDS.recruiterProfile, s],
+      );
+      expect(ok24.rows[0].id).toBeTruthy();
+      expect(ok24.rows[0].status).toBe(s);
+
+      const a30 = await createFreshApp(db, `pd-${s}-30`, IDS.opportunity, IDS.recruiterProfile);
+      const ok30 = await db.query<{ id: string; status: string }>(
+        `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
+         VALUES ($1,$2,$3,$4,$5::text,now(),now()+interval '30 days','{"v":1}'::jsonb,1) RETURNING id, status`,
+        [a30.appId, IDS.opportunity, a30.driverId, IDS.recruiterProfile, s],
+      );
+      expect(ok30.rows[0].id).toBeTruthy();
+      expect(ok30.rows[0].status).toBe(s);
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Real DB reapplication proof (item 2) — no Supabase client mock.
+  // ---------------------------------------------------------------------
+
+  it('reapplication after rejected: key A created → rejected → key A replay → key B new application', async () => {
+    // Fresh Driver + profile so we can safely mutate to a terminal status.
+    await asOwner(db);
+    const driver = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    await db.exec(
+      `INSERT INTO auth.users(id,email) VALUES ('${driver}','reapply-rej@test') ON CONFLICT DO NOTHING;
+       INSERT INTO public.driver_opportunity_profiles(user_id, full_name, email, phone, profile_completed)
+         VALUES ('${driver}','Reapply Rej','reapply-rej@test','555-4001', true)
+         ON CONFLICT DO NOTHING;`,
+    );
+
+    const KEY_R_A = 'reapply-rej-key-a-000001';
+    const KEY_R_B = 'reapply-rej-key-b-000001';
+
+    // 1. First apply as authenticated Driver — created.
+    await asAuthenticated(db, driver);
+    const r1 = await db.query<{ application_id: string; application_status: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'first', true, true, true, 'email', true
+       )`,
+      [IDS.opportunity, KEY_R_A],
+    );
+    expect(r1.rows[0].result_code).toBe('created');
+    const firstId = r1.rows[0].application_id;
+    expect(firstId).toBeTruthy();
+
+    // 2. Recruiter (owner of opportunity) legally moves new → rejected via the
+    //    ordinary UPDATE path — this is the recruiter's real production path.
+    await asAuthenticated(db, IDS.recruiterUser);
+    const upd = await db.query<{ status: string }>(
+      `UPDATE public.opportunity_applications SET status='rejected' WHERE id=$1 RETURNING status`,
+      [firstId],
+    );
+    expect(upd.rows[0].status).toBe('rejected');
+
+    // 3. Reapply with SAME key A → idempotent_replay pointing at the same row.
+    await asAuthenticated(db, driver);
+    const r2 = await db.query<{ application_id: string; application_status: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'replay', true, true, true, 'email', true
+       )`,
+      [IDS.opportunity, KEY_R_A],
+    );
+    expect(r2.rows[0].result_code).toBe('idempotent_replay');
+    expect(r2.rows[0].application_id).toBe(firstId);
+    expect(r2.rows[0].application_status).toBe('rejected');
+
+    // 4. Reapply with NEW key B → a distinct new formal application is created.
+    const r3 = await db.query<{ application_id: string; application_status: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'reapply', true, true, true, 'email', true
+       )`,
+      [IDS.opportunity, KEY_R_B],
+    );
+    expect(r3.rows[0].result_code).toBe('created');
+    expect(r3.rows[0].application_id).not.toBe(firstId);
+    expect(r3.rows[0].application_status).toBe('new');
+
+    // Two distinct formal apply rows exist for (driver, opportunity).
+    await asOwner(db);
+    const rows = await db.query<{ id: string; status: string; idempotency_key: string }>(
+      `SELECT id, status, idempotency_key FROM public.opportunity_applications
+        WHERE driver_user_id=$1 AND opportunity_id=$2 AND application_type='apply'
+        ORDER BY submitted_at ASC`,
+      [driver, IDS.opportunity],
+    );
+    expect(rows.rows.length).toBe(2);
+    expect(rows.rows.map((r) => r.idempotency_key).sort()).toEqual([KEY_R_A, KEY_R_B].sort());
+    expect(rows.rows.map((r) => r.status).sort()).toEqual(['new', 'rejected']);
+  });
+
+  it('reapplication after withdrawn: key A created → withdrawn (GUC path) → key A replay → key B new application', async () => {
+    await asOwner(db);
+    const driver = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+    await db.exec(
+      `INSERT INTO auth.users(id,email) VALUES ('${driver}','reapply-wd@test') ON CONFLICT DO NOTHING;
+       INSERT INTO public.driver_opportunity_profiles(user_id, full_name, email, phone, profile_completed)
+         VALUES ('${driver}','Reapply Wd','reapply-wd@test','555-4002', true)
+         ON CONFLICT DO NOTHING;`,
+    );
+
+    const KEY_W_A = 'reapply-wd-key-a-000001';
+    const KEY_W_B = 'reapply-wd-key-b-000001';
+
+    await asAuthenticated(db, driver);
+    const r1 = await db.query<{ application_id: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'first', true, true, true, 'email', true
+       )`,
+      [IDS.opportunity, KEY_W_A],
+    );
+    expect(r1.rows[0].result_code).toBe('created');
+    const firstId = r1.rows[0].application_id;
+
+    // Withdrawn transition is only allowed under the app.allow_driver_withdraw
+    // GUC (the same path the dedicated withdraw RPC would set). Represent that
+    // path directly rather than dropping the terminal-status coverage.
+    await asOwner(db);
+    await db.exec(`SET app.allow_driver_withdraw = 'true';`);
+    const upd = await db.query<{ status: string }>(
+      `UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1 RETURNING status`,
+      [firstId],
+    );
+    await db.exec(`RESET app.allow_driver_withdraw;`);
+    expect(upd.rows[0].status).toBe('withdrawn');
+
+    await asAuthenticated(db, driver);
+    const r2 = await db.query<{ application_id: string; application_status: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'replay', true, true, true, 'email', true
+       )`,
+      [IDS.opportunity, KEY_W_A],
+    );
+    expect(r2.rows[0].result_code).toBe('idempotent_replay');
+    expect(r2.rows[0].application_id).toBe(firstId);
+    expect(r2.rows[0].application_status).toBe('withdrawn');
+
+    const r3 = await db.query<{ application_id: string; result_code: string; application_status: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'reapply', true, true, true, 'email', true
+       )`,
+      [IDS.opportunity, KEY_W_B],
+    );
+    expect(r3.rows[0].result_code).toBe('created');
+    expect(r3.rows[0].application_id).not.toBe(firstId);
+    expect(r3.rows[0].application_status).toBe('new');
   });
 
   it('unrelated billing tables are not altered', async () => {
