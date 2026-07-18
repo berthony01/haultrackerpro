@@ -130,21 +130,52 @@ export function RecruiterBillingPanel() {
     : 'Standard Access';
 
   return (
-    <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/5 space-y-5">
-      <div className="flex items-start gap-3">
+    <Card
+      className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/5 space-y-5 overflow-hidden"
+      aria-labelledby="recruiter-billing-heading"
+    >
+      <div className="flex items-start gap-3 min-w-0">
         <div className="rounded-xl bg-primary p-2.5 shadow-primary shrink-0">
-          <CreditCard className="h-5 w-5 text-primary-foreground" />
+          <CreditCard className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-foreground">Recruiter Plan</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 id="recruiter-billing-heading" className="text-lg font-bold text-foreground">
+            Recruiter Plan
+          </h2>
+          <p className="text-xs text-muted-foreground break-words">
             Recruiters with a complete, non-suspended profile can post standard opportunities. Verification adds a Verified Recruiter badge. Paid plans add premium recruiting tools, limits, and reporting.
           </p>
         </div>
-        <Button size="sm" variant="ghost" onClick={refresh} disabled={isLoading}>
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={refresh}
+          disabled={isLoading}
+          aria-label="Refresh billing status"
+          aria-busy={isLoading || undefined}
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            'Refresh'
+          )}
         </Button>
       </div>
+
+      {statusMessage && (
+        <div
+          role={statusMessage.kind === 'error' ? 'alert' : 'status'}
+          aria-live={statusMessage.kind === 'error' ? 'assertive' : 'polite'}
+          data-testid="recruiter-billing-status"
+          className={
+            statusMessage.kind === 'error'
+              ? 'text-xs text-destructive'
+              : 'text-xs text-muted-foreground'
+          }
+        >
+          {statusMessage.text}
+        </div>
+      )}
 
       <Card className="p-4 border-border/60 bg-muted/20 space-y-3">
         <div className="flex items-center gap-2">
