@@ -653,12 +653,11 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     expect(Object.keys(safe.rows[0]).sort()).toEqual(['ends_at','restriction','scope','starts_at']);
     expect(safe.rows[0].restriction).toBe('blocked');
 
-    await expect(
-      db.query(
-        `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('blocked-apply-key-1', 'x', true)})`,
-        [IDS.opportunity],
-      ),
-    ).rejects.toThrow(/restricted from submitting/);
+    const blocked = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(${APPLY_ARGS('blocked-apply-key-1', 'x', true)})`,
+      [IDS.opportunity],
+    );
+    expect(blocked.rows[0].result_code).toBe('restricted');
   });
 
   it('recruiter RLS update cannot set onboarding or hired; only rejection remains', async () => {
