@@ -816,14 +816,17 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
   });
 
   it('offer FK relationships are RESTRICT — deleting application/opportunity/recruiter is blocked when offer exists', async () => {
+    // Non-destructive fixture: create its own fresh app + sent offer so this
+    // test does not depend on any earlier test leaving an offer behind.
+    const fresh = await createFreshApp(db, 'fk-restrict', IDS.opportunity, IDS.recruiterProfile);
     await asOwner(db);
-    const app = await db.query<{ id: string }>(
-      `SELECT id FROM public.opportunity_applications
-        WHERE driver_user_id=$1 AND opportunity_id=$2 AND application_type='apply' LIMIT 1`,
-      [IDS.driverB, IDS.opportunity],
+    await db.query(
+      `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
+       VALUES ($1,$2,$3,$4,'sent',now(),now()+interval '7 days','{"v":1}'::jsonb,1)`,
+      [fresh.appId, IDS.opportunity, fresh.driverId, IDS.recruiterProfile],
     );
     await expect(
-      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [app.rows[0].id]),
+      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [fresh.appId]),
     ).rejects.toThrow(/violates foreign key constraint|update or delete/i);
     await expect(
       db.query(`DELETE FROM public.opportunities WHERE id=$1`, [IDS.opportunity]),
