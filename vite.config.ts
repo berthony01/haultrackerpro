@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { htpBuildShaPlugin } from "./vite/htpBuildShaPlugin";
+
 
 // CRITICAL: Production-build resilience for Supabase env injection.
 //
