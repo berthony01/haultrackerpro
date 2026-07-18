@@ -308,6 +308,10 @@ class StripeFake implements StripeGateway {
   failNextListSubs = 0;
   failNextCreateSession = 0;
   failNextRetrieveCustomer = 0;
+  // Narrow mutation hook: transforms the session about to be returned/stored
+  // by createSession. Used to prove the orchestrator rejects malformed
+  // Stripe returns without duplicating orchestrator logic.
+  sessionCreateMutator: ((s: StripeSessionLike) => StripeSessionLike) | null = null;
   // Search injection: exact-metadata search returns these when set
   metadataSearchOverride: StripeCustomerRecord[] | null = null;
   // Email-only lookalike customers to prove they are ignored
@@ -386,13 +390,14 @@ class StripeFake implements StripeGateway {
       throw new Error("stripe transient");
     }
     const id = this.nextId("cs");
-    const session: StripeSessionLike = {
+    const base: StripeSessionLike = {
       id, status: "open",
       url: `https://checkout.stripe.example/${id}`,
       customer: input.customerId,
       expires_at: input.expiresAt,
       metadata: { ...input.metadata },
     };
+    const session = this.sessionCreateMutator ? this.sessionCreateMutator(base) : base;
     this.sessions.set(id, session);
     this.sessionIdemp.set(input.idempotencyKey, id);
     this.createdSessions.push(id);
@@ -725,5 +730,114 @@ describe("Phase 1G-R1A2 — recruiter checkout orchestrator", () => {
     // exists and the old flow no longer branches on billingRow directly.
     expect(src.includes("billingRow")).toBe(false);
     expect(src.includes("buildDeps(")).toBe(true);
+  });
+
+
+
+  // ---------------------------------------------------------------------
+  // Phase 1G-R1A2-R1 — session identity + safe-logging closure
+  // ---------------------------------------------------------------------
+
+  describe("R1 — newly created session validation (fresh claim path)", () => {
+    for (const badStatus of ["complete", "expired", "", "some_future_status"]) {
+      it(`21.${badStatus || "empty"} rejects returned session with status "${badStatus}" and never completes`, async () => {
+        stripe.sessionCreateMutator = (s) => ({ ...s, status: badStatus });
+        const r = await runRecruiterCheckout(baseInput(), deps);
+        expect(r.status).toBe(409);
+        expect(r.code).toBe("session_invalid");
+        expect(intents.completeCalls).toBe(0);
+        // Terminal fail is recorded with the stable code.
+        expect(intents.failCalls.some((f) => f.terminal && f.errorCode === "session_invalid_return")).toBe(true);
+      });
+    }
+
+    it("22. rejects returned session with metadata mismatch and never completes", async () => {
+      stripe.sessionCreateMutator = (s) => ({
+        ...s,
+        metadata: { ...s.metadata, plan: "starter" }, // requested was 'growth'
+      });
+      const r = await runRecruiterCheckout(baseInput(), deps);
+      expect(r.status).toBe(409);
+      expect(r.code).toBe("session_invalid");
+      expect(intents.completeCalls).toBe(0);
+      expect(intents.failCalls.some((f) => f.terminal && f.errorCode === "session_invalid_return")).toBe(true);
+    });
+
+    it("23a. rejects returned session expires_at earlier than requested and never completes", async () => {
+      stripe.sessionCreateMutator = (s) => ({ ...s, expires_at: s.expires_at - 60 });
+      const r = await runRecruiterCheckout(baseInput(), deps);
+      expect(r.code).toBe("session_invalid");
+      expect(intents.completeCalls).toBe(0);
+    });
+
+    it("23b. rejects returned session expires_at later than requested and never completes", async () => {
+      stripe.sessionCreateMutator = (s) => ({ ...s, expires_at: s.expires_at + 60 });
+      const r = await runRecruiterCheckout(baseInput(), deps);
+      expect(r.code).toBe("session_invalid");
+      expect(intents.completeCalls).toBe(0);
+    });
+
+    it("23c. requested expiration equals injected clock + RECRUITER_CHECKOUT_TTL_SECONDS", async () => {
+      const nowAtCall = clock.nowSeconds();
+      const r = await runRecruiterCheckout(baseInput(), deps);
+      expect(r.code).toBe("checkout_ready");
+      expect(stripe.createSessionCalls[0].expiresAt).toBe(nowAtCall + RECRUITER_CHECKOUT_TTL_SECONDS);
+    });
+  });
+
+  describe("R1 — ready-candidate canonical integrity (no intent fallback)", () => {
+    it("24. ready candidate with no canonical DB customer is rejected even when intent has one", async () => {
+      // Produce a ready intent normally.
+      const first = await runRecruiterCheckout(baseInput(), deps);
+      expect(first.code).toBe("checkout_ready");
+      // Wipe canonical billing while the intent still points at the customer.
+      intents.billing.clear();
+      const r = await runRecruiterCheckout(baseInput(), deps);
+      expect(r.status).toBe(409);
+      expect(r.code).toBe("support_required");
+      // Ready path has no claim token — no fail call on this path.
+      expect(intents.failCalls.length).toBe(0);
+    });
+
+    it("25. ready candidate with canonical differing from intent customer is rejected", async () => {
+      const first = await runRecruiterCheckout(baseInput(), deps);
+      expect(first.code).toBe("checkout_ready");
+      // Mutate canonical to a different customer id than the ready row's stored one.
+      intents.billing.set(`${RECRUITER_ID}:${USER_ID}`, "cus_different");
+      const r = await runRecruiterCheckout(baseInput(), deps);
+      expect(r.status).toBe(409);
+      expect(r.code).toBe("customer_conflict");
+      expect(intents.failCalls.length).toBe(0);
+    });
+  });
+
+  describe("R1 — source integrity: safe logging + fail-closed normalization", () => {
+    const edgeSrc = readFileSync(
+      resolve(__dirname, "../../supabase/functions/create-recruiter-checkout/index.ts"),
+      "utf8",
+    );
+
+    it("26. edge source contains no raw exception logging patterns", () => {
+      // Concrete tripwires: raw error interpolation into logs.
+      expect(edgeSrc).not.toMatch(/\be\.message\b/);
+      expect(edgeSrc).not.toMatch(/\bString\(\s*e\s*\)/);
+      expect(edgeSrc).not.toMatch(/\.stack\b/);
+      // No template interpolation of an `e`/`err`/`error` variable inside log/console calls.
+      expect(edgeSrc).not.toMatch(/log\([^)]*\$\{\s*(e|err|error)\b/);
+      expect(edgeSrc).not.toMatch(/console\.[a-z]+\([^)]*\$\{\s*(e|err|error)\b/);
+      // No raw error object interpolation into JSON responses.
+      expect(edgeSrc).not.toMatch(/message:\s*e\b/);
+      expect(edgeSrc).not.toMatch(/message:\s*String\(\s*e\s*\)/);
+      // Positive: the stable safe-log event exists.
+      expect(edgeSrc).toContain('log("request_failed"');
+    });
+
+    it("27. edge normalizeSession does not default status to open and preserves invalid defaults", () => {
+      // Enforce structural invariants of the fail-closed normalizer.
+      expect(edgeSrc).not.toMatch(/status:\s*s\?\.status\s*\?\?\s*["']open["']/);
+      expect(edgeSrc).toContain('typeof s?.status === "string" ? s.status : ""');
+      // id must not default to a truthy value that would slip past validation.
+      expect(edgeSrc).toContain('typeof s?.id === "string" ? s.id : ""');
+    });
   });
 });

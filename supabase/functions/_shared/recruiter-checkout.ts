@@ -664,14 +664,18 @@ async function handleClaimed(
     return resultTransient();
   }
   const session = createCall.value;
-  if (
-    !session.id ||
-    !session.url ||
-    session.url.trim() === "" ||
-    session.customer !== customerId ||
-    typeof session.expires_at !== "number" ||
-    session.expires_at <= nowSec
-  ) {
+  // Full return-session identity contract. All conditions required; any
+  // mismatch is terminal — the returned session must not be persisted.
+  const returnedOk =
+    !!session &&
+    typeof session.id === "string" && session.id !== "" &&
+    session.status === "open" &&
+    typeof session.url === "string" && session.url.trim() !== "" &&
+    session.customer === customerId &&
+    typeof session.expires_at === "number" &&
+    session.expires_at === expiresAt &&
+    sessionMetadataMatches(session, metadata);
+  if (!returnedOk) {
     await safeFail(deps, intentId, claimToken, "session_invalid_return", true);
     return resultSessionInvalid();
   }
@@ -693,7 +697,7 @@ async function handleClaimed(
     return resultTransient();
   }
 
-  return resultReady(session.url);
+  return resultReady(session.url as string);
 }
 
 // ---------------------------------------------------------------------------
@@ -703,13 +707,13 @@ async function handleClaimed(
 type CustomerResolveOk = { kind: "ok"; customer: StripeCustomerLike };
 type CustomerResolveErr = { kind: "err"; result: RecruiterCheckoutResult };
 
-/** For the ready-candidate path (no claim token) — validate stored customer. */
+/** For the ready-candidate path (no claim token) — canonical row is
+ *  authoritative. Never falls back to the intent's stored customer. */
 async function resolveCanonicalCustomer(
   input: RecruiterCheckoutInput,
   deps: RecruiterCheckoutDeps,
   storedCustomerId: string,
 ): Promise<CustomerResolveOk | CustomerResolveErr> {
-  // If DB has a canonical row, treat it as authoritative and use that.
   const canonCall = await safeCall(() =>
     deps.intents.loadCanonicalCustomer({
       recruiterId: input.recruiterId,
@@ -717,7 +721,13 @@ async function resolveCanonicalCustomer(
     }),
   );
   if (!canonCall.ok) return { kind: "err", result: resultTransient() };
-  const canonicalId = canonCall.value.stripeCustomerId ?? storedCustomerId;
+
+  const canonicalId = canonCall.value.stripeCustomerId;
+  // Canonical row must exist for a ready-state intent. No intent fallback.
+  if (!canonicalId) {
+    return { kind: "err", result: resultSupport() };
+  }
+  // Canonical must equal what the ready intent recorded.
   if (canonicalId !== storedCustomerId) {
     return { kind: "err", result: resultCustomerConflict() };
   }
