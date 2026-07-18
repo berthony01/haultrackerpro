@@ -71,22 +71,28 @@ const STANDARD_ACCESS_PERKS: PerkLabel[] = [
 ];
 
 export function RecruiterBillingPanel() {
+  const hook = useRecruiterBilling();
   const {
-    billing,
     plan,
     isBillingActive,
     isLoading,
     startCheckout,
     openPortal,
-    prepareTab,
     refresh,
-    uiState,
-    canStartCheckout,
-    showManageBilling,
-    checkStatus,
-    headline,
-    checkServerStatus,
-  } = useRecruiterBilling();
+  } = hook;
+  // Defensive defaults: legacy call sites (and rendered-copy tests) mock
+  // this hook with a narrower shape. When new-state fields are absent, the
+  // panel degrades to the eligible-idle, no-headline default rather than
+  // throwing.
+  const prepareTab = hook.prepareTab ?? (() => {});
+  const uiState = hook.uiState ?? ({ kind: 'eligible_idle' } as const);
+  const canStartCheckout = hook.canStartCheckout ?? true;
+  const showManageBilling =
+    hook.showManageBilling ?? !!hook.billing?.stripe_subscription_id;
+  const checkStatus =
+    hook.checkStatus ?? { visible: false, clickable: false };
+  const headline = hook.headline ?? null;
+  const checkServerStatus = hook.checkServerStatus ?? (() => {});
 
   const [pendingPlan, setPendingPlan] = useState<PaidPlan | null>(null);
   const [fallback, setFallback] = useState<{
