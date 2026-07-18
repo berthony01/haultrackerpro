@@ -1,9 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
-import { createHtpBuildVersionPlugin } from "./build/htpBuildVersion";
+import { createHtpBuildVersionPlugin } from "./src/lib/htpBuildVersion";
 
 // CRITICAL: Production-build resilience for Supabase env injection.
 //
@@ -40,6 +41,17 @@ const resolvedSupabaseProjectId =
     ? process.env.VITE_SUPABASE_PROJECT_ID
     : FALLBACK_SUPABASE_PROJECT_ID;
 
+function readGitHeadSha(): string | undefined {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return undefined;
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   define: {
@@ -60,7 +72,10 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
-    mode === "production" && createHtpBuildVersionPlugin(),
+    mode === "production" && createHtpBuildVersionPlugin({
+      env: process.env,
+      readGitSha: readGitHeadSha,
+    }),
     // PWA service worker is intentionally DISABLED in self-destroying mode.
     // Reason: a previous Workbox precache SW (`/sw.js`) cached the entire
     // build (`index.html` + hashed `/assets/*`) on every visitor's browser.
