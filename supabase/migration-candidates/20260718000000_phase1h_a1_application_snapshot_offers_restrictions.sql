@@ -631,6 +631,9 @@ DECLARE
   _allow_driver_accept_offer boolean;
   _allowed text[];
 BEGIN
+  _allow_withdraw := (current_setting('app.allow_driver_withdraw', true) = 'true');
+  _allow_driver_accept_offer := (current_setting('app.allow_driver_accept_offer', true) = 'true');
+
   IF public.is_admin(auth.uid()) THEN
     NEW.updated_at := now();
     RETURN NEW;
@@ -650,14 +653,15 @@ BEGIN
      OR NEW.snapshot_version IS DISTINCT FROM OLD.snapshot_version
      OR NEW.idempotency_key IS DISTINCT FROM OLD.idempotency_key
      OR NEW.submitted_at IS DISTINCT FROM OLD.submitted_at
+     OR (
+          NEW.withdrawn_at IS DISTINCT FROM OLD.withdrawn_at
+          AND NOT (_allow_withdraw AND NEW.status = 'withdrawn')
+        )
      OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'Recruiters may only update application status.' USING ERRCODE = '42501';
   END IF;
 
   IF NEW.status IS DISTINCT FROM OLD.status THEN
-    _allow_withdraw := (current_setting('app.allow_driver_withdraw', true) = 'true');
-    _allow_driver_accept_offer := (current_setting('app.allow_driver_accept_offer', true) = 'true');
-
     IF _allow_withdraw AND NEW.status = 'withdrawn' THEN
       NEW.withdrawn_at := COALESCE(NEW.withdrawn_at, now());
       NEW.updated_at := now();
