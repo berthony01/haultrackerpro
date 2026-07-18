@@ -267,7 +267,8 @@ describe('Phase 1H-A1 — foundation candidate migration (PGlite)', () => {
        WHERE proname='submit_opportunity_application' AND pronamespace='public'::regnamespace`,
     );
     const s = acl.rows[0].acl ?? '';
-    expect(s).not.toContain('=X/'); // no PUBLIC EXECUTE
+    // No PUBLIC EXECUTE — a PUBLIC grant serializes with an empty grantee, e.g. "=X/owner".
+    expect(/(^|,)=X\//.test(s)).toBe(false);
     expect(s).toContain('authenticated=X');
   });
 
