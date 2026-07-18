@@ -112,8 +112,10 @@ export function RecruiterBillingPanel() {
   const isPending = startCheckout.isPending || openPortal.isPending;
 
   const handleUpgrade = (p: PaidPlan) => {
+    if (actionInFlightRef.current) return;
     if (isPending) return;
     if (!canStartCheckout) return;
+    actionInFlightRef.current = true;
     setFallback(null);
     // Synchronous popup MUST come before any awaited work so browsers
     // treat it as user-gesture initiated. Same deterministic name across
@@ -122,10 +124,12 @@ export function RecruiterBillingPanel() {
     setPendingPlan(p);
     startCheckout.mutate(p, {
       onSuccess: () => {
+        actionInFlightRef.current = false;
         setPendingPlan(null);
         toast.success('Opening checkout in a new tab…');
       },
       onError: (e: Error) => {
+        actionInFlightRef.current = false;
         setPendingPlan(null);
         const err = e as RecruiterCheckoutFailure;
         if (err.fallbackUrl) {
@@ -141,14 +145,18 @@ export function RecruiterBillingPanel() {
   };
 
   const handlePortal = () => {
+    if (actionInFlightRef.current) return;
     if (isPending) return;
+    actionInFlightRef.current = true;
     setFallback(null);
     prepareTab();
     openPortal.mutate(undefined, {
       onSuccess: () => {
+        actionInFlightRef.current = false;
         toast.success('Opening billing portal…');
       },
       onError: (e: Error) => {
+        actionInFlightRef.current = false;
         const err = e as RecruiterCheckoutFailure;
         if (err.fallbackUrl) {
           setFallback({
