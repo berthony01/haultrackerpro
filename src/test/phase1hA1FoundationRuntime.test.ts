@@ -722,7 +722,10 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     ).rejects.toThrow(/permission denied|violates row-level security/i);
   });
 
-  it('offers: 23h expiry rejected, >30d expiry rejected, exactly 24h and 30d accepted, snapshot required', async () => {
+  it('offers (sent): 23h rejected, >30d rejected, snapshot required, 24h and 30d accepted on separate fresh apps', async () => {
+    // Non-destructive: never delete historical offer rows. Each boundary
+    // acceptance uses its own fresh Driver + application so the
+    // one_sent_per_app unique index is not artificially freed.
     await asOwner(db);
     const app = await db.query<{ id: string }>(
       `SELECT id FROM public.opportunity_applications
@@ -731,7 +734,7 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     );
     const appId = app.rows[0].id;
 
-    // 23 hours — rejected
+    // Rejections against the existing driverB app — no row is created.
     await expect(
       db.query(
         `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
@@ -739,8 +742,6 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
         [appId, IDS.opportunity, IDS.driverB, IDS.recruiterProfile],
       ),
     ).rejects.toThrow(/opportunity_offers_sent_expiry_chk/);
-
-    // >30 days — rejected
     await expect(
       db.query(
         `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
@@ -748,8 +749,6 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
         [appId, IDS.opportunity, IDS.driverB, IDS.recruiterProfile],
       ),
     ).rejects.toThrow(/opportunity_offers_sent_expiry_chk/);
-
-    // Missing snapshot — rejected
     await expect(
       db.query(
         `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
@@ -758,25 +757,21 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
       ),
     ).rejects.toThrow(/opportunity_offers_post_draft_snapshot_chk|opportunity_offers_sent_expiry_chk/);
 
-    // Exactly 24h — accepted
-    const okId = await db.query<{ id: string }>(
+    // Accepted 24h boundary — fresh driver + fresh formal application.
+    const app24 = await createFreshApp(db, 'offer-24h', IDS.opportunity, IDS.recruiterProfile);
+    const ok24 = await db.query<{ id: string }>(
       `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
        VALUES ($1,$2,$3,$4,'sent',now(),now()+interval '24 hours','{"v":1}'::jsonb,1) RETURNING id`,
-      [appId, IDS.opportunity, IDS.driverB, IDS.recruiterProfile],
+      [app24.appId, IDS.opportunity, app24.driverId, IDS.recruiterProfile],
     );
-    expect(okId.rows[0].id).toBeTruthy();
+    expect(ok24.rows[0].id).toBeTruthy();
 
-    // Exactly 30d on a separate app (delete the sent one to satisfy one-sent-per-app)
-    await db.query(`UPDATE public.opportunity_offers SET status='canceled', canceled_at=now() WHERE id=$1`, [okId.rows[0].id]);
-    // Above update violates immutability once sent — swallow if fails, then delete raw as owner
-    // Owner bypasses triggers only when SECURITY DEFINER — the guard runs as definer either way,
-    // so cleanup via DELETE which is not guarded by the update trigger.
-    await db.exec(`DELETE FROM public.opportunity_offers WHERE application_id='${appId}';`).catch(() => undefined);
-
+    // Accepted 30d boundary — separate fresh driver + fresh formal application.
+    const app30 = await createFreshApp(db, 'offer-30d', IDS.opportunity, IDS.recruiterProfile);
     const ok30 = await db.query<{ id: string }>(
       `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
        VALUES ($1,$2,$3,$4,'sent',now(),now()+interval '30 days','{"v":1}'::jsonb,1) RETURNING id`,
-      [appId, IDS.opportunity, IDS.driverB, IDS.recruiterProfile],
+      [app30.appId, IDS.opportunity, app30.driverId, IDS.recruiterProfile],
     );
     expect(ok30.rows[0].id).toBeTruthy();
   });
