@@ -259,9 +259,19 @@ export function RecruiterBillingPanel() {
                 className="w-full"
                 variant={isCurrent ? 'outline' : 'default'}
                 disabled={startCheckout.isPending || isCurrent}
+                aria-busy={startCheckout.isPending || undefined}
                 onClick={() => handleUpgrade(p.key)}
               >
-                {isCurrent ? 'Active' : `Choose ${RECRUITER_PLAN_LABELS[p.key]}`}
+                {startCheckout.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    <span>Preparing…</span>
+                  </>
+                ) : isCurrent ? (
+                  'Active'
+                ) : (
+                  `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
+                )}
               </Button>
             </Card>
           );
@@ -269,8 +279,14 @@ export function RecruiterBillingPanel() {
       </div>
 
       {billing?.stripe_subscription_id && (
-        <Button variant="outline" size="sm" onClick={handlePortal} disabled={openPortal.isPending}>
-          <ExternalLink className="h-4 w-4" /> Manage Billing
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePortal}
+          disabled={openPortal.isPending}
+          aria-busy={openPortal.isPending || undefined}
+        >
+          <ExternalLink className="h-4 w-4" aria-hidden="true" /> Manage Billing
         </Button>
       )}
 
