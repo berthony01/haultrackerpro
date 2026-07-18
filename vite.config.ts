@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { createHtpBuildVersionPlugin } from "./build/htpBuildVersion";
 
 // CRITICAL: Production-build resilience for Supabase env injection.
 //
@@ -59,6 +60,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
+    mode === "production" && createHtpBuildVersionPlugin(),
     // PWA service worker is intentionally DISABLED in self-destroying mode.
     // Reason: a previous Workbox precache SW (`/sw.js`) cached the entire
     // build (`index.html` + hashed `/assets/*`) on every visitor's browser.
