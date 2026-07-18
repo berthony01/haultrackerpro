@@ -8,6 +8,12 @@ import {
   isRecruiterPaidPlanActive,
   resolveRecruiterCapabilityTier,
 } from '@/lib/recruiterCapabilities';
+import {
+  isSafeStripeCheckoutUrl,
+  parseCheckoutError,
+  RECRUITER_CHECKOUT_MESSAGES,
+  type ParsedCheckoutError,
+} from '@/lib/opportunities/recruiterCheckoutMessages';
 
 export type RecruiterBilling = Tables<'recruiter_billing_profiles'>;
 export type RecruiterPlan = 'none' | 'starter' | 'growth' | 'fleet';
@@ -99,13 +105,31 @@ export function useRecruiterBilling() {
 
   const startCheckout = useMutation({
     mutationFn: async (selectedPlan: Exclude<RecruiterPlan, 'none'>) => {
-      const { data, error } = await supabase.functions.invoke('create-recruiter-checkout', {
-        body: { plan: selectedPlan },
-      });
-      if (error) throw error;
-      const url = (data as { url?: string } | null)?.url;
-      if (!url) throw new Error('No checkout URL returned');
-      window.open(url, '_blank');
+      // Phase 1G-R1A7: extract structured {code,message}, validate URL is a
+      // real Stripe checkout URL before redirecting, and never leak raw
+      // server errors, IDs, or stale URLs to the browser.
+      const { data, error } = await supabase.functions.invoke(
+        'create-recruiter-checkout',
+        { body: { plan: selectedPlan } },
+      );
+      if (error) {
+        const parsed = await parseCheckoutError(error);
+        const err = new Error(parsed.message) as Error & {
+          code: ParsedCheckoutError['code'];
+        };
+        err.code = parsed.code;
+        throw err;
+      }
+      const url = (data as { url?: unknown } | null)?.url;
+      if (!isSafeStripeCheckoutUrl(url)) {
+        const err = new Error(
+          RECRUITER_CHECKOUT_MESSAGES.session_invalid,
+        ) as Error & { code: ParsedCheckoutError['code'] };
+        err.code = 'session_invalid';
+        throw err;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return { code: 'checkout_ready' as const };
     },
   });
 

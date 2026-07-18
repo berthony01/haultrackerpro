@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -82,17 +83,45 @@ export function RecruiterBillingPanel() {
     refresh,
   } = useRecruiterBilling();
 
+  // Phase 1G-R1A7: aria-live status region. Complements sonner toasts with
+  // an assistive-tech-friendly announcement anchored to the billing card.
+  const [statusMessage, setStatusMessage] = useState<{
+    kind: 'success' | 'error' | 'info';
+    text: string;
+  } | null>(null);
+
   const handleUpgrade = (p: PaidPlan) => {
+    if (startCheckout.isPending) return; // hard client-side dedupe on rapid clicks
+    setStatusMessage({ kind: 'info', text: 'Preparing secure checkout…' });
     startCheckout.mutate(p, {
-      onSuccess: () => toast.success('Opening checkout in a new tab…'),
-      onError: (e: Error) => toast.error(e.message),
+      onSuccess: () => {
+        setStatusMessage({
+          kind: 'success',
+          text: 'Opening checkout in a new tab.',
+        });
+        toast.success('Opening checkout in a new tab…');
+      },
+      onError: (e: Error) => {
+        setStatusMessage({ kind: 'error', text: e.message });
+        toast.error(e.message);
+      },
     });
   };
 
   const handlePortal = () => {
+    if (openPortal.isPending) return;
     openPortal.mutate(undefined, {
-      onSuccess: () => toast.success('Opening billing portal…'),
-      onError: (e: Error) => toast.error(e.message),
+      onSuccess: () => {
+        setStatusMessage({
+          kind: 'success',
+          text: 'Opening billing portal in a new tab.',
+        });
+        toast.success('Opening billing portal…');
+      },
+      onError: (e: Error) => {
+        setStatusMessage({ kind: 'error', text: e.message });
+        toast.error(e.message);
+      },
     });
   };
 
@@ -101,21 +130,52 @@ export function RecruiterBillingPanel() {
     : 'Standard Access';
 
   return (
-    <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/5 space-y-5">
-      <div className="flex items-start gap-3">
+    <Card
+      className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/5 space-y-5 overflow-hidden"
+      aria-labelledby="recruiter-billing-heading"
+    >
+      <div className="flex items-start gap-3 min-w-0">
         <div className="rounded-xl bg-primary p-2.5 shadow-primary shrink-0">
-          <CreditCard className="h-5 w-5 text-primary-foreground" />
+          <CreditCard className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-foreground">Recruiter Plan</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 id="recruiter-billing-heading" className="text-lg font-bold text-foreground">
+            Recruiter Plan
+          </h2>
+          <p className="text-xs text-muted-foreground break-words">
             Recruiters with a complete, non-suspended profile can post standard opportunities. Verification adds a Verified Recruiter badge. Paid plans add premium recruiting tools, limits, and reporting.
           </p>
         </div>
-        <Button size="sm" variant="ghost" onClick={refresh} disabled={isLoading}>
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={refresh}
+          disabled={isLoading}
+          aria-label="Refresh billing status"
+          aria-busy={isLoading || undefined}
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            'Refresh'
+          )}
         </Button>
       </div>
+
+      {statusMessage && (
+        <div
+          role={statusMessage.kind === 'error' ? 'alert' : 'status'}
+          aria-live={statusMessage.kind === 'error' ? 'assertive' : 'polite'}
+          data-testid="recruiter-billing-status"
+          className={
+            statusMessage.kind === 'error'
+              ? 'text-xs text-destructive'
+              : 'text-xs text-muted-foreground'
+          }
+        >
+          {statusMessage.text}
+        </div>
+      )}
 
       <Card className="p-4 border-border/60 bg-muted/20 space-y-3">
         <div className="flex items-center gap-2">
@@ -199,9 +259,19 @@ export function RecruiterBillingPanel() {
                 className="w-full"
                 variant={isCurrent ? 'outline' : 'default'}
                 disabled={startCheckout.isPending || isCurrent}
+                aria-busy={startCheckout.isPending || undefined}
                 onClick={() => handleUpgrade(p.key)}
               >
-                {isCurrent ? 'Active' : `Choose ${RECRUITER_PLAN_LABELS[p.key]}`}
+                {startCheckout.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    <span>Preparing…</span>
+                  </>
+                ) : isCurrent ? (
+                  'Active'
+                ) : (
+                  `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
+                )}
               </Button>
             </Card>
           );
@@ -209,8 +279,14 @@ export function RecruiterBillingPanel() {
       </div>
 
       {billing?.stripe_subscription_id && (
-        <Button variant="outline" size="sm" onClick={handlePortal} disabled={openPortal.isPending}>
-          <ExternalLink className="h-4 w-4" /> Manage Billing
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePortal}
+          disabled={openPortal.isPending}
+          aria-busy={openPortal.isPending || undefined}
+        >
+          <ExternalLink className="h-4 w-4" aria-hidden="true" /> Manage Billing
         </Button>
       )}
 
