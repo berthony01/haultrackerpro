@@ -83,17 +83,45 @@ export function RecruiterBillingPanel() {
     refresh,
   } = useRecruiterBilling();
 
+  // Phase 1G-R1A7: aria-live status region. Complements sonner toasts with
+  // an assistive-tech-friendly announcement anchored to the billing card.
+  const [statusMessage, setStatusMessage] = useState<{
+    kind: 'success' | 'error' | 'info';
+    text: string;
+  } | null>(null);
+
   const handleUpgrade = (p: PaidPlan) => {
+    if (startCheckout.isPending) return; // hard client-side dedupe on rapid clicks
+    setStatusMessage({ kind: 'info', text: 'Preparing secure checkout…' });
     startCheckout.mutate(p, {
-      onSuccess: () => toast.success('Opening checkout in a new tab…'),
-      onError: (e: Error) => toast.error(e.message),
+      onSuccess: () => {
+        setStatusMessage({
+          kind: 'success',
+          text: 'Opening checkout in a new tab.',
+        });
+        toast.success('Opening checkout in a new tab…');
+      },
+      onError: (e: Error) => {
+        setStatusMessage({ kind: 'error', text: e.message });
+        toast.error(e.message);
+      },
     });
   };
 
   const handlePortal = () => {
+    if (openPortal.isPending) return;
     openPortal.mutate(undefined, {
-      onSuccess: () => toast.success('Opening billing portal…'),
-      onError: (e: Error) => toast.error(e.message),
+      onSuccess: () => {
+        setStatusMessage({
+          kind: 'success',
+          text: 'Opening billing portal in a new tab.',
+        });
+        toast.success('Opening billing portal…');
+      },
+      onError: (e: Error) => {
+        setStatusMessage({ kind: 'error', text: e.message });
+        toast.error(e.message);
+      },
     });
   };
 
