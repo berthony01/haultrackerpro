@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/recruiter-checkout-postgres.yml'
-      - 'build/htpBuildVersion.ts'
+      - 'src/lib/htpBuildVersion.ts'
       - 'vite.config.ts'
       - 'src/components/opportunities/RecruiterBillingPanel.tsx'
       - 'src/test/phase1gR1A4BuildProof.test.tsx'
