@@ -178,9 +178,9 @@ export function RecruiterBillingPanel() {
             Recruiter Plan
           </h2>
           <p className="text-xs text-muted-foreground break-words">
-            Recruiters with a complete, non-suspended profile can post standard
-            opportunities. Verification adds a Verified Recruiter badge. Paid
-            plans add premium recruiting tools, limits, and reporting.
+            {'Recruiters with a complete, non-suspended profile can post standard opportunities.'}{' '}
+            {'Verification adds a Verified Recruiter badge.'}{' '}
+            {'Paid plans add premium recruiting tools, limits, and reporting.'}
           </p>
         </div>
         <Button
