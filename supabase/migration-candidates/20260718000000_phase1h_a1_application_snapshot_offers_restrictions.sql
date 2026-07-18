@@ -89,7 +89,7 @@ ALTER TABLE public.opportunity_applications
 CREATE UNIQUE INDEX IF NOT EXISTS opportunity_applications_active_apply_uidx
   ON public.opportunity_applications (opportunity_id, driver_user_id)
   WHERE application_type = 'apply'
-    AND status NOT IN ('rejected', 'withdrawn');
+    AND opportunity_applications.status NOT IN ('rejected', 'withdrawn');
 
 -- Inquiries: exactly one 'request_info' row per (opportunity, driver).
 -- Blocks accidental double-tap duplicates while preserving history via
