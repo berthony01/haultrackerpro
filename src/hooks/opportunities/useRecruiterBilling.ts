@@ -89,10 +89,17 @@ export function useRecruiterBilling() {
     if (openingRef.current) return;
     openingRef.current = true;
     try {
+      // Phase 1G-R1A7-R1: real-Chromium testing proved that passing
+      // 'noopener' OR 'noreferrer' as a window feature makes window.open()
+      // return null unconditionally (Chromium treats noreferrer as implying
+      // noopener) — so the intended auto-navigate happy path was dead code
+      // in every real browser; every checkout silently fell through to the
+      // popup-blocked fallback link. We instead take a real handle here and
+      // close the tabnabbing vector explicitly via `w.opener = null` in
+      // settleTab(), which is the standard safe pattern for this exact case.
       pendingWindowRef.current = window.open(
         'about:blank',
         RECRUITER_BILLING_POPUP_NAME,
-        'noopener,noreferrer',
       );
     } catch {
       pendingWindowRef.current = null;
