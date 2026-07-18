@@ -33,7 +33,7 @@ import {
   injectHtpBuildShaMeta,
   normalizeFullGitSha,
   resolveHtpBuildSha,
-} from '../../build/htpBuildVersion';
+} from '@/lib/htpBuildVersion';
 
 const HTP_SHA = 'a'.repeat(40);
 const GITHUB_SHA = 'b'.repeat(40);
