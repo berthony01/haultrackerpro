@@ -1,6 +1,31 @@
 name: Recruiter Checkout — Postgres 16 Concurrency Gate
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/recruiter-checkout-postgres.yml'
+      - 'tests/postgres/recruiterCheckoutConcurrency.test.ts'
+      - 'vitest.recruiter-checkout-postgres.config.ts'
+      - 'supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql'
+      - 'supabase/functions/_shared/recruiter-checkout.ts'
+      - 'supabase/functions/create-recruiter-checkout/index.ts'
+      - 'src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts'
+      - 'src/components/opportunities/RecruiterBillingPanel.tsx'
+      - 'src/test/phase1gR1A4BuildShaAndCopy.test.ts'
+      - 'src/test/phase1gR1A4BillingCopyRendered.test.tsx'
+      - 'src/test/phase1gR1A7RecruiterBillingFlow.test.tsx'
+      - 'src/hooks/opportunities/useRecruiterBilling.ts'
+      - 'src/lib/opportunities/recruiterCheckoutMessages.ts'
+      - 'src/lib/opportunities/recruiterBillingState.ts'
+      - 'src/index.css'
+      - 'tests/e2e/recruiter-billing.spec.ts'
+      - 'playwright.recruiter-billing.config.ts'
+      - 'package.json'
+      - 'bun.lockb'
+      - 'vite/htpBuildShaPlugin.ts'
+      - 'vite.config.ts'
   pull_request:
     paths:
       - '.github/workflows/recruiter-checkout-postgres.yml'
