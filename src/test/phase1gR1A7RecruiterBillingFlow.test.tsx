@@ -287,7 +287,7 @@ describe('subscription status classifier', () => {
 // ---------------------------------------------------------------------------
 
 describe('eligible checkout happy path', () => {
-  it('opens the deterministic named popup synchronously with noopener,noreferrer', async () => {
+  it('opens the deterministic named popup synchronously with no window-feature string (real-Chromium: noopener/noreferrer force a null return and were removed; anti-tabnabbing is enforced via w.opener = null instead)', async () => {
     supabaseMocks.invoke.mockResolvedValue({
       data: { code: 'checkout_ready', url: CHECKOUT_URL },
       error: null,
@@ -299,7 +299,6 @@ describe('eligible checkout happy path', () => {
     expect(openSpy).toHaveBeenCalledWith(
       'about:blank',
       RECRUITER_BILLING_POPUP_NAME,
-      'noopener,noreferrer',
     );
   });
 

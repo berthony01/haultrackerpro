@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,6 +95,14 @@ export function RecruiterBillingPanel() {
   const checkServerStatus = hook.checkServerStatus ?? (() => {});
 
   const [pendingPlan, setPendingPlan] = useState<PaidPlan | null>(null);
+  // Phase 1G-R1A7-R1: real-Chromium rapid-double-click testing proved that
+  // React Query's `isPending` flag is NOT synchronously available between
+  // two near-instant clicks (it only reflects true after React commits the
+  // state update from the first mutate() call), so relying on it alone let
+  // a second click slip a second checkout/portal request through. This ref
+  // is set synchronously, before any async work, and is the single source
+  // of truth for "an action is already in flight" — closing that race.
+  const actionInFlightRef = useRef(false);
   const [fallback, setFallback] = useState<{
     url: string;
     label: string;
@@ -104,8 +112,10 @@ export function RecruiterBillingPanel() {
   const isPending = startCheckout.isPending || openPortal.isPending;
 
   const handleUpgrade = (p: PaidPlan) => {
+    if (actionInFlightRef.current) return;
     if (isPending) return;
     if (!canStartCheckout) return;
+    actionInFlightRef.current = true;
     setFallback(null);
     // Synchronous popup MUST come before any awaited work so browsers
     // treat it as user-gesture initiated. Same deterministic name across
@@ -114,10 +124,12 @@ export function RecruiterBillingPanel() {
     setPendingPlan(p);
     startCheckout.mutate(p, {
       onSuccess: () => {
+        actionInFlightRef.current = false;
         setPendingPlan(null);
         toast.success('Opening checkout in a new tab…');
       },
       onError: (e: Error) => {
+        actionInFlightRef.current = false;
         setPendingPlan(null);
         const err = e as RecruiterCheckoutFailure;
         if (err.fallbackUrl) {
@@ -133,14 +145,18 @@ export function RecruiterBillingPanel() {
   };
 
   const handlePortal = () => {
+    if (actionInFlightRef.current) return;
     if (isPending) return;
+    actionInFlightRef.current = true;
     setFallback(null);
     prepareTab();
     openPortal.mutate(undefined, {
       onSuccess: () => {
+        actionInFlightRef.current = false;
         toast.success('Opening billing portal…');
       },
       onError: (e: Error) => {
+        actionInFlightRef.current = false;
         const err = e as RecruiterCheckoutFailure;
         if (err.fallbackUrl) {
           setFallback({
