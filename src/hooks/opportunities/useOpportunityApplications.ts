@@ -223,10 +223,9 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
-    onSettled: (_d, _e, vars) => {
-      const callerKey = (vars as unknown as { idempotency_key?: string }).idempotency_key;
-      store.release('request_info', vars.opportunity_id, callerKey);
-    },
+    // v1 permits only one initial inquiry per opportunity, so the generated
+    // key must persist for the hook lifetime. Do NOT release on settle — a
+    // fresh key would defeat idempotency across separate user actions.
   });
 
   const withdrawApplication = useMutation({
