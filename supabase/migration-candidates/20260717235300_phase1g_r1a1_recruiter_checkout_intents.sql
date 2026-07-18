@@ -169,14 +169,16 @@ BEGIN
     outcome := 'not_owner'; reason := 'recruiter_ownership_mismatch'; RETURN NEXT; RETURN;
   END IF;
 
+  -- Suspension check runs BEFORE the approved-verification check.
+  IF v_prof.status = 'suspended' OR v_prof.verification_status = 'suspended' THEN
+    outcome := 'not_eligible'; reason := 'account_suspended'; RETURN NEXT; RETURN;
+  END IF;
+
   -- Eligibility uses real columns only.
   IF COALESCE(v_prof.verification_status,'') <> 'approved' THEN
     outcome := 'not_eligible'; reason := 'verification_not_approved'; RETURN NEXT; RETURN;
   END IF;
 
-  IF v_prof.status = 'suspended' OR v_prof.verification_status = 'suspended' THEN
-    outcome := 'not_eligible'; reason := 'account_suspended'; RETURN NEXT; RETURN;
-  END IF;
 
   SELECT * INTO v_row FROM public.recruiter_checkout_intents
     WHERE recruiter_id = _recruiter_id FOR UPDATE;
