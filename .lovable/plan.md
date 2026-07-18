@@ -1,79 +1,122 @@
 
-# Phase 1G-R1A7-R1 — Execution Plan (Honest Split)
+# Phase 1H Implementation Audit — READ-ONLY
 
-## Difficulty assessment
+No files were modified, no migrations created, no packages installed, no DB writes.
 
-Extreme. The contract requires, in one turn:
-- Full rewrite of `RecruiterBillingPanel` around an explicit state-machine model with ~15 states.
-- Rewrite of `useRecruiterBilling` popup/redirect flow with sync-open + post-validate navigation, portal parity, dual strict validators.
-- Restructure `recruiterCheckoutMessages.ts` into per-state accurate copy + two dedicated validators.
-- 46 focused RTL/vitest cases against real production components (currently 23).
-- 25 real Chromium Playwright scenarios covering 15 subscription states, popup blocking, retry cooldowns, keyboard nav, network failure retry, remount rehydration, and standard-posting-copy independence.
-- Axe scans with pass thresholds on the real preview build.
-- Responsive proof at 6 viewports with `scrollWidth <= clientWidth` and bounding-box assertions.
-- A brand-new dedicated Playwright config for the built-preview run.
-- New CI workflow (or extension of existing one) with 20 enforced steps including Playwright install, built-preview serving, Axe artifact upload, screenshot upload, PostgreSQL suite, orchestrator suite, DEF-04/DEF-23 suites, full vitest, TS, and build with `HTP_BUILD_SHA=${{ github.sha }}`.
-- Lockfile-provenance investigation and controlled restore of `noTrialLanguage.test.ts` + `bun.lock`.
-- Exactly one pinned dependency addition: `@axe-core/playwright`.
-- Authoritative local build only after all commits land, with SHA equality proof across `git rev-parse HEAD`, `dist/version.json`, and the single `htp-build-sha` meta tag.
+## A. Repository and branch state
 
-Attempting all of this in a single turn will produce either a shallow/unverifiable pass or scope drift into prohibited files. Neither is acceptable under this contract.
+- Current branch: `edit/edt-0c578eda-f00f-4ce9-a83b-a457a7f6128e` (Lovable working branch, tracks `main`).
+- Current HEAD SHA: `4faa861661eef457a5a5608699aa9aea86af3032` — **exactly** the previously accepted main SHA.
+- `phase1h-driver-application-pipeline` branch: **does not exist** (not local, not on `origin`).
+- Commits since the referenced SHA on any Phase 1H topic: **zero**. Recent commits (`64a3fbce`, `ba4dfb53`, `ffb268b1`, `6c8fd220`, `fc3a1a76`, …) are all Phase 1G-R1A7 billing / CI / lockfile / workflow work. No Phase 1H commit exists in the repo.
 
-## Proposed split
+## B. Files and migrations inspected
 
-Each sub-phase ends with its own PASS/FAIL gate and its own commit. I do not proceed to the next until you accept the prior.
+Source:
+- `src/components/opportunities/OpportunityDetail.tsx` (Driver detail view, primary CTA)
+- `src/hooks/opportunities/useOpportunityApplications.ts` (driver + recruiter application hook, RPC calls)
+- `src/components/opportunities/DriverApplicationsPanel.tsx` (present, pre-1H)
+- `src/components/opportunities/RecruiterApplicationsDashboard.tsx` (present, pre-1H)
+- `src/components/opportunities/ApplicationTimeline.tsx` (present, pre-1H, driven by `application_events`)
+- `src/lib/opportunities/applicationStatus.ts` (existing status/label/transition tables — no offer states)
+- `src/integrations/supabase/types.ts` (no `opportunity_offers`, no `marketplace_user_restrictions`)
 
-### R1a — Production source correction (no new test infra)
-Scope:
-- Restore `src/test/noTrialLanguage.test.ts` to A4 baseline (`938294906571bb5780c1c89db4a67cde2dfcc15b`).
-- Investigate lockfile provenance vs A4; if the current `bun.lock` is drift-only, restore it. Only permitted mutation to `bun.lock` in R1a is that restore.
-- Rewrite `src/lib/opportunities/recruiterCheckoutMessages.ts`:
-  - split into `isSafeStripeCheckoutUrl` (exact `checkout.stripe.com`) and `isSafeStripeBillingPortalUrl` (exact `billing.stripe.com`).
-  - per-state accurate public copy for all 15+ subscription/checkout states.
-  - remove misleading "already have an active recruiter subscription" for past_due/unpaid/incomplete/paused.
-- Rewrite `src/hooks/opportunities/useRecruiterBilling.ts`:
-  - explicit discriminated-union client billing state model (idle | loading | ineligible | starting{plan} | checkout_ready | popup_blocked{url} | in_progress | processing | active | trialing | past_due | unpaid | incomplete | paused | canceled | unknown | portal_opening | portal_blocked{url} | retryable_error | support_required).
-  - sync-open blank popup pattern on click; validate returned URL; on failure close popup; on popup-block return validated fallback URL.
-  - portal flow gets the same treatment with `isSafeStripeBillingPortalUrl`.
-  - refetch billing queries on `in_progress`/`subscription_exists`/`checkout_processing` responses.
-  - cooldown-gated Check-Status/Retry action.
-- Rewrite `src/components/opportunities/RecruiterBillingPanel.tsx` to consume the new state model, disable all plan buttons during pending, show "Preparing" only on the selected plan, render fallback "Continue to secure checkout" button when popup blocked (using validated URL), aria-live status region, state-accurate copy per subscription status, no raw errors.
-- Optional: one new helper at `src/lib/opportunities/recruiterCheckoutNavigation.ts` for sync-open+post-validate.
+Migrations:
+- Latest migration in tree: `20260717223452_ff4257ea…sql` (Phase 1F-A.2.2-R1B live consent-pair). No newer migrations.
+- `opportunity_applications` table defined in `20260513003741_…sql` with `application_type text NOT NULL DEFAULT 'request_info'` and CHECK constraint `application_type IN ('apply','request_info','callback')` — so the `'apply'` value is schema-legal but no code path submits it.
+- `application_events` and recruiter transition guards exist pre-1H (`20260513004834_…`, `20260513025656_…`, `20260513040206_…`, `20260516014826_…`, `20260516040340_…`, `20260528225151_…`, `20260529005635_…`, `20260627161959_…`, `20260627162043_…`, `20260627174143_…`, `20260717185620_…`).
+- No migration anywhere in the tree references `opportunity_offers` or `marketplace_user_restrictions`. Grep on both source and migrations returns zero hits.
 
-Deliverable: TS passes; existing focused A7 tests updated minimally to compile (behavioral test overhaul is R1b). Commit: `A7-R1a`.
+## C. Current Driver opportunity action (verbatim)
 
-### R1b — Focused RTL suite (46 cases)
-Scope:
-- Full rewrite of `src/test/phase1gR1A7RecruiterBillingFlow.test.tsx` to the 46-case matrix (states 1–46 in your contract).
-- No changes outside the test file.
+`OpportunityDetail.tsx` lines 78–110 and 306–309:
 
-Deliverable: focused suite passes with 46/46, full vitest suite still green. Commit: `A7-R1b`.
+- Handler: `handleRequestInfo` → `createApplication.mutate({ application_type: 'request_info', message: "I'm interested in learning more about this opportunity.", … })`.
+- Button label (verbatim): `{alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}`.
+- Icon: `Send`. No secondary "Apply Now" button. No structured application form. No separate "Ask Recruiter a Question" surface — the same button *is* the inquiry path, and it's the only path.
 
-### R1c — Real Chromium browser suite + Axe + dedicated config
-Scope:
-- Add exactly `@axe-core/playwright` pinned to a resolved version, single lockfile update.
-- New `playwright.recruiter-billing.config.ts` targeting the built preview (`vite preview`) on a dedicated port.
-- New `tests/e2e/recruiter-billing.spec.ts` covering all 25 Chromium scenarios, with network-boundary mocking of `supabase.functions.invoke('create-recruiter-checkout')` and `supabase.functions.invoke('recruiter-billing-portal')`, plus REST mocks for `recruiter_profiles`, `recruiter_billing_profiles`, `opportunities` count. Auth session restore via `LOVABLE_BROWSER_*` if injected, else fully mocked. Screenshots at 320/375/390/768/1280/1440. Axe scan on eligible+active+past_due+popup_blocked states. Overflow assertions per viewport.
+## D. Implementation matrix
 
-Deliverable: browser suite runs green locally against built preview. Commit: `A7-R1c`.
+| Capability | Status |
+|---|---|
+| Primary "Apply Now" CTA | **Absent** |
+| Structured Driver application form | **Absent** |
+| `application_type='apply'` submission path | **Absent** in code (schema allows the value; nothing writes it) |
+| Immutable application submission snapshot | **Absent** (only contact snapshot fields on the inquiry row) |
+| Separate "Ask Recruiter a Question" form | **Absent** (Request Info is the only path) |
+| Inquiry + formal application coexisting on same opportunity | **Absent** |
+| Driver "My Applications" tracking | **Partial** (pre-1H `DriverApplicationsPanel` exists; no formal-application distinction) |
+| Recruiter application pipeline | **Partial** (pre-1H `RecruiterApplicationsDashboard` + transition guards; no offer stage) |
+| Separate `opportunity_offers` table/entity | **Absent** |
+| Recruiter send-offer workflow | **Absent** |
+| Driver accept/decline offer workflow | **Absent** |
+| Onboarding application status | **Absent** (`applicationStatus.ts` has no `onboarding`) |
+| Block direct `offer_sent → hired` | **Absent** — `getAllowedRecruiterTransitions` explicitly permits `offer_sent: ['hired', 'rejected']` |
+| Offer expiration / replacement / idempotency / concurrency | **Absent** |
+| Offer/application-specific timeline events + notifications | **Absent** (existing `application_events` cover only pre-1H statuses; no `offer_*` events) |
+| `marketplace_user_restrictions` | **Absent** (no table, no code reference) |
 
-### R1d — CI workflow + authoritative build + release-gate proof
-Scope:
-- New workflow `.github/workflows/recruiter-billing-browser.yml` (or narrow extension of `recruiter-checkout-postgres.yml`) implementing all 20 required steps with genuine failure propagation (no unguarded `| tail`, no unenforced `continue-on-error`), triggered on the exact path filter listed in the contract.
-- Local authoritative build with `HTP_BUILD_SHA=$(git rev-parse HEAD)` executed only after R1d commit lands, then SHA-equality proof (`git rev-parse HEAD` == `dist/version.json.sha` == meta tag).
-- Final PASS/FAIL report with exact test counts and artifact references.
+## E. Existing reusable application infrastructure (pre-1H, safe to build on)
 
-Deliverable: workflow committed, local authoritative build proof captured. Commit: `A7-R1d`.
+- `opportunity_applications` table with `application_type` CHECK already includes `'apply'`.
+- `application_events` table + trigger that logs status transitions.
+- Recruiter transition guard trigger restricting server-side status moves.
+- `list_recruiter_applications_safe` RPC with PII gating.
+- `record_driver_application_response` and `withdraw_opportunity_application` RPCs.
+- `applicationStatus.ts` status/label/badge/transition tables (extendable, not offer-aware).
+- `DriverApplicationsPanel`, `RecruiterApplicationsDashboard`, `ApplicationTimeline` components.
 
-## Technical notes
-- Prohibited-file list is respected across all sub-phases: no SQL/migrations/edge/webhook/orchestrator/RLS/type-gen/opportunity-form/driver/agency/assistant/dispatcher changes.
-- The Recruiter checkout edge function's response shape (`code` + `url`) is treated as the authoritative contract; the client never invents success.
-- All URL validation is destination-specific with exact hostname allow-lists; no `endsWith('.stripe.com')` anywhere.
-- Popup pattern: `const w = window.open('about:blank', 'recruiter-checkout')` sync on click → call edge fn → on success `w.opener = null; w.location = validatedUrl` → on failure `w.close()` → if `w === null` (blocked) surface accessible fallback with validated URL only.
-- No live DB, no live Stripe, no deploy, no publish, no production env change.
+## F. Missing Phase 1H functionality
 
-## Ask
-Please confirm:
-1. Approval to execute R1a → R1b → R1c → R1d sequentially, each committed and reported before the next begins.
-2. Whether the CI job may run on GitHub Actions (I can only prepare and commit the workflow; I cannot execute Actions from the sandbox — CI evidence is proof-of-workflow-syntax + a local `act`-free rehearsal of each script step).
-3. Whether Playwright browser install (~150MB Chromium) inside this sandbox for R1c local proof is acceptable; if not, R1c local evidence will be limited to config+spec syntax + a subset headless run.
+Everything listed in D as Absent or Partial. Specifically, no code, migration, RPC, edge function, hook, component, route, type, test, or notification implements:
+- Apply Now CTA + structured form,
+- immutable submission snapshot,
+- offer entity + workflow,
+- Driver offer accept/decline,
+- onboarding stage,
+- offer_sent → hired guard,
+- offer expiration/replacement/idempotency,
+- offer/application notifications,
+- marketplace user restrictions.
+
+## G. Deployment / publish status
+
+- No Phase 1H commits exist, therefore nothing Phase 1H-related has been merged, deployed, or published.
+- The published app at the project's Preview / Published URLs is serving the exact code at `4faa8616`, which contains the pre-1H `Request Info` flow.
+- No pending migration in `supabase/migration-candidates/` references Phase 1H (only the pre-existing `20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql`).
+
+## H. Documentation vs. code discrepancies
+
+- `.lovable/plan.md` describes only Phase 1G-R1A7-R1. It contains **no** Phase 1H plan. There is no Phase 1H design document, checklist, or migration candidate in the repo.
+- If a prior agent turn described Phase 1H as "implemented", "in progress", "branch created", or "deployed", that claim is **not** supported by the repository: no branch, no commits, no files, no migrations. The only accurate historical statement is that Phase 1H was *discussed as future work*.
+
+## I. Exact reason the user still sees "Request Info"
+
+`src/components/opportunities/OpportunityDetail.tsx` line 306–309 is the only primary CTA rendered on a Driver's opportunity detail view. Its label is the string literal `'Request Info'` (with `'Request Sent'` / `'Sending…'` as its only other states), and its click handler unconditionally calls `createApplication.mutate({ application_type: 'request_info', … })`. No other button, route, dialog, or feature-flagged branch exists to render an "Apply Now" CTA. Because no Phase 1H code was ever committed, the label and behavior are simply the pre-1H code still in production.
+
+## J. Verdicts
+
+| Area | Verdict |
+|---|---|
+| Apply Now CTA | **FAIL** |
+| Structured application form + snapshot | **FAIL** |
+| Inquiry vs. formal application separation | **FAIL** |
+| Driver My Applications (1H scope) | **FAIL** |
+| Recruiter pipeline (1H scope, incl. offer stage) | **FAIL** |
+| Offers entity + send/accept/decline | **FAIL** |
+| Onboarding stage + offer_sent→hired guard | **FAIL** |
+| Offer lifecycle safety (expire/replace/idempotency/concurrency) | **FAIL** |
+| Offer/application notifications + timeline events | **FAIL** |
+| `marketplace_user_restrictions` | **FAIL** |
+| **Overall Phase 1H** | **FAIL — not implemented** |
+
+## K. Safest next action (not performed)
+
+Author a Phase 1H patch-level execution packet (following the workspace's Standing Delivery Protocol) that:
+1. Defines the final product rule for Apply Now vs. Ask Recruiter, offer lifecycle, and onboarding stage.
+2. Lists exact new files, one new migration for `opportunity_offers` (+ RLS + grants + transition guards + `marketplace_user_restrictions` if in scope), and extensions to `applicationStatus.ts` / `application_events`.
+3. Specifies the offer_sent → hired block (must route through offer accept + onboarding).
+4. Provides an acceptance-test matrix and live-DB post-checks.
+5. Ships as a dedicated branch `phase1h-driver-application-pipeline`, split into sub-phases (schema → driver apply → recruiter pipeline → offers → onboarding → notifications) so each can be independently proven.
+
+Awaiting explicit approval before any implementation work.
