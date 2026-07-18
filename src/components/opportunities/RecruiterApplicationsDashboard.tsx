@@ -372,7 +372,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
             {allowed.map((status) => (
               <Button
                 key={status}
-                variant={status === 'hired' ? 'default' : status === 'rejected' ? 'ghost' : 'outline'}
+                variant={status === 'rejected' ? 'ghost' : 'outline'}
                 size="sm"
                 onClick={() => handleUpdate(a.id, status)}
                 disabled={pendingId === a.id || updateApplicationStatus.isPending}
