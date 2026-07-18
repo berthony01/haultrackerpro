@@ -211,6 +211,8 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     refetchRecruiter: recruiterQuery.refetch,
     // Mutations
     createApplication,
+    submitApplication,
+    submitRequestInfo,
     withdrawApplication,
     updateApplicationStatus,
     recordDriverResponse,
