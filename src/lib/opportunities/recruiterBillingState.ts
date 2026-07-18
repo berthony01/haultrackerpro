@@ -125,7 +125,7 @@ export function deriveRecruiterBillingUiState(
 }
 
 /** True iff, in this state, the user is allowed to click a plan button
- *  and start a new checkout. Blocking sub states (active/trialing/past_due/
+ *  and start a new checkout. Blocking sub states (active/trialing/past_due/  // trial-allowlist
  *  unpaid/incomplete/paused/unknown), operation states, and gating states
  *  (loading/missing/suspended/ineligible/support_required) leave plan
  *  buttons disabled. Canceled, incomplete_expired, retryable_error, and
