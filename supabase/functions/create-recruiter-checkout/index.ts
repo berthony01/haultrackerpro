@@ -391,16 +391,22 @@ function normalizeSimple(data: any): IntentSimpleResult {
   return { outcome: row?.outcome ?? "unknown", reason: row?.reason ?? null };
 }
 
+// Fail-closed session normalization. Missing/absent fields become invalid
+// sentinel values (empty string / 0 / "") so downstream validation rejects
+// them. NEVER default status to "open" — that would let malformed Stripe
+// responses masquerade as valid open sessions.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeSession(s: any): StripeSessionLike {
   const customer =
     typeof s?.customer === "string"
       ? s.customer
-      : s?.customer?.id ?? null;
+      : typeof s?.customer?.id === "string"
+        ? s.customer.id
+        : null;
   return {
-    id: s?.id,
-    status: s?.status ?? "open",
-    url: s?.url ?? null,
+    id: typeof s?.id === "string" ? s.id : "",
+    status: typeof s?.status === "string" ? s.status : "",
+    url: typeof s?.url === "string" ? s.url : null,
     customer,
     expires_at: typeof s?.expires_at === "number" ? s.expires_at : 0,
     metadata: (s?.metadata ?? {}) as Record<string, string>,
