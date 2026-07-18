@@ -52,7 +52,17 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        // Sandbox escape hatch: when the Playwright-bundled chromium can't
+        // load required system libs (e.g. NixOS sandboxes without glibc
+        // FHS), point this at a locally-installed chromium. Unused in CI
+        // and normal dev — Playwright's own browser is used by default.
+        ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+          ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } }
+          : {}),
+      },
     },
   ],
   webServer: {
