@@ -63,12 +63,12 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
   },
 ];
 
-const FREE_VERIFIED_PERKS: PerkLabel[] = [
-  'Unlimited standard opportunity posts',
-  'Admin-reviewed listings',
+const STANDARD_ACCESS_PERKS: PerkLabel[] = [
+  'Standard opportunity posting for complete profiles',
+  'Opportunity status and listing management',
   'Basic applicant inbox',
   'Standard marketplace placement',
-  'Verified recruiter profile',
+  'Verification can add a Verified Recruiter trust badge',
 ];
 
 export function RecruiterBillingPanel() {
@@ -99,7 +99,7 @@ export function RecruiterBillingPanel() {
 
   const currentPlanLabel = isBillingActive
     ? RECRUITER_PLAN_LABELS[plan]
-    : 'Free Verified';
+    : 'Standard Access';
 
   return (
     <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/5 space-y-5">
@@ -110,7 +110,7 @@ export function RecruiterBillingPanel() {
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-foreground">Recruiter Plan</h2>
           <p className="text-xs text-muted-foreground">
-            Verified recruiters can post unlimited standard opportunities. Paid plans unlock premium recruiting tools.
+            Complete, non-suspended Recruiter profiles can post standard opportunities. Verification adds trust and a Verified Recruiter badge. Paid plans add premium recruiting tools.
           </p>
         </div>
         <Button size="sm" variant="ghost" onClick={refresh} disabled={isLoading}>
@@ -127,9 +127,12 @@ export function RecruiterBillingPanel() {
         <div className="grid sm:grid-cols-2 gap-2 text-xs text-foreground">
           <AccessRow
             label="Standard opportunity posting"
-            value="Unlimited for verified recruiters"
+            value="Included with a complete, non-suspended profile"
           />
-          <AccessRow label="Listing review" value="Admin-reviewed for driver trust" />
+          <AccessRow
+            label="Verification"
+            value="Adds trust and a Verified Recruiter badge"
+          />
           <AccessRow
             label="Current plan"
             value={
@@ -142,27 +145,27 @@ export function RecruiterBillingPanel() {
             label="Premium features"
             value={
               <span className="text-muted-foreground">
-                {isBillingActive ? 'Unlocked by your plan' : 'Based on paid plan'}
+                {isBillingActive ? 'Unlocked by your plan' : 'Available with a paid plan'}
               </span>
             }
           />
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Standard posting is based on recruiter approval. Premium features are based on your paid plan.
+          Standard posting depends on profile completeness and suspension status, not verification or payment. Paid plans add premium limits, workflow tools, and reporting benefits.
         </p>
       </Card>
 
-      {/* Free Verified card */}
+      {/* Standard access card */}
       <Card className="p-4 border-border/60">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-bold text-foreground">Verified Recruiter Access</h3>
+          <h3 className="text-sm font-bold text-foreground">Standard Recruiter Access</h3>
           {!isBillingActive && <Badge variant="default">Current</Badge>}
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Free · Included once your recruiter profile is approved.
+          Free · Included with a complete, non-suspended Recruiter profile.
         </p>
         <ul className="space-y-1">
-          {FREE_VERIFIED_PERKS.map((perk, i) => (
+          {STANDARD_ACCESS_PERKS.map((perk, i) => (
             <PerkItem key={i} perk={perk} />
           ))}
         </ul>
@@ -175,7 +178,7 @@ export function RecruiterBillingPanel() {
           <h3 className="text-sm font-bold text-foreground">Upgrade for premium recruiting tools</h3>
         </div>
         <p className="text-xs text-muted-foreground">
-          Premium visibility, reports, contract tools, analytics, and recruiting workflow features.
+          Paid plans add premium visibility, higher limits, reports, contract tools, analytics, and recruiting workflow features.
         </p>
       </div>
 
