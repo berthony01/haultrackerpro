@@ -822,6 +822,17 @@ const Index = () => {
                 </div>
               )}
               <NotificationBell onNavigate={handleNavigate} />
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Admin console"
+                  className="hidden lg:inline-flex gap-1.5 rounded-xl h-10 font-bold border-primary/30 text-primary hover:bg-primary/10"
+                  onClick={() => navigate('/admin')}
+                >
+                  <Shield className="h-4 w-4" /> Admin
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
