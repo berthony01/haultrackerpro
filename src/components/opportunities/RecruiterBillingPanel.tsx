@@ -63,13 +63,12 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
   },
 ];
 
-const FREE_VERIFIED_PERKS: PerkLabel[] = [
-  'Unlimited standard opportunity posts',
+const STANDARD_ACCESS_PERKS: PerkLabel[] = [
+  'Standard opportunity posting for complete, non-suspended profiles',
   'Basic applicant inbox',
   'Standard marketplace placement',
   'Optional Verified Recruiter badge after verification',
 ];
-
 
 export function RecruiterBillingPanel() {
   const {
@@ -99,7 +98,7 @@ export function RecruiterBillingPanel() {
 
   const currentPlanLabel = isBillingActive
     ? RECRUITER_PLAN_LABELS[plan]
-    : 'Free Verified';
+    : 'Standard Access';
 
   return (
     <Card className="p-5 border-border/60 bg-gradient-to-br from-card via-card to-primary/5 space-y-5">
@@ -112,14 +111,12 @@ export function RecruiterBillingPanel() {
           <p className="text-xs text-muted-foreground">
             Recruiters with a complete, non-suspended profile can post standard opportunities. Verification adds a Verified Recruiter badge. Paid plans add premium recruiting tools, limits, and reporting.
           </p>
-
         </div>
         <Button size="sm" variant="ghost" onClick={refresh} disabled={isLoading}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
         </Button>
       </div>
 
-      {/* Recruiter Access / Status card */}
       <Card className="p-4 border-border/60 bg-muted/20 space-y-3">
         <div className="flex items-center gap-2">
           <BadgeCheck className="h-4 w-4 text-primary" />
@@ -128,7 +125,7 @@ export function RecruiterBillingPanel() {
         <div className="grid sm:grid-cols-2 gap-2 text-xs text-foreground">
           <AccessRow
             label="Standard opportunity posting"
-            value="Unlocked by completing your recruiter profile"
+            value="Included with a complete, non-suspended recruiter profile"
           />
           <AccessRow
             label="Verified Recruiter badge"
@@ -152,29 +149,25 @@ export function RecruiterBillingPanel() {
           />
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Standard posting is unlocked by completing your recruiter profile. Verification adds a Verified Recruiter badge. Premium recruiting tools are included with paid plans.
+          Standard posting depends on profile completeness and suspension status, not verification or payment. Verification adds a Verified Recruiter badge. Premium recruiting tools are included with paid plans.
         </p>
-
       </Card>
 
-      {/* Free Verified card */}
       <Card className="p-4 border-border/60">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-bold text-foreground">Included with your Recruiter Profile</h3>
+          <h3 className="text-sm font-bold text-foreground">Standard Recruiter Access</h3>
           {!isBillingActive && <Badge variant="default">Current</Badge>}
         </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Free · Available once your recruiter profile is complete.
+          Free · Included with a complete, non-suspended Recruiter profile.
         </p>
-
         <ul className="space-y-1">
-          {FREE_VERIFIED_PERKS.map((perk, i) => (
+          {STANDARD_ACCESS_PERKS.map((perk, i) => (
             <PerkItem key={i} perk={perk} />
           ))}
         </ul>
       </Card>
 
-      {/* Paid plans */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
