@@ -191,11 +191,12 @@ serve(async (req) => {
       deps,
     );
 
-    log("checkout result", { code: result.code, status: result.status });
+    log("checkout_result", { code: result.code, status: result.status });
     return jsonResponse(result);
-  } catch (e) {
-    // Never leak raw error content into the response.
-    log("ERROR", { message: e instanceof Error ? e.message : String(e) });
+  } catch (_e) {
+    // Safe logging: never log raw error messages, stacks, IDs, URLs, emails,
+    // or interpolated dependency data. Stable event only.
+    log("request_failed", { code: "unexpected_error" });
     return jsonResponse({
       status: 500,
       code: "internal_error",
