@@ -110,8 +110,9 @@ export function RecruiterBillingPanel() {
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-foreground">Recruiter Plan</h2>
           <p className="text-xs text-muted-foreground">
-            Verified recruiters can post unlimited standard opportunities. Paid plans unlock premium recruiting tools.
+            Recruiters with a complete, non-suspended profile can post standard opportunities. Verification adds a Verified Recruiter badge. Paid plans add premium recruiting tools, limits, and reporting.
           </p>
+
         </div>
         <Button size="sm" variant="ghost" onClick={refresh} disabled={isLoading}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
