@@ -261,7 +261,9 @@ BEGIN
   intent_id := v_row.id;
   claim_token := v_new_token;
   generation := v_row.generation;
+  stripe_customer_id := v_row.stripe_customer_id;
   RETURN NEXT; RETURN;
+
 END;
 $$;
 
