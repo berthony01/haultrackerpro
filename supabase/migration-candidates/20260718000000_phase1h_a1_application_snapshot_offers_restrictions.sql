@@ -713,7 +713,14 @@ BEGIN
 
   SELECT * INTO v_profile FROM public.driver_opportunity_profiles dop WHERE dop.user_id = v_uid LIMIT 1;
 
-  IF _contact_sharing_consent AND v_profile.user_id IS NOT NULL THEN
+  -- Consent=true requires a Driver profile so we can attach a truthful
+  -- PII snapshot and satisfy the consent-state CHECK. Consent=false may
+  -- still submit an inquiry without a profile (product rule).
+  IF _contact_sharing_consent AND v_profile.user_id IS NULL THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'profile_required'::text; RETURN;
+  END IF;
+
+  IF _contact_sharing_consent THEN
     v_email_snap := v_profile.email;
     v_phone_snap := v_profile.phone;
     v_consent_at := now();
