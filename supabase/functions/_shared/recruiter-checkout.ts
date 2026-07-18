@@ -664,14 +664,18 @@ async function handleClaimed(
     return resultTransient();
   }
   const session = createCall.value;
-  if (
-    !session.id ||
-    !session.url ||
-    session.url.trim() === "" ||
-    session.customer !== customerId ||
-    typeof session.expires_at !== "number" ||
-    session.expires_at <= nowSec
-  ) {
+  // Full return-session identity contract. All conditions required; any
+  // mismatch is terminal — the returned session must not be persisted.
+  const returnedOk =
+    !!session &&
+    typeof session.id === "string" && session.id !== "" &&
+    session.status === "open" &&
+    typeof session.url === "string" && session.url.trim() !== "" &&
+    session.customer === customerId &&
+    typeof session.expires_at === "number" &&
+    session.expires_at === expiresAt &&
+    sessionMetadataMatches(session, metadata);
+  if (!returnedOk) {
     await safeFail(deps, intentId, claimToken, "session_invalid_return", true);
     return resultSessionInvalid();
   }
@@ -693,7 +697,7 @@ async function handleClaimed(
     return resultTransient();
   }
 
-  return resultReady(session.url);
+  return resultReady(session.url as string);
 }
 
 // ---------------------------------------------------------------------------
