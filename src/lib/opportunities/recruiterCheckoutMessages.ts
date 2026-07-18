@@ -1,6 +1,7 @@
-// Phase 1G-R1A7 — client-side mapping of server response `code` values
+// Phase 1G-R1A7-R1 — client-side mapping of server response `code` values
 // (see supabase/functions/_shared/recruiter-checkout.ts RecruiterCheckoutPublicCode)
-// to Recruiter-facing UI messages, plus a safe checkout-URL validator.
+// to Recruiter-facing UI messages, plus destination-specific safe URL
+// validators for Stripe Checkout and Stripe Billing Portal.
 
 export type RecruiterCheckoutCode =
   | 'checkout_ready'
@@ -26,7 +27,7 @@ export interface ParsedCheckoutError {
   message: string;
 }
 
-/** Human, non-technical, actionable messages. No IDs, no URLs, no raw errors. */
+/** Server-code → human, non-technical, actionable message. No IDs, no URLs. */
 export const RECRUITER_CHECKOUT_MESSAGES: Record<
   RecruiterCheckoutCode | 'unknown_error',
   string
@@ -61,12 +62,26 @@ export const RECRUITER_CHECKOUT_MESSAGES: Record<
   unknown_error: 'Something went wrong. Please try again.',
 };
 
-/**
- * Validate a checkout URL before opening. Must be https and hosted on Stripe
- * checkout to protect against unsafe/stale redirects returned by an
- * unexpected server response shape (acceptance criterion #6).
- */
-export function isSafeStripeCheckoutUrl(raw: unknown): raw is string {
+/** Per-subscription-status accurate public copy. */
+export const RECRUITER_SUBSCRIPTION_STATUS_MESSAGES: Record<string, string> = {
+  active: 'Your recruiter subscription is active.',
+  trialing: 'Your recruiter subscription is currently active.', // trial-allowlist
+  past_due:
+    'Your last payment did not go through. Please update your payment method in Manage Billing.',
+  unpaid:
+    'Your subscription is unpaid. Please update your payment method in Manage Billing to restore premium features.',
+  incomplete:
+    'Your last checkout was not completed. Please finish payment or start a new checkout.',
+  incomplete_expired:
+    'Your previous checkout expired. Please start a new checkout.',
+  paused:
+    'Your subscription is paused. Use Manage Billing to resume premium features.',
+  canceled:
+    'Your subscription has been canceled. You can start a new plan at any time.',
+  inactive: 'You do not have an active premium plan.',
+};
+
+function isHttpsUrlWithHost(raw: unknown, allowedHost: string): raw is string {
   if (typeof raw !== 'string' || raw.length === 0) return false;
   let u: URL;
   try {
@@ -75,8 +90,19 @@ export function isSafeStripeCheckoutUrl(raw: unknown): raw is string {
     return false;
   }
   if (u.protocol !== 'https:') return false;
-  const host = u.hostname.toLowerCase();
-  return host === 'checkout.stripe.com' || host.endsWith('.stripe.com');
+  // Exact hostname match only — no endsWith('.stripe.com'), so a hostile
+  // subdomain like `checkout.stripe.com.evil.example` cannot slip through.
+  return u.hostname.toLowerCase() === allowedHost;
+}
+
+/** Only `https://checkout.stripe.com/...` is accepted. */
+export function isSafeStripeCheckoutUrl(raw: unknown): raw is string {
+  return isHttpsUrlWithHost(raw, 'checkout.stripe.com');
+}
+
+/** Only `https://billing.stripe.com/...` is accepted. */
+export function isSafeStripeBillingPortalUrl(raw: unknown): raw is string {
+  return isHttpsUrlWithHost(raw, 'billing.stripe.com');
 }
 
 /**

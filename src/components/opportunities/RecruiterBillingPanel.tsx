@@ -16,7 +16,9 @@ import {
   useRecruiterBilling,
   RECRUITER_PLAN_LABELS,
   type RecruiterPlan,
+  type RecruiterCheckoutFailure,
 } from '@/hooks/opportunities/useRecruiterBilling';
+import { RECRUITER_SUBSCRIPTION_STATUS_MESSAGES } from '@/lib/opportunities/recruiterCheckoutMessages';
 
 type PaidPlan = Exclude<RecruiterPlan, 'none'>;
 
@@ -80,21 +82,31 @@ export function RecruiterBillingPanel() {
     isLoading,
     startCheckout,
     openPortal,
+    prepareTab,
     refresh,
   } = useRecruiterBilling();
 
-  // Phase 1G-R1A7: aria-live status region. Complements sonner toasts with
-  // an assistive-tech-friendly announcement anchored to the billing card.
+  // Track which plan is currently being prepared so we only show the spinner
+  // on the clicked button (not all plan buttons at once).
+  const [pendingPlan, setPendingPlan] = useState<PaidPlan | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
     kind: 'success' | 'error' | 'info';
     text: string;
+    fallbackUrl?: string;
+    fallbackLabel?: string;
   } | null>(null);
 
   const handleUpgrade = (p: PaidPlan) => {
-    if (startCheckout.isPending) return; // hard client-side dedupe on rapid clicks
+    if (startCheckout.isPending) return;
+    // Open the popup SYNCHRONOUSLY inside this click gesture so browsers do
+    // not block it. The hook navigates it to the validated URL after the
+    // server responds, or closes it and surfaces a fallback if blocked.
+    prepareTab();
+    setPendingPlan(p);
     setStatusMessage({ kind: 'info', text: 'Preparing secure checkout…' });
     startCheckout.mutate(p, {
       onSuccess: () => {
+        setPendingPlan(null);
         setStatusMessage({
           kind: 'success',
           text: 'Opening checkout in a new tab.',
@@ -102,14 +114,22 @@ export function RecruiterBillingPanel() {
         toast.success('Opening checkout in a new tab…');
       },
       onError: (e: Error) => {
-        setStatusMessage({ kind: 'error', text: e.message });
-        toast.error(e.message);
+        setPendingPlan(null);
+        const err = e as RecruiterCheckoutFailure;
+        setStatusMessage({
+          kind: 'error',
+          text: err.message,
+          fallbackUrl: err.fallbackUrl,
+          fallbackLabel: 'Continue to secure checkout',
+        });
+        toast.error(err.message);
       },
     });
   };
 
   const handlePortal = () => {
     if (openPortal.isPending) return;
+    prepareTab();
     openPortal.mutate(undefined, {
       onSuccess: () => {
         setStatusMessage({
@@ -119,8 +139,14 @@ export function RecruiterBillingPanel() {
         toast.success('Opening billing portal…');
       },
       onError: (e: Error) => {
-        setStatusMessage({ kind: 'error', text: e.message });
-        toast.error(e.message);
+        const err = e as RecruiterCheckoutFailure;
+        setStatusMessage({
+          kind: 'error',
+          text: err.message,
+          fallbackUrl: err.fallbackUrl,
+          fallbackLabel: 'Open billing portal',
+        });
+        toast.error(err.message);
       },
     });
   };
@@ -128,6 +154,11 @@ export function RecruiterBillingPanel() {
   const currentPlanLabel = isBillingActive
     ? RECRUITER_PLAN_LABELS[plan]
     : 'Standard Access';
+
+  // Per-status accurate copy: past_due/unpaid/incomplete/paused/canceled
+  // must NOT say "you already have an active recruiter subscription".
+  const subscriptionStatusCopy =
+    (billing && RECRUITER_SUBSCRIPTION_STATUS_MESSAGES[status]) || null;
 
   return (
     <Card
@@ -169,12 +200,37 @@ export function RecruiterBillingPanel() {
           data-testid="recruiter-billing-status"
           className={
             statusMessage.kind === 'error'
-              ? 'text-xs text-destructive'
-              : 'text-xs text-muted-foreground'
+              ? 'text-xs text-destructive space-y-2'
+              : 'text-xs text-muted-foreground space-y-2'
           }
         >
-          {statusMessage.text}
+          <p className="break-words">{statusMessage.text}</p>
+          {statusMessage.fallbackUrl && (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              data-testid="recruiter-billing-fallback"
+            >
+              <a
+                href={statusMessage.fallbackUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {statusMessage.fallbackLabel ?? 'Continue'}
+              </a>
+            </Button>
+          )}
         </div>
+      )}
+
+      {subscriptionStatusCopy && (
+        <p
+          data-testid="recruiter-subscription-status-copy"
+          className="text-xs text-muted-foreground break-words"
+        >
+          {subscriptionStatusCopy}
+        </p>
       )}
 
       <Card className="p-4 border-border/60 bg-muted/20 space-y-3">
@@ -259,10 +315,10 @@ export function RecruiterBillingPanel() {
                 className="w-full"
                 variant={isCurrent ? 'outline' : 'default'}
                 disabled={startCheckout.isPending || isCurrent}
-                aria-busy={startCheckout.isPending || undefined}
+                aria-busy={pendingPlan === p.key || undefined}
                 onClick={() => handleUpgrade(p.key)}
               >
-                {startCheckout.isPending ? (
+                {pendingPlan === p.key ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     <span>Preparing…</span>
