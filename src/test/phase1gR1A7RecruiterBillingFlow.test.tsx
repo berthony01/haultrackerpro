@@ -462,7 +462,7 @@ describe('subscription-state rendering + blocking', () => {
     it(`status=${c.status} renders correct copy and ${c.blocks ? 'blocks' : 'allows'} checkout`, async () => {
       withBilling({
         recruiter_id: 'rec-1',
-        plan: c.status === 'active' || c.status === 'trialing' ? 'starter' : 'none',
+        plan: c.status === 'active' || c.status === 'trialing' ? 'starter' : 'none', // trial-allowlist
         status: c.status,
         stripe_customer_id: 'cus_x',
         stripe_subscription_id: c.status === 'inactive' ? null : 'sub_x',
