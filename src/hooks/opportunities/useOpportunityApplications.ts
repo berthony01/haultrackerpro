@@ -13,6 +13,8 @@ export type RecruiterApplicationStatus =
   | 'waiting_documents'
   | 'interviewing'
   | 'offer_sent'
+  // Phase 1H-A1 — non-terminal onboarding stage before hired.
+  | 'onboarding'
   | 'hired'
   | 'rejected';
 
