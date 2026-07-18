@@ -327,9 +327,9 @@ CREATE OR REPLACE FUNCTION public.submit_opportunity_application(
   _message            text DEFAULT NULL
 )
 RETURNS TABLE (
-  application_id uuid,
-  status         text,
-  result_code    text
+  application_id     uuid,
+  application_status text,
+  result_code        text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
