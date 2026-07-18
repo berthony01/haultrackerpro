@@ -833,10 +833,12 @@ BEGIN
   -- offer_sent → onboarding (item 9).
   _allow_withdraw := (current_setting('app.allow_driver_withdraw', true) = 'true');
 
-  IF public.is_admin(auth.uid()) THEN
-    NEW.updated_at := now();
-    RETURN NEW;
-  END IF;
+  -- Item 1: no admin bypass. Admin visibility is unaffected (SELECT policies),
+  -- but sensitive workflow transitions (onboarding/hired/withdrawn) and
+  -- immutable submission/consent/identity fields are off-limits via the
+  -- ordinary UPDATE path even for admins. Future dedicated RPCs (A3+) will
+  -- perform those transitions atomically.
+
 
   IF NEW.id IS DISTINCT FROM OLD.id
      OR NEW.opportunity_id IS DISTINCT FROM OLD.opportunity_id
