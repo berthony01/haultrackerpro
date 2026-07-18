@@ -58,14 +58,21 @@ ALTER TABLE public.opportunity_applications
     )
   );
 
--- Contact snapshot may only be populated when consent is true (item 5/6).
+-- Consent state must be internally consistent (item 3):
+--   * consent=true  requires contact_sharing_consent_at set;
+--   * consent=false requires timestamp and PII snapshots to be null.
 ALTER TABLE public.opportunity_applications
   DROP CONSTRAINT IF EXISTS opportunity_applications_contact_consent_chk;
 ALTER TABLE public.opportunity_applications
-  ADD CONSTRAINT opportunity_applications_contact_consent_chk
+  DROP CONSTRAINT IF EXISTS opportunity_applications_consent_state_chk;
+ALTER TABLE public.opportunity_applications
+  ADD CONSTRAINT opportunity_applications_consent_state_chk
   CHECK (
-    contact_sharing_consent = true
-    OR (driver_email_snapshot IS NULL AND driver_phone_snapshot IS NULL)
+    (contact_sharing_consent = true  AND contact_sharing_consent_at IS NOT NULL)
+    OR (contact_sharing_consent = false
+        AND contact_sharing_consent_at IS NULL
+        AND driver_email_snapshot IS NULL
+        AND driver_phone_snapshot IS NULL)
   );
 
 -- ---------------------------------------------------------------------
