@@ -3,6 +3,8 @@ import type { Plugin } from "vite";
 export const HTP_APP_NAME = "haultrackerpro" as const;
 export const HTP_BUILD_META_NAME = "htp-build-sha" as const;
 
+// This helper intentionally accepts only the three public commit identifiers
+// used to prove which source revision produced a deployed static build.
 const FULL_GIT_SHA = /^[0-9a-f]{40}$/i;
 const BUILD_SHA_ENV_KEYS = [
   "HTP_BUILD_SHA",
