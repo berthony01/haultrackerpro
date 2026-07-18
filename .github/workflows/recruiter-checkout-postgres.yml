@@ -64,7 +64,23 @@ jobs:
           exit 1
 
       - name: Run real-PostgreSQL Recruiter Checkout suite
-        run: bunx vitest run --config vitest.recruiter-checkout-postgres.config.ts --reporter=verbose
+        id: postgres_suite
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run --config vitest.recruiter-checkout-postgres.config.ts --reporter=verbose 2>&1 | tee recruiter-checkout-postgres.log
+
+      - name: Upload PostgreSQL suite log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recruiter-checkout-postgres-log
+          path: recruiter-checkout-postgres.log
+          if-no-files-found: error
+
+      - name: Enforce PostgreSQL suite result
+        if: steps.postgres_suite.outcome != 'success'
+        run: exit 1
 
       - name: Run focused Recruiter Checkout orchestrator suite
         run: bunx vitest run src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts
