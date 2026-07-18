@@ -730,6 +730,9 @@ describe("Phase 1G-R1A2 — recruiter checkout orchestrator", () => {
     // exists and the old flow no longer branches on billingRow directly.
     expect(src.includes("billingRow")).toBe(false);
     expect(src.includes("buildDeps(")).toBe(true);
+  });
+
+
 
   // ---------------------------------------------------------------------
   // Phase 1G-R1A2-R1 — session identity + safe-logging closure
