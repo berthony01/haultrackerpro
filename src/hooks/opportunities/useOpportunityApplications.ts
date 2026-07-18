@@ -3,6 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import {
+  createIdempotencyStore,
+  type IdempotencyStore,
+} from '@/lib/opportunities/submissionIdempotency';
+
 
 // Phase 1H-A1 — public-safe RPC outcome contract. Kept local until A2/A3
 // expand generated types coverage. Any business-outcome result_code other
@@ -71,22 +76,18 @@ const APPLICATION_SELECT_RECRUITER = '*, opportunities:opportunity_id(id,title,c
 export function useOpportunityApplications(opts: { recruiterId?: string } = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  // Stable per-(opportunity_id, type) idempotency keys, established outside
-  // the mutation function so a retry of the same submission reuses the exact
-  // key. A caller may still supply its own key; when it does, we preserve it.
-  const idempotencyKeysRef = useRef<Map<string, string>>(new Map());
-  const stableKey = (opportunityId: string, kind: 'apply' | 'request_info', caller?: string) => {
-    const mapKey = `${kind}:${opportunityId}`;
-    if (caller && caller.length >= 8) {
-      idempotencyKeysRef.current.set(mapKey, caller);
-      return caller;
-    }
-    const existing = idempotencyKeysRef.current.get(mapKey);
-    if (existing) return existing;
-    const generated = crypto.randomUUID();
-    idempotencyKeysRef.current.set(mapKey, generated);
-    return generated;
-  };
+  // Submission-attempt-scoped idempotency store: one key per in-flight
+  // submission (kind, opportunity_id). Released in onSettled so the NEXT
+  // user action for the same opportunity/type receives a fresh key. Retries
+  // within a single React Query mutation attempt reuse the reserved key
+  // because `mutationFn` re-runs but `onSettled` only fires after the whole
+  // attempt (including retries) has settled.
+  const idempotencyStoreRef = useRef<IdempotencyStore>();
+  if (!idempotencyStoreRef.current) {
+    idempotencyStoreRef.current = createIdempotencyStore();
+  }
+  const store = idempotencyStoreRef.current;
+
 
 
   // Driver: own applications (with limited related opportunity context)
@@ -137,7 +138,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       contact_sharing_consent: boolean;
     }): Promise<SubmissionResult> => {
       if (!user) throw new Error('Not authenticated');
-      const key = stableKey(args.opportunity_id, 'apply', args.idempotency_key);
+      const key = store.acquire('apply', args.opportunity_id, args.idempotency_key);
       const { data, error } = await (supabase as any).rpc('submit_opportunity_application', {
         _opportunity_id: args.opportunity_id,
         _idempotency_key: key,
@@ -153,6 +154,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSettled: (_d, _e, args) => store.release('apply', args.opportunity_id, args.idempotency_key),
   });
 
   // Driver-initiated question — required question text and preferred contact method.
@@ -165,7 +167,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       contact_sharing_consent: boolean;
     }): Promise<SubmissionResult> => {
       if (!user) throw new Error('Not authenticated');
-      const key = stableKey(args.opportunity_id, 'request_info', args.idempotency_key);
+      const key = store.acquire('request_info', args.opportunity_id, args.idempotency_key);
       const { data, error } = await (supabase as any).rpc('submit_request_info', {
         _opportunity_id: args.opportunity_id,
         _idempotency_key: key,
@@ -178,6 +180,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSettled: (_d, _e, args) => store.release('request_info', args.opportunity_id, args.idempotency_key),
   });
 
   // Back-compat façade for legacy `createApplication.mutate(...)` callsites.
@@ -197,7 +200,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       const explicitConsent = (data as unknown as { contact_sharing_consent?: boolean })
         .contact_sharing_consent === true;
       const callerKey = (data as unknown as { idempotency_key?: string }).idempotency_key;
-      const key = stableKey(data.opportunity_id, 'request_info', callerKey);
+      const key = store.acquire('request_info', data.opportunity_id, callerKey);
       const { data: rpcData, error } = await (supabase as any).rpc('submit_request_info', {
         _opportunity_id: data.opportunity_id,
         _idempotency_key: key,
@@ -210,6 +213,10 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSettled: (_d, _e, vars) => {
+      const callerKey = (vars as unknown as { idempotency_key?: string }).idempotency_key;
+      store.release('request_info', vars.opportunity_id, callerKey);
+    },
   });
 
   const withdrawApplication = useMutation({
