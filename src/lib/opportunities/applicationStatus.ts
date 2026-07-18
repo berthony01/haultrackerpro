@@ -30,9 +30,10 @@ const STATUS_RANK: Record<string, number> = {
   waiting_documents: 5,
   interviewing: 6,
   offer_sent: 7,
-  hired: 8,
-  rejected: 8,
-  withdrawn: 8,
+  onboarding: 8,
+  hired: 9,
+  rejected: 9,
+  withdrawn: 9,
 };
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -44,6 +45,7 @@ export const STATUS_LABEL: Record<string, string> = {
   waiting_documents: 'Waiting on Documents',
   interviewing: 'Interviewing',
   offer_sent: 'Offer Sent',
+  onboarding: 'Onboarding',
   hired: 'Hired',
   rejected: 'Rejected',
   withdrawn: 'Withdrawn',
@@ -58,6 +60,7 @@ export const STATUS_BADGE_CLASS: Record<string, string> = {
   waiting_documents: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   interviewing: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   offer_sent: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+  onboarding: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   hired: 'bg-green-500/15 text-green-400 border-green-500/30',
   rejected: 'bg-red-500/15 text-red-400 border-red-500/30',
   withdrawn: 'bg-muted text-muted-foreground border-border',
@@ -77,11 +80,10 @@ const RECRUITER_NEXT: Record<string, RecruiterTransition[]> = {
   call_scheduled: ['waiting_documents', 'interviewing', 'rejected'],
   waiting_documents: ['interviewing', 'rejected'],
   interviewing: ['offer_sent', 'rejected'],
-  // Phase 1H-A1: recruiter cannot jump offer_sent -> hired. Onboarding
-  // stage is required first. (Hired is only reachable through the
-  // application-accept + onboarding path once Phase 1H-A3 lands.)
-  offer_sent: ['onboarding', 'rejected'],
-  onboarding: ['hired', 'rejected'],
+  // Phase 1H-A1 remediation: recruiters cannot select onboarding or hired.
+  // Onboarding is reserved for future driver offer-acceptance workflow.
+  offer_sent: ['rejected'],
+  onboarding: ['rejected'],
 };
 
 export function getAllowedRecruiterTransitions(currentStatus: string): RecruiterTransition[] {
@@ -124,7 +126,7 @@ export const DRIVER_PIPELINE_GROUPS: { key: string; label: string; statuses: str
   {
     key: 'interview',
     label: 'Interviewing & Offers',
-    statuses: ['interviewing', 'offer_sent'],
+    statuses: ['interviewing', 'offer_sent', 'onboarding'],
   },
   { key: 'closed', label: 'Closed', statuses: ['hired', 'rejected', 'withdrawn'] },
 ];

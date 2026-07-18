@@ -73,9 +73,14 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
   const createApplication = useMutation({
     mutationFn: async (data: OpportunityApplicationInsert) => {
       if (!user) throw new Error('Not authenticated');
-      const { error } = await supabase
-        .from('opportunity_applications')
-        .insert({ ...data, driver_user_id: user.id });
+      const rpcName = data.application_type === 'apply'
+        ? 'submit_opportunity_application'
+        : 'submit_request_info';
+      const { error } = await (supabase as any).rpc(rpcName, {
+        _opportunity_id: data.opportunity_id,
+        _idempotency_key: crypto.randomUUID(),
+        _message: data.message ?? null,
+      });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
