@@ -519,8 +519,11 @@ BEGIN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
-  -- Whitelisted attestations required (item 5).
-  IF NOT (_availability_confirmed AND _requirements_confirmed AND _truth_attestation) THEN
+  -- Whitelisted attestations required (item 5). Each attestation must be
+  -- EXACTLY TRUE. NULL is not TRUE — reject explicitly with IS DISTINCT FROM.
+  IF _availability_confirmed IS DISTINCT FROM TRUE
+     OR _requirements_confirmed IS DISTINCT FROM TRUE
+     OR _truth_attestation      IS DISTINCT FROM TRUE THEN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
