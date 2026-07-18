@@ -54,7 +54,8 @@ import { ContractActionsCard } from '@/components/contracts/ContractActionsCard'
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import AssistantBlockedNotice from '@/components/assistants/AssistantBlockedNotice';
 
-import { Truck, LogOut, X, Route, Users, TrendingUp } from 'lucide-react';
+import { Truck, LogOut, X, Route, Users, TrendingUp, Shield } from 'lucide-react';
+import { useAdmin } from '@/hooks/useAdmin';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { normalizeLegacyEditStops } from '@/lib/stopNormalization';
@@ -77,6 +78,7 @@ const Index = () => {
   
   const { role, isLoading: roleLoading } = useUserRole();
   const { effectiveRole, setViewMode, canSwitch } = useViewMode();
+  const { isAdmin } = useAdmin();
   const isRecruiterView = effectiveRole === 'recruiter';
   const { responses: feedbackResponses } = useFeedback();
   const { settings } = useUserSettings();
@@ -821,6 +823,17 @@ const Index = () => {
                 </div>
               )}
               <NotificationBell onNavigate={handleNavigate} />
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Admin console"
+                  className="hidden lg:inline-flex gap-1.5 rounded-xl h-10 font-bold border-primary/30 text-primary hover:bg-primary/10"
+                  onClick={() => navigate('/admin')}
+                >
+                  <Shield className="h-4 w-4" /> Admin
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
