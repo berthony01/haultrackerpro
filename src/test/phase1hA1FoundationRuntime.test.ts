@@ -799,7 +799,148 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     ).rejects.toThrow(/violates foreign key constraint|update or delete/i);
   });
 
+  // ---------------------------------------------------------------------
+  // Independent-audit follow-ups (final A1 correctness patch)
+  // ---------------------------------------------------------------------
+
+  it('submit_opportunity_application rejects NULL attestations with invalid_input and inserts no row', async () => {
+    await asOwner(db);
+    const before = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM public.opportunity_applications
+        WHERE driver_user_id=$1 AND opportunity_id=$2 AND application_type='apply'`,
+      [IDS.driverA, IDS.opportunity],
+    );
+
+    const call = async (a: string, b: string, c: string, key: string) => {
+      await asAuthenticated(db, IDS.driverA);
+      const rows = await db.query<{ result_code: string; application_id: string | null }>(
+        `SELECT * FROM public.submit_opportunity_application(
+           $1::uuid, $2, 'null-attest', ${a}, ${b}, ${c}, 'phone', true
+         )`,
+        [IDS.opportunity, key],
+      );
+      return rows.rows[0];
+    };
+
+    const r1 = await call('NULL', 'true', 'true', 'null-attest-availability-1');
+    const r2 = await call('true', 'NULL', 'true', 'null-attest-requirements-1');
+    const r3 = await call('true', 'true', 'NULL', 'null-attest-truth-1');
+    const r4 = await call('NULL', 'NULL', 'NULL', 'null-attest-all-1');
+
+    expect([r1, r2, r3, r4].map((r) => r.result_code)).toEqual([
+      'invalid_input', 'invalid_input', 'invalid_input', 'invalid_input',
+    ]);
+    for (const r of [r1, r2, r3, r4]) expect(r.application_id).toBeNull();
+
+    await asOwner(db);
+    const after = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM public.opportunity_applications
+        WHERE driver_user_id=$1 AND opportunity_id=$2 AND application_type='apply'`,
+      [IDS.driverA, IDS.opportunity],
+    );
+    expect(after.rows[0].n).toBe(before.rows[0].n);
+  });
+
+  it('submit_request_info returns profile_required (no DB error) when consent=true and no Driver profile', async () => {
+    await asOwner(db);
+    const noProfileDriver = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    await db.exec(
+      `INSERT INTO auth.users(id,email) VALUES ('${noProfileDriver}','no-profile@example.com')
+         ON CONFLICT DO NOTHING;`,
+    );
+
+    await asAuthenticated(db, noProfileDriver);
+    const consented = await db.query<{ result_code: string; application_id: string | null }>(
+      `SELECT * FROM public.submit_request_info(
+         $1::uuid, 'noprof-consent-key-1', 'Any details?', 'email', true
+       )`,
+      [IDS.opportunity],
+    );
+    expect(consented.rows[0].result_code).toBe('profile_required');
+    expect(consented.rows[0].application_id).toBeNull();
+
+    const noConsent = await db.query<{ result_code: string; application_id: string | null }>(
+      `SELECT * FROM public.submit_request_info(
+         $1::uuid, 'noprof-noconsent-key-1', 'Any details?', 'in_app', false
+       )`,
+      [IDS.opportunity],
+    );
+    expect(noConsent.rows[0].result_code).toBe('created');
+    expect(noConsent.rows[0].application_id).not.toBeNull();
+  });
+
+  it('offer post-draft expiry invariant applies to accepted/declined/expired/canceled/superseded direct inserts', async () => {
+    await asOwner(db);
+    // Fresh application for this test — do not reuse or delete historical rows.
+    const freshDriver = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+    await db.exec(
+      `INSERT INTO auth.users(id,email) VALUES ('${freshDriver}','fresh-offer@example.com')
+         ON CONFLICT DO NOTHING;
+       INSERT INTO public.driver_opportunity_profiles(user_id, full_name, email, phone, profile_completed)
+         VALUES ('${freshDriver}','Fresh Offer','fresh-offer@example.com','555-0100', true)
+         ON CONFLICT DO NOTHING;`,
+    );
+    await asAuthenticated(db, freshDriver);
+    await db.query(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, 'fresh-offer-apply-key-1', 'apply', true, true, true, 'email', true
+       )`,
+      [IDS.opportunity],
+    );
+    await asOwner(db);
+    const app = await db.query<{ id: string }>(
+      `SELECT id FROM public.opportunity_applications
+        WHERE driver_user_id=$1 AND opportunity_id=$2 AND application_type='apply' LIMIT 1`,
+      [freshDriver, IDS.opportunity],
+    );
+    const appId = app.rows[0].id;
+
+    const NON_DRAFT: string[] = ['accepted', 'declined', 'expired', 'canceled', 'superseded'];
+
+    // Missing expires_at rejected for every non-draft state.
+    for (const s of NON_DRAFT) {
+      await expect(
+        db.query(
+          `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
+           VALUES ($1,$2,$3,$4,$5::text,now(),NULL,'{"v":1}'::jsonb,1)`,
+          [appId, IDS.opportunity, freshDriver, IDS.recruiterProfile, s],
+        ),
+      ).rejects.toThrow(/opportunity_offers_sent_expiry_chk/);
+    }
+
+    // 23h rejected for every non-draft state.
+    for (const s of NON_DRAFT) {
+      await expect(
+        db.query(
+          `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
+           VALUES ($1,$2,$3,$4,$5::text,now(),now()+interval '23 hours','{"v":1}'::jsonb,1)`,
+          [appId, IDS.opportunity, freshDriver, IDS.recruiterProfile, s],
+        ),
+      ).rejects.toThrow(/opportunity_offers_sent_expiry_chk/);
+    }
+
+    // >30d rejected for every non-draft state.
+    for (const s of NON_DRAFT) {
+      await expect(
+        db.query(
+          `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status,sent_at,expires_at,sent_snapshot,snapshot_version)
+           VALUES ($1,$2,$3,$4,$5::text,now(),now()+interval '31 days','{"v":1}'::jsonb,1)`,
+          [appId, IDS.opportunity, freshDriver, IDS.recruiterProfile, s],
+        ),
+      ).rejects.toThrow(/opportunity_offers_sent_expiry_chk/);
+    }
+
+    // Draft still flexible: no sent_at / no expires_at accepted.
+    const draft = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunity_offers(application_id,opportunity_id,driver_user_id,recruiter_id,status)
+       VALUES ($1,$2,$3,$4,'draft') RETURNING id`,
+      [appId, IDS.opportunity, freshDriver, IDS.recruiterProfile],
+    );
+    expect(draft.rows[0].id).toBeTruthy();
+  });
+
   it('unrelated billing tables are not altered', async () => {
+
     await asOwner(db);
     const subs = await db.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='subscriptions' ORDER BY column_name`,

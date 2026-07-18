@@ -153,9 +153,11 @@ CREATE TABLE IF NOT EXISTS public.opportunity_offers (
       AND sent_snapshot <> '{}'::jsonb
     )
   ),
-  -- Sent offers must expire in [+24h, +30d] relative to sent_at
+  -- Every non-draft state (sent, accepted, declined, expired, canceled,
+  -- superseded) must carry sent_at plus an expires_at bounded within
+  -- [sent_at + 24h, sent_at + 30d]. Draft stays flexible.
   CONSTRAINT opportunity_offers_sent_expiry_chk CHECK (
-    status <> 'sent'
+    status = 'draft'
     OR (
       sent_at IS NOT NULL
       AND expires_at IS NOT NULL
@@ -191,7 +193,7 @@ ALTER TABLE public.opportunity_offers
     )
   ),
   ADD CONSTRAINT opportunity_offers_sent_expiry_chk CHECK (
-    status <> 'sent'
+    status = 'draft'
     OR (
       sent_at IS NOT NULL
       AND expires_at IS NOT NULL
@@ -519,8 +521,11 @@ BEGIN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
-  -- Whitelisted attestations required (item 5).
-  IF NOT (_availability_confirmed AND _requirements_confirmed AND _truth_attestation) THEN
+  -- Whitelisted attestations required (item 5). Each attestation must be
+  -- EXACTLY TRUE. NULL is not TRUE — reject explicitly with IS DISTINCT FROM.
+  IF _availability_confirmed IS DISTINCT FROM TRUE
+     OR _requirements_confirmed IS DISTINCT FROM TRUE
+     OR _truth_attestation      IS DISTINCT FROM TRUE THEN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
@@ -710,7 +715,14 @@ BEGIN
 
   SELECT * INTO v_profile FROM public.driver_opportunity_profiles dop WHERE dop.user_id = v_uid LIMIT 1;
 
-  IF _contact_sharing_consent AND v_profile.user_id IS NOT NULL THEN
+  -- Consent=true requires a Driver profile so we can attach a truthful
+  -- PII snapshot and satisfy the consent-state CHECK. Consent=false may
+  -- still submit an inquiry without a profile (product rule).
+  IF _contact_sharing_consent AND v_profile.user_id IS NULL THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'profile_required'::text; RETURN;
+  END IF;
+
+  IF _contact_sharing_consent THEN
     v_email_snap := v_profile.email;
     v_phone_snap := v_profile.phone;
     v_consent_at := now();
