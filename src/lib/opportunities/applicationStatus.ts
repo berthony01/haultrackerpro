@@ -8,6 +8,8 @@ export type ApplicationStatus =
   | 'waiting_documents'
   | 'interviewing'
   | 'offer_sent'
+  // Phase 1H-A1 — new non-terminal stage between offer_sent and hired.
+  | 'onboarding'
   | 'hired'
   | 'rejected'
   | 'withdrawn'
@@ -75,7 +77,11 @@ const RECRUITER_NEXT: Record<string, RecruiterTransition[]> = {
   call_scheduled: ['waiting_documents', 'interviewing', 'rejected'],
   waiting_documents: ['interviewing', 'rejected'],
   interviewing: ['offer_sent', 'rejected'],
-  offer_sent: ['hired', 'rejected'],
+  // Phase 1H-A1: recruiter cannot jump offer_sent -> hired. Onboarding
+  // stage is required first. (Hired is only reachable through the
+  // application-accept + onboarding path once Phase 1H-A3 lands.)
+  offer_sent: ['onboarding', 'rejected'],
+  onboarding: ['hired', 'rejected'],
 };
 
 export function getAllowedRecruiterTransitions(currentStatus: string): RecruiterTransition[] {
@@ -90,6 +96,7 @@ export const RECRUITER_ACTION_LABEL: Record<RecruiterTransition, string> = {
   waiting_documents: 'Waiting on Docs',
   interviewing: 'Move to Interview',
   offer_sent: 'Send Offer',
+  onboarding: 'Start Onboarding',
   hired: 'Hire',
   rejected: 'Reject',
 };
