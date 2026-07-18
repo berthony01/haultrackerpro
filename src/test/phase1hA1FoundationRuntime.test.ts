@@ -420,6 +420,7 @@ describe('Phase 1H-A1 remediation candidate migration (PGlite)', () => {
   });
 
   it('new apply rows must have snapshot_version >= 1 while historical request_info remains version 0', async () => {
+    await asOwner(db);
     const versions = await db.query<{ application_type: string; min_version: number }>(
       `SELECT application_type, MIN(snapshot_version)::int AS min_version
          FROM public.opportunity_applications
@@ -476,9 +477,11 @@ describe('Phase 1H-A1 remediation candidate migration (PGlite)', () => {
         WHERE driver_user_id=$1 AND opportunity_id=$2 AND application_type='apply' LIMIT 1`,
       [IDS.driverA, IDS.opportunity],
     );
-    await db.query(`UPDATE public.opportunity_applications SET status='offer_sent' WHERE id=$1`, [app.rows[0].id]);
 
     await asAuthenticated(db, IDS.recruiterUser);
+    for (const status of ['viewed', 'contact_requested', 'call_scheduled', 'interviewing', 'offer_sent']) {
+      await db.query(`UPDATE public.opportunity_applications SET status=$2 WHERE id=$1`, [app.rows[0].id, status]);
+    }
     await expect(
       db.query(`UPDATE public.opportunity_applications SET status='onboarding' WHERE id=$1`, [app.rows[0].id]),
     ).rejects.toThrow(/Only server-authorized workflow|row-level security|permission denied/i);

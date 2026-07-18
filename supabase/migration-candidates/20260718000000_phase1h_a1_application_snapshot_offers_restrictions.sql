@@ -615,7 +615,8 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS trg_opportunity_applications_snapshot_freeze ON public.opportunity_applications;
-CREATE TRIGGER trg_opportunity_applications_snapshot_freeze
+DROP TRIGGER IF EXISTS aaa_opportunity_applications_snapshot_freeze_trigger ON public.opportunity_applications;
+CREATE TRIGGER aaa_opportunity_applications_snapshot_freeze_trigger
   BEFORE UPDATE ON public.opportunity_applications
   FOR EACH ROW EXECUTE FUNCTION public.opportunity_applications_snapshot_freeze();
 
