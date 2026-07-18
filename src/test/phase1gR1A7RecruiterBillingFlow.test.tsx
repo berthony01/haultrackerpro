@@ -447,7 +447,7 @@ const SUB_CASES: {
   blocks: boolean;
 }[] = [
   { status: 'active', dataState: 'sub_active', fragment: /is active/i, blocks: true },
-  { status: 'trialing', dataState: 'sub_trialing', fragment: /trial/i, blocks: true },
+  { status: 'trialing', dataState: 'sub_trialing', fragment: /trial/i, blocks: true }, // trial-allowlist
   { status: 'past_due', dataState: 'sub_past_due', fragment: /payment did not go through/i, blocks: true },
   { status: 'unpaid', dataState: 'sub_unpaid', fragment: /unpaid/i, blocks: true },
   { status: 'incomplete', dataState: 'sub_incomplete', fragment: /was not completed/i, blocks: true },
