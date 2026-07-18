@@ -344,15 +344,27 @@ BEGIN
   END IF;
 
   IF v_current_customer IS NULL THEN
-    INSERT INTO public.recruiter_billing_profiles
-      (recruiter_id, user_id, stripe_customer_id)
-    VALUES
-      (v_row.recruiter_id, v_row.user_id, _customer_id)
-    ON CONFLICT (recruiter_id) DO UPDATE
-      SET stripe_customer_id = EXCLUDED.stripe_customer_id
-      WHERE public.recruiter_billing_profiles.stripe_customer_id IS NULL
-        AND public.recruiter_billing_profiles.user_id = EXCLUDED.user_id;
+    -- Narrow SQLSTATE 23505 handler scoped ONLY to the canonical
+    -- recruiter_billing_profiles insert/upsert. A concurrent identity
+    -- race is surfaced as a structured customer_conflict/
+    -- billing_identity_unique_conflict outcome — never as a raw DB
+    -- error and never with constraint names exposed to the caller.
+    BEGIN
+      INSERT INTO public.recruiter_billing_profiles
+        (recruiter_id, user_id, stripe_customer_id)
+      VALUES
+        (v_row.recruiter_id, v_row.user_id, _customer_id)
+      ON CONFLICT (recruiter_id) DO UPDATE
+        SET stripe_customer_id = EXCLUDED.stripe_customer_id
+        WHERE public.recruiter_billing_profiles.stripe_customer_id IS NULL
+          AND public.recruiter_billing_profiles.user_id = EXCLUDED.user_id;
+    EXCEPTION WHEN unique_violation THEN
+      outcome := 'customer_conflict';
+      reason  := 'billing_identity_unique_conflict';
+      RETURN NEXT; RETURN;
+    END;
 
+    -- Post-write ownership verification is preserved.
     IF NOT EXISTS (
       SELECT 1 FROM public.recruiter_billing_profiles
        WHERE recruiter_id = v_row.recruiter_id
