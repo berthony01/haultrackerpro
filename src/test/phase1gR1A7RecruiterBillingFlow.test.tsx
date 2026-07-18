@@ -846,6 +846,7 @@ describe('focus and re-enable', () => {
     const user = userEvent.setup();
     renderPanel();
     const btn = screen.getByRole('button', { name: /Choose Starter/i });
+    await waitFor(() => expect(btn).not.toBeDisabled());
     btn.focus();
     await user.keyboard('{Enter}');
     await waitFor(() => expect(openSpy).toHaveBeenCalled());
