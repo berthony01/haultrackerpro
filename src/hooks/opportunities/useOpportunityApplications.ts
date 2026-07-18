@@ -70,21 +70,81 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
   });
 
 
-  const createApplication = useMutation({
-    mutationFn: async (data: OpportunityApplicationInsert) => {
+  // Formal apply — whitelisted attestations only, no client-supplied identity/PII.
+  const submitApplication = useMutation({
+    mutationFn: async (args: {
+      opportunity_id: string;
+      idempotency_key: string;
+      message?: string | null;
+      availability_confirmed: boolean;
+      requirements_confirmed: boolean;
+      truth_attestation: boolean;
+      preferred_contact_method: 'phone' | 'email' | 'sms' | 'in_app';
+      contact_sharing_consent: boolean;
+    }) => {
       if (!user) throw new Error('Not authenticated');
-      const rpcName = data.application_type === 'apply'
-        ? 'submit_opportunity_application'
-        : 'submit_request_info';
-      const { error } = await (supabase as any).rpc(rpcName, {
-        _opportunity_id: data.opportunity_id,
-        _idempotency_key: crypto.randomUUID(),
-        _message: data.message ?? null,
+      const { error } = await (supabase as any).rpc('submit_opportunity_application', {
+        _opportunity_id: args.opportunity_id,
+        _idempotency_key: args.idempotency_key,
+        _message: args.message ?? null,
+        _availability_confirmed: args.availability_confirmed,
+        _requirements_confirmed: args.requirements_confirmed,
+        _truth_attestation: args.truth_attestation,
+        _preferred_contact_method: args.preferred_contact_method,
+        _contact_sharing_consent: args.contact_sharing_consent,
       });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
   });
+
+  // Driver-initiated question — required question text and preferred contact method.
+  const submitRequestInfo = useMutation({
+    mutationFn: async (args: {
+      opportunity_id: string;
+      idempotency_key: string;
+      question: string;
+      preferred_contact_method: 'phone' | 'email' | 'sms' | 'in_app';
+      contact_sharing_consent: boolean;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await (supabase as any).rpc('submit_request_info', {
+        _opportunity_id: args.opportunity_id,
+        _idempotency_key: args.idempotency_key,
+        _question: args.question,
+        _preferred_contact_method: args.preferred_contact_method,
+        _contact_sharing_consent: args.contact_sharing_consent,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+  });
+
+  // Back-compat façade for legacy `createApplication.mutate(...)` callsites.
+  // Fails closed for unsupported application_type values; callers must migrate
+  // to the dedicated submit* mutations for whitelisted attestation input.
+  const createApplication = {
+    mutate: (data: OpportunityApplicationInsert) => {
+      if (data.application_type === 'apply') {
+        throw new Error('Formal apply requires the submitApplication mutation with whitelisted attestations.');
+      }
+      if (data.application_type === 'request_info') {
+        return submitRequestInfo.mutate({
+          opportunity_id: data.opportunity_id!,
+          idempotency_key:
+            (data as unknown as { idempotency_key?: string }).idempotency_key ?? crypto.randomUUID(),
+          question: data.message ?? '',
+          preferred_contact_method:
+            ((data as unknown as { preferred_contact_method?: string }).preferred_contact_method as
+              | 'phone' | 'email' | 'sms' | 'in_app'
+              | undefined) ?? 'in_app',
+          contact_sharing_consent: false,
+        });
+      }
+      throw new Error(`Unsupported application_type: ${String(data.application_type)}`);
+    },
+    isPending: submitApplication.isPending || submitRequestInfo.isPending,
+  };
 
   // Driver withdraws own request via SECURITY DEFINER RPC
   const withdrawApplication = useMutation({
