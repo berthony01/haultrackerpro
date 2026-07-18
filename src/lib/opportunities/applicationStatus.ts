@@ -8,6 +8,8 @@ export type ApplicationStatus =
   | 'waiting_documents'
   | 'interviewing'
   | 'offer_sent'
+  // Phase 1H-A1 — new non-terminal stage between offer_sent and hired.
+  | 'onboarding'
   | 'hired'
   | 'rejected'
   | 'withdrawn'
