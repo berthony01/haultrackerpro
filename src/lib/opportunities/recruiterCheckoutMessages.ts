@@ -156,7 +156,7 @@ export const RECRUITER_SUBSCRIPTION_STATUS_MESSAGES: Record<
   string
 > = {
   active: 'Your recruiter subscription is active.',
-  trialing:
+  trialing: // trial-allowlist
     'Your recruiter subscription is currently in a trial. Use Manage Billing to review or change plans.', // trial-allowlist
   past_due:
     'Your last payment did not go through. Please update your payment method in Manage Billing to keep premium features.',
