@@ -73,7 +73,11 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === "development" && componentTagger(),
     mode === "production" && createHtpBuildVersionPlugin({
-      env: process.env,
+      env: {
+        HTP_BUILD_SHA: process.env.HTP_BUILD_SHA,
+        GITHUB_SHA: process.env.GITHUB_SHA,
+        VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA,
+      },
       readGitSha: readGitHeadSha,
     }),
     // PWA service worker is intentionally DISABLED in self-destroying mode.
