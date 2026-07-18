@@ -128,11 +128,14 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
   });
 
 
-  // Formal apply — whitelisted attestations only, no client-supplied identity/PII.
+  // Formal apply (item 3) — REQUIRES a caller-supplied idempotency_key so a
+  // legitimate reapplication after rejected/withdrawn cannot silently reuse
+  // a stale key. React Query retries reuse the same caller value verbatim
+  // because the key lives in mutation `variables`, not in a hook-level cache.
   const submitApplication = useMutation({
     mutationFn: async (args: {
       opportunity_id: string;
-      idempotency_key?: string;
+      idempotency_key: string;
       message?: string | null;
       availability_confirmed: boolean;
       requirements_confirmed: boolean;
@@ -141,10 +144,12 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       contact_sharing_consent: boolean;
     }): Promise<SubmissionResult> => {
       if (!user) throw new Error('Not authenticated');
-      const key = store.acquire('apply', args.opportunity_id, args.idempotency_key);
+      if (!args.idempotency_key || args.idempotency_key.length < 8) {
+        throw new Error('submission_failed:invalid_input');
+      }
       const { data, error } = await (supabase as any).rpc('submit_opportunity_application', {
         _opportunity_id: args.opportunity_id,
-        _idempotency_key: key,
+        _idempotency_key: args.idempotency_key,
         _message: args.message ?? null,
         _availability_confirmed: args.availability_confirmed,
         _requirements_confirmed: args.requirements_confirmed,
@@ -157,23 +162,26 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
-    onSettled: (_d, _e, args) => store.release('apply', args.opportunity_id, args.idempotency_key),
   });
 
-  // Driver-initiated question — required question text and preferred contact method.
+  // Driver-initiated question (item 3) — also REQUIRES a caller-supplied
+  // idempotency_key. Same reasoning as formal apply: retries reuse the exact
+  // caller value, and a distinct user action must supply a distinct value.
   const submitRequestInfo = useMutation({
     mutationFn: async (args: {
       opportunity_id: string;
-      idempotency_key?: string;
+      idempotency_key: string;
       question: string;
       preferred_contact_method: 'phone' | 'email' | 'sms' | 'in_app';
       contact_sharing_consent: boolean;
     }): Promise<SubmissionResult> => {
       if (!user) throw new Error('Not authenticated');
-      const key = store.acquire('request_info', args.opportunity_id, args.idempotency_key);
+      if (!args.idempotency_key || args.idempotency_key.length < 8) {
+        throw new Error('submission_failed:invalid_input');
+      }
       const { data, error } = await (supabase as any).rpc('submit_request_info', {
         _opportunity_id: args.opportunity_id,
-        _idempotency_key: key,
+        _idempotency_key: args.idempotency_key,
         _question: args.question,
         _preferred_contact_method: args.preferred_contact_method,
         _contact_sharing_consent: args.contact_sharing_consent,
@@ -183,7 +191,6 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
-    onSettled: (_d, _e, args) => store.release('request_info', args.opportunity_id, args.idempotency_key),
   });
 
   // Back-compat façade for legacy `createApplication.mutate(...)` callsites.
