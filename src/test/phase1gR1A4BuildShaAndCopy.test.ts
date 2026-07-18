@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 import {
   HTP_APP_NAME,
   HTP_META_NAME,
@@ -10,9 +10,10 @@ import {
 } from "../../vite/htpBuildShaPlugin";
 
 const PANEL_SRC = readFileSync(
-  fileURLToPath(new URL("../components/opportunities/RecruiterBillingPanel.tsx", import.meta.url)),
+  path.resolve(process.cwd(), "src/components/opportunities/RecruiterBillingPanel.tsx"),
   "utf8",
 );
+
 
 const TEST_SHA = "0123456789abcdef0123456789abcdef01234567";
 const TEST_SHA_UPPER = TEST_SHA.toUpperCase();
