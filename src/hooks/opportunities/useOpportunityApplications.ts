@@ -123,28 +123,35 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
   // Back-compat façade for legacy `createApplication.mutate(...)` callsites.
   // Fails closed for unsupported application_type values; callers must migrate
   // to the dedicated submit* mutations for whitelisted attestation input.
-  const createApplication = {
-    mutate: (data: OpportunityApplicationInsert) => {
+  // Back-compat façade preserving the useMutation callback contract
+  // (`.mutate(data, { onSuccess, onError })`). Fails closed for unsupported
+  // application_type values — no silent misrouting.
+  const createApplication = useMutation({
+    mutationFn: async (data: OpportunityApplicationInsert) => {
+      if (!user) throw new Error('Not authenticated');
       if (data.application_type === 'apply') {
         throw new Error('Formal apply requires the submitApplication mutation with whitelisted attestations.');
       }
-      if (data.application_type === 'request_info') {
-        return submitRequestInfo.mutate({
-          opportunity_id: data.opportunity_id!,
-          idempotency_key:
-            (data as unknown as { idempotency_key?: string }).idempotency_key ?? crypto.randomUUID(),
-          question: data.message ?? '',
-          preferred_contact_method:
-            ((data as unknown as { preferred_contact_method?: string }).preferred_contact_method as
-              | 'phone' | 'email' | 'sms' | 'in_app'
-              | undefined) ?? 'in_app',
-          contact_sharing_consent: false,
-        });
+      if (data.application_type !== 'request_info') {
+        throw new Error(`Unsupported application_type: ${String(data.application_type)}`);
       }
-      throw new Error(`Unsupported application_type: ${String(data.application_type)}`);
+      const preferred = ((data as unknown as { preferred_contact_method?: string })
+        .preferred_contact_method as 'phone' | 'email' | 'sms' | 'in_app' | undefined) ?? 'in_app';
+      const explicitConsent = (data as unknown as { contact_sharing_consent?: boolean })
+        .contact_sharing_consent === true;
+      const key = (data as unknown as { idempotency_key?: string }).idempotency_key
+        ?? crypto.randomUUID();
+      const { error } = await (supabase as any).rpc('submit_request_info', {
+        _opportunity_id: data.opportunity_id,
+        _idempotency_key: key,
+        _question: data.message ?? '',
+        _preferred_contact_method: preferred,
+        _contact_sharing_consent: explicitConsent,
+      });
+      if (error) throw error;
     },
-    isPending: submitApplication.isPending || submitRequestInfo.isPending,
-  };
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+  });
 
   // Driver withdraws own request via SECURITY DEFINER RPC
   const withdrawApplication = useMutation({
