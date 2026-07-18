@@ -207,6 +207,9 @@ BEGIN
     generation := v_row.generation;
     checkout_url := v_row.checkout_url;
     checkout_expires_at := v_row.checkout_expires_at;
+    stripe_customer_id := v_row.stripe_customer_id;
+    stripe_checkout_session_id := v_row.stripe_checkout_session_id;
+    -- claim_token intentionally NULL: only 'claimed' issues a token.
     RETURN NEXT; RETURN;
   END IF;
 
@@ -217,9 +220,12 @@ BEGIN
     outcome := 'in_progress';
     intent_id := v_row.id;
     generation := v_row.generation;
+    stripe_customer_id := v_row.stripe_customer_id;
     reason := 'active_lease';
+    -- claim_token intentionally NULL: only 'claimed' issues a token.
     RETURN NEXT; RETURN;
   END IF;
+
 
   -- Generation matrix for all remaining (claimable) branches:
   --   expired processing + same plan   → keep generation
