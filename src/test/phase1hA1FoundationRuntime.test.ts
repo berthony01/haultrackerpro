@@ -283,7 +283,7 @@ describe('Phase 1H-A1 — foundation candidate migration (PGlite)', () => {
       [IDS.opportunity, JSON.stringify(snap)],
     );
     expect(r.rows[0].result_code).toBe('created');
-    expect(r.rows[0].status).toBe('new');
+    expect(r.rows[0].application_status).toBe('new');
 
     const row = await db.query<{ cnt: string; snap: string; sv: number; sub_at: string }>(
       `SELECT COUNT(*)::text AS cnt, submission_snapshot::text AS snap, snapshot_version AS sv, submitted_at::text AS sub_at
