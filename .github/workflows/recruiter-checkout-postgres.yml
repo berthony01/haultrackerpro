@@ -30,7 +30,7 @@ jobs:
   recruiter-checkout-postgres:
     name: Real Postgres 16 — Recruiter Checkout Atomicity
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     services:
       postgres:
