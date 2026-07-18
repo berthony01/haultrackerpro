@@ -167,7 +167,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       contact_sharing_consent: boolean;
     }): Promise<SubmissionResult> => {
       if (!user) throw new Error('Not authenticated');
-      const key = stableKey(args.opportunity_id, 'request_info', args.idempotency_key);
+      const key = store.acquire('request_info', args.opportunity_id, args.idempotency_key);
       const { data, error } = await (supabase as any).rpc('submit_request_info', {
         _opportunity_id: args.opportunity_id,
         _idempotency_key: key,
@@ -180,6 +180,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
       return assertSubmissionSuccess(row ?? null);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['opportunity_applications'] }),
+    onSettled: (_d, _e, args) => store.release('request_info', args.opportunity_id, args.idempotency_key),
   });
 
   // Back-compat façade for legacy `createApplication.mutate(...)` callsites.
