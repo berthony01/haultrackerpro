@@ -12,11 +12,11 @@
 --      with advisory transaction locks keyed by recruiter_id.
 --
 -- R1 corrections:
---   - Eligibility uses real columns: recruiter_profiles.status and
+--   - Eligibility uses real columns only: recruiter_profiles.status and
 --     recruiter_profiles.verification_status. Ineligible when either equals
---     'suspended' or verification_status <> 'approved'. Nonexistent columns
---     is_suspended / suspended_at are NOT referenced anywhere.
---   - No _rci_touch_updated_at() function and no trigger; every UPDATE sets
+--     the suspended sentinel or verification_status is not the approved
+--     sentinel. No reference to any legacy boolean/timestamp flag.
+--   - No fifth function and no trigger; every UPDATE sets
 --     updated_at directly. Exactly four function definitions.
 --   - Claim generation matrix:
 --       * new row                                   → gen 1, claimed
