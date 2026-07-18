@@ -95,6 +95,14 @@ export function RecruiterBillingPanel() {
   const checkServerStatus = hook.checkServerStatus ?? (() => {});
 
   const [pendingPlan, setPendingPlan] = useState<PaidPlan | null>(null);
+  // Phase 1G-R1A7-R1: real-Chromium rapid-double-click testing proved that
+  // React Query's `isPending` flag is NOT synchronously available between
+  // two near-instant clicks (it only reflects true after React commits the
+  // state update from the first mutate() call), so relying on it alone let
+  // a second click slip a second checkout/portal request through. This ref
+  // is set synchronously, before any async work, and is the single source
+  // of truth for "an action is already in flight" — closing that race.
+  const actionInFlightRef = useRef(false);
   const [fallback, setFallback] = useState<{
     url: string;
     label: string;
