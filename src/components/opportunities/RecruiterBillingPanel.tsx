@@ -16,7 +16,9 @@ import {
   useRecruiterBilling,
   RECRUITER_PLAN_LABELS,
   type RecruiterPlan,
+  type RecruiterCheckoutFailure,
 } from '@/hooks/opportunities/useRecruiterBilling';
+import { RECRUITER_SUBSCRIPTION_STATUS_MESSAGES } from '@/lib/opportunities/recruiterCheckoutMessages';
 
 type PaidPlan = Exclude<RecruiterPlan, 'none'>;
 
