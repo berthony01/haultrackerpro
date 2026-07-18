@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,8 +14,22 @@ import {
   isSafeStripeBillingPortalUrl,
   parseCheckoutError,
   RECRUITER_CHECKOUT_MESSAGES,
+  RECRUITER_CHECKOUT_COOLDOWN_MS,
+  RECRUITER_BILLING_POPUP_NAME,
+  RECRUITER_SUPPORT_CODES,
   type ParsedCheckoutError,
+  type RecruiterCheckoutCode,
 } from '@/lib/opportunities/recruiterCheckoutMessages';
+import {
+  deriveRecruiterBillingUiState,
+  canStartCheckout as canStartCheckoutFn,
+  shouldShowManageBilling as shouldShowManageBillingFn,
+  checkStatusVisibility as checkStatusVisibilityFn,
+  stateHeadline as stateHeadlineFn,
+  type PaidPlan,
+  type RecruiterBillingUiState,
+} from '@/lib/opportunities/recruiterBillingState';
+import { describeRecruiterEligibility } from '@/lib/opportunities/recruiterEligibility';
 
 export type RecruiterBilling = Tables<'recruiter_billing_profiles'>;
 export type RecruiterPlan = 'none' | 'starter' | 'growth' | 'fleet';
@@ -34,22 +48,9 @@ export const RECRUITER_PLAN_LABELS: Record<RecruiterPlan, string> = {
   fleet: 'Fleet',
 };
 
-// Codes that indicate the server made progress on billing state and the
-// client should refetch billing so any subsequent action sees fresh state.
-const REFETCH_CODES = new Set<ParsedCheckoutError['code']>([
-  'in_progress',
-  'subscription_exists',
-  'checkout_processing',
-  'unknown_subscription_status',
-]);
-
 export interface RecruiterCheckoutFailure extends Error {
   code: ParsedCheckoutError['code'];
-  /**
-   * Fallback URL surfaced ONLY when the browser blocked the sync-opened tab.
-   * Validated against `checkout.stripe.com` or `billing.stripe.com` before
-   * being set. Never populated on any other failure path.
-   */
+  /** Validated Stripe URL surfaced ONLY on popup-blocked path. */
   fallbackUrl?: string;
 }
 
@@ -66,15 +67,75 @@ function makeFailure(
 
 export function useRecruiterBilling() {
   const { user } = useAuth();
-  const { profile, isApproved, isSuspended } = useRecruiterProfile();
+  const {
+    profile,
+    isLoading: profileLoading,
+    isApproved,
+    isSuspended,
+  } = useRecruiterProfile();
   const recruiterId = profile?.id ?? null;
   const qc = useQueryClient();
 
-  // Track the sync-opened blank tab across the async invoke, so we can either
-  // navigate it to the validated Stripe URL or close it if the server call
-  // fails. Popup blockers null the return value of window.open — we detect
-  // that and surface an accessible fallback with the validated URL only.
+  // Deterministic single popup. Same name across window.open() calls
+  // guarantees rapid clicks reuse the same tab.
   const pendingWindowRef = useRef<Window | null>(null);
+  // Guard against re-entrance from a rapid second click on the SAME
+  // button-press cycle (before mutation.isPending flips).
+  const openingRef = useRef<boolean>(false);
+
+  // ---- Popup helpers -----------------------------------------------------
+
+  const prepareTab = useCallback(() => {
+    if (openingRef.current) return;
+    openingRef.current = true;
+    try {
+      pendingWindowRef.current = window.open(
+        'about:blank',
+        RECRUITER_BILLING_POPUP_NAME,
+        'noopener,noreferrer',
+      );
+    } catch {
+      pendingWindowRef.current = null;
+    }
+  }, []);
+
+  const settleTab = useCallback(
+    (validatedUrl: string): { opened: boolean; url: string } => {
+      const w = pendingWindowRef.current;
+      pendingWindowRef.current = null;
+      openingRef.current = false;
+      if (w && !w.closed) {
+        try {
+          (w as { opener: unknown }).opener = null;
+          w.location.href = validatedUrl;
+          return { opened: true, url: validatedUrl };
+        } catch {
+          try {
+            w.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      return { opened: false, url: validatedUrl };
+    },
+    [],
+  );
+
+  const discardTab = useCallback(() => {
+    const w = pendingWindowRef.current;
+    pendingWindowRef.current = null;
+    openingRef.current = false;
+    if (w && !w.closed) {
+      try {
+        w.close();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  // ---- Queries -----------------------------------------------------------
 
   const billingQuery = useQuery({
     queryKey: ['recruiter_billing', recruiterId],
@@ -114,9 +175,7 @@ export function useRecruiterBilling() {
   const isBillingActive = status === 'active' || status === 'trialing'; // trial-allowlist
   const activeCount = activeCountQuery.data ?? 0;
 
-  /**
-   * @deprecated Legacy pre-pivot posting-limit flag.
-   */
+  /** @deprecated Legacy pre-pivot posting-limit flag. */
   const legacyCanSubmitMore_DO_NOT_USE_FOR_STANDARD_POSTING =
     isBillingActive && activeCount < limit;
 
@@ -127,154 +186,258 @@ export function useRecruiterBilling() {
     isSuspended,
   });
 
-  const capabilityTier = capabilities.tier;
-  const isPaidRecruiterPlanActive = isRecruiterPaidPlanActive(plan, status);
-
-  const refetchBilling = () => {
+  const refetchBilling = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['recruiter_billing'] });
     qc.invalidateQueries({ queryKey: ['recruiter_active_opportunity_count'] });
-  };
+    qc.invalidateQueries({ queryKey: ['recruiter_profile'] });
+  }, [qc]);
 
-  /**
-   * prepareTab: open the popup SYNCHRONOUSLY inside the click handler that
-   * calls startCheckout.mutate(). Browsers only allow window.open() to bypass
-   * the popup blocker when called directly from a user gesture — we can't do
-   * this after `await`. If the browser blocks it, `pendingWindowRef.current`
-   * is null and we surface a fallback button with the validated URL.
-   */
-  const prepareTab = () => {
-    try {
-      pendingWindowRef.current = window.open(
-        'about:blank',
-        '_blank',
-        'noopener,noreferrer',
-      );
-    } catch {
-      pendingWindowRef.current = null;
+  // ---- Server-progress + error state (drives the UI state machine) ------
+
+  const [serverProgress, setServerProgress] = useState<{
+    kind: 'in_progress' | 'processing';
+    cooldownActive: boolean;
+  } | null>(null);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCooldownTimer = () => {
+    if (cooldownTimerRef.current) {
+      clearTimeout(cooldownTimerRef.current);
+      cooldownTimerRef.current = null;
     }
   };
 
-  const settleTab = (
-    validatedUrl: string,
-  ): { opened: boolean; url: string } => {
-    const w = pendingWindowRef.current;
-    pendingWindowRef.current = null;
-    if (w && !w.closed) {
-      try {
-        // Belt-and-suspenders: prevent reverse-tabnabbing in case the browser
-        // ignored the noopener hint on window.open (Safari edge cases).
-        (w as { opener: unknown }).opener = null;
-        w.location.href = validatedUrl;
-        return { opened: true, url: validatedUrl };
-      } catch {
-        try {
-          w.close();
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-    return { opened: false, url: validatedUrl };
+  useEffect(() => () => clearCooldownTimer(), []);
+
+  const startServerProgress = (kind: 'in_progress' | 'processing') => {
+    clearCooldownTimer();
+    setServerProgress({ kind, cooldownActive: true });
+    cooldownTimerRef.current = setTimeout(() => {
+      setServerProgress((s) => (s ? { ...s, cooldownActive: false } : null));
+    }, RECRUITER_CHECKOUT_COOLDOWN_MS);
   };
 
-  const discardTab = () => {
-    const w = pendingWindowRef.current;
-    pendingWindowRef.current = null;
-    if (w && !w.closed) {
-      try {
-        w.close();
-      } catch {
-        /* ignore */
-      }
-    }
+  const clearServerProgress = () => {
+    clearCooldownTimer();
+    setServerProgress(null);
   };
+
+  const [popupBlockedCheckout, setPopupBlockedCheckout] = useState<{
+    url: string;
+    plan: PaidPlan;
+  } | null>(null);
+  const [popupBlockedPortal, setPopupBlockedPortal] = useState<{
+    url: string;
+  } | null>(null);
+  const [supportError, setSupportError] = useState<string | null>(null);
+  const [retryableError, setRetryableError] = useState<string | null>(null);
+  const [startingPlan, setStartingPlan] = useState<PaidPlan | null>(null);
+  const [portalOpening, setPortalOpening] = useState<boolean>(false);
+
+  const clearTransient = () => {
+    setPopupBlockedCheckout(null);
+    setPopupBlockedPortal(null);
+    setSupportError(null);
+    setRetryableError(null);
+  };
+
+  // ---- Derived UI state --------------------------------------------------
+
+  const premiumEligible = useMemo(() => {
+    if (!profile) return false;
+    if (isSuspended) return false;
+    return describeRecruiterEligibility(profile).canPost;
+  }, [profile, isSuspended]);
+
+  const uiState: RecruiterBillingUiState = useMemo(
+    () =>
+      deriveRecruiterBillingUiState({
+        profileLoading,
+        billingLoading: billingQuery.isLoading,
+        profileMissing: !profileLoading && !profile,
+        suspended: isSuspended,
+        premiumEligible,
+        subscriptionStatusRaw: billing?.status,
+        hasSubscriptionRow: !!billing,
+        starting: startingPlan,
+        portalOpening,
+        popupBlockedCheckout,
+        popupBlockedPortal,
+        serverProgress,
+        supportError,
+        retryableError,
+      }),
+    [
+      profileLoading,
+      billingQuery.isLoading,
+      profile,
+      isSuspended,
+      premiumEligible,
+      billing,
+      startingPlan,
+      portalOpening,
+      popupBlockedCheckout,
+      popupBlockedPortal,
+      serverProgress,
+      supportError,
+      retryableError,
+    ],
+  );
+
+  const canStartCheckout = canStartCheckoutFn(uiState);
+  const showManageBilling = shouldShowManageBillingFn(
+    uiState,
+    !!billing?.stripe_subscription_id,
+  );
+  const checkStatus = checkStatusVisibilityFn(uiState);
+  const headline = stateHeadlineFn(uiState);
+
+  // ---- Mutations ---------------------------------------------------------
 
   const startCheckout = useMutation({
-    mutationFn: async (selectedPlan: Exclude<RecruiterPlan, 'none'>) => {
-      const { data, error } = await supabase.functions.invoke(
-        'create-recruiter-checkout',
-        { body: { plan: selectedPlan } },
-      );
-      if (error) {
-        const parsed = await parseCheckoutError(error);
-        discardTab();
-        if (REFETCH_CODES.has(parsed.code)) refetchBilling();
-        throw makeFailure(parsed.code, parsed.message);
-      }
-      const url = (data as { url?: unknown } | null)?.url;
-      if (!isSafeStripeCheckoutUrl(url)) {
-        discardTab();
-        throw makeFailure(
-          'session_invalid',
-          RECRUITER_CHECKOUT_MESSAGES.session_invalid,
+    mutationFn: async (selectedPlan: PaidPlan) => {
+      clearTransient();
+      setStartingPlan(selectedPlan);
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          'create-recruiter-checkout',
+          { body: { plan: selectedPlan } },
         );
+        if (error) {
+          const parsed = await parseCheckoutError(error);
+          discardTab();
+          handleServerCode(parsed.code);
+          throw makeFailure(parsed.code, parsed.message);
+        }
+        const url = (data as { url?: unknown } | null)?.url;
+        if (!isSafeStripeCheckoutUrl(url)) {
+          discardTab();
+          setRetryableError(RECRUITER_CHECKOUT_MESSAGES.session_invalid);
+          throw makeFailure(
+            'session_invalid',
+            RECRUITER_CHECKOUT_MESSAGES.session_invalid,
+          );
+        }
+        const { opened } = settleTab(url);
+        if (!opened) {
+          setPopupBlockedCheckout({ url, plan: selectedPlan });
+          throw makeFailure(
+            'checkout_ready',
+            'Your browser blocked the checkout tab. Click "Continue to secure checkout" to open it.',
+            url,
+          );
+        }
+        return { code: 'checkout_ready' as const, plan: selectedPlan };
+      } finally {
+        setStartingPlan(null);
       }
-      const { opened } = settleTab(url);
-      if (!opened) {
-        // Popup blocked. Surface a validated URL for a user-clickable fallback.
-        throw makeFailure(
-          'checkout_ready',
-          'Your browser blocked the checkout tab. Click "Continue to secure checkout" to open it.',
-          url,
-        );
-      }
-      return { code: 'checkout_ready' as const, plan: selectedPlan };
     },
   });
 
   const openPortal = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke(
-        'recruiter-billing-portal',
-      );
-      if (error) {
-        discardTab();
-        throw makeFailure(
-          'internal_error',
-          RECRUITER_CHECKOUT_MESSAGES.internal_error,
+      clearTransient();
+      setPortalOpening(true);
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          'recruiter-billing-portal',
         );
+        if (error) {
+          discardTab();
+          setRetryableError(RECRUITER_CHECKOUT_MESSAGES.internal_error);
+          throw makeFailure(
+            'internal_error',
+            RECRUITER_CHECKOUT_MESSAGES.internal_error,
+          );
+        }
+        const url = (data as { url?: unknown } | null)?.url;
+        if (!isSafeStripeBillingPortalUrl(url)) {
+          discardTab();
+          setRetryableError(RECRUITER_CHECKOUT_MESSAGES.session_invalid);
+          throw makeFailure(
+            'session_invalid',
+            RECRUITER_CHECKOUT_MESSAGES.session_invalid,
+          );
+        }
+        const { opened } = settleTab(url);
+        if (!opened) {
+          setPopupBlockedPortal({ url });
+          throw makeFailure(
+            'checkout_ready',
+            'Your browser blocked the billing portal tab. Click "Open billing portal" to continue.',
+            url,
+          );
+        }
+        return { code: 'portal_ready' as const };
+      } finally {
+        setPortalOpening(false);
       }
-      const url = (data as { url?: unknown } | null)?.url;
-      if (!isSafeStripeBillingPortalUrl(url)) {
-        discardTab();
-        throw makeFailure(
-          'session_invalid',
-          RECRUITER_CHECKOUT_MESSAGES.session_invalid,
-        );
-      }
-      const { opened } = settleTab(url);
-      if (!opened) {
-        throw makeFailure(
-          'checkout_ready',
-          'Your browser blocked the billing portal tab. Click "Open billing portal" to continue.',
-          url,
-        );
-      }
-      return { code: 'portal_ready' as const };
     },
   });
 
+  function handleServerCode(code: RecruiterCheckoutCode | 'unknown_error') {
+    if (code === 'in_progress') {
+      startServerProgress('in_progress');
+      refetchBilling();
+      return;
+    }
+    if (code === 'checkout_processing') {
+      startServerProgress('processing');
+      refetchBilling();
+      return;
+    }
+    if (code === 'subscription_exists' || code === 'unknown_subscription_status') {
+      refetchBilling();
+      return;
+    }
+    if (RECRUITER_SUPPORT_CODES.has(code)) {
+      setSupportError(RECRUITER_CHECKOUT_MESSAGES[code]);
+      return;
+    }
+    setRetryableError(RECRUITER_CHECKOUT_MESSAGES[code]);
+  }
+
+  // Called by the "Check Status" cooldown button.
+  const checkServerStatus = useCallback(() => {
+    clearServerProgress();
+    setRetryableError(null);
+    refetchBilling();
+  }, [refetchBilling]);
+
+  // Called by the Refresh button top-right — always allowed.
+  const refresh = useCallback(() => {
+    refetchBilling();
+  }, [refetchBilling]);
+
   return {
+    // Raw billing (kept for existing callers)
     billing,
     plan,
     status,
     limit,
     activeCount,
     isBillingActive,
-    /**
-     * @deprecated Legacy pre-pivot posting-limit flag.
-     */
     canSubmitMore: legacyCanSubmitMore_DO_NOT_USE_FOR_STANDARD_POSTING,
     isLoading: billingQuery.isLoading || activeCountQuery.isLoading,
+
+    // Discriminated UI state (single source of truth for the panel)
+    uiState,
+    canStartCheckout,
+    showManageBilling,
+    checkStatus,
+    headline,
+    checkServerStatus,
+
+    // Mutations + popup coordination
     startCheckout,
     openPortal,
-    /** Call synchronously from the click handler BEFORE mutate(). */
     prepareTab,
-    refresh: refetchBilling,
-    // Capability layer
+    refresh,
+
+    // Capability layer (unchanged)
     capabilities,
-    capabilityTier,
-    isPaidRecruiterPlanActive,
+    capabilityTier: capabilities.tier,
+    isPaidRecruiterPlanActive: isRecruiterPaidPlanActive(plan, status),
     canPostStandardOpportunitiesCapability:
       capabilities.canPostStandardOpportunities,
     canUsePriorityPlacement: capabilities.canUsePriorityPlacement,
