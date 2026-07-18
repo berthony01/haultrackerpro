@@ -133,13 +133,15 @@ CREATE OR REPLACE FUNCTION public.claim_recruiter_checkout_intent(
   _plan         text
 )
 RETURNS TABLE (
-  outcome              text,
-  intent_id            uuid,
-  claim_token          uuid,
-  generation           integer,
-  checkout_url         text,
-  checkout_expires_at  timestamptz,
-  reason               text
+  outcome                     text,
+  intent_id                   uuid,
+  claim_token                 uuid,
+  generation                  integer,
+  checkout_url                text,
+  checkout_expires_at         timestamptz,
+  stripe_customer_id          text,
+  stripe_checkout_session_id  text,
+  reason                      text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
