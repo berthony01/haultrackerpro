@@ -8,9 +8,6 @@ on:
       - 'vitest.phase1h-m2-postgres.config.ts'
       - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
       - 'supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
-      - 'src/test/phase1hM2OfferWorkflow.test.ts'
-      - 'package.json'
-      - 'bun.lockb'
   pull_request:
     paths:
       - '.github/workflows/phase1h-m2-postgres.yml'
@@ -18,9 +15,6 @@ on:
       - 'vitest.phase1h-m2-postgres.config.ts'
       - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
       - 'supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
-      - 'src/test/phase1hM2OfferWorkflow.test.ts'
-      - 'package.json'
-      - 'bun.lockb'
   workflow_dispatch:
 
 jobs:
@@ -57,6 +51,13 @@ jobs:
 
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
+
+      - name: Forbidden-marker scan (no .only / .skip / .todo)
+        run: |
+          if grep -nE '\.only\(|\.skip\(|it\.todo\(|describe\.todo\(' tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts; then
+            echo "Forbidden Vitest marker found in Phase 1H-M2 PG16 test."; exit 1
+          fi
+          echo "clean"
 
       - name: Wait for Postgres readiness
         run: |
