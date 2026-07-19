@@ -1097,17 +1097,21 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     expect(r1.rows[0].result_code).toBe('created');
     const firstId = r1.rows[0].application_id;
 
-    // Withdrawn transition is only allowed under the app.allow_driver_withdraw
-    // GUC (the same path the dedicated withdraw RPC would set). Represent that
-    // path directly rather than dropping the terminal-status coverage.
-    await asOwner(db);
-    await db.exec(`SET app.allow_driver_withdraw = 'true';`);
-    const upd = await db.query<{ status: string }>(
-      `UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1 RETURNING status`,
+    // FIX 2: withdrawn transition requires app.allow_driver_withdraw AND
+    // auth.uid() = driver_user_id. Simulate the SECURITY DEFINER withdraw
+    // RPC: RESET ROLE (bypass RLS as owner) while keeping the caller's
+    // JWT sub so auth.uid() still resolves to the owning Driver.
+    await db.exec(
+      `RESET ROLE; SET request.jwt.claim.sub = '${driver}'; SET app.allow_driver_withdraw = 'true';`,
+    );
+    const upd = await db.query<{ status: string; withdrawn_at: string | null }>(
+      `UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1
+         RETURNING status, withdrawn_at`,
       [firstId],
     );
-    await db.exec(`RESET app.allow_driver_withdraw;`);
+    await db.exec(`RESET app.allow_driver_withdraw; RESET request.jwt.claim.sub;`);
     expect(upd.rows[0].status).toBe('withdrawn');
+    expect(upd.rows[0].withdrawn_at).not.toBeNull();
 
     await asAuthenticated(db, driver);
     const r2 = await db.query<{ application_id: string; application_status: string; result_code: string }>(
@@ -1130,6 +1134,239 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     expect(r3.rows[0].application_id).not.toBe(firstId);
     expect(r3.rows[0].application_status).toBe('new');
   });
+
+  // -------------------------------------------------------------------
+  // Final closeout — FIX 1/2/3/4 proofs.
+  // -------------------------------------------------------------------
+
+  it('FIX 1: formal apply invariant is tied to application_type=apply (no submitted_at bypass)', async () => {
+    await asOwner(db);
+    // Direct service-role INSERT of a formal apply row with submitted_at=NULL
+    // must be rejected — previously this would have satisfied the old
+    // "submitted_at IS NULL OR (...)" check.
+    await expect(
+      db.query(
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id,driver_user_id,recruiter_id,application_type,status,
+            submission_snapshot,snapshot_version,idempotency_key,submitted_at,contact_sharing_consent)
+         VALUES ($1,$2,$3,'apply','new','{"a":1}'::jsonb,1,'valid-apply-key-1',NULL,false)`,
+        [IDS.opportunity, IDS.driverA, IDS.recruiterProfile],
+      ),
+    ).rejects.toThrow(/opportunity_applications_formal_apply_chk/);
+
+    // Missing snapshot for apply row: rejected regardless of submitted_at.
+    await expect(
+      db.query(
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id,driver_user_id,recruiter_id,application_type,status,
+            submission_snapshot,snapshot_version,idempotency_key,submitted_at,contact_sharing_consent)
+         VALUES ($1,$2,$3,'apply','new','{}'::jsonb,1,'valid-apply-key-2',now(),false)`,
+        [IDS.opportunity, IDS.driverA, IDS.recruiterProfile],
+      ),
+    ).rejects.toThrow(/opportunity_applications_formal_apply_chk/);
+
+    // snapshot_version < 1 for apply row: rejected.
+    await expect(
+      db.query(
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id,driver_user_id,recruiter_id,application_type,status,
+            submission_snapshot,snapshot_version,idempotency_key,submitted_at,contact_sharing_consent)
+         VALUES ($1,$2,$3,'apply','new','{"a":1}'::jsonb,0,'valid-apply-key-3',now(),false)`,
+        [IDS.opportunity, IDS.driverA, IDS.recruiterProfile],
+      ),
+    ).rejects.toThrow(/opportunity_applications_formal_apply_chk/);
+
+    // Short idempotency_key for apply row: rejected.
+    await expect(
+      db.query(
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id,driver_user_id,recruiter_id,application_type,status,
+            submission_snapshot,snapshot_version,idempotency_key,submitted_at,contact_sharing_consent)
+         VALUES ($1,$2,$3,'apply','new','{"a":1}'::jsonb,1,'short',now(),false)`,
+        [IDS.opportunity, IDS.driverA, IDS.recruiterProfile],
+      ),
+    ).rejects.toThrow(/opportunity_applications_formal_apply_chk/);
+
+    // NULL idempotency_key for apply row: rejected.
+    await expect(
+      db.query(
+        `INSERT INTO public.opportunity_applications
+           (opportunity_id,driver_user_id,recruiter_id,application_type,status,
+            submission_snapshot,snapshot_version,idempotency_key,submitted_at,contact_sharing_consent)
+         VALUES ($1,$2,$3,'apply','new','{"a":1}'::jsonb,1,NULL,now(),false)`,
+        [IDS.opportunity, IDS.driverA, IDS.recruiterProfile],
+      ),
+    ).rejects.toThrow(/opportunity_applications_formal_apply_chk/);
+  });
+
+  it('FIX 2: withdrawal is driver-bound; other drivers/recruiter/admin cannot withdraw; withdrawn_at immutable+server-set', async () => {
+    // Fresh Driver + fresh formal apply.
+    const fresh = await createFreshApp(db, 'wd-bound', IDS.opportunity, IDS.recruiterProfile);
+
+    // 1) Another Driver (driverA) with the GUC set cannot withdraw.
+    await db.exec(
+      `RESET ROLE; SET request.jwt.claim.sub = '${IDS.driverA}'; SET app.allow_driver_withdraw = 'true';`,
+    );
+    await expect(
+      db.query(
+        `UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1`,
+        [fresh.appId],
+      ),
+    ).rejects.toThrow(/Only the application owner may withdraw/);
+    await db.exec(`RESET app.allow_driver_withdraw;`);
+
+    // 2) Recruiter with GUC set cannot withdraw someone else's app.
+    await db.exec(
+      `RESET ROLE; SET request.jwt.claim.sub = '${IDS.recruiterUser}'; SET app.allow_driver_withdraw = 'true';`,
+    );
+    await expect(
+      db.query(
+        `UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1`,
+        [fresh.appId],
+      ),
+    ).rejects.toThrow(/Only the application owner may withdraw/);
+    await db.exec(`RESET app.allow_driver_withdraw;`);
+
+    // 3) With no auth.uid() (owner-only) + GUC: cannot withdraw either.
+    await db.exec(
+      `RESET ROLE; RESET request.jwt.claim.sub; SET app.allow_driver_withdraw = 'true';`,
+    );
+    await expect(
+      db.query(
+        `UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1`,
+        [fresh.appId],
+      ),
+    ).rejects.toThrow(/Only the application owner may withdraw/);
+    await db.exec(`RESET app.allow_driver_withdraw;`);
+
+    // 4) The rightful Driver with the GUC set CAN withdraw. withdrawn_at is
+    // server-set to now() even if the client tried to inject a stale value.
+    await db.exec(
+      `RESET ROLE; SET request.jwt.claim.sub = '${fresh.driverId}'; SET app.allow_driver_withdraw = 'true';`,
+    );
+    const ok = await db.query<{ status: string; withdrawn_at: string | null }>(
+      `UPDATE public.opportunity_applications
+          SET status='withdrawn', withdrawn_at = timestamptz '1970-01-01'
+        WHERE id=$1 RETURNING status, withdrawn_at`,
+      [fresh.appId],
+    );
+    expect(ok.rows[0].status).toBe('withdrawn');
+    expect(ok.rows[0].withdrawn_at).not.toBeNull();
+    // Server-set means the year must be current, not 1970.
+    expect(new Date(ok.rows[0].withdrawn_at as string).getUTCFullYear()).toBeGreaterThan(2020);
+    await db.exec(`RESET app.allow_driver_withdraw; RESET request.jwt.claim.sub;`);
+
+    // 5) After withdrawal, withdrawn_at is immutable via ordinary update.
+    await asAuthenticated(db, IDS.recruiterUser);
+    await expect(
+      db.query(
+        `UPDATE public.opportunity_applications SET withdrawn_at = timestamptz '1970-01-01' WHERE id=$1`,
+        [fresh.appId],
+      ),
+    ).rejects.toThrow(/Recruiters may only update application status/);
+    await asOwner(db);
+  });
+
+  it('FIX 3: idempotent replay precedes mutable eligibility (opportunity closed / restriction added)', async () => {
+    // Set up a fresh Driver + opportunity we can safely close afterward.
+    await asOwner(db);
+    const closingOppId = 'dddd0000-dddd-4ddd-8ddd-ddddffff0001';
+    const driverId = 'dddd0001-dddd-4ddd-8ddd-ddddffff0002';
+    await db.exec(
+      `INSERT INTO public.opportunities(id,recruiter_id,title,company_name,status,admin_review_status)
+         VALUES ('${closingOppId}','${IDS.recruiterProfile}','Closing Lane','Acme','active','approved');
+       INSERT INTO auth.users(id,email) VALUES ('${driverId}','fix3-close@test') ON CONFLICT DO NOTHING;
+       INSERT INTO public.driver_opportunity_profiles(user_id, full_name, email, phone, profile_completed)
+         VALUES ('${driverId}','Fix3 Close','fix3-close@test','555-3001', true) ON CONFLICT DO NOTHING;`,
+    );
+
+    const KEY_A = 'fix3-close-key-a-000001';
+    const KEY_B = 'fix3-close-key-b-000001';
+
+    await asAuthenticated(db, driverId);
+    const r1 = await db.query<{ application_id: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'first', true, true, true, 'email', true)`,
+      [closingOppId, KEY_A],
+    );
+    expect(r1.rows[0].result_code).toBe('created');
+    const firstId = r1.rows[0].application_id;
+
+    // Now close the opportunity — eligibility would fail for a NEW submission.
+    await asOwner(db);
+    await db.exec(`UPDATE public.opportunities SET status='closed' WHERE id='${closingOppId}';`);
+
+    // Key A replay: still returns idempotent_replay + original id, even
+    // though driver_can_access_opportunity would now return false.
+    await asAuthenticated(db, driverId);
+    const replay = await db.query<{ application_id: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'retry', true, true, true, 'email', true)`,
+      [closingOppId, KEY_A],
+    );
+    expect(replay.rows[0].result_code).toBe('idempotent_replay');
+    expect(replay.rows[0].application_id).toBe(firstId);
+
+    // Key B (new key) DOES hit business validation and fails with
+    // opportunity_unavailable.
+    const fresh = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'newkey', true, true, true, 'email', true)`,
+      [closingOppId, KEY_B],
+    );
+    expect(fresh.rows[0].result_code).toBe('opportunity_unavailable');
+
+    // Same shape for submit_request_info: reopen the opp, seed an inquiry,
+    // then add a messaging restriction and prove Key A still replays.
+    await asOwner(db);
+    await db.exec(`UPDATE public.opportunities SET status='active' WHERE id='${closingOppId}';`);
+    const INFO_A = 'fix3-info-key-a-000001';
+    const INFO_B = 'fix3-info-key-b-000001';
+    await asAuthenticated(db, driverId);
+    const info1 = await db.query<{ application_id: string; result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, $2, 'q?', 'email', true)`,
+      [closingOppId, INFO_A],
+    );
+    expect(info1.rows[0].result_code).toBe('created');
+
+    await asOwner(db);
+    await db.exec(
+      `INSERT INTO public.marketplace_user_restrictions(user_id, scope, restriction, reason_code)
+         VALUES ('${driverId}','messaging','blocked','spam')`,
+    );
+
+    await asAuthenticated(db, driverId);
+    const infoReplay = await db.query<{ application_id: string; result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, $2, 'q?', 'email', true)`,
+      [closingOppId, INFO_A],
+    );
+    expect(infoReplay.rows[0].result_code).toBe('idempotent_replay');
+    expect(infoReplay.rows[0].application_id).toBe(info1.rows[0].application_id);
+
+    const infoFresh = await db.query<{ result_code: string }>(
+      `SELECT * FROM public.submit_request_info($1::uuid, $2, 'new q?', 'email', true)`,
+      [closingOppId, INFO_B],
+    );
+    expect(infoFresh.rows[0].result_code).toBe('restricted');
+    await asOwner(db);
+    await db.exec(`DELETE FROM public.marketplace_user_restrictions WHERE user_id='${driverId}';`);
+  });
+
+  it('FIX 4: getAllowedRecruiterTransitions excludes onboarding, hired, withdrawn from every state', () => {
+    const forbidden = new Set(['onboarding', 'hired', 'withdrawn']);
+    for (const from of [
+      'new','viewed','contact_requested','contacted','call_scheduled',
+      'waiting_documents','interviewing','offer_sent','onboarding',
+      'hired','rejected','withdrawn',
+    ]) {
+      const allowed = getAllowedRecruiterTransitions(from) as string[];
+      for (const s of allowed) {
+        expect(forbidden.has(s), `state ${from} → ${s} must be forbidden`).toBe(false);
+      }
+    }
+  });
+
+
 
   it('unrelated billing tables are not altered', async () => {
 

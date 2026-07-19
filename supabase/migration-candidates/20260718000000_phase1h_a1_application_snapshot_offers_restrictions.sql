@@ -41,20 +41,24 @@ COMMENT ON COLUMN public.opportunity_applications.idempotency_key IS
 COMMENT ON COLUMN public.opportunity_applications.contact_sharing_consent IS
   'Phase 1H: explicit per-submission contact-sharing consent. Must be true for driver_email_snapshot/driver_phone_snapshot to be non-null.';
 
--- Formal apply row DB invariant (item 4). Legacy rows are preserved because
--- submitted_at IS NULL for all pre-1H rows.
+-- Formal apply row DB invariant (final closeout FIX 1). Tied to
+-- application_type = 'apply' so a formal-apply row can never bypass the
+-- invariant by having submitted_at NULL. Legacy request_info / callback
+-- rows are unaffected (only 'apply' rows must satisfy the clause).
 ALTER TABLE public.opportunity_applications
   DROP CONSTRAINT IF EXISTS opportunity_applications_formal_apply_chk;
 ALTER TABLE public.opportunity_applications
   ADD CONSTRAINT opportunity_applications_formal_apply_chk
   CHECK (
-    submitted_at IS NULL
+    application_type <> 'apply'
     OR (
-      snapshot_version >= 1
+      submitted_at IS NOT NULL
+      AND snapshot_version >= 1
+      AND submission_snapshot IS NOT NULL
       AND submission_snapshot <> '{}'::jsonb
       AND idempotency_key IS NOT NULL
-      AND char_length(idempotency_key) BETWEEN 8 AND 200
       AND btrim(idempotency_key) <> ''
+      AND char_length(idempotency_key) BETWEEN 8 AND 200
     )
   );
 
@@ -507,13 +511,13 @@ BEGIN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '28000';
   END IF;
 
-  -- Explicit bounded message (item 4). Reject oversized instead of truncating.
-  IF _message IS NOT NULL AND char_length(_message) > 4000 THEN
+  -- Basic shape: opportunity_id + idempotency_key must be usable BEFORE
+  -- taking the advisory lock. Everything else (attestations, message,
+  -- consent, contact method, restrictions, opportunity availability,
+  -- profile, snapshot) is mutable business state that FIX 3 defers.
+  IF _opportunity_id IS NULL THEN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
-  v_message := NULLIF(btrim(coalesce(_message, '')), '');
-
-  -- Idempotency key contract (item 4): bounded nonempty.
   IF _idempotency_key IS NULL
      OR btrim(_idempotency_key) = ''
      OR char_length(_idempotency_key) < 8
@@ -521,8 +525,33 @@ BEGIN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
-  -- Whitelisted attestations required (item 5). Each attestation must be
-  -- EXACTLY TRUE. NULL is not TRUE — reject explicitly with IS DISTINCT FROM.
+  -- FIX 3: idempotent replay MUST precede any mutable eligibility check.
+  -- Serialize per (driver, opp, type) so a concurrent insert cannot slip
+  -- between the replay lookup and the eligibility branch.
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended(v_uid::text || '|' || _opportunity_id::text || '|apply', 0)
+  );
+
+  SELECT * INTO v_existing
+    FROM public.opportunity_applications oa
+   WHERE oa.driver_user_id = v_uid
+     AND oa.opportunity_id = _opportunity_id
+     AND oa.application_type = 'apply'
+     AND oa.idempotency_key = _idempotency_key
+   LIMIT 1;
+  IF FOUND THEN
+    -- Return the ORIGINAL outcome even if external state (opportunity
+    -- status, restrictions, profile) changed after the first submission.
+    RETURN QUERY SELECT v_existing.id, v_existing.status, 'idempotent_replay'::text;
+    RETURN;
+  END IF;
+
+  -- Now business validation (post-replay).
+  IF _message IS NOT NULL AND char_length(_message) > 4000 THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
+  END IF;
+  v_message := NULLIF(btrim(coalesce(_message, '')), '');
+
   IF _availability_confirmed IS DISTINCT FROM TRUE
      OR _requirements_confirmed IS DISTINCT FROM TRUE
      OR _truth_attestation      IS DISTINCT FROM TRUE THEN
@@ -546,7 +575,6 @@ BEGIN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'opportunity_unavailable'::text; RETURN;
   END IF;
 
-  -- Self-application block (item 7 previous pass).
   IF EXISTS (SELECT 1 FROM public.recruiter_profiles rp
              WHERE rp.id = v_recruiter_id AND rp.user_id = v_uid) THEN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'self_opportunity'::text; RETURN;
@@ -578,27 +606,10 @@ BEGIN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'profile_required'::text; RETURN;
   END IF;
 
-  -- Contact PII only from authenticated Driver-owned profile, only with consent.
   IF _contact_sharing_consent THEN
     v_email_snap := v_profile.email;
     v_phone_snap := v_profile.phone;
     v_consent_at := now();
-  END IF;
-
-  PERFORM pg_advisory_xact_lock(
-    hashtextextended(v_uid::text || '|' || _opportunity_id::text || '|apply', 0)
-  );
-
-  SELECT * INTO v_existing
-    FROM public.opportunity_applications oa
-   WHERE oa.driver_user_id = v_uid
-     AND oa.opportunity_id = _opportunity_id
-     AND oa.application_type = 'apply'
-     AND oa.idempotency_key = _idempotency_key
-   LIMIT 1;
-  IF FOUND THEN
-    RETURN QUERY SELECT v_existing.id, v_existing.status, 'idempotent_replay'::text;
-    RETURN;
   END IF;
 
   SELECT * INTO v_existing
@@ -669,6 +680,10 @@ BEGIN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '28000';
   END IF;
 
+  IF _opportunity_id IS NULL THEN
+    RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
+  END IF;
+
   IF _idempotency_key IS NULL
      OR btrim(_idempotency_key) = ''
      OR char_length(_idempotency_key) < 8
@@ -676,7 +691,25 @@ BEGIN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
 
-  -- Reject oversized question (item 4). Documented max is 2,000 chars.
+  -- FIX 3: replay MUST precede mutable eligibility. Advisory lock
+  -- serializes concurrent submissions for (driver, opp, type).
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended(v_uid::text || '|' || _opportunity_id::text || '|request_info', 0)
+  );
+
+  SELECT * INTO v_existing
+    FROM public.opportunity_applications oa
+   WHERE oa.driver_user_id = v_uid
+     AND oa.opportunity_id = _opportunity_id
+     AND oa.application_type = 'request_info'
+     AND oa.idempotency_key = _idempotency_key
+   LIMIT 1;
+  IF FOUND THEN
+    RETURN QUERY SELECT v_existing.id, v_existing.status, 'idempotent_replay'::text;
+    RETURN;
+  END IF;
+
+  -- Business validation (post-replay).
   IF _question IS NOT NULL AND char_length(_question) > 2000 THEN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'invalid_input'::text; RETURN;
   END IF;
@@ -703,7 +736,6 @@ BEGIN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'opportunity_unavailable'::text; RETURN;
   END IF;
 
-  -- Self-inquiry block.
   IF EXISTS (SELECT 1 FROM public.recruiter_profiles rp
              WHERE rp.id = v_recruiter_id AND rp.user_id = v_uid) THEN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'self_opportunity'::text; RETURN;
@@ -715,9 +747,6 @@ BEGIN
 
   SELECT * INTO v_profile FROM public.driver_opportunity_profiles dop WHERE dop.user_id = v_uid LIMIT 1;
 
-  -- Consent=true requires a Driver profile so we can attach a truthful
-  -- PII snapshot and satisfy the consent-state CHECK. Consent=false may
-  -- still submit an inquiry without a profile (product rule).
   IF _contact_sharing_consent AND v_profile.user_id IS NULL THEN
     RETURN QUERY SELECT NULL::uuid, NULL::text, 'profile_required'::text; RETURN;
   END IF;
@@ -726,22 +755,6 @@ BEGIN
     v_email_snap := v_profile.email;
     v_phone_snap := v_profile.phone;
     v_consent_at := now();
-  END IF;
-
-  PERFORM pg_advisory_xact_lock(
-    hashtextextended(v_uid::text || '|' || _opportunity_id::text || '|request_info', 0)
-  );
-
-  SELECT * INTO v_existing
-    FROM public.opportunity_applications oa
-   WHERE oa.driver_user_id = v_uid
-     AND oa.opportunity_id = _opportunity_id
-     AND oa.application_type = 'request_info'
-     AND oa.idempotency_key = _idempotency_key
-   LIMIT 1;
-  IF FOUND THEN
-    RETURN QUERY SELECT v_existing.id, v_existing.status, 'idempotent_replay'::text;
-    RETURN;
   END IF;
 
   SELECT * INTO v_existing
@@ -791,9 +804,11 @@ SET search_path = public
 AS $$
 BEGIN
   IF TG_OP = 'UPDATE' THEN
-    -- Freeze is anchored to submitted_at, not snapshot_version, so no
-    -- version-zero loophole permits mutating a formal apply's snapshot.
-    IF OLD.submitted_at IS NOT NULL THEN
+    -- FIX 1b: freeze is anchored to application_type = 'apply'. Every formal
+    -- apply row — regardless of submitted_at state — must have its
+    -- submission fields protected. No version-zero / null-submitted_at
+    -- loophole permits mutating a formal apply's snapshot.
+    IF OLD.application_type = 'apply' THEN
       IF NEW.submission_snapshot IS DISTINCT FROM OLD.submission_snapshot THEN
         RAISE EXCEPTION 'submission_snapshot is immutable' USING ERRCODE = '42501';
       END IF;
@@ -837,20 +852,30 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  _allow_withdraw boolean;
-  _allowed text[];
+  _allow_withdraw   boolean;
+  _driver_withdraw  boolean;
+  _allowed          text[];
 BEGIN
-  -- Only the driver-withdraw RPC may flip withdrawn state via a GUC. There
-  -- is no Driver acceptance path in A1, so no GUC bypass exists for
-  -- offer_sent → onboarding (item 9).
+  -- FIX 2: driver-bound withdrawal. The internal withdraw RPC sets
+  -- app.allow_driver_withdraw = 'true', but the guard only honors that
+  -- GUC when the authenticated caller is the application's own driver
+  -- AND the source status is a legal withdraw-from state AND the
+  -- resulting status is 'withdrawn'. No other role (recruiter, admin,
+  -- another driver) can flip 'withdrawn' or mutate withdrawn_at.
   _allow_withdraw := (current_setting('app.allow_driver_withdraw', true) = 'true');
+  _driver_withdraw := (
+    _allow_withdraw
+    AND auth.uid() IS NOT NULL
+    AND auth.uid() = OLD.driver_user_id
+    AND NEW.status = 'withdrawn'
+    AND OLD.status NOT IN ('withdrawn','hired','rejected')
+  );
 
   -- Item 1: no admin bypass. Admin visibility is unaffected (SELECT policies),
   -- but sensitive workflow transitions (onboarding/hired/withdrawn) and
   -- immutable submission/consent/identity fields are off-limits via the
   -- ordinary UPDATE path even for admins. Future dedicated RPCs (A3+) will
   -- perform those transitions atomically.
-
 
   IF NEW.id IS DISTINCT FROM OLD.id
      OR NEW.opportunity_id IS DISTINCT FROM OLD.opportunity_id
@@ -868,18 +893,19 @@ BEGIN
      OR NEW.submitted_at IS DISTINCT FROM OLD.submitted_at
      OR NEW.contact_sharing_consent IS DISTINCT FROM OLD.contact_sharing_consent
      OR NEW.contact_sharing_consent_at IS DISTINCT FROM OLD.contact_sharing_consent_at
-     OR (
-          NEW.withdrawn_at IS DISTINCT FROM OLD.withdrawn_at
-          AND NOT (_allow_withdraw AND NEW.status = 'withdrawn')
-        )
+     OR NEW.withdrawn_at IS DISTINCT FROM OLD.withdrawn_at
      OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'Recruiters may only update application status.' USING ERRCODE = '42501';
   END IF;
 
   IF NEW.status IS DISTINCT FROM OLD.status THEN
-    IF _allow_withdraw AND NEW.status = 'withdrawn' THEN
-      NEW.withdrawn_at := COALESCE(NEW.withdrawn_at, now());
-      NEW.updated_at := now();
+    IF NEW.status = 'withdrawn' THEN
+      IF NOT _driver_withdraw THEN
+        RAISE EXCEPTION 'Only the application owner may withdraw via the driver withdraw RPC.' USING ERRCODE = '42501';
+      END IF;
+      -- Server-set and immutable-going-forward: force withdrawn_at to now().
+      NEW.withdrawn_at := now();
+      NEW.updated_at   := now();
       RETURN NEW;
     END IF;
 
@@ -887,7 +913,7 @@ BEGIN
       RAISE EXCEPTION 'Terminal application status cannot be changed.' USING ERRCODE = '42501';
     END IF;
 
-    IF NEW.status IN ('withdrawn','onboarding','hired') THEN
+    IF NEW.status IN ('onboarding','hired') THEN
       RAISE EXCEPTION 'Only server-authorized workflow can set %, not recruiter update.', NEW.status USING ERRCODE = '42501';
     END IF;
 
