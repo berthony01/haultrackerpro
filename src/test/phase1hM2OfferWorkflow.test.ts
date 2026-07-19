@@ -1030,9 +1030,9 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
     // Force suspended-recruiter application to hired directly as owner to prove
     // suspended recruiter cannot use idempotent already_hired to confirm state.
     await db.exec(`
-      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard;
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
       UPDATE public.opportunity_applications SET status='hired', updated_at=now() WHERE id='${SUSP_APP}';
-      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard;
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
     `);
     await asAuth(db, SUSP_USER);
     await expect(
