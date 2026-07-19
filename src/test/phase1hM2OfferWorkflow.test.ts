@@ -1392,6 +1392,14 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
   const DRV_L  = 'b2000000-b200-b200-b200-b20000000056';
   const DRV_M  = 'b2000000-b200-b200-b200-b20000000067';
   const DRV_N  = 'b2000000-b200-b200-b200-b20000000078';
+  const DRV_O  = 'b2000000-b200-b200-b200-b20000000089';
+  const DRV_P  = 'b2000000-b200-b200-b200-b2000000009a';
+  const DRV_Q  = 'b2000000-b200-b200-b200-b2000000009b';
+  // Alt recruiter + opportunity fixture used by the immutability test to
+  // prove that the guard rejects a real identity change (not the same values).
+  const ALT_R_USER = 'b2000000-b200-b200-b200-b200000000a1';
+  const ALT_R_PROF = 'b2000000-b200-b200-b200-b200000000a2';
+  const ALT_OPP    = 'b2000000-b200-b200-b200-b200000000a3';
 
   beforeAll(async () => {
     await asOwner(db);
