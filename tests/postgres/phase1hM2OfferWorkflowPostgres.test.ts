@@ -750,7 +750,13 @@ if (!shouldRun && REQUIRE) {
     });
 
     it("C3: suspended recruiter denied 'recruiter not eligible'", async () => {
-      const appId = await submitApply(url, ids.driverB, ids.suspendedOpportunity);
+      const drv = await mintDriver(pool);
+      const appId = await submitApply(url, drv, ids.suspendedOpportunity);
+      // Now suspend the recruiter (was 'active' at seed so the driver could submit).
+      await pool.query(
+        `UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`,
+        [ids.suspendedRecruiterProfile],
+      );
       const c = await newAuthClient(url, ids.suspendedRecruiterUser);
       let msg = "";
       let code = "";
@@ -765,6 +771,11 @@ if (!shouldRun && REQUIRE) {
       }
       await c.query("ROLLBACK").catch(() => {});
       await c.end().catch(() => {});
+      // Restore for other tests.
+      await pool.query(
+        `UPDATE public.recruiter_profiles SET status='active' WHERE id=$1`,
+        [ids.suspendedRecruiterProfile],
+      );
       expect(code).toBe("42501");
       expect(msg).toContain("recruiter not eligible");
     });
