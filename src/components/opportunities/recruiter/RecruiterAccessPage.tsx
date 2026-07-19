@@ -844,15 +844,9 @@ export function RecruiterTrustStatus({
       >
         {view.verificationLabel}
       </Badge>
-      {view.showVerifiedBadge && (
-        <Badge
-          variant="default"
-          className="text-[10px] gap-1"
-          data-testid="recruiter-verified-badge"
-        >
-          <ShieldCheck className="h-3 w-3" /> Verified Recruiter
-        </Badge>
-      )}
+      {/* Note: verificationLabel above already reads "Verified Recruiter"
+        * when approved, so we intentionally do NOT render an additional
+        * badge here — that would show the chip twice on the dashboard. */}
     </div>
   );
 }
