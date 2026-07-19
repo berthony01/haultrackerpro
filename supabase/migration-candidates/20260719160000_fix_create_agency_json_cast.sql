@@ -55,8 +55,8 @@ BEGIN
   IF _name IS NULL OR length(btrim(_name)) < 2 OR length(_name) > 120 THEN
     RAISE EXCEPTION 'Agency name must be 2–120 characters' USING ERRCODE='22023';
   END IF;
-  IF _contact_email IS NOT NULL AND _contact_email <> ''
-     AND lower(_contact_email) !~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$' THEN
+ IF _contact_email IS NOT NULL AND btrim(_contact_email) <> ''
+    AND lower(btrim(_contact_email)) !~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$' THEN
     RAISE EXCEPTION 'Invalid contact email' USING ERRCODE='22023';
   END IF;
 
