@@ -1357,7 +1357,9 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
       );
       ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
     `);
+    await asAuth(db, IDS.recruiterUser);
     const r2 = await db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [hApp]);
     expect(r2.rows[0].result_code).toBe('already_hired');
+    await asOwner(db);
   });
 });
