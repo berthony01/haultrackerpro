@@ -29,6 +29,12 @@ import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityP
 import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ReferDriverDialog } from './ReferDriverDialog';
+import { ApplyNowDialog } from './ApplyNowDialog';
+import {
+  classifyFormalApply,
+  classifyRequestInfo,
+  submissionErrorMessage,
+} from '@/lib/opportunities/applicationSubmission';
 
 interface Props {
   opportunity: Opportunity;
@@ -36,6 +42,7 @@ interface Props {
   isPro: boolean;
   onUpgrade: () => void;
   driverProfile?: DriverOpportunityProfile | null;
+  onEditProfile: () => void;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
@@ -43,15 +50,20 @@ const fmtMoney = (v: number | null | undefined) =>
 const fmtMiles = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString()} mi`;
 
-export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, driverProfile }: Props) {
+export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, driverProfile, onEditProfile }: Props) {
   const { saved, save, unsave } = useSavedOpportunities();
   const { driverApplications, createApplication } = useOpportunityApplications();
   const [submitting, setSubmitting] = useState(false);
   const [showRefer, setShowRefer] = useState(false);
+  const [showApply, setShowApply] = useState(false);
 
   const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
-  const alreadyApplied = useMemo(
-    () => driverApplications.some((a) => a.opportunity_id === o.id),
+  const formalState = useMemo(
+    () => classifyFormalApply(driverApplications as any[], o.id),
+    [driverApplications, o.id]
+  );
+  const requestInfoState = useMemo(
+    () => classifyRequestInfo(driverApplications as any[], o.id),
     [driverApplications, o.id]
   );
 
