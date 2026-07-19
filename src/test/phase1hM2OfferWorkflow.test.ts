@@ -717,8 +717,8 @@ describe('Phase 1H-M2 Turn 2b-i remediations', () => {
     // Seed a fresh 'interviewing' apply row owned by recruiterUser so RLS
     // update policy passes; the ONLY defense between recruiter and a direct
     // sensitive status update is the trigger checking workflow_bypass token.
-    const gDriver = 'gggg1111-gggg-1111-gggg-111111111111';
-    const targetId = 'gggg2222-gggg-2222-gggg-222222222222';
+    const gDriver = 'abcd1111-abcd-1111-abcd-111111111111';
+    const targetId = 'abcd2222-abcd-2222-abcd-222222222222';
     await db.exec(`
       INSERT INTO auth.users(id,email) VALUES ('${gDriver}','g@t');
       INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
