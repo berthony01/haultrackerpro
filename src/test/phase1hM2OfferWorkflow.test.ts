@@ -1240,6 +1240,7 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
   it('send_opportunity_offer: foreign existing offer ID and nonexistent ID return same public-safe denial', async () => {
     // Seed a sent offer under owning recruiter.
     const zDriver = 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1';
+    await asOwner(db);
     await db.exec(`
       INSERT INTO auth.users(id,email) VALUES ('${zDriver}','z1@t') ON CONFLICT DO NOTHING;
       INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
