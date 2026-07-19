@@ -93,7 +93,7 @@ export function ApplyNowDialog({
   }, [consent, preferred]);
 
   const messageOver = message.length > MESSAGE_LIMIT;
-  const externalMethod = preferred === 'email' || preferred === 'phone';
+  const externalMethod = preferred === 'email' || preferred === 'phone' || preferred === 'sms';
   const consentValid = !externalMethod || consent;
   const canSubmit =
     profileCompleted &&
