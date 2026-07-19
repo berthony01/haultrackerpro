@@ -39,7 +39,6 @@ import {
 import { toast } from 'sonner';
 import {
   useOpportunityApplications,
-  type RecruiterApplicationStatus,
 } from '@/hooks/opportunities/useOpportunityApplications';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
@@ -54,36 +53,19 @@ import {
   RECRUITER_ACTION_LABEL,
   RECRUITER_PIPELINE_GROUPS,
   getAllowedRecruiterTransitions,
+  type RecruiterTransition,
 } from '@/lib/opportunities/applicationStatus';
 import { ApplicationTimeline } from './ApplicationTimeline';
 import {
   pipelineCounts,
   hireConversionRate,
 } from '@/lib/opportunities/pipelineAnalytics';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface Props {
   onBack: () => void;
 }
 
 const ANY = 'any';
-
-function formatHireError(e: Error, status: RecruiterApplicationStatus): string {
-  const msg = e?.message || '';
-  if (status === 'hired' && /contract/i.test(msg)) {
-    return 'Driver cannot be marked hired until the current contract is approved.';
-  }
-  return msg || 'Update failed';
-}
 
 function StatusBadge({ status }: { status: string }) {
   return (
@@ -125,7 +107,6 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
   const [opportunityFilter, setOpportunityFilter] = useState<string>(ANY);
   const [search, setSearch] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [warnHire, setWarnHire] = useState<{ id: string; status: RecruiterApplicationStatus } | null>(null);
   const [expandedTimeline, setExpandedTimeline] = useState<Record<string, boolean>>({});
 
   const appIds = useMemo(() => recruiterApplications.map((a: any) => a.id), [recruiterApplications]);
@@ -185,35 +166,16 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     };
   }, [recruiterApplications]);
 
-  const handleUpdate = (id: string, status: RecruiterApplicationStatus) => {
-    if (status === 'hired') {
-      const readiness = readinessMap.get(id)?.readiness;
-      if (readiness !== 'driver_approved') {
-        setWarnHire({ id, status });
-        return;
-      }
-    }
+  // FIX 4: no direct-hire code path. Recruiter selects only RecruiterTransition
+  // values. Hired/onboarding/withdrawn are server-workflow-only and never
+  // reachable from this dashboard.
+  const handleUpdate = (id: string, status: RecruiterTransition) => {
     setPendingId(id);
     updateApplicationStatus.mutate(
       { id, status },
       {
         onSuccess: () => toast.success(`Marked ${STATUS_LABEL[status] ?? status}`),
-        onError: (e: Error) => toast.error(formatHireError(e, status)),
-        onSettled: () => setPendingId(null),
-      },
-    );
-  };
-
-  const confirmWarnedHire = () => {
-    if (!warnHire) return;
-    const { id, status } = warnHire;
-    setWarnHire(null);
-    setPendingId(id);
-    updateApplicationStatus.mutate(
-      { id, status },
-      {
-        onSuccess: () => toast.success(`Marked ${STATUS_LABEL[status] ?? status}`),
-        onError: (e: Error) => toast.error(formatHireError(e, status)),
+        onError: (e: Error) => toast.error(e?.message || 'Update failed'),
         onSettled: () => setPendingId(null),
       },
     );
@@ -529,22 +491,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
         </div>
       )}
 
-      <AlertDialog open={!!warnHire} onOpenChange={(open) => { if (!open) setWarnHire(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-400" />
-              Contract Approval Required
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This driver cannot be marked hired until the current contract is approved.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setWarnHire(null)}>Close</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
 
       <Dialog
         open={!!contactModalAppId}

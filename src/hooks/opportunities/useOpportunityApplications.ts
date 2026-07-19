@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type { RecruiterTransition } from '@/lib/opportunities/applicationStatus';
 import {
   createIdempotencyStore,
   type IdempotencyStore,
@@ -51,17 +52,10 @@ function assertSubmissionSuccess(row: SubmissionResult | null | undefined): Subm
 export type OpportunityApplication = Tables<'opportunity_applications'>;
 export type OpportunityApplicationInsert = Omit<TablesInsert<'opportunity_applications'>, 'driver_user_id'>;
 
-export type RecruiterApplicationStatus =
-  | 'viewed'
-  | 'contact_requested'
-  | 'call_scheduled'
-  | 'waiting_documents'
-  | 'interviewing'
-  | 'offer_sent'
-  // Phase 1H-A1 — non-terminal onboarding stage before hired.
-  | 'onboarding'
-  | 'hired'
-  | 'rejected';
+// FIX 4: Recruiter-selectable statuses via the ordinary UPDATE path are
+// strictly the RecruiterTransition set. onboarding/hired/withdrawn are
+// server-workflow-only and MUST NOT be settable from the client mutation.
+export type RecruiterApplicationStatus = RecruiterTransition;
 
 export type DriverResponseType =
   | 'still_interested'
