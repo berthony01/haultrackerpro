@@ -285,10 +285,10 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
 
       {/* Action bar: fixed above BottomNav on mobile, fixed within main column on desktop */}
       <div className="fixed left-0 right-0 lg:left-[calc(15rem+1.5rem)] lg:right-6 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30 space-y-2">
-        {profileIncomplete && !alreadyApplied && (
+        {profileIncomplete && formalState.kind === 'none' && (
           <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-            <span>Add a few Opportunity Preferences to improve your match score and give recruiters better context.</span>
+            <span>Complete your Opportunity Profile to apply and improve your match score.</span>
           </div>
         )}
         <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
@@ -316,9 +316,28 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
               <Lock className="h-4 w-4" /> Refer a Driver — Pro
             </Button>
           )}
-          <Button onClick={handleRequestInfo} disabled={alreadyApplied || submitting} className="flex-1">
+          <Button
+            variant="outline"
+            onClick={handleRequestInfo}
+            disabled={requestInfoState.exists || submitting}
+            className="flex-1"
+          >
             <Send className="h-4 w-4" />
-            {alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}
+            {requestInfoState.exists ? 'Info Requested' : submitting ? 'Sending…' : 'Request Info'}
+          </Button>
+          <Button
+            onClick={() => setShowApply(true)}
+            disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
+            className="flex-1"
+          >
+            <Send className="h-4 w-4" />
+            {formalState.kind === 'active'
+              ? 'Application Submitted'
+              : formalState.kind === 'completed'
+              ? 'Hired'
+              : formalState.kind === 'reapplyable'
+              ? 'Apply Again'
+              : 'Apply Now'}
           </Button>
         </div>
       </div>
@@ -332,6 +351,16 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         companyName={o.company_name}
         isPro={isPro}
         onUpgrade={onUpgrade}
+      />
+
+      <ApplyNowDialog
+        open={showApply}
+        onOpenChange={setShowApply}
+        opportunityId={o.id}
+        opportunityTitle={o.title}
+        companyName={o.company_name}
+        driverProfile={driverProfile ?? null}
+        onEditProfile={onEditProfile}
       />
     </div>
   );
