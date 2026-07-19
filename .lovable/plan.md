@@ -1,122 +1,223 @@
+# Phase 1H-A2 Closeout — Hermetic Tests, Idempotency/Consent/Privacy/Error Runtime Proofs
 
-# Phase 1H Implementation Audit — READ-ONLY
+## Scope
 
-No files were modified, no migrations created, no packages installed, no DB writes.
+Verification-and-test-only closeout. No production code changes unless a new runtime test exposes a real defect. All work is confined to two test files plus one narrow, deterministic test-utility. Migration, generated types, `package.json`, `bun.lockb`, referral production code, `ApplyNowDialog.tsx`, `OpportunityDetail.tsx`, and Supabase client remain untouched.
 
-## A. Repository and branch state
+## Files to change
 
-- Current branch: `edit/edt-0c578eda-f00f-4ce9-a83b-a457a7f6128e` (Lovable working branch, tracks `main`).
-- Current HEAD SHA: `4faa861661eef457a5a5608699aa9aea86af3032` — **exactly** the previously accepted main SHA.
-- `phase1h-driver-application-pipeline` branch: **does not exist** (not local, not on `origin`).
-- Commits since the referenced SHA on any Phase 1H topic: **zero**. Recent commits (`64a3fbce`, `ba4dfb53`, `ffb268b1`, `6c8fd220`, `fc3a1a76`, …) are all Phase 1G-R1A7 billing / CI / lockfile / workflow work. No Phase 1H commit exists in the repo.
+1. `src/test/phase1hA2OpportunityDetail.test.tsx` — expand integration coverage; keep `ReferDriverDialog` mocked at the module boundary; add hermetic + post-success rerender proofs.
+2. `src/test/phase1hA2ApplyNow.test.tsx` — expand with deterministic UUID mock and explicit named cases for every FIX 2/3/4/5/7 proof.
 
-## B. Files and migrations inspected
+No new test files are created unless one of the two above cannot host the case cleanly; if added, it will appear in the focused command.
 
-Source:
-- `src/components/opportunities/OpportunityDetail.tsx` (Driver detail view, primary CTA)
-- `src/hooks/opportunities/useOpportunityApplications.ts` (driver + recruiter application hook, RPC calls)
-- `src/components/opportunities/DriverApplicationsPanel.tsx` (present, pre-1H)
-- `src/components/opportunities/RecruiterApplicationsDashboard.tsx` (present, pre-1H)
-- `src/components/opportunities/ApplicationTimeline.tsx` (present, pre-1H, driven by `application_events`)
-- `src/lib/opportunities/applicationStatus.ts` (existing status/label/transition tables — no offer states)
-- `src/integrations/supabase/types.ts` (no `opportunity_offers`, no `marketplace_user_restrictions`)
+## Approach per FIX
 
-Migrations:
-- Latest migration in tree: `20260717223452_ff4257ea…sql` (Phase 1F-A.2.2-R1B live consent-pair). No newer migrations.
-- `opportunity_applications` table defined in `20260513003741_…sql` with `application_type text NOT NULL DEFAULT 'request_info'` and CHECK constraint `application_type IN ('apply','request_info','callback')` — so the `'apply'` value is schema-legal but no code path submits it.
-- `application_events` and recruiter transition guards exist pre-1H (`20260513004834_…`, `20260513025656_…`, `20260513040206_…`, `20260516014826_…`, `20260516040340_…`, `20260528225151_…`, `20260529005635_…`, `20260627161959_…`, `20260627162043_…`, `20260627174143_…`, `20260717185620_…`).
-- No migration anywhere in the tree references `opportunity_offers` or `marketplace_user_restrictions`. Grep on both source and migrations returns zero hits.
+### FIX 1 — Hermetic OpportunityDetail
 
-## C. Current Driver opportunity action (verbatim)
+- `vi.mock('@/components/opportunities/ReferDriverDialog', ...)` is already in place; verify it hoists before the `OpportunityDetail` import (top-of-file, before the SUT import). No production changes.
+- Add a first-in-file test that simply mounts the page and asserts Apply Now is present, guaranteeing the module graph loads with all `VITE_SUPABASE_*` vars unset. Verified by running the exact `env -u ...` command.
 
-`OpportunityDetail.tsx` lines 78–110 and 306–309:
+### FIX 2 — Idempotency lifecycle (deterministic UUIDs)
 
-- Handler: `handleRequestInfo` → `createApplication.mutate({ application_type: 'request_info', message: "I'm interested in learning more about this opportunity.", … })`.
-- Button label (verbatim): `{alreadyApplied ? 'Request Sent' : submitting ? 'Sending…' : 'Request Info'}`.
-- Icon: `Send`. No secondary "Apply Now" button. No structured application form. No separate "Ask Recruiter a Question" surface — the same button *is* the inquiry path, and it's the only path.
+- Install a `vi.spyOn(crypto, 'randomUUID')` sequence returning `k1, k2, k3, ...`. Reset per test.
+- Separate named cases:
+  - `opens dialog → generates exactly one UUID`
+  - `rerender with dialog open preserves the same UUID` (submit, assert payload key === k1, spy call count === 1)
+  - `field mutations (message, method, consent, attestations) preserve UUID` (submit, assert k1, spy count === 1)
+  - `mutateAsync rejects then second submit reuses same key` (two payloads, both k1)
+  - `cancel then reopen assigns a fresh UUID` (k1 then k2 in payload)
+  - `success then reopen assigns a fresh UUID` (k1 used, then k2 on reopen)
+  - `Apply Again after rejected status assigns a new UUID` (rendered via `OpportunityDetail` with rejected app; open dialog; submit; assert new key distinct from any prior)
+  - `Apply Again after withdrawn status assigns a new UUID`
 
-## D. Implementation matrix
+### FIX 3 — Contact method & consent
 
-| Capability | Status |
-|---|---|
-| Primary "Apply Now" CTA | **Absent** |
-| Structured Driver application form | **Absent** |
-| `application_type='apply'` submission path | **Absent** in code (schema allows the value; nothing writes it) |
-| Immutable application submission snapshot | **Absent** (only contact snapshot fields on the inquiry row) |
-| Separate "Ask Recruiter a Question" form | **Absent** (Request Info is the only path) |
-| Inquiry + formal application coexisting on same opportunity | **Absent** |
-| Driver "My Applications" tracking | **Partial** (pre-1H `DriverApplicationsPanel` exists; no formal-application distinction) |
-| Recruiter application pipeline | **Partial** (pre-1H `RecruiterApplicationsDashboard` + transition guards; no offer stage) |
-| Separate `opportunity_offers` table/entity | **Absent** |
-| Recruiter send-offer workflow | **Absent** |
-| Driver accept/decline offer workflow | **Absent** |
-| Onboarding application status | **Absent** (`applicationStatus.ts` has no `onboarding`) |
-| Block direct `offer_sent → hired` | **Absent** — `getAllowedRecruiterTransitions` explicitly permits `offer_sent: ['hired', 'rejected']` |
-| Offer expiration / replacement / idempotency / concurrency | **Absent** |
-| Offer/application-specific timeline events + notifications | **Absent** (existing `application_events` cover only pre-1H statuses; no `offer_*` events) |
-| `marketplace_user_restrictions` | **Absent** (no table, no code reference) |
+Named runtime cases interacting with the real Radix Select and Checkbox:
 
-## E. Existing reusable application infrastructure (pre-1H, safe to build on)
+- missing email → email option disabled; in-app remains
+- missing phone → phone and SMS options disabled
+- email + consent → payload `preferred_contact_method: 'email'`
+- phone + consent → `'phone'`
+- SMS + consent → `'sms'`
+- toggle consent off while email/phone/SMS selected → method resets to `in_app` (three tests)
+- in-app path submits with `contact_sharing_consent: false` and no consent required
+- assert no editable email/phone/SMS destination text input is rendered (`queryByRole('textbox', { name: /email|phone|sms/i })` returns null)
 
-- `opportunity_applications` table with `application_type` CHECK already includes `'apply'`.
-- `application_events` table + trigger that logs status transitions.
-- Recruiter transition guard trigger restricting server-side status moves.
-- `list_recruiter_applications_safe` RPC with PII gating.
-- `record_driver_application_response` and `withdraw_opportunity_application` RPCs.
-- `applicationStatus.ts` status/label/badge/transition tables (extendable, not offer-aware).
-- `DriverApplicationsPanel`, `RecruiterApplicationsDashboard`, `ApplicationTimeline` components.
+### FIX 4 — Privacy copy & exact SMS payload allowlist
 
-## F. Missing Phase 1H functionality
+- Assert `getByText` for the visible privacy statement (matcher tolerates split nodes via a function matcher; the dialog currently renders the required wording verbatim in `DialogDescription`).
+- Complete an SMS submission; capture `submitMutateAsync.mock.calls[0][0]`.
+- `expect(Object.keys(payload).sort()).toEqual([...allowlist])`.
+- Assert none of the forbidden fields (driver_user_id, recruiter_id, profile_id, full_name, email, phone digits, cdl_class, years_experience, endorsements, trailer, snapshot, snapshot_version, status, application_type, submitted timestamp, subscription/load/expense/fuel/tax data) appear via a stringified-payload substring scan against the actual profile fixture values ([jane@example.com](mailto:jane@example.com), 5551234567, "A", "Jane Driver", etc.).
 
-Everything listed in D as Absent or Partial. Specifically, no code, migration, RPC, edge function, hook, component, route, type, test, or notification implements:
-- Apply Now CTA + structured form,
-- immutable submission snapshot,
-- offer entity + workflow,
-- Driver offer accept/decline,
-- onboarding stage,
-- offer_sent → hired guard,
-- offer expiration/replacement/idempotency,
-- offer/application notifications,
-- marketplace user restrictions.
+### FIX 5 — Success toast & reset
 
-## G. Deployment / publish status
+- `sonner` is already mocked. Assert `toast.success` called with `'Application submitted'` and a description property matching the approved copy.
+- Assert dialog closes (`onOpenChange(false)`).
+- Reopen (parent-controlled `open` toggled true again): assert message empty, all checkboxes unchecked, select back to In-app, no error region, spy shows a new UUID for the new attempt (k2 ≠ k1).
 
-- No Phase 1H commits exist, therefore nothing Phase 1H-related has been merged, deployed, or published.
-- The published app at the project's Preview / Published URLs is serving the exact code at `4faa8616`, which contains the pre-1H `Request Info` flow.
-- No pending migration in `supabase/migration-candidates/` references Phase 1H (only the pre-existing `20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql`).
+### FIX 6 — Post-success OpportunityDetail state
 
-## H. Documentation vs. code discrepancies
+- Render `OpportunityDetail` with no formal apps → assert Apply Now enabled.
+- Open dialog, complete, submit successfully.
+- Re-invoke `renderPage({ apps: [{...active formal apply...}] })` to simulate React Query refresh (the mocked hook already reads from `driverApplicationsRef.current`; toggle it and rerender).
+- Assert Apply Now no longer actionable (renders "Application Submitted" disabled) and Request Info remains independently classified. No production changes.
 
-- `.lovable/plan.md` describes only Phase 1G-R1A7-R1. It contains **no** Phase 1H plan. There is no Phase 1H design document, checklist, or migration candidate in the repo.
-- If a prior agent turn described Phase 1H as "implemented", "in progress", "branch created", or "deployed", that claim is **not** supported by the repository: no branch, no commits, no files, no migrations. The only accurate historical statement is that Phase 1H was *discussed as future work*.
+### FIX 7 — Full error matrix
 
-## I. Exact reason the user still sees "Request Info"
+Table-driven test iterating over the 8 result codes plus a raw unknown error:
 
-`src/components/opportunities/OpportunityDetail.tsx` line 306–309 is the only primary CTA rendered on a Driver's opportunity detail view. Its label is the string literal `'Request Info'` (with `'Request Sent'` / `'Sending…'` as its only other states), and its click handler unconditionally calls `createApplication.mutate({ application_type: 'request_info', … })`. No other button, route, dialog, or feature-flagged branch exists to render an "Apply Now" CTA. Because no Phase 1H code was ever committed, the label and behavior are simply the pre-1H code still in production.
+- `duplicate_same_type`, `opportunity_unavailable`, `self_opportunity`, `profile_required`, `restricted`, `invalid_input`, `empty_response`, unknown.
+- For each: reject `submitMutateAsync` with `new Error('submission_failed:<code>')` (unknown uses a bare `Error('boom')`), submit, then assert:
+  - The public-safe message from `applicationSubmission.ts` is visible.
+  - Dialog stays open (`onOpenChange(false)` not called after failure).
+  - Message appears inside the `role="status"` live region.
+  - The rendered text does not contain `submission_failed:`, `SQL`, table names, policy names, or `[object Object]`.
+- Add a distinct retry-preserves-key assertion inside the same open attempt (already covered by FIX 2 retry case; cross-reference only).
 
-## J. Verdicts
+## Determinism & hygiene
 
-| Area | Verdict |
-|---|---|
-| Apply Now CTA | **FAIL** |
-| Structured application form + snapshot | **FAIL** |
-| Inquiry vs. formal application separation | **FAIL** |
-| Driver My Applications (1H scope) | **FAIL** |
-| Recruiter pipeline (1H scope, incl. offer stage) | **FAIL** |
-| Offers entity + send/accept/decline | **FAIL** |
-| Onboarding stage + offer_sent→hired guard | **FAIL** |
-| Offer lifecycle safety (expire/replace/idempotency/concurrency) | **FAIL** |
-| Offer/application notifications + timeline events | **FAIL** |
-| `marketplace_user_restrictions` | **FAIL** |
-| **Overall Phase 1H** | **FAIL — not implemented** |
+- All UUID generation controlled by a `randomUUID` spy; restore in `afterEach`.
+- Reset mocks in `beforeEach`; no `.only`/`.skip`; no source-string assertions; no environment-dependent branches.
+- Radix pointer-capture polyfill retained.
 
-## K. Safest next action (not performed)
+## Verification (run separately, in order)
 
-Author a Phase 1H patch-level execution packet (following the workspace's Standing Delivery Protocol) that:
-1. Defines the final product rule for Apply Now vs. Ask Recruiter, offer lifecycle, and onboarding stage.
-2. Lists exact new files, one new migration for `opportunity_offers` (+ RLS + grants + transition guards + `marketplace_user_restrictions` if in scope), and extensions to `applicationStatus.ts` / `application_events`.
-3. Specifies the offer_sent → hired block (must route through offer accept + onboarding).
-4. Provides an acceptance-test matrix and live-DB post-checks.
-5. Ships as a dedicated branch `phase1h-driver-application-pipeline`, split into sub-phases (schema → driver apply → recruiter pipeline → offers → onboarding → notifications) so each can be independently proven.
+```text
+bun install --frozen-lockfile
+env -u VITE_SUPABASE_URL -u VITE_SUPABASE_ANON_KEY -u VITE_SUPABASE_PUBLISHABLE_KEY \
+  bunx vitest run src/test/phase1hA2OpportunityDetail.test.tsx
+bunx vitest run \
+  src/test/phase1hA1FoundationRuntime.test.ts \
+  src/test/phase1hA1SubmissionIdempotency.test.ts \
+  src/test/phase1hA2ApplyNow.test.tsx \
+  src/test/phase1hA2OpportunityDetail.test.tsx
+bunx vitest run
+bunx tsgo -p tsconfig.app.json --noEmit
+bunx tsgo -p tsconfig.node.json --noEmit
+bun run build
+grep -RInE '\.(only|skip)\(' src/test/phase1hA2ApplyNow.test.tsx src/test/phase1hA2OpportunityDetail.test.tsx
+```
 
-Awaiting explicit approval before any implementation work.
+Expected: hermetic command exits 0; full Vitest count > 1,341; TypeScript and build succeed; grep returns no matches.
+
+## Stop conditions honored
+
+If the hermetic command still requires a Supabase variable, if any A1/A2 test regresses, if a proof would require production referral changes, or if a runtime test uncovers a real production defect, work stops and the failure plus root cause is reported instead of expanding scope or beginning A3.
+
+## Out of scope (untouched)
+
+- `ApplyNowDialog.tsx`, `OpportunityDetail.tsx`, `useOpportunityApplications.ts`, `useDriverReferrals.ts`, `ReferDriverDialog.tsx`
+- `supabase/integrations/*`, `supabase/migration-candidates/*`, `supabase/config.toml`
+- `package.json`, `bun.lockb`, `tsconfig*.json`, `vite.config.ts`, `vitest.config.ts`
+- Any live DB write, migration application, publish, or deploy
+- A3 (Ask Recruiter)
+
+APPROVED. EXECUTE THE PHASE 1H-A2 HERMETIC TEST CLOSEOUT NOW.
+
+Do not produce another plan, checklist, proposed approach, or restatement of requirements.
+
+You have already completed the assessment and described the intended implementation. Proceed immediately with the actual file edits and verification commands.
+
+STARTING COMMIT:
+
+ef29ce2bdb41f95022e8ab9a43d95de6dbb333c6
+
+STRICT SCOPE:
+
+This remains a test-only closeout unless a newly added runtime test proves a real production defect.
+
+Expected changed files:
+
+- src/test/phase1hA2ApplyNow.test.tsx
+
+- src/test/phase1hA2OpportunityDetail.test.tsx
+
+No production source changes are authorized unless a new runtime test demonstrates a confirmed defect. If that occurs, stop before changing production code and report:
+
+1. The failing test
+
+2. The observed production behavior
+
+3. The exact source defect
+
+4. The smallest proposed production correction
+
+Do not begin A3.
+
+==================================================
+
+IMPLEMENT NOW
+
+==================================================
+
+Complete every item from the approved plan:
+
+1. Hermetic OpportunityDetail test isolation
+
+2. Deterministic UUID lifecycle tests
+
+3. Rerender key preservation
+
+4. Field-change key preservation
+
+5. Failed-submit retry key preservation
+
+6. Cancel-and-reopen fresh key
+
+7. Success-and-reopen fresh key
+
+8. Rejected Apply Again fresh key
+
+9. Withdrawn Apply Again fresh key
+
+10. Missing-email behavior
+
+11. Missing-phone and SMS behavior
+
+12. Email consent behavior
+
+13. Phone consent behavior
+
+14. SMS consent behavior
+
+15. Consent-off reset for email
+
+16. Consent-off reset for phone
+
+17. Consent-off reset for SMS
+
+18. In-app submission without consent
+
+19. No editable contact-destination inputs
+
+20. Visible privacy statement
+
+21. Exact mutation payload allowlist
+
+22. No PII or snapshot values in payload
+
+23. Success toast assertion
+
+24. Success form-reset assertion
+
+25. Post-success OpportunityDetail rerender state
+
+26. Actual rendered public-safe error matrix
+
+27. Accessible live-region error behavior
+
+28. No internal error leakage
+
+The OpportunityDetail test must mock the unrelated referral component at the module boundary before importing the component under test:
+
+```ts
+
+vi.mock('@/components/opportunities/ReferDriverDialog', () => ({
+
+  ReferDriverDialog: () => null,
+
+}));
+
+&nbsp;
