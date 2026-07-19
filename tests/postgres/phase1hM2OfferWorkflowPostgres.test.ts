@@ -770,8 +770,8 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
         await c.query(`ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard`);
         await c.query(
           `INSERT INTO public.opportunity_offers
-            (application_id,opportunity_id,recruiter_id,driver_user_id,status,accepted_at,pay_description)
-            SELECT $1, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'accepted', now(), 'pay'
+            (application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,accepted_at,pay_description,snapshot_version,sent_snapshot,expires_at)
+            SELECT $1, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'accepted', now(), now(), 'pay', 1, '{"seed":true}'::jsonb, now()+interval '2 days'
               FROM public.opportunity_applications a WHERE a.id=$1`,
           [appId],
         );
@@ -779,8 +779,8 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
         try {
           await c.query(
             `INSERT INTO public.opportunity_offers
-              (application_id,opportunity_id,recruiter_id,driver_user_id,status,accepted_at,pay_description)
-              SELECT $1, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'accepted', now(), 'pay'
+              (application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,accepted_at,pay_description,snapshot_version,sent_snapshot,expires_at)
+              SELECT $1, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'accepted', now(), now(), 'pay', 1, '{"seed":true}'::jsonb, now()+interval '2 days'
                 FROM public.opportunity_applications a WHERE a.id=$1`,
             [appId],
           );
