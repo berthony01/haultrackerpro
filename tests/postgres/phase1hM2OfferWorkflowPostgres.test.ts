@@ -1010,18 +1010,34 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
   });
 
   it("C6: inquiry rows (request_info and callback) cannot enter formal transition/offer/hiring workflow", async () => {
-    for (const [rpc, key] of [["submit_request_info", "q-"], ["submit_callback_request", "cb-"]] as const) {
+    for (const inqType of ["request_info", "callback"] as const) {
       const drv = await mintDriver(pool);
-      const c = await newAuthClient(url, drv);
-      const r = await c.query(
-        `SELECT * FROM public.${rpc}($1::uuid,$2::text,'x','phone',false)`,
-        [ids.opportunity, `${key}${randomUUID()}`],
-      );
-      expect(r.rows[0].result_code).toBe("created");
-      const inqId = r.rows[0].application_id as string;
-      await commitEnd(c);
+      let inqId: string;
+      if (inqType === "request_info") {
+        const c = await newAuthClient(url, drv);
+        const r = await c.query(
+          `SELECT * FROM public.submit_request_info($1::uuid,$2::text,'x','phone',false)`,
+          [ids.opportunity, `q-${randomUUID()}`],
+        );
+        expect(r.rows[0].result_code).toBe("created");
+        inqId = r.rows[0].application_id as string;
+        await commitEnd(c);
+      } else {
+        // No callback RPC; insert directly as service_role (BYPASSRLS) to fabricate
+        // the row shape. The point of C6 is proving the formal workflow rejects
+        // application_type='callback', not the callback-submission path.
+        const ins = await pool.query(
+          `INSERT INTO public.opportunity_applications
+             (opportunity_id, driver_user_id, recruiter_id, application_type, status,
+              submission_snapshot, snapshot_version, idempotency_key, preferred_contact_method,
+              contact_sharing_consent, is_legacy)
+           VALUES ($1,$2,$3,'callback','submitted','{}'::jsonb,0,$4,'phone',false,true)
+           RETURNING id`,
+          [ids.opportunity, drv, ids.recruiterProfile, `cb-${randomUUID()}`],
+        );
+        inqId = ins.rows[0].id as string;
+      }
 
-      // Recruiter attempts formal-only paths.
       for (const [sql, args] of [
         [`SELECT * FROM public.transition_opportunity_application($1::uuid,'interviewing',NULL)`, [inqId]],
         [`SELECT * FROM public.save_opportunity_offer_draft($1::uuid,'p',1000,NULL,NULL,NULL,NULL,NULL,NULL,NULL)`, [inqId]],
@@ -1031,15 +1047,14 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
         let code = "";
         try { await cc.query(sql, args); } catch (e) { code = (e as { code?: string }).code ?? ""; }
         await rollbackEnd(cc);
-        expect(code, `${rpc} ${sql}`).toBe("42501");
+        expect(code, `${inqType} ${sql}`).toBe("42501");
       }
-      // Driver: withdraw must reject inquiry.
       const dc = await newAuthClient(url, drv);
       let dcode = "";
       try { await dc.query(`SELECT * FROM public.withdraw_opportunity_application($1::uuid)`, [inqId]); }
       catch (e) { dcode = (e as { code?: string }).code ?? ""; }
       await rollbackEnd(dc);
-      expect(dcode, `${rpc} withdraw`).toBe("42501");
+      expect(dcode, `${inqType} withdraw`).toBe("42501");
     }
   });
 
