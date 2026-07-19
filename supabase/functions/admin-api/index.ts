@@ -284,7 +284,12 @@ Deno.serve(async (req) => {
 
       return json({
         total_users: totalUsers,
-        subs_free: subsFree.count ?? 0,
+        // Derive free-user count from existing users minus active Pro so
+        // Total = Free + Active Pro is always consistent. The raw
+        // subscriptions.status='free' count can include rows for auth users
+        // that were later deleted (orphans), which historically caused
+        // Free Users > Total Users on the Admin Overview.
+        subs_free: Math.max(0, totalUsers - activePro),
         subs_active_pro: activePro,
         subs_canceled: subsCanceled.count ?? 0,
         pro_conversion_rate: conversionRate,

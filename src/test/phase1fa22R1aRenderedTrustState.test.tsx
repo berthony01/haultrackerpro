@@ -259,13 +259,15 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     expect(screen.queryByTestId('recruiter-verified-badge')).toBeNull();
   });
 
-  it('complete + approved → top Post ENABLED and visible Verified Recruiter badge in the snapshot', () => {
+  it('complete + approved → top Post ENABLED and verification label reads Verified Recruiter (rendered once)', () => {
     installHooks({ profile: makeProfile({ verification_status: 'approved' }) });
     renderPage();
     expect(topPostButton()).not.toBeDisabled();
-    const verified = screen.getByTestId('recruiter-verified-badge');
-    expect(verified).toBeInTheDocument();
-    expect(verified).toHaveTextContent(/Verified Recruiter/);
+    // The duplicate `recruiter-verified-badge` affirmation was removed;
+    // the verification label alone conveys the Verified Recruiter status.
+    expect(screen.queryByTestId('recruiter-verified-badge')).toBeNull();
+    const verificationLabel = within(trustStatus()).getByTestId('recruiter-verification-label');
+    expect(verificationLabel).toHaveTextContent(/Verified Recruiter/);
     expect(trustStatus().getAttribute('data-verified')).toBe('true');
   });
 

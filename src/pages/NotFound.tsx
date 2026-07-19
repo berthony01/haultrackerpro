@@ -10,12 +10,18 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <SEOHead title="Page Not Found | HaulTrackerPro" description="Page not found." path="/404" noindex />
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">404</h1>
-        <p className="mb-4 text-xl text-muted-foreground">Oops! Page not found</p>
-        <a href="/" className="text-primary underline hover:text-primary/90">
+      <div className="text-center max-w-md">
+        <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-3">Error 404</p>
+        <h1 className="mb-4 text-5xl font-black tracking-tight text-foreground">Page not found</h1>
+        <p className="mb-6 text-base text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <a
+          href="/"
+          className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-primary hover:bg-primary/90 transition-colors"
+        >
           Return to Home
         </a>
       </div>

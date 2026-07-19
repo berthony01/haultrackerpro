@@ -77,6 +77,26 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const PREFERRED_CONTACT_LABELS: Record<string, string> = {
+  in_app: 'In-app',
+  email: 'Email',
+  phone: 'Phone',
+  sms: 'SMS',
+};
+
+function formatPreferredContact(value?: string | null): string {
+  if (!value) return '—';
+  const key = String(value).toLowerCase();
+  return (
+    PREFERRED_CONTACT_LABELS[key] ??
+    key
+      .split(/[_\s]+/)
+      .filter(Boolean)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(' ')
+  );
+}
+
 function fmtDate(d?: string | null) {
   if (!d) return '—';
   try {
@@ -247,7 +267,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <h3 className="text-base font-bold text-foreground">
-              {dp?.full_name || 'Driver'}
+              {dp?.full_name || 'Driver (name not provided)'}
             </h3>
             <p className="text-xs text-muted-foreground">
               {[dp?.city, dp?.state].filter(Boolean).join(', ') || '—'}
@@ -281,7 +301,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                 <Field label="Opportunity" value={opp?.title || '—'} />
                 <Field label="Submitted" value={fmtDate(a.created_at)} />
                 <Field label="Last Activity" value={fmtDate(a.updated_at)} />
-                <Field label="Preferred Contact" value={a.preferred_contact_method || '—'} />
+                <Field label="Preferred Contact" value={formatPreferredContact(a.preferred_contact_method)} />
                 {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
                 {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
                 {contactApproved && a.driver_phone_snapshot && (
