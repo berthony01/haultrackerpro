@@ -175,8 +175,9 @@ BEGIN
 END;
 $function$;
 
-DROP TRIGGER IF EXISTS opportunity_applications_update_guard_trigger
-  ON public.opportunity_applications;
+-- Trigger from M1 (opportunity_applications_update_guard_trigger, BEFORE UPDATE)
+-- is preserved; this migration only replaces the function body via CREATE OR
+-- REPLACE above.
 
 -- ---------------------------------------------------------------------
 -- Offer guard (hardened M2).
