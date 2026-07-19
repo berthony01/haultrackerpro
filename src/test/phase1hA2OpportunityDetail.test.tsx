@@ -34,6 +34,11 @@ vi.mock('@/hooks/opportunities/useSavedOpportunities', () => ({
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), message: vi.fn() }),
 }));
+// Hermetic isolation: ReferDriverDialog pulls in useDriverReferrals -> Supabase client.
+// The referral workflow is out of scope for A2 OpportunityDetail integration tests.
+vi.mock('@/components/opportunities/ReferDriverDialog', () => ({
+  ReferDriverDialog: () => null,
+}));
 
 import { OpportunityDetail } from '@/components/opportunities/OpportunityDetail';
 
