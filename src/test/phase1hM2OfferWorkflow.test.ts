@@ -1412,7 +1412,7 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
         ('${DRV_G}','b2-g@t'),('${DRV_H}','b2-h@t'),('${DRV_I}','b2-i@t'),
         ('${DRV_J}','b2-j@t'),('${DRV_K}','b2-k@t'),('${DRV_L}','b2-l@t'),
         ('${DRV_M}','b2-m@t'),('${DRV_N}','b2-n@t'),
-        ('${DRV_O}','b2-o@t'),('${DRV_P}','b2-p@t'),('${DRV_Q}','b2-q@t'),
+        ('${DRV_O}','b2-o@t'),('${DRV_P}','b2-p@t'),('${DRV_Q}','b2-q@t'),('${DRV_R}','b2-r@t'),
         ('${ALT_R_USER}','b2-alt-r@t')
       ON CONFLICT DO NOTHING;
 
