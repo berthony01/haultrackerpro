@@ -1410,24 +1410,30 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
         ('${DRV_D}','b2-d@t'),('${DRV_E}','b2-e@t'),('${DRV_F}','b2-f@t'),
         ('${DRV_G}','b2-g@t'),('${DRV_H}','b2-h@t'),('${DRV_I}','b2-i@t'),
         ('${DRV_J}','b2-j@t'),('${DRV_K}','b2-k@t'),('${DRV_L}','b2-l@t'),
-        ('${DRV_M}','b2-m@t'),('${DRV_N}','b2-n@t')
+        ('${DRV_M}','b2-m@t'),('${DRV_N}','b2-n@t'),
+        ('${DRV_O}','b2-o@t'),('${DRV_P}','b2-p@t'),('${DRV_Q}','b2-q@t'),
+        ('${ALT_R_USER}','b2-alt-r@t')
       ON CONFLICT DO NOTHING;
 
       INSERT INTO public.recruiter_profiles(
         id,user_id,recruiter_name,recruiter_email,company_name,dot_number,
         posting_terms_accepted_at,posting_terms_version,verification_status,status
-      ) VALUES (
-        '${R_PROF}','${R_USER}','B2 Recruiter','b2-r@t','B2 Co','DOTB2',
-        now(),'2026-07-17.v1','approved','active'
-      ) ON CONFLICT DO NOTHING;
+      ) VALUES
+        ('${R_PROF}','${R_USER}','B2 Recruiter','b2-r@t','B2 Co','DOTB2',
+         now(),'2026-07-17.v1','approved','active'),
+        ('${ALT_R_PROF}','${ALT_R_USER}','B2 Alt Recruiter','b2-alt-r@t','B2 Alt Co','DOTB2ALT',
+         now(),'2026-07-17.v1','approved','active')
+      ON CONFLICT DO NOTHING;
 
       INSERT INTO public.opportunities(
         id,recruiter_id,title,company_name,hiring_city,hiring_state,driver_type,route_type,trailer_type,
         pay_model,cpm,estimated_weekly_gross,estimated_weekly_miles,status,admin_review_status
-      ) VALUES (
-        '${OPP}','${R_PROF}','B2 OTR','B2 Co','Dallas','TX','company','regional','dry_van',
-        'cpm',0.62,1800,2800,'active','approved'
-      ) ON CONFLICT DO NOTHING;
+      ) VALUES
+        ('${OPP}','${R_PROF}','B2 OTR','B2 Co','Dallas','TX','company','regional','dry_van',
+         'cpm',0.62,1800,2800,'active','approved'),
+        ('${ALT_OPP}','${ALT_R_PROF}','B2 Alt OTR','B2 Alt Co','Dallas','TX','company','regional','dry_van',
+         'cpm',0.62,1800,2800,'active','approved')
+      ON CONFLICT DO NOTHING;
 
       INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
       VALUES
@@ -1444,7 +1450,10 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
         ('${DRV_K}','K','A',5,'phone','apply_only',true),
         ('${DRV_L}','L','A',5,'phone','apply_only',true),
         ('${DRV_M}','M','A',5,'phone','apply_only',true),
-        ('${DRV_N}','N','A',5,'phone','apply_only',true)
+        ('${DRV_N}','N','A',5,'phone','apply_only',true),
+        ('${DRV_O}','O','A',5,'phone','apply_only',true),
+        ('${DRV_P}','P','A',5,'phone','apply_only',true),
+        ('${DRV_Q}','Q','A',5,'phone','apply_only',true)
       ON CONFLICT DO NOTHING;
     `);
   });
