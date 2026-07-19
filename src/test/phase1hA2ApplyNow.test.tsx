@@ -750,19 +750,12 @@ describe('ApplyNowDialog — per-method consent submission', () => {
 describe('ApplyNowDialog — privacy copy and success toast', () => {
   it('visibly displays the approved privacy statement about snapshot and consent', () => {
     renderDialog();
-    // The text may be split across nodes; use a matcher that joins textContent.
-    const match = (needle: RegExp) =>
-      screen.getByText((_, node) => {
-        if (!node) return false;
-        const text = node.textContent || '';
-        return needle.test(text);
-      });
-    expect(
-      match(/professional Opportunity Profile is included in the application snapshot/i),
-    ).toBeInTheDocument();
-    expect(
-      match(/shared only when you explicitly consent/i),
-    ).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    const text = dialog.textContent ?? '';
+    expect(text).toMatch(
+      /professional Opportunity Profile is included in the application snapshot/i,
+    );
+    expect(text).toMatch(/shared only when you explicitly consent/i);
   });
 
   it('calls sonner toast.success with "Application submitted" on a successful submission', async () => {
