@@ -24,7 +24,7 @@ import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { submissionErrorMessage } from '@/lib/opportunities/applicationSubmission';
 
-type PreferredMethod = 'in_app' | 'email' | 'phone';
+type PreferredMethod = 'in_app' | 'email' | 'phone' | 'sms';
 
 interface Props {
   open: boolean;
@@ -93,7 +93,7 @@ export function ApplyNowDialog({
   }, [consent, preferred]);
 
   const messageOver = message.length > MESSAGE_LIMIT;
-  const externalMethod = preferred === 'email' || preferred === 'phone';
+  const externalMethod = preferred === 'email' || preferred === 'phone' || preferred === 'sms';
   const consentValid = !externalMethod || consent;
   const canSubmit =
     profileCompleted &&
@@ -136,8 +136,8 @@ export function ApplyNowDialog({
           <DialogTitle>Apply to {opportunityTitle}</DialogTitle>
           <DialogDescription>
             Submit a formal application to {companyName}. Your professional Opportunity Profile is
-            included in the application snapshot. Email or phone is shared only when you explicitly
-            consent.
+            included in the application snapshot. Email, phone, or SMS is shared only when you
+            explicitly consent.
           </DialogDescription>
         </DialogHeader>
 
@@ -209,6 +209,9 @@ export function ApplyNowDialog({
                     <SelectItem value="phone" disabled={!hasPhone}>
                       Phone {hasPhone ? '' : '(not on profile)'}
                     </SelectItem>
+                    <SelectItem value="sms" disabled={!hasPhone}>
+                      SMS {hasPhone ? '' : '(no phone on profile)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -220,7 +223,7 @@ export function ApplyNowDialog({
               />
               {externalMethod && !consent && (
                 <p className="text-xs text-muted-foreground">
-                  Enable contact sharing to use email or phone, or keep in-app messaging.
+                  Enable contact sharing to use email, phone, or SMS, or keep in-app messaging.
                 </p>
               )}
             </div>
