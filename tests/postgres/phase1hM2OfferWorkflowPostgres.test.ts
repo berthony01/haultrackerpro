@@ -1266,6 +1266,10 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
       `SELECT indisvalid FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='opportunity_offers_one_accepted_per_app_uidx'`,
     );
     expect(idx.rows[0].indisvalid).toBe(true);
+    // Clean up the losing 'sent' row and restore the one_sent index for
+    // subsequent tests / suite invariants.
+    await pool.query(`DELETE FROM public.opportunity_offers WHERE application_id=$1 AND status='sent'`, [appId]);
+    await pool.query(`CREATE UNIQUE INDEX opportunity_offers_one_sent_per_app_uidx ON public.opportunity_offers(application_id) WHERE status = 'sent'`);
   });
 
   it("D6 race: acceptance vs service expiration sweep — accepted OR expired, never both; onboarding only when accepted", async () => {
