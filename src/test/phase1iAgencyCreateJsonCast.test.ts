@@ -240,29 +240,24 @@ describe('Agency create_agency JSON cast — root-cause proof', () => {
   });
 
   it('candidate accepts optional description + contact_email and normalizes blanks to NULL', async () => {
-    // Fresh DB for a second owner scenario.
-    const db2 = new PGlite() as unknown as AnyPGlite;
-    await primeSchema(db2);
-    await db2.exec(loadCandidate());
-    await db2.exec(
-      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);`,
+    // Re-use the shared db under a different owner id so idempotency is bypassed.
+    await db.exec(
+      `INSERT INTO auth.users(id,email) VALUES ('22222222-2222-2222-2222-222222222222','bravo@example.com');
+       SELECT set_config('request.jwt.claim.sub','22222222-2222-2222-2222-222222222222', false);`,
     );
-
-    const full = await db2.query<{ description: string | null; contact_email: string | null }>(
+    const full = await db.query<{ description: string | null; contact_email: string | null }>(
       `SELECT description, contact_email FROM public.create_agency($1, $2, $3)`,
       ['Bravo Logistics', '  Fleet ops  ', 'owner@bravo.com'],
     );
     expect(full.rows[0].description).toBe('Fleet ops');
     expect(full.rows[0].contact_email).toBe('owner@bravo.com');
 
-    // Whitespace-only optional fields normalize to NULL (no JSON cast in path).
-    const db3 = new PGlite() as unknown as AnyPGlite;
-    await primeSchema(db3);
-    await db3.exec(loadCandidate());
-    await db3.exec(
-      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);`,
+    // Whitespace-only optional fields normalize to NULL under a third owner.
+    await db.exec(
+      `INSERT INTO auth.users(id,email) VALUES ('33333333-3333-3333-3333-333333333333','charlie@example.com');
+       SELECT set_config('request.jwt.claim.sub','33333333-3333-3333-3333-333333333333', false);`,
     );
-    const blanks = await db3.query<{ description: string | null; contact_email: string | null }>(
+    const blanks = await db.query<{ description: string | null; contact_email: string | null }>(
       `SELECT description, contact_email FROM public.create_agency($1, $2, $3)`,
       ['Charlie Freight', '   ', '   '],
     );
