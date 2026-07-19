@@ -705,14 +705,17 @@ BEGIN
   IF _actor IS NULL THEN RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501'; END IF;
   IF _expires_at IS NULL THEN RAISE EXCEPTION 'expires_at required' USING ERRCODE = '22023'; END IF;
 
-  SELECT * INTO _offer FROM public.opportunity_offers WHERE id = _offer_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'offer not found' USING ERRCODE = 'P0002'; END IF;
-
-  -- AUTHORIZATION FIRST — before disclosing already_sent.
-  SELECT * INTO _rp FROM public.recruiter_profiles WHERE id = _offer.recruiter_id;
-  IF NOT FOUND OR _rp.user_id <> _actor THEN
+  -- Ownership-scoped lookup: foreign existing and nonexistent both yield the
+  -- same public-safe not-authorized denial (no offer-not-found disclosure).
+  SELECT o.* INTO _offer
+    FROM public.opportunity_offers o
+    JOIN public.recruiter_profiles r ON r.id = o.recruiter_id
+   WHERE o.id = _offer_id AND r.user_id = _actor
+   FOR UPDATE OF o;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
   END IF;
+
   IF NOT public.current_user_can_manage_recruiter_opportunities(_offer.recruiter_id) THEN
     RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
   END IF;
@@ -1144,14 +1147,17 @@ DECLARE
 BEGIN
   IF _actor IS NULL THEN RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501'; END IF;
 
-  SELECT * INTO _app FROM public.opportunity_applications WHERE id=_application_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'application not found' USING ERRCODE = 'P0002'; END IF;
-
-  -- AUTHORIZATION FIRST — before disclosing already_hired.
-  SELECT * INTO _rp FROM public.recruiter_profiles WHERE id=_app.recruiter_id;
-  IF NOT FOUND OR _rp.user_id <> _actor THEN
+  -- Ownership-scoped lookup: foreign existing and nonexistent both yield the
+  -- same public-safe not-authorized denial (no application-not-found disclosure).
+  SELECT a.* INTO _app
+    FROM public.opportunity_applications a
+    JOIN public.recruiter_profiles r ON r.id = a.recruiter_id
+   WHERE a.id = _application_id AND r.user_id = _actor
+   FOR UPDATE OF a;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
   END IF;
+
   IF NOT public.current_user_can_manage_recruiter_opportunities(_app.recruiter_id) THEN
     RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
   END IF;
