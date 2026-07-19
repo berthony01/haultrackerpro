@@ -281,7 +281,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                 <Field label="Opportunity" value={opp?.title || '—'} />
                 <Field label="Submitted" value={fmtDate(a.created_at)} />
                 <Field label="Last Activity" value={fmtDate(a.updated_at)} />
-                <Field label="Preferred Contact" value={a.preferred_contact_method || '—'} />
+                <Field label="Preferred Contact" value={formatPreferredContact(a.preferred_contact_method)} />
                 {dp?.preferred_driver_type && <Field label="Driver Type" value={dp.preferred_driver_type} />}
                 {dp?.preferred_route_type && <Field label="Route" value={dp.preferred_route_type} />}
                 {contactApproved && a.driver_phone_snapshot && (
