@@ -223,7 +223,7 @@ export function ApplyNowDialog({
               />
               {externalMethod && !consent && (
                 <p className="text-xs text-muted-foreground">
-                  Enable contact sharing to use email or phone, or keep in-app messaging.
+                  Enable contact sharing to use email, phone, or SMS, or keep in-app messaging.
                 </p>
               )}
             </div>
