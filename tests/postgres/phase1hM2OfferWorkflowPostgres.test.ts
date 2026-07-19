@@ -360,6 +360,29 @@ async function seed(pool: pg.Pool, ids: Ids) {
   }
 }
 
+async function mintDriver(pool: pg.Pool): Promise<string> {
+  const uid = randomUUID();
+  const c = await pool.connect();
+  try {
+    await c.query(`INSERT INTO auth.users(id,email) VALUES ($1, $2)`, [uid, `${uid.slice(0, 8)}@t`]);
+    await c.query(
+      `INSERT INTO public.driver_opportunity_profiles(
+         user_id,full_name,city,state,cdl_class,years_experience,endorsements,trailer_experience,
+         preferred_driver_type,preferred_route_type,preferred_home_time,preferred_states,
+         min_weekly_gross,min_weekly_net,min_effective_rpm,available_start_date,
+         willing_to_relocate,contact_preference,visibility,allow_verified_recruiter_contact,
+         profile_completed,phone,email)
+       VALUES($1,'D','Austin','TX','A',5,ARRAY['H']::text[],ARRAY['dry_van']::text[],
+         'company','regional','weekends',ARRAY['TX']::text[],1500,1200,1.8,'2026-08-01',
+         false,'phone','apply_only',true,true,'555','x@t')`,
+      [uid],
+    );
+  } finally {
+    c.release();
+  }
+  return uid;
+}
+
 async function newAuthClient(url: string, uid: string): Promise<pg.Client> {
   const c = new pg.Client({ connectionString: url, statement_timeout: 30_000 });
   await c.connect();
