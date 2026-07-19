@@ -44,8 +44,6 @@ export interface AssistantAgencyPlan {
   monthlyPrice: number;
   /** Annual price placeholder. null = annual not exposed publicly yet. */
   annualPrice: number | null;
-  /** Stripe price id for Phase 8 wiring. null until checkout is configured. */
-  futureStripePriceId: string | null;
   limits: AgencyPlanLimits;
   /** Public-facing bullet list for the pricing page. */
   publicBullets: string[];
@@ -60,7 +58,6 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
     tagline: 'Free to accept approved driver invitations',
     monthlyPrice: 0,
     annualPrice: 0,
-    futureStripePriceId: null,
     limits: {
       memberLimit: 1,
       activeClientLimit: null, // an assistant can be invited by any number of drivers
@@ -85,7 +82,6 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
     tagline: 'Solo back-office side hustle',
     monthlyPrice: 29,
     annualPrice: null,
-    futureStripePriceId: null,
     limits: {
       memberLimit: 2,
       activeClientLimit: 5,
@@ -112,7 +108,6 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
     tagline: 'Small back-office team',
     monthlyPrice: 79,
     annualPrice: null,
-    futureStripePriceId: null,
     limits: {
       memberLimit: 5,
       activeClientLimit: 25,
@@ -139,7 +134,6 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
     tagline: 'Larger back-office operations',
     monthlyPrice: 149,
     annualPrice: null,
-    futureStripePriceId: null,
     limits: {
       memberLimit: 15,
       activeClientLimit: 100,
