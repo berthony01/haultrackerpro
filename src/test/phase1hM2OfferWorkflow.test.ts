@@ -1246,7 +1246,7 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
       VALUES ('${zDriver}','Z1','A',5,'phone','apply_only',true);
     `);
     const zApp = await submitApply(db, zDriver, IDS.opportunity, 'z1-existence-key');
-    await asOwner(db);
+    await asAuth(db, IDS.recruiterUser);
     await db.query(
       `SELECT * FROM public.transition_opportunity_application($1::uuid,'interviewing',NULL)`, [zApp]);
     const draft = await db.query(
