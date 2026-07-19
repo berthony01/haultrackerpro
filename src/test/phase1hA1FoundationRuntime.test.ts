@@ -210,6 +210,11 @@ async function primeBaseline(db: AnyPGlite) {
       FOR UPDATE TO authenticated
       USING (public.current_user_can_manage_recruiter_opportunities(recruiter_id))
       WITH CHECK (public.current_user_can_manage_recruiter_opportunities(recruiter_id));
+    -- Legacy vulnerability: primes the exact policy the candidate migration
+    -- must drop. See phase1hA1DeletePolicyClosure.test.ts for the before/after
+    -- proof that direct authenticated DELETE is closed.
+    CREATE POLICY "Driver deletes own application" ON public.opportunity_applications
+      FOR DELETE TO authenticated USING (auth.uid() = driver_user_id);
 
     CREATE TABLE public.subscriptions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL, status text NOT NULL DEFAULT 'inactive');
     CREATE TABLE public.recruiter_billing_profiles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), recruiter_id uuid NOT NULL, stripe_customer_id text);
