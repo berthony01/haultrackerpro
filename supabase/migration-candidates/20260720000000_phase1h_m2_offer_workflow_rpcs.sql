@@ -126,6 +126,7 @@ BEGIN
     public._m2_driver_withdraw_active()
     AND _actor IS NOT NULL AND _actor = OLD.driver_user_id
     AND NEW.status = 'withdrawn'
+    AND OLD.application_type = 'apply'
     AND OLD.status NOT IN ('withdrawn','hired','rejected','onboarding')
     AND NOT EXISTS (
       SELECT 1 FROM public.opportunity_offers
