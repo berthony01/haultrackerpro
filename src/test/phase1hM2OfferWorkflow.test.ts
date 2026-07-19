@@ -1327,9 +1327,8 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
       VALUES ('${oDriver}','O3','A',5,'phone','apply_only',true);
     `);
     const oApp = await submitApply(db, oDriver, IDS.opportunity, 'o3-owner-reach-key');
+    await transitionToInterviewing(db, oApp, IDS.recruiterUser);
     await asAuth(db, IDS.recruiterUser);
-    await db.query(
-      `SELECT * FROM public.transition_opportunity_application($1::uuid,'interviewing',NULL)`, [oApp]);
     const draft = await db.query(
       `SELECT * FROM public.save_opportunity_offer_draft(NULL, $1::uuid, jsonb_build_object('pay',jsonb_build_object('mode','cpm','rate_cpm',0.62)))`,
       [oApp]);
