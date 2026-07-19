@@ -88,7 +88,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
   const profileIncomplete = !driverProfile || !driverProfile.profile_completed;
 
   const handleRequestInfo = async () => {
-    if (alreadyApplied) return;
+    if (requestInfoState.exists) return;
     setSubmitting(true);
     // Phase 28C: only send the snapshot matching the driver's contact_preference,
     // and only when consent is on. DB trigger is the final authority.
@@ -114,12 +114,13 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
           setSubmitting(false);
         },
         onError: (e: Error) => {
-          toast.error(e.message);
+          toast.error(submissionErrorMessage(e));
           setSubmitting(false);
         },
       }
     );
   };
+
 
   return (
     <div className="space-y-5 animate-fade-in">
