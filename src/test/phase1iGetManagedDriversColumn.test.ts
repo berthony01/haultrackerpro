@@ -44,10 +44,15 @@ END;
 $function$;
 `;
 
+// Canonical applied migration (live history version 20260719151733).
+// The parallel candidate file `20260719160500_fix_get_my_managed_drivers_full_name.sql`
+// was removed in Pass B1 as an unrecorded duplicate — its executable SQL was
+// identical to this migration, and live `supabase_migrations.schema_migrations`
+// only records the `20260719151730_...` version.
 const CANDIDATE = readFileSync(
   join(
     process.cwd(),
-    'supabase/migration-candidates/20260719160500_fix_get_my_managed_drivers_full_name.sql',
+    'supabase/migrations/20260719151730_239618e5-edae-47bd-a44e-04c903761bc5.sql',
   ),
   'utf8',
 );
