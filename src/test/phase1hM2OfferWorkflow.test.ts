@@ -1454,7 +1454,8 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
         ('${DRV_N}','N','A',5,'phone','apply_only',true),
         ('${DRV_O}','O','A',5,'phone','apply_only',true),
         ('${DRV_P}','P','A',5,'phone','apply_only',true),
-        ('${DRV_Q}','Q','A',5,'phone','apply_only',true)
+        ('${DRV_Q}','Q','A',5,'phone','apply_only',true),
+        ('${DRV_R}','R','A',5,'phone','apply_only',true)
       ON CONFLICT DO NOTHING;
     `);
   });
