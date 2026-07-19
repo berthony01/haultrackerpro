@@ -709,8 +709,8 @@ if (!shouldRun && REQUIRE) {
     });
 
     it("C2: foreign recruiter gets 'not authorized' identical to a random nonexistent id (no state disclosure)", async () => {
-      // Set up: driverA has an app on recruiterProfile with a real sent offer.
-      const appId = await submitApply(url, ids.driverA, ids.opportunity);
+      const drv = await mintDriver(pool);
+      const appId = await submitApply(url, drv, ids.opportunity);
       await advanceToInterviewing(url, ids.recruiterUser, appId);
       const offerId = await saveDraft(url, ids.recruiterUser, appId);
       const sentRes = await sendOffer(url, ids.recruiterUser, offerId);
