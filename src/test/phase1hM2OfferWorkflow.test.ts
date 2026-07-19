@@ -1344,6 +1344,7 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
     // already_hired path
     const hDriver = 'a4a4a4a4-a4a4-a4a4-a4a4-a4a4a4a4a4a4';
     const hApp = 'a4444444-a444-a444-a444-a44444444444';
+    await asOwner(db);
     await db.exec(`
       INSERT INTO auth.users(id,email) VALUES ('${hDriver}','h4@t') ON CONFLICT DO NOTHING;
       INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
