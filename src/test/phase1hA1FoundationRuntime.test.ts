@@ -1385,4 +1385,207 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     );
     expect(rbp.rows.map((r) => r.column_name).sort()).toEqual(['id','recruiter_id','stripe_customer_id']);
   });
+
+  // -------------------------------------------------------------------
+  // Delete-policy closeout — proves the legacy Driver DELETE path is
+  // removed at BOTH the policy and grant layers by the candidate
+  // migration, while the withdrawal RPC path and service_role/owner
+  // cleanup remain functional.
+  // -------------------------------------------------------------------
+
+  it('legacy baseline exposes the vulnerable DELETE policy and grant BEFORE the candidate migration', async () => {
+    const legacy = new PGlite() as unknown as AnyPGlite;
+    await primeBaseline(legacy);
+    // No candidate applied. Policy exists.
+    const pol = await legacy.query<{ policyname: string }>(
+      `SELECT policyname FROM pg_policies
+        WHERE schemaname='public' AND tablename='opportunity_applications' AND cmd='DELETE'`,
+    );
+    expect(pol.rows.map((r) => r.policyname)).toContain('Driver deletes own application');
+
+    const grant = await legacy.query<{ privilege_type: string }>(
+      `SELECT privilege_type FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='opportunity_applications'
+          AND grantee='authenticated' AND privilege_type='DELETE'`,
+    );
+    expect(grant.rows.length).toBe(1);
+
+    // Runtime proof: the authenticated Driver actually CAN delete their
+    // own application in the legacy fixture. This is the exact defect
+    // the candidate must close.
+    await legacy.exec(`RESET ROLE; SET ROLE authenticated; SET request.jwt.claim.sub = '${IDS.driverA}';`);
+    const del = await legacy.query<{ id: string }>(
+      `DELETE FROM public.opportunity_applications WHERE id=$1 RETURNING id`,
+      [IDS.historicalInquiryId],
+    );
+    expect(del.rows.length).toBe(1);
+    await legacy.exec(`RESET ROLE;`);
+  });
+
+  it('after candidate migration: authenticated DELETE is closed at BOTH policy and grant layers', async () => {
+    await asOwner(db);
+    // No DELETE policy for any authenticated-facing role remains.
+    const pol = await db.query<{ policyname: string; roles: string[] }>(
+      `SELECT policyname, roles FROM pg_policies
+        WHERE schemaname='public' AND tablename='opportunity_applications' AND cmd='DELETE'`,
+    );
+    for (const r of pol.rows) {
+      expect(r.roles).not.toContain('authenticated');
+      expect(r.roles).not.toContain('anon');
+      expect(r.roles).not.toContain('public');
+    }
+    // authenticated + anon have NO DELETE grant. service_role retains it.
+    const grants = await db.query<{ grantee: string; privilege_type: string }>(
+      `SELECT grantee, privilege_type FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='opportunity_applications'
+          AND privilege_type='DELETE'
+        ORDER BY grantee`,
+    );
+    const grantees = grants.rows.map((r) => r.grantee);
+    expect(grantees).not.toContain('authenticated');
+    expect(grantees).not.toContain('anon');
+    expect(grantees).toContain('service_role');
+  });
+
+  it('authenticated Driver cannot DELETE own formal application, own inquiry, or another Driver/Recruiter/admin path', async () => {
+    // Seed a fresh formal apply owned by driverB, and rely on the
+    // historical inquiry already owned by driverA.
+    const KEY_DEL = 'del-closeout-key-000001';
+    await asAuthenticated(db, IDS.driverB);
+    const created = await db.query<{ application_id: string; result_code: string }>(
+      `SELECT * FROM public.submit_opportunity_application(
+         $1::uuid, $2, 'delete-target', true, true, true, 'email', true)`,
+      [IDS.opportunity, KEY_DEL],
+    );
+    expect(created.rows[0].result_code).toBe('created');
+    const formalId = created.rows[0].application_id;
+
+    // Driver B tries to DELETE their own formal application.
+    await expect(
+      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [formalId]),
+    ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
+
+    // Driver A tries to DELETE their own request-info inquiry.
+    await asAuthenticated(db, IDS.driverA);
+    await expect(
+      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [IDS.historicalInquiryId]),
+    ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
+
+    // Driver A tries to DELETE Driver B's formal application.
+    await expect(
+      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [formalId]),
+    ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
+
+    // Recruiter tries to DELETE via the ordinary table path.
+    await asAuthenticated(db, IDS.recruiterUser);
+    await expect(
+      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [formalId]),
+    ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
+
+    // Authenticated administrator: even with is_admin returning true, the
+    // ordinary DELETE path is denied because the authenticated role has
+    // no DELETE grant at all.
+    await asOwner(db);
+    await db.exec(
+      `CREATE OR REPLACE FUNCTION public.is_admin(_uid uuid) RETURNS boolean
+         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ SELECT true $$;`,
+    );
+    await asAuthenticated(db, IDS.recruiterUser);
+    await expect(
+      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [formalId]),
+    ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
+    await asOwner(db);
+    await db.exec(
+      `CREATE OR REPLACE FUNCTION public.is_admin(_uid uuid) RETURNS boolean
+         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ SELECT false $$;`,
+    );
+
+    // Rows survive all failed DELETE attempts.
+    const still = await db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM public.opportunity_applications WHERE id IN ($1,$2)`,
+      [formalId, IDS.historicalInquiryId],
+    );
+    expect(still.rows[0].count).toBe('2');
+  });
+
+  it('failed DELETE does not remove linked application history (offer FK integrity preserved)', async () => {
+    // Fresh Driver + application + accepted offer linked via RESTRICT FK.
+    const fresh = await createFreshApp(db, 'del-fk', IDS.opportunity, IDS.recruiterProfile);
+    await asOwner(db);
+    await db.exec(
+      `INSERT INTO public.opportunity_offers(
+         application_id, opportunity_id, recruiter_id, driver_user_id,
+         offer_status, offer_snapshot, snapshot_version, expires_at)
+       VALUES ('${fresh.appId}','${IDS.opportunity}','${IDS.recruiterProfile}','${fresh.driverId}',
+               'sent','{"terms":"ok"}'::jsonb,1, now() + interval '7 days');`,
+    );
+
+    // Driver attempts DELETE on their own application — must fail on
+    // the authorization layer (not the FK layer), and the linked
+    // history offer must remain intact.
+    await asAuthenticated(db, fresh.driverId);
+    await expect(
+      db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [fresh.appId]),
+    ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
+    await asOwner(db);
+
+    const offerStill = await db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM public.opportunity_offers WHERE application_id=$1`,
+      [fresh.appId],
+    );
+    expect(offerStill.rows[0].count).toBe('1');
+    const appStill = await db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM public.opportunity_applications WHERE id=$1`,
+      [fresh.appId],
+    );
+    expect(appStill.rows[0].count).toBe('1');
+  });
+
+  it('withdrawal RPC path still works after the delete-policy closeout: row preserved, status=withdrawn, withdrawn_at server-set', async () => {
+    const fresh = await createFreshApp(db, 'wd-post-del', IDS.opportunity, IDS.recruiterProfile);
+    // Simulate the SECURITY DEFINER withdraw path: owner role bypasses
+    // RLS while auth.uid() still resolves to the Driver, and the GUC
+    // authorizes the driver-bound withdraw transition.
+    await db.exec(
+      `RESET ROLE; SET request.jwt.claim.sub = '${fresh.driverId}'; SET app.allow_driver_withdraw = 'true';`,
+    );
+    const upd = await db.query<{ status: string; withdrawn_at: string | null }>(
+      `UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1
+         RETURNING status, withdrawn_at`,
+      [fresh.appId],
+    );
+    await db.exec(`RESET app.allow_driver_withdraw; RESET request.jwt.claim.sub;`);
+    expect(upd.rows[0].status).toBe('withdrawn');
+    expect(upd.rows[0].withdrawn_at).not.toBeNull();
+    expect(new Date(upd.rows[0].withdrawn_at as string).getUTCFullYear()).toBeGreaterThan(2020);
+
+    // Row still exists — withdrawal is not deletion.
+    await asOwner(db);
+    const still = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`,
+      [fresh.appId],
+    );
+    expect(still.rows.length).toBe(1);
+    expect(still.rows[0].status).toBe('withdrawn');
+  });
+
+  it('internal cleanup remains possible through the database-owner / service-role path', async () => {
+    const fresh = await createFreshApp(db, 'owner-cleanup', IDS.opportunity, IDS.recruiterProfile);
+    // Owner path (represents the service-role architectural entry) can
+    // still DELETE for account-deletion / admin cleanup.
+    await asOwner(db);
+    const del = await db.query<{ id: string }>(
+      `DELETE FROM public.opportunity_applications WHERE id=$1 RETURNING id`,
+      [fresh.appId],
+    );
+    expect(del.rows.length).toBe(1);
+
+    // Grant confirmation: service_role retains DELETE table privilege.
+    const g = await db.query<{ privilege_type: string }>(
+      `SELECT privilege_type FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='opportunity_applications'
+          AND grantee='service_role' AND privilege_type='DELETE'`,
+    );
+    expect(g.rows.length).toBe(1);
+  });
 });
