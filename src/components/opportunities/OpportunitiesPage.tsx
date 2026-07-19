@@ -225,6 +225,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
         isPro={isPro}
         onUpgrade={onUpgrade}
         driverProfile={profile}
+        onEditProfile={() => { setSelectedId(null); setShowProfile(true); }}
       />
     );
   }
