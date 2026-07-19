@@ -1395,6 +1395,7 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
   const DRV_O  = 'b2000000-b200-b200-b200-b20000000089';
   const DRV_P  = 'b2000000-b200-b200-b200-b2000000009a';
   const DRV_Q  = 'b2000000-b200-b200-b200-b2000000009b';
+  const DRV_R  = 'b2000000-b200-b200-b200-b2000000009c';
   // Alt recruiter + opportunity fixture used by the immutability test to
   // prove that the guard rejects a real identity change (not the same values).
   const ALT_R_USER = 'b2000000-b200-b200-b200-b200000000a1';
