@@ -1031,7 +1031,7 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
              (opportunity_id, driver_user_id, recruiter_id, application_type, status,
               submission_snapshot, snapshot_version, idempotency_key, preferred_contact_method,
               contact_sharing_consent, is_legacy)
-           VALUES ($1,$2,$3,'callback','submitted','{}'::jsonb,0,$4,'phone',false,true)
+           VALUES ($1,$2,$3,'callback','new','{}'::jsonb,0,$4,'phone',false,true)
            RETURNING id`,
           [ids.opportunity, drv, ids.recruiterProfile, `cb-${randomUUID()}`],
         );
