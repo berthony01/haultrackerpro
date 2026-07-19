@@ -10,7 +10,7 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="dark flex min-h-screen items-center justify-center bg-background px-4">
       <SEOHead title="Page Not Found | HaulTrackerPro" description="Page not found." path="/404" noindex />
       <div className="text-center max-w-md">
         <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-3">Error 404</p>
