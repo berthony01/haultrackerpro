@@ -1280,6 +1280,7 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
     // Seed a hired application under owning recruiter (bypass guard for setup).
     const zDriver2 = 'a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2';
     const zApp2 = 'a2222222-a222-a222-a222-a22222222222';
+    await asOwner(db);
     await db.exec(`
       INSERT INTO auth.users(id,email) VALUES ('${zDriver2}','z2@t') ON CONFLICT DO NOTHING;
       INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
