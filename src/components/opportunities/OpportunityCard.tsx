@@ -120,7 +120,7 @@ export function OpportunityCard({ opportunity: o, isSaved, onView, onToggleSave,
         <Stat icon={DollarSign} label="Est. weekly gross" value={fmtMoney(f.estimatedGross)} />
         {isPro ? (
           <>
-            <Stat icon={TrendingUp} label="Est. net" value={fmtMoney(f.estimatedNet)} />
+            <EstimatedNetStat value={f.estimatedNet} />
             <Stat icon={Gauge} label="Effective RPM" value={fmtRpm(f.effectiveRpm)} />
           </>
         ) : (
