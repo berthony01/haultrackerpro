@@ -159,7 +159,7 @@ async function primeSchema(db: AnyPGlite) {
 
 async function asOwner(db: AnyPGlite) {
   await db.exec(
-    `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', true);`,
+    `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);`,
   );
 }
 
@@ -245,7 +245,7 @@ describe('Agency create_agency JSON cast — root-cause proof', () => {
     await primeSchema(db2);
     await db2.exec(loadCandidate());
     await db2.exec(
-      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', true);`,
+      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);`,
     );
 
     const full = await db2.query<{ description: string | null; contact_email: string | null }>(
@@ -260,7 +260,7 @@ describe('Agency create_agency JSON cast — root-cause proof', () => {
     await primeSchema(db3);
     await db3.exec(loadCandidate());
     await db3.exec(
-      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', true);`,
+      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);`,
     );
     const blanks = await db3.query<{ description: string | null; contact_email: string | null }>(
       `SELECT description, contact_email FROM public.create_agency($1, $2, $3)`,
@@ -275,7 +275,7 @@ describe('Agency create_agency JSON cast — root-cause proof', () => {
     await primeSchema(db4);
     await db4.exec(loadCandidate());
     await db4.exec(
-      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', true);`,
+      `SELECT set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111', false);`,
     );
 
     let e1: unknown = null;
