@@ -848,108 +848,76 @@ if (!shouldRun && REQUIRE) {
       return { appId, offerId };
     }
 
-    async function raceAsRecruiter(
-      offerId: string,
-      body: string,
-    ): Promise<Array<{ ok: boolean; row?: Record<string, unknown>; err?: string }>> {
-      const a = new pg.Client({ connectionString: url, statement_timeout: 30_000 });
-      const b = new pg.Client({ connectionString: url, statement_timeout: 30_000 });
-      await Promise.all([a.connect(), b.connect()]);
-      const setup = async (c: pg.Client) => {
-        await c.query("BEGIN");
-        await c.query("SET LOCAL role authenticated");
-        await c.query(`SET LOCAL "request.jwt.claim.sub" = '${ids.recruiterUser}'`);
-      };
-      await Promise.all([setup(a), setup(b)]);
-      const call = (c: pg.Client) =>
-        c.query(body, [offerId])
-          .then((r) => ({ ok: true, row: r.rows[0] as Record<string, unknown> }))
-          .catch((e: Error) => ({ ok: false, err: e.message }));
-      const [ra, rb] = await Promise.all([call(a), call(b)]);
-      await Promise.all([
-        (ra.ok ? a.query("COMMIT") : a.query("ROLLBACK")).catch(() => {}),
-        (rb.ok ? b.query("COMMIT") : b.query("ROLLBACK")).catch(() => {}),
-      ]);
-      await Promise.all([a.end().catch(() => {}), b.end().catch(() => {})]);
-      return [ra, rb];
-    }
-
-    async function raceAsDrivers(
-      offerId: string,
-      driverA: string,
-      driverB: string,
+    /**
+     * Run two RPCs concurrently on independent connections. Each txn is
+     * committed/rolled-back immediately when *its own* RPC returns so the
+     * row-lock held by the winner is released before the loser's blocked
+     * SELECT FOR UPDATE times out.
+     */
+    async function raceIndependent(
+      uidA: string,
+      uidB: string,
       bodyA: string,
       bodyB: string,
+      offerId: string,
     ): Promise<Array<{ ok: boolean; row?: Record<string, unknown>; err?: string }>> {
-      const a = new pg.Client({ connectionString: url, statement_timeout: 30_000 });
-      const b = new pg.Client({ connectionString: url, statement_timeout: 30_000 });
-      await Promise.all([a.connect(), b.connect()]);
-      const setup = async (c: pg.Client, uid: string) => {
-        await c.query("BEGIN");
-        await c.query("SET LOCAL role authenticated");
-        await c.query(`SET LOCAL "request.jwt.claim.sub" = '${uid}'`);
+      const runOne = async (uid: string, body: string) => {
+        const c = new pg.Client({ connectionString: url, statement_timeout: 30_000 });
+        await c.connect();
+        try {
+          await c.query("BEGIN");
+          await c.query("SET LOCAL role authenticated");
+          await c.query(`SET LOCAL "request.jwt.claim.sub" = '${uid}'`);
+          try {
+            const r = await c.query(body, [offerId]);
+            await c.query("COMMIT");
+            return { ok: true as const, row: r.rows[0] as Record<string, unknown> };
+          } catch (e) {
+            await c.query("ROLLBACK").catch(() => {});
+            return { ok: false as const, err: (e as Error).message };
+          }
+        } finally {
+          await c.end().catch(() => {});
+        }
       };
-      await Promise.all([setup(a, driverA), setup(b, driverB)]);
-      const call = (c: pg.Client, body: string) =>
-        c.query(body, [offerId])
-          .then((r) => ({ ok: true, row: r.rows[0] as Record<string, unknown> }))
-          .catch((e: Error) => ({ ok: false, err: e.message }));
-      const [ra, rb] = await Promise.all([call(a, bodyA), call(b, bodyB)]);
-      await Promise.all([
-        (ra.ok ? a.query("COMMIT") : a.query("ROLLBACK")).catch(() => {}),
-        (rb.ok ? b.query("COMMIT") : b.query("ROLLBACK")).catch(() => {}),
-      ]);
-      await Promise.all([a.end().catch(() => {}), b.end().catch(() => {})]);
-      return [ra, rb];
+      return Promise.all([runOne(uidA, bodyA), runOne(uidB, bodyB)]);
     }
 
     it("D1 race: send draft offer concurrently twice — one offer_sent, one already_sent", async () => {
-      const { appId, offerId } = await setupDraftOffer(ids.driverA);
-      // Re-seed a fresh driver because setupDraftOffer already consumed driverA.
-      // Actually driverA is per-test unique via newIds… but ids are shared.
-      // Use driverF for isolation.
-      void appId;
-      const { offerId: offerId2, appId: appId2 } = await setupDraftOffer(ids.driverF);
-      const [ra, rb] = await raceAsRecruiter(
-        offerId2,
+      const drv = await mintDriver(pool);
+      const { appId, offerId } = await setupDraftOffer(drv);
+      const [ra, rb] = await raceIndependent(
+        ids.recruiterUser, ids.recruiterUser,
         `SELECT * FROM public.send_opportunity_offer($1::uuid, (now() + interval '2 days')::timestamptz)`,
+        `SELECT * FROM public.send_opportunity_offer($1::uuid, (now() + interval '2 days')::timestamptz)`,
+        offerId,
       );
       const codes = [ra, rb].filter((x) => x.ok).map((x) => x.row!.result_code as string).sort();
       expect(codes).toEqual(["already_sent", "offer_sent"]);
-      const off = await pool.query(
-        `SELECT status FROM public.opportunity_offers WHERE id=$1`,
-        [offerId2],
-      );
+      const off = await pool.query(`SELECT status FROM public.opportunity_offers WHERE id=$1`, [offerId]);
       expect(off.rows[0].status).toBe("sent");
-      const app = await pool.query(
-        `SELECT status FROM public.opportunity_applications WHERE id=$1`,
-        [appId2],
-      );
+      const app = await pool.query(`SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId]);
       expect(app.rows[0].status).toBe("offer_sent");
       const ev = await pool.query(
-        `SELECT count(*)::int AS n FROM public.application_events
-          WHERE application_id=$1 AND event_type='offer_sent'`,
-        [appId2],
+        `SELECT count(*)::int AS n FROM public.application_events WHERE application_id=$1 AND event_type='offer_sent'`,
+        [appId],
       );
       expect(ev.rows[0].n).toBe(1);
       const notif = await pool.query(
-        `SELECT count(*)::int AS n FROM public.notifications
-          WHERE type='offer_sent' AND payload->>'application_id'=$1`,
-        [appId2],
+        `SELECT count(*)::int AS n FROM public.notifications WHERE type='offer_sent' AND payload->>'application_id'=$1::text`,
+        [appId],
       );
       expect(notif.rows[0].n).toBe(1);
-      // Unused offerId path retained above only to avoid TS unused warning.
-      void offerId;
     });
 
-    it("D2 race: accept same sent offer concurrently as driver from two connections — one accepted, one already_accepted", async () => {
-      const { appId, offerId } = await setupSentOffer(ids.driverB);
-      // Both connections use the same driver (driverB) — the driver row lock serializes.
-      const [ra, rb] = await raceAsDrivers(
+    it("D2 race: accept same sent offer concurrently — one accepted, one already_accepted", async () => {
+      const drv = await mintDriver(pool);
+      const { appId, offerId } = await setupSentOffer(drv);
+      const [ra, rb] = await raceIndependent(
+        drv, drv,
+        `SELECT * FROM public.accept_opportunity_offer($1::uuid)`,
+        `SELECT * FROM public.accept_opportunity_offer($1::uuid)`,
         offerId,
-        ids.driverB, ids.driverB,
-        `SELECT * FROM public.accept_opportunity_offer($1::uuid)`,
-        `SELECT * FROM public.accept_opportunity_offer($1::uuid)`,
       );
       const codes = [ra, rb].filter((x) => x.ok).map((x) => x.row!.result_code as string).sort();
       expect(codes).toEqual(["already_accepted", "offer_accepted"]);
@@ -963,23 +931,22 @@ if (!shouldRun && REQUIRE) {
       );
       expect(ev.rows[0].n).toBe(1);
       const notif = await pool.query(
-        `SELECT count(*)::int AS n FROM public.notifications WHERE type='offer_accepted' AND payload->>'application_id'=$1`,
+        `SELECT count(*)::int AS n FROM public.notifications WHERE type='offer_accepted' AND payload->>'application_id'=$1::text`,
         [appId],
       );
       expect(notif.rows[0].n).toBe(1);
     });
 
-    it("D3 race: accept vs decline on same sent offer — exactly one terminal winner, never both", async () => {
-      const { appId, offerId } = await setupSentOffer(ids.driverC);
-      const [ra, rb] = await raceAsDrivers(
-        offerId,
-        ids.driverC, ids.driverC,
+    it("D3 race: accept vs decline on same sent offer — exactly one terminal winner", async () => {
+      const drv = await mintDriver(pool);
+      const { appId, offerId } = await setupSentOffer(drv);
+      const [ra, rb] = await raceIndependent(
+        drv, drv,
         `SELECT * FROM public.accept_opportunity_offer($1::uuid)`,
         `SELECT * FROM public.decline_opportunity_offer($1::uuid, NULL)`,
+        offerId,
       );
       const okRows = [ra, rb].filter((x) => x.ok).map((x) => x.row!);
-      // Both should commit — the loser gets an error like "not available to accept/decline".
-      // Only one should have accepted or declined the offer; the other must fail.
       const finalStatus = (await pool.query(
         `SELECT status FROM public.opportunity_offers WHERE id=$1`,
         [offerId],
@@ -989,23 +956,22 @@ if (!shouldRun && REQUIRE) {
       if (finalStatus === "accepted") {
         expect(app.rows[0].status).toBe("onboarding");
       } else {
-        // decline does not change application status
         expect(app.rows[0].status).toBe("offer_sent");
       }
-      // Exactly one of the two calls should have committed a terminal action.
-      const successful = okRows.filter((r) => r.result_code === "offer_accepted" || r.result_code === "offer_declined");
-      expect(successful.length).toBe(1);
+      const terminal = okRows.filter(
+        (r) => r.result_code === "offer_accepted" || r.result_code === "offer_declined",
+      );
+      expect(terminal.length).toBe(1);
     });
 
     it("D4 race: complete_hiring concurrently — one hiring_completed, one already_hired", async () => {
-      const { appId, offerId } = await setupSentOffer(ids.driverD);
-      // Driver accepts.
-      const acc = await newAuthClient(url, ids.driverD);
+      const drv = await mintDriver(pool);
+      const { appId, offerId } = await setupSentOffer(drv);
+      const acc = await newAuthClient(url, drv);
       await acc.query(`SELECT * FROM public.accept_opportunity_offer($1::uuid)`, [offerId]);
       await acc.query("COMMIT");
       await acc.end();
 
-      // Seed contract + uploaded version approved for this app.
       const contract = await pool.query(
         `INSERT INTO public.contracts(application_id,status,updated_at) VALUES($1,'approved',now()) RETURNING id`,
         [appId],
@@ -1017,28 +983,13 @@ if (!shouldRun && REQUIRE) {
       );
       await pool.query(`UPDATE public.contracts SET current_version_id=$1 WHERE id=$2`, [cv.rows[0].id, cid]);
 
-      // Race two recruiter complete_hiring calls.
-      const a = new pg.Client({ connectionString: url });
-      const b = new pg.Client({ connectionString: url });
-      await Promise.all([a.connect(), b.connect()]);
-      const setup = async (c: pg.Client) => {
-        await c.query("BEGIN");
-        await c.query("SET LOCAL role authenticated");
-        await c.query(`SET LOCAL "request.jwt.claim.sub" = '${ids.recruiterUser}'`);
-      };
-      await Promise.all([setup(a), setup(b)]);
-      const call = (c: pg.Client) =>
-        c.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [appId])
-          .then((r) => ({ ok: true, code: r.rows[0].result_code as string }))
-          .catch((e: Error) => ({ ok: false, err: e.message }));
-      const [ra, rb] = await Promise.all([call(a), call(b)]);
-      await Promise.all([
-        (ra.ok ? a.query("COMMIT") : a.query("ROLLBACK")).catch(() => {}),
-        (rb.ok ? b.query("COMMIT") : b.query("ROLLBACK")).catch(() => {}),
-      ]);
-      await Promise.all([a.end().catch(() => {}), b.end().catch(() => {})]);
-
-      const codes = [ra, rb].filter((x) => x.ok).map((x) => (x as { code: string }).code).sort();
+      const [ra, rb] = await raceIndependent(
+        ids.recruiterUser, ids.recruiterUser,
+        `SELECT * FROM public.complete_hiring($1::uuid)`,
+        `SELECT * FROM public.complete_hiring($1::uuid)`,
+        appId, // NB: passed as $1
+      );
+      const codes = [ra, rb].filter((x) => x.ok).map((x) => x.row!.result_code as string).sort();
       expect(codes).toEqual(["already_hired", "hiring_completed"]);
       const app = await pool.query(`SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId]);
       expect(app.rows[0].status).toBe("hired");
@@ -1049,65 +1000,59 @@ if (!shouldRun && REQUIRE) {
       expect(ev.rows[0].n).toBe(1);
       const notif = await pool.query(
         `SELECT count(*)::int AS n FROM public.notifications
-          WHERE user_id=$1 AND type='hiring_completed' AND payload->>'application_id'=$2`,
-        [ids.driverD, appId],
+          WHERE user_id=$1 AND type='hiring_completed' AND payload->>'application_id'=$2::text`,
+        [drv, appId],
       );
       expect(notif.rows[0].n).toBe(1);
     });
 
     it("D5 race: two concurrent expiration sweeps use SKIP LOCKED — each expired offer processed exactly once", async () => {
-      // Seed 3 sent offers, force expires_at into the past via service_role bypass.
-      const drivers = [ids.driverA, ids.driverB, ids.driverC];
       const created: string[] = [];
       for (let i = 0; i < 3; i++) {
-        // Each driver already used above may already have apps — use a fresh app on foreignOpportunity? no,
-        // that recruiter is different. Use fresh drivers here.
-        const uid = randomUUID();
-        await pool.query(`INSERT INTO auth.users(id,email) VALUES ($1, $2)`, [uid, `sweep-${i}@t`]);
-        await pool.query(
-          `INSERT INTO public.driver_opportunity_profiles(user_id,full_name,city,state,cdl_class,years_experience,
-             preferred_driver_type,preferred_route_type,preferred_home_time,available_start_date,profile_completed,phone,email)
-           VALUES($1,'D','Austin','TX','A',5,'company','regional','weekends','2026-08-01',true,'555','x@t')`,
-          [uid],
-        );
-        const appId = await submitApply(url, uid, ids.opportunity);
+        const drv = await mintDriver(pool);
+        const appId = await submitApply(url, drv, ids.opportunity);
         await advanceToInterviewing(url, ids.recruiterUser, appId);
         const offerId = await saveDraft(url, ids.recruiterUser, appId);
         await sendOffer(url, ids.recruiterUser, offerId);
-        // Force expiration into the past (bypass the immutable check by disabling the trigger briefly).
+        // Force expiration into the past. Update BOTH sent_at and expires_at
+        // so the sent_expiry CHECK constraint stays satisfied
+        // (expires_at BETWEEN sent_at + 24h AND sent_at + 30d).
+        // Disable the offer guard trigger to permit sent_at mutation.
         await pool.query(`ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard`);
         await pool.query(
-          `UPDATE public.opportunity_offers SET expires_at = now() - interval '1 minute' WHERE id=$1`,
+          `UPDATE public.opportunity_offers
+              SET sent_at = now() - interval '25 hours',
+                  expires_at = now() - interval '1 minute'
+            WHERE id=$1`,
           [offerId],
         );
         await pool.query(`ALTER TABLE public.opportunity_offers ENABLE TRIGGER trg_opportunity_offers_guard`);
         created.push(offerId);
-        void drivers;
       }
-      const a = new pg.Client({ connectionString: url });
-      const b = new pg.Client({ connectionString: url });
-      await Promise.all([a.connect(), b.connect()]);
-      const setup = async (c: pg.Client) => {
-        await c.query("BEGIN");
-        await c.query("SET LOCAL role service_role");
+      const runSweep = async () => {
+        const c = new pg.Client({ connectionString: url });
+        await c.connect();
+        try {
+          await c.query("BEGIN");
+          await c.query("SET LOCAL role service_role");
+          const r = await c.query(`SELECT public.expire_opportunity_offers(500) AS n`);
+          await c.query("COMMIT");
+          return r.rows[0].n as number;
+        } finally {
+          await c.end().catch(() => {});
+        }
       };
-      await Promise.all([setup(a), setup(b)]);
-      const call = (c: pg.Client) =>
-        c.query(`SELECT public.expire_opportunity_offers(500) AS n`).then((r) => r.rows[0].n as number);
-      const [na, nb] = await Promise.all([call(a), call(b)]);
-      await Promise.all([a.query("COMMIT"), b.query("COMMIT")]);
-      await Promise.all([a.end(), b.end()]);
+      const [na, nb] = await Promise.all([runSweep(), runSweep()]);
       expect(na + nb).toBe(3);
       const rows = await pool.query(
         `SELECT status FROM public.opportunity_offers WHERE id = ANY($1::uuid[])`,
         [created],
       );
       for (const r of rows.rows) expect(r.status).toBe("expired");
-      // exactly one offer_expired event per offer
       for (const oid of created) {
         const ev = await pool.query(
           `SELECT count(*)::int AS n FROM public.application_events
-            WHERE event_type='offer_expired' AND metadata->>'offer_id'=$1`,
+            WHERE event_type='offer_expired' AND metadata->>'offer_id'=$1::text`,
           [oid],
         );
         expect(ev.rows[0].n).toBe(1);
@@ -1118,20 +1063,13 @@ if (!shouldRun && REQUIRE) {
     // E. Forced rollback proof
     // --------------------------------------------------------------------
     it("E: driver acceptance rolled back leaves offer sent, application offer_sent, and no events/notifications", async () => {
-      const uid = randomUUID();
-      await pool.query(`INSERT INTO auth.users(id,email) VALUES ($1, 'rb@t')`, [uid]);
-      await pool.query(
-        `INSERT INTO public.driver_opportunity_profiles(user_id,full_name,city,state,cdl_class,years_experience,
-           preferred_driver_type,preferred_route_type,preferred_home_time,available_start_date,profile_completed,phone,email)
-         VALUES($1,'D','Austin','TX','A',5,'company','regional','weekends','2026-08-01',true,'555','x@t')`,
-        [uid],
-      );
+      const uid = await mintDriver(pool);
       const { appId, offerId } = await setupSentOffer(uid);
 
       const before = await pool.query(
         `SELECT
            (SELECT count(*)::int FROM public.application_events WHERE application_id=$1 AND event_type='offer_accepted') AS ev,
-           (SELECT count(*)::int FROM public.notifications WHERE type='offer_accepted' AND payload->>'application_id'=$1) AS notif`,
+           (SELECT count(*)::int FROM public.notifications WHERE type='offer_accepted' AND payload->>'application_id'=$1::text) AS notif`,
         [appId],
       );
 
@@ -1148,7 +1086,7 @@ if (!shouldRun && REQUIRE) {
       const after = await pool.query(
         `SELECT
            (SELECT count(*)::int FROM public.application_events WHERE application_id=$1 AND event_type='offer_accepted') AS ev,
-           (SELECT count(*)::int FROM public.notifications WHERE type='offer_accepted' AND payload->>'application_id'=$1) AS notif`,
+           (SELECT count(*)::int FROM public.notifications WHERE type='offer_accepted' AND payload->>'application_id'=$1::text) AS notif`,
         [appId],
       );
       expect(after.rows[0].ev).toBe(before.rows[0].ev);
