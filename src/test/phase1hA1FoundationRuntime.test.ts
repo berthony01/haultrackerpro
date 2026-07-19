@@ -1448,19 +1448,13 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
   });
 
   it('authenticated Driver cannot DELETE own formal application, own inquiry, or another Driver/Recruiter/admin path', async () => {
-    // Seed a fresh formal apply owned by driverB, and rely on the
-    // historical inquiry already owned by driverA.
-    const KEY_DEL = 'del-closeout-key-000001';
-    await asAuthenticated(db, IDS.driverB);
-    const created = await db.query<{ application_id: string; result_code: string }>(
-      `SELECT * FROM public.submit_opportunity_application(
-         $1::uuid, $2, 'delete-target', true, true, true, 'email', true)`,
-      [IDS.opportunity, KEY_DEL],
-    );
-    expect(created.rows[0].result_code).toBe('created');
-    const formalId = created.rows[0].application_id;
+    // Fresh formal application owned by a fresh Driver (avoids the
+    // duplicate_same_type block from earlier apply tests in this suite).
+    const fresh = await createFreshApp(db, 'del-target', IDS.opportunity, IDS.recruiterProfile);
+    const formalId = fresh.appId;
 
-    // Driver B tries to DELETE their own formal application.
+    // Owning Driver tries to DELETE their own formal application.
+    await asAuthenticated(db, fresh.driverId);
     await expect(
       db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [formalId]),
     ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
@@ -1471,7 +1465,7 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
       db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [IDS.historicalInquiryId]),
     ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
 
-    // Driver A tries to DELETE Driver B's formal application.
+    // Another Driver tries to DELETE the formal application.
     await expect(
       db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [formalId]),
     ).rejects.toThrow(/permission denied|denied by policy|row-level security/i);
@@ -1508,21 +1502,20 @@ describe('Phase 1H-A1 remediation pass 2 (PGlite)', () => {
     expect(still.rows[0].count).toBe('2');
   });
 
-  it('failed DELETE does not remove linked application history (offer FK integrity preserved)', async () => {
-    // Fresh Driver + application + accepted offer linked via RESTRICT FK.
+  it('failed DELETE does not remove linked application history (offer row integrity preserved)', async () => {
+    // Fresh Driver + application + sent offer linked via RESTRICT FK.
     const fresh = await createFreshApp(db, 'del-fk', IDS.opportunity, IDS.recruiterProfile);
     await asOwner(db);
     await db.exec(
       `INSERT INTO public.opportunity_offers(
          application_id, opportunity_id, recruiter_id, driver_user_id,
-         offer_status, offer_snapshot, snapshot_version, expires_at)
+         status, sent_snapshot, snapshot_version, sent_at, expires_at)
        VALUES ('${fresh.appId}','${IDS.opportunity}','${IDS.recruiterProfile}','${fresh.driverId}',
-               'sent','{"terms":"ok"}'::jsonb,1, now() + interval '7 days');`,
+               'sent','{"terms":"ok"}'::jsonb, 1, now(), now() + interval '7 days');`,
     );
 
     // Driver attempts DELETE on their own application — must fail on
-    // the authorization layer (not the FK layer), and the linked
-    // history offer must remain intact.
+    // the authorization layer, and the linked offer must remain intact.
     await asAuthenticated(db, fresh.driverId);
     await expect(
       db.query(`DELETE FROM public.opportunity_applications WHERE id=$1`, [fresh.appId]),
