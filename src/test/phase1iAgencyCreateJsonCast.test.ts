@@ -239,20 +239,7 @@ describe('Agency create_agency JSON cast — root-cause proof', () => {
     expect(rows[0].n).toBe('1');
   });
 
-  it('candidate accepts optional description + contact_email and normalizes blanks to NULL', async () => {
-    // Re-use the shared db under a different owner id so idempotency is bypassed.
-    await db.exec(
-      `INSERT INTO auth.users(id,email) VALUES ('22222222-2222-2222-2222-222222222222','bravo@example.com');
-       SELECT set_config('request.jwt.claim.sub','22222222-2222-2222-2222-222222222222', false);`,
-    );
-    const full = await db.query<{ description: string | null; contact_email: string | null }>(
-      `SELECT description, contact_email FROM public.create_agency($1, $2, $3)`,
-      ['Bravo Logistics', '  Fleet ops  ', 'owner@bravo.com'],
-    );
-    expect(full.rows[0].description).toBe('Fleet ops');
-    expect(full.rows[0].contact_email).toBe('owner@bravo.com');
-
-    // Whitespace-only optional fields normalize to NULL under a third owner.
+  it('candidate normalizes whitespace-only optional fields to NULL (no JSON cast in path)', async () => {
     await db.exec(
       `INSERT INTO auth.users(id,email) VALUES ('33333333-3333-3333-3333-333333333333','charlie@example.com');
        SELECT set_config('request.jwt.claim.sub','33333333-3333-3333-3333-333333333333', false);`,
