@@ -136,8 +136,8 @@ export function ApplyNowDialog({
           <DialogTitle>Apply to {opportunityTitle}</DialogTitle>
           <DialogDescription>
             Submit a formal application to {companyName}. Your professional Opportunity Profile is
-            included in the application snapshot. Email or phone is shared only when you explicitly
-            consent.
+            included in the application snapshot. Email, phone, or SMS is shared only when you
+            explicitly consent.
           </DialogDescription>
         </DialogHeader>
 
