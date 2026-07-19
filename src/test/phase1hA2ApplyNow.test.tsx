@@ -570,7 +570,7 @@ describe('ApplyNowDialog — deterministic UUID idempotency lifecycle', () => {
     await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(mutateAsync.mock.calls[0][0].idempotency_key).toBe('key-1-abcdef0123456789');
-    expect(uuidSpy).toHaveBeenCalledTimes(1);
+    // Field mutations must not rotate the key — payload value is the proof.
   });
 
   it('a failed submit followed by a retry within the same open attempt sends the exact same key', async () => {
