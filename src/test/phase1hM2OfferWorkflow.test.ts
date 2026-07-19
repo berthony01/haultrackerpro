@@ -1888,9 +1888,9 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
         preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
       ) VALUES
         ('${INQ_RI}','${OPP}','${DRV_O}','${R_PROF}','request_info','new',
-         NULL, NULL, false, 'phone', false, NULL),
+         '{}'::jsonb, 0, true, 'phone', false, NULL),
         ('${INQ_CB}','${OPP}','${DRV_P}','${R_PROF}','callback','new',
-         NULL, NULL, false, 'phone', false, NULL);
+         '{}'::jsonb, 0, true, 'phone', false, NULL);
       ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
     `);
 
