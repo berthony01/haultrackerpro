@@ -757,18 +757,22 @@ const Index = () => {
               : navKey === 'dashboard'
                 ? 'Dashboard'
                 : navKey.charAt(0).toUpperCase() + navKey.slice(1).replace(/[_-]/g, ' ');
-  const navSubtitle =
-    navKey === 'recruiter-access'
-      ? 'Manage your recruiter command center'
-      : navKey === 'recruiter-access:manager'
-        ? 'Post and manage your opportunities'
-        : navKey === 'recruiter-access:applications'
-          ? 'Review driver applications'
-          : navKey === 'recruiter-access:reports'
-            ? 'Activity and Pipeline reports for your recruiting'
-            : navKey === 'opportunity-preferences'
-              ? 'Tune what recruiters see and how you match'
-              : 'Your hauling overview';
+  const NAV_SUBTITLES: Record<string, string> = {
+    'recruiter-access': 'Manage your recruiter command center',
+    'recruiter-access:manager': 'Post and manage your opportunities',
+    'recruiter-access:applications': 'Review driver applications',
+    'recruiter-access:reports': 'Activity and pipeline reports for your recruiting',
+    'opportunity-preferences': 'Tune what recruiters see and how you match',
+    dashboard: 'Your hauling overview',
+    loads: 'Your loads and pay',
+    expenses: 'Track every dollar out',
+    fuel: 'Fuel logs and MPG',
+    reports: 'Exports and analytics',
+    settings: 'Customize your experience',
+    opportunities: 'Verified driver opportunities',
+    contracts: 'Review and sign contracts',
+  };
+  const navSubtitle = NAV_SUBTITLES[navKey] ?? '';
 
   const handleAddLoadFromModal = () => {
     setEditingLoad(null);
