@@ -156,7 +156,7 @@ describe('ApplyNowDialog gating', () => {
     const { onEditProfile } = renderDialog({
       driverProfile: { ...baseProfile, profile_completed: false },
     });
-    await userEvent.click(screen.getByRole('button', { name: /Complete Opportunity Profile/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Update Opportunity Profile/i }));
     expect(onEditProfile).toHaveBeenCalled();
   });
 
