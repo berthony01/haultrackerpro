@@ -1214,35 +1214,22 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
 
   it("D5 race: two distinct sent offers for one application accepted concurrently — exactly one accepted; partial unique index preserved", async () => {
     const drv = await mintDriver(pool);
-    const appId = await submitApply(url, drv, ids.opportunity);
-    await advanceToInterviewing(url, ids.recruiterUser, appId);
+    // Legitimate path builds appId + one sent offer via the real RPCs, so
+    // the application is in offer_sent with valid authorization state.
+    const { appId, offerId: oidA } = await setupSentOffer(drv);
     // Fixture-only setup: temporarily drop the one_sent_per_app partial unique
     // index (M1 invariant, unrelated to the accepted-offer index under test)
-    // so we can construct two competing sent rows. Recreated before the race.
+    // so we can construct a second competing sent row.
     await pool.query(`DROP INDEX public.opportunity_offers_one_sent_per_app_uidx`);
-    const oidA = randomUUID();
     const oidB = randomUUID();
     const nowExpires = new Date(Date.now() + 2 * 24 * 3600_000).toISOString();
     await pool.query(
       `INSERT INTO public.opportunity_offers
          (id,application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,expires_at,pay_description,snapshot_version,sent_snapshot)
-         SELECT $1, a.id, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'sent', now(), $3::timestamptz, 'p', 1, '{"seed":true}'::jsonb
-           FROM public.opportunity_applications a WHERE a.id=$2`,
-      [oidA, appId, nowExpires],
+         SELECT $1, a.id, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'sent', now(), $2::timestamptz, 'p', 1, '{"seed":true}'::jsonb
+           FROM public.opportunity_applications a WHERE a.id=$3`,
+      [oidB, nowExpires, appId],
     );
-    await pool.query(
-      `INSERT INTO public.opportunity_offers
-         (id,application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,expires_at,pay_description,snapshot_version,sent_snapshot)
-         SELECT $1, a.id, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'sent', now(), $3::timestamptz, 'p', 1, '{"seed":true}'::jsonb
-           FROM public.opportunity_applications a WHERE a.id=$2`,
-      [oidB, appId, nowExpires],
-    );
-    // one_sent index will be recreated after the race (only one 'sent' row
-    // will remain then, either as the loser or as 'accepted').
-    // Set app to offer_sent via service_role for the accept RPC's precondition.
-    const sv = await newAuthClient(url, "", "service_role");
-    await sv.query(`SELECT public._m2_set_application_status($1::uuid,'offer_sent')`, [appId]);
-    await commitEnd(sv);
 
     const [ra, rb] = await barrierRace(url, [
       { uid: drv, sql: ACCEPT_SQL, params: [oidA] },
