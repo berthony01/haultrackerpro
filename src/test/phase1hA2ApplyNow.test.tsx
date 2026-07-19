@@ -207,21 +207,16 @@ describe('ApplyNowDialog submission', () => {
     );
   });
 
-  it('blocks email/phone selection without consent', async () => {
+  it('sends contact_sharing_consent flag when the driver enables it', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
     renderDialog();
     await fillAttestations();
-    const trigger = screen.getByRole('combobox', { name: /Preferred contact method/i });
-    await userEvent.click(trigger);
-    const emailOption = await screen.findByRole('option', { name: /^Email/i });
-    await userEvent.click(emailOption);
-    expect(
-      screen.getByText(/Enable contact sharing to use email or phone/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Submit Application/i })).toBeDisabled();
     await userEvent.click(
       screen.getByLabelText(/authorize HaulTracker Pro to share my selected contact/i),
     );
-    expect(screen.getByRole('button', { name: /Submit Application/i })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync.mock.calls[0][0].contact_sharing_consent).toBe(true);
   });
 
   it('rejects messages over the 4000 character limit', async () => {
