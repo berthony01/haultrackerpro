@@ -312,6 +312,7 @@ CREATE OR REPLACE FUNCTION public.transition_opportunity_application(
 ) RETURNS TABLE(
   application_id uuid, application_status text, offer_id uuid, offer_status text, result_code text
 ) LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _app public.opportunity_applications%ROWTYPE;
   _rp  public.recruiter_profiles%ROWTYPE;
@@ -402,6 +403,7 @@ CREATE OR REPLACE FUNCTION public.save_opportunity_offer_draft(
   _recruiter_message text DEFAULT NULL
 ) RETURNS TABLE(application_id uuid, offer_id uuid, offer_status text, result_code text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _app public.opportunity_applications%ROWTYPE;
@@ -526,6 +528,7 @@ CREATE OR REPLACE FUNCTION public.send_opportunity_offer(
   application_id uuid, application_status text,
   offer_id uuid, offer_status text, result_code text
 ) LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _offer public.opportunity_offers%ROWTYPE;
@@ -658,6 +661,7 @@ RETURNS TABLE(
   application_id uuid, application_status text,
   offer_id uuid, offer_status text, result_code text
 ) LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _offer public.opportunity_offers%ROWTYPE;
@@ -739,6 +743,7 @@ CREATE OR REPLACE FUNCTION public.decline_opportunity_offer(
   _offer_id uuid, _reason text DEFAULT NULL
 ) RETURNS TABLE(application_id uuid, offer_id uuid, offer_status text, result_code text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _offer public.opportunity_offers%ROWTYPE;
@@ -799,6 +804,7 @@ CREATE OR REPLACE FUNCTION public.cancel_opportunity_offer(
   _offer_id uuid, _reason text DEFAULT NULL
 ) RETURNS TABLE(application_id uuid, offer_id uuid, offer_status text, result_code text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _offer public.opportunity_offers%ROWTYPE;
@@ -858,6 +864,7 @@ DROP FUNCTION IF EXISTS public.expire_opportunity_offers(integer);
 CREATE OR REPLACE FUNCTION public.expire_opportunity_offers(_limit integer DEFAULT 500)
 RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _count integer := 0;
   _rec RECORD;
@@ -902,6 +909,7 @@ GRANT EXECUTE ON FUNCTION public.expire_opportunity_offers(integer) TO service_r
 CREATE OR REPLACE FUNCTION public.withdraw_opportunity_application(application_id uuid)
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _row public.opportunity_applications%ROWTYPE;
@@ -967,6 +975,7 @@ DROP FUNCTION IF EXISTS public.complete_hiring(uuid);
 CREATE OR REPLACE FUNCTION public.complete_hiring(_application_id uuid)
 RETURNS TABLE(application_id uuid, application_status text, result_code text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+#variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _app public.opportunity_applications%ROWTYPE;
