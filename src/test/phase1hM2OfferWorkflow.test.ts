@@ -1250,7 +1250,7 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
     await transitionToInterviewing(db, zApp, IDS.recruiterUser);
     await asAuth(db, IDS.recruiterUser);
     const draft = await db.query(
-      `SELECT * FROM public.save_opportunity_offer_draft(NULL, $1::uuid, jsonb_build_object('pay',jsonb_build_object('mode','cpm','rate_cpm',0.62)))`,
+      `SELECT * FROM public.save_opportunity_offer_draft($1::uuid, '$0.62 CPM')`,
       [zApp]);
     const existingOfferId = draft.rows[0].offer_id as string;
 
@@ -1330,7 +1330,7 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
     await transitionToInterviewing(db, oApp, IDS.recruiterUser);
     await asAuth(db, IDS.recruiterUser);
     const draft = await db.query(
-      `SELECT * FROM public.save_opportunity_offer_draft(NULL, $1::uuid, jsonb_build_object('pay',jsonb_build_object('mode','cpm','rate_cpm',0.62)))`,
+      `SELECT * FROM public.save_opportunity_offer_draft($1::uuid, '$0.62 CPM')`,
       [oApp]);
     const offerId = draft.rows[0].offer_id as string;
     await db.query(
