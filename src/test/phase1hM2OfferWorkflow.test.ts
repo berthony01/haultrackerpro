@@ -1225,4 +1225,139 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
       expect(m.toLowerCase()).not.toContain('onboarding');
     }
   });
+
+  // -----------------------------------------------------------------------
+  // Phase 2B-1 correction: private record existence must not leak.
+  // Foreign existing ID and nonexistent random ID MUST return the same
+  // public-safe not-authorized denial (no offer/application-not-found,
+  // no already_sent/already_hired, no IDs/statuses).
+  // -----------------------------------------------------------------------
+
+  const captureErr = async (fn: () => Promise<unknown>): Promise<string> => {
+    try { await fn(); return ''; } catch (e) { return (e as Error).message ?? String(e); }
+  };
+
+  it('send_opportunity_offer: foreign existing offer ID and nonexistent ID return same public-safe denial', async () => {
+    // Seed a sent offer under owning recruiter.
+    const zDriver = 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1';
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${zDriver}','z1@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${zDriver}','Z1','A',5,'phone','apply_only',true);
+    `);
+    const zApp = await submitApply(db, zDriver, IDS.opportunity, 'z1-existence-key');
+    await asOwner(db);
+    await db.query(
+      `SELECT * FROM public.transition_opportunity_application($1::uuid,'interviewing',NULL)`, [zApp]);
+    const draft = await db.query(
+      `SELECT * FROM public.save_opportunity_offer_draft(NULL, $1::uuid, jsonb_build_object('pay',jsonb_build_object('mode','cpm','rate_cpm',0.62)))`,
+      [zApp]);
+    const existingOfferId = draft.rows[0].offer_id as string;
+
+    await asAuth(db, IDS.foreignRecruiterUser);
+    const nonexistent = '99999999-9999-9999-9999-999999999999';
+    const foreignMsg = await captureErr(() =>
+      db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [existingOfferId]));
+    const missingMsg = await captureErr(() =>
+      db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [nonexistent]));
+    await asOwner(db);
+
+    expect(foreignMsg).toMatch(/not authorized/i);
+    expect(missingMsg).toMatch(/not authorized/i);
+    expect(foreignMsg).toBe(missingMsg);
+    for (const m of [foreignMsg, missingMsg]) {
+      expect(m.toLowerCase()).not.toContain('offer not found');
+      expect(m.toLowerCase()).not.toContain('already_sent');
+      expect(m).not.toContain(existingOfferId);
+      expect(m).not.toContain(zApp);
+      expect(m.toLowerCase()).not.toContain('draft');
+      expect(m.toLowerCase()).not.toContain('sent');
+    }
+  });
+
+  it('complete_hiring: foreign existing app ID and nonexistent ID return same public-safe denial', async () => {
+    // Seed a hired application under owning recruiter (bypass guard for setup).
+    const zDriver2 = 'a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2';
+    const zApp2 = 'a2222222-a222-a222-a222-a22222222222';
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${zDriver2}','z2@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${zDriver2}','Z2','A',5,'phone','apply_only',true);
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
+      INSERT INTO public.opportunity_applications(
+        id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
+        submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
+        preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
+      ) VALUES (
+        '${zApp2}','${IDS.opportunity}','${zDriver2}','${IDS.recruiterProfile}',
+        'apply','hired', jsonb_build_object('seed',true), 1, 'z2-exist-key',
+        now(), false, 'phone', true, now()
+      );
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
+    `);
+
+    await asAuth(db, IDS.foreignRecruiterUser);
+    const nonexistent = '88888888-8888-8888-8888-888888888888';
+    const foreignMsg = await captureErr(() =>
+      db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [zApp2]));
+    const missingMsg = await captureErr(() =>
+      db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [nonexistent]));
+    await asOwner(db);
+
+    expect(foreignMsg).toMatch(/not authorized/i);
+    expect(missingMsg).toMatch(/not authorized/i);
+    expect(foreignMsg).toBe(missingMsg);
+    for (const m of [foreignMsg, missingMsg]) {
+      expect(m.toLowerCase()).not.toContain('application not found');
+      expect(m.toLowerCase()).not.toContain('already_hired');
+      expect(m).not.toContain(zApp2);
+      expect(m.toLowerCase()).not.toContain('hired');
+      expect(m.toLowerCase()).not.toContain('onboarding');
+    }
+  });
+
+  it('eligible owner still reaches already_sent and already_hired after lookup change', async () => {
+    // already_sent path
+    const oDriver = 'a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3';
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${oDriver}','o3@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${oDriver}','O3','A',5,'phone','apply_only',true);
+    `);
+    const oApp = await submitApply(db, oDriver, IDS.opportunity, 'o3-owner-reach-key');
+    await asOwner(db);
+    await db.query(
+      `SELECT * FROM public.transition_opportunity_application($1::uuid,'interviewing',NULL)`, [oApp]);
+    const draft = await db.query(
+      `SELECT * FROM public.save_opportunity_offer_draft(NULL, $1::uuid, jsonb_build_object('pay',jsonb_build_object('mode','cpm','rate_cpm',0.62)))`,
+      [oApp]);
+    const offerId = draft.rows[0].offer_id as string;
+    await db.query(
+      `SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [offerId]);
+    const r1 = await db.query(
+      `SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [offerId]);
+    expect(r1.rows[0].result_code).toBe('already_sent');
+
+    // already_hired path
+    const hDriver = 'a4a4a4a4-a4a4-a4a4-a4a4-a4a4a4a4a4a4';
+    const hApp = 'a4444444-a444-a444-a444-a44444444444';
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${hDriver}','h4@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${hDriver}','H4','A',5,'phone','apply_only',true);
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
+      INSERT INTO public.opportunity_applications(
+        id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
+        submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
+        preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
+      ) VALUES (
+        '${hApp}','${IDS.opportunity}','${hDriver}','${IDS.recruiterProfile}',
+        'apply','hired', jsonb_build_object('seed',true), 1, 'h4-owner-reach-key',
+        now(), false, 'phone', true, now()
+      );
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
+    `);
+    const r2 = await db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [hApp]);
+    expect(r2.rows[0].result_code).toBe('already_hired');
+  });
 });
