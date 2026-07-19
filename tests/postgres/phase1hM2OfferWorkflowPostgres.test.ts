@@ -810,8 +810,11 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
       await rollbackEnd(c);
       expect(code, `direct offer_sent update with forged token=${JSON.stringify(token)}`).toBe("42501");
 
-      // As driver, try to set withdrawn via UPDATE with forged withdraw token.
-      const c2 = await newAuthClient(url, drv);
+      // Forged withdraw token via service_role (bypasses RLS so the guard is
+      // the sole line of defense). JWT claim spoofed as driver, but the token
+      // is wrong so _m2_driver_withdraw_active() returns false → guard rejects.
+      const c2 = await newAuthClient(url, drv, "service_role");
+      await c2.query(`SET LOCAL "request.jwt.claim.sub" = '${drv}'`);
       let code2 = "";
       try {
         await c2.query(`SET LOCAL "app.driver_withdraw_token" = ${pg.escapeLiteral(token)}`);
