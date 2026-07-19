@@ -1123,7 +1123,7 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
 
   it('transition: owning suspended recruiter denied with recruiter-not-eligible on their own app', async () => {
     // SUSP_APP is now status='hired' (terminal); reset to interviewing to test transition path.
-    await db.exec(`UPDATE public.opportunity_applications SET status='interviewing', updated_at=now() WHERE id='${SUSP_APP}';`);
+    await db.exec(`ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger; UPDATE public.opportunity_applications SET status='interviewing', updated_at=now() WHERE id='${SUSP_APP}'; ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;`);
     await asAuth(db, SUSP_USER);
     await expect(
       db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [SUSP_APP]),
