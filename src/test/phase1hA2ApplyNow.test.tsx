@@ -293,11 +293,12 @@ describe('ApplyNowDialog — SMS support', () => {
     mutateAsync.mockResolvedValue({ result_code: 'created' });
     renderDialog();
     await fillAttest();
-    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
-    await userEvent.click(await screen.findByRole('option', { name: /^SMS/i }));
+    // Enable consent FIRST so external methods aren't reverted to in_app.
     await userEvent.click(
       screen.getByLabelText(/authorize HaulTracker Pro to share my selected contact/i),
     );
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /^SMS/i }));
     await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
     const payload = mutateAsync.mock.calls[0][0];
