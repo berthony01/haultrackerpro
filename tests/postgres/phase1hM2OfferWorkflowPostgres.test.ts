@@ -319,7 +319,7 @@ async function seed(pool: pg.Pool, ids: Ids) {
          ($1,$2,'R','r@t','Acme','DOT1',now(),'v1','approved','active'),
          ($3,$4,'FR','fr@t','Foreign','DOT2',now(),'v1','approved','active'),
          ($5,$6,'IR','ir@t','Inc','DOT3',NULL,NULL,'approved','active'),
-         ($7,$8,'SR','sr@t','Susp','DOT4',now(),'v1','suspended','active')`,
+         ($7,$8,'SR','sr@t','Susp','DOT4',now(),'v1','approved','active')`,
       [
         ids.recruiterProfile, ids.recruiterUser,
         ids.foreignRecruiterProfile, ids.foreignRecruiterUser,
