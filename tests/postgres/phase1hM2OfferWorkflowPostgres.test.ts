@@ -781,8 +781,8 @@ if (!shouldRun && REQUIRE) {
     });
 
     it("C4: inquiry (request_info) cannot enter formal offer/hiring workflow", async () => {
-      // Seed a request_info via RPC as driverC.
-      const c1 = await newAuthClient(url, ids.driverC);
+      const drv = await mintDriver(pool);
+      const c1 = await newAuthClient(url, drv);
       const key = `q-${randomUUID()}`;
       const r = await c1.query(
         `SELECT * FROM public.submit_request_info($1::uuid,$2::text,'Question?','phone',false)`,
@@ -793,7 +793,6 @@ if (!shouldRun && REQUIRE) {
       await c1.query("COMMIT");
       await c1.end();
 
-      // Try to draft an offer on an inquiry.
       const c2 = await newAuthClient(url, ids.recruiterUser);
       let code = "";
       try {
@@ -809,14 +808,15 @@ if (!shouldRun && REQUIRE) {
       expect(code).toBe("42501");
     });
 
-    it("C5: foreign driver cannot accept/decline another driver's offer", async () => {
-      const appId = await submitApply(url, ids.driverD, ids.opportunity);
+    it("C5: foreign driver cannot accept another driver's offer", async () => {
+      const drv = await mintDriver(pool);
+      const other = await mintDriver(pool);
+      const appId = await submitApply(url, drv, ids.opportunity);
       await advanceToInterviewing(url, ids.recruiterUser, appId);
       const offerId = await saveDraft(url, ids.recruiterUser, appId);
       await sendOffer(url, ids.recruiterUser, offerId);
 
-      // driverE tries to accept.
-      const c = await newAuthClient(url, ids.driverE);
+      const c = await newAuthClient(url, other);
       let msg = "";
       try {
         await c.query(`SELECT * FROM public.accept_opportunity_offer($1::uuid)`, [offerId]);
@@ -827,6 +827,7 @@ if (!shouldRun && REQUIRE) {
       await c.end().catch(() => {});
       expect(msg).toContain("not authorized");
     });
+
 
     // --------------------------------------------------------------------
     // D. True-concurrency races (independent pg clients)
