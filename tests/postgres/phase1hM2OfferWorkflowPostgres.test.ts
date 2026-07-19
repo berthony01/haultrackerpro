@@ -1216,10 +1216,10 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     const drv = await mintDriver(pool);
     const appId = await submitApply(url, drv, ids.opportunity);
     await advanceToInterviewing(url, ids.recruiterUser, appId);
-    // Fixture-only setup: construct two distinct sent offers by direct INSERT.
-    // Trigger stays enabled so app identity invariants are checked; only the
-    // supersede logic in send_opportunity_offer is what we're bypassing (it
-    // is workflow behavior, not a data integrity guard).
+    // Fixture-only setup: temporarily drop the one_sent_per_app partial unique
+    // index (M1 invariant, unrelated to the accepted-offer index under test)
+    // so we can construct two competing sent rows. Recreated before the race.
+    await pool.query(`DROP INDEX public.opportunity_offers_one_sent_per_app_uidx`);
     const oidA = randomUUID();
     const oidB = randomUUID();
     const nowExpires = new Date(Date.now() + 2 * 24 * 3600_000).toISOString();
@@ -1237,6 +1237,9 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
            FROM public.opportunity_applications a WHERE a.id=$2`,
       [oidB, appId, nowExpires],
     );
+    // Restore the one_sent index before the race so we prove one_accepted alone
+    // isn't the only line of defense (both invariants are present).
+    await pool.query(`CREATE UNIQUE INDEX opportunity_offers_one_sent_per_app_uidx ON public.opportunity_offers(application_id) WHERE status = 'sent'`);
     // Set app to offer_sent via service_role for the accept RPC's precondition.
     const sv = await newAuthClient(url, "", "service_role");
     await sv.query(`SELECT public._m2_set_application_status($1::uuid,'offer_sent')`, [appId]);
