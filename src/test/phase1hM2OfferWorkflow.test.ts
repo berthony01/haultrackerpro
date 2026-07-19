@@ -273,9 +273,11 @@ async function primeBaseline(db: AnyPGlite) {
       id,user_id,recruiter_name,recruiter_email,company_name,dot_number,posting_terms_accepted_at,posting_terms_version,verification_status,status
     ) VALUES
       ('${IDS.recruiterProfile}','${IDS.recruiterUser}','Test Recruiter','recruiter@test','Acme','DOT123',now(),'2026-07-17.v1','approved','active'),
-      ('${IDS.foreignRecruiterProfile}','${IDS.foreignRecruiterUser}','Foreign Recruiter','foreign-r@test','Foreign Co','DOTF','2026-07-17.v1','approved','active'),
+      ('${IDS.foreignRecruiterProfile}','${IDS.foreignRecruiterUser}','Foreign Recruiter','foreign-r@test','Foreign Co','DOTF',now(),'2026-07-17.v1','approved','active'),
       ('${IDS.incompleteRecruiterProfile}','${IDS.incompleteRecruiterUser}','Inc Recruiter','inc-r@test','Inc Co','DOTI',NULL,NULL,'approved','active'),
       ('${IDS.unverifiedRecruiterProfile}','${IDS.unverifiedRecruiterUser}','Unv Recruiter','unv-r@test','Unv Co','DOTU',now(),'2026-07-17.v1','pending','active');
+
+    -- No fixup needed; foreign recruiter has terms accepted from the seed.
 
     UPDATE public.recruiter_profiles SET posting_terms_accepted_at=now() WHERE id='${IDS.foreignRecruiterProfile}';
 
