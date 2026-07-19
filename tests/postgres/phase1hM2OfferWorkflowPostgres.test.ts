@@ -741,9 +741,9 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
   it("B9: partial unique index on opportunity_offers enforces one accepted offer per application (pg_index inspection)", async () => {
     // Locate the index row directly in pg_index/pg_class.
     const q = await pool.query(
-      `SELECT i.indisunique, i.indkey, i.indpred, c.relname AS index_name, t.relname AS table_name,
+      `SELECT i.indisunique, i.indpred, c.relname AS index_name, t.relname AS table_name,
               pg_get_expr(i.indpred, i.indrelid) AS pred_expr,
-              (SELECT array_agg(a.attname ORDER BY k.ord)
+              (SELECT array_agg(a.attname::text ORDER BY k.ord)
                  FROM unnest(i.indkey) WITH ORDINALITY k(attnum, ord)
                  JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=k.attnum) AS key_cols
          FROM pg_index i
