@@ -2035,6 +2035,45 @@ export type Database = {
           },
         ]
       }
+      marketplace_user_restrictions: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          reason_code: string | null
+          restriction: string
+          scope: string
+          starts_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          reason_code?: string | null
+          restriction: string
+          scope: string
+          starts_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          reason_code?: string | null
+          restriction?: string
+          scope?: string
+          starts_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           agency_events: boolean
@@ -2301,48 +2340,72 @@ export type Database = {
       opportunity_applications: {
         Row: {
           application_type: string
+          contact_sharing_consent: boolean
+          contact_sharing_consent_at: string | null
           created_at: string
           driver_email_snapshot: string | null
           driver_phone_snapshot: string | null
           driver_profile_id: string | null
           driver_user_id: string
           id: string
+          idempotency_key: string | null
+          is_legacy: boolean
           message: string | null
           opportunity_id: string
           preferred_contact_method: string | null
           recruiter_id: string
+          snapshot_version: number
           status: string
+          submission_snapshot: Json
+          submitted_at: string | null
           updated_at: string
+          withdrawn_at: string | null
         }
         Insert: {
           application_type?: string
+          contact_sharing_consent?: boolean
+          contact_sharing_consent_at?: string | null
           created_at?: string
           driver_email_snapshot?: string | null
           driver_phone_snapshot?: string | null
           driver_profile_id?: string | null
           driver_user_id: string
           id?: string
+          idempotency_key?: string | null
+          is_legacy?: boolean
           message?: string | null
           opportunity_id: string
           preferred_contact_method?: string | null
           recruiter_id: string
+          snapshot_version?: number
           status?: string
+          submission_snapshot?: Json
+          submitted_at?: string | null
           updated_at?: string
+          withdrawn_at?: string | null
         }
         Update: {
           application_type?: string
+          contact_sharing_consent?: boolean
+          contact_sharing_consent_at?: string | null
           created_at?: string
           driver_email_snapshot?: string | null
           driver_phone_snapshot?: string | null
           driver_profile_id?: string | null
           driver_user_id?: string
           id?: string
+          idempotency_key?: string | null
+          is_legacy?: boolean
           message?: string | null
           opportunity_id?: string
           preferred_contact_method?: string | null
           recruiter_id?: string
+          snapshot_version?: number
           status?: string
+          submission_snapshot?: Json
+          submitted_at?: string | null
           updated_at?: string
+          withdrawn_at?: string | null
         }
         Relationships: [
           {
@@ -2364,6 +2427,131 @@ export type Database = {
             columns: ["recruiter_id"]
             isOneToOne: false
             referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_offers: {
+        Row: {
+          accepted_at: string | null
+          application_id: string
+          canceled_at: string | null
+          contingencies: string | null
+          created_at: string
+          created_by: string | null
+          declined_at: string | null
+          driver_user_id: string
+          equipment_summary: string | null
+          estimated_weekly_amount: number | null
+          expired_at: string | null
+          expires_at: string | null
+          home_time_terms: string | null
+          id: string
+          opportunity_id: string
+          orientation_details: string | null
+          pay_description: string | null
+          proposed_start_date: string | null
+          recruiter_id: string
+          recruiter_message: string | null
+          responded_at: string | null
+          route_summary: string | null
+          sent_at: string | null
+          sent_snapshot: Json
+          snapshot_version: number
+          status: string
+          superseded_at: string | null
+          superseded_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          application_id: string
+          canceled_at?: string | null
+          contingencies?: string | null
+          created_at?: string
+          created_by?: string | null
+          declined_at?: string | null
+          driver_user_id: string
+          equipment_summary?: string | null
+          estimated_weekly_amount?: number | null
+          expired_at?: string | null
+          expires_at?: string | null
+          home_time_terms?: string | null
+          id?: string
+          opportunity_id: string
+          orientation_details?: string | null
+          pay_description?: string | null
+          proposed_start_date?: string | null
+          recruiter_id: string
+          recruiter_message?: string | null
+          responded_at?: string | null
+          route_summary?: string | null
+          sent_at?: string | null
+          sent_snapshot?: Json
+          snapshot_version?: number
+          status?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          application_id?: string
+          canceled_at?: string | null
+          contingencies?: string | null
+          created_at?: string
+          created_by?: string | null
+          declined_at?: string | null
+          driver_user_id?: string
+          equipment_summary?: string | null
+          estimated_weekly_amount?: number | null
+          expired_at?: string | null
+          expires_at?: string | null
+          home_time_terms?: string | null
+          id?: string
+          opportunity_id?: string
+          orientation_details?: string | null
+          pay_description?: string | null
+          proposed_start_date?: string | null
+          recruiter_id?: string
+          recruiter_message?: string | null
+          responded_at?: string | null
+          route_summary?: string | null
+          sent_at?: string | null
+          sent_snapshot?: Json
+          snapshot_version?: number
+          status?: string
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_offers_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_offers_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_offers_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_offers_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "opportunity_offers"
             referencedColumns: ["id"]
           },
         ]
@@ -3660,6 +3848,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      build_application_submission_snapshot: {
+        Args: {
+          _attestations?: Json
+          _driver_user_id: string
+          _opportunity_id: string
+        }
+        Returns: Json
+      }
       build_lane_key: {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
@@ -3940,6 +4136,15 @@ export type Database = {
         }[]
       }
       get_my_managed_drivers: { Args: never; Returns: Json[] }
+      get_my_marketplace_restrictions: {
+        Args: never
+        Returns: {
+          ends_at: string
+          restriction: string
+          scope: string
+          starts_at: string
+        }[]
+      }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
       get_my_waiting_work_item: {
         Args: { _id: string }
@@ -4542,6 +4747,37 @@ export type Database = {
         }
         Returns: string
       }
+      submit_opportunity_application: {
+        Args: {
+          _availability_confirmed: boolean
+          _contact_sharing_consent: boolean
+          _idempotency_key: string
+          _message: string
+          _opportunity_id: string
+          _preferred_contact_method: string
+          _requirements_confirmed: boolean
+          _truth_attestation: boolean
+        }
+        Returns: {
+          application_id: string
+          application_status: string
+          result_code: string
+        }[]
+      }
+      submit_request_info: {
+        Args: {
+          _contact_sharing_consent: boolean
+          _idempotency_key: string
+          _opportunity_id: string
+          _preferred_contact_method: string
+          _question: string
+        }
+        Returns: {
+          application_id: string
+          application_status: string
+          result_code: string
+        }[]
+      }
       update_agency_package: {
         Args: {
           _billing_frequency_display_text: string
@@ -4639,6 +4875,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      user_is_marketplace_blocked: {
+        Args: { _scope: string; _user_id: string }
+        Returns: boolean
       }
       withdraw_opportunity_application: {
         Args: { application_id: string }
