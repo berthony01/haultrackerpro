@@ -247,7 +247,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <h3 className="text-base font-bold text-foreground">
-              {dp?.full_name || 'Driver'}
+              {dp?.full_name || 'Driver (name not provided)'}
             </h3>
             <p className="text-xs text-muted-foreground">
               {[dp?.city, dp?.state].filter(Boolean).join(', ') || '—'}
