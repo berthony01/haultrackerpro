@@ -1237,9 +1237,8 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
            FROM public.opportunity_applications a WHERE a.id=$2`,
       [oidB, appId, nowExpires],
     );
-    // Restore the one_sent index before the race so we prove one_accepted alone
-    // isn't the only line of defense (both invariants are present).
-    await pool.query(`CREATE UNIQUE INDEX opportunity_offers_one_sent_per_app_uidx ON public.opportunity_offers(application_id) WHERE status = 'sent'`);
+    // one_sent index will be recreated after the race (only one 'sent' row
+    // will remain then, either as the loser or as 'accepted').
     // Set app to offer_sent via service_role for the accept RPC's precondition.
     const sv = await newAuthClient(url, "", "service_role");
     await sv.query(`SELECT public._m2_set_application_status($1::uuid,'offer_sent')`, [appId]);
