@@ -893,7 +893,7 @@ BEGIN
      OR NEW.submitted_at IS DISTINCT FROM OLD.submitted_at
      OR NEW.contact_sharing_consent IS DISTINCT FROM OLD.contact_sharing_consent
      OR NEW.contact_sharing_consent_at IS DISTINCT FROM OLD.contact_sharing_consent_at
-     OR NEW.withdrawn_at IS DISTINCT FROM OLD.withdrawn_at
+     OR (NEW.withdrawn_at IS DISTINCT FROM OLD.withdrawn_at AND NOT _driver_withdraw)
      OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'Recruiters may only update application status.' USING ERRCODE = '42501';
   END IF;
