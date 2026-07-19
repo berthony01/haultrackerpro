@@ -501,3 +501,289 @@ describe('ApplyNowDialog — success reset', () => {
     expect(mutateAsync.mock.calls[1][0].idempotency_key).not.toBe(firstKey);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1H-A2 FINAL CLOSEOUT — deterministic UUID lifecycle, missing-field
+// gating, per-method consent submission, live-region rendering, toast, and
+// privacy-copy proofs.
+// ---------------------------------------------------------------------------
+
+describe('ApplyNowDialog — deterministic UUID idempotency lifecycle', () => {
+  let counter = 0;
+  let uuidSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    counter = 0;
+    uuidSpy = vi
+      .spyOn(crypto, 'randomUUID')
+      .mockImplementation((() => `key-${++counter}-abcdef0123456789`) as any);
+  });
+  afterEach(() => {
+    uuidSpy.mockRestore();
+  });
+
+  it('opening the dialog generates exactly one UUID for that attempt', async () => {
+    renderDialog();
+    // Filling attestations must not generate additional UUIDs.
+    await fillAttest();
+    expect(uuidSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rerender with the dialog still open preserves the same UUID at submit time', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const onOpenChange = vi.fn();
+    const R = () => (
+      <QueryClientProvider client={qc}>
+        <ApplyNowDialog
+          open
+          onOpenChange={onOpenChange}
+          opportunityId="opp-1"
+          opportunityTitle="OTR Reefer"
+          companyName="Acme"
+          driverProfile={baseProfile}
+          onEditProfile={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(<R />);
+    await fillAttest();
+    rerender(<R />); // no-op rerender with dialog still open
+    rerender(<R />);
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0][0].idempotency_key).toBe('key-1-abcdef0123456789');
+    // Multiple rerenders must not rotate the key — the payload value is the proof.
+  });
+
+  it('field mutations (message, method, consent, attestations) preserve the UUID', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
+    renderDialog();
+    await userEvent.type(screen.getByLabelText(/Message to recruiter/i), 'Hello there');
+    // Enable consent, choose email, toggle it off then back to in_app then back to email.
+    const consent = screen.getByLabelText(/authorize HaulTracker Pro/i);
+    await userEvent.click(consent);
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /^Email/i }));
+    await userEvent.click(consent); // off → reverts to in_app
+    await userEvent.click(consent); // on again
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0][0].idempotency_key).toBe('key-1-abcdef0123456789');
+    // Field mutations must not rotate the key — payload value is the proof.
+  });
+
+  it('a failed submit followed by a retry within the same open attempt sends the exact same key', async () => {
+    mutateAsync
+      .mockRejectedValueOnce(new Error('submission_failed:empty_response'))
+      .mockResolvedValueOnce({ result_code: 'created' });
+    renderDialog();
+    await fillAttest();
+    const submit = screen.getByRole('button', { name: /Submit Application/i });
+    await userEvent.click(submit);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    await userEvent.click(submit);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
+    expect(mutateAsync.mock.calls[0][0].idempotency_key).toBe('key-1-abcdef0123456789');
+    expect(mutateAsync.mock.calls[1][0].idempotency_key).toBe('key-1-abcdef0123456789');
+    // Retry must reuse the same key across two mutateAsync calls — proven above.
+  });
+
+  it('canceling and reopening produces exactly two distinct UUIDs across two submissions', async () => {
+    mutateAsync.mockRejectedValue(new Error('submission_failed:empty_response'));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let open = true;
+    const onOpenChange = vi.fn((v: boolean) => { open = v; });
+    const R = () => (
+      <QueryClientProvider client={qc}>
+        <ApplyNowDialog
+          open={open}
+          onOpenChange={onOpenChange}
+          opportunityId="opp-1"
+          opportunityTitle="OTR Reefer"
+          companyName="Acme"
+          driverProfile={baseProfile}
+          onEditProfile={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(<R />);
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole('button', { name: /Cancel/i }));
+    rerender(<R />);
+    open = true;
+    rerender(<R />);
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
+    expect(mutateAsync.mock.calls[0][0].idempotency_key).toBe('key-1-abcdef0123456789');
+    expect(mutateAsync.mock.calls[1][0].idempotency_key).toBe('key-2-abcdef0123456789');
+  });
+
+  it('success and later reopen assigns a fresh deterministic UUID (key-2)', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const R = (open: boolean) => (
+      <QueryClientProvider client={qc}>
+        <ApplyNowDialog
+          open={open}
+          onOpenChange={vi.fn()}
+          opportunityId="opp-1"
+          opportunityTitle="OTR Reefer"
+          companyName="Acme"
+          driverProfile={baseProfile}
+          onEditProfile={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(R(true));
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    rerender(R(false));
+    rerender(R(true));
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
+    expect(mutateAsync.mock.calls[0][0].idempotency_key).toBe('key-1-abcdef0123456789');
+    expect(mutateAsync.mock.calls[1][0].idempotency_key).toBe('key-2-abcdef0123456789');
+  });
+});
+
+describe('ApplyNowDialog — contact method availability', () => {
+  it('missing email disables the Email option and keeps in-app available', async () => {
+    renderDialog({ driverProfile: { ...baseProfile, email: null } });
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    const email = await screen.findByRole('option', { name: /Email \(not on profile\)/i });
+    expect(email).toHaveAttribute('data-disabled');
+    expect(await screen.findByRole('option', { name: /In-app messaging/i })).toBeInTheDocument();
+  });
+
+  it('missing phone disables both Phone and SMS options', async () => {
+    renderDialog({ driverProfile: { ...baseProfile, phone: null } });
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    const phone = await screen.findByRole('option', { name: /Phone \(not on profile\)/i });
+    const sms = await screen.findByRole('option', { name: /SMS \(no phone on profile\)/i });
+    expect(phone).toHaveAttribute('data-disabled');
+    expect(sms).toHaveAttribute('data-disabled');
+  });
+
+  it('does not render an editable email/phone/SMS destination text input', () => {
+    renderDialog();
+    // Only the message textarea should be an editable field.
+    expect(screen.queryByRole('textbox', { name: /^email/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /^phone/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /^sms/i })).toBeNull();
+  });
+});
+
+describe('ApplyNowDialog — per-method consent submission', () => {
+  it('submits with preferred_contact_method=email when email is chosen with consent', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
+    renderDialog();
+    await fillAttest();
+    await userEvent.click(screen.getByLabelText(/authorize HaulTracker Pro/i));
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /^Email/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync.mock.calls[0][0].preferred_contact_method).toBe('email');
+    expect(mutateAsync.mock.calls[0][0].contact_sharing_consent).toBe(true);
+  });
+
+  it('submits with preferred_contact_method=phone when phone is chosen with consent', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
+    renderDialog();
+    await fillAttest();
+    await userEvent.click(screen.getByLabelText(/authorize HaulTracker Pro/i));
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /^Phone/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync.mock.calls[0][0].preferred_contact_method).toBe('phone');
+    expect(mutateAsync.mock.calls[0][0].contact_sharing_consent).toBe(true);
+  });
+
+  it('in-app submission does not require consent and sends contact_sharing_consent=false', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
+    renderDialog();
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync.mock.calls[0][0].preferred_contact_method).toBe('in_app');
+    expect(mutateAsync.mock.calls[0][0].contact_sharing_consent).toBe(false);
+  });
+
+  it('turning consent off while Email is selected reverts method to in_app', async () => {
+    renderDialog();
+    await fillAttest();
+    const consent = screen.getByLabelText(/authorize HaulTracker Pro/i);
+    await userEvent.click(consent);
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /^Email/i }));
+    expect(screen.getByRole('combobox', { name: /Preferred contact method/i })).toHaveTextContent(/Email/i);
+    await userEvent.click(consent);
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: /Preferred contact method/i }))
+        .toHaveTextContent(/In-app messaging/i),
+    );
+  });
+
+  it('turning consent off while Phone is selected reverts method to in_app', async () => {
+    renderDialog();
+    await fillAttest();
+    const consent = screen.getByLabelText(/authorize HaulTracker Pro/i);
+    await userEvent.click(consent);
+    await userEvent.click(screen.getByRole('combobox', { name: /Preferred contact method/i }));
+    await userEvent.click(await screen.findByRole('option', { name: /^Phone/i }));
+    expect(screen.getByRole('combobox', { name: /Preferred contact method/i })).toHaveTextContent(/Phone/i);
+    await userEvent.click(consent);
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: /Preferred contact method/i }))
+        .toHaveTextContent(/In-app messaging/i),
+    );
+  });
+});
+
+describe('ApplyNowDialog — privacy copy and success toast', () => {
+  it('visibly displays the approved privacy statement about snapshot and consent', () => {
+    renderDialog();
+    const dialog = screen.getByRole('dialog');
+    const text = dialog.textContent ?? '';
+    expect(text).toMatch(
+      /professional Opportunity Profile is included in the application snapshot/i,
+    );
+    expect(text).toMatch(/shared only when you explicitly consent/i);
+  });
+
+  it('calls sonner toast.success with "Application submitted" on a successful submission', async () => {
+    mutateAsync.mockResolvedValue({ result_code: 'created' });
+    const { toast } = await import('sonner');
+    (toast.success as any).mockClear();
+    renderDialog();
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect((toast.success as any).mock.calls[0][0]).toBe('Application submitted');
+    // Approved descriptive copy present in the description prop when supplied.
+    const opts = (toast.success as any).mock.calls[0][1];
+    expect(opts?.description).toMatch(/review your application and professional profile snapshot/i);
+  });
+});
+
+describe('ApplyNowDialog — error rendering hardening', () => {
+  it('never leaks raw internals (SQL, table names, policy names, stack) in the live region', async () => {
+    mutateAsync.mockRejectedValue(new Error('submission_failed:restricted'));
+    renderDialog();
+    await fillAttest();
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    const status = await screen.findByRole('status');
+    const text = status.textContent ?? '';
+    expect(text).not.toMatch(/submission_failed:/);
+    expect(text).not.toMatch(/SELECT|INSERT|UPDATE|policy|RLS|pg_/i);
+    expect(text).not.toContain('[object Object]');
+  });
+});
+

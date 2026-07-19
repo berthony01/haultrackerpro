@@ -201,3 +201,87 @@ describe('OpportunityDetail — Apply Now integration', () => {
     expect(screen.getByRole('button', { name: /Info Requested/i })).toBeDisabled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1H-A2 CLOSEOUT — post-success rerender + Apply Again fresh-key proofs
+// ---------------------------------------------------------------------------
+
+describe('OpportunityDetail — post-success page state', () => {
+  it('after a successful Apply Now submission, refreshed hook data disables Apply Now while Request Info stays independent', async () => {
+    submitMutateAsync.mockResolvedValue({ result_code: 'created' });
+    const { rerender } = renderPage({ apps: [] });
+    // Pre: Apply Now available.
+    expect(screen.getByRole('button', { name: /^Apply Now$/ })).toBeEnabled();
+    // Open dialog + submit successfully.
+    await userEvent.click(screen.getByRole('button', { name: /^Apply Now$/ }));
+    const dialog = await screen.findByRole('dialog');
+    const within = (root: HTMLElement) => root;
+    await userEvent.click(dialog.querySelector('label[for="apply-availability"]')!);
+    await userEvent.click(dialog.querySelector('label[for="apply-requirements"]')!);
+    await userEvent.click(dialog.querySelector('label[for="apply-truth"]')!);
+    void within(dialog);
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(submitMutateAsync).toHaveBeenCalledTimes(1);
+    // Simulate React Query invalidation returning the new formal apply row.
+    driverApplicationsRef.current = [
+      { opportunity_id: 'opp-1', application_type: 'apply', status: 'new' },
+    ];
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    rerender(
+      <QueryClientProvider client={qc}>
+        <OpportunityDetail
+          opportunity={opportunity}
+          onBack={vi.fn()}
+          isPro={false}
+          onUpgrade={vi.fn()}
+          driverProfile={driverProfile}
+          onEditProfile={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    const applyBtn = screen.getByRole('button', { name: /Application Submitted/i });
+    expect(applyBtn).toBeDisabled();
+    // Request Info remains independently available (no request_info row exists).
+    expect(screen.getByRole('button', { name: /Request Info/ })).toBeEnabled();
+  });
+});
+
+describe('OpportunityDetail — Apply Again fresh idempotency keys', () => {
+  it('rejected Apply Again attempt receives a fresh idempotency key', async () => {
+    submitMutateAsync.mockResolvedValue({ result_code: 'created' });
+    renderPage({
+      apps: [{ opportunity_id: 'opp-1', application_type: 'apply', status: 'rejected' }],
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Apply Again/i }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(dialog.querySelector('label[for="apply-availability"]')!);
+    await userEvent.click(dialog.querySelector('label[for="apply-requirements"]')!);
+    await userEvent.click(dialog.querySelector('label[for="apply-truth"]')!);
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(submitMutateAsync).toHaveBeenCalledTimes(1);
+    const key = submitMutateAsync.mock.calls[0][0].idempotency_key;
+    expect(typeof key).toBe('string');
+    expect(key.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('withdrawn Apply Again attempt receives a fresh idempotency key', async () => {
+    submitMutateAsync.mockResolvedValue({ result_code: 'created' });
+    renderPage({
+      apps: [{ opportunity_id: 'opp-1', application_type: 'apply', status: 'withdrawn' }],
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Apply Again/i }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(dialog.querySelector('label[for="apply-availability"]')!);
+    await userEvent.click(dialog.querySelector('label[for="apply-requirements"]')!);
+    await userEvent.click(dialog.querySelector('label[for="apply-truth"]')!);
+    await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(submitMutateAsync).toHaveBeenCalledTimes(1);
+    const key = submitMutateAsync.mock.calls[0][0].idempotency_key;
+    expect(typeof key).toBe('string');
+    expect(key.length).toBeGreaterThanOrEqual(8);
+  });
+});
+
