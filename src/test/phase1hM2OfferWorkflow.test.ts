@@ -1831,17 +1831,156 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
 
   it('E. application identity and type remain immutable via direct recruiter update', async () => {
     const APP = 'b2b2e444-b2b2-e444-b2b2-b2b2b2b2e444';
+    const NEW_ID = 'b2b2e444-b2b2-e444-b2b2-b2b2b2b2e4ff';
     await seedApp(APP, DRV_D, 'interviewing', 'b2-e-imm-key-x');
     await asAuth(db, R_USER);
-    for (const stmt of [
-      `UPDATE public.opportunity_applications SET application_type='request_info' WHERE id=$1`,
-      `UPDATE public.opportunity_applications SET driver_user_id='${DRV_E}' WHERE id=$1`,
-      `UPDATE public.opportunity_applications SET opportunity_id='${OPP}', recruiter_id='${R_PROF}', idempotency_key='changed' WHERE id=$1`,
-      `UPDATE public.opportunity_applications SET submission_snapshot='{"tamper":true}'::jsonb WHERE id=$1`,
-    ]) {
-      await expect(db.query(stmt, [APP])).rejects.toThrow(/only update application status|application identity is immutable|submission_snapshot|idempotency/i);
+    // Each attempt must be rejected AND the row must retain its original
+    // identity. Using alternate real fixtures (ALT_OPP, ALT_R_PROF, DRV_E)
+    // ensures the denial is the guard, not a foreign-key error.
+    const mutations: Array<[string, string]> = [
+      ['id',              `UPDATE public.opportunity_applications SET id='${NEW_ID}' WHERE id=$1`],
+      ['opportunity_id',  `UPDATE public.opportunity_applications SET opportunity_id='${ALT_OPP}' WHERE id=$1`],
+      ['recruiter_id',    `UPDATE public.opportunity_applications SET recruiter_id='${ALT_R_PROF}' WHERE id=$1`],
+      ['driver_user_id',  `UPDATE public.opportunity_applications SET driver_user_id='${DRV_E}' WHERE id=$1`],
+      ['application_type',`UPDATE public.opportunity_applications SET application_type='request_info' WHERE id=$1`],
+    ];
+    for (const [, stmt] of mutations) {
+      await expect(db.query(stmt, [APP])).rejects.toThrow(
+        /only update application status|application identity is immutable/i,
+      );
     }
     await asOwner(db);
+    // Persisted identity must be unchanged.
+    const row = await db.query<{
+      id: string; opportunity_id: string; recruiter_id: string;
+      driver_user_id: string; application_type: string; status: string;
+    }>(
+      `SELECT id, opportunity_id, recruiter_id, driver_user_id, application_type, status
+         FROM public.opportunity_applications WHERE id=$1`, [APP]);
+    expect(row.rows[0]).toMatchObject({
+      id: APP,
+      opportunity_id: OPP,
+      recruiter_id: R_PROF,
+      driver_user_id: DRV_D,
+      application_type: 'apply',
+      status: 'interviewing',
+    });
+  });
+
+  // -----------------------------------------------------------------
+  // Defect 1 close-out: trusted internal withdrawal setter must refuse
+  // non-formal (request_info / callback) rows even when invoked as
+  // service_role with the linked driver's JWT identity.
+  // -----------------------------------------------------------------
+  it('C. trusted _m2_set_application_withdrawn refuses request_info and callback rows', async () => {
+    const INQ_RI = 'b2b2c777-b2b2-c777-b2b2-b2b2b2b2c777';
+    const INQ_CB = 'b2b2c888-b2b2-c888-b2b2-b2b2b2b2c888';
+    await asOwner(db);
+    // Seed legacy-style inquiry rows with guard temporarily off so we can
+    // construct historical state without needing snapshot/consent scaffolding.
+    await db.exec(`
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
+      INSERT INTO public.opportunity_applications(
+        id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
+        submission_snapshot, snapshot_version, is_legacy,
+        preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
+      ) VALUES
+        ('${INQ_RI}','${OPP}','${DRV_O}','${R_PROF}','request_info','new',
+         NULL, NULL, false, 'phone', false, NULL),
+        ('${INQ_CB}','${OPP}','${DRV_P}','${R_PROF}','callback','new',
+         NULL, NULL, false, 'phone', false, NULL);
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
+    `);
+
+    for (const [app, driver] of [[INQ_RI, DRV_O], [INQ_CB, DRV_P]] as const) {
+      // Invoke ONLY via service_role (authenticated has no EXECUTE grant),
+      // with auth.uid() resolved to the linked driver so the actor check
+      // cannot be the reason for denial.
+      await db.exec(`RESET ROLE; SET ROLE service_role; SET request.jwt.claim.sub = '${driver}';`);
+      await expect(
+        db.query(`SELECT public._m2_set_application_withdrawn($1::uuid)`, [app]),
+      ).rejects.toThrow(/application owner may withdraw|driver withdraw RPC/i);
+    }
+    await asOwner(db);
+
+    const chk = await db.query<{ id: string; status: string; application_type: string }>(
+      `SELECT id, status, application_type FROM public.opportunity_applications
+        WHERE id IN ($1,$2) ORDER BY id`, [INQ_RI, INQ_CB]);
+    for (const r of chk.rows) {
+      expect(r.status).toBe('new');
+      expect(['request_info', 'callback']).toContain(r.application_type);
+    }
+  });
+
+  // -----------------------------------------------------------------
+  // Defect 2 close-out: sent offer whose identity does not match the
+  // application cannot satisfy the offer_sent invariant, even under a
+  // real trusted workflow context.
+  // -----------------------------------------------------------------
+  it('C. offer_sent trigger rejects sent offer with mismatched driver identity', async () => {
+    const APP = 'b2b2c999-b2b2-c999-b2b2-b2b2b2b2c999';
+    const OFF = 'b2b2c999-b2b2-c999-b2b2-b2b2b2b2c9aa';
+    await seedApp(APP, DRV_Q, 'interviewing', 'b2-c-mismatch-key');
+    // Fixture: seed a sent offer whose driver_user_id deliberately does
+    // NOT match the application (opportunity/recruiter match; driver does
+    // not). Trigger disabled ONLY for fixture construction, then restored.
+    await db.exec(`
+      ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard;
+      INSERT INTO public.opportunity_offers(
+        id, application_id, opportunity_id, driver_user_id, recruiter_id,
+        status, pay_description, created_by, sent_at, expires_at,
+        sent_snapshot, snapshot_version
+      ) VALUES (
+        '${OFF}','${APP}','${OPP}','${DRV_A}','${R_PROF}',
+        'sent','pay','${R_USER}', now(), now() + interval '7 days',
+        jsonb_build_object('seed',true), 1
+      );
+      ALTER TABLE public.opportunity_offers ENABLE TRIGGER trg_opportunity_offers_guard;
+    `);
+    // All triggers restored — exercise with a real trusted workflow token.
+    const tok = await realBypassToken();
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='offer_sent' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/matching sent offer/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+    const s = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [APP]);
+    expect(s.rows[0].status).toBe('interviewing');
+  });
+
+  // -----------------------------------------------------------------
+  // Defect 3A close-out: hired requires an accepted offer even when a
+  // valid, uploaded, approved contract already exists for the app.
+  // -----------------------------------------------------------------
+  it('C. hired rejected without accepted offer even with valid uploaded approved contract', async () => {
+    const APP = 'b2b2caaa-b2b2-caaa-b2b2-b2b2b2b2caaa';
+    const CON = 'b2b2caaa-b2b2-caaa-b2b2-b2b2b2b2cabb';
+    const VER = 'b2b2caaa-b2b2-caaa-b2b2-b2b2b2b2cacc';
+    await seedApp(APP, DRV_H, 'onboarding', 'b2-c-hire-noacc-key');
+    await asOwner(db);
+    // Contract path is fully valid; only the accepted offer is absent.
+    await db.exec(`
+      INSERT INTO public.contracts(id, application_id, status)
+        VALUES ('${CON}','${APP}','approved');
+      INSERT INTO public.contract_versions(id, contract_id, upload_status)
+        VALUES ('${VER}','${CON}','uploaded');
+      UPDATE public.contracts SET current_version_id='${VER}' WHERE id='${CON}';
+    `);
+    const tok = await realBypassToken();
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/accepted offer/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+    const s = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [APP]);
+    expect(s.rows[0].status).toBe('onboarding');
   });
 });
+
 
