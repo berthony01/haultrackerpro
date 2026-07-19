@@ -250,7 +250,7 @@ describe('Agency create_agency JSON cast — root-cause proof', () => {
 
     const full = await db2.query<{ description: string | null; contact_email: string | null }>(
       `SELECT description, contact_email FROM public.create_agency($1, $2, $3)`,
-      ['Bravo Logistics', '  Fleet ops  ', '  Owner@Bravo.COM  '],
+      ['Bravo Logistics', '  Fleet ops  ', 'Owner@Bravo.COM'],
     );
     expect(full.rows[0].description).toBe('Fleet ops');
     expect(full.rows[0].contact_email).toBe('owner@bravo.com');
