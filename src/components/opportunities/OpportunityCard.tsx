@@ -181,3 +181,40 @@ function Stat({
     </div>
   );
 }
+
+/**
+ * Est. net can go negative when the driver's personal weekly cost profile
+ * exceeds the listing's estimated gross. That's a personalized calculation
+ * — not a broken listing — so we surface it with a warning tone, a
+ * clarifying caption, and a tooltip explaining the source, rather than
+ * hiding it or styling it as a plain metric.
+ */
+function EstimatedNetStat({ value }: { value: number | null | undefined }) {
+  const isNegative = value != null && Number(value) < 0;
+  const tooltip =
+    'Est. net is your listing gross minus your weekly cost profile (fixed + variable costs). A negative value means this listing does not clear your current cost profile.';
+  return (
+    <div className="flex items-start gap-2 min-w-0" title={tooltip}>
+      {isNegative ? (
+        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" aria-hidden />
+      ) : (
+        <TrendingUp className="h-4 w-4 mt-0.5 shrink-0 text-primary" aria-hidden />
+      )}
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+          Est. net
+        </p>
+        <p
+          className={`text-sm font-semibold truncate ${
+            isNegative ? 'text-warning' : 'text-foreground'
+          }`}
+        >
+          {fmtMoney(value)}
+        </p>
+        <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+          {isNegative ? 'Based on your cost profile' : 'After your cost profile'}
+        </p>
+      </div>
+    </div>
+  );
+}
