@@ -1365,3 +1365,466 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
     await asOwner(db);
   });
 });
+
+// =====================================================================
+// Phase 1H-M2 Phase 2B-2 — trusted workflow spoof resistance and
+// sensitive-status relational invariants. Loads the same M2 candidate
+// migration executed above (no embedded SQL). Uses real role switching
+// via SET ROLE authenticated + request.jwt.claim.sub. Superuser only for
+// non-authorization fixture seeding, clearly separated.
+// =====================================================================
+describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () => {
+  // Isolated recruiter+driver fixture for this suite.
+  const R_USER = 'b2000000-b200-b200-b200-b20000000001';
+  const R_PROF = 'b2000000-b200-b200-b200-b20000000002';
+  const OPP    = 'b2000000-b200-b200-b200-b20000000003';
+  const DRV_A  = 'b2000000-b200-b200-b200-b200000000aa';
+  const DRV_B  = 'b2000000-b200-b200-b200-b200000000bb';
+  const DRV_C  = 'b2000000-b200-b200-b200-b200000000cc';
+  const DRV_D  = 'b2000000-b200-b200-b200-b200000000dd';
+  const DRV_E  = 'b2000000-b200-b200-b200-b200000000ee';
+  const DRV_F  = 'b2000000-b200-b200-b200-b200000000ff';
+  const DRV_G  = 'b2000000-b200-b200-b200-b20000000abc';
+  const DRV_H  = 'b2000000-b200-b200-b200-b20000000def';
+  const DRV_I  = 'b2000000-b200-b200-b200-b20000000012';
+  const DRV_J  = 'b2000000-b200-b200-b200-b20000000034';
+  const DRV_K  = 'b2000000-b200-b200-b200-b20000000045';
+  const DRV_L  = 'b2000000-b200-b200-b200-b20000000056';
+  const DRV_M  = 'b2000000-b200-b200-b200-b20000000067';
+  const DRV_N  = 'b2000000-b200-b200-b200-b20000000078';
+
+  beforeAll(async () => {
+    await asOwner(db);
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES
+        ('${R_USER}','b2-r@t'),
+        ('${DRV_A}','b2-a@t'),('${DRV_B}','b2-b@t'),('${DRV_C}','b2-c@t'),
+        ('${DRV_D}','b2-d@t'),('${DRV_E}','b2-e@t'),('${DRV_F}','b2-f@t'),
+        ('${DRV_G}','b2-g@t'),('${DRV_H}','b2-h@t'),('${DRV_I}','b2-i@t'),
+        ('${DRV_J}','b2-j@t'),('${DRV_K}','b2-k@t'),('${DRV_L}','b2-l@t'),
+        ('${DRV_M}','b2-m@t'),('${DRV_N}','b2-n@t')
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO public.recruiter_profiles(
+        id,user_id,recruiter_name,recruiter_email,company_name,dot_number,
+        posting_terms_accepted_at,posting_terms_version,verification_status,status
+      ) VALUES (
+        '${R_PROF}','${R_USER}','B2 Recruiter','b2-r@t','B2 Co','DOTB2',
+        now(),'2026-07-17.v1','approved','active'
+      ) ON CONFLICT DO NOTHING;
+
+      INSERT INTO public.opportunities(
+        id,recruiter_id,title,company_name,hiring_city,hiring_state,driver_type,route_type,trailer_type,
+        pay_model,cpm,estimated_weekly_gross,estimated_weekly_miles,status,admin_review_status
+      ) VALUES (
+        '${OPP}','${R_PROF}','B2 OTR','B2 Co','Dallas','TX','company','regional','dry_van',
+        'cpm',0.62,1800,2800,'active','approved'
+      ) ON CONFLICT DO NOTHING;
+
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES
+        ('${DRV_A}','A','A',5,'phone','apply_only',true),
+        ('${DRV_B}','B','A',5,'phone','apply_only',true),
+        ('${DRV_C}','C','A',5,'phone','apply_only',true),
+        ('${DRV_D}','D','A',5,'phone','apply_only',true),
+        ('${DRV_E}','E','A',5,'phone','apply_only',true),
+        ('${DRV_F}','F','A',5,'phone','apply_only',true),
+        ('${DRV_G}','G','A',5,'phone','apply_only',true),
+        ('${DRV_H}','H','A',5,'phone','apply_only',true),
+        ('${DRV_I}','I','A',5,'phone','apply_only',true),
+        ('${DRV_J}','J','A',5,'phone','apply_only',true),
+        ('${DRV_K}','K','A',5,'phone','apply_only',true),
+        ('${DRV_L}','L','A',5,'phone','apply_only',true),
+        ('${DRV_M}','M','A',5,'phone','apply_only',true),
+        ('${DRV_N}','N','A',5,'phone','apply_only',true)
+      ON CONFLICT DO NOTHING;
+    `);
+  });
+
+  // Helper: seed an application at a chosen status by inserting with the
+  // guard trigger temporarily disabled. Used ONLY to construct historical
+  // fixture state; every authorization/invariant assertion in this block
+  // is made with all triggers active.
+  async function seedApp(id: string, driver: string, status: string, key: string): Promise<void> {
+    await asOwner(db);
+    await db.exec(`
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
+      INSERT INTO public.opportunity_applications(
+        id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
+        submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
+        preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
+      ) VALUES (
+        '${id}','${OPP}','${driver}','${R_PROF}',
+        'apply','${status}', jsonb_build_object('seed',true), 1, '${key}',
+        now(), false, 'phone', true, now()
+      );
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
+    `);
+  }
+
+  // -----------------------------------------------------------------
+  // A. Grant / execute exposure (contract items 1–7)
+  // -----------------------------------------------------------------
+  it('A. authenticated and anon cannot read _m2_workflow_secret or invoke internal helpers', async () => {
+    for (const role of ['authenticated', 'anon']) {
+      await db.exec(`RESET ROLE; RESET request.jwt.claim.sub; SET ROLE ${role};`);
+      await expect(db.query(`SELECT token FROM public._m2_workflow_secret`))
+        .rejects.toThrow(/permission denied/i);
+      await expect(db.query(`SELECT public._m2_workflow_token()`))
+        .rejects.toThrow(/permission denied/i);
+      await expect(db.query(`SELECT public._m2_workflow_bypass_active()`))
+        .rejects.toThrow(/permission denied/i);
+      await expect(db.query(`SELECT public._m2_driver_withdraw_active()`))
+        .rejects.toThrow(/permission denied/i);
+      await expect(db.query(
+        `SELECT public._m2_set_application_status('00000000-0000-0000-0000-000000000000'::uuid, 'onboarding')`))
+        .rejects.toThrow(/permission denied/i);
+      await expect(db.query(
+        `SELECT public._m2_set_application_withdrawn('00000000-0000-0000-0000-000000000000'::uuid)`))
+        .rejects.toThrow(/permission denied/i);
+    }
+    await asOwner(db);
+  });
+
+  // -----------------------------------------------------------------
+  // B. Direct spoof (contract items 8–14)
+  // -----------------------------------------------------------------
+  it('B. recruiter cannot spoof workflow_bypass_token (guessed / boolean / empty / malformed) for offer_sent, onboarding, hired', async () => {
+    const APP = 'b2b21111-b2b2-1111-b2b2-b2b2b2b21111';
+    await seedApp(APP, DRV_A, 'interviewing', 'b2-spoof-key-a');
+
+    const spoofSettings = [
+      `SET app.workflow_bypass_token = 'not-a-real-token'`,           // 8/9/10 guessed
+      `SET app.workflow_bypass = 'true'`,                              // 12 boolean
+      `SET app.workflow_bypass_token = ''`,                            // 14 empty
+      `SET app.workflow_bypass_token = 'zzzz-not-a-uuid'`,             // 14 malformed
+    ];
+    for (const setStmt of spoofSettings) {
+      await asAuth(db, R_USER);
+      await db.exec(setStmt);
+      for (const s of ['offer_sent','onboarding','hired']) {
+        await expect(
+          db.query(`UPDATE public.opportunity_applications SET status=$2::text WHERE id=$1`, [APP, s]),
+        ).rejects.toThrow(/server-authorized workflow/i);
+      }
+      await db.exec(`RESET app.workflow_bypass_token; RESET app.workflow_bypass;`);
+    }
+    await asOwner(db);
+    const chk = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [APP]);
+    expect(chk.rows[0].status).toBe('interviewing');
+  });
+
+  it('B. driver cannot spoof driver_withdraw_token (guessed / boolean allow_driver_withdraw)', async () => {
+    // Drivers have no direct UPDATE policy on opportunity_applications, so
+    // a spoofed UPDATE silently affects 0 rows. Prove the status is
+    // unchanged, and that the RPC path is required.
+    const APP = 'b2b22222-b2b2-2222-b2b2-b2b2b2b22222';
+    await seedApp(APP, DRV_B, 'interviewing', 'b2-spoof-key-b');
+    for (const setStmt of [
+      `SET app.driver_withdraw_token = 'not-a-real-token'`,
+      `SET app.allow_driver_withdraw = 'true'`,
+      `SET app.driver_withdraw_token = ''`,
+    ]) {
+      await asAuth(db, DRV_B);
+      await db.exec(setStmt);
+      const r = await db.query<{ n: string }>(
+        `WITH u AS (UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=$1 RETURNING 1)
+         SELECT COUNT(*)::text AS n FROM u`, [APP]);
+      expect(r.rows[0].n).toBe('0');
+      await db.exec(`RESET app.driver_withdraw_token; RESET app.allow_driver_withdraw;`);
+    }
+    await asOwner(db);
+    const chk = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [APP]);
+    expect(chk.rows[0].status).toBe('interviewing');
+  });
+
+  // -----------------------------------------------------------------
+  // C. Relational invariants (contract items 15–26)
+  //    Force trigger to run with a REAL token but a broken relational
+  //    prerequisite. Token is fetched under owner privileges only for
+  //    trigger-input reproduction; caller identity remains the tested role.
+  // -----------------------------------------------------------------
+  async function realBypassToken(): Promise<string> {
+    await asOwner(db);
+    const t = await db.query<{ token: string }>(`SELECT token::text AS token FROM public._m2_workflow_secret LIMIT 1`);
+    return t.rows[0].token;
+  }
+
+  it('C. offer_sent trigger requires a matching sent offer (identity-scoped)', async () => {
+    const APP = 'b2b2c111-b2b2-c111-b2b2-b2b2b2b2c111';
+    await seedApp(APP, DRV_C, 'interviewing', 'b2-c-offer-key');
+    const tok = await realBypassToken();
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='offer_sent' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/matching sent offer/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+  });
+
+  it('C. onboarding requires source=offer_sent AND matching accepted offer', async () => {
+    const APP = 'b2b2c222-b2b2-c222-b2b2-b2b2b2b2c222';
+    await seedApp(APP, DRV_N, 'interviewing', 'b2-c-onboard-key');
+    const tok = await realBypassToken();
+    // Wrong source state (interviewing → onboarding) fails.
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='onboarding' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/prior offer_sent/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+
+    // Now flip source to offer_sent (still no accepted offer) → must fail.
+    await asOwner(db);
+    await db.exec(`
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
+      UPDATE public.opportunity_applications SET status='offer_sent' WHERE id='${APP}';
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
+    `);
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='onboarding' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/accepted offer/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+  });
+
+  it('C. hired requires accepted offer + contract + matching current_version + uploaded + approved|signed', async () => {
+    // Fresh app in onboarding with an accepted offer.
+    const APP = 'b2b2c333-b2b2-c333-b2b2-b2b2b2b2c333';
+    await seedApp(APP, DRV_E, 'onboarding', 'b2-c-hire-key');
+    // Seed accepted offer (matching identity) via owner.
+    const OFF = 'b2b2c333-b2b2-c333-b2b2-b2b2b2b2caaa';
+    await db.exec(`
+      ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard;
+      INSERT INTO public.opportunity_offers(id,application_id,opportunity_id,driver_user_id,recruiter_id,status,pay_description,created_by,accepted_at,sent_at,expires_at,sent_snapshot,snapshot_version)
+      VALUES ('${OFF}','${APP}','${OPP}','${DRV_E}','${R_PROF}','accepted','pay','${R_USER}',now(),now() - interval '2 days',now() + interval '5 days',jsonb_build_object('seed',true),1);
+      ALTER TABLE public.opportunity_offers ENABLE TRIGGER trg_opportunity_offers_guard;
+    `);
+    const tok = await realBypassToken();
+    // 20: No contract → fails
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/contract/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+
+    // Contract exists but current_version_id is NULL → fails
+    await db.exec(`INSERT INTO public.contracts(id,application_id,status) VALUES ('b2b2c333-b2b2-c333-b2b2-b2b2b2b2cbbb','${APP}','draft')`);
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/current_version_id|contract/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+
+    // Contract status draft but with uploaded version → still fails (status)
+    await db.exec(`
+      INSERT INTO public.contract_versions(id,contract_id,upload_status)
+      VALUES ('b2b2c333-b2b2-c333-b2b2-b2b2b2b2cccc','b2b2c333-b2b2-c333-b2b2-b2b2b2b2cbbb','uploaded');
+      UPDATE public.contracts SET current_version_id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cccc' WHERE id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cbbb';
+    `);
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/approved or signed/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+
+    // Approve contract but point current_version at a version from another contract → fails
+    await db.exec(`
+      UPDATE public.contracts SET status='approved' WHERE id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cbbb';
+      INSERT INTO public.contracts(id,application_id,status) VALUES ('b2b2c333-b2b2-c333-b2b2-b2b2b2b2cddd','${APP}','approved');
+      INSERT INTO public.contract_versions(id,contract_id,upload_status)
+        VALUES ('b2b2c333-b2b2-c333-b2b2-b2b2b2b2ceee','b2b2c333-b2b2-c333-b2b2-b2b2b2b2cddd','uploaded');
+      -- Point original contract's current_version at the OTHER contract's version.
+      UPDATE public.contracts SET current_version_id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2ceee',updated_at=now()+interval '1 second'
+        WHERE id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cbbb';
+    `);
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/belong to the contract/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+
+    // Repoint to own version but pending upload → fails
+    await db.exec(`
+      UPDATE public.contract_versions SET upload_status='pending' WHERE id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cccc';
+      UPDATE public.contracts SET current_version_id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cccc',updated_at=now()+interval '2 seconds'
+        WHERE id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cbbb';
+    `);
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [APP]),
+    ).rejects.toThrow(/uploaded/i);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+
+    // Fix all: uploaded + approved + own version → success (positive-path)
+    await db.exec(`
+      UPDATE public.contract_versions SET upload_status='uploaded' WHERE id='b2b2c333-b2b2-c333-b2b2-b2b2b2b2cccc';
+    `);
+    await asAuth(db, R_USER);
+    await db.exec(`SET app.workflow_bypass_token = '${tok}'`);
+    await db.query(`UPDATE public.opportunity_applications SET status='hired' WHERE id=$1`, [APP]);
+    await db.exec(`RESET app.workflow_bypass_token`);
+    await asOwner(db);
+    const s = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [APP]);
+    expect(s.rows[0].status).toBe('hired');
+  });
+
+  it('C. withdraw RPC blocks: onboarding source, accepted offer, foreign driver', async () => {
+    // Onboarding source
+    const APP1 = 'b2b2c444-b2b2-c444-b2b2-b2b2b2b2c444';
+    await seedApp(APP1, DRV_F, 'onboarding', 'b2-c-wd1-key');
+    await asAuth(db, DRV_F);
+    await expect(
+      db.query(`SELECT public.withdraw_opportunity_application($1::uuid)`, [APP1]),
+    ).rejects.toThrow(/onboarding/i);
+    await asOwner(db);
+
+    // Accepted offer blocks (source = offer_sent)
+    const APP2 = 'b2b2c555-b2b2-c555-b2b2-b2b2b2b2c555';
+    await seedApp(APP2, DRV_G, 'offer_sent', 'b2-c-wd2-key');
+    const OFF2 = 'b2b2c555-b2b2-c555-b2b2-b2b2b2b2c5aa';
+    await db.exec(`
+      ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard;
+      INSERT INTO public.opportunity_offers(id,application_id,opportunity_id,driver_user_id,recruiter_id,status,pay_description,created_by,accepted_at,sent_at,expires_at,sent_snapshot,snapshot_version)
+      VALUES ('${OFF2}','${APP2}','${OPP}','${DRV_G}','${R_PROF}','accepted','pay','${R_USER}',now(),now() - interval '2 days',now() + interval '5 days',jsonb_build_object('seed',true),1);
+      ALTER TABLE public.opportunity_offers ENABLE TRIGGER trg_opportunity_offers_guard;
+    `);
+    await asAuth(db, DRV_G);
+    await expect(
+      db.query(`SELECT public.withdraw_opportunity_application($1::uuid)`, [APP2]),
+    ).rejects.toThrow(/accepted offer/i);
+    await asOwner(db);
+
+    // Foreign driver
+    const APP3 = 'b2b2c666-b2b2-c666-b2b2-b2b2b2b2c666';
+    await seedApp(APP3, DRV_H, 'interviewing', 'b2-c-wd3-key');
+    await asAuth(db, DRV_A);
+    await expect(
+      db.query(`SELECT public.withdraw_opportunity_application($1::uuid)`, [APP3]),
+    ).rejects.toThrow(/not authorized/i);
+    await asOwner(db);
+  });
+
+  // -----------------------------------------------------------------
+  // D. Positive-path regression (contract items 27–30)
+  // -----------------------------------------------------------------
+  it('D. approved RPC flow: send→offer_sent, accept→onboarding, complete_hiring→hired, withdraw→withdrawn', async () => {
+    // Fresh app end-to-end via approved RPCs (not direct trigger bypass).
+    const APP = await submitApply(db, DRV_I, OPP, 'b2-d-flow-key');
+    await transitionToInterviewing(db, APP, R_USER);
+    await asAuth(db, R_USER);
+    await db.query(
+      `SELECT * FROM public.save_opportunity_offer_draft($1::uuid,'pay',1800,NULL,NULL,NULL,NULL,NULL,NULL,NULL)`, [APP]);
+    const d = await db.query<{ id: string }>(
+      `SELECT id FROM public.opportunity_offers WHERE application_id=$1 AND status='draft'`, [APP]);
+    const sent = await db.query<{ application_status: string; result_code: string }>(
+      `SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [d.rows[0].id]);
+    expect(sent.rows[0].result_code).toBe('offer_sent');
+    expect(sent.rows[0].application_status).toBe('offer_sent');
+    await asOwner(db);
+
+    await asAuth(db, DRV_I);
+    const acc = await db.query<{ application_status: string; result_code: string }>(
+      `SELECT * FROM public.accept_opportunity_offer($1::uuid)`, [d.rows[0].id]);
+    expect(acc.rows[0].result_code).toBe('offer_accepted');
+    expect(acc.rows[0].application_status).toBe('onboarding');
+    await asOwner(db);
+
+    await db.exec(`
+      INSERT INTO public.contracts(id,application_id,status)
+        VALUES ('b2b2d001-b2b2-d001-b2b2-b2b2b2b2d001','${APP}','approved');
+      INSERT INTO public.contract_versions(id,contract_id,upload_status)
+        VALUES ('b2b2d001-b2b2-d001-b2b2-b2b2b2b2d0aa','b2b2d001-b2b2-d001-b2b2-b2b2b2b2d001','uploaded');
+      UPDATE public.contracts SET current_version_id='b2b2d001-b2b2-d001-b2b2-b2b2b2b2d0aa'
+        WHERE id='b2b2d001-b2b2-d001-b2b2-b2b2b2b2d001';
+    `);
+    await asAuth(db, R_USER);
+    const h = await db.query<{ application_status: string; result_code: string }>(
+      `SELECT * FROM public.complete_hiring($1::uuid)`, [APP]);
+    expect(h.rows[0].result_code).toBe('hiring_completed');
+    expect(h.rows[0].application_status).toBe('hired');
+    await asOwner(db);
+
+    // Withdraw path on a fresh app (linked driver, interviewing).
+    const APP2 = await submitApply(db, DRV_J, OPP, 'b2-d-wd-key');
+    await transitionToInterviewing(db, APP2, R_USER);
+    await asAuth(db, DRV_J);
+    await db.query(`SELECT public.withdraw_opportunity_application($1::uuid)`, [APP2]);
+    await asOwner(db);
+    const wd = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [APP2]);
+    expect(wd.rows[0].status).toBe('withdrawn');
+  });
+
+  // -----------------------------------------------------------------
+  // E. Terminal / immutability (contract items 31–34)
+  // -----------------------------------------------------------------
+  it('E. hired cannot revert; withdrawn cannot revert; accepted offer cannot revert via direct update', async () => {
+    // Hired revert (recruiter direct + via RPC)
+    const HIRED = 'b2b2e111-b2b2-e111-b2b2-b2b2b2b2e111';
+    await seedApp(HIRED, DRV_K, 'hired', 'b2-e-hired-key-x');
+    await asAuth(db, R_USER);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='onboarding' WHERE id=$1`, [HIRED]),
+    ).rejects.toThrow(/Terminal application status/i);
+    await asOwner(db);
+
+    // Withdrawn revert
+    const WD = 'b2b2e222-b2b2-e222-b2b2-b2b2b2b2e222';
+    await seedApp(WD, DRV_L, 'withdrawn', 'b2-e-wd-key-x');
+    await asAuth(db, R_USER);
+    await expect(
+      db.query(`UPDATE public.opportunity_applications SET status='interviewing' WHERE id=$1`, [WD]),
+    ).rejects.toThrow(/Terminal application status/i);
+    await asOwner(db);
+
+    // Accepted offer cannot revert via direct update.
+    const APP = 'b2b2e333-b2b2-e333-b2b2-b2b2b2b2e333';
+    await seedApp(APP, DRV_M, 'onboarding', 'b2-e-acc-key-x');
+    const OFF = 'b2b2e333-b2b2-e333-b2b2-b2b2b2b2e3aa';
+    await db.exec(`
+      ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard;
+      INSERT INTO public.opportunity_offers(id,application_id,opportunity_id,driver_user_id,recruiter_id,status,pay_description,created_by,accepted_at,sent_at,expires_at,sent_snapshot,snapshot_version)
+      VALUES ('${OFF}','${APP}','${OPP}','${DRV_M}','${R_PROF}','accepted','pay','${R_USER}',now(),now() - interval '2 days',now() + interval '5 days',jsonb_build_object('seed',true),1);
+      ALTER TABLE public.opportunity_offers ENABLE TRIGGER trg_opportunity_offers_guard;
+    `);
+    await asAuth(db, R_USER);
+    await expect(
+      db.query(`UPDATE public.opportunity_offers SET status='sent' WHERE id=$1`, [OFF]),
+    ).rejects.toThrow(/accepted offers cannot change status|permission denied/i);
+    await asOwner(db);
+  });
+
+  it('E. application identity and type remain immutable via direct recruiter update', async () => {
+    const APP = 'b2b2e444-b2b2-e444-b2b2-b2b2b2b2e444';
+    await seedApp(APP, DRV_D, 'interviewing', 'b2-e-imm-key-x');
+    await asAuth(db, R_USER);
+    for (const stmt of [
+      `UPDATE public.opportunity_applications SET application_type='request_info' WHERE id=$1`,
+      `UPDATE public.opportunity_applications SET driver_user_id='${DRV_E}' WHERE id=$1`,
+      `UPDATE public.opportunity_applications SET opportunity_id='${OPP}', recruiter_id='${R_PROF}', idempotency_key='changed' WHERE id=$1`,
+      `UPDATE public.opportunity_applications SET submission_snapshot='{"tamper":true}'::jsonb WHERE id=$1`,
+    ]) {
+      await expect(db.query(stmt, [APP])).rejects.toThrow(/only update application status/i);
+    }
+    await asOwner(db);
+  });
+});
+

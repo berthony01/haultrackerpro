@@ -120,11 +120,17 @@ BEGIN
   _workflow := public._m2_workflow_bypass_active();
   _actor    := auth.uid();
 
+  -- Trusted driver-withdraw path: must have real token, driver actor identity,
+  -- target 'withdrawn', source not terminal / not onboarding, and no accepted offer.
   _driver_withdraw := (
     public._m2_driver_withdraw_active()
     AND _actor IS NOT NULL AND _actor = OLD.driver_user_id
     AND NEW.status = 'withdrawn'
-    AND OLD.status NOT IN ('withdrawn','hired','rejected')
+    AND OLD.status NOT IN ('withdrawn','hired','rejected','onboarding')
+    AND NOT EXISTS (
+      SELECT 1 FROM public.opportunity_offers
+       WHERE application_id = OLD.id AND status = 'accepted'
+    )
   );
 
   IF NEW.id IS DISTINCT FROM OLD.id
@@ -182,14 +188,23 @@ BEGIN
         SELECT o.id INTO _current_sent_offer
           FROM public.opportunity_offers o
          WHERE o.application_id = OLD.id AND o.status = 'sent'
+           AND o.opportunity_id = OLD.opportunity_id
+           AND o.driver_user_id = OLD.driver_user_id
+           AND o.recruiter_id = OLD.recruiter_id
          LIMIT 1;
         IF _current_sent_offer IS NULL THEN
           RAISE EXCEPTION 'offer_sent requires a matching sent offer' USING ERRCODE = '42501';
         END IF;
       ELSIF NEW.status = 'onboarding' THEN
+        IF OLD.status <> 'offer_sent' THEN
+          RAISE EXCEPTION 'onboarding requires prior offer_sent' USING ERRCODE = '42501';
+        END IF;
         SELECT o.id INTO _current_accepted
           FROM public.opportunity_offers o
          WHERE o.application_id = OLD.id AND o.status = 'accepted'
+           AND o.opportunity_id = OLD.opportunity_id
+           AND o.driver_user_id = OLD.driver_user_id
+           AND o.recruiter_id = OLD.recruiter_id
          LIMIT 1;
         IF _current_accepted IS NULL THEN
           RAISE EXCEPTION 'onboarding requires an accepted offer' USING ERRCODE = '42501';
@@ -201,6 +216,9 @@ BEGIN
         SELECT o.id INTO _current_accepted
           FROM public.opportunity_offers o
          WHERE o.application_id = OLD.id AND o.status = 'accepted'
+           AND o.opportunity_id = OLD.opportunity_id
+           AND o.driver_user_id = OLD.driver_user_id
+           AND o.recruiter_id = OLD.recruiter_id
          LIMIT 1;
         IF _current_accepted IS NULL THEN
           RAISE EXCEPTION 'hired requires an accepted offer' USING ERRCODE = '42501';
