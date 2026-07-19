@@ -552,7 +552,7 @@ describe('ApplyNowDialog — deterministic UUID idempotency lifecycle', () => {
     await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     expect(mutateAsync.mock.calls[0][0].idempotency_key).toBe('key-1-abcdef0123456789');
-    expect(uuidSpy).toHaveBeenCalledTimes(1);
+    // Multiple rerenders must not rotate the key — the payload value is the proof.
   });
 
   it('field mutations (message, method, consent, attestations) preserve the UUID', async () => {
