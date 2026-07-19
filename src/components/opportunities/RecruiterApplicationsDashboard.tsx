@@ -77,6 +77,26 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const PREFERRED_CONTACT_LABELS: Record<string, string> = {
+  in_app: 'In-app',
+  email: 'Email',
+  phone: 'Phone',
+  sms: 'SMS',
+};
+
+function formatPreferredContact(value?: string | null): string {
+  if (!value) return '—';
+  const key = String(value).toLowerCase();
+  return (
+    PREFERRED_CONTACT_LABELS[key] ??
+    key
+      .split(/[_\s]+/)
+      .filter(Boolean)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(' ')
+  );
+}
+
 function fmtDate(d?: string | null) {
   if (!d) return '—';
   try {
