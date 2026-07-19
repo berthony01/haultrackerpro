@@ -962,3 +962,27 @@ CREATE POLICY "Recruiter updates application status"
   FOR UPDATE TO authenticated
   USING (public.current_user_can_manage_recruiter_opportunities(recruiter_id))
   WITH CHECK (public.current_user_can_manage_recruiter_opportunities(recruiter_id));
+
+-- ---------------------------------------------------------------------
+-- 10. Delete-policy closeout. Applications must be withdrawn, not
+-- permanently deleted by an authenticated user. Drop every legacy
+-- DELETE policy on opportunity_applications and revoke direct DELETE
+-- from PUBLIC, anon, and authenticated. service_role retains DELETE
+-- for authorized administrative and account-deletion cleanup.
+-- Enforcement is layered: (a) no DELETE policy for authenticated roles
+-- exists, and (b) the authenticated role has no table-level DELETE
+-- privilege at all, so even a superuser-authored DELETE policy could
+-- not bypass the grant boundary.
+-- ---------------------------------------------------------------------
+DROP POLICY IF EXISTS "Driver deletes own application" ON public.opportunity_applications;
+DROP POLICY IF EXISTS "Drivers delete own application" ON public.opportunity_applications;
+DROP POLICY IF EXISTS "Drivers delete own applications" ON public.opportunity_applications;
+DROP POLICY IF EXISTS "Users delete own applications" ON public.opportunity_applications;
+DROP POLICY IF EXISTS "Driver can delete application" ON public.opportunity_applications;
+DROP POLICY IF EXISTS "Recruiter deletes application" ON public.opportunity_applications;
+DROP POLICY IF EXISTS "Admins delete applications" ON public.opportunity_applications;
+
+REVOKE DELETE ON public.opportunity_applications FROM PUBLIC;
+REVOKE DELETE ON public.opportunity_applications FROM anon;
+REVOKE DELETE ON public.opportunity_applications FROM authenticated;
+GRANT DELETE ON public.opportunity_applications TO service_role;
