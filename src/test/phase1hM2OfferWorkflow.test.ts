@@ -911,3 +911,318 @@ describe('Phase 1H-M2 Turn 2b-i remediations', () => {
     expect(nfy2.rows[0].n).toBe('1');
   });
 });
+
+// ---------------------------------------------------------------------
+// Phase 2B-1 checkpoint suite — authorization ordering, canonical
+// recruiter eligibility, foreign-state disclosure. All tests execute the
+// exact M2 candidate SQL loaded in beforeAll (no embedded replacements).
+// ---------------------------------------------------------------------
+describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
+  // Suspended recruiter fixture: complete profile but status=suspended.
+  const SUSP_USER = 'f1111111-f111-f111-f111-f11111111111';
+  const SUSP_PROF = 'f2222222-f222-f222-f222-f22222222222';
+  const SUSP_OPP  = 'f3333333-f333-f333-f333-f33333333333';
+  const SUSP_DRV  = 'f4444444-f444-f444-f444-f44444444444';
+
+  beforeAll(async () => {
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES
+        ('${SUSP_USER}','susp-r@t'),
+        ('${SUSP_DRV}','susp-d@t')
+      ON CONFLICT DO NOTHING;
+      INSERT INTO public.recruiter_profiles(
+        id,user_id,recruiter_name,recruiter_email,company_name,dot_number,
+        posting_terms_accepted_at,posting_terms_version,verification_status,status
+      ) VALUES (
+        '${SUSP_PROF}','${SUSP_USER}','Susp Recruiter','susp-r@t','Susp Co','DOTS',
+        now(),'2026-07-17.v1','approved','suspended'
+      );
+      INSERT INTO public.opportunities(
+        id,recruiter_id,title,company_name,hiring_city,hiring_state,driver_type,route_type,trailer_type,
+        pay_model,cpm,estimated_weekly_gross,estimated_weekly_miles,status,admin_review_status
+      ) VALUES (
+        '${SUSP_OPP}','${SUSP_PROF}','Susp OTR','Susp Co','Dallas','TX','company','regional','dry_van',
+        'cpm',0.62,1800,2800,'active','approved'
+      );
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${SUSP_DRV}','S','A',5,'phone','apply_only',true);
+      -- Seed apply row directly (RLS driver_can_access_opportunity would fail on suspended recruiter).
+      INSERT INTO public.opportunity_applications(
+        id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
+        submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
+        preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
+      ) VALUES (
+        'f5555555-f555-f555-f555-f55555555555',
+        '${SUSP_OPP}','${SUSP_DRV}','${SUSP_PROF}',
+        'apply','interviewing', jsonb_build_object('seed',true), 1, 'susp-seed-key-1234',
+        now(), false, 'phone', true, now()
+      );
+    `);
+  });
+
+  const SUSP_APP = 'f5555555-f555-f555-f555-f55555555555';
+
+  // ---------- send_opportunity_offer ----------
+  it('send: unauthenticated caller is denied', async () => {
+    await asOwner(db);
+    // Seed a sent offer via owner + trusted RPC path (owner runs as superuser,
+    // authorization guard checks auth.uid()=NULL → denied path is
+    // "authentication required".)
+    // Use the pre-existing driverE sent offer.
+    const off = await db.query<{ id: string }>(
+      `SELECT o.id FROM public.opportunity_offers o
+        JOIN public.opportunity_applications a ON a.id=o.application_id
+        WHERE a.driver_user_id='${IDS.driverE}' LIMIT 1`);
+    await db.exec(`RESET ROLE; RESET request.jwt.claim.sub;`);
+    await db.exec(`SET ROLE authenticated;`); // no jwt.sub set
+    await expect(
+      db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [off.rows[0].id]),
+    ).rejects.toThrow(/authentication required/i);
+    await asOwner(db);
+  });
+
+  it('send: suspended recruiter (owner) is denied with recruiter-not-eligible', async () => {
+    // Seed a draft on the suspended-recruiter application as owner (bypasses RPC gating).
+    const draftId = 'f6666666-f666-f666-f666-f66666666666';
+    await db.exec(`
+      INSERT INTO public.opportunity_offers(
+        id, application_id, opportunity_id, driver_user_id, recruiter_id, status,
+        pay_description, estimated_weekly_amount, created_by
+      ) VALUES (
+        '${draftId}','${SUSP_APP}','${SUSP_OPP}','${SUSP_DRV}','${SUSP_PROF}',
+        'draft','pay',1800,'${SUSP_USER}'
+      );
+    `);
+    await asAuth(db, SUSP_USER);
+    await expect(
+      db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [draftId]),
+    ).rejects.toThrow(/recruiter not eligible/i);
+    await asOwner(db);
+  });
+
+  it('send: driver cannot obtain already_sent for a sent offer they received', async () => {
+    const off = await db.query<{ id: string }>(
+      `SELECT o.id FROM public.opportunity_offers o
+        JOIN public.opportunity_applications a ON a.id=o.application_id
+        WHERE a.driver_user_id='${IDS.driverE}' AND o.status IN ('sent','expired') LIMIT 1`);
+    await asAuth(db, IDS.driverE);
+    await expect(
+      db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [off.rows[0].id]),
+    ).rejects.toThrow(/not authorized/i);
+    await asOwner(db);
+  });
+
+  // ---------- complete_hiring ----------
+  it('complete_hiring: unauthenticated caller is denied', async () => {
+    // Use appC (already hired in test b).
+    const r = await db.query<{ id: string }>(
+      `SELECT id FROM public.opportunity_applications
+        WHERE driver_user_id='${IDS.driverC}' AND status='hired' LIMIT 1`);
+    await db.exec(`RESET ROLE; RESET request.jwt.claim.sub;`);
+    await db.exec(`SET ROLE authenticated;`);
+    await expect(
+      db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [r.rows[0].id]),
+    ).rejects.toThrow(/authentication required/i);
+    await asOwner(db);
+  });
+
+  it('complete_hiring: suspended recruiter denied (recruiter-not-eligible) — no already_hired leak', async () => {
+    // Force suspended-recruiter application to hired directly as owner to prove
+    // suspended recruiter cannot use idempotent already_hired to confirm state.
+    await db.exec(`
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
+      UPDATE public.opportunity_applications SET status='hired', updated_at=now() WHERE id='${SUSP_APP}';
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
+    `);
+    await asAuth(db, SUSP_USER);
+    await expect(
+      db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [SUSP_APP]),
+    ).rejects.toThrow(/recruiter not eligible/i);
+    await asOwner(db);
+  });
+
+  it('complete_hiring: incomplete recruiter denied', async () => {
+    // Fresh driver on incompleteOpportunity to avoid unique-active-apply collision.
+    const incDriver = 'f7d7d7d7-f7d7-d7d7-f7d7-d7d7d7d7d7d7';
+    const rowId = 'f7777777-f777-f777-f777-f77777777777';
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${incDriver}','inch@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${incDriver}','Inch','A',5,'phone','apply_only',true);
+      INSERT INTO public.opportunity_applications(
+        id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
+        submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
+        preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
+      ) VALUES (
+        '${rowId}','${IDS.incompleteOpportunity}','${incDriver}','${IDS.incompleteRecruiterProfile}',
+        'apply','hired', jsonb_build_object('seed',true), 1, 'inc-hired-seed-key',
+        now(), false, 'phone', true, now()
+      );
+    `);
+    await asAuth(db, IDS.incompleteRecruiterUser);
+    await expect(
+      db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [rowId]),
+    ).rejects.toThrow(/recruiter not eligible/i);
+    await asOwner(db);
+  });
+
+  it('complete_hiring: driver cannot obtain already_hired', async () => {
+    const r = await db.query<{ id: string }>(
+      `SELECT id FROM public.opportunity_applications
+        WHERE driver_user_id='${IDS.driverC}' AND status='hired' LIMIT 1`);
+    await asAuth(db, IDS.driverC);
+    await expect(
+      db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [r.rows[0].id]),
+    ).rejects.toThrow(/not authorized/i);
+    await asOwner(db);
+  });
+
+  // ---------- transition_opportunity_application ----------
+  it('transition: unauthenticated denied; foreign, incomplete, suspended recruiters denied', async () => {
+    // Use SUSP_APP (still interviewing before earlier direct hire flip? Now hired).
+    // Seed a fresh interviewing row on owning recruiter for transition target.
+    const tRow = 'f8888888-f888-f888-f888-f88888888888';
+    const tDriver = 'f8d8d8d8-f8d8-d8d8-f8d8-d8d8d8d8d8d8';
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${tDriver}','td@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${tDriver}','Td','A',5,'phone','apply_only',true);
+      INSERT INTO public.opportunity_applications(
+        id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
+        submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
+        preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
+      ) VALUES (
+        '${tRow}','${IDS.opportunity}','${tDriver}','${IDS.recruiterProfile}',
+        'apply','interviewing', jsonb_build_object('seed',true), 1, 'transition-seed-key-1',
+        now(), false, 'phone', true, now()
+      );
+    `);
+    // Unauthenticated
+    await db.exec(`RESET ROLE; RESET request.jwt.claim.sub;`);
+    await db.exec(`SET ROLE authenticated;`);
+    await expect(
+      db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [tRow]),
+    ).rejects.toThrow(/authentication required/i);
+    // Foreign
+    await asAuth(db, IDS.foreignRecruiterUser);
+    await expect(
+      db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [tRow]),
+    ).rejects.toThrow(/not authorized/i);
+    // Incomplete (owns a different recruiter — treated as foreign to this app)
+    await asAuth(db, IDS.incompleteRecruiterUser);
+    await expect(
+      db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [tRow]),
+    ).rejects.toThrow(/not authorized/i);
+    // Suspended recruiter user (foreign to this row)
+    await asAuth(db, SUSP_USER);
+    await expect(
+      db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [tRow]),
+    ).rejects.toThrow(/not authorized/i);
+    await asOwner(db);
+  });
+
+  it('transition: owning suspended recruiter denied with recruiter-not-eligible on their own app', async () => {
+    // SUSP_APP is now status='hired' (terminal); reset to interviewing to test transition path.
+    await db.exec(`ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger; UPDATE public.opportunity_applications SET status='interviewing', updated_at=now() WHERE id='${SUSP_APP}'; ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;`);
+    await asAuth(db, SUSP_USER);
+    await expect(
+      db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [SUSP_APP]),
+    ).rejects.toThrow(/recruiter not eligible/i);
+    await asOwner(db);
+  });
+
+  // ---------- cancel_opportunity_offer ----------
+  it('cancel: foreign, unauthenticated, suspended recruiters denied', async () => {
+    // Seed a fresh sent offer on owning recruiter to have something targetable.
+    const cDriver = 'f9999999-f999-f999-f999-f99999999999';
+    await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${cDriver}','cx@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${cDriver}','Cx','A',5,'phone','apply_only',true);
+    `);
+    const cApp = await submitApply(db, cDriver, IDS.opportunity, 'cancel-focus-key-1');
+    await transitionToInterviewing(db, cApp, IDS.recruiterUser);
+    await asAuth(db, IDS.recruiterUser);
+    await db.query(`SELECT * FROM public.save_opportunity_offer_draft($1::uuid,'pay',1800,NULL,NULL,NULL,NULL,NULL,NULL,NULL)`, [cApp]);
+    const d = await db.query<{ id: string }>(
+      `SELECT id FROM public.opportunity_offers WHERE application_id=$1 AND status='draft'`, [cApp]);
+    await db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [d.rows[0].id]);
+    await asOwner(db);
+    const offerId = d.rows[0].id;
+
+    // Unauthenticated
+    await db.exec(`RESET ROLE; RESET request.jwt.claim.sub;`);
+    await db.exec(`SET ROLE authenticated;`);
+    await expect(
+      db.query(`SELECT * FROM public.cancel_opportunity_offer($1::uuid,NULL)`, [offerId]),
+    ).rejects.toThrow(/authentication required/i);
+    // Foreign
+    await asAuth(db, IDS.foreignRecruiterUser);
+    await expect(
+      db.query(`SELECT * FROM public.cancel_opportunity_offer($1::uuid,NULL)`, [offerId]),
+    ).rejects.toThrow(/not authorized/i);
+    // Suspended (foreign to this offer)
+    await asAuth(db, SUSP_USER);
+    await expect(
+      db.query(`SELECT * FROM public.cancel_opportunity_offer($1::uuid,NULL)`, [offerId]),
+    ).rejects.toThrow(/not authorized/i);
+    // Driver (owner of app) still denied — cancel is recruiter-only.
+    await asAuth(db, cDriver);
+    await expect(
+      db.query(`SELECT * FROM public.cancel_opportunity_offer($1::uuid,NULL)`, [offerId]),
+    ).rejects.toThrow(/not authorized/i);
+    await asOwner(db);
+  });
+
+  // ---------- save_opportunity_offer_draft ----------
+  it('draft: unauthenticated denied; suspended-owner denied with recruiter-not-eligible', async () => {
+    // Unauth on SUSP_APP
+    await db.exec(`RESET ROLE; RESET request.jwt.claim.sub;`);
+    await db.exec(`SET ROLE authenticated;`);
+    await expect(
+      db.query(`SELECT * FROM public.save_opportunity_offer_draft($1::uuid,'pay',1800,NULL,NULL,NULL,NULL,NULL,NULL,NULL)`, [SUSP_APP]),
+    ).rejects.toThrow(/authentication required/i);
+    // Suspended owner
+    await asAuth(db, SUSP_USER);
+    await expect(
+      db.query(`SELECT * FROM public.save_opportunity_offer_draft($1::uuid,'pay',1800,NULL,NULL,NULL,NULL,NULL,NULL,NULL)`, [SUSP_APP]),
+    ).rejects.toThrow(/recruiter not eligible/i);
+    await asOwner(db);
+  });
+
+  // ---------- disclosure consistency ----------
+  it('denial errors expose no application/offer IDs, statuses, or terms', async () => {
+    // Get real IDs to make sure they're not present in error messages.
+    const off = await db.query<{ id: string; application_id: string }>(
+      `SELECT o.id, o.application_id FROM public.opportunity_offers o
+        JOIN public.opportunity_applications a ON a.id=o.application_id
+        WHERE a.driver_user_id='${IDS.driverE}' LIMIT 1`);
+    const offerId = off.rows[0].id;
+    const appId2 = off.rows[0].application_id;
+
+    const captureError = async (fn: () => Promise<unknown>): Promise<string> => {
+      try { await fn(); return ''; }
+      catch (e) { return (e as Error).message ?? String(e); }
+    };
+
+    await asAuth(db, IDS.foreignRecruiterUser);
+    const m1 = await captureError(() =>
+      db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [offerId]));
+    const m2 = await captureError(() =>
+      db.query(`SELECT * FROM public.complete_hiring($1::uuid)`, [appId2]));
+    const m3 = await captureError(() =>
+      db.query(`SELECT * FROM public.cancel_opportunity_offer($1::uuid,NULL)`, [offerId]));
+    await asOwner(db);
+
+    for (const m of [m1, m2, m3]) {
+      expect(m).toMatch(/not authorized/i);
+      expect(m).not.toContain(offerId);
+      expect(m).not.toContain(appId2);
+      expect(m.toLowerCase()).not.toContain('already_sent');
+      expect(m.toLowerCase()).not.toContain('already_hired');
+      expect(m.toLowerCase()).not.toContain('already_canceled');
+      expect(m.toLowerCase()).not.toContain('offer_sent');
+      expect(m.toLowerCase()).not.toContain('onboarding');
+    }
+  });
+});
