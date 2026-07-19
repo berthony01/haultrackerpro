@@ -1,9 +1,9 @@
 // @vitest-environment node
 // =====================================================================
-// Phase 1H-A1 — Remediated foundation runtime harness (PGlite)
-// Pass 2. Exercises production authorization paths under SET ROLE
-// authenticated where RLS is material, and asserts every unresolved
-// item from the pass-1 independent audit.
+// Phase 1H-M1 — Canonical foundation runtime harness (PGlite)
+// Exercises production authorization paths under SET ROLE authenticated
+// where RLS is material against the canonical M1 migration promoted to
+// supabase/migrations/. This suite is the M1 focused gate.
 // =====================================================================
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -17,11 +17,11 @@ interface AnyPGlite {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-const CANDIDATE_REL =
-  '../../supabase/migration-candidates/20260718000000_phase1h_a1_application_snapshot_offers_restrictions.sql';
+const CANONICAL_M1_REL =
+  '../../supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql';
 
 function loadCandidate(): string {
-  const p = fileURLToPath(new URL(CANDIDATE_REL, import.meta.url));
+  const p = fileURLToPath(new URL(CANONICAL_M1_REL, import.meta.url));
   return fs.readFileSync(p, 'utf8');
 }
 
