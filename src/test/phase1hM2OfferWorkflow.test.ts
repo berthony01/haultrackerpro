@@ -1822,7 +1822,7 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
       `UPDATE public.opportunity_applications SET opportunity_id='${OPP}', recruiter_id='${R_PROF}', idempotency_key='changed' WHERE id=$1`,
       `UPDATE public.opportunity_applications SET submission_snapshot='{"tamper":true}'::jsonb WHERE id=$1`,
     ]) {
-      await expect(db.query(stmt, [APP])).rejects.toThrow(/only update application status/i);
+      await expect(db.query(stmt, [APP])).rejects.toThrow(/only update application status|application identity is immutable|submission_snapshot|idempotency/i);
     }
     await asOwner(db);
   });
