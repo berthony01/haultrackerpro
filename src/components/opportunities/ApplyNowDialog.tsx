@@ -209,6 +209,9 @@ export function ApplyNowDialog({
                     <SelectItem value="phone" disabled={!hasPhone}>
                       Phone {hasPhone ? '' : '(not on profile)'}
                     </SelectItem>
+                    <SelectItem value="sms" disabled={!hasPhone}>
+                      SMS {hasPhone ? '' : '(no phone on profile)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
