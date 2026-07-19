@@ -1225,15 +1225,15 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     const nowExpires = new Date(Date.now() + 2 * 24 * 3600_000).toISOString();
     await pool.query(
       `INSERT INTO public.opportunity_offers
-         (id,application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,expires_at,pay_description)
-         SELECT $1, a.id, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'sent', now(), $3::timestamptz, 'p'
+         (id,application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,expires_at,pay_description,snapshot_version,sent_snapshot)
+         SELECT $1, a.id, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'sent', now(), $3::timestamptz, 'p', 1, '{"seed":true}'::jsonb
            FROM public.opportunity_applications a WHERE a.id=$2`,
       [oidA, appId, nowExpires],
     );
     await pool.query(
       `INSERT INTO public.opportunity_offers
-         (id,application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,expires_at,pay_description)
-         SELECT $1, a.id, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'sent', now(), $3::timestamptz, 'p'
+         (id,application_id,opportunity_id,recruiter_id,driver_user_id,status,sent_at,expires_at,pay_description,snapshot_version,sent_snapshot)
+         SELECT $1, a.id, a.opportunity_id, a.recruiter_id, a.driver_user_id, 'sent', now(), $3::timestamptz, 'p', 1, '{"seed":true}'::jsonb
            FROM public.opportunity_applications a WHERE a.id=$2`,
       [oidB, appId, nowExpires],
     );
