@@ -365,11 +365,12 @@ describe('ApplyNowDialog — idempotency-key lifecycle', () => {
   it('generates a new key when reopened after cancel', async () => {
     mutateAsync.mockRejectedValue(new Error('submission_failed:empty_response'));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const onOpenChange = vi.fn();
-    const { rerender } = render(
+    let open = true;
+    const onOpenChange = vi.fn((v: boolean) => { open = v; });
+    const Render = () => (
       <QueryClientProvider client={qc}>
         <ApplyNowDialog
-          open
+          open={open}
           onOpenChange={onOpenChange}
           opportunityId="opp-1"
           opportunityTitle="OTR Reefer"
@@ -377,40 +378,19 @@ describe('ApplyNowDialog — idempotency-key lifecycle', () => {
           driverProfile={baseProfile}
           onEditProfile={vi.fn()}
         />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
+    const { rerender } = render(<Render />);
     await fillAttest();
     await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
     const firstKey = mutateAsync.mock.calls[0][0].idempotency_key;
-    // Close dialog
-    rerender(
-      <QueryClientProvider client={qc}>
-        <ApplyNowDialog
-          open={false}
-          onOpenChange={onOpenChange}
-          opportunityId="opp-1"
-          opportunityTitle="OTR Reefer"
-          companyName="Acme"
-          driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
-        />
-      </QueryClientProvider>,
-    );
+    // Cancel via the actual button so handleOpenChange fires and resetForm runs.
+    await userEvent.click(screen.getByRole('button', { name: /Cancel/i }));
+    rerender(<Render />); // reflect open=false
     // Reopen
-    rerender(
-      <QueryClientProvider client={qc}>
-        <ApplyNowDialog
-          open
-          onOpenChange={onOpenChange}
-          opportunityId="opp-1"
-          opportunityTitle="OTR Reefer"
-          companyName="Acme"
-          driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
-        />
-      </QueryClientProvider>,
-    );
+    open = true;
+    rerender(<Render />);
     await fillAttest();
     await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
