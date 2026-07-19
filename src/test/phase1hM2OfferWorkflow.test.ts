@@ -818,7 +818,7 @@ describe('Phase 1H-M2 Turn 2b-i remediations', () => {
       `SELECT id FROM public.opportunity_offers WHERE application_id=$1 AND status='sent' LIMIT 1`, [appE]);
     const offerE = eOff.rows[0].id;
     // Force expiry in past by disabling offer guard.
-    await db.exec(`ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard;`);
+    await db.exec(`ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard; ALTER TABLE public.opportunity_offers DROP CONSTRAINT IF EXISTS opportunity_offers_sent_expiry_chk;`);
     await db.query(`UPDATE public.opportunity_offers SET expires_at = now() - interval '1 hour' WHERE id=$1`, [offerE]);
     await db.exec(`ALTER TABLE public.opportunity_offers ENABLE TRIGGER trg_opportunity_offers_guard;`);
     await asAuth(db, IDS.driverE);
@@ -856,7 +856,7 @@ describe('Phase 1H-M2 Turn 2b-i remediations', () => {
       `SELECT id FROM public.opportunity_offers WHERE application_id=$1 AND status='draft'`, [appJ]);
     await db.query(`SELECT * FROM public.send_opportunity_offer($1::uuid, now() + interval '7 days')`, [dj.rows[0].id]);
     await asOwner(db);
-    await db.exec(`ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard;`);
+    await db.exec(`ALTER TABLE public.opportunity_offers DISABLE TRIGGER trg_opportunity_offers_guard; ALTER TABLE public.opportunity_offers DROP CONSTRAINT IF EXISTS opportunity_offers_sent_expiry_chk;`);
     await db.query(`UPDATE public.opportunity_offers SET expires_at = now() - interval '1 hour' WHERE id=$1`, [dj.rows[0].id]);
     await db.exec(`ALTER TABLE public.opportunity_offers ENABLE TRIGGER trg_opportunity_offers_guard;`);
     await asAuth(db, IDS.recruiterUser);
@@ -884,8 +884,8 @@ describe('Phase 1H-M2 Turn 2b-i remediations', () => {
         ('${kDriver1}','K1','A',5,'phone','apply_only',true),
         ('${kDriver2}','K2','A',5,'phone','apply_only',true);
     `);
-    const appK1 = await submitApply(db, kDriver1, IDS.opportunity, 'k1-key');
-    const appK2 = await submitApply(db, kDriver2, IDS.opportunity, 'k2-key');
+    const appK1 = await submitApply(db, kDriver1, IDS.opportunity, 'k1-driver-key-01');
+    const appK2 = await submitApply(db, kDriver2, IDS.opportunity, 'k2-driver-key-02');
 
     await asAuth(db, kDriver1);
     await db.query(`SELECT public.withdraw_opportunity_application($1::uuid)`, [appK1]);
