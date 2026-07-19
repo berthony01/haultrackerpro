@@ -1961,7 +1961,7 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
     const APP = 'b2b2caaa-b2b2-caaa-b2b2-b2b2b2b2caaa';
     const CON = 'b2b2caaa-b2b2-caaa-b2b2-b2b2b2b2cabb';
     const VER = 'b2b2caaa-b2b2-caaa-b2b2-b2b2b2b2cacc';
-    await seedApp(APP, DRV_H, 'onboarding', 'b2-c-hire-noacc-key');
+    await seedApp(APP, DRV_R, 'onboarding', 'b2-c-hire-noacc-key');
     await asOwner(db);
     // Contract path is fully valid; only the accepted offer is absent.
     await db.exec(`
