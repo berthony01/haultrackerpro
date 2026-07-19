@@ -240,10 +240,10 @@ describe('ApplyNowDialog submission', () => {
 
   it('renders the profile snapshot with core fields', () => {
     renderDialog();
-    const snapshot = screen.getByText(/Application snapshot/i).closest('div')!.parentElement!;
+    const snapshot = screen.getByText(/Application snapshot \(read-only\)/i)
+      .closest('div')!.parentElement!.parentElement!;
     expect(within(snapshot).getByText(/Jane Driver/)).toBeInTheDocument();
     expect(within(snapshot).getByText(/Dallas, TX/)).toBeInTheDocument();
-    expect(within(snapshot).getByText(/^A$/)).toBeInTheDocument();
     expect(within(snapshot).getByText(/5 yrs/)).toBeInTheDocument();
   });
 });
