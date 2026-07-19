@@ -7,9 +7,8 @@
  * limits anywhere else.
  *
  * IMPORTANT
- *  - Stripe checkout for agency plans is NOT live in Phase 7. Wiring happens
- *    in Phase 8. Do not present "Subscribe" / "Pay" CTAs until the agency
- *    checkout edge function exists and is verified.
+ *  - Agency Stripe checkout shipped in Phase 8B. Subscribe/Pay CTAs are live
+ *    through the agency checkout edge function.
  *  - HaulTrackerPro does not process service payments between drivers and
  *    assistants/agencies. Charges defined here are for software access only.
  *  - assistant_free is a capability with no software fee — accepting a
