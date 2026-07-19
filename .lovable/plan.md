@@ -1,103 +1,72 @@
-# Strict Recruiter Flow Audit — Plan
+## Disclosure first — read before approving
 
-## Objective
+Two things you should know before greenlighting this plan, because they change what "PASS" for this audit means:
 
-Produce a single, evidence-based audit report of the entire Recruiter surface (auth → onboarding → billing/checkout → posting eligibility → opportunities → applications inbox → offers/pipeline → webhooks/entitlements → admin oversight). Read-only. No source, migration, DB, or config changes. Deliverable is a written report, not code.
+1. **The create_agency JSON defect is already fixed and live.** In the previous turn (build mode) I applied a migration to `create_agency` that switched `_defaults` from `jsonb` to `record` and trimmed the contact email before regex validation. The current network log confirms it: `POST …/rpc/create_agency` returned `200` at `2026-07-19T14:50:25Z` and produced agency `7657c655-…`. This turn's instruction says "do not apply a live migration"; that instruction arrived after the fix was already applied, so I'm disclosing rather than hiding it. No further live writes are proposed below.
+2. **A different live defect just surfaced in the same session.** `get_my_managed_drivers` returns `400 / 42703 / "column p.full_name does not exist"` on every call from `/agency`. I confirmed the function body references `COALESCE(p.display_name, p.full_name, lower(u.email))` while `public.profiles` has no `full_name` column (only `display_name`). This blocks the Assistant driver switcher and any surface that lists managed drivers.
 
-## Ground rules
+Given your standing protocol (narrow scope, one focused implementation run, honest split rather than overreach), I do **not** recommend attempting the full 51-scenario, 12-part audit in a single turn. I'm proposing a scoped Pass A that closes both confirmed defects with real tests, and explicitly deferring the rest into a Pass B execution packet.
 
-- Plan mode + audit mode: no file edits, no migrations, no `bunx`/`bun run`, no dependency changes, no live DB writes.
-- Every finding must cite: exact file path + line range OR exact DB object (function/policy/grant/table) OR exact test file + test name.
-- Every current-state claim is backed by a read performed during the audit. Nothing assumed from prior phase memory.
-- Treat prior "PASS" claims (1C, 1D, 1E, 1F-A/A.2/A.2.1/A.2.2, 1G-R1A1..R1A7, 1H-A1, 1H-A2) as claims to re-verify against HEAD, not as facts.
-- Severity taxonomy: **P0** production data/authz/billing defect · **P1** blocking correctness · **P2** UX/observability gap · **P3** hygiene.
-- Each finding: ID, severity, title, evidence (file:line or DB object), observed behavior, expected behavior per canonical product rule, minimal proposed remediation scope, whether it is in a candidate migration vs. live.
+## Scope of this plan (Pass A only)
 
-## Canonical product rules being audited against
+**In scope**
+- Candidate migration fixing `public.get_my_managed_drivers` to drop the non-existent `p.full_name` reference.
+- PGlite runtime test that reproduces the `42703` error against the current function body and proves the candidate fixes it.
+- Reproduction note + evidence for the already-applied `create_agency` fix (no code change; test already exists at `src/test/phase1iAgencyCreateJsonCast.test.ts`).
+- Full verification gates: `bunx vitest run`, `bunx tsgo` on both configs, `bun run build`, forbidden-test grep.
 
-1. Recruiter completes profile → standard posting unlocked (verification adds trust badge, not access).
-2. Suspension removes access.
-3. Recruiter checkout: no duplicate active subscriptions; intent/lease table gates concurrent starts; canonical `stripe_customer_id` on `recruiter_billing_profiles` is authority, not webhook metadata.
-4. Stripe webhook idempotency is state-machine based (`claim/complete/fail`), retry-safe.
-5. Applications: server-authoritative snapshot, split RPCs (`submit_opportunity_application` / `submit_request_info`), `result_code` contract, caller-required idempotency keys on formal paths, self-application blocked, DELETE revoked from `authenticated`, withdrawal driver-bound only.
-6. Offers: RPC-only mutation, post-draft expiry invariant, RESTRICT on FK delete.
-7. Recruiter UI cannot select `onboarding` or `hired` directly (offer workflow owns those transitions).
+**Explicitly deferred to Pass B** (out of scope this turn)
+- Parts 2–10 of the audit prompt: profile/settings, members, service packages, delegation, assistant invitation lifecycle, permission enforcement, workspace switching, driver control, RLS cross-tenant proofs, full JSON/JSONB contract inventory.
+- Parts 47–51 driver-control tests and cross-agency isolation proofs.
+- Any RLS or grants changes.
 
-## Audit scope (what will be read)
+Reason for the split: each of those parts requires reading 5–15 live functions/policies and writing role-scoped PGlite fixtures. Attempting all in one turn violates your "one focused implementation run" rule and produces exactly the kind of self-graded PASS you've called out before.
 
-### A. Codebase surfaces
-- `src/pages/Recruiter*` and any `Recruiter*` routes wired in `src/App.tsx`
-- `src/components/opportunities/Recruiter*`, `RecruiterApplicationsDashboard.tsx`, `RecruiterBillingPanel.tsx`, `RecruiterAccessPage.tsx`, `RecruiterOnboarding.tsx`, opportunity form components
-- `src/hooks/opportunities/useRecruiter*.ts` (profile, billing, opportunities, referrals, contact requests, analytics, settings)
-- `src/lib/opportunities/recruiter*` (eligibility, billing state, checkout messages, benefits format), `src/lib/recruiterCapabilities.ts`, `src/lib/recruiterFeatureList.ts`, `src/lib/recruiterReports/*`
-- `src/hooks/admin/useAdminRecruiter*.ts`, `useRecruiterOutreachStatus.ts`, admin recruiter oversight surfaces
-- Auth/role wiring for recruiter role: `useUserRole.ts`, `useActingContext.tsx`, `useViewMode.ts`, `useRoleIntentReconciler.ts`, `authNavigation.ts`
+## Root cause (confirmed by live reads)
 
-### B. Edge functions
-- `create-recruiter-checkout`, `recruiter-billing-portal`, `stripe-webhook`, `_shared/stripe-webhook-identity.ts`, `_shared/recruiter-checkout*`, `_shared/driver-billing.ts` (shared config path), `_shared/account-deletion.ts`
-- CORS, JWT verification, safe logging, session validation, canonical identity resolution, 409 duplicate guard
-
-### C. Database (READ-ONLY via `supabase--read_query` / `supabase--linter`)
-- Tables: `recruiter_billing_profiles`, `recruiter_checkout_intents`, `stripe_webhook_events`, `opportunity_applications`, `opportunity_offers`, `marketplace_user_restrictions`, `opportunities`, `user_roles`
-- For each: RLS enabled? policies (name, cmd, roles, USING/WITH CHECK), GRANTs (per role), triggers, constraints
-- RPCs: `recruiter_can_post`, `driver_can_access_opportunity`, `accept_recruiter_posting_terms`, `submit_opportunity_application`, `submit_request_info`, `build_application_submission_snapshot`, `claim_stripe_webhook_event`, `complete_stripe_webhook_event`, `fail_stripe_webhook_event`, checkout-intent RPCs, `has_role` — signature, `SECURITY DEFINER`, `search_path`, EXECUTE grants
-- Compare candidate migrations under `supabase/migration-candidates/*` against what is actually live (drift check)
-
-### D. Tests
-- `phase1c*`, `phase1d*` (if present), `phase1e*`, `phase1f*`, `phase1gR1A*`, `phase1hA1*`, `phase1hA2*`, `recruiter*`, `securityViewsShape.test.ts`
-- Report file count, passing count, and whether they exercise the real RPC path vs. mocks
-- Note any Postgres/PGlite runtime harnesses under `tests/postgres/`
-
-### E. Config / CI
-- `.github/workflows/recruiter-*.yml`, `playwright.recruiter-billing.config.ts`, `vitest.recruiter-checkout-postgres.config.ts`, `vitest.postgres.config.ts`
-- `supabase/config.toml` recruiter-related function `verify_jwt` and secret presence (names only; never values)
-
-## Report structure (deliverable)
-
+`public.get_my_managed_drivers` body (verified via `pg_get_functiondef`):
 ```
-Recruiter Flow Audit — HEAD <sha>
-
-1. Executive summary
-   - PASS / OPEN-BLOCKING / OPEN-NONBLOCKING counts by severity
-   - Candidate-vs-live drift summary
-
-2. Canonical product rules — pass/fail matrix (one row per rule above)
-
-3. Findings (grouped)
-   3.1 Auth / role / view-mode
-   3.2 Onboarding & profile completion
-   3.3 Posting eligibility & terms consent
-   3.4 Checkout (create-recruiter-checkout + intents)
-   3.5 Billing portal + subscription state
-   3.6 Stripe webhook identity + idempotency
-   3.7 Opportunities CRUD + RLS
-   3.8 Applications inbox + status transitions
-   3.9 Offers workflow
-   3.10 Admin oversight + suspension
-   3.11 Tests & CI evidence
-   3.12 Candidate-migration drift vs. live DB
-
-4. Confirmed-open defects (P0/P1) with minimal remediation scope per item
-
-5. Non-issues verified (explicit “checked, PASS” list — so we don’t re-audit next round)
-
-6. Cannot-confirm items (with the exact blocker: e.g. sandbox branch, missing secret, DB permission)
+COALESCE(p.display_name, p.full_name, lower(u.email))
+LEFT JOIN public.profiles p ON p.user_id = da.driver_user_id
 ```
+`public.profiles` columns (verified via `information_schema.columns`):
+```
+id, user_id, display_name, created_at, updated_at, subscription_status,
+subscription_plan, stripe_customer_id, subscription_expires_at,
+stripe_subscription_id, driver_handle, handle_emoji, handle_public,
+last_seen_release_id, intended_role
+```
+No `full_name`. Function raises `42703` on every call. Canonical fix: remove `p.full_name` from the COALESCE — `display_name` already exists and `lower(u.email)` is the fallback.
 
-## What the audit will NOT do
+## Files this turn will touch
 
-- No edits to any file, migration, workflow, or config
-- No `bun`/`bunx`/`npm` execution, no builds, no test runs (test presence and structure only)
-- No DB writes, no migration application, no publish, no deploy
-- No A3 (Ask Recruiter) design work, no scope expansion
-- No Stripe API calls, no live webhook replays
+- `supabase/migration-candidates/20260719160500_fix_get_my_managed_drivers_full_name.sql` — candidate only, not moved to `supabase/migrations/`.
+- `src/test/phase1iGetManagedDriversColumn.test.ts` — new PGlite test: reproduces `42703` with current body, applies candidate, proves it returns rows without error.
 
-## Stop conditions
+No client code changes (the hook just calls the RPC). No changes to `package.json`, lockfile, RLS, grants, or unrelated migrations.
 
-- If a read requires branch-isolated sandbox access we don’t have → report as **Cannot-confirm** with the exact blocker, do not guess.
-- If a finding requires a product decision (e.g., should suspension revoke posting immediately vs. next login) → surface as a decision item, do not choose.
-- If the audit uncovers a P0 mid-run → report it immediately at the top of the deliverable; do not begin remediation in this task.
+## Verification I will run and report verbatim
 
-## Estimated size
+1. `bunx vitest run src/test/phase1iGetManagedDriversColumn.test.ts src/test/phase1iAgencyCreateJsonCast.test.ts`
+2. `bunx vitest run` (full suite, single command, must exit 0)
+3. `bunx tsgo -p tsconfig.app.json --noEmit`
+4. `bunx tsgo -p tsconfig.node.json --noEmit`
+5. `bun run build`
+6. `grep -RInE '\.(only|skip)\(' src/test`
 
-Report only. ~1 long assistant message with the structure above. No file writes.
+I will not apply the candidate migration. You can promote it in a follow-up turn.
+
+## What I will NOT do this turn
+
+- No live SQL execution (migration or insert).
+- No RLS/grants changes.
+- No touching Phase 1H, Stripe, recruiter, driver dashboard, or account deletion paths.
+- No `package.json`/lockfile edits.
+- No publish/deploy.
+- No claim of PASS on any audit part I did not actually exercise — Parts 2–10 will be reported as DEFERRED, not PASS.
+
+## Stop conditions honored
+
+If the PGlite reproduction of `42703` fails to fire on the current body, or the full Vitest suite regresses, I stop and report FAIL rather than patch around it. If Pass B is needed, I'll return an execution packet naming the exact functions/policies/tests required instead of starting it inline.
+
+Approve to proceed with Pass A, or tell me to reshape the split (e.g. include one more specific Part).
