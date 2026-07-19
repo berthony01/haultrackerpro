@@ -1027,12 +1027,12 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
   });
 
   it('complete_hiring: suspended recruiter denied (recruiter-not-eligible) — no already_hired leak', async () => {
-    // Force suspended-recruiter application to onboarding + accepted offer + valid contract,
-    // then flip status→hired directly as owner to prove suspended recruiter cannot use
-    // idempotent already_hired to confirm state.
+    // Force suspended-recruiter application to hired directly as owner to prove
+    // suspended recruiter cannot use idempotent already_hired to confirm state.
     await db.exec(`
-      UPDATE public.opportunity_applications SET status='hired', updated_at=now()
-        WHERE id='${SUSP_APP}';
+      ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard;
+      UPDATE public.opportunity_applications SET status='hired', updated_at=now() WHERE id='${SUSP_APP}';
+      ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard;
     `);
     await asAuth(db, SUSP_USER);
     await expect(
@@ -1042,16 +1042,19 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
   });
 
   it('complete_hiring: incomplete recruiter denied', async () => {
-    // Seed an onboarding+accepted+hired app owned by the incomplete recruiter,
-    // as owner (bypasses guards). Then call as incomplete recruiter user.
+    // Fresh driver on incompleteOpportunity to avoid unique-active-apply collision.
+    const incDriver = 'f7d7d7d7-f7d7-d7d7-f7d7-d7d7d7d7d7d7';
     const rowId = 'f7777777-f777-f777-f777-f77777777777';
     await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${incDriver}','inch@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${incDriver}','Inch','A',5,'phone','apply_only',true);
       INSERT INTO public.opportunity_applications(
         id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
         submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
         preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
       ) VALUES (
-        '${rowId}','${IDS.incompleteOpportunity}','${IDS.driverD}','${IDS.incompleteRecruiterProfile}',
+        '${rowId}','${IDS.incompleteOpportunity}','${incDriver}','${IDS.incompleteRecruiterProfile}',
         'apply','hired', jsonb_build_object('seed',true), 1, 'inc-hired-seed-key',
         now(), false, 'phone', true, now()
       );
