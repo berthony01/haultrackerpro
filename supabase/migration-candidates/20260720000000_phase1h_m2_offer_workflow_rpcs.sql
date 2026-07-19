@@ -1,45 +1,101 @@
 -- =====================================================================
--- Phase 1H-M2 CANDIDATE: Atomic offer, withdrawal, onboarding, and
--- hiring workflow RPCs.
+-- Phase 1H-M2 CANDIDATE (Turn 2b-i remediation): Atomic offer,
+-- withdrawal, onboarding, and hiring workflow RPCs.
 --
--- STATUS: candidate — not applied live in Turn 2a per execution packet
--- section 27 (Environment actions: Migrations applied live: none).
--- Exercised end-to-end by src/test/phase1hM2OfferWorkflow.test.ts
--- against a fresh PGlite database that also loads the canonical M1
--- migration.
+-- STATUS: candidate — not applied live. Exercised end-to-end by
+-- src/test/phase1hM2OfferWorkflow.test.ts against a fresh PGlite database
+-- that also loads the canonical M1 migration.
 --
--- This migration:
---   (1) Hardens the application update guard so sensitive states
---       (offer_sent, onboarding, hired, withdrawn) can be set only by
---       server-authorized workflow RPCs, and only when supporting
---       offer / contract rows exist.
---   (2) Hardens the offer guard so identity + terminal state invariants
---       hold, one accepted offer per application, one current sent
---       offer per application, and accepted offers cannot be reverted.
---   (3) Introduces nine SECURITY DEFINER workflow RPCs:
---         transition_opportunity_application
---         save_opportunity_offer_draft
---         send_opportunity_offer
---         accept_opportunity_offer
---         decline_opportunity_offer
---         cancel_opportunity_offer
---         expire_opportunity_offers        (service_role only)
---         withdraw_opportunity_application (compat with A1 signature)
---         complete_hiring
---
--- Sensitive statuses are gated behind an internal workflow flag AND
--- live ownership + state validation inside the trigger.
+-- Remediations closed in this pass:
+--   * Authorization is performed BEFORE any idempotent state disclosure
+--     (already_sent / already_accepted / already_declined / already_canceled
+--     / already_hired). Foreign or ineligible callers can never learn
+--     private offer/application state.
+--   * transition / draft / send / cancel / complete_hiring all enforce
+--     public.current_user_can_manage_recruiter_opportunities on the
+--     application's recruiter_id in addition to ownership.
+--   * Draft eligibility is a positive list: interviewing OR offer_sent
+--     (replacement). Send eligibility is the same positive list.
+--   * Client-spoofable app.workflow_bypass GUC is replaced by a
+--     server-only per-DB secret token. The trigger accepts the workflow
+--     bypass ONLY when current_setting('app.workflow_bypass_token') equals
+--     public._m2_workflow_token() (a SECURITY DEFINER function whose row
+--     is not visible to authenticated). Same treatment for driver
+--     withdraw. Both settings default false via GUC scoping (SET LOCAL).
+--   * hired guard validates: accepted offer, contract for application,
+--     current_version_id set and matches a contract_versions row whose
+--     upload_status='uploaded', contract.status IN ('approved','signed').
+--   * Event / notification emission are consolidated through
+--     _m2_insert_event_once and _m2_notify_once. Notification dedup is
+--     keyed on (user_id, type, application_id, offer_id) so distinct
+--     applications never suppress each other.
+--   * Expiration flows through one canonical helper (_m2_expire_offer)
+--     used by accept, decline, cancel, send-replacement reconciliation,
+--     and the service_role sweep. Every expiration notifies both driver
+--     and recruiter exactly once (deduped per application+offer).
+--   * complete_hiring returns
+--     (application_id, application_status, offer_id, offer_status,
+--      result_code) and notifies the driver exactly once.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- Uniqueness: exactly one accepted offer per application. The existing
--- partial unique already enforces one current sent offer.
+-- Server-only workflow bypass token. Authenticated clients cannot read
+-- the row (revoked) and cannot execute the helper. RPCs are SECURITY
+-- DEFINER and execute nested calls as owner, which retains access.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public._m2_workflow_secret (
+  singleton boolean PRIMARY KEY DEFAULT true,
+  token     uuid NOT NULL DEFAULT gen_random_uuid(),
+  CONSTRAINT _m2_workflow_secret_singleton CHECK (singleton = true)
+);
+INSERT INTO public._m2_workflow_secret (singleton) VALUES (true)
+  ON CONFLICT (singleton) DO NOTHING;
+REVOKE ALL ON public._m2_workflow_secret FROM PUBLIC;
+REVOKE ALL ON public._m2_workflow_secret FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public._m2_workflow_token() RETURNS text
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path TO 'public' AS $$
+  SELECT token::text FROM public._m2_workflow_secret LIMIT 1
+$$;
+REVOKE ALL ON FUNCTION public._m2_workflow_token() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_workflow_token() FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._m2_workflow_token() TO service_role;
+
+-- Convenience: assert a bypass token is present in current session.
+CREATE OR REPLACE FUNCTION public._m2_workflow_bypass_active() RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path TO 'public' AS $$
+DECLARE v text; t text;
+BEGIN
+  v := current_setting('app.workflow_bypass_token', true);
+  IF v IS NULL OR v = '' THEN RETURN false; END IF;
+  SELECT token::text INTO t FROM public._m2_workflow_secret LIMIT 1;
+  RETURN v = t;
+END $$;
+REVOKE ALL ON FUNCTION public._m2_workflow_bypass_active() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_workflow_bypass_active() FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._m2_workflow_bypass_active() TO service_role;
+
+CREATE OR REPLACE FUNCTION public._m2_driver_withdraw_active() RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path TO 'public' AS $$
+DECLARE v text; t text;
+BEGIN
+  v := current_setting('app.driver_withdraw_token', true);
+  IF v IS NULL OR v = '' THEN RETURN false; END IF;
+  SELECT token::text INTO t FROM public._m2_workflow_secret LIMIT 1;
+  RETURN v = t;
+END $$;
+REVOKE ALL ON FUNCTION public._m2_driver_withdraw_active() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_driver_withdraw_active() FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._m2_driver_withdraw_active() TO service_role;
+
+-- ---------------------------------------------------------------------
+-- Uniqueness: exactly one accepted offer per application.
 -- ---------------------------------------------------------------------
 CREATE UNIQUE INDEX IF NOT EXISTS opportunity_offers_one_accepted_per_app_uidx
   ON public.opportunity_offers (application_id) WHERE status = 'accepted';
 
 -- ---------------------------------------------------------------------
--- Application update guard (hardened M2).
+-- Application update guard (M2 hardened).
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.opportunity_applications_update_guard()
 RETURNS trigger
@@ -48,21 +104,25 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  _allow_withdraw       boolean;
   _driver_withdraw      boolean;
   _workflow             boolean;
   _actor                uuid;
   _recruiter_user_id    uuid;
   _current_sent_offer   uuid;
   _current_accepted     uuid;
+  _c_id                 uuid;
+  _c_status             text;
+  _c_current_version    uuid;
+  _v_status             text;
+  _v_contract_id        uuid;
   _allowed              text[];
 BEGIN
-  _allow_withdraw := (current_setting('app.allow_driver_withdraw', true) = 'true');
-  _workflow       := (current_setting('app.workflow_bypass', true) = 'true');
-  _actor          := auth.uid();
+  _workflow := public._m2_workflow_bypass_active();
+  _actor    := auth.uid();
 
   _driver_withdraw := (
-    _allow_withdraw AND _actor IS NOT NULL AND _actor = OLD.driver_user_id
+    public._m2_driver_withdraw_active()
+    AND _actor IS NOT NULL AND _actor = OLD.driver_user_id
     AND NEW.status = 'withdrawn'
     AND OLD.status NOT IN ('withdrawn','hired','rejected')
   );
@@ -145,6 +205,34 @@ BEGIN
         IF _current_accepted IS NULL THEN
           RAISE EXCEPTION 'hired requires an accepted offer' USING ERRCODE = '42501';
         END IF;
+        -- Contract gate: must have a contract linked to this application
+        -- whose current_version_id points to an uploaded version of the
+        -- same contract, and whose status is approved or signed.
+        SELECT c.id, c.status::text, c.current_version_id
+          INTO _c_id, _c_status, _c_current_version
+          FROM public.contracts c
+         WHERE c.application_id = OLD.id
+         ORDER BY c.updated_at DESC
+         LIMIT 1;
+        IF _c_id IS NULL THEN
+          RAISE EXCEPTION 'hired requires a contract for this application' USING ERRCODE = '42501';
+        END IF;
+        IF _c_current_version IS NULL THEN
+          RAISE EXCEPTION 'hired requires contract.current_version_id' USING ERRCODE = '42501';
+        END IF;
+        IF _c_status NOT IN ('approved','signed') THEN
+          RAISE EXCEPTION 'hired requires contract status approved or signed' USING ERRCODE = '42501';
+        END IF;
+        SELECT cv.contract_id, cv.upload_status
+          INTO _v_contract_id, _v_status
+          FROM public.contract_versions cv
+         WHERE cv.id = _c_current_version;
+        IF _v_contract_id IS NULL OR _v_contract_id <> _c_id THEN
+          RAISE EXCEPTION 'hired requires current version to belong to the contract' USING ERRCODE = '42501';
+        END IF;
+        IF _v_status <> 'uploaded' THEN
+          RAISE EXCEPTION 'hired requires uploaded contract version' USING ERRCODE = '42501';
+        END IF;
       END IF;
 
       NEW.updated_at := now();
@@ -175,12 +263,8 @@ BEGIN
 END;
 $function$;
 
--- Trigger from M1 (opportunity_applications_update_guard_trigger, BEFORE UPDATE)
--- is preserved; this migration only replaces the function body via CREATE OR
--- REPLACE above.
-
 -- ---------------------------------------------------------------------
--- Offer guard (hardened M2).
+-- Offer guard (M2 hardened).
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.opportunity_offers_guard()
 RETURNS trigger
@@ -253,8 +337,10 @@ END;
 $function$;
 
 -- ---------------------------------------------------------------------
--- Internal helpers (service_role only).
+-- Internal helpers.
 -- ---------------------------------------------------------------------
+
+-- Event dedup includes (application_id, event_type, offer_id).
 CREATE OR REPLACE FUNCTION public._m2_insert_event_once(
   _application_id uuid, _actor_type text, _actor uuid,
   _event_type text, _offer_id uuid, _metadata jsonb
@@ -277,31 +363,109 @@ BEGIN
                     ELSE jsonb_build_object('offer_id', _offer_id) END);
 END;
 $function$;
-REVOKE ALL ON FUNCTION public._m2_insert_event_once(uuid,text,uuid,text,uuid,jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public._m2_insert_event_once(uuid,text,uuid,text,uuid,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_insert_event_once(uuid,text,uuid,text,uuid,jsonb) FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION public._m2_insert_event_once(uuid,text,uuid,text,uuid,jsonb) TO service_role;
 
+-- Notification dedup includes (user_id, type, application_id, offer_id).
 CREATE OR REPLACE FUNCTION public._m2_notify_once(
-  _user_id uuid, _type text, _title text, _body text, _offer_id uuid, _payload jsonb
+  _user_id uuid, _type text, _title text, _body text,
+  _application_id uuid, _offer_id uuid, _payload jsonb
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+DECLARE
+  _final_payload jsonb;
 BEGIN
   IF _user_id IS NULL THEN RETURN; END IF;
+  _final_payload := COALESCE(_payload,'{}'::jsonb)
+    || CASE WHEN _application_id IS NULL THEN '{}'::jsonb
+            ELSE jsonb_build_object('application_id', _application_id) END
+    || CASE WHEN _offer_id IS NULL THEN '{}'::jsonb
+            ELSE jsonb_build_object('offer_id', _offer_id) END;
   IF EXISTS (
     SELECT 1 FROM public.notifications n
      WHERE n.user_id = _user_id AND n.type = _type
+       AND (
+         (_application_id IS NULL AND (n.payload ? 'application_id') = false)
+         OR (n.payload->>'application_id' = _application_id::text)
+       )
        AND (
          (_offer_id IS NULL AND (n.payload ? 'offer_id') = false)
          OR (n.payload->>'offer_id' = _offer_id::text)
        )
   ) THEN RETURN; END IF;
-  PERFORM public.create_notification(_user_id, _type, _title, _body,
-    COALESCE(_payload,'{}'::jsonb)
-      || CASE WHEN _offer_id IS NULL THEN '{}'::jsonb
-              ELSE jsonb_build_object('offer_id', _offer_id) END);
+  PERFORM public.create_notification(_user_id, _type, _title, _body, _final_payload);
 END;
 $function$;
-REVOKE ALL ON FUNCTION public._m2_notify_once(uuid,text,text,text,uuid,jsonb) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public._m2_notify_once(uuid,text,text,text,uuid,jsonb) TO service_role;
+REVOKE ALL ON FUNCTION public._m2_notify_once(uuid,text,text,text,uuid,uuid,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_notify_once(uuid,text,text,text,uuid,uuid,jsonb) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._m2_notify_once(uuid,text,text,text,uuid,uuid,jsonb) TO service_role;
+
+-- Canonical expiration path. Marks a currently-sent offer expired and
+-- notifies driver + recruiter exactly once (dedup on application_id+offer_id).
+CREATE OR REPLACE FUNCTION public._m2_expire_offer(_offer_id uuid) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+DECLARE
+  _o public.opportunity_offers%ROWTYPE;
+  _rp_user uuid;
+  _now timestamptz := now();
+BEGIN
+  SELECT * INTO _o FROM public.opportunity_offers WHERE id = _offer_id FOR UPDATE;
+  IF NOT FOUND THEN RETURN false; END IF;
+  IF _o.status <> 'sent' THEN RETURN false; END IF;
+
+  UPDATE public.opportunity_offers SET status='expired', expired_at=_now WHERE id=_o.id;
+
+  PERFORM public._m2_insert_event_once(_o.application_id, 'system', NULL,
+    'offer_expired', _o.id, '{}'::jsonb);
+
+  PERFORM public._m2_notify_once(_o.driver_user_id, 'offer_expired',
+    'Offer expired', 'An offer you received has expired.',
+    _o.application_id, _o.id,
+    jsonb_build_object('opportunity_id', _o.opportunity_id));
+
+  SELECT rp.user_id INTO _rp_user FROM public.recruiter_profiles rp WHERE rp.id = _o.recruiter_id;
+  PERFORM public._m2_notify_once(_rp_user, 'offer_expired',
+    'Offer expired', 'An offer you sent has expired.',
+    _o.application_id, _o.id,
+    jsonb_build_object('opportunity_id', _o.opportunity_id));
+
+  RETURN true;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public._m2_expire_offer(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_expire_offer(uuid) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._m2_expire_offer(uuid) TO service_role;
+
+-- Wrap a status update to opportunity_applications with the workflow
+-- bypass token for the trigger. Confines the token to this LOCAL setting.
+CREATE OR REPLACE FUNCTION public._m2_set_application_status(_app_id uuid, _status text) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+DECLARE _t text;
+BEGIN
+  SELECT token::text INTO _t FROM public._m2_workflow_secret LIMIT 1;
+  PERFORM set_config('app.workflow_bypass_token', _t, true);
+  UPDATE public.opportunity_applications SET status = _status WHERE id = _app_id;
+  PERFORM set_config('app.workflow_bypass_token', '', true);
+END;
+$function$;
+REVOKE ALL ON FUNCTION public._m2_set_application_status(uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_set_application_status(uuid,text) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._m2_set_application_status(uuid,text) TO service_role;
+
+CREATE OR REPLACE FUNCTION public._m2_set_application_withdrawn(_app_id uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
+DECLARE _t text;
+BEGIN
+  SELECT token::text INTO _t FROM public._m2_workflow_secret LIMIT 1;
+  PERFORM set_config('app.driver_withdraw_token', _t, true);
+  UPDATE public.opportunity_applications SET status = 'withdrawn' WHERE id = _app_id;
+  PERFORM set_config('app.driver_withdraw_token', '', true);
+END;
+$function$;
+REVOKE ALL ON FUNCTION public._m2_set_application_withdrawn(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._m2_set_application_withdrawn(uuid) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._m2_set_application_withdrawn(uuid) TO service_role;
 
 -- ---------------------------------------------------------------------
 -- RPC 1: transition_opportunity_application
@@ -327,16 +491,16 @@ BEGIN
   SELECT * INTO _app FROM public.opportunity_applications WHERE id = _application_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'application not found' USING ERRCODE = 'P0002'; END IF;
 
-  IF _app.application_type <> 'apply' THEN
-    RAISE EXCEPTION 'transitions only allowed on formal applications' USING ERRCODE = '42501';
-  END IF;
-
   SELECT * INTO _rp FROM public.recruiter_profiles WHERE id = _app.recruiter_id;
   IF NOT FOUND OR _rp.user_id <> _actor THEN
     RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
   END IF;
-  IF _rp.status = 'suspended' OR _rp.verification_status = 'suspended' THEN
+  IF NOT public.current_user_can_manage_recruiter_opportunities(_app.recruiter_id) THEN
     RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
+  END IF;
+
+  IF _app.application_type <> 'apply' THEN
+    RAISE EXCEPTION 'transitions only allowed on formal applications' USING ERRCODE = '42501';
   END IF;
 
   IF _target_status IN ('offer_sent','onboarding','hired','withdrawn') THEN
@@ -356,8 +520,9 @@ BEGIN
       PERFORM public._m2_insert_event_once(_app.id, 'recruiter', _actor,
         'offer_canceled', _sent.id, jsonb_build_object('reason','rejected','note',_note));
       PERFORM public._m2_notify_once(_app.driver_user_id, 'offer_canceled',
-        'Offer canceled', 'The offer was canceled.', _sent.id,
-        jsonb_build_object('application_id', _app.id, 'opportunity_id', _app.opportunity_id));
+        'Offer canceled', 'The offer was canceled.',
+        _app.id, _sent.id,
+        jsonb_build_object('opportunity_id', _app.opportunity_id));
     END IF;
   END IF;
 
@@ -448,22 +613,21 @@ BEGIN
     WHERE id = _application_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'application not found' USING ERRCODE = 'P0002'; END IF;
 
-  IF _app.application_type <> 'apply' THEN
-    RAISE EXCEPTION 'offers require a formal application' USING ERRCODE = '42501';
-  END IF;
-
+  -- AUTHORIZATION FIRST — before any eligibility/state disclosure.
   SELECT * INTO _rp FROM public.recruiter_profiles WHERE id = _app.recruiter_id;
   IF NOT FOUND OR _rp.user_id <> _actor THEN
     RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
-  END IF;
-  IF _rp.status = 'suspended' OR _rp.verification_status = 'suspended' THEN
-    RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
   END IF;
   IF NOT public.current_user_can_manage_recruiter_opportunities(_app.recruiter_id) THEN
     RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
   END IF;
 
-  IF _app.status IN ('hired','rejected','withdrawn','onboarding') THEN
+  IF _app.application_type <> 'apply' THEN
+    RAISE EXCEPTION 'offers require a formal application' USING ERRCODE = '42501';
+  END IF;
+
+  -- Positive-list draft eligibility.
+  IF _app.status NOT IN ('interviewing','offer_sent') THEN
     RAISE EXCEPTION 'application not eligible for draft' USING ERRCODE = '42501';
   END IF;
 
@@ -544,6 +708,15 @@ BEGIN
   SELECT * INTO _offer FROM public.opportunity_offers WHERE id = _offer_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'offer not found' USING ERRCODE = 'P0002'; END IF;
 
+  -- AUTHORIZATION FIRST — before disclosing already_sent.
+  SELECT * INTO _rp FROM public.recruiter_profiles WHERE id = _offer.recruiter_id;
+  IF NOT FOUND OR _rp.user_id <> _actor THEN
+    RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.current_user_can_manage_recruiter_opportunities(_offer.recruiter_id) THEN
+    RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
+  END IF;
+
   IF _offer.status = 'sent' THEN
     application_id := _offer.application_id; offer_id := _offer.id; offer_status := 'sent';
     SELECT status INTO application_status FROM public.opportunity_applications WHERE id = _offer.application_id;
@@ -558,18 +731,12 @@ BEGIN
     WHERE id = _offer.application_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'application not found' USING ERRCODE = 'P0002'; END IF;
 
-  SELECT * INTO _rp FROM public.recruiter_profiles WHERE id = _app.recruiter_id;
-  IF NOT FOUND OR _rp.user_id <> _actor THEN
-    RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
-  END IF;
-  IF _rp.status = 'suspended' OR _rp.verification_status = 'suspended' THEN
-    RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
-  END IF;
-
   IF _app.application_type <> 'apply' THEN
     RAISE EXCEPTION 'offers require a formal application' USING ERRCODE = '42501';
   END IF;
-  IF _app.status IN ('hired','rejected','withdrawn','onboarding') THEN
+
+  -- Positive-list send eligibility.
+  IF _app.status NOT IN ('interviewing','offer_sent') THEN
     RAISE EXCEPTION 'application state does not permit send' USING ERRCODE = '42501';
   END IF;
   IF EXISTS (SELECT 1 FROM public.opportunity_offers
@@ -593,16 +760,13 @@ BEGIN
     RAISE EXCEPTION 'expiration must be within 30 days' USING ERRCODE = '22023';
   END IF;
 
+  -- Reconcile prior sent offers on the same application.
   FOR _prior IN
     SELECT * FROM public.opportunity_offers
      WHERE application_id=_app.id AND status='sent' FOR UPDATE
   LOOP
     IF _prior.expires_at IS NOT NULL AND _prior.expires_at <= _now THEN
-      UPDATE public.opportunity_offers SET status='expired', expired_at=_now WHERE id=_prior.id;
-      PERFORM public._m2_insert_event_once(_app.id, 'system', NULL, 'offer_expired', _prior.id, '{}'::jsonb);
-      PERFORM public._m2_notify_once(_app.driver_user_id, 'offer_expired',
-        'Offer expired', 'The offer expired without a response.', _prior.id,
-        jsonb_build_object('application_id', _app.id));
+      PERFORM public._m2_expire_offer(_prior.id);
     ELSE
       UPDATE public.opportunity_offers
          SET status='superseded', superseded_at=_now, superseded_by=_offer.id
@@ -637,12 +801,17 @@ BEGIN
          snapshot_version = GREATEST(snapshot_version, 1)
    WHERE id=_offer.id;
 
-  PERFORM set_config('app.workflow_bypass','true',true);
-  UPDATE public.opportunity_applications SET status='offer_sent' WHERE id=_app.id;
-  PERFORM set_config('app.workflow_bypass','false',true);
+  IF _app.status <> 'offer_sent' THEN
+    PERFORM public._m2_set_application_status(_app.id, 'offer_sent');
+  END IF;
 
   PERFORM public._m2_insert_event_once(_app.id, 'recruiter', _actor,
     'offer_sent', _offer.id, jsonb_build_object('expires_at', _expires_at));
+
+  PERFORM public._m2_notify_once(_app.driver_user_id, 'offer_sent',
+    'New offer', 'You have received an offer.',
+    _app.id, _offer.id,
+    jsonb_build_object('opportunity_id', _app.opportunity_id));
 
   application_id := _app.id; application_status := 'offer_sent';
   offer_id := _offer.id; offer_status := 'sent';
@@ -673,6 +842,8 @@ BEGIN
 
   SELECT * INTO _offer FROM public.opportunity_offers WHERE id=_offer_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'offer not found' USING ERRCODE = 'P0002'; END IF;
+
+  -- AUTHORIZATION FIRST.
   IF _offer.driver_user_id <> _actor THEN
     RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
   END IF;
@@ -684,15 +855,7 @@ BEGIN
   END IF;
 
   IF _offer.status='sent' AND _offer.expires_at IS NOT NULL AND _offer.expires_at <= _now THEN
-    UPDATE public.opportunity_offers SET status='expired', expired_at=_now WHERE id=_offer.id;
-    PERFORM public._m2_insert_event_once(_offer.application_id, 'system', NULL, 'offer_expired', _offer.id, '{}'::jsonb);
-    PERFORM public._m2_notify_once(_offer.driver_user_id, 'offer_expired',
-      'Offer expired', 'This offer expired before you responded.', _offer.id,
-      jsonb_build_object('application_id', _offer.application_id));
-    SELECT rp.user_id INTO _rp_user FROM public.recruiter_profiles rp WHERE rp.id = _offer.recruiter_id;
-    PERFORM public._m2_notify_once(_rp_user, 'offer_expired',
-      'Offer expired', 'An offer you sent expired.', _offer.id,
-      jsonb_build_object('application_id', _offer.application_id));
+    PERFORM public._m2_expire_offer(_offer.id);
     application_id := _offer.application_id; offer_id := _offer.id; offer_status := 'expired';
     SELECT status INTO application_status FROM public.opportunity_applications WHERE id=_offer.application_id;
     result_code := 'offer_expired'; RETURN NEXT; RETURN;
@@ -715,17 +878,16 @@ BEGIN
      SET status='accepted', responded_at=_now, accepted_at=_now
    WHERE id=_offer.id;
 
-  PERFORM set_config('app.workflow_bypass','true',true);
-  UPDATE public.opportunity_applications SET status='onboarding' WHERE id=_app.id;
-  PERFORM set_config('app.workflow_bypass','false',true);
+  PERFORM public._m2_set_application_status(_app.id, 'onboarding');
 
   PERFORM public._m2_insert_event_once(_app.id, 'driver', _actor,
     'offer_accepted', _offer.id, '{}'::jsonb);
 
   SELECT rp.user_id INTO _rp_user FROM public.recruiter_profiles rp WHERE rp.id=_app.recruiter_id;
   PERFORM public._m2_notify_once(_rp_user, 'offer_accepted',
-    'Offer accepted', 'The driver accepted your offer.', _offer.id,
-    jsonb_build_object('application_id', _app.id, 'opportunity_id', _app.opportunity_id));
+    'Offer accepted', 'The driver accepted your offer.',
+    _app.id, _offer.id,
+    jsonb_build_object('opportunity_id', _app.opportunity_id));
 
   application_id := _app.id; application_status := 'onboarding';
   offer_id := _offer.id; offer_status := 'accepted';
@@ -757,6 +919,8 @@ BEGIN
 
   SELECT * INTO _offer FROM public.opportunity_offers WHERE id=_offer_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'offer not found' USING ERRCODE = 'P0002'; END IF;
+
+  -- AUTHORIZATION FIRST.
   IF _offer.driver_user_id <> _actor THEN
     RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
   END IF;
@@ -770,8 +934,7 @@ BEGIN
   END IF;
 
   IF _offer.status='sent' AND _offer.expires_at IS NOT NULL AND _offer.expires_at <= _now THEN
-    UPDATE public.opportunity_offers SET status='expired', expired_at=_now WHERE id=_offer.id;
-    PERFORM public._m2_insert_event_once(_offer.application_id, 'system', NULL, 'offer_expired', _offer.id, '{}'::jsonb);
+    PERFORM public._m2_expire_offer(_offer.id);
     application_id := _offer.application_id; offer_id := _offer.id; offer_status := 'expired';
     result_code := 'offer_expired'; RETURN NEXT; RETURN;
   END IF;
@@ -786,8 +949,8 @@ BEGIN
     'offer_declined', _offer.id, jsonb_build_object('reason', _reason));
   SELECT rp.user_id INTO _rp_user FROM public.recruiter_profiles rp WHERE rp.id=_offer.recruiter_id;
   PERFORM public._m2_notify_once(_rp_user, 'offer_declined',
-    'Offer declined', 'The driver declined your offer.', _offer.id,
-    jsonb_build_object('application_id', _offer.application_id));
+    'Offer declined', 'The driver declined your offer.',
+    _offer.application_id, _offer.id, '{}'::jsonb);
 
   application_id := _offer.application_id; offer_id := _offer.id; offer_status := 'declined';
   result_code := 'offer_declined'; RETURN NEXT;
@@ -819,9 +982,13 @@ BEGIN
   SELECT * INTO _offer FROM public.opportunity_offers WHERE id=_offer_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'offer not found' USING ERRCODE = 'P0002'; END IF;
 
+  -- AUTHORIZATION FIRST.
   SELECT * INTO _rp FROM public.recruiter_profiles WHERE id=_offer.recruiter_id;
   IF NOT FOUND OR _rp.user_id <> _actor THEN
     RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.current_user_can_manage_recruiter_opportunities(_offer.recruiter_id) THEN
+    RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
   END IF;
 
   IF _offer.status = 'canceled' THEN
@@ -833,8 +1000,7 @@ BEGIN
   END IF;
 
   IF _offer.status='sent' AND _offer.expires_at IS NOT NULL AND _offer.expires_at <= _now THEN
-    UPDATE public.opportunity_offers SET status='expired', expired_at=_now WHERE id=_offer.id;
-    PERFORM public._m2_insert_event_once(_offer.application_id, 'system', NULL, 'offer_expired', _offer.id, '{}'::jsonb);
+    PERFORM public._m2_expire_offer(_offer.id);
     application_id := _offer.application_id; offer_id := _offer.id; offer_status := 'expired';
     result_code := 'offer_expired'; RETURN NEXT; RETURN;
   END IF;
@@ -847,8 +1013,8 @@ BEGIN
   PERFORM public._m2_insert_event_once(_offer.application_id, 'recruiter', _actor,
     'offer_canceled', _offer.id, jsonb_build_object('reason', _reason));
   PERFORM public._m2_notify_once(_offer.driver_user_id, 'offer_canceled',
-    'Offer canceled', 'The recruiter canceled the offer.', _offer.id,
-    jsonb_build_object('application_id', _offer.application_id));
+    'Offer canceled', 'The recruiter canceled the offer.',
+    _offer.application_id, _offer.id, '{}'::jsonb);
 
   application_id := _offer.application_id; offer_id := _offer.id; offer_status := 'canceled';
   result_code := 'offer_canceled'; RETURN NEXT;
@@ -868,32 +1034,20 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
 DECLARE
   _count integer := 0;
   _rec RECORD;
-  _rp_user uuid;
   _now timestamptz := now();
 BEGIN
   IF _limit IS NULL OR _limit <= 0 THEN _limit := 500; END IF;
 
   FOR _rec IN
-    SELECT id, application_id, driver_user_id, recruiter_id
+    SELECT id
       FROM public.opportunity_offers
      WHERE status='sent' AND expires_at IS NOT NULL AND expires_at <= _now
      ORDER BY expires_at
      LIMIT _limit
      FOR UPDATE SKIP LOCKED
   LOOP
-    UPDATE public.opportunity_offers SET status='expired', expired_at=_now
-     WHERE id=_rec.id AND status='sent';
-    IF FOUND THEN
+    IF public._m2_expire_offer(_rec.id) THEN
       _count := _count + 1;
-      PERFORM public._m2_insert_event_once(_rec.application_id, 'system', NULL,
-        'offer_expired', _rec.id, '{}'::jsonb);
-      PERFORM public._m2_notify_once(_rec.driver_user_id, 'offer_expired',
-        'Offer expired', 'An offer you received has expired.', _rec.id,
-        jsonb_build_object('application_id', _rec.application_id));
-      SELECT rp.user_id INTO _rp_user FROM public.recruiter_profiles rp WHERE rp.id=_rec.recruiter_id;
-      PERFORM public._m2_notify_once(_rp_user, 'offer_expired',
-        'Offer expired', 'An offer you sent has expired.', _rec.id,
-        jsonb_build_object('application_id', _rec.application_id));
     END IF;
   END LOOP;
 
@@ -921,6 +1075,8 @@ BEGIN
   SELECT * INTO _row FROM public.opportunity_applications
     WHERE id = withdraw_opportunity_application.application_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Application not found' USING ERRCODE = 'P0002'; END IF;
+
+  -- AUTHORIZATION FIRST.
   IF _row.driver_user_id <> _actor THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE = '42501'; END IF;
   IF _row.application_type <> 'apply' THEN
     RAISE EXCEPTION 'Only formal applications may be withdrawn' USING ERRCODE = '42501';
@@ -946,13 +1102,11 @@ BEGIN
       'offer_canceled', _sent.id, jsonb_build_object('reason','withdrawn'));
     SELECT rp.user_id INTO _rp_user FROM public.recruiter_profiles rp WHERE rp.id=_row.recruiter_id;
     PERFORM public._m2_notify_once(_rp_user, 'offer_canceled',
-      'Offer canceled', 'The driver withdrew their application.', _sent.id,
-      jsonb_build_object('application_id', _row.id));
+      'Offer canceled', 'The driver withdrew their application.',
+      _row.id, _sent.id, '{}'::jsonb);
   END IF;
 
-  PERFORM set_config('app.allow_driver_withdraw','true',true);
-  UPDATE public.opportunity_applications SET status='withdrawn' WHERE id=_row.id;
-  PERFORM set_config('app.allow_driver_withdraw','false',true);
+  PERFORM public._m2_set_application_withdrawn(_row.id);
 
   PERFORM public._m2_insert_event_once(_row.id, 'driver', _actor,
     'application_withdrawn', NULL, '{}'::jsonb);
@@ -961,8 +1115,9 @@ BEGIN
     SELECT rp.user_id INTO _rp_user FROM public.recruiter_profiles rp WHERE rp.id=_row.recruiter_id;
   END IF;
   PERFORM public._m2_notify_once(_rp_user, 'application_withdrawn',
-    'Application withdrawn', 'A driver withdrew their application.', NULL,
-    jsonb_build_object('application_id', _row.id, 'opportunity_id', _row.opportunity_id));
+    'Application withdrawn', 'A driver withdrew their application.',
+    _row.id, NULL,
+    jsonb_build_object('opportunity_id', _row.opportunity_id));
 END;
 $function$;
 REVOKE ALL ON FUNCTION public.withdraw_opportunity_application(uuid) FROM PUBLIC, anon;
@@ -973,13 +1128,17 @@ GRANT EXECUTE ON FUNCTION public.withdraw_opportunity_application(uuid) TO authe
 -- ---------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.complete_hiring(uuid);
 CREATE OR REPLACE FUNCTION public.complete_hiring(_application_id uuid)
-RETURNS TABLE(application_id uuid, application_status text, result_code text)
+RETURNS TABLE(
+  application_id uuid, application_status text,
+  offer_id uuid, offer_status text, result_code text
+)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $function$
 #variable_conflict use_column
 DECLARE
   _actor uuid := auth.uid();
   _app public.opportunity_applications%ROWTYPE;
   _rp  public.recruiter_profiles%ROWTYPE;
+  _accepted public.opportunity_offers%ROWTYPE;
   _c   public.contracts%ROWTYPE;
   _v   public.contract_versions%ROWTYPE;
 BEGIN
@@ -988,29 +1147,34 @@ BEGIN
   SELECT * INTO _app FROM public.opportunity_applications WHERE id=_application_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'application not found' USING ERRCODE = 'P0002'; END IF;
 
-  IF _app.status = 'hired' THEN
-    application_id := _app.id; application_status := 'hired';
-    result_code := 'already_hired'; RETURN NEXT; RETURN;
+  -- AUTHORIZATION FIRST — before disclosing already_hired.
+  SELECT * INTO _rp FROM public.recruiter_profiles WHERE id=_app.recruiter_id;
+  IF NOT FOUND OR _rp.user_id <> _actor THEN
+    RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.current_user_can_manage_recruiter_opportunities(_app.recruiter_id) THEN
+    RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
   END IF;
 
   IF _app.application_type <> 'apply' THEN
     RAISE EXCEPTION 'hiring requires a formal application' USING ERRCODE = '42501';
   END IF;
 
-  SELECT * INTO _rp FROM public.recruiter_profiles WHERE id=_app.recruiter_id;
-  IF NOT FOUND OR _rp.user_id <> _actor THEN
-    RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
-  END IF;
-  IF _rp.status='suspended' OR _rp.verification_status='suspended' THEN
-    RAISE EXCEPTION 'recruiter not eligible' USING ERRCODE = '42501';
+  SELECT * INTO _accepted FROM public.opportunity_offers
+    WHERE opportunity_offers.application_id=_app.id AND status='accepted'
+    LIMIT 1;
+
+  IF _app.status = 'hired' THEN
+    application_id := _app.id; application_status := 'hired';
+    offer_id := _accepted.id; offer_status := _accepted.status;
+    result_code := 'already_hired'; RETURN NEXT; RETURN;
   END IF;
 
   IF _app.status <> 'onboarding' THEN
     RAISE EXCEPTION 'application must be in onboarding to complete hire' USING ERRCODE = '42501';
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM public.opportunity_offers
-                  WHERE opportunity_offers.application_id=_app.id AND status='accepted') THEN
+  IF _accepted.id IS NULL THEN
     RAISE EXCEPTION 'accepted offer required' USING ERRCODE = '42501';
   END IF;
 
@@ -1028,14 +1192,18 @@ BEGIN
     RAISE EXCEPTION 'contract required' USING ERRCODE = '42501', HINT = 'contract_required';
   END IF;
 
-  PERFORM set_config('app.workflow_bypass','true',true);
-  UPDATE public.opportunity_applications SET status='hired' WHERE id=_app.id;
-  PERFORM set_config('app.workflow_bypass','false',true);
+  PERFORM public._m2_set_application_status(_app.id, 'hired');
 
   PERFORM public._m2_insert_event_once(_app.id, 'recruiter', _actor,
     'hiring_completed', NULL, '{}'::jsonb);
 
+  PERFORM public._m2_notify_once(_app.driver_user_id, 'hiring_completed',
+    'You are hired', 'The recruiter completed your hiring.',
+    _app.id, _accepted.id,
+    jsonb_build_object('opportunity_id', _app.opportunity_id));
+
   application_id := _app.id; application_status := 'hired';
+  offer_id := _accepted.id; offer_status := _accepted.status;
   result_code := 'hiring_completed'; RETURN NEXT;
 END;
 $function$;
