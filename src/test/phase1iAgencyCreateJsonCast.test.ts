@@ -11,10 +11,10 @@
 //   * The CORRECTED behavior is loaded from the canonical migration:
 //       supabase/migrations/20260719144733_f61ea960-ce0b-4e78-9cdd-df707ea51cd0.sql
 //     No simplified re-implementation is used.
-//   * The obsolete parallel candidate
-//       supabase/migration-candidates/20260719160000_fix_create_agency_json_cast.sql
-//     was removed during B1b (canonical migration is byte-for-byte
-//     identical to it in executable behavior).
+//   * The obsolete parallel candidate migration under
+//     supabase/migration-candidates/ was removed during B1b (the
+//     canonical migration is byte-for-byte identical to it in
+//     executable behavior).
 //   * This suite APPLIES NO MIGRATION to any real database. All SQL
 //     runs inside isolated PGlite databases created per scenario.
 // =====================================================================
