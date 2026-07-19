@@ -24,7 +24,7 @@ import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { submissionErrorMessage } from '@/lib/opportunities/applicationSubmission';
 
-type PreferredMethod = 'in_app' | 'email' | 'phone';
+type PreferredMethod = 'in_app' | 'email' | 'phone' | 'sms';
 
 interface Props {
   open: boolean;
