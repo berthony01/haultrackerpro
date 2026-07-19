@@ -1082,13 +1082,17 @@ describe('Phase 1H-M2 Phase 2B-1: recruiter authorization + disclosure', () => {
     // Use SUSP_APP (still interviewing before earlier direct hire flip? Now hired).
     // Seed a fresh interviewing row on owning recruiter for transition target.
     const tRow = 'f8888888-f888-f888-f888-f88888888888';
+    const tDriver = 'f8d8d8d8-f8d8-d8d8-f8d8-d8d8d8d8d8d8';
     await db.exec(`
+      INSERT INTO auth.users(id,email) VALUES ('${tDriver}','td@t') ON CONFLICT DO NOTHING;
+      INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+      VALUES ('${tDriver}','Td','A',5,'phone','apply_only',true);
       INSERT INTO public.opportunity_applications(
         id, opportunity_id, driver_user_id, recruiter_id, application_type, status,
         submission_snapshot, snapshot_version, idempotency_key, submitted_at, is_legacy,
         preferred_contact_method, contact_sharing_consent, contact_sharing_consent_at
       ) VALUES (
-        '${tRow}','${IDS.opportunity}','${IDS.driverB}','${IDS.recruiterProfile}',
+        '${tRow}','${IDS.opportunity}','${tDriver}','${IDS.recruiterProfile}',
         'apply','interviewing', jsonb_build_object('seed',true), 1, 'transition-seed-key-1',
         now(), false, 'phone', true, now()
       );
