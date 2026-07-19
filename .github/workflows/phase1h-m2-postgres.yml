@@ -1,0 +1,99 @@
+name: Phase 1H-M2 — Postgres 16 Offer Workflow Gate
+
+on:
+  push:
+    paths:
+      - '.github/workflows/phase1h-m2-postgres.yml'
+      - 'tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts'
+      - 'vitest.phase1h-m2-postgres.config.ts'
+      - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
+      - 'supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
+      - 'src/test/phase1hM2OfferWorkflow.test.ts'
+      - 'package.json'
+      - 'bun.lockb'
+  pull_request:
+    paths:
+      - '.github/workflows/phase1h-m2-postgres.yml'
+      - 'tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts'
+      - 'vitest.phase1h-m2-postgres.config.ts'
+      - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
+      - 'supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
+      - 'src/test/phase1hM2OfferWorkflow.test.ts'
+      - 'package.json'
+      - 'bun.lockb'
+  workflow_dispatch:
+
+jobs:
+  phase1h-m2-postgres:
+    name: Real Postgres 16 — M2 offer workflow
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: phase1h_m2
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d phase1h_m2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PHASE1H_M2_DATABASE_URL: postgres://postgres:postgres@localhost:5432/phase1h_m2
+      PHASE1H_M2_REQUIRE_POSTGRES: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Wait for Postgres readiness
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres; then
+              echo "postgres ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "postgres did not become ready"; exit 1
+
+      - name: Run Phase 1H-M2 real-Postgres 16 gate
+        id: pg_gate
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          bunx vitest run --config vitest.phase1h-m2-postgres.config.ts --reporter=verbose 2>&1 | tee artifacts/phase1h-m2-postgres.log
+        continue-on-error: true
+
+      - name: Upload PG16 gate log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1h-m2-postgres-log
+          path: artifacts/phase1h-m2-postgres.log
+
+      - name: Enforce PG16 gate result
+        if: steps.pg_gate.outcome != 'success'
+        run: |
+          echo "Phase 1H-M2 real-Postgres 16 gate failed. See uploaded log."
+          exit 1
+
+      - name: Run existing Phase 1H-M2 focused PGlite suite
+        run: bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
+
+      - name: Typecheck (node)
+        run: bunx tsgo -p tsconfig.node.json --noEmit
+
+      - name: Typecheck (app)
+        run: bunx tsgo -p tsconfig.app.json --noEmit
