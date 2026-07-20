@@ -1248,24 +1248,28 @@ const Index = () => {
       </div>
       {!workspaceShellBlocked && (
         <>
-          <AddActionModal
-            open={showAddModal}
-            onOpenChange={setShowAddModal}
-            onAddLoad={handleAddLoadFromModal}
-            onAddExpense={handleAddExpenseFromModal}
-            onAddFuelLog={handleAddFuelFromModal}
-          />
+          {effectiveRole === 'driver' && driverWorkspaceAllowed && (
+            <AddActionModal
+              open={showAddModal}
+              onOpenChange={setShowAddModal}
+              onAddLoad={handleAddLoadFromModal}
+              onAddExpense={handleAddExpenseFromModal}
+              onAddFuelLog={handleAddFuelFromModal}
+            />
+          )}
           <Suspense fallback={null}>
             <FeedbackModal
               totalLoads={allLoadsQuery.loads.length}
               open={showFeedback}
               onClose={() => setShowFeedback(false)}
             />
-            <OnboardingModal
-              open={showOnboardingModal}
-              onComplete={handleOnboardingComplete}
-              onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
-            />
+            {effectiveRole === 'driver' && driverWorkspaceAllowed && (
+              <OnboardingModal
+                open={showOnboardingModal}
+                onComplete={handleOnboardingComplete}
+                onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
+              />
+            )}
             <WhatsNewModal open={showWhatsNew} onClose={handleCloseWhatsNew} />
           </Suspense>
         </>
