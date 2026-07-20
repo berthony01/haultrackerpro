@@ -1058,25 +1058,69 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     }
   });
 
-  it("C7: recruiter eligibility — complete allowed, incomplete denied, suspended denied", async () => {
-    // Complete: already tested positively in C2. Prove the deny paths explicitly.
-    // Incomplete recruiter (posting_terms_accepted_at NULL, no grandfather) cannot advance an app.
+  it("C7: recruiter eligibility — direct proof incomplete/suspended cannot manage an existing application", async () => {
+    // ---- Direct incomplete-recruiter management denial ----
+    // Fixture: create a formal application while the recruiter is complete/eligible
+    // (uses the standard opportunity + recruiter fixture), then flip that recruiter
+    // to incomplete and prove a recruiter workflow RPC on the EXISTING application
+    // is denied with 42501 / 'recruiter not eligible'.
     const drvInc = await mintDriver(pool);
-    const appInc = await submitApply(url, drvInc, ids.incompleteOpportunity).catch(() => null);
-    // If submission itself blocked (driver_can_access uses recruiter_profile_can_manage), that's still a deny.
-    if (appInc) {
-      const c = await newAuthClient(url, ids.incompleteRecruiterUser);
-      let code = "";
-      try { await c.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'viewed',NULL)`, [appInc]); }
-      catch (e) { code = (e as { code?: string }).code ?? ""; }
+    const appInc = await submitApply(url, drvInc, ids.opportunity);
+    const appStatusBefore = (await pool.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appInc],
+    )).rows[0].status;
+    const evBefore = await eventCount(appInc, "application_transitioned");
+    // Save current consent state so we can restore after the test.
+    const consent = await pool.query(
+      `SELECT posting_terms_accepted_at, legacy_terms_grandfathered_at
+         FROM public.recruiter_profiles WHERE id=$1`,
+      [ids.recruiterProfile],
+    );
+    try {
+      // Make the recruiter INCOMPLETE (clear both eligibility fields).
+      await pool.query(
+        `UPDATE public.recruiter_profiles
+            SET posting_terms_accepted_at=NULL, legacy_terms_grandfathered_at=NULL
+          WHERE id=$1`,
+        [ids.recruiterProfile],
+      );
+
+      const c = await newAuthClient(url, ids.recruiterUser);
+      let code = ""; let msg = "";
+      try {
+        await c.query(
+          `SELECT * FROM public.transition_opportunity_application($1::uuid,'viewed',NULL)`,
+          [appInc],
+        );
+      } catch (e) {
+        code = (e as { code?: string }).code ?? "";
+        msg  = (e as Error).message;
+      }
       await rollbackEnd(c);
       expect(code).toBe("42501");
-    } else {
-      // Submission denial is also acceptable proof of the eligibility gate.
-      expect(appInc).toBeNull();
+      expect(msg.toLowerCase()).toContain("recruiter not eligible");
+
+      // Application state unchanged; no workflow event emitted.
+      const appAfter = (await pool.query(
+        `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appInc],
+      )).rows[0].status;
+      expect(appAfter).toBe(appStatusBefore);
+      expect(await eventCount(appInc, "application_transitioned")).toBe(evBefore);
+    } finally {
+      // Restore the fixture recruiter so later tests remain isolated.
+      await pool.query(
+        `UPDATE public.recruiter_profiles
+            SET posting_terms_accepted_at=$2, legacy_terms_grandfathered_at=$3
+          WHERE id=$1`,
+        [
+          ids.recruiterProfile,
+          consent.rows[0].posting_terms_accepted_at,
+          consent.rows[0].legacy_terms_grandfathered_at,
+        ],
+      );
     }
 
-    // Suspended recruiter path: submission happened while active, then we suspend and expect deny.
+    // ---- Suspended recruiter path ----
     const drvS = await mintDriver(pool);
     const appS = await submitApply(url, drvS, ids.suspendedOpportunity);
     await pool.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`, [ids.suspendedRecruiterProfile]);
