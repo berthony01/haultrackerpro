@@ -69,6 +69,16 @@ export function OpportunityDetail({
   const [showRefer, setShowRefer] = useState(false);
   const [showApply, setShowApply] = useState(false);
 
+  const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
+  const formalState = useMemo(
+    () => classifyFormalApply(driverApplications as any[], o.id),
+    [driverApplications, o.id]
+  );
+  const requestInfoState = useMemo(
+    () => classifyRequestInfo(driverApplications as any[], o.id),
+    [driverApplications, o.id]
+  );
+
   // One-shot Apply Now resume after Opportunity Preferences completion.
   const consumedTokenRef = useRef<string | null>(null);
   useEffect(() => {
@@ -81,16 +91,6 @@ export function OpportunityDetail({
     onResumeApplyConsumed?.(resumeApplyToken);
   }, [resumeApplyToken, driverProfile, formalState, onResumeApplyConsumed]);
 
-
-  const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
-  const formalState = useMemo(
-    () => classifyFormalApply(driverApplications as any[], o.id),
-    [driverApplications, o.id]
-  );
-  const requestInfoState = useMemo(
-    () => classifyRequestInfo(driverApplications as any[], o.id),
-    [driverApplications, o.id]
-  );
 
   const location = [o.hiring_city, o.hiring_state].filter(Boolean).join(', ') || 'Multiple states';
 
