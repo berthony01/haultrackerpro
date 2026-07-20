@@ -27,6 +27,26 @@ const CANDIDATE_PATH = fileURLToPath(
   ),
 );
 
+const CANONICAL_PATH = fileURLToPath(
+  new URL(
+    '../../supabase/migrations/20260717185620_7efcb752-08f0-46b5-aaad-593e410aa818.sql',
+    import.meta.url,
+  ),
+);
+
+function extractRecruiterCanManageBlock(): string {
+  const src = readFileSync(CANONICAL_PATH, 'utf8');
+  const startMarker =
+    'CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(';
+  const endMarker =
+    'GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;';
+  const start = src.indexOf(startMarker);
+  if (start < 0) throw new Error('canonical: start marker not found');
+  const endIdx = src.indexOf(endMarker, start);
+  if (endIdx < 0) throw new Error('canonical: end marker not found');
+  return src.slice(start, endIdx + endMarker.length);
+}
+
 const BOOTSTRAP_SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -76,22 +96,8 @@ CREATE TABLE IF NOT EXISTS public.recruiter_profiles (
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.recruiter_profiles TO authenticated, service_role;
 
-CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(_recruiter_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-    WHERE rp.id = _recruiter_id
-      AND rp.status <> 'suspended' AND rp.verification_status <> 'suspended'
-      AND COALESCE(btrim(rp.recruiter_name), '') <> ''
-      AND COALESCE(btrim(rp.company_name), '') <> ''
-      AND COALESCE(btrim(rp.recruiter_email), '') <> ''
-      AND btrim(rp.recruiter_email) ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
-      AND (COALESCE(btrim(rp.dot_number), '') <> '' OR COALESCE(btrim(rp.mc_number), '') <> '')
-      AND (rp.posting_terms_accepted_at IS NOT NULL OR rp.legacy_terms_grandfathered_at IS NOT NULL)
-  );
-$$;
-REVOKE ALL ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;
+-- Canonical Phase 1F rule is loaded verbatim after this bootstrap runs
+-- (see beforeAll / extractRecruiterCanManageBlock).
 
 -- Billing shadow tables to assert non-interference.
 CREATE TABLE IF NOT EXISTS public.subscriptions (
