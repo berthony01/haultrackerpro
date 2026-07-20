@@ -1531,6 +1531,10 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
       `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId],
     )).rows[0].status;
     expect(inTxApp).toBe("rejected");
+    // Escalate to owner role inside the same transaction to read the
+    // uncommitted event and notification rows (authenticated cannot SELECT
+    // application_events / notifications directly under RLS).
+    await rc.query(`SET LOCAL role postgres`);
     const inTxEv = (await rc.query(
       `SELECT count(*)::int n FROM public.application_events
         WHERE application_id=$1 AND event_type='application_rejected'`, [appId],
