@@ -13,12 +13,39 @@ import { PGlite } from '@electric-sql/pglite';
 
 import {
   deriveUserCapabilitiesView,
+  parseUserCapabilityRow,
+  parseUserCapabilityRows,
+  parseUserCapabilityStatus,
+  isUserCapabilityStatus,
+  isUserCapabilityType,
+  USER_CAPABILITY_STATUSES,
+  USER_CAPABILITY_TYPES,
   type UserCapabilityRow,
 } from '@/lib/userCapabilities';
 import {
   getRecruiterPlanCapabilities,
   resolveRecruiterCapabilityTier,
 } from '@/lib/recruiterCapabilities';
+
+const CANONICAL_REL =
+  '../../supabase/migrations/20260717185620_7efcb752-08f0-46b5-aaad-593e410aa818.sql';
+
+/**
+ * Read the canonical Phase 1F migration and slice out the exact block
+ * defining `public.recruiter_profile_can_manage_opportunities(uuid)` up to
+ * and including the service_role GRANT. Never returns a handwritten copy.
+ */
+function extractRecruiterCanManageBlock(): string {
+  const src = read(CANONICAL_REL);
+  const startMarker = 'CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(';
+  const endMarker =
+    'GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;';
+  const start = src.indexOf(startMarker);
+  if (start < 0) throw new Error('canonical: start marker not found');
+  const endIdx = src.indexOf(endMarker, start);
+  if (endIdx < 0) throw new Error('canonical: end marker not found');
+  return src.slice(start, endIdx + endMarker.length);
+}
 
 interface AnyPGlite {
   exec(sql: string): Promise<unknown>;
@@ -68,22 +95,8 @@ CREATE TABLE public.recruiter_profiles (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Canonical Phase 1F rule (reused verbatim).
-CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(_recruiter_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-    WHERE rp.id = _recruiter_id
-      AND rp.status <> 'suspended'
-      AND rp.verification_status <> 'suspended'
-      AND COALESCE(btrim(rp.recruiter_name), '') <> ''
-      AND COALESCE(btrim(rp.company_name), '') <> ''
-      AND COALESCE(btrim(rp.recruiter_email), '') <> ''
-      AND btrim(rp.recruiter_email) ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
-      AND (COALESCE(btrim(rp.dot_number), '') <> '' OR COALESCE(btrim(rp.mc_number), '') <> '')
-      AND (rp.posting_terms_accepted_at IS NOT NULL OR rp.legacy_terms_grandfathered_at IS NOT NULL)
-  );
-$$;
+-- Canonical Phase 1F rule is loaded verbatim from
+-- supabase/migrations/20260717185620_*.sql after this bootstrap runs.
 
 CREATE TABLE public.subscriptions (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
