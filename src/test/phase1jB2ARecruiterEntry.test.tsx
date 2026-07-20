@@ -56,10 +56,11 @@ function LocationProbe() {
 function renderRoute() {
   return render(
     <MemoryRouter initialEntries={['/recruiter']}>
+      <LocationProbe />
       <Routes>
         <Route path="/recruiter" element={<RecruiterEntryRoute />} />
-        <Route path="/dashboard" element={<LocationProbe />} />
-        <Route path="*" element={<LocationProbe />} />
+        <Route path="/dashboard" element={<div data-testid="dashboard-page" />} />
+        <Route path="*" element={<div data-testid="other-page" />} />
       </Routes>
     </MemoryRouter>,
   );

@@ -5,8 +5,9 @@
  * the SAME authenticated driver account (never creates a new account).
  *
  * Authorization inputs (only): `useAuth`, `useUserCapabilities`,
- * `useViewMode`. NO admin, intended_role, localStorage, billing, Stripe,
- * plan, recruiter profile existence, or URL parameters.
+ * `useViewMode`. No admin flags, intended_role, localStorage reads,
+ * billing/plan hooks, payment providers, recruiter profile existence,
+ * or URL parameters participate in authorization.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
