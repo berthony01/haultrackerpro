@@ -709,9 +709,52 @@ describe('Source audits', () => {
     const sidebar = src.slice(src.indexOf('<AppSidebar'), src.indexOf('/>', src.indexOf('<AppSidebar')));
     expect(sidebar).toMatch(/recruiterCapabilityStatus=/);
     expect(sidebar).toMatch(/recruiterOperationsAllowed=/);
+    expect(sidebar).toMatch(/workspaceLoading=\{workspaceShellBlocked\}/);
     const bottom = src.slice(src.indexOf('<BottomNav'), src.indexOf('/>', src.indexOf('<BottomNav')));
     expect(bottom).toMatch(/recruiterCapabilityStatus=/);
     expect(bottom).toMatch(/recruiterOperationsAllowed=/);
+    expect(bottom).toMatch(/workspaceLoading=\{workspaceShellBlocked\}/);
+  });
+
+  it('Index.tsx defines workspaceShellBlocked from loading/unavailable/settled', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    expect(src).toMatch(/const\s+workspaceShellBlocked\s*=[\s\S]{0,200}workspaceLoading[\s\S]{0,200}workspaceUnavailable[\s\S]{0,200}navigationSettled/);
+  });
+
+  it('Index.tsx gates both ViewModeSwitch surfaces on !workspaceShellBlocked', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    const matches = src.match(/canSwitch\s*&&\s*!workspaceShellBlocked/g) ?? [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    // And no legacy `!workspaceLoading` gate remains on ViewModeSwitch.
+    expect(/canSwitch\s*&&\s*!workspaceLoading\s*&&/.test(src)).toBe(false);
+  });
+
+  it('Index.tsx conditionally renders workspace modals only when shell is not blocked', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    // A single guard wraps all four modals.
+    const guardIdx = src.indexOf('{!workspaceShellBlocked && (');
+    expect(guardIdx).toBeGreaterThan(-1);
+    const region = src.slice(guardIdx);
+    expect(region).toMatch(/<AddActionModal/);
+    expect(region).toMatch(/<FeedbackModal/);
+    expect(region).toMatch(/<OnboardingModal/);
+    expect(region).toMatch(/<WhatsNewModal/);
+    // And they are not ALSO rendered unguarded elsewhere in the file.
+    const before = src.slice(0, guardIdx);
+    expect(before).not.toMatch(/<AddActionModal/);
+    expect(before).not.toMatch(/<FeedbackModal/);
+    expect(before).not.toMatch(/<OnboardingModal/);
+    expect(before).not.toMatch(/<WhatsNewModal/);
+  });
+
+  it('RecruiterAccessRoute source: no useMemo import, no useMemoSafe helper', async () => {
+    const src = await readSrc('src/components/opportunities/recruiter/RecruiterAccessRoute.tsx');
+    // useMemo must not be imported.
+    const importLine = src.match(/^import\s*\{([^}]+)\}\s*from\s*['"]react['"];/m);
+    expect(importLine).toBeTruthy();
+    expect(importLine![1]).not.toMatch(/\buseMemo\b/);
+    // The misleading local helper is gone.
+    expect(src).not.toMatch(/useMemoSafe/);
   });
 
   it('dashboardWorkspacePolicy has no forbidden imports', async () => {
