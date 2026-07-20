@@ -808,6 +808,12 @@ const Index = () => {
   const workspaceUnavailable =
     !workspaceLoading &&
     (!!workspaceError || !effectiveRole || (renderDecision?.unresolved ?? false));
+  // Single synchronous shell-block flag. Nav shells, ViewModeSwitch, and
+  // portal/workspace modals must all be blocked whenever ANY of these
+  // hold: capability is loading, workspace is unavailable, or the current
+  // (page, recruiterView) pair does not yet match the resolved decision.
+  const workspaceShellBlocked =
+    workspaceLoading || workspaceUnavailable || !navigationSettled;
 
   // Derive sidebar/header key so Recruiter Access has its own label & highlight.
   const navKey =
