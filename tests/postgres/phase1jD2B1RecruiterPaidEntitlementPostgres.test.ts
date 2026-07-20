@@ -187,6 +187,17 @@ async function openAuthenticatedSession(userId: string): Promise<{
   return {
     query: (sql: string, params: unknown[] = []) => client.query(sql, params),
     end: async () => {
+      // Clear every identity GUC this session touched so the pooled client
+      // cannot leak `auth.uid()` or `app.user_id` into a later checkout, then
+      // drop back to the connection's default role.
+      try {
+        await client.query(
+          `SELECT set_config('request.jwt.claim.sub', '', false),
+                  set_config('app.user_id',           '', false)`,
+        );
+      } catch {
+        /* ignore */
+      }
       try {
         await client.query(`RESET ROLE`);
       } catch {
