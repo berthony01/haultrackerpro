@@ -519,14 +519,15 @@ describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)
 
   it('billing ACTIVE vs INACTIVE → posting parity for eligible profile', () => {
     installHooks({ profile: makeProfile({ verification_status: 'pending' }), isBillingActive: true });
+    renderPage();
     expect(screen.getByRole('button', { name: /Post an Opportunity/i })).not.toBeDisabled();
     // remount in inactive state
+    cleanup();
     vi.clearAllMocks();
     vi.mocked(useUserRole).mockReturnValue({ intentRecruiter: true } as never);
     installHooks({ profile: makeProfile({ verification_status: 'pending' }), isBillingActive: false });
     renderPage();
-    const buttons = screen.getAllByRole('button', { name: /Post an Opportunity/i });
-    for (const b of buttons) expect(b).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).not.toBeDisabled();
   });
 });
 
