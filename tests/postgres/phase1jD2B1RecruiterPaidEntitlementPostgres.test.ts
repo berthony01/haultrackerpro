@@ -89,8 +89,10 @@ CREATE TABLE IF NOT EXISTS public.recruiter_profiles (
 );
 `;
 
-// -- RESET: drops every fixture object this suite created and cleans up the
-// role memberships it granted to the connection owner. Idempotent.
+// -- RESET: drops every fixture object this suite created, revokes any role
+// memberships/privileges the three fixture roles hold, and then drops the
+// roles themselves. Guarded/dynamic so it is safe to run BEFORE the roles
+// exist too. Idempotent across repeated runs.
 const RESET_SQL = `
 DROP FUNCTION IF EXISTS public.current_user_has_recruiter_minimum_paid_plan(text) CASCADE;
 DROP FUNCTION IF EXISTS public._recruiter_has_minimum_paid_plan(uuid, text) CASCADE;
@@ -100,7 +102,31 @@ DROP TABLE IF EXISTS public.recruiter_profiles CASCADE;
 DROP TABLE IF EXISTS auth.users CASCADE;
 DROP FUNCTION IF EXISTS auth.uid() CASCADE;
 DROP SCHEMA IF EXISTS auth CASCADE;
-DO $$ BEGIN REVOKE anon, authenticated, service_role FROM CURRENT_USER; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $reset$
+DECLARE
+  r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      -- Revoke role membership from the connection owner (best effort).
+      BEGIN
+        EXECUTE format('REVOKE %I FROM CURRENT_USER', r);
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+      -- Revoke every privilege the role holds across public + auth schemas
+      -- and on the schemas themselves, so DROP ROLE has no owned privileges
+      -- left to complain about.
+      BEGIN EXECUTE format('REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+      BEGIN EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+      BEGIN EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+      BEGIN EXECUTE format('REVOKE ALL ON SCHEMA public FROM %I', r);                  EXCEPTION WHEN OTHERS THEN NULL; END;
+      -- Drop the role itself.
+      BEGIN EXECUTE format('DROP ROLE %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+    END IF;
+  END LOOP;
+END
+$reset$;
 `;
 
 const pool = new pg.Pool({ connectionString: URL_STR, max: 8 });
