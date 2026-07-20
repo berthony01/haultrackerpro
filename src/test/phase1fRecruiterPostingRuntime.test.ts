@@ -57,10 +57,14 @@ function findPhase1FA1Migration(): string {
   // two Phase 1F-A.2 files (appended separately below in exact file order
   // so the two-line correction lands second).
   const idx = files.indexOf(base);
+  const firstA2Idx = files.indexOf(PHASE_1F_A2_FILES[0]);
+  if (firstA2Idx === -1 || firstA2Idx <= idx) {
+    throw new Error("Phase 1F-A.2 migration boundary not found after Phase 1F-A.1");
+  }
   const relevant =
     /request_driver_contact|recruiter_can_post|list_driver_visible_opportunities|create_driver_referral_safe|recruiter_profile_can_manage_opportunities|current_user_can_manage_recruiter_opportunities|opportunities_guard|opportunities_billing_guard|recruiter_profile_guard/;
   const between = files
-    .slice(idx + 1)
+    .slice(idx + 1, firstA2Idx)
     .filter(
       (f) =>
         !PHASE_1F_A2_FILES.includes(f) &&
