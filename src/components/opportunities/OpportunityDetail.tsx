@@ -300,7 +300,7 @@ export function OpportunityDetail({
         {profileIncomplete && formalState.kind === 'none' && (
           <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-            <span>Complete your Opportunity Profile to apply and improve your match score.</span>
+            <span>Complete your Opportunity Preferences to apply and improve your match score.</span>
           </div>
         )}
         <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
@@ -372,7 +372,7 @@ export function OpportunityDetail({
         opportunityTitle={o.title}
         companyName={o.company_name}
         driverProfile={driverProfile ?? null}
-        onEditProfile={onEditProfile}
+        onOpenPreferences={onOpenPreferencesForApply}
       />
     </div>
   );
