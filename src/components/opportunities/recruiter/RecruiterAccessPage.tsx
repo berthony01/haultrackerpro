@@ -258,7 +258,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                     ? 'Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Standard posting unlocks the moment those are saved.'
                     : intentRecruiter
                     ? 'You signed up as a recruiter, but your recruiter profile is not complete yet. Complete the short recruiter profile to start posting.'
-                    : 'Add recruiter as an additional workspace on your account. Standard posting unlocks as soon as your profile is complete — no admin approval needed to post.'}
+                    : 'Add the recruiter workspace to your account. Standard posting unlocks as soon as your profile is complete — no admin approval or paid plan is required.'}
                 </p>
                 <Button onClick={onOpenOnboarding} data-testid="finish-recruiter-setup-cta">
                   {state === 'incomplete'

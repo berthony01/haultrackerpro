@@ -454,7 +454,12 @@ describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)
       screen.getByRole('button', { name: /Set Up Recruiter Profile/ }),
     ).toBeInTheDocument();
     // Setup copy uses completion language, not application/review-gate language.
-    expect(container.textContent).toMatch(/no admin approval needed/i);
+    expect(container.textContent).toMatch(
+      /Add the recruiter workspace to your account\. Standard posting unlocks as soon as your profile is complete — no admin approval or paid plan is required\./,
+    );
+    expect(container.textContent).not.toMatch(
+      /Add recruiter as an additional workspace on your account\. Standard posting unlocks as soon as your profile is complete — no admin approval needed to post\./,
+    );
     expectNoForbidden(container);
   });
 
