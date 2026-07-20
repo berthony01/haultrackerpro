@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
+  beginRecruiterSetupRpc,
   deriveUserCapabilitiesView,
   parseUserCapabilityRows,
-  parseUserCapabilityStatus,
   type UserCapabilityRow,
   type UserCapabilityStatus,
   type UserCapabilitiesView,
@@ -47,14 +47,13 @@ export function useUserCapabilities(): UseUserCapabilitiesResult {
   });
 
   const mutation = useMutation({
-    mutationFn: async (): Promise<UserCapabilityStatus> => {
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
-      const { data, error } = await (supabase as any).rpc('begin_recruiter_setup');
-      if (error) throw error;
-      return parseUserCapabilityStatus(data);
-    },
+    mutationFn: (): Promise<UserCapabilityStatus> =>
+      beginRecruiterSetupRpc(userId, () =>
+        (supabase as any).rpc('begin_recruiter_setup') as Promise<{
+          data: unknown;
+          error: unknown;
+        }>,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-capabilities', userId] });
     },
