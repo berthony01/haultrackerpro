@@ -202,9 +202,13 @@ async function caps(userId: string) {
   );
 }
 
+let CANONICAL_BLOCK = '';
+
 beforeAll(async () => {
   await pool.query(RESET_SQL);
   await pool.query(BOOTSTRAP_SQL);
+  CANONICAL_BLOCK = extractRecruiterCanManageBlock();
+  await pool.query(CANONICAL_BLOCK);
   const candidate = readFileSync(CANDIDATE_PATH, 'utf8');
   await pool.query(candidate);
 });
