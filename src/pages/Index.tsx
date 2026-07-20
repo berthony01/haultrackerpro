@@ -839,7 +839,15 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} workspaceLoading={workspaceLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
+      <AppSidebar
+        active={navKey}
+        onNavigate={handleNavigate}
+        role={effectiveRole ?? 'driver'}
+        workspaceLoading={workspaceLoading || !effectiveRole}
+        recruiterCapabilityStatus={recruiterCapabilityStatus}
+        recruiterOperationsAllowed={recruiterOperationsAllowed}
+        assistantPermissions={isActingAsAssistant ? actingPermissions : null}
+      />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
