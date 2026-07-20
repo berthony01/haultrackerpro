@@ -808,6 +808,12 @@ const Index = () => {
   const workspaceUnavailable =
     !workspaceLoading &&
     (!!workspaceError || !effectiveRole || (renderDecision?.unresolved ?? false));
+  // Single synchronous shell-block flag. Nav shells, ViewModeSwitch, and
+  // portal/workspace modals must all be blocked whenever ANY of these
+  // hold: capability is loading, workspace is unavailable, or the current
+  // (page, recruiterView) pair does not yet match the resolved decision.
+  const workspaceShellBlocked =
+    workspaceLoading || workspaceUnavailable || !navigationSettled;
 
   // Derive sidebar/header key so Recruiter Access has its own label & highlight.
   const navKey =
@@ -876,7 +882,7 @@ const Index = () => {
         active={navKey}
         onNavigate={handleNavigate}
         role={effectiveRole ?? 'driver'}
-        workspaceLoading={workspaceLoading || !effectiveRole}
+        workspaceLoading={workspaceShellBlocked}
         recruiterCapabilityStatus={recruiterCapabilityStatus}
         recruiterOperationsAllowed={recruiterOperationsAllowed}
         assistantPermissions={isActingAsAssistant ? actingPermissions : null}
@@ -902,7 +908,7 @@ const Index = () => {
               <p className="text-xs text-muted-foreground truncate">{navSubtitle}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {canSwitch && !workspaceLoading && (
+              {canSwitch && !workspaceShellBlocked && (
                 <div className="hidden lg:block">
                   <ViewModeSwitch
                     value={effectiveRole ?? 'driver'}
@@ -933,7 +939,7 @@ const Index = () => {
               </Button>
             </div>
           </div>
-          {canSwitch && !workspaceLoading && (
+          {canSwitch && !workspaceShellBlocked && (
             <div className="lg:hidden px-4 pb-2 -mt-1 flex justify-end">
               <ViewModeSwitch
                 value={effectiveRole ?? 'driver'}
@@ -1230,32 +1236,36 @@ const Index = () => {
           active={page}
           onNavigate={handleNavigate}
           role={effectiveRole ?? 'driver'}
-          workspaceLoading={workspaceLoading || !effectiveRole}
+          workspaceLoading={workspaceShellBlocked}
           recruiterCapabilityStatus={recruiterCapabilityStatus}
           recruiterOperationsAllowed={recruiterOperationsAllowed}
           assistantPermissions={isActingAsAssistant ? actingPermissions : null}
         />
       </div>
-      <AddActionModal
-        open={showAddModal}
-        onOpenChange={setShowAddModal}
-        onAddLoad={handleAddLoadFromModal}
-        onAddExpense={handleAddExpenseFromModal}
-        onAddFuelLog={handleAddFuelFromModal}
-      />
-      <Suspense fallback={null}>
-        <FeedbackModal
-          totalLoads={allLoadsQuery.loads.length}
-          open={showFeedback}
-          onClose={() => setShowFeedback(false)}
-        />
-        <OnboardingModal
-          open={showOnboardingModal}
-          onComplete={handleOnboardingComplete}
-          onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
-        />
-        <WhatsNewModal open={showWhatsNew} onClose={handleCloseWhatsNew} />
-      </Suspense>
+      {!workspaceShellBlocked && (
+        <>
+          <AddActionModal
+            open={showAddModal}
+            onOpenChange={setShowAddModal}
+            onAddLoad={handleAddLoadFromModal}
+            onAddExpense={handleAddExpenseFromModal}
+            onAddFuelLog={handleAddFuelFromModal}
+          />
+          <Suspense fallback={null}>
+            <FeedbackModal
+              totalLoads={allLoadsQuery.loads.length}
+              open={showFeedback}
+              onClose={() => setShowFeedback(false)}
+            />
+            <OnboardingModal
+              open={showOnboardingModal}
+              onComplete={handleOnboardingComplete}
+              onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
+            />
+            <WhatsNewModal open={showWhatsNew} onClose={handleCloseWhatsNew} />
+          </Suspense>
+        </>
+      )}
     </div>
   );
 };

@@ -14,7 +14,7 @@
  * Index. No useUserRole, admin, billing, plan, recruiter profile,
  * localStorage, sessionStorage, or URL parsing participates here.
  */
-import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { RecruiterAccessPage } from './RecruiterAccessPage';
@@ -126,8 +126,8 @@ export function RecruiterAccessRoute({
     return <NeutralPanel label="Recruiter workspace unavailable." />;
   }
 
-  // Re-resolve on every render as a final belt-and-braces check.
-  const safeView = useMemoSafe(view, resolveInternal);
+  // Belt-and-braces: re-resolve against the current status on every render.
+  const safeView = resolveInternal(view);
 
   if (safeView === 'onboarding') {
     return <RecruiterOnboarding onBack={() => setViewSafe('hub')} />;
@@ -161,12 +161,4 @@ export function RecruiterAccessRoute({
       onApplications={() => setViewSafe('applications')}
     />
   );
-}
-
-// Local hook: re-derive safeView cheaply without pulling useMemo import.
-function useMemoSafe(
-  view: RecruiterSubview,
-  resolveInternal: (v: RecruiterSubview) => RecruiterSubview,
-): RecruiterSubview {
-  return resolveInternal(view);
 }

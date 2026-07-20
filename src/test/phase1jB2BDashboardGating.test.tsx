@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import {
@@ -459,12 +459,201 @@ describe('BottomNav — capability tier gating', () => {
     expect(screen.getByLabelText('Dashboard')).toBeTruthy();
     expect(screen.queryByLabelText('Home')).toBeNull();
   });
-  it('loading: exposes no workspace action', () => {
+  it('loading: renders bottom-nav-loading skeleton, no Sheet/More/Add/Home/Dashboard', () => {
     renderBottom({ role: 'driver', recruiterCapabilityStatus: null, workspaceLoading: true });
+    expect(screen.getByTestId('bottom-nav-loading')).toBeTruthy();
+    expect(screen.queryByLabelText('More')).toBeNull();
+    expect(screen.queryByLabelText('Add new load or expense')).toBeNull();
     expect(screen.queryByLabelText('Dashboard')).toBeNull();
     expect(screen.queryByLabelText('Home')).toBeNull();
+    expect(screen.queryByLabelText('Opps')).toBeNull();
+    expect(screen.queryByLabelText('Apps')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });
+
+// ==========================================================================
+// RENDERED — BottomNav More sheet interaction contents by tier
+// ==========================================================================
+describe('BottomNav — More sheet interaction contents', () => {
+  function openMore() {
+    const btn = screen.getByLabelText('More');
+    fireEvent.click(btn);
+  }
+
+  it('recruiter active+ops: More sheet shows full recruiter menu', () => {
+    renderBottom({
+      role: 'recruiter', recruiterCapabilityStatus: 'active', recruiterOperationsAllowed: true,
+    });
+    openMore();
+    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Manage Opportunities')).toBeTruthy();
+    expect(screen.getByText('Applications')).toBeTruthy();
+    expect(screen.getByText('Reports')).toBeTruthy();
+    expect(screen.getByText('Contracts')).toBeTruthy();
+    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+  });
+
+  it('recruiter setup: More sheet has ONLY Recruiter Dashboard + Sign Out', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'setup' });
+    openMore();
+    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+    expect(screen.queryByText('Reports')).toBeNull();
+    expect(screen.queryByText('Contracts')).toBeNull();
+    expect(screen.queryByText('Settings')).toBeNull();
+  });
+
+  it('recruiter suspended: More sheet has ONLY Recruiter Dashboard + Sign Out', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'suspended' });
+    openMore();
+    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+  });
+
+  it('recruiter explicit null: More sheet has ONLY Sign Out — no Recruiter Dashboard', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: null });
+    openMore();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+    expect(screen.queryByText('Reports')).toBeNull();
+  });
+
+  it('recruiter revoked: More sheet has ONLY Sign Out', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'revoked' });
+    openMore();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+  });
+
+  it('driver workspace + recruiter active: driver More menu, not recruiter menu', () => {
+    renderBottom({
+      role: 'driver', recruiterCapabilityStatus: 'active', recruiterOperationsAllowed: true,
+    });
+    openMore();
+    expect(screen.getByText('Reports')).toBeTruthy();
+    expect(screen.getByText('Expenses')).toBeTruthy();
+    expect(screen.getByText('Fuel')).toBeTruthy();
+    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+  });
+});
+
+// ==========================================================================
+// RENDERED — RecruiterAccessRoute callback interactions
+// ==========================================================================
+describe('RecruiterAccessRoute — hub callback interactions', () => {
+  it('setup hub: click Manage → onboarding, click Applications → onboarding, never manager/apps', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'setup', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    expect(screen.getByTestId('recruiter-onboarding')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    cleanup();
+    renderRoute({
+      recruiterCapabilityStatus: 'setup', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.getByTestId('recruiter-onboarding')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-apps')).toBeNull();
+  });
+
+  it('active+ops hub: click Manage → manager', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: true, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    expect(screen.getByTestId('recruiter-manager')).toBeTruthy();
+  });
+
+  it('active+ops hub: click Applications → apps', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: true, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.getByTestId('recruiter-apps')).toBeTruthy();
+  });
+
+  it('active WITHOUT ops: click Manage/Applications stays on hub', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    expect(screen.getByTestId('recruiter-access-page')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.queryByTestId('recruiter-apps')).toBeNull();
+    expect(screen.getByTestId('recruiter-access-page')).toBeTruthy();
+  });
+
+  it('suspended hub: onboarding/manage/apps callbacks stay on hub', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'suspended', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-onboarding'));
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.getByTestId('recruiter-access-page')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-onboarding')).toBeNull();
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    expect(screen.queryByTestId('recruiter-apps')).toBeNull();
+  });
+
+  it('active+ops initial reports mounts RecruiterReportsPanel (lazy)', async () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: true, initialView: 'reports',
+    });
+    expect(await screen.findByTestId('recruiter-reports')).toBeTruthy();
+  });
+
+  it('active→setup rerender: manager child collapses synchronously to onboarding', () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <RecruiterAccessRoute
+          onBack={vi.fn()}
+          initialView="manager"
+          recruiterCapabilityStatus="active"
+          recruiterHubAllowed={true}
+          recruiterOperationsAllowed={true}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('recruiter-manager')).toBeTruthy();
+    rerender(
+      <MemoryRouter>
+        <RecruiterAccessRoute
+          onBack={vi.fn()}
+          initialView="manager"
+          recruiterCapabilityStatus="setup"
+          recruiterHubAllowed={true}
+          recruiterOperationsAllowed={false}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    expect(screen.getByTestId('recruiter-onboarding')).toBeTruthy();
+  });
+});
+
 
 // ==========================================================================
 // SOURCE — Index & module import audits
@@ -520,9 +709,52 @@ describe('Source audits', () => {
     const sidebar = src.slice(src.indexOf('<AppSidebar'), src.indexOf('/>', src.indexOf('<AppSidebar')));
     expect(sidebar).toMatch(/recruiterCapabilityStatus=/);
     expect(sidebar).toMatch(/recruiterOperationsAllowed=/);
+    expect(sidebar).toMatch(/workspaceLoading=\{workspaceShellBlocked\}/);
     const bottom = src.slice(src.indexOf('<BottomNav'), src.indexOf('/>', src.indexOf('<BottomNav')));
     expect(bottom).toMatch(/recruiterCapabilityStatus=/);
     expect(bottom).toMatch(/recruiterOperationsAllowed=/);
+    expect(bottom).toMatch(/workspaceLoading=\{workspaceShellBlocked\}/);
+  });
+
+  it('Index.tsx defines workspaceShellBlocked from loading/unavailable/settled', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    expect(src).toMatch(/const\s+workspaceShellBlocked\s*=[\s\S]{0,200}workspaceLoading[\s\S]{0,200}workspaceUnavailable[\s\S]{0,200}navigationSettled/);
+  });
+
+  it('Index.tsx gates both ViewModeSwitch surfaces on !workspaceShellBlocked', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    const matches = src.match(/canSwitch\s*&&\s*!workspaceShellBlocked/g) ?? [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    // And no legacy `!workspaceLoading` gate remains on ViewModeSwitch.
+    expect(/canSwitch\s*&&\s*!workspaceLoading\s*&&/.test(src)).toBe(false);
+  });
+
+  it('Index.tsx conditionally renders workspace modals only when shell is not blocked', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    // A single guard wraps all four modals.
+    const guardIdx = src.indexOf('{!workspaceShellBlocked && (');
+    expect(guardIdx).toBeGreaterThan(-1);
+    const region = src.slice(guardIdx);
+    expect(region).toMatch(/<AddActionModal/);
+    expect(region).toMatch(/<FeedbackModal/);
+    expect(region).toMatch(/<OnboardingModal/);
+    expect(region).toMatch(/<WhatsNewModal/);
+    // And they are not ALSO rendered unguarded elsewhere in the file.
+    const before = src.slice(0, guardIdx);
+    expect(before).not.toMatch(/<AddActionModal/);
+    expect(before).not.toMatch(/<FeedbackModal/);
+    expect(before).not.toMatch(/<OnboardingModal/);
+    expect(before).not.toMatch(/<WhatsNewModal/);
+  });
+
+  it('RecruiterAccessRoute source: no useMemo import, no useMemoSafe helper', async () => {
+    const src = await readSrc('src/components/opportunities/recruiter/RecruiterAccessRoute.tsx');
+    // useMemo must not be imported.
+    const importLine = src.match(/^import\s*\{([^}]+)\}\s*from\s*['"]react['"];/m);
+    expect(importLine).toBeTruthy();
+    expect(importLine![1]).not.toMatch(/\buseMemo\b/);
+    // The misleading local helper is gone.
+    expect(src).not.toMatch(/useMemoSafe/);
   });
 
   it('dashboardWorkspacePolicy has no forbidden imports', async () => {
