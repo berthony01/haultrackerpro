@@ -89,8 +89,10 @@ CREATE TABLE IF NOT EXISTS public.recruiter_profiles (
 );
 `;
 
-// -- RESET: drops every fixture object this suite created and cleans up the
-// role memberships it granted to the connection owner. Idempotent.
+// -- RESET: drops every fixture object this suite created, revokes any role
+// memberships/privileges the three fixture roles hold, and then drops the
+// roles themselves. Guarded/dynamic so it is safe to run BEFORE the roles
+// exist too. Idempotent across repeated runs.
 const RESET_SQL = `
 DROP FUNCTION IF EXISTS public.current_user_has_recruiter_minimum_paid_plan(text) CASCADE;
 DROP FUNCTION IF EXISTS public._recruiter_has_minimum_paid_plan(uuid, text) CASCADE;
@@ -100,7 +102,31 @@ DROP TABLE IF EXISTS public.recruiter_profiles CASCADE;
 DROP TABLE IF EXISTS auth.users CASCADE;
 DROP FUNCTION IF EXISTS auth.uid() CASCADE;
 DROP SCHEMA IF EXISTS auth CASCADE;
-DO $$ BEGIN REVOKE anon, authenticated, service_role FROM CURRENT_USER; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $reset$
+DECLARE
+  r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon','authenticated','service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      -- Revoke role membership from the connection owner (best effort).
+      BEGIN
+        EXECUTE format('REVOKE %I FROM CURRENT_USER', r);
+      EXCEPTION WHEN OTHERS THEN NULL;
+      END;
+      -- Revoke every privilege the role holds across public + auth schemas
+      -- and on the schemas themselves, so DROP ROLE has no owned privileges
+      -- left to complain about.
+      BEGIN EXECUTE format('REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+      BEGIN EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+      BEGIN EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+      BEGIN EXECUTE format('REVOKE ALL ON SCHEMA public FROM %I', r);                  EXCEPTION WHEN OTHERS THEN NULL; END;
+      -- Drop the role itself.
+      BEGIN EXECUTE format('DROP ROLE %I', r); EXCEPTION WHEN OTHERS THEN NULL; END;
+    END IF;
+  END LOOP;
+END
+$reset$;
 `;
 
 const pool = new pg.Pool({ connectionString: URL_STR, max: 8 });
@@ -161,6 +187,17 @@ async function openAuthenticatedSession(userId: string): Promise<{
   return {
     query: (sql: string, params: unknown[] = []) => client.query(sql, params),
     end: async () => {
+      // Clear every identity GUC this session touched so the pooled client
+      // cannot leak `auth.uid()` or `app.user_id` into a later checkout, then
+      // drop back to the connection's default role.
+      try {
+        await client.query(
+          `SELECT set_config('request.jwt.claim.sub', '', false),
+                  set_config('app.user_id',           '', false)`,
+        );
+      } catch {
+        /* ignore */
+      }
       try {
         await client.query(`RESET ROLE`);
       } catch {
@@ -536,26 +573,25 @@ describe('Phase 1J-D2B-1 · EXECUTE ACL (exact per-role matrix)', () => {
   );
 
   it('PUBLIC (grantee OID 0) is absent from every candidate function ACL', async () => {
+    // Query candidate rows as `f`, and use aclexplode that reads `f.proacl`
+    // / `f.proowner` directly — no shadowing pg_proc alias, no out-of-scope
+    // reference. Works on PostgreSQL 16.
     const rows = await q<{ name: string; public_present: boolean }>(
-      `WITH fns AS (
-         SELECT p.oid, p.proname
-           FROM pg_proc p
-           JOIN pg_namespace n ON n.oid=p.pronamespace
-          WHERE n.nspname='public'
-            AND p.proname IN (
-              '_recruiter_paid_plan_rank',
-              '_recruiter_has_minimum_paid_plan',
-              'current_user_has_recruiter_minimum_paid_plan'
-            )
-       )
-       SELECT f.proname AS name,
+      `SELECT f.proname AS name,
               EXISTS (
                 SELECT 1
-                  FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
-                  JOIN pg_proc p ON p.oid = f.oid
+                  FROM aclexplode(COALESCE(f.proacl, acldefault('f', f.proowner))) AS a
                  WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'
               ) AS public_present
-         FROM fns f`,
+         FROM pg_proc f
+         JOIN pg_namespace n ON n.oid = f.pronamespace
+        WHERE n.nspname = 'public'
+          AND f.proname IN (
+            '_recruiter_paid_plan_rank',
+            '_recruiter_has_minimum_paid_plan',
+            'current_user_has_recruiter_minimum_paid_plan'
+          )
+        ORDER BY f.proname`,
     );
     expect(rows.length).toBe(3);
     for (const r of rows) {
@@ -572,21 +608,30 @@ describe('Phase 1J-D2B-1 · authenticated role direct invocation', () => {
     const rid = await createRecruiter(u);
     await insertBilling(rid, u, 'growth', 'active');
 
+    // PostgreSQL aborts the current transaction on the first error, so each
+    // expected-permission-denied call is wrapped in its own SAVEPOINT that we
+    // ROLLBACK TO after the failure. The caller-bound call then runs in the
+    // same, still-live transaction and genuinely succeeds.
     await asAuthenticated(u, async (client) => {
-      // rank helper: not executable by authenticated.
+      await client.query(`SAVEPOINT sp_rank`);
       await expect(
         client.query(`SELECT public._recruiter_paid_plan_rank('starter')`),
       ).rejects.toThrow(/permission denied/i);
+      await client.query(`ROLLBACK TO SAVEPOINT sp_rank`);
+      await client.query(`RELEASE SAVEPOINT sp_rank`);
 
-      // internal resolver: not executable by authenticated.
+      await client.query(`SAVEPOINT sp_internal`);
       await expect(
         client.query(
           `SELECT public._recruiter_has_minimum_paid_plan($1,'starter')`,
           [rid],
         ),
       ).rejects.toThrow(/permission denied/i);
+      await client.query(`ROLLBACK TO SAVEPOINT sp_internal`);
+      await client.query(`RELEASE SAVEPOINT sp_internal`);
 
-      // caller-bound function: executable, returns true for this paid user.
+      // Caller-bound function: executable in the same live transaction and
+      // returns true for this paid user.
       const r = await client.query(
         `SELECT public.current_user_has_recruiter_minimum_paid_plan('starter') AS ok`,
       );
