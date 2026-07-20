@@ -503,7 +503,7 @@ describe('Phase 1J-D2B-2 — policy catalog preservation and tightening', () => 
     expect(wc).toContain(norm("reviewer_role='recruiter'"));
     expect(wc).toContain(norm('c.id=contract_reviews.contract_id'));
     expect(wc).toContain(norm('is_recruiter_owner(auth.uid(),c.recruiter_id)'));
-    const growth = wc.match(/current_user_has_recruiter_minimum_paid_plan\('growth'\)/g);
+    const growth = wc.match(/current_user_has_recruiter_minimum_paid_plan\('growth'(::text)?\)/g);
     expect(growth?.length).toBe(1);
     expect(p.qual).toBeNull();
   });
