@@ -502,9 +502,8 @@ describe('Phase 1J-D2B-1 — catalog signature proof (proof 13)', () => {
     },
   ];
 
-  it.each(expected)(
-    'exactly one overload of $name with signature $args -> $rtype',
-    async ({ name, args, rtype }) => {
+  it('all three functions have exactly one overload, exact identity args, exact result types, and the caller-bound function exposes no user_id/recruiter_id parameter', async () => {
+    for (const { name, args, rtype } of expected) {
       const r = await db.query<{ args: string; rtype: string }>(
         `SELECT pg_get_function_identity_arguments(p.oid) AS args,
                 pg_catalog.format_type(p.prorettype, NULL)   AS rtype
@@ -514,23 +513,16 @@ describe('Phase 1J-D2B-1 — catalog signature proof (proof 13)', () => {
         [name],
       );
       expect(r.rows.length, `expected exactly one overload of public.${name}`).toBe(1);
-      expect(r.rows[0].args).toBe(args);
-      expect(r.rows[0].rtype).toBe(rtype);
-    },
-  );
-
-  it('caller-bound public function accepts neither user_id nor recruiter_id parameter', async () => {
-    const r = await db.query<{ args: string }>(
-      `SELECT pg_get_function_identity_arguments(p.oid) AS args
-         FROM pg_proc p
-         JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname='public'
-          AND p.proname='current_user_has_recruiter_minimum_paid_plan'`,
-    );
-    expect(r.rows.length).toBe(1);
-    expect(r.rows[0].args).not.toMatch(/user_id/i);
-    expect(r.rows[0].args).not.toMatch(/recruiter_id/i);
-    expect(r.rows[0].args).toBe('_minimum_plan text');
+      expect(r.rows[0].args, `identity args for public.${name}`).toBe(args);
+      expect(r.rows[0].rtype, `return type for public.${name}`).toBe(rtype);
+    }
+    // Caller-bound public function must accept no user_id or recruiter_id parameter.
+    const caller = expected.find(
+      (e) => e.name === 'current_user_has_recruiter_minimum_paid_plan',
+    )!;
+    expect(caller.args).not.toMatch(/user_id/i);
+    expect(caller.args).not.toMatch(/recruiter_id/i);
+    expect(caller.args).toBe('_minimum_plan text');
   });
 });
 
