@@ -515,6 +515,137 @@ describe('RecruiterEntryRoute — in-flight user race isolation', () => {
 });
 
 // -----------------------------------------------------------------------
+// K3/K4. Synchronous user-owned UI state.
+// A's error/pending must be invisible on B's FIRST render after switch.
+// -----------------------------------------------------------------------
+describe('RecruiterEntryRoute — synchronous user-owned attempt UI state', () => {
+  it('K3. A error is not visible on B first render; B activates once; only B may refetch/navigate after validated rows', async () => {
+    // A rejects to display an error UI.
+    const beginA = vi
+      .fn()
+      .mockRejectedValue(new Error('A only error visible to A'));
+    const refetchA = vi.fn().mockResolvedValue(undefined);
+    const setViewA = viewState.setViewMode;
+    capsState = defaultCaps({ beginRecruiterSetup: beginA, refetch: refetchA });
+
+    const { rerender } = renderRoute();
+    await waitFor(() => {
+      expect(beginA).toHaveBeenCalledTimes(1);
+    });
+    await screen.findByText(/A only error visible to A/i);
+
+    // Switch to B and do exactly one real rerender.
+    const beginB = vi.fn().mockResolvedValue('setup' as UserCapabilityStatus);
+    const refetchB = vi.fn().mockResolvedValue(undefined);
+    const setViewB = vi.fn();
+    authState = { user: { id: 'user-b' }, loading: false };
+    capsState = defaultCaps({ beginRecruiterSetup: beginB, refetch: refetchB });
+    viewState = defaultView({ setViewMode: setViewB });
+
+    rerender(<Tree />);
+
+    // IMMEDIATE B render: A error must be absent, location safe.
+    expect(screen.queryByText(/A only error visible to A/i)).toBeNull();
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
+
+    // B begins its own activation exactly once.
+    await waitFor(() => {
+      expect(beginB).toHaveBeenCalledTimes(1);
+    });
+    expect(beginA).toHaveBeenCalledTimes(1); // A never fired again
+    expect(refetchA).not.toHaveBeenCalled();
+    expect(setViewA).not.toHaveBeenCalled();
+
+    // Complete B with validated recruiter setup + hub authorization.
+    viewState = defaultView({
+      setViewMode: setViewB,
+      recruiterCapabilityStatus: 'setup',
+      recruiterHubAllowed: true,
+    });
+    rerender(<Tree />);
+
+    await waitFor(() => {
+      expect(setViewB).toHaveBeenCalledWith('recruiter');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe(
+        '/dashboard?page=recruiter-access:onboarding',
+      );
+    });
+    // Only B may have refetched.
+    expect(refetchB).toHaveBeenCalled();
+    expect(refetchA).not.toHaveBeenCalled();
+    // A never influenced view mode.
+    expect(setViewA).not.toHaveBeenCalled();
+  });
+
+  it('K4. A pending is not visible on B first render; B owns its own visible state', async () => {
+    // A is pending indefinitely.
+    let rejectA: ((e: Error) => void) | null = null;
+    const beginA = vi.fn().mockImplementation(
+      () =>
+        new Promise<UserCapabilityStatus>((_res, rej) => {
+          rejectA = (e) => rej(e);
+        }),
+    );
+    const refetchA = vi.fn().mockResolvedValue(undefined);
+    const setViewA = viewState.setViewMode;
+    capsState = defaultCaps({ beginRecruiterSetup: beginA, refetch: refetchA });
+
+    const { rerender } = renderRoute();
+    await waitFor(() => {
+      expect(beginA).toHaveBeenCalledTimes(1);
+    });
+
+    // Switch to B (pending on A is set but should not carry over).
+    let rejectB: ((e: Error) => void) | null = null;
+    const beginB = vi.fn().mockImplementation(
+      () =>
+        new Promise<UserCapabilityStatus>((_res, rej) => {
+          rejectB = (e) => rej(e);
+        }),
+    );
+    const refetchB = vi.fn().mockResolvedValue(undefined);
+    const setViewB = vi.fn();
+    authState = { user: { id: 'user-b' }, loading: false };
+    capsState = defaultCaps({ beginRecruiterSetup: beginB, refetch: refetchB });
+    viewState = defaultView({ setViewMode: setViewB });
+
+    rerender(<Tree />);
+
+    // First B render: no A-owned error text; location safe.
+    expect(screen.queryByText(/A only error/i)).toBeNull();
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
+
+    await waitFor(() => {
+      expect(beginB).toHaveBeenCalledTimes(1);
+    });
+
+    // Now trigger a distinct B error and prove it renders as B-owned.
+    await act(async () => {
+      rejectB?.(new Error('B distinct error'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await screen.findByText(/B distinct error/i);
+
+    // Now release A's stale rejection: must remain a no-op — B's UI
+    // stays showing B's error only.
+    await act(async () => {
+      rejectA?.(new Error('A late error must be invisible'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/A late error must be invisible/i)).toBeNull();
+    // B's error still visible.
+    expect(screen.getByText(/B distinct error/i)).toBeTruthy();
+    // A never influenced view mode or refetched.
+    expect(refetchA).not.toHaveBeenCalled();
+    expect(setViewA).not.toHaveBeenCalled();
+  });
+});
+
+// -----------------------------------------------------------------------
 // L. Import surface — no forbidden authorization sources
 // -----------------------------------------------------------------------
 describe('RecruiterEntryRoute — import surface', () => {
