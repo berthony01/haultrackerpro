@@ -772,11 +772,92 @@ describe('Phase 1J-A — activated_at strict validation', () => {
     }
   });
 
-  it('rejects invalid dates that match the shape but are not real (bad month)', () => {
-    // Regex matches shape; Date.parse rejects impossible month/day.
-    const v = '2026-13-01T00:00:00Z';
-    expect(isValidActivatedAt(v)).toBe(false);
-    expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
+  it('rejects impossible calendar dates (shape-valid but not real days)', () => {
+    // JS `Date.parse` would normalize 2026-02-30 → 2026-03-02 and
+    // 2026-04-31 → 2026-05-01, and 2025-02-29 → 2025-03-01.
+    // The validator must reject all of them without normalization.
+    const invalid = [
+      '2026-02-30T00:00:00Z',
+      '2026-04-31T00:00:00Z',
+      '2025-02-29T00:00:00Z', // 2025 is NOT a leap year
+      '2026-00-15T00:00:00Z',
+      '2026-13-01T00:00:00Z',
+      '2026-01-00T00:00:00Z',
+      '2026-01-32T00:00:00Z',
+      '1900-02-29T00:00:00Z', // 1900 is a century year, NOT a leap year
+    ];
+    for (const v of invalid) {
+      expect(isValidActivatedAt(v)).toBe(false);
+      expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
+    }
+  });
+
+  it('rejects out-of-range clock components (hour 24, minute 60, second 60)', () => {
+    const invalid = [
+      '2026-07-20T24:00:00Z',
+      '2026-07-20T23:60:00Z',
+      '2026-07-20T23:59:60Z',
+    ];
+    for (const v of invalid) {
+      expect(isValidActivatedAt(v)).toBe(false);
+      expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
+    }
+  });
+
+  it('rejects out-of-range timezone offsets (+24:00, +00:60, -24:00, -00:60)', () => {
+    const invalid = [
+      '2026-07-20T12:00:00+24:00',
+      '2026-07-20T12:00:00+00:60',
+      '2026-07-20T12:00:00-24:00',
+      '2026-07-20T12:00:00-00:60',
+    ];
+    for (const v of invalid) {
+      expect(isValidActivatedAt(v)).toBe(false);
+      expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
+    }
+  });
+
+  it('accepts real leap day 2024-02-29T23:59:59Z (2024 IS a leap year)', () => {
+    const v = '2024-02-29T23:59:59Z';
+    expect(isValidActivatedAt(v)).toBe(true);
+    const row = parseUserCapabilityRow({ ...base, activated_at: v });
+    expect(row).not.toBeNull();
+    // Preserve the original string exactly — no normalization.
+    expect(row?.activated_at).toBe(v);
+  });
+
+  it('accepts real leap day 2000-02-29 (400-year rule) and rejects 2100-02-29 (century non-leap)', () => {
+    expect(isValidActivatedAt('2000-02-29T12:00:00Z')).toBe(true);
+    expect(isValidActivatedAt('2100-02-29T12:00:00Z')).toBe(false);
+  });
+
+  it('accepts a valid timestamp with fractional seconds', () => {
+    const v = '2026-07-20T12:34:56.789Z';
+    expect(isValidActivatedAt(v)).toBe(true);
+    expect(parseUserCapabilityRow({ ...base, activated_at: v })?.activated_at).toBe(v);
+  });
+
+  it('accepts a valid positive offset (+09:00) and preserves it exactly', () => {
+    const v = '2026-07-20T12:34:56+09:00';
+    expect(isValidActivatedAt(v)).toBe(true);
+    expect(parseUserCapabilityRow({ ...base, activated_at: v })?.activated_at).toBe(v);
+  });
+
+  it('accepts a valid negative offset (-05:30) and preserves it exactly', () => {
+    const v = '2026-07-20T12:34:56-05:30';
+    expect(isValidActivatedAt(v)).toBe(true);
+    expect(parseUserCapabilityRow({ ...base, activated_at: v })?.activated_at).toBe(v);
+  });
+
+  it('accepts boundary clock values (00:00:00 and 23:59:59) with Z and with offsets', () => {
+    for (const v of [
+      '2026-07-20T00:00:00Z',
+      '2026-07-20T23:59:59Z',
+      '2026-07-20T00:00:00+23:59',
+      '2026-07-20T23:59:59-23:59',
+    ]) {
+      expect(isValidActivatedAt(v)).toBe(true);
+    }
   });
 
   it('rejects numbers, booleans, arrays, and objects', () => {
