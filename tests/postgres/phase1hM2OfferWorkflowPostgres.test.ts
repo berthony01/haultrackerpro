@@ -1270,7 +1270,7 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     await pool.query(`CREATE UNIQUE INDEX opportunity_offers_one_sent_per_app_uidx ON public.opportunity_offers(application_id) WHERE status = 'sent'`);
   });
 
-  it("D6 race: acceptance vs service expiration sweep — accepted OR expired, never both; onboarding only when accepted", async () => {
+  it("D6 race: acceptance vs service expiration sweep — exact recipient-scoped side effects", async () => {
     const drv = await mintDriver(pool);
     const { appId, offerId } = await setupSentOffer(drv);
     // Force expiration eligibility.
@@ -1292,13 +1292,18 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     if (off === "accepted") {
       expect(app).toBe("onboarding");
       expect(await eventCount(appId, "offer_accepted")).toBe(1);
-      expect(await notifCount(appId, "offer_accepted")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(1);
       expect(await eventCount(appId, "offer_expired")).toBe(0);
+      expect(await notifCountFor(drv, appId, "offer_expired")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_expired")).toBe(0);
     } else {
       expect(app).toBe("offer_sent");
       expect(await eventCount(appId, "offer_expired")).toBe(1);
+      // _m2_expire_offer notifies both driver AND recruiter.
+      expect(await notifCountFor(drv, appId, "offer_expired")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_expired")).toBe(1);
       expect(await eventCount(appId, "offer_accepted")).toBe(0);
-      expect(await notifCount(appId, "offer_accepted")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(0);
     }
   });
 
