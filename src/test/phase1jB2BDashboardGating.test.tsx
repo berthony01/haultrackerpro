@@ -459,12 +459,201 @@ describe('BottomNav — capability tier gating', () => {
     expect(screen.getByLabelText('Dashboard')).toBeTruthy();
     expect(screen.queryByLabelText('Home')).toBeNull();
   });
-  it('loading: exposes no workspace action', () => {
+  it('loading: renders bottom-nav-loading skeleton, no Sheet/More/Add/Home/Dashboard', () => {
     renderBottom({ role: 'driver', recruiterCapabilityStatus: null, workspaceLoading: true });
+    expect(screen.getByTestId('bottom-nav-loading')).toBeTruthy();
+    expect(screen.queryByLabelText('More')).toBeNull();
+    expect(screen.queryByLabelText('Add new load or expense')).toBeNull();
     expect(screen.queryByLabelText('Dashboard')).toBeNull();
     expect(screen.queryByLabelText('Home')).toBeNull();
+    expect(screen.queryByLabelText('Opps')).toBeNull();
+    expect(screen.queryByLabelText('Apps')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });
+
+// ==========================================================================
+// RENDERED — BottomNav More sheet interaction contents by tier
+// ==========================================================================
+describe('BottomNav — More sheet interaction contents', () => {
+  function openMore() {
+    const btn = screen.getByLabelText('More');
+    fireEvent.click(btn);
+  }
+
+  it('recruiter active+ops: More sheet shows full recruiter menu', () => {
+    renderBottom({
+      role: 'recruiter', recruiterCapabilityStatus: 'active', recruiterOperationsAllowed: true,
+    });
+    openMore();
+    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Manage Opportunities')).toBeTruthy();
+    expect(screen.getByText('Applications')).toBeTruthy();
+    expect(screen.getByText('Reports')).toBeTruthy();
+    expect(screen.getByText('Contracts')).toBeTruthy();
+    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+  });
+
+  it('recruiter setup: More sheet has ONLY Recruiter Dashboard + Sign Out', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'setup' });
+    openMore();
+    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+    expect(screen.queryByText('Reports')).toBeNull();
+    expect(screen.queryByText('Contracts')).toBeNull();
+    expect(screen.queryByText('Settings')).toBeNull();
+  });
+
+  it('recruiter suspended: More sheet has ONLY Recruiter Dashboard + Sign Out', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'suspended' });
+    openMore();
+    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+  });
+
+  it('recruiter explicit null: More sheet has ONLY Sign Out — no Recruiter Dashboard', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: null });
+    openMore();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+    expect(screen.queryByText('Reports')).toBeNull();
+  });
+
+  it('recruiter revoked: More sheet has ONLY Sign Out', () => {
+    renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'revoked' });
+    openMore();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+  });
+
+  it('driver workspace + recruiter active: driver More menu, not recruiter menu', () => {
+    renderBottom({
+      role: 'driver', recruiterCapabilityStatus: 'active', recruiterOperationsAllowed: true,
+    });
+    openMore();
+    expect(screen.getByText('Reports')).toBeTruthy();
+    expect(screen.getByText('Expenses')).toBeTruthy();
+    expect(screen.getByText('Fuel')).toBeTruthy();
+    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('Sign Out')).toBeTruthy();
+    expect(screen.queryByText('Manage Opportunities')).toBeNull();
+    expect(screen.queryByText('Applications')).toBeNull();
+    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+  });
+});
+
+// ==========================================================================
+// RENDERED — RecruiterAccessRoute callback interactions
+// ==========================================================================
+describe('RecruiterAccessRoute — hub callback interactions', () => {
+  it('setup hub: click Manage → onboarding, click Applications → onboarding, never manager/apps', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'setup', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    expect(screen.getByTestId('recruiter-onboarding')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    cleanup();
+    renderRoute({
+      recruiterCapabilityStatus: 'setup', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.getByTestId('recruiter-onboarding')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-apps')).toBeNull();
+  });
+
+  it('active+ops hub: click Manage → manager', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: true, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    expect(screen.getByTestId('recruiter-manager')).toBeTruthy();
+  });
+
+  it('active+ops hub: click Applications → apps', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: true, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.getByTestId('recruiter-apps')).toBeTruthy();
+  });
+
+  it('active WITHOUT ops: click Manage/Applications stays on hub', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    expect(screen.getByTestId('recruiter-access-page')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.queryByTestId('recruiter-apps')).toBeNull();
+    expect(screen.getByTestId('recruiter-access-page')).toBeTruthy();
+  });
+
+  it('suspended hub: onboarding/manage/apps callbacks stay on hub', () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'suspended', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: false, initialView: 'hub',
+    });
+    fireEvent.click(screen.getByTestId('cb-onboarding'));
+    fireEvent.click(screen.getByTestId('cb-manage'));
+    fireEvent.click(screen.getByTestId('cb-apps'));
+    expect(screen.getByTestId('recruiter-access-page')).toBeTruthy();
+    expect(screen.queryByTestId('recruiter-onboarding')).toBeNull();
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    expect(screen.queryByTestId('recruiter-apps')).toBeNull();
+  });
+
+  it('active+ops initial reports mounts RecruiterReportsPanel (lazy)', async () => {
+    renderRoute({
+      recruiterCapabilityStatus: 'active', recruiterHubAllowed: true,
+      recruiterOperationsAllowed: true, initialView: 'reports',
+    });
+    expect(await screen.findByTestId('recruiter-reports')).toBeTruthy();
+  });
+
+  it('active→setup rerender: manager child collapses synchronously to onboarding', () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <RecruiterAccessRoute
+          onBack={vi.fn()}
+          initialView="manager"
+          recruiterCapabilityStatus="active"
+          recruiterHubAllowed={true}
+          recruiterOperationsAllowed={true}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('recruiter-manager')).toBeTruthy();
+    rerender(
+      <MemoryRouter>
+        <RecruiterAccessRoute
+          onBack={vi.fn()}
+          initialView="manager"
+          recruiterCapabilityStatus="setup"
+          recruiterHubAllowed={true}
+          recruiterOperationsAllowed={false}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId('recruiter-manager')).toBeNull();
+    expect(screen.getByTestId('recruiter-onboarding')).toBeTruthy();
+  });
+});
+
 
 // ==========================================================================
 // SOURCE — Index & module import audits
