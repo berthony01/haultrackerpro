@@ -344,8 +344,8 @@ BEGIN
    WHERE user_id = _uid AND capability = 'recruiter'
    FOR UPDATE;
 
-  IF FOUND AND (_existing = 'active' OR _existing = 'suspended') THEN
-    -- Never unsuspend and never demote an active recruiter.
+  IF FOUND AND _existing IN ('active','suspended','revoked') THEN
+    -- Never unsuspend, never demote an active recruiter, never reverse revoked.
     RETURN _existing;
   END IF;
 
@@ -355,7 +355,7 @@ BEGIN
   ON CONFLICT (user_id, capability) DO UPDATE
     SET status = 'setup'::public.user_capability_status,
         updated_at = now()
-    WHERE public.user_capabilities.status NOT IN ('active','suspended');
+    WHERE public.user_capabilities.status NOT IN ('active','suspended','revoked');
 
   SELECT status INTO _existing
     FROM public.user_capabilities
