@@ -1,4 +1,5 @@
-# CI trigger: validate the current Phase 1H-M2 candidate on real PostgreSQL 16.
+# CI trigger: validate the canonical Phase 1H-M2 migration on real PostgreSQL 16.
+# Final observable verification branch; do not merge this comment-only change.
 name: Phase 1H-M2 — Postgres 16 Offer Workflow Gate
 
 on:
