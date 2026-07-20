@@ -479,8 +479,8 @@ describe('Phase 1J-D2B-2 — policy catalog preservation and tightening', () => 
     const wc = norm(p.with_check);
     expect(q).toContain(norm('is_recruiter_owner(auth.uid(),recruiter_id)'));
     expect(wc).toContain(norm('is_recruiter_owner(auth.uid(),recruiter_id)'));
-    const growthQ = q.match(/current_user_has_recruiter_minimum_paid_plan\('growth'\)/g);
-    const growthW = wc.match(/current_user_has_recruiter_minimum_paid_plan\('growth'\)/g);
+    const growthQ = q.match(/current_user_has_recruiter_minimum_paid_plan\('growth'(::text)?\)/g);
+    const growthW = wc.match(/current_user_has_recruiter_minimum_paid_plan\('growth'(::text)?\)/g);
     expect(growthQ?.length).toBe(1);
     expect(growthW?.length).toBe(1);
   });
