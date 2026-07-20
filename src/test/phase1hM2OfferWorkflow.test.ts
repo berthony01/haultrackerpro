@@ -1983,6 +1983,233 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
       `SELECT status FROM public.opportunity_applications WHERE id=$1`, [APP]);
     expect(s.rows[0].status).toBe('onboarding');
   });
+
+  // -----------------------------------------------------------------
+  // Phase 1H-M2 2B-3: canonical rejection side effects (PGlite regression)
+  // -----------------------------------------------------------------
+  describe('Phase 1H-M2 2B-3 rejection side effects (PGlite)', () => {
+    // Isolated recruiter/driver fixtures for the rejection regression suite,
+    // so foreign/incomplete/suspended paths are fully independent.
+    const RJ_R_USER  = 'b2000000-b200-b200-b200-b20000000f01';
+    const RJ_R_PROF  = 'b2000000-b200-b200-b200-b20000000f02';
+    const RJ_OPP     = 'b2000000-b200-b200-b200-b20000000f03';
+    const RJ_INC_U   = 'b2000000-b200-b200-b200-b20000000f04';
+    const RJ_INC_P   = 'b2000000-b200-b200-b200-b20000000f05';
+    const RJ_INC_OPP = 'b2000000-b200-b200-b200-b20000000f06';
+    const RJ_SUS_U   = 'b2000000-b200-b200-b200-b20000000f07';
+    const RJ_SUS_P   = 'b2000000-b200-b200-b200-b20000000f08';
+    const RJ_SUS_OPP = 'b2000000-b200-b200-b200-b20000000f09';
+    const RJ_FOR_U   = 'b2000000-b200-b200-b200-b20000000f0a';
+    const RJ_FOR_P   = 'b2000000-b200-b200-b200-b20000000f0b';
+    const DRV = (n: string) => `b2000000-b200-b200-b200-b20000000f${n}`;
+    const drivers = ['20','21','22','23','24','25','26','27','28','29'].map(DRV);
+
+    beforeAll(async () => {
+      await asOwner(db);
+      const userVals = [
+        `('${RJ_R_USER}','rj-r@t')`,
+        `('${RJ_INC_U}','rj-inc@t')`,
+        `('${RJ_SUS_U}','rj-sus@t')`,
+        `('${RJ_FOR_U}','rj-for@t')`,
+        ...drivers.map((d, i) => `('${d}','rj-d${i}@t')`),
+      ].join(',');
+      const drvProfVals = drivers
+        .map((d, i) => `('${d}','D${i}','A',5,'phone','apply_only',true)`).join(',');
+      await db.exec(`
+        INSERT INTO auth.users(id,email) VALUES ${userVals} ON CONFLICT DO NOTHING;
+
+        INSERT INTO public.recruiter_profiles(
+          id,user_id,recruiter_name,recruiter_email,company_name,dot_number,
+          posting_terms_accepted_at,posting_terms_version,verification_status,status
+        ) VALUES
+          ('${RJ_R_PROF}','${RJ_R_USER}','RJ Rec','rj-r@t','RJ Co','DOTRJ',
+           now(),'2026-07-17.v1','approved','active'),
+          ('${RJ_INC_P}','${RJ_INC_U}','RJ Inc','rj-inc@t','RJ Inc','DOTRJINC',
+           NULL,NULL,'approved','active'),
+          ('${RJ_SUS_P}','${RJ_SUS_U}','RJ Sus','rj-sus@t','RJ Sus','DOTRJSUS',
+           now(),'2026-07-17.v1','approved','active'),
+          ('${RJ_FOR_P}','${RJ_FOR_U}','RJ For','rj-for@t','RJ For','DOTRJFOR',
+           now(),'2026-07-17.v1','approved','active')
+        ON CONFLICT DO NOTHING;
+
+        INSERT INTO public.opportunities(
+          id,recruiter_id,title,company_name,hiring_city,hiring_state,driver_type,route_type,trailer_type,
+          pay_model,cpm,estimated_weekly_gross,estimated_weekly_miles,status,admin_review_status
+        ) VALUES
+          ('${RJ_OPP}','${RJ_R_PROF}','RJ Job','RJ Co','Dallas','TX','company','regional','dry_van',
+           'cpm',0.62,1800,2800,'active','approved'),
+          ('${RJ_INC_OPP}','${RJ_INC_P}','RJ Inc Job','RJ Inc','Dallas','TX','company','regional','dry_van',
+           'cpm',0.62,1800,2800,'active','approved'),
+          ('${RJ_SUS_OPP}','${RJ_SUS_P}','RJ Sus Job','RJ Sus','Dallas','TX','company','regional','dry_van',
+           'cpm',0.62,1800,2800,'active','approved')
+        ON CONFLICT DO NOTHING;
+
+        INSERT INTO public.driver_opportunity_profiles(user_id,full_name,cdl_class,years_experience,contact_preference,visibility,profile_completed)
+        VALUES ${drvProfVals}
+        ON CONFLICT DO NOTHING;
+      `);
+    });
+
+    async function rejEventCount(appId: string): Promise<number> {
+      const r = await db.query<{ n: number }>(
+        `SELECT count(*)::int n FROM public.application_events
+          WHERE application_id=$1 AND event_type='application_rejected'`, [appId]);
+      return r.rows[0].n;
+    }
+    async function rejNotifCount(driverUid: string, appId: string): Promise<number> {
+      const r = await db.query<{ n: number }>(
+        `SELECT count(*)::int n FROM public.notifications
+          WHERE user_id=$1 AND type='application_rejected'
+            AND payload->>'application_id'=$2::text`, [driverUid, appId]);
+      return r.rows[0].n;
+    }
+
+    it('1. successful rejection emits exactly one application_rejected event and one driver notification', async () => {
+      const drv = drivers[0]!;
+      const app = await submitApply(db, drv, RJ_OPP, 'rj-1-key');
+      await asAuth(db, RJ_R_USER);
+      const r = await db.query<{ result_code: string }>(
+        `SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]);
+      expect(r.rows[0].result_code).toBe('application_transitioned');
+      await asOwner(db);
+      const s = await db.query<{ status: string }>(
+        `SELECT status FROM public.opportunity_applications WHERE id=$1`, [app]);
+      expect(s.rows[0].status).toBe('rejected');
+      expect(await rejEventCount(app)).toBe(1);
+      expect(await rejNotifCount(drv, app)).toBe(1);
+      const meta = await db.query<{ metadata: Record<string, unknown> }>(
+        `SELECT metadata FROM public.application_events
+          WHERE application_id=$1 AND event_type='application_rejected'`, [app]);
+      expect(meta.rows[0].metadata.opportunity_id).toBe(RJ_OPP);
+      expect(meta.rows[0].metadata.recruiter_id).toBe(RJ_R_PROF);
+    });
+
+    it('2. rejection is idempotent — replaying no-op does not duplicate event or notification', async () => {
+      const drv = drivers[1]!;
+      const app = await submitApply(db, drv, RJ_OPP, 'rj-2-key');
+      await asAuth(db, RJ_R_USER);
+      await db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]);
+      // Replay while already rejected — early no-op branch, no new side effects.
+      await db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]);
+      await asOwner(db);
+      expect(await rejEventCount(app)).toBe(1);
+      expect(await rejNotifCount(drv, app)).toBe(1);
+    });
+
+    it('3. foreign recruiter cannot reject and produces no rejection side effects', async () => {
+      const drv = drivers[2]!;
+      const app = await submitApply(db, drv, RJ_OPP, 'rj-3-key');
+      await asAuth(db, RJ_FOR_U);
+      await expect(
+        db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]),
+      ).rejects.toThrow(/not authorized/i);
+      await asOwner(db);
+      expect(await rejEventCount(app)).toBe(0);
+      expect(await rejNotifCount(drv, app)).toBe(0);
+    });
+
+    it('4. incomplete recruiter cannot reject and produces no rejection side effects', async () => {
+      // Fixture: submit while owning recruiter is complete; then flip THAT recruiter
+      // to incomplete and prove rejection is denied on the existing application.
+      const drv = drivers[3]!;
+      const app = await submitApply(db, drv, RJ_OPP, 'rj-4-key');
+      await asOwner(db);
+      await db.exec(
+        `UPDATE public.recruiter_profiles SET posting_terms_accepted_at=NULL,
+           legacy_terms_grandfathered_at=NULL WHERE id='${RJ_R_PROF}'`);
+      try {
+        await asAuth(db, RJ_R_USER);
+        await expect(
+          db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]),
+        ).rejects.toThrow(/recruiter not eligible/i);
+        await asOwner(db);
+        expect(await rejEventCount(app)).toBe(0);
+        expect(await rejNotifCount(drv, app)).toBe(0);
+      } finally {
+        await asOwner(db);
+        await db.exec(
+          `UPDATE public.recruiter_profiles SET posting_terms_accepted_at=now(),
+             posting_terms_version='2026-07-17.v1' WHERE id='${RJ_R_PROF}'`);
+      }
+    });
+
+    it('5. suspended recruiter cannot reject and produces no rejection side effects', async () => {
+      const drv = drivers[4]!;
+      const app = await submitApply(db, drv, RJ_SUS_OPP, 'rj-5-key');
+      await asOwner(db);
+      await db.exec(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id='${RJ_SUS_P}'`);
+      try {
+        await asAuth(db, RJ_SUS_U);
+        await expect(
+          db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]),
+        ).rejects.toThrow(/recruiter not eligible/i);
+        await asOwner(db);
+        expect(await rejEventCount(app)).toBe(0);
+        expect(await rejNotifCount(drv, app)).toBe(0);
+      } finally {
+        await asOwner(db);
+        await db.exec(`UPDATE public.recruiter_profiles SET status='active' WHERE id='${RJ_SUS_P}'`);
+      }
+    });
+
+    it('6. inquiry rows (request_info / callback) cannot be rejected and emit no side effects', async () => {
+      await asOwner(db);
+      const inqRI = 'b2000000-b200-b200-b200-b20000000f31';
+      const inqCB = 'b2000000-b200-b200-b200-b20000000f32';
+      await db.exec(`
+        INSERT INTO public.opportunity_applications(
+          id,opportunity_id,driver_user_id,recruiter_id,application_type,status,is_legacy,
+          preferred_contact_method,contact_sharing_consent,contact_sharing_consent_at
+        ) VALUES
+          ('${inqRI}','${RJ_OPP}','${drivers[5]}','${RJ_R_PROF}','request_info','new',true,'phone',true,now()),
+          ('${inqCB}','${RJ_OPP}','${drivers[6]}','${RJ_R_PROF}','callback','new',true,'phone',true,now());
+      `);
+      for (const [app, drv] of [[inqRI, drivers[5]!], [inqCB, drivers[6]!]] as const) {
+        await asAuth(db, RJ_R_USER);
+        await expect(
+          db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]),
+        ).rejects.toThrow(/formal applications/i);
+        await asOwner(db);
+        expect(await rejEventCount(app)).toBe(0);
+        expect(await rejNotifCount(drv, app)).toBe(0);
+      }
+    });
+
+    it('7. invalid target-status transitions (hired/withdrawn/onboarding/offer_sent) never emit rejection side effects', async () => {
+      const drv = drivers[7]!;
+      const app = await submitApply(db, drv, RJ_OPP, 'rj-7-key');
+      await asAuth(db, RJ_R_USER);
+      for (const bad of ['hired', 'withdrawn', 'onboarding', 'offer_sent']) {
+        await expect(
+          db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,$2::text,NULL)`, [app, bad]),
+        ).rejects.toThrow();
+      }
+      await asOwner(db);
+      expect(await rejEventCount(app)).toBe(0);
+      expect(await rejNotifCount(drv, app)).toBe(0);
+    });
+
+    it('8. terminal-state application (already hired) cannot be re-rejected; no new rejection side effects', async () => {
+      const drv = drivers[8]!;
+      const app = await submitApply(db, drv, RJ_OPP, 'rj-8-key');
+      await seedApp; // no-op reference to keep TS happy if helper unused elsewhere
+      await asOwner(db);
+      // Force to 'hired' via guard-disabled write; then attempt rejection.
+      await db.exec(`
+        ALTER TABLE public.opportunity_applications DISABLE TRIGGER opportunity_applications_update_guard_trigger;
+        UPDATE public.opportunity_applications SET status='hired' WHERE id='${app}';
+        ALTER TABLE public.opportunity_applications ENABLE TRIGGER opportunity_applications_update_guard_trigger;
+      `);
+      await asAuth(db, RJ_R_USER);
+      // From 'hired' the update-guard blocks the status change; the RPC surfaces that.
+      await expect(
+        db.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'rejected',NULL)`, [app]),
+      ).rejects.toThrow();
+      await asOwner(db);
+      expect(await rejEventCount(app)).toBe(0);
+      expect(await rejNotifCount(drv, app)).toBe(0);
+    });
+  });
 });
 
 
