@@ -70,14 +70,27 @@ function BlockedPanel({
   );
 }
 
+/**
+ * Attempt UI state is single-object, owner-tagged. Every render only
+ * exposes error/pending when the owner matches the current user id AND
+ * the current generation. A superseded or foreign owner is treated as
+ * null/false synchronously — no post-render effect is required to
+ * privacy-scrub A's UI before B renders.
+ */
+type AttemptState = {
+  ownerUserId: string;
+  ownerGeneration: number;
+  pending: boolean;
+  error: Error | null;
+};
+
 export default function RecruiterEntryRoute() {
   const { user, loading: authLoading } = useAuth();
   const caps = useUserCapabilities();
   const view = useViewMode();
   const navigate = useNavigate();
 
-  const [rpcError, setRpcError] = useState<Error | null>(null);
-  const [rpcPending, setRpcPending] = useState(false);
+  const [attempt, setAttempt] = useState<AttemptState | null>(null);
 
   const userId = user?.id ?? null;
   const recruiterStatus = view.recruiterCapabilityStatus;
@@ -99,23 +112,36 @@ export default function RecruiterEntryRoute() {
   // for the same user session.
   const attemptedGenerationRef = useRef<number>(-1);
 
-  // Reset guards and mutation state whenever the authenticated user id
-  // changes. This must run before any effect that could fire an RPC.
+  // Mounted guard: after unmount, no completion may mutate state or
+  // trigger refetch.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Reset guards synchronously when the authenticated user id changes.
+  // This runs during render (before effects) so the CURRENT render
+  // already sees the new generation and never re-fires stale attempts.
   if (lastUserIdRef.current !== userId) {
     lastUserIdRef.current = userId;
     generationRef.current += 1;
     attemptedGenerationRef.current = -1;
-    // Reset render-visible state synchronously via setState in a
-    // useEffect below; refs above are safe to mutate during render.
   }
 
-  useEffect(() => {
-    // Whenever userId changes, drop any stale error/pending from a
-    // previous user so B never inherits A's UI. Effect runs post-render
-    // and is bound to userId.
-    setRpcError(null);
-    setRpcPending(false);
-  }, [userId]);
+  // Owner-scoped visibility. A stored `attempt` owned by A is
+  // invisible when the current user is B or when the current
+  // generation has advanced.
+  const currentGeneration = generationRef.current;
+  const attemptVisible =
+    attempt !== null &&
+    userId !== null &&
+    attempt.ownerUserId === userId &&
+    attempt.ownerGeneration === currentGeneration;
+  const rpcError: Error | null = attemptVisible ? attempt!.error : null;
+  const rpcPending: boolean = attemptVisible ? attempt!.pending : false;
 
   const beginRecruiterSetup = caps.beginRecruiterSetup;
   const refetch = caps.refetch;
@@ -128,32 +154,40 @@ export default function RecruiterEntryRoute() {
     attemptedGenerationRef.current = startedGeneration;
 
     const isCurrent = () =>
+      mountedRef.current &&
       currentUserRef.current === startedUserId &&
       generationRef.current === startedGeneration;
 
-    // Only touch state if this attempt is still current.
-    if (isCurrent()) {
-      setRpcPending(true);
-      setRpcError(null);
-    }
+    const writeOwned = (patch: { pending: boolean; error: Error | null }) => {
+      if (!isCurrent()) return;
+      setAttempt({
+        ownerUserId: startedUserId,
+        ownerGeneration: startedGeneration,
+        ...patch,
+      });
+    };
+
+    writeOwned({ pending: true, error: null });
 
     try {
       await beginRecruiterSetup();
       if (!isCurrent()) return; // stale success: no refetch, no state
       await refetch();
       if (!isCurrent()) return;
-      setRpcPending(false);
+      writeOwned({ pending: false, error: null });
     } catch (e) {
       if (!isCurrent()) return; // stale failure: swallow silently
-      setRpcError(e instanceof Error ? e : new Error(String(e)));
-      setRpcPending(false);
+      writeOwned({
+        pending: false,
+        error: e instanceof Error ? e : new Error(String(e)),
+      });
     }
   }, [userId, beginRecruiterSetup, refetch]);
 
   // Auto-invoke activation only when validated rows prove:
   //   driver.status === 'active' AND recruiter capability absent.
   // Fail-closed on loading, missing user, capability error, or any
-  // other capability shape.
+  // other capability shape. Uses the current-user-visible error only.
   const shouldAutoActivate =
     !isLoading &&
     !capsError &&
@@ -268,9 +302,10 @@ export default function RecruiterEntryRoute() {
           type="button"
           onClick={() => {
             // Allow exactly one additional attempt per click, bound to
-            // the CURRENT user/generation.
+            // the CURRENT user/generation. Clear the owned error so
+            // shouldAutoActivate is not blocked by the stale error.
             attemptedGenerationRef.current = -1;
-            setRpcError(null);
+            setAttempt(null);
             void runActivation();
           }}
           className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
