@@ -122,8 +122,8 @@ jobs:
       - name: Phase 1J-A additive capabilities PGlite regression
         run: bunx vitest run src/test/phase1jAdditiveCapabilities.test.ts
 
-      - name: Typecheck (app)
-        run: bunx tsgo -p tsconfig.app.json --noEmit
+      - name: Typecheck (app, tsc)
+        run: bunx tsc -p tsconfig.app.json --noEmit
 
-      - name: Typecheck (node)
-        run: bunx tsgo -p tsconfig.node.json --noEmit
+      - name: Typecheck (node, tsc)
+        run: bunx tsc -p tsconfig.node.json --noEmit
