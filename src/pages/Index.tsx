@@ -225,7 +225,7 @@ const Index = () => {
     }
     // Prefill from Landing Profit Intelligence demo
     // Prefill from Landing Profit Intelligence demo — driver-only.
-    if (params.get('prefill') === 'load' && !roleLoading && !isRecruiterView) {
+    if (params.get('prefill') === 'load' && !workspaceLoading && !isRecruiterView) {
       try {
         const raw = sessionStorage.getItem('htp_demo_prefill');
         if (raw) {
@@ -291,7 +291,7 @@ const Index = () => {
     const pageParam = params.get('page');
     const isRecruiterAccessParam =
       pageParam === 'recruiter-access' || (pageParam?.startsWith('recruiter-access:') ?? false);
-    if (roleLoading && (isRecruiterAccessParam || pageParam === 'opportunities' || recruiterIntent)) {
+    if (workspaceLoading && (isRecruiterAccessParam || pageParam === 'opportunities' || recruiterIntent)) {
       // Re-run once role resolves.
       return;
     }
@@ -341,7 +341,7 @@ const Index = () => {
       try { sessionStorage.setItem('htp_recruiter_intent', '1'); } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey, roleLoading, isRecruiterView]);
+  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey, workspaceLoading, isRecruiterView]);
 
   // Fire purchase analytics once the resolved plan is available (avoids stale closure)
   useEffect(() => {
@@ -379,10 +379,10 @@ const Index = () => {
   }, []);
 
   // Show onboarding modal for first-time DRIVERS only.
-  // Gated on roleLoading so recruiters never see "Log Your First Load" —
+  // Gated on workspaceLoading so recruiters never see "Log Your First Load" —
   // even returning recruiters with cleared session storage.
   useEffect(() => {
-    if (roleLoading || isRecruiterView) return;
+    if (workspaceLoading || isRecruiterView) return;
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
       if (suppressOnboardingForAddDeepLink) return;
       let recruiter = false;
@@ -393,7 +393,7 @@ const Index = () => {
       }
       setShowOnboardingModal(true);
     }
-  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, roleLoading, isRecruiterView]);
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, workspaceLoading, isRecruiterView]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboardingModal(false);
@@ -408,7 +408,7 @@ const Index = () => {
   // "Log Your First Load" — even during the brief window before the role
   // guard effect redirects them off /dashboard.
   const showOnboarding =
-    !roleLoading &&
+    !workspaceLoading &&
     !isRecruiterView &&
     !allLoadsQuery.isLoading &&
     allLoadsQuery.loads.length === 0 &&
@@ -640,7 +640,7 @@ const Index = () => {
   const isRecruiterPageId = (p: string) =>
     p === 'recruiter-access' || p.startsWith('recruiter-access:');
   useEffect(() => {
-    if (roleLoading) return;
+    if (workspaceLoading) return;
     if (page === 'contracts') return; // shared route, never redirect
     if (isRecruiterView && driverOnlyPages.has(page)) {
       setPage('recruiter-access');
@@ -648,7 +648,7 @@ const Index = () => {
       setPage('dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleLoading, isRecruiterView, page]);
+  }, [workspaceLoading, isRecruiterView, page]);
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
@@ -683,7 +683,7 @@ const Index = () => {
     }
     if (p === 'add') {
       // Defense-in-depth: recruiters never see the Add Load / Add Expense / Fuel modal.
-      if (isRecruiterView || roleLoading) {
+      if (isRecruiterView || workspaceLoading) {
         setPage(isRecruiterView ? 'recruiter-access' : 'dashboard');
         return;
       }
@@ -809,7 +809,7 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
+      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} workspaceLoading={workspaceLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
@@ -823,7 +823,7 @@ const Index = () => {
                 <h1 className="text-base font-black font-heading tracking-tight text-foreground truncate">
                   Haul<span className="text-primary">TrackerPro</span>
                 </h1>
-                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em] truncate">{roleLoading ? 'Loading…' : isRecruiterView ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em] truncate">{workspaceLoading ? 'Loading…' : isRecruiterView ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
               </div>
             </div>
             <div className="hidden lg:block min-w-0">
@@ -831,7 +831,7 @@ const Index = () => {
               <p className="text-xs text-muted-foreground truncate">{navSubtitle}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {canSwitch && !roleLoading && (
+              {canSwitch && !workspaceLoading && (
                 <div className="hidden lg:block">
                   <ViewModeSwitch
                     value={effectiveRole}
@@ -865,7 +865,7 @@ const Index = () => {
               </Button>
             </div>
           </div>
-          {canSwitch && !roleLoading && (
+          {canSwitch && !workspaceLoading && (
             <div className="lg:hidden px-4 pb-2 -mt-1 flex justify-end">
               <ViewModeSwitch
                 value={effectiveRole}
@@ -882,7 +882,7 @@ const Index = () => {
         {/* Hard render-level role gate. While the role is still resolving,
             we render a neutral fallback so neither role can flash the wrong
             UI (driver Add/Onboarding for recruiters, recruiter hub for drivers). */}
-        {roleLoading ? (
+        {workspaceLoading ? (
           <ViewFallback />
         ) : (
           <>
@@ -1136,7 +1136,7 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
+        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} workspaceLoading={workspaceLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
       </div>
       <AddActionModal
         open={showAddModal}
