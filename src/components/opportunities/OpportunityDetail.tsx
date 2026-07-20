@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +42,9 @@ interface Props {
   isPro: boolean;
   onUpgrade: () => void;
   driverProfile?: DriverOpportunityProfile | null;
-  onEditProfile: () => void;
+  onOpenPreferencesForApply: () => void;
+  resumeApplyToken?: string | null;
+  onResumeApplyConsumed?: (token: string) => void;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
@@ -50,7 +52,17 @@ const fmtMoney = (v: number | null | undefined) =>
 const fmtMiles = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString()} mi`;
 
-export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, driverProfile, onEditProfile }: Props) {
+export function OpportunityDetail({
+  opportunity: o,
+  onBack,
+  isPro,
+  onUpgrade,
+  driverProfile,
+  onOpenPreferencesForApply,
+  resumeApplyToken,
+  onResumeApplyConsumed,
+}: Props) {
+
   const { saved, save, unsave } = useSavedOpportunities();
   const { driverApplications, createApplication } = useOpportunityApplications();
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +78,19 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
     () => classifyRequestInfo(driverApplications as any[], o.id),
     [driverApplications, o.id]
   );
+
+  // One-shot Apply Now resume after Opportunity Preferences completion.
+  const consumedTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!resumeApplyToken) return;
+    if (consumedTokenRef.current === resumeApplyToken) return;
+    if (!driverProfile || !driverProfile.profile_completed) return;
+    if (formalState.kind !== 'none' && formalState.kind !== 'reapplyable') return;
+    consumedTokenRef.current = resumeApplyToken;
+    setShowApply(true);
+    onResumeApplyConsumed?.(resumeApplyToken);
+  }, [resumeApplyToken, driverProfile, formalState, onResumeApplyConsumed]);
+
 
   const location = [o.hiring_city, o.hiring_state].filter(Boolean).join(', ') || 'Multiple states';
 
@@ -288,7 +313,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         {profileIncomplete && formalState.kind === 'none' && (
           <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-            <span>Complete your Opportunity Profile to apply and improve your match score.</span>
+            <span>Complete your Opportunity Preferences to apply and improve your match score.</span>
           </div>
         )}
         <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
@@ -360,7 +385,7 @@ export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, dr
         opportunityTitle={o.title}
         companyName={o.company_name}
         driverProfile={driverProfile ?? null}
-        onEditProfile={onEditProfile}
+        onOpenPreferences={onOpenPreferencesForApply}
       />
     </div>
   );

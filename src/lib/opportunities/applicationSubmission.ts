@@ -85,7 +85,7 @@ export function submissionErrorMessage(err: unknown): string {
     case 'self_opportunity':
       return 'You cannot apply to an opportunity posted by your own Recruiter account.';
     case 'profile_required':
-      return 'Complete your Opportunity Profile before applying.';
+      return 'Complete your Opportunity Preferences before applying.';
     case 'restricted':
       return 'Applications are not available for your account right now. Contact support for assistance.';
     case 'invalid_input':

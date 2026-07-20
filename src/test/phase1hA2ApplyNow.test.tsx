@@ -55,7 +55,7 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof ApplyNowDia
         opportunityTitle="OTR Reefer"
         companyName="Acme"
         driverProfile={baseProfile}
-        onEditProfile={onEditProfile}
+        onOpenPreferences={onEditProfile}
         {...overrides}
       />
     </QueryClientProvider>
@@ -376,7 +376,7 @@ describe('ApplyNowDialog — idempotency-key lifecycle', () => {
           opportunityTitle="OTR Reefer"
           companyName="Acme"
           driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
+          onOpenPreferences={vi.fn()}
         />
       </QueryClientProvider>
     );
@@ -412,7 +412,7 @@ describe('ApplyNowDialog — idempotency-key lifecycle', () => {
           opportunityTitle="OTR Reefer"
           companyName="Acme"
           driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
+          onOpenPreferences={vi.fn()}
         />
       </QueryClientProvider>
     );
@@ -472,7 +472,7 @@ describe('ApplyNowDialog — success reset', () => {
           opportunityTitle="OTR Reefer"
           companyName="Acme"
           driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
+          onOpenPreferences={vi.fn()}
         />
       </QueryClientProvider>
     );
@@ -541,7 +541,7 @@ describe('ApplyNowDialog — deterministic UUID idempotency lifecycle', () => {
           opportunityTitle="OTR Reefer"
           companyName="Acme"
           driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
+          onOpenPreferences={vi.fn()}
         />
       </QueryClientProvider>
     );
@@ -603,7 +603,7 @@ describe('ApplyNowDialog — deterministic UUID idempotency lifecycle', () => {
           opportunityTitle="OTR Reefer"
           companyName="Acme"
           driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
+          onOpenPreferences={vi.fn()}
         />
       </QueryClientProvider>
     );
@@ -634,7 +634,7 @@ describe('ApplyNowDialog — deterministic UUID idempotency lifecycle', () => {
           opportunityTitle="OTR Reefer"
           companyName="Acme"
           driverProfile={baseProfile}
-          onEditProfile={vi.fn()}
+          onOpenPreferences={vi.fn()}
         />
       </QueryClientProvider>
     );
