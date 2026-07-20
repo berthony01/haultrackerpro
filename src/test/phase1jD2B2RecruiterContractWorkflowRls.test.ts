@@ -462,7 +462,7 @@ describe('Phase 1J-D2B-2 — policy catalog preservation and tightening', () => 
     const wc = norm(p.with_check);
     expect(wc).toContain(norm('is_recruiter_owner(auth.uid(),recruiter_id)'));
     expect(wc).toContain(norm('auth.uid()=recruiter_user_id'));
-    expect(wc).toContain(norm('oa.id=application_id'));
+    expect(wc).toContain(norm('oa.id=contracts.application_id'));
     expect(wc).toContain(norm('oa.recruiter_id=contracts.recruiter_id'));
     expect(wc).toContain(norm('oa.opportunity_id=contracts.opportunity_id'));
     expect(wc).toContain(norm('oa.driver_user_id=contracts.driver_user_id'));
