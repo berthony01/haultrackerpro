@@ -167,11 +167,40 @@ async function capsFor(db: AnyPGlite, userId: string) {
 }
 
 let db: AnyPGlite;
+let CANONICAL_BLOCK: string;
 
 beforeAll(async () => {
   db = new PGlite() as unknown as AnyPGlite;
   await db.exec(BOOTSTRAP);
+  CANONICAL_BLOCK = extractRecruiterCanManageBlock();
+  await db.exec(CANONICAL_BLOCK);
   await db.exec(read(CANDIDATE_REL));
+});
+
+describe('Phase 1J-A — canonical recruiter completeness helper source', () => {
+  it('canonical migration file exists and is nonempty', () => {
+    const src = read(CANONICAL_REL);
+    expect(src.length).toBeGreaterThan(200);
+  });
+
+  it('extracted block contains the exact function signature and service_role GRANT', () => {
+    expect(CANONICAL_BLOCK).toContain(
+      'CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(',
+    );
+    expect(CANONICAL_BLOCK).toContain(
+      'GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;',
+    );
+    expect(CANONICAL_BLOCK).toContain('REVOKE ALL ON FUNCTION');
+    expect(CANONICAL_BLOCK).toContain('SECURITY DEFINER');
+    expect(CANONICAL_BLOCK.length).toBeGreaterThan(200);
+  });
+
+  it('bootstrap does not contain a second handwritten definition', () => {
+    const occurrences = (BOOTSTRAP.match(
+      /CREATE OR REPLACE FUNCTION public\.recruiter_profile_can_manage_opportunities/g,
+    ) || []).length;
+    expect(occurrences).toBe(0);
+  });
 });
 
 describe('Phase 1J-A — pure capability helper', () => {
