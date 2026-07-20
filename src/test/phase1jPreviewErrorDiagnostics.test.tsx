@@ -76,14 +76,18 @@ describe('ErrorBoundary — preview host', () => {
         <Boom msg="preview-panel-msg" />
       </ErrorBoundary>,
     );
-    expect(screen.getByText('Preview render diagnostic')).toBeInTheDocument();
-    expect(screen.getByText(/preview-panel-msg/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Preview render diagnostic' }),
+    ).toBeInTheDocument();
+    // Message appears both in the header line and inside the JS stack <pre>.
+    expect(screen.getAllByText(/preview-panel-msg/).length).toBeGreaterThan(0);
     expect(screen.getByText('JavaScript stack')).toBeInTheDocument();
     expect(screen.getByText('React component stack')).toBeInTheDocument();
-    // path + build fallback
-    expect(screen.getByText(/\/dashboard/)).toBeInTheDocument();
-    expect(screen.getByText(/unknown|[0-9a-f]{6,}/i)).toBeInTheDocument();
-    // deterministic id is rendered
+    // path is rendered inside a <code>
+    expect(screen.getByText('/dashboard')).toBeInTheDocument();
+    // build fallback is 'unknown' with no VITE_*_SHA env vars
+    expect(screen.getByText('unknown')).toBeInTheDocument();
+    // deterministic id is rendered and non-empty
     expect(screen.getByTestId('diagnostic-id').textContent?.length ?? 0).toBeGreaterThan(0);
   });
 });
@@ -258,8 +262,10 @@ describe('sessionStorage persistence', () => {
         </ErrorBoundary>,
       );
       // Fallback still renders — proves the throw was swallowed.
-      expect(screen.getByText('Preview render diagnostic')).toBeInTheDocument();
-      expect(screen.getByText(/storage-throws/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Preview render diagnostic' }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByText(/storage-throws/).length).toBeGreaterThan(0);
     } finally {
       setItemSpy.mockRestore();
     }
