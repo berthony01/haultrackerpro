@@ -62,6 +62,7 @@ const RecruiterFAQ = lazy(() => import("./pages/recruiter/RecruiterFAQ"));
 const RecruiterFeatures = lazy(() => import("./pages/recruiter/RecruiterFeatures"));
 const RecruiterGuide = lazy(() => import("./pages/recruiter/RecruiterGuide"));
 const RecruiterUpdates = lazy(() => import("./pages/recruiter/RecruiterUpdates"));
+const RecruiterEntryRoute = lazy(() => import("./components/opportunities/recruiter/RecruiterEntryRoute"));
 const About = lazy(() => import("./pages/About"));
 const CompareVsSpreadsheets = lazy(() => import("./pages/comparisons/HaulTrackerProVsSpreadsheets"));
 const CompareVsQuickBooks = lazy(() => import("./pages/comparisons/HaulTrackerProVsQuickBooks"));
@@ -284,7 +285,7 @@ const App = () => (
               {/* First-class recruiter hub URL. Forwards into the existing
                   recruiter access surface inside the dashboard shell so the
                   hub stays a single source of truth. */}
-              <Route path="/recruiter" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access" replace /></ProtectedRoute>} />
+              <Route path="/recruiter" element={<ProtectedRoute><RecruiterEntryRoute /></ProtectedRoute>} />
               <Route path="/recruiter/manage" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:manager" replace /></ProtectedRoute>} />
               <Route path="/recruiter/applications" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:applications" replace /></ProtectedRoute>} />
               <Route path="/recruiter/reports" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:reports" replace /></ProtectedRoute>} />
