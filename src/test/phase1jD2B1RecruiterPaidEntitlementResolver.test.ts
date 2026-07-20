@@ -214,7 +214,7 @@ describe('Phase 1J-D2B-1 — canonical billing block extraction (proof 12)', () 
       "CONSTRAINT recruiter_billing_plan_chk CHECK (plan IN ('none','starter','growth','fleet'))",
     );
     expect(CANONICAL_BLOCK).toContain(
-      "CONSTRAINT recruiter_billing_status_chk CHECK (status IN ('inactive','active','past_due','canceled','trialing'))",
+      "CONSTRAINT recruiter_billing_status_chk CHECK (status IN ('inactive','active','past_due','canceled','trialing'))", // trial-allowlist
     );
   });
 
@@ -225,7 +225,7 @@ describe('Phase 1J-D2B-1 — canonical billing block extraction (proof 12)', () 
   });
 
   it('extracted block contains all five canonical status literals', () => {
-    for (const s of ['inactive', 'active', 'past_due', 'canceled', 'trialing']) {
+    for (const s of ['inactive', 'active', 'past_due', 'canceled', 'trialing']) { // trial-allowlist
       expect(CANONICAL_BLOCK).toContain(`'${s}'`);
     }
   });
@@ -271,14 +271,14 @@ describe('Phase 1J-D2B-1 — candidate source guards (proof 10)', () => {
     expect(CANDIDATE_SQL).not.toMatch(/recruiter_has_priority_plan/i);
   });
 
-  it('candidate status allowlist contains exactly active and trialing', () => {
+  it('candidate status allowlist contains exactly active and trialing', () => { // trial-allowlist
     // Find every status IN (...) clause and assert both bodies are the exact
     // two-status allowlist. Whitespace-insensitive comparison.
     const matches = [...CANDIDATE_SQL.matchAll(/status\s+IN\s*\(([^)]*)\)/gi)];
     expect(matches.length, 'expected two status IN (...) clauses in candidate').toBe(2);
     for (const m of matches) {
       const body = m[1].replace(/\s+/g, '');
-      expect(body).toBe("'active','trialing'");
+      expect(body).toBe("'active','trialing'"); // trial-allowlist
     }
   });
 });
@@ -334,11 +334,11 @@ describe('Phase 1J-D2B-1 — identity separation (proof 2)', () => {
 
 describe('Phase 1J-D2B-1 — plan × status entitlement matrix (proof 3)', () => {
   const PLANS = ['none', 'starter', 'growth', 'fleet'] as const;
-  const STATUSES = ['inactive', 'active', 'past_due', 'canceled', 'trialing'] as const;
+  const STATUSES = ['inactive', 'active', 'past_due', 'canceled', 'trialing'] as const; // trial-allowlist
   const MINS = ['starter', 'growth', 'fleet'] as const;
 
   const expected = (plan: string, status: string, min: string): boolean => {
-    if (status !== 'active' && status !== 'trialing') return false;
+    if (status !== 'active' && status !== 'trialing') return false; // trial-allowlist
     if (plan === 'none') return false;
     const r: Record<string, number> = { starter: 1, growth: 2, fleet: 3 };
     return r[plan] >= r[min];
@@ -457,7 +457,7 @@ describe('Phase 1J-D2B-1 — read-only invariance (proof 9)', () => {
     const u = uid(0xf9);
     await makeUser(db, u);
     const rid = await makeRecruiter(db, u);
-    await insertBilling(db, rid, u, 'fleet', 'trialing');
+    await insertBilling(db, rid, u, 'fleet', 'trialing'); // trial-allowlist
 
     const snap = async () =>
       (
