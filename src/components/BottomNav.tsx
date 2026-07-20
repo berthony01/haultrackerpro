@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Plus,
@@ -16,6 +17,7 @@ import {
   LogOut,
   FileSignature,
   BarChart3,
+  ArrowLeftRight,
 } from 'lucide-react';
 import {
   Sheet,
@@ -79,6 +81,7 @@ export function BottomNav(props: BottomNavProps) {
   } = props;
   const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
+  const navigate = useNavigate();
   const isAssistant = !!assistantPermissions;
   const loading = workspaceLoading ?? roleLoading;
 
@@ -114,6 +117,10 @@ export function BottomNav(props: BottomNavProps) {
   const go = (page: string) => {
     setMoreOpen(false);
     onNavigate(page);
+  };
+  const goHref = (href: string) => {
+    setMoreOpen(false);
+    navigate(href);
   };
 
   type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
