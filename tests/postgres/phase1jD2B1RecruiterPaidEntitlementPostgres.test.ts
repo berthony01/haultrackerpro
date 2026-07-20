@@ -573,26 +573,25 @@ describe('Phase 1J-D2B-1 · EXECUTE ACL (exact per-role matrix)', () => {
   );
 
   it('PUBLIC (grantee OID 0) is absent from every candidate function ACL', async () => {
+    // Query candidate rows as `f`, and use aclexplode that reads `f.proacl`
+    // / `f.proowner` directly — no shadowing pg_proc alias, no out-of-scope
+    // reference. Works on PostgreSQL 16.
     const rows = await q<{ name: string; public_present: boolean }>(
-      `WITH fns AS (
-         SELECT p.oid, p.proname
-           FROM pg_proc p
-           JOIN pg_namespace n ON n.oid=p.pronamespace
-          WHERE n.nspname='public'
-            AND p.proname IN (
-              '_recruiter_paid_plan_rank',
-              '_recruiter_has_minimum_paid_plan',
-              'current_user_has_recruiter_minimum_paid_plan'
-            )
-       )
-       SELECT f.proname AS name,
+      `SELECT f.proname AS name,
               EXISTS (
                 SELECT 1
-                  FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
-                  JOIN pg_proc p ON p.oid = f.oid
+                  FROM aclexplode(COALESCE(f.proacl, acldefault('f', f.proowner))) AS a
                  WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'
               ) AS public_present
-         FROM fns f`,
+         FROM pg_proc f
+         JOIN pg_namespace n ON n.oid = f.pronamespace
+        WHERE n.nspname = 'public'
+          AND f.proname IN (
+            '_recruiter_paid_plan_rank',
+            '_recruiter_has_minimum_paid_plan',
+            'current_user_has_recruiter_minimum_paid_plan'
+          )
+        ORDER BY f.proname`,
     );
     expect(rows.length).toBe(3);
     for (const r of rows) {
@@ -609,21 +608,30 @@ describe('Phase 1J-D2B-1 · authenticated role direct invocation', () => {
     const rid = await createRecruiter(u);
     await insertBilling(rid, u, 'growth', 'active');
 
+    // PostgreSQL aborts the current transaction on the first error, so each
+    // expected-permission-denied call is wrapped in its own SAVEPOINT that we
+    // ROLLBACK TO after the failure. The caller-bound call then runs in the
+    // same, still-live transaction and genuinely succeeds.
     await asAuthenticated(u, async (client) => {
-      // rank helper: not executable by authenticated.
+      await client.query(`SAVEPOINT sp_rank`);
       await expect(
         client.query(`SELECT public._recruiter_paid_plan_rank('starter')`),
       ).rejects.toThrow(/permission denied/i);
+      await client.query(`ROLLBACK TO SAVEPOINT sp_rank`);
+      await client.query(`RELEASE SAVEPOINT sp_rank`);
 
-      // internal resolver: not executable by authenticated.
+      await client.query(`SAVEPOINT sp_internal`);
       await expect(
         client.query(
           `SELECT public._recruiter_has_minimum_paid_plan($1,'starter')`,
           [rid],
         ),
       ).rejects.toThrow(/permission denied/i);
+      await client.query(`ROLLBACK TO SAVEPOINT sp_internal`);
+      await client.query(`RELEASE SAVEPOINT sp_internal`);
 
-      // caller-bound function: executable, returns true for this paid user.
+      // Caller-bound function: executable in the same live transaction and
+      // returns true for this paid user.
       const r = await client.query(
         `SELECT public.current_user_has_recruiter_minimum_paid_plan('starter') AS ok`,
       );
