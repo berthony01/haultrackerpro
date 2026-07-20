@@ -805,6 +805,7 @@ describe('Source audits', () => {
     const wnWindow = region.slice(Math.max(0, whatsNewIdx - 200), whatsNewIdx);
     expect(fbWindow).not.toMatch(/effectiveRole\s*===\s*['"]driver['"]\s*&&\s*driverWorkspaceAllowed/);
     expect(wnWindow).not.toMatch(/effectiveRole\s*===\s*['"]driver['"]\s*&&\s*driverWorkspaceAllowed/);
+  });
 
   it('RecruiterAccessRoute source: no useMemo import, no useMemoSafe helper', async () => {
     const src = await readSrc('src/components/opportunities/recruiter/RecruiterAccessRoute.tsx');
