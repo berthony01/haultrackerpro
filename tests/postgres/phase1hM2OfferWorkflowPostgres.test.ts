@@ -1058,25 +1058,69 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     }
   });
 
-  it("C7: recruiter eligibility — complete allowed, incomplete denied, suspended denied", async () => {
-    // Complete: already tested positively in C2. Prove the deny paths explicitly.
-    // Incomplete recruiter (posting_terms_accepted_at NULL, no grandfather) cannot advance an app.
+  it("C7: recruiter eligibility — direct proof incomplete/suspended cannot manage an existing application", async () => {
+    // ---- Direct incomplete-recruiter management denial ----
+    // Fixture: create a formal application while the recruiter is complete/eligible
+    // (uses the standard opportunity + recruiter fixture), then flip that recruiter
+    // to incomplete and prove a recruiter workflow RPC on the EXISTING application
+    // is denied with 42501 / 'recruiter not eligible'.
     const drvInc = await mintDriver(pool);
-    const appInc = await submitApply(url, drvInc, ids.incompleteOpportunity).catch(() => null);
-    // If submission itself blocked (driver_can_access uses recruiter_profile_can_manage), that's still a deny.
-    if (appInc) {
-      const c = await newAuthClient(url, ids.incompleteRecruiterUser);
-      let code = "";
-      try { await c.query(`SELECT * FROM public.transition_opportunity_application($1::uuid,'viewed',NULL)`, [appInc]); }
-      catch (e) { code = (e as { code?: string }).code ?? ""; }
+    const appInc = await submitApply(url, drvInc, ids.opportunity);
+    const appStatusBefore = (await pool.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appInc],
+    )).rows[0].status;
+    const evBefore = await eventCount(appInc, "application_transitioned");
+    // Save current consent state so we can restore after the test.
+    const consent = await pool.query(
+      `SELECT posting_terms_accepted_at, legacy_terms_grandfathered_at
+         FROM public.recruiter_profiles WHERE id=$1`,
+      [ids.recruiterProfile],
+    );
+    try {
+      // Make the recruiter INCOMPLETE (clear both eligibility fields).
+      await pool.query(
+        `UPDATE public.recruiter_profiles
+            SET posting_terms_accepted_at=NULL, legacy_terms_grandfathered_at=NULL
+          WHERE id=$1`,
+        [ids.recruiterProfile],
+      );
+
+      const c = await newAuthClient(url, ids.recruiterUser);
+      let code = ""; let msg = "";
+      try {
+        await c.query(
+          `SELECT * FROM public.transition_opportunity_application($1::uuid,'viewed',NULL)`,
+          [appInc],
+        );
+      } catch (e) {
+        code = (e as { code?: string }).code ?? "";
+        msg  = (e as Error).message;
+      }
       await rollbackEnd(c);
       expect(code).toBe("42501");
-    } else {
-      // Submission denial is also acceptable proof of the eligibility gate.
-      expect(appInc).toBeNull();
+      expect(msg.toLowerCase()).toContain("recruiter not eligible");
+
+      // Application state unchanged; no workflow event emitted.
+      const appAfter = (await pool.query(
+        `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appInc],
+      )).rows[0].status;
+      expect(appAfter).toBe(appStatusBefore);
+      expect(await eventCount(appInc, "application_transitioned")).toBe(evBefore);
+    } finally {
+      // Restore the fixture recruiter so later tests remain isolated.
+      await pool.query(
+        `UPDATE public.recruiter_profiles
+            SET posting_terms_accepted_at=$2, legacy_terms_grandfathered_at=$3
+          WHERE id=$1`,
+        [
+          ids.recruiterProfile,
+          consent.rows[0].posting_terms_accepted_at,
+          consent.rows[0].legacy_terms_grandfathered_at,
+        ],
+      );
     }
 
-    // Suspended recruiter path: submission happened while active, then we suspend and expect deny.
+    // ---- Suspended recruiter path ----
     const drvS = await mintDriver(pool);
     const appS = await submitApply(url, drvS, ids.suspendedOpportunity);
     await pool.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE id=$1`, [ids.suspendedRecruiterProfile]);
@@ -1127,6 +1171,14 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     const q = await pool.query(
       `SELECT count(*)::int AS n FROM public.notifications WHERE type=$1 AND payload->>'application_id'=$2::text`,
       [type, appId],
+    );
+    return q.rows[0].n as number;
+  }
+  async function notifCountFor(userId: string, appId: string, type: string) {
+    const q = await pool.query(
+      `SELECT count(*)::int AS n FROM public.notifications
+        WHERE user_id=$1 AND type=$2 AND payload->>'application_id'=$3::text`,
+      [userId, type, appId],
     );
     return q.rows[0].n as number;
   }
@@ -1190,7 +1242,7 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     }
   });
 
-  it("D4 race: accept vs recruiter cancel — accepted offer cannot be canceled; exactly one terminal winner", async () => {
+  it("D4 race: accept vs recruiter cancel — exact winner with recipient-scoped side effects", async () => {
     const drv = await mintDriver(pool);
     const { appId, offerId } = await setupSentOffer(drv);
     await barrierRace(url, [
@@ -1203,12 +1255,15 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     if (off === "accepted") {
       expect(app).toBe("onboarding");
       expect(await eventCount(appId, "offer_accepted")).toBe(1);
-      expect(await notifCount(appId, "offer_accepted")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(1);
       expect(await eventCount(appId, "offer_canceled")).toBe(0);
+      expect(await notifCountFor(drv, appId, "offer_canceled")).toBe(0);
     } else {
       expect(app).toBe("offer_sent");
       expect(await eventCount(appId, "offer_canceled")).toBe(1);
+      expect(await notifCountFor(drv, appId, "offer_canceled")).toBe(1);
       expect(await eventCount(appId, "offer_accepted")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(0);
     }
   });
 
@@ -1259,7 +1314,7 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     await pool.query(`CREATE UNIQUE INDEX opportunity_offers_one_sent_per_app_uidx ON public.opportunity_offers(application_id) WHERE status = 'sent'`);
   });
 
-  it("D6 race: acceptance vs service expiration sweep — accepted OR expired, never both; onboarding only when accepted", async () => {
+  it("D6 race: acceptance vs service expiration sweep — exact recipient-scoped side effects", async () => {
     const drv = await mintDriver(pool);
     const { appId, offerId } = await setupSentOffer(drv);
     // Force expiration eligibility.
@@ -1281,13 +1336,18 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     if (off === "accepted") {
       expect(app).toBe("onboarding");
       expect(await eventCount(appId, "offer_accepted")).toBe(1);
-      expect(await notifCount(appId, "offer_accepted")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(1);
       expect(await eventCount(appId, "offer_expired")).toBe(0);
+      expect(await notifCountFor(drv, appId, "offer_expired")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_expired")).toBe(0);
     } else {
       expect(app).toBe("offer_sent");
       expect(await eventCount(appId, "offer_expired")).toBe(1);
+      // _m2_expire_offer notifies both driver AND recruiter.
+      expect(await notifCountFor(drv, appId, "offer_expired")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_expired")).toBe(1);
       expect(await eventCount(appId, "offer_accepted")).toBe(0);
-      expect(await notifCount(appId, "offer_accepted")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(0);
     }
   });
 
@@ -1322,10 +1382,9 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     expect(notif.rows[0].n).toBe(1);
   });
 
-  it("D8 race: driver withdrawal vs recruiter rejection — exactly one terminal winner (withdrawn or rejected)", async () => {
+  it("D8 race: driver withdrawal vs recruiter rejection — exact winner with recipient-scoped side effects", async () => {
     const drv = await mintDriver(pool);
     const appId = await submitApply(url, drv, ids.opportunity);
-    // Advance so rejection is a valid transition (from 'new' rejection is allowed).
     await barrierRace(url, [
       { uid: drv, sql: WITHDRAW_SQL, params: [appId] },
       { uid: ids.recruiterUser, sql: REJECT_SQL, params: [appId] },
@@ -1334,14 +1393,14 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     expect(["withdrawn", "rejected"]).toContain(app);
     if (app === "withdrawn") {
       expect(await eventCount(appId, "application_withdrawn")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "application_withdrawn")).toBe(1);
+      expect(await eventCount(appId, "application_rejected")).toBe(0);
+      expect(await notifCountFor(drv, appId, "application_rejected")).toBe(0);
     } else {
-      expect(await eventCount(appId, "application_rejected")).toBeGreaterThanOrEqual(0);
-      // Must not also be withdrawn.
-      const w = await pool.query(
-        `SELECT count(*)::int n FROM public.application_events WHERE application_id=$1 AND event_type='application_withdrawn'`,
-        [appId],
-      );
-      expect(w.rows[0].n).toBe(0);
+      expect(await eventCount(appId, "application_rejected")).toBe(1);
+      expect(await notifCountFor(drv, appId, "application_rejected")).toBe(1);
+      expect(await eventCount(appId, "application_withdrawn")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "application_withdrawn")).toBe(0);
     }
   });
 
@@ -1453,5 +1512,50 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     expect(contractAfter.rows[0].current_version_id).toBe(contractBefore.rows[0].current_version_id);
     expect(await eventCount(appId, "hiring_completed")).toBe(evBefore);
     expect(await notifCount(appId, "hiring_completed")).toBe(nfBefore);
+  });
+
+  it("E3: transition_opportunity_application('rejected') rolled back leaves prior state, no rejection event or notification", async () => {
+    const drv = await mintDriver(pool);
+    const appId = await submitApply(url, drv, ids.opportunity);
+    const appBefore = (await pool.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId],
+    )).rows[0].status;
+    const evBefore = await eventCount(appId, "application_rejected");
+    const nfBefore = await notifCountFor(drv, appId, "application_rejected");
+
+    const rc = await newAuthClient(url, ids.recruiterUser);
+    const r = await rc.query(REJECT_SQL, [appId]);
+    expect(r.rows[0].result_code).toBe("application_transitioned");
+    // In-txn side effects visible.
+    const inTxApp = (await rc.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId],
+    )).rows[0].status;
+    expect(inTxApp).toBe("rejected");
+    // Escalate to owner role inside the same transaction to read the
+    // uncommitted event and notification rows (authenticated cannot SELECT
+    // application_events / notifications directly under RLS).
+    await rc.query(`SET LOCAL role postgres`);
+    const inTxEv = (await rc.query(
+      `SELECT count(*)::int n FROM public.application_events
+        WHERE application_id=$1 AND event_type='application_rejected'`, [appId],
+    )).rows[0].n as number;
+    expect(inTxEv).toBe(evBefore + 1);
+    const inTxNf = (await rc.query(
+      `SELECT count(*)::int n FROM public.notifications
+        WHERE user_id=$1 AND type='application_rejected' AND payload->>'application_id'=$2::text`,
+      [drv, appId],
+    )).rows[0].n as number;
+    expect(inTxNf).toBe(nfBefore + 1);
+
+    await rc.query("ROLLBACK");
+    await rc.end();
+
+    // From a separate connection: original state restored, no persisted side effects.
+    const appAfter = (await pool.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId],
+    )).rows[0].status;
+    expect(appAfter).toBe(appBefore);
+    expect(await eventCount(appId, "application_rejected")).toBe(evBefore);
+    expect(await notifCountFor(drv, appId, "application_rejected")).toBe(nfBefore);
   });
 });
