@@ -1513,4 +1513,45 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     expect(await eventCount(appId, "hiring_completed")).toBe(evBefore);
     expect(await notifCount(appId, "hiring_completed")).toBe(nfBefore);
   });
+
+  it("E3: transition_opportunity_application('rejected') rolled back leaves prior state, no rejection event or notification", async () => {
+    const drv = await mintDriver(pool);
+    const appId = await submitApply(url, drv, ids.opportunity);
+    const appBefore = (await pool.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId],
+    )).rows[0].status;
+    const evBefore = await eventCount(appId, "application_rejected");
+    const nfBefore = await notifCountFor(drv, appId, "application_rejected");
+
+    const rc = await newAuthClient(url, ids.recruiterUser);
+    const r = await rc.query(REJECT_SQL, [appId]);
+    expect(r.rows[0].result_code).toBe("application_transitioned");
+    // In-txn side effects visible.
+    const inTxApp = (await rc.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId],
+    )).rows[0].status;
+    expect(inTxApp).toBe("rejected");
+    const inTxEv = (await rc.query(
+      `SELECT count(*)::int n FROM public.application_events
+        WHERE application_id=$1 AND event_type='application_rejected'`, [appId],
+    )).rows[0].n as number;
+    expect(inTxEv).toBe(evBefore + 1);
+    const inTxNf = (await rc.query(
+      `SELECT count(*)::int n FROM public.notifications
+        WHERE user_id=$1 AND type='application_rejected' AND payload->>'application_id'=$2::text`,
+      [drv, appId],
+    )).rows[0].n as number;
+    expect(inTxNf).toBe(nfBefore + 1);
+
+    await rc.query("ROLLBACK");
+    await rc.end();
+
+    // From a separate connection: original state restored, no persisted side effects.
+    const appAfter = (await pool.query(
+      `SELECT status FROM public.opportunity_applications WHERE id=$1`, [appId],
+    )).rows[0].status;
+    expect(appAfter).toBe(appBefore);
+    expect(await eventCount(appId, "application_rejected")).toBe(evBefore);
+    expect(await notifCountFor(drv, appId, "application_rejected")).toBe(nfBefore);
+  });
 });
