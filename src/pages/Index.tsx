@@ -271,74 +271,89 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
-    // Route to Opportunities / Recruiter Access from external CTA OR auth intent.
-    // Wait for role resolution so recruiters don't briefly land on the driver
-    // Opportunities page before the role guard redirects them.
-    // Note: we intentionally do NOT remove `htp_auth_intent` here —
-    // `useRoleIntentReconciler` (mounted in App) owns clearing it once the
-    // durable `profiles.intended_role` upsert succeeds. Removing it early
-    // races the reconciler and breaks Google recruiter signups.
-    let recruiterIntent = false;
-    try {
-      const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
-      if (storedAuthIntent === 'recruiter') {
-        recruiterIntent = true;
-      }
-    } catch {}
+    // Route to Recruiter Access / Opportunities from external CTA. URL
+    // params only HINT; the pure dashboard policy authorizes the mount
+    // once capabilities resolve. `htp_auth_intent` / `htp_recruiter_intent`
+    // sessionStorage keys are no longer authorization inputs here.
+    if (workspaceLoading) return;
     const pageParam = params.get('page');
     const isRecruiterAccessParam =
       pageParam === 'recruiter-access' || (pageParam?.startsWith('recruiter-access:') ?? false);
-    if (workspaceLoading && (isRecruiterAccessParam || pageParam === 'opportunities' || recruiterIntent)) {
-      // Re-run once role resolves.
-      return;
-    }
+
     if (isRecruiterAccessParam && pageParam) {
-      // Allowlist sub-routes so a recruiter deep-link lands on the right panel.
-      const sub = pageParam.split(':')[1];
-      const allowedSubs = new Set(['manager', 'applications', 'reports', 'onboarding']);
-      if (isRecruiterView) {
-        setRecruiterView(
-          sub && allowedSubs.has(sub) ? (sub as 'manager' | 'applications' | 'reports' | 'onboarding') : 'hub'
-        );
-        setPage('recruiter-access');
-        recruiterIntent = true;
-      } else {
-        // Non-recruiters never land on recruiter pages — guard will redirect.
+      const requestedSub = parseRecruiterSubviewFromPage(pageParam) ?? 'hub';
+      if (recruiterHubAllowed && recruiterCapabilityStatus &&
+          recruiterCapabilityStatus !== 'revoked') {
+        // Authorized: switch view mode + resolve safe subview via policy.
+        setViewMode('recruiter');
+        const decision = resolveDashboardNavigation({
+          requestedPage: 'recruiter-access',
+          requestedRecruiterSubview: requestedSub,
+          effectiveWorkspace: 'recruiter',
+          recruiterCapabilityStatus,
+          recruiterHubAllowed,
+          recruiterOperationsAllowed,
+        });
+        if (!decision.unresolved) {
+          setRecruiterView(decision.recruiterSubview ?? 'hub');
+          setPage(decision.page);
+        }
+      } else if (driverCapabilityStatus === 'active') {
+        // Capability missing but driver active → route to B2A entry.
+        navigate('/recruiter', { replace: true });
+        return;
+      } else if (driverWorkspaceAllowed) {
         setPage('dashboard');
       }
       window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'opportunities') {
       const view = params.get('view');
-      if (view === 'recruiter' || isRecruiterView) {
-        // Backward compat + role guard: recruiters never see the driver Opportunities page.
-        setPage('recruiter-access');
-        recruiterIntent = true;
-      } else {
+      if (view === 'recruiter') {
+        // Recruiter opportunities hint. Route through B2A entry when
+        // driver is active but no recruiter capability. Never mount
+        // recruiter dashboard directly here.
+        if (recruiterHubAllowed && recruiterCapabilityStatus &&
+            recruiterCapabilityStatus !== 'revoked') {
+          setViewMode('recruiter');
+          setRecruiterView('hub');
+          setPage('recruiter-access');
+        } else if (driverCapabilityStatus === 'active') {
+          navigate('/recruiter', { replace: true });
+          return;
+        } else if (driverWorkspaceAllowed) {
+          setPage('dashboard');
+        }
+      } else if (driverWorkspaceAllowed) {
         setPage('opportunities');
         if (view === 'driver-profile') {
-          sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
+          try { sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile'); } catch {}
         }
       }
       window.history.replaceState({}, '', window.location.pathname);
-    } else if (recruiterIntent) {
-      setPage('recruiter-access');
     } else if (pageParam === 'add') {
-      // First-load email deep link. Recruiter view never lands on driver add-load.
-      if (isRecruiterView) {
-        setPage('recruiter-access');
-      } else {
+      if (driverWorkspaceAllowed && effectiveRole === 'driver') {
         setSuppressOnboardingForAddDeepLink(true);
         setEditingLoad(null);
         setPage('add');
+      } else if (recruiterHubAllowed && effectiveRole === 'recruiter') {
+        setPage('recruiter-access');
       }
       window.history.replaceState({}, '', window.location.pathname);
     }
-    if (recruiterIntent) {
-      // Suppress driver-first onboarding modal once for recruiter signups
-      try { sessionStorage.setItem('htp_recruiter_intent', '1'); } catch {}
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey, workspaceLoading, isRecruiterView]);
+  }, [
+    user?.id,
+    subscription.isLoading,
+    subscription.isPro,
+    subscription.planKey,
+    workspaceLoading,
+    effectiveRole,
+    recruiterHubAllowed,
+    recruiterOperationsAllowed,
+    recruiterCapabilityStatus,
+    driverWorkspaceAllowed,
+    driverCapabilityStatus,
+  ]);
 
   // Fire purchase analytics once the resolved plan is available (avoids stale closure)
   useEffect(() => {
