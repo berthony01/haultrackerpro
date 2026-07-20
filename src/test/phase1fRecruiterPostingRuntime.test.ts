@@ -57,10 +57,14 @@ function findPhase1FA1Migration(): string {
   // two Phase 1F-A.2 files (appended separately below in exact file order
   // so the two-line correction lands second).
   const idx = files.indexOf(base);
+  const firstA2Idx = files.indexOf(PHASE_1F_A2_FILES[0]);
+  if (firstA2Idx === -1 || firstA2Idx <= idx) {
+    throw new Error("Phase 1F-A.2 migration boundary not found after Phase 1F-A.1");
+  }
   const relevant =
     /request_driver_contact|recruiter_can_post|list_driver_visible_opportunities|create_driver_referral_safe|recruiter_profile_can_manage_opportunities|current_user_can_manage_recruiter_opportunities|opportunities_guard|opportunities_billing_guard|recruiter_profile_guard/;
   const between = files
-    .slice(idx + 1)
+    .slice(idx + 1, firstA2Idx)
     .filter(
       (f) =>
         !PHASE_1F_A2_FILES.includes(f) &&
@@ -259,17 +263,14 @@ beforeAll(async () => {
       company_name text,
       hiring_city text,
       hiring_state text,
-      hiring_states text[] NOT NULL DEFAULT '{}',
       driver_type text,
       route_type text,
       trailer_type text,
-      pay_model text,
       deadhead_paid boolean,
       lease_payment numeric,
       insurance_deductions numeric,
       maintenance_deductions numeric,
       other_deductions numeric,
-      home_time text,
       escrow_amount numeric,
       escrow_required boolean,
       estimated_weekly_gross numeric,
@@ -347,19 +348,13 @@ beforeAll(async () => {
       years_experience integer,
       preferred_driver_type text,
       preferred_route_type text,
-      preferred_home_time text,
-      preferred_states text[] NOT NULL DEFAULT '{}',
       endorsements text[],
       trailer_experience text[],
       min_weekly_gross numeric,
       min_weekly_net numeric,
       min_effective_rpm numeric,
-      available_start_date date,
-      willing_to_relocate boolean NOT NULL DEFAULT false,
       allow_verified_recruiter_contact boolean NOT NULL DEFAULT false,
-      contact_preference text,
-      visibility text NOT NULL DEFAULT 'private',
-      profile_completed boolean NOT NULL DEFAULT false
+      contact_preference text
     );
     GRANT SELECT, INSERT, UPDATE ON public.driver_opportunity_profiles TO authenticated;
 
