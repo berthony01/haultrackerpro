@@ -12,7 +12,9 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 
 import {
+  beginRecruiterSetupRpc,
   deriveUserCapabilitiesView,
+  isValidActivatedAt,
   parseUserCapabilityRow,
   parseUserCapabilityRows,
   parseUserCapabilityStatus,
