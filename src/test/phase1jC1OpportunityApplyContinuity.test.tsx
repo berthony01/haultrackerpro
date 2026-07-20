@@ -115,11 +115,34 @@ vi.mock('@/components/opportunities/ReferDriverDialog', () => ({
   ReferDriverDialog: () => null,
 }));
 
+// Phase 1J-C1 hook-order proof: mock DriverApplicationsPanel and
+// DriverReferralsPanel as simple panels with Back buttons so a real
+// list→panel→list transition is deterministic without pulling in
+// referral/application Supabase chains.
+vi.mock('@/components/opportunities/DriverApplicationsPanel', () => ({
+  DriverApplicationsPanel: ({ onBack }: any) => (
+    <div data-testid="apps-panel">
+      <h1>My Requests Panel</h1>
+      <button onClick={onBack}>Apps Back</button>
+    </div>
+  ),
+}));
+vi.mock('@/components/opportunities/DriverReferralsPanel', () => ({
+  DriverReferralsPanel: ({ onBack }: any) => (
+    <div data-testid="referrals-panel">
+      <h1>My Referrals Panel</h1>
+      <button onClick={onBack}>Referrals Back</button>
+    </div>
+  ),
+}));
+
+
 // DriverOpportunityProfile parent boundary — exposes deterministic buttons
 // for the two save-success outcomes the real component can produce. The real
 // component's mutation-failure contract (mutate onError → onSaveSuccess is
 // NEVER called) is exercised separately against the REAL component in
-// `phase1hA2OpportunityDetail.test.tsx` under a dedicated describe block.
+// `phase1jC1DriverProfileMutationFailure.test.tsx` under a dedicated file.
+
 const prefsCallbacks: {
   onBack: Array<() => void>;
   onSaveSuccess: Array<(r: { completed: boolean }) => void>;
@@ -528,4 +551,98 @@ describe('Phase 1J-C1 — Opportunity Apply continuity (integration)', () => {
     expect(hookSrc).toMatch(/Tables<'driver_opportunity_profiles'>/);
   });
 
+  it('14. hook-order source audit: existingIds useMemo and handleResumeApplyConsumed useCallback occur BEFORE the first conditional return', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../components/opportunities/OpportunitiesPage.tsx'),
+      'utf8',
+    );
+    // Locate the function body start and every conditional early return.
+    const fnStart = src.indexOf('export function OpportunitiesPage');
+    expect(fnStart).toBeGreaterThan(-1);
+    const body = src.slice(fnStart);
+    const idxExisting = body.indexOf('const existingIds = useMemo');
+    const idxCallback = body.indexOf('const handleResumeApplyConsumed = useCallback');
+    // First early-return positions inside the function body.
+    const idxIsError = body.indexOf('if (isError) {');
+    const idxApps = body.indexOf('if (showDriverApps) {');
+    const idxRefs = body.indexOf('if (showReferrals) {');
+    const idxProfile = body.indexOf('if (showProfile) {');
+    expect(idxExisting).toBeGreaterThan(-1);
+    expect(idxCallback).toBeGreaterThan(-1);
+    expect(idxIsError).toBeGreaterThan(-1);
+    expect(idxApps).toBeGreaterThan(-1);
+    expect(idxRefs).toBeGreaterThan(-1);
+    expect(idxProfile).toBeGreaterThan(-1);
+    const firstReturn = Math.min(idxIsError, idxApps, idxRefs, idxProfile);
+    expect(idxExisting).toBeLessThan(firstReturn);
+    expect(idxCallback).toBeLessThan(firstReturn);
+    // Additionally, no `useMemo(` or `useCallback(` or `useState(` or `useEffect(`
+    // or `useRef(` may appear AFTER the first conditional return.
+    const afterFirstReturn = body.slice(firstReturn);
+    expect(afterFirstReturn).not.toMatch(/\buseMemo\(/);
+    expect(afterFirstReturn).not.toMatch(/\buseCallback\(/);
+    expect(afterFirstReturn).not.toMatch(/\buseState\(/);
+    expect(afterFirstReturn).not.toMatch(/\buseEffect\(/);
+    expect(afterFirstReturn).not.toMatch(/\buseRef\(/);
+  });
+
+  it('15. rendered proof: View My Requests / My Referrals transitions do not throw a hook-order error and return cleanly to the list', async () => {
+    // A hook-order violation surfaces as a synchronous React exception
+    // during the panel→list re-render. We wrap the React error surface
+    // ONLY to fail the test loudly rather than to suppress it: any
+    // captured console.error is re-asserted as a failure below.
+    const errors: string[] = [];
+    const origError = console.error;
+    console.error = (...args: any[]) => {
+      const first = args[0];
+      const msg =
+        typeof first === 'string'
+          ? first
+          : first instanceof Error
+            ? first.message
+            : String(first);
+      errors.push(msg);
+      // Still forward so vitest reporters show it.
+      origError.apply(console, args as any);
+    };
+    try {
+      renderPage();
+      // List surface present.
+      expect(
+        await screen.findByRole('button', { name: /View My Requests/i }),
+      ).toBeInTheDocument();
+
+      // → View My Requests → Back
+      await userEvent.click(screen.getByRole('button', { name: /View My Requests/i }));
+      expect(await screen.findByTestId('apps-panel')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /Apps Back/i }));
+      expect(
+        await screen.findByRole('button', { name: /View My Requests/i }),
+      ).toBeInTheDocument();
+
+      // → View My Referrals → Back
+      await userEvent.click(screen.getByRole('button', { name: /View My Referrals/i }));
+      expect(await screen.findByTestId('referrals-panel')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /Referrals Back/i }));
+      expect(
+        await screen.findByRole('button', { name: /View My Requests/i }),
+      ).toBeInTheDocument();
+
+      // No global crash surfaces.
+      expect(screen.queryByText(/Preview render diagnostic/i)).toBeNull();
+      expect(screen.queryByText(/Something went wrong/i)).toBeNull();
+    } finally {
+      console.error = origError;
+    }
+    // Hook-order / render-count violations MUST NOT have surfaced.
+    const hookOrderHits = errors.filter(
+      (m) =>
+        /Rendered fewer hooks than expected/i.test(m) ||
+        /Rendered more hooks than during the previous render/i.test(m) ||
+        /change in the order of Hooks/i.test(m) ||
+        /Rules of Hooks/i.test(m),
+    );
+    expect(hookOrderHits).toEqual([]);
+  });
 });
+
