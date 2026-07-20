@@ -388,13 +388,16 @@ BEGIN
     PERFORM public._sync_recruiter_capability(_r.user_id);
   END LOOP;
 
-  -- Intent-only recruiters (no profile row yet).
+  -- Intent-only recruiters (no profile row yet) → seed a `setup` row directly.
   FOR _r IN
     SELECT p.user_id
       FROM public.profiles p
       LEFT JOIN public.recruiter_profiles rp ON rp.user_id = p.user_id
      WHERE p.intended_role = 'recruiter' AND rp.user_id IS NULL
   LOOP
-    PERFORM public._sync_recruiter_capability(_r.user_id);
+    INSERT INTO public.user_capabilities (user_id, capability, status, activated_at)
+    VALUES (_r.user_id, 'recruiter'::public.user_capability_type,
+                        'setup'::public.user_capability_status, NULL)
+    ON CONFLICT (user_id, capability) DO NOTHING;
   END LOOP;
 END $$;
