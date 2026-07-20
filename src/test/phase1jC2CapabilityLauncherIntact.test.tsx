@@ -29,11 +29,7 @@ describe('Phase 1J-C2B — CapabilityLauncher tiles intact', () => {
   });
 
   it('exposes all four capability data attributes', () => {
-    const { container } = render(
-      <MemoryRouter>
-        <CapabilityLauncher />
-      </MemoryRouter>,
-    );
+    const { container } = renderLauncher();
     for (const id of ['driver', 'recruiter', 'assistant', 'agency']) {
       expect(container.querySelector(`[data-capability="${id}"]`)).not.toBeNull();
     }
