@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
   deriveUserCapabilitiesView,
+  parseUserCapabilityRows,
+  parseUserCapabilityStatus,
   type UserCapabilityRow,
   type UserCapabilityStatus,
   type UserCapabilitiesView,
@@ -15,7 +17,8 @@ import {
  * Sources capability rows exclusively from the two new RPCs
  * (`get_my_user_capabilities`, `begin_recruiter_setup`). Never infers
  * capabilities from localStorage, sessionStorage, loads, billing, Stripe,
- * recruiter plan, or client-supplied roles.
+ * recruiter plan, or client-supplied roles. All RPC payloads are passed
+ * through the pure parsers in `@/lib/userCapabilities`.
  */
 export interface UseUserCapabilitiesResult extends UserCapabilitiesView {
   isLoading: boolean;
@@ -30,33 +33,39 @@ const EMPTY: UserCapabilityRow[] = [];
 export function useUserCapabilities(): UseUserCapabilitiesResult {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const userId = user?.id ?? null;
 
   const query = useQuery({
-    queryKey: ['user-capabilities', user?.id],
-    enabled: !!user,
+    queryKey: ['user-capabilities', userId],
+    enabled: !!userId,
     staleTime: 30_000,
     queryFn: async (): Promise<UserCapabilityRow[]> => {
       const { data, error } = await (supabase as any).rpc('get_my_user_capabilities');
       if (error) throw error;
-      const rows = Array.isArray(data) ? (data as UserCapabilityRow[]) : EMPTY;
-      return rows;
+      return parseUserCapabilityRows(data);
     },
   });
 
   const mutation = useMutation({
     mutationFn: async (): Promise<UserCapabilityStatus> => {
+      if (!userId) {
+        throw new Error('Not authenticated');
+      }
       const { data, error } = await (supabase as any).rpc('begin_recruiter_setup');
       if (error) throw error;
-      return data as UserCapabilityStatus;
+      return parseUserCapabilityStatus(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-capabilities', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-capabilities', userId] });
     },
   });
 
   const beginRecruiterSetup = useCallback(async () => {
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
     return await mutation.mutateAsync();
-  }, [mutation]);
+  }, [mutation, userId]);
 
   const view = useMemo(
     () => deriveUserCapabilitiesView(query.data ?? EMPTY),
@@ -65,7 +74,7 @@ export function useUserCapabilities(): UseUserCapabilitiesResult {
 
   return {
     ...view,
-    isLoading: authLoading || (!!user && query.isLoading),
+    isLoading: authLoading || (!!userId && query.isLoading),
     error: (query.error as Error | null) ?? null,
     refetch: query.refetch,
     beginRecruiterSetup,
