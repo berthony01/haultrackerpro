@@ -903,11 +903,8 @@ const Index = () => {
           {canSwitch && !workspaceLoading && (
             <div className="lg:hidden px-4 pb-2 -mt-1 flex justify-end">
               <ViewModeSwitch
-                value={effectiveRole}
-                onChange={(next) => {
-                  setViewMode(next);
-                  handleNavigate(next === 'recruiter' ? 'recruiter-access' : 'dashboard');
-                }}
+                value={effectiveRole ?? 'driver'}
+                onChange={handleWorkspaceSwitch}
               />
             </div>
           )}
