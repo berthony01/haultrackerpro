@@ -344,7 +344,7 @@ describe('Phase 1J-A · A. Catalog & ACL (exact matrix)', () => {
               CASE p.polcmd WHEN 'r' THEN 'SELECT' WHEN 'a' THEN 'INSERT'
                             WHEN 'w' THEN 'UPDATE' WHEN 'd' THEN 'DELETE'
                             WHEN '*' THEN 'ALL' END AS polcmd,
-              ARRAY(SELECT rolname FROM pg_roles WHERE oid = ANY(p.polroles)) AS roles,
+              ARRAY(SELECT rolname::text FROM pg_roles WHERE oid = ANY(p.polroles))::text[] AS roles,
               pg_get_expr(p.polqual, p.polrelid) AS qual,
               pg_get_expr(p.polwithcheck, p.polrelid) AS withcheck
          FROM pg_policy p
@@ -392,8 +392,8 @@ describe('Phase 1J-A · A. Catalog & ACL (exact matrix)', () => {
   }> = [
     { name: 'get_my_user_capabilities', args: '', volatility: 's' },
     { name: 'begin_recruiter_setup', args: '', volatility: 'v' },
-    { name: '_derive_recruiter_capability_status', args: 'uuid', volatility: 's' },
-    { name: '_sync_recruiter_capability', args: 'uuid', volatility: 'v' },
+    { name: '_derive_recruiter_capability_status', args: '_user_id uuid', volatility: 's' },
+    { name: '_sync_recruiter_capability', args: '_user_id uuid', volatility: 'v' },
     { name: '_recruiter_profile_capability_sync', args: '', volatility: 'v' },
     { name: '_profile_intent_capability_sync', args: '', volatility: 'v' },
     { name: '_provision_driver_capability_for_new_user', args: '', volatility: 'v' },
