@@ -483,4 +483,99 @@ describe('useViewMode hook', () => {
     }
   });
 
+  // ------------------------------------------------------------------
+  // RENDER-GATE PROOFS — effectiveRole is derived synchronously and
+  // can NEVER flash stale access on account/capability transitions.
+  // ------------------------------------------------------------------
+  it('user A dual-cap stored recruiter → rerender as user B driver-only never flashes recruiter', () => {
+    localStorage.setItem('htp_view_mode:userA', 'recruiter');
+    let user: { id: string } | null = { id: 'userA' };
+    let rows: UserCapabilityRow[] = rowsFor('active', 'active');
+    authMock = () => ({ user, loading: false });
+    capMock = () => ({ rows, isLoading: false, error: null });
+    const { result, rerender } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('recruiter');
+
+    // Swap account synchronously.
+    user = { id: 'userB' };
+    rows = rowsFor('active', null);
+    rerender();
+    // First render as user B: recruiter is FORBIDDEN. Must not appear.
+    expect(result.current.effectiveRole).not.toBe('recruiter');
+    // Legal values are null (fail-closed) or the sole allowed workspace.
+    expect(['driver', null]).toContain(result.current.effectiveRole);
+    // After effects reconcile, driver is the stable state.
+    expect(result.current.effectiveRole).toBe('driver');
+  });
+
+  it('recruiter active → rows rerender as recruiter revoked; never returns recruiter', () => {
+    let rows: UserCapabilityRow[] = rowsFor('active', 'active');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows, isLoading: false, error: null });
+    const { result, rerender } = renderHook(() => useViewMode());
+    act(() => result.current.setViewMode('recruiter'));
+    expect(result.current.effectiveRole).toBe('recruiter');
+
+    // Revoke recruiter capability.
+    rows = rowsFor('active', 'revoked');
+    rerender();
+    // BEFORE any additional effect: synchronous gate must have flipped.
+    expect(result.current.effectiveRole).not.toBe('recruiter');
+    // AFTER effects: stable state is driver, stored key cleared.
+    rerender();
+    expect(result.current.effectiveRole).not.toBe('recruiter');
+    expect(result.current.effectiveRole).toBe('driver');
+  });
+
+  it('driver active → driver revoked / rows empty: effectiveRole becomes null synchronously', () => {
+    let rows: UserCapabilityRow[] = rowsFor('active', null);
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows, isLoading: false, error: null });
+    const { result, rerender } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+
+    rows = rowsFor('revoked', null);
+    rerender();
+    expect(result.current.effectiveRole).toBeNull();
+
+    rows = [];
+    rerender();
+    expect(result.current.effectiveRole).toBeNull();
+  });
+
+  it('loading begins after a valid mode → effectiveRole becomes null synchronously', () => {
+    let loading = false;
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({
+      rows: rowsFor('active', 'active'),
+      isLoading: loading,
+      error: null,
+    });
+    const { result, rerender } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+
+    loading = true;
+    rerender();
+    expect(result.current.effectiveRole).toBeNull();
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('capability error begins after a valid mode → effectiveRole becomes null synchronously', () => {
+    let error: Error | null = null;
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({
+      rows: rowsFor('active', 'active'),
+      isLoading: false,
+      error,
+    });
+    const { result, rerender } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+
+    error = new Error('capability fetch failed');
+    rerender();
+    expect(result.current.effectiveRole).toBeNull();
+    expect(result.current.error).toBeInstanceOf(Error);
+  });
+
 });
+

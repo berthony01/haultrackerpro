@@ -35,24 +35,25 @@ function clearStored(key: string) {
 }
 
 /**
- * Phase 1J-B1 — Capability-driven, user-bound view mode.
+ * Phase 1J-B1 — Capability-driven, user-bound view mode with a
+ * synchronous render-time access gate.
  *
- * Authorization comes exclusively from `useUserCapabilities`. `useUserRole`
- * is consulted ONLY for its `intended_role` hint (preferred initial
- * workspace when the account can enter both). `useAuth` is consulted ONLY
- * for the authenticated user id (to scope the stored preference) and auth
- * loading. Admin status is NOT an authorization signal — admin alone does
- * not grant recruiter workspace.
+ * `effectiveRole` is derived synchronously on every render from the
+ * currently validated capability view. It is non-null only when all of
+ * these hold on THIS render:
+ *   - auth, capability, and role are not loading
+ *   - an authenticated `user.id` is present
+ *   - no capability error
+ *   - the current selection (in-memory or scoped storage) is allowed by
+ *     the validated capability rows
+ * Otherwise `effectiveRole` is `null` immediately, before any effect
+ * runs. A reconciliation effect may still persist/clear the scoped
+ * storage preference and normalize in-memory state to the next allowed
+ * workspace, but it is NEVER the sole access guard.
  *
  * Storage is bound to `htp_view_mode:<userId>`. The legacy unscoped
- * `htp_view_mode` key is proactively cleared on every mount and never
- * trusted. A signed-out session or a session with a capability error
- * always yields `effectiveRole = null`.
- *
- * Effect stability: the reconciliation effect depends on stable primitive
- * fields (`rows` reference from React Query, `preferredRole` string,
- * `userId` string, boolean flags) so unchanged capability data does not
- * re-trigger the effect.
+ * `htp_view_mode` key is proactively cleared and never trusted. Admin
+ * status is NOT an authorization signal.
  */
 export function useViewMode() {
   const { user, loading: authLoading } = useAuth();
@@ -77,50 +78,75 @@ export function useViewMode() {
     [trustedView],
   );
 
-  const [viewMode, setViewModeState] = useState<WorkspaceRole | null>(null);
+  // In-memory selection tracks explicit switches only. It is validated
+  // synchronously on every render against `trustedView` before being
+  // exposed as `effectiveRole`.
+  const [selection, setSelection] = useState<WorkspaceRole | null>(null);
 
-  // Legacy unscoped key must never be trusted; clear it once on mount and
-  // whenever the effect runs (cheap, idempotent).
+  // Legacy unscoped key must never be trusted; clear it once on mount.
   useEffect(() => {
     try { localStorage.removeItem(LEGACY_UNSCOPED_KEY); } catch {}
   }, []);
 
+  // -------------------------------------------------------------------
+  // SYNCHRONOUS render-time access gate.
+  // No effect has run yet. This is the source of truth for consumers.
+  // -------------------------------------------------------------------
+  const effectiveRole: WorkspaceRole | null = useMemo(() => {
+    if (isLoading) return null;
+    if (!userId) return null;
+    if (!trustedView) return null;
+
+    // Honor an explicit in-memory selection only if it is still allowed
+    // by the CURRENT validated rows (not last render's rows).
+    if (selection && isWorkspaceAllowed(trustedView, selection)) {
+      return selection;
+    }
+
+    // Otherwise resolve from scoped stored preference + preferred role
+    // hint. `resolveInitialWorkspace` fails closed and never synthesizes
+    // driver when no capability exists.
+    const stored = readStored(scopedKey(userId));
+    return resolveInitialWorkspace(trustedView, {
+      preferredRole: (preferredRole as WorkspaceRole | null) ?? null,
+      storedPreference: stored,
+    }).workspace;
+  }, [isLoading, userId, trustedView, selection, preferredRole]);
+
+  // Reconciliation effect: persist/clear scoped storage and normalize
+  // in-memory selection to the currently effective role. This runs
+  // AFTER render and is never the access guard.
   useEffect(() => {
     if (isLoading) return;
-    // No user id → fail closed and never persist or read a preference.
     if (!userId) {
-      setViewModeState(null);
+      if (selection !== null) setSelection(null);
       return;
     }
-    // Capability error → fail closed. Do not fall back to prior data.
     if (!trustedView) {
-      setViewModeState(null);
+      if (selection !== null) setSelection(null);
       return;
     }
     const key = scopedKey(userId);
     const stored = readStored(key);
-    const { workspace, shouldClearStoredPreference } = resolveInitialWorkspace(
-      trustedView,
-      {
-        preferredRole: (preferredRole as WorkspaceRole | null) ?? null,
-        storedPreference: stored,
-      },
-    );
-    if (shouldClearStoredPreference) clearStored(key);
-    setViewModeState(workspace);
-  }, [isLoading, trustedView, userId, preferredRole]);
+    if (stored && !isWorkspaceAllowed(trustedView, stored)) {
+      clearStored(key);
+    }
+    // Drop any stale selection that is no longer allowed.
+    if (selection && !isWorkspaceAllowed(trustedView, selection)) {
+      setSelection(null);
+    }
+  }, [isLoading, userId, trustedView, selection]);
 
   const setViewMode = useCallback(
     (next: WorkspaceRole) => {
       if (!userId) return;
+      if (!trustedView) return;
       if (!isWorkspaceAllowed(trustedView, next)) return;
-      setViewModeState(next);
+      setSelection(next);
       writeStored(scopedKey(userId), next);
     },
     [userId, trustedView],
   );
-
-  const effectiveRole: WorkspaceRole | null = viewMode;
 
   return {
     effectiveRole,
