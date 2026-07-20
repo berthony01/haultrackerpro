@@ -95,8 +95,33 @@ jobs:
       - name: Run existing Phase 1H-M2 focused PGlite suite
         run: bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
 
-      - name: Typecheck (node)
-        run: bunx tsgo -p tsconfig.node.json --noEmit
+      - name: Typecheck (node diagnostic)
+        id: node_typecheck
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          bunx tsgo -p tsconfig.node.json --noEmit 2>&1 | tee artifacts/node-typecheck.log
 
-      - name: Typecheck (app)
-        run: bunx tsgo -p tsconfig.app.json --noEmit
+      - name: Typecheck (app diagnostic)
+        id: app_typecheck
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          bunx tsgo -p tsconfig.app.json --noEmit 2>&1 | tee artifacts/app-typecheck.log
+
+      - name: Upload typecheck diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1h-m2-typecheck-logs
+          path: |
+            artifacts/node-typecheck.log
+            artifacts/app-typecheck.log
+
+      - name: Enforce typecheck results
+        if: steps.node_typecheck.outcome != 'success' || steps.app_typecheck.outcome != 'success'
+        run: |
+          echo "One or more Phase 1H-M2 typechecks failed. See uploaded diagnostics."
+          exit 1
