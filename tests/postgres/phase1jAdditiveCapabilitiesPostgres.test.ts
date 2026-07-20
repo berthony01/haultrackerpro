@@ -855,3 +855,50 @@ describe('Phase 1J-A · E. Capability lifecycle durability', () => {
     expect(drv?.activated_at).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('Phase 1J-A · F. No-intent recruiter lifecycle', () => {
+  it('driver with intended_role null → begin_setup → complete profile → active → delete → setup', async () => {
+    const u = await createUser();
+    await insertProfile(u, null); // no recruiter intent
+    const first = await asUser(u, async (c) =>
+      (await c.query(`SELECT public.begin_recruiter_setup()::text AS s`)).rows[0].s,
+    );
+    expect(first).toBe('setup');
+
+    await completeRecruiter(u, { verification_status: 'approved' });
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('active');
+
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    const rows = await caps(u);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+
+    const [p] = await q<{ intended_role: string | null }>(
+      `SELECT intended_role FROM public.profiles WHERE user_id = $1`,
+      [u],
+    );
+    expect(p.intended_role).toBeNull();
+  });
+
+  it('active recruiter with intended_role null → delete profile → setup, driver still active', async () => {
+    const u = await createUser();
+    await insertProfile(u, null);
+    await completeRecruiter(u, { verification_status: 'approved' });
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    const rows = await caps(u);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+  });
+
+  it("active recruiter with intended_role 'driver' → delete profile → setup, driver still active", async () => {
+    const u = await createUser();
+    await insertProfile(u, 'driver');
+    await completeRecruiter(u, { verification_status: 'approved' });
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    const rows = await caps(u);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+  });
+});
+
