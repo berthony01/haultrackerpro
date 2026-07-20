@@ -111,6 +111,9 @@ jobs:
       - name: Trial-language guard
         run: bunx vitest run src/test/noTrialLanguage.test.ts
 
+      - name: Full default Vitest suite
+        run: bunx vitest run
+
       - name: Prepare artifacts directory
         run: mkdir -p artifacts
 
@@ -147,5 +150,8 @@ jobs:
 
       - name: Typecheck node
         run: bunx tsc -p tsconfig.node.json --noEmit
+
+      - name: Production build
+        run: bun run build
 
 # CI verification trigger: Phase 1J-D2B-2 PostgreSQL 16 PR gate.
