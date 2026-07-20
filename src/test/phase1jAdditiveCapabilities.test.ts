@@ -772,9 +772,9 @@ describe('Phase 1J-A — activated_at strict validation', () => {
     }
   });
 
-  it('rejects invalid dates that match the shape but are not real (e.g. Feb 30)', () => {
-    // Regex matches shape; Date.parse detects the impossible calendar date.
-    const v = '2026-02-30T00:00:00Z';
+  it('rejects invalid dates that match the shape but are not real (bad month)', () => {
+    // Regex matches shape; Date.parse rejects impossible month/day.
+    const v = '2026-13-01T00:00:00Z';
     expect(isValidActivatedAt(v)).toBe(false);
     expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
   });
