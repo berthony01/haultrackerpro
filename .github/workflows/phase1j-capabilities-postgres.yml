@@ -1,5 +1,5 @@
-# CI trigger: validate the Phase 1J-A additive capability candidate on real
-# PostgreSQL 16. Path-filtered to only the files owned by this phase.
+# Final CI verification: validate the accepted Phase 1J-A additive capability candidate
+# on real PostgreSQL 16. Temporary PR is comment-only and must not be merged.
 name: Phase 1J-A — Postgres 16 Additive Capabilities Gate
 
 on:
