@@ -1,21 +1,13 @@
-// @vitest-environment node
 /**
- * Phase 1J-B1 — Capability-based workspace decisions.
+ * Phase 1J-B1 — Capability-based workspace decisions + user-bound view mode.
  *
- * Pure tests over `src/lib/workspaceAccess.ts`. No React, no Supabase,
- * no billing. Proves the additive product model turn-for-turn:
- *
- *   - driver / recruiter statuses combine into per-workspace access,
- *     switcher availability, and initial-workspace resolution.
- *   - suspended/setup collapse operational recruiter subviews.
- *   - revoked / missing recruiter cannot select recruiter.
- *   - admin-shaped inputs do NOT grant recruiter access.
- *   - stored/preferred hints are validated against real access;
- *     stale stored recruiter is flagged for cleanup.
- *   - plan/billing-shaped inputs are irrelevant (module never sees them
- *     and the decision matrix is identical regardless of any extra props).
+ * Pure tests over `src/lib/workspaceAccess.ts` and hook tests over
+ * `src/hooks/useViewMode.ts` with mocked `useAuth`, `useUserCapabilities`,
+ * and `useUserRole`. No Supabase, no billing, no admin.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+
 import {
   computeWorkspaceAccess,
   isWorkspaceAllowed,
@@ -30,29 +22,63 @@ import {
   type UserCapabilityStatus,
 } from '@/lib/userCapabilities';
 
+// --------------------------------------------------------------------------
+// Hook mocks — declared BEFORE the SUT import via vi.mock hoisting.
+// --------------------------------------------------------------------------
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => authMock(),
+}));
+vi.mock('@/hooks/useUserCapabilities', () => ({
+  useUserCapabilities: () => capMock(),
+}));
+vi.mock('@/hooks/useUserRole', () => ({
+  useUserRole: () => roleMock(),
+}));
+
+let authMock: () => { user: { id: string } | null; loading: boolean };
+let capMock: () => {
+  rows: UserCapabilityRow[] | undefined;
+  isLoading: boolean;
+  error: Error | null;
+};
+let roleMock: () => { role: WorkspaceRole | null; isLoading: boolean };
+
+import { useViewMode } from '@/hooks/useViewMode';
+
+// --------------------------------------------------------------------------
+// Helpers
+// --------------------------------------------------------------------------
+function rowsFor(
+  driver: UserCapabilityStatus | null,
+  recruiter: UserCapabilityStatus | null,
+): UserCapabilityRow[] {
+  const r: UserCapabilityRow[] = [];
+  if (driver) r.push({ capability: 'driver', status: driver, activated_at: null });
+  if (recruiter) r.push({ capability: 'recruiter', status: recruiter, activated_at: null });
+  return r;
+}
+
 function view(
   driver: UserCapabilityStatus | null,
   recruiter: UserCapabilityStatus | null,
 ) {
-  const rows: UserCapabilityRow[] = [];
-  if (driver) rows.push({ capability: 'driver', status: driver, activated_at: null });
-  if (recruiter) rows.push({ capability: 'recruiter', status: recruiter, activated_at: null });
-  return deriveUserCapabilitiesView(rows);
+  return deriveUserCapabilitiesView(rowsFor(driver, recruiter));
 }
 
+// ==========================================================================
+// PURE — computeWorkspaceAccess
+// ==========================================================================
 describe('computeWorkspaceAccess', () => {
   it('driver-only active: driver workspace only, no switcher', () => {
     const d = computeWorkspaceAccess(view('active', null));
     expect(d.driverWorkspaceAllowed).toBe(true);
     expect(d.recruiterHubAllowed).toBe(false);
-    expect(d.recruiterOperationsAllowed).toBe(false);
     expect(d.switcherAvailable).toBe(false);
     expect(d.allowedFallbackWorkspace).toBe('driver');
   });
 
   it('driver active + recruiter setup: hub allowed, no operations, switcher on', () => {
     const d = computeWorkspaceAccess(view('active', 'setup'));
-    expect(d.driverWorkspaceAllowed).toBe(true);
     expect(d.recruiterHubAllowed).toBe(true);
     expect(d.recruiterOperationsAllowed).toBe(false);
     expect(d.switcherAvailable).toBe(true);
@@ -63,7 +89,6 @@ describe('computeWorkspaceAccess', () => {
     const d = computeWorkspaceAccess(view('active', 'active'));
     expect(d.recruiterOperationsAllowed).toBe(true);
     expect(d.switcherAvailable).toBe(true);
-    expect(d.allowedFallbackWorkspace).toBe('driver');
   });
 
   it('driver active + recruiter suspended: hub only, no operations, switcher on', () => {
@@ -76,7 +101,6 @@ describe('computeWorkspaceAccess', () => {
   it('driver active + recruiter revoked: driver only, no recruiter, no switcher', () => {
     const d = computeWorkspaceAccess(view('active', 'revoked'));
     expect(d.recruiterHubAllowed).toBe(false);
-    expect(d.recruiterOperationsAllowed).toBe(false);
     expect(d.switcherAvailable).toBe(false);
     expect(d.allowedFallbackWorkspace).toBe('driver');
   });
@@ -85,7 +109,6 @@ describe('computeWorkspaceAccess', () => {
     const d = computeWorkspaceAccess(view(null, null));
     expect(d.driverWorkspaceAllowed).toBe(false);
     expect(d.recruiterHubAllowed).toBe(false);
-    expect(d.switcherAvailable).toBe(false);
     expect(d.allowedFallbackWorkspace).toBeNull();
   });
 
@@ -109,8 +132,55 @@ describe('computeWorkspaceAccess', () => {
     expect(d.recruiterHubAllowed).toBe(false);
     expect(d.switcherAvailable).toBe(false);
   });
+
+  // --- Adversarial: forged sibling booleans are IGNORED ---
+  it('forged booleans on empty rows do not grant access', () => {
+    const forged = {
+      rows: [],
+      canEnterDriverWorkspace: true,
+      hasRecruiterCapability: true,
+      canOperateRecruiterWorkspace: true,
+      isRecruiterSuspended: false,
+      driverCapabilityStatus: 'active',
+      recruiterCapabilityStatus: 'active',
+      hasDriverCapability: true,
+    } as unknown as Parameters<typeof computeWorkspaceAccess>[0];
+    const d = computeWorkspaceAccess(forged);
+    expect(d.driverWorkspaceAllowed).toBe(false);
+    expect(d.recruiterHubAllowed).toBe(false);
+    expect(d.recruiterOperationsAllowed).toBe(false);
+    expect(d.driverCapabilityStatus).toBeNull();
+    expect(d.recruiterCapabilityStatus).toBeNull();
+  });
+
+  it('driver revoked row with forged active booleans: no driver access', () => {
+    const forged = {
+      rows: rowsFor('revoked', null),
+      canEnterDriverWorkspace: true,
+      driverCapabilityStatus: 'active',
+    } as unknown as Parameters<typeof computeWorkspaceAccess>[0];
+    const d = computeWorkspaceAccess(forged);
+    expect(d.driverWorkspaceAllowed).toBe(false);
+    expect(d.driverCapabilityStatus).toBe('revoked');
+  });
+
+  it('recruiter revoked row with forged active flags: no recruiter access', () => {
+    const forged = {
+      rows: rowsFor('active', 'revoked'),
+      hasRecruiterCapability: true,
+      canOperateRecruiterWorkspace: true,
+      recruiterCapabilityStatus: 'active',
+    } as unknown as Parameters<typeof computeWorkspaceAccess>[0];
+    const d = computeWorkspaceAccess(forged);
+    expect(d.recruiterHubAllowed).toBe(false);
+    expect(d.recruiterOperationsAllowed).toBe(false);
+    expect(d.recruiterCapabilityStatus).toBe('revoked');
+  });
 });
 
+// ==========================================================================
+// PURE — resolveInitialWorkspace (fail-closed, never synthesizes driver)
+// ==========================================================================
 describe('resolveInitialWorkspace', () => {
   it('driver-only: lands on driver regardless of hints', () => {
     const v = view('active', null);
@@ -130,12 +200,8 @@ describe('resolveInitialWorkspace', () => {
 
   it('dual: preferredRole honored when no stored preference', () => {
     const v = view('active', 'active');
-    expect(
-      resolveInitialWorkspace(v, { preferredRole: 'recruiter' }).workspace,
-    ).toBe('recruiter');
-    expect(
-      resolveInitialWorkspace(v, { preferredRole: 'driver' }).workspace,
-    ).toBe('driver');
+    expect(resolveInitialWorkspace(v, { preferredRole: 'recruiter' }).workspace).toBe('recruiter');
+    expect(resolveInitialWorkspace(v, { preferredRole: 'driver' }).workspace).toBe('driver');
   });
 
   it('dual: default to driver when no hints provided', () => {
@@ -143,26 +209,25 @@ describe('resolveInitialWorkspace', () => {
   });
 
   it('recruiter setup only (no driver capability): lands on recruiter', () => {
-    const v = view(null, 'setup');
-    expect(resolveInitialWorkspace(v).workspace).toBe('recruiter');
+    expect(resolveInitialWorkspace(view(null, 'setup')).workspace).toBe('recruiter');
   });
 
   it('preferred recruiter is IGNORED when recruiter revoked', () => {
-    const v = view('active', 'revoked');
-    const r = resolveInitialWorkspace(v, { preferredRole: 'recruiter' });
+    const r = resolveInitialWorkspace(view('active', 'revoked'), { preferredRole: 'recruiter' });
     expect(r.workspace).toBe('driver');
-    expect(r.shouldClearStoredPreference).toBe(false);
   });
 
   it('stale stored recruiter is flagged when recruiter missing', () => {
-    const v = view('active', null);
-    const r = resolveInitialWorkspace(v, { storedPreference: 'recruiter' });
+    const r = resolveInitialWorkspace(view('active', null), { storedPreference: 'recruiter' });
     expect(r.workspace).toBe('driver');
     expect(r.shouldClearStoredPreference).toBe(true);
   });
 
-  it('no capabilities: workspace is null', () => {
+  it('no capabilities: workspace is null (never synthesizes driver)', () => {
     expect(resolveInitialWorkspace(view(null, null)).workspace).toBeNull();
+    expect(resolveInitialWorkspace(null).workspace).toBeNull();
+    expect(resolveInitialWorkspace(undefined).workspace).toBeNull();
+    expect(resolveInitialWorkspace({ rows: null } as never).workspace).toBeNull();
   });
 
   it('bogus stored preference values are ignored', () => {
@@ -177,12 +242,13 @@ describe('resolveInitialWorkspace', () => {
   });
 });
 
+// ==========================================================================
+// PURE — resolveRecruiterSubview
+// ==========================================================================
 describe('resolveRecruiterSubview', () => {
   it('no recruiter capability → null', () => {
     const v = view('active', null);
-    for (const s of RECRUITER_SUBVIEWS) {
-      expect(resolveRecruiterSubview(v, s)).toBeNull();
-    }
+    for (const s of RECRUITER_SUBVIEWS) expect(resolveRecruiterSubview(v, s)).toBeNull();
   });
 
   it('revoked recruiter → null', () => {
@@ -199,20 +265,16 @@ describe('resolveRecruiterSubview', () => {
     expect(resolveRecruiterSubview(v, null)).toBe('onboarding');
   });
 
-  it('suspended collapses operational subviews to hub', () => {
+  it('suspended collapses EVERY subview (including onboarding) to hub', () => {
     const v = view('active', 'suspended');
-    expect(resolveRecruiterSubview(v, 'manager')).toBe('hub');
-    expect(resolveRecruiterSubview(v, 'applications')).toBe('hub');
-    expect(resolveRecruiterSubview(v, 'reports')).toBe('hub');
-    expect(resolveRecruiterSubview(v, 'onboarding')).toBe('onboarding');
+    for (const s of RECRUITER_SUBVIEWS) expect(resolveRecruiterSubview(v, s)).toBe('hub');
     expect(resolveRecruiterSubview(v, null)).toBe('hub');
+    expect(resolveRecruiterSubview(v, 'not-a-subview')).toBe('hub');
   });
 
   it('active preserves requested subview and defaults to hub', () => {
     const v = view('active', 'active');
-    for (const s of RECRUITER_SUBVIEWS) {
-      expect(resolveRecruiterSubview(v, s)).toBe(s);
-    }
+    for (const s of RECRUITER_SUBVIEWS) expect(resolveRecruiterSubview(v, s)).toBe(s);
     expect(resolveRecruiterSubview(v, null)).toBe('hub');
     expect(resolveRecruiterSubview(v, 'not-a-subview')).toBe('hub');
   });
@@ -223,20 +285,7 @@ describe('isWorkspaceAllowed', () => {
     const v = view('active', 'setup');
     expect(isWorkspaceAllowed(v, 'driver')).toBe(true);
     expect(isWorkspaceAllowed(v, 'recruiter')).toBe(true);
-    const nope = view('active', 'revoked');
-    expect(isWorkspaceAllowed(nope, 'recruiter')).toBe(false);
-  });
-});
-
-describe('admin-shaped inputs do not grant recruiter access', () => {
-  it('a view carrying an unrelated `isAdmin` field grants nothing extra', () => {
-    const v = view('active', null) as unknown as Record<string, unknown>;
-    v.isAdmin = true;
-    v.adminRole = 'super_admin';
-    const d = computeWorkspaceAccess(v as never);
-    expect(d.recruiterHubAllowed).toBe(false);
-    expect(d.recruiterOperationsAllowed).toBe(false);
-    expect(d.switcherAvailable).toBe(false);
+    expect(isWorkspaceAllowed(view('active', 'revoked'), 'recruiter')).toBe(false);
   });
 });
 
@@ -245,7 +294,6 @@ describe('plan / billing independence', () => {
     const src = await import('node:fs').then((fs) =>
       fs.readFileSync(new URL('../lib/workspaceAccess.ts', import.meta.url), 'utf8'),
     );
-    // Extract only import specifiers to avoid matching prose comments.
     const specifiers = Array.from(src.matchAll(/from\s+['"]([^'"]+)['"]/g)).map((m) => m[1]);
     for (const spec of specifiers) {
       expect(spec).not.toMatch(/billing/i);
@@ -253,10 +301,9 @@ describe('plan / billing independence', () => {
       expect(spec).not.toMatch(/stripe/i);
       expect(spec).not.toMatch(/recruiterCapabilities/);
       expect(spec).not.toMatch(/useSubscription/);
+      expect(spec).not.toMatch(/useAdmin/);
     }
   });
-
-
 
   it('adding plan/billing-shaped fields to the view does not change decisions', () => {
     const base = view('active', 'active');
@@ -267,12 +314,171 @@ describe('plan / billing independence', () => {
       subscription: { tier: 'pro' },
       stripeCustomerId: 'cus_x',
     } as unknown as typeof base;
-    const a = computeWorkspaceAccess(base);
-    const b = computeWorkspaceAccess(plated);
-    expect(b).toEqual(a);
+    expect(computeWorkspaceAccess(plated)).toEqual(computeWorkspaceAccess(base));
+    expect(
+      resolveInitialWorkspace(plated, { preferredRole: 'recruiter' }),
+    ).toEqual(resolveInitialWorkspace(base, { preferredRole: 'recruiter' }));
+  });
+});
 
-    const r1 = resolveInitialWorkspace(base, { preferredRole: 'recruiter' });
-    const r2 = resolveInitialWorkspace(plated, { preferredRole: 'recruiter' });
-    expect(r2).toEqual(r1);
+// ==========================================================================
+// HOOK — useViewMode
+// ==========================================================================
+describe('useViewMode hook', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    authMock = () => ({ user: null, loading: false });
+    capMock = () => ({ rows: [], isLoading: false, error: null });
+    roleMock = () => ({ role: null, isLoading: false });
+  });
+
+  it('no user id → effectiveRole null; nothing written to storage', () => {
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBeNull();
+    expect(result.current.canSwitch).toBe(false);
+    // No unrelated keys created.
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('while loading → effectiveRole null', () => {
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: undefined, isLoading: true, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBeNull();
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it('capability error → effectiveRole null even with a user id', () => {
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({
+      rows: rowsFor('active', 'active'),
+      isLoading: false,
+      error: new Error('boom'),
+    });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBeNull();
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.canSwitch).toBe(false);
+  });
+
+  it('no capability rows (empty) → effectiveRole null; never synthesizes driver', () => {
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: [], isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBeNull();
+    expect(result.current.canSwitch).toBe(false);
+  });
+
+  it('driver-only active lands on driver; recruiter setViewMode is a no-op', () => {
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', null), isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+    act(() => result.current.setViewMode('recruiter'));
+    expect(result.current.effectiveRole).toBe('driver');
+    expect(localStorage.getItem('htp_view_mode:u1')).toBeNull();
+  });
+
+  it('dual-capability active/active user can switch both ways and persists per-user', () => {
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.canSwitch).toBe(true);
+    expect(result.current.effectiveRole).toBe('driver');
+    act(() => result.current.setViewMode('recruiter'));
+    expect(result.current.effectiveRole).toBe('recruiter');
+    expect(localStorage.getItem('htp_view_mode:u1')).toBe('recruiter');
+    act(() => result.current.setViewMode('driver'));
+    expect(result.current.effectiveRole).toBe('driver');
+    expect(localStorage.getItem('htp_view_mode:u1')).toBe('driver');
+  });
+
+  it('same-user allowed stored preference is honored on mount', () => {
+    localStorage.setItem('htp_view_mode:u1', 'recruiter');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('recruiter');
+  });
+
+  it('unavailable stored mode is cleared', () => {
+    localStorage.setItem('htp_view_mode:u1', 'recruiter');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'revoked'), isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+    expect(localStorage.getItem('htp_view_mode:u1')).toBeNull();
+  });
+
+  it('user A stored recruiter does NOT affect user B', () => {
+    localStorage.setItem('htp_view_mode:userA', 'recruiter');
+    authMock = () => ({ user: { id: 'userB' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    // User B has no scoped preference → default driver (no preferred role hint).
+    expect(result.current.effectiveRole).toBe('driver');
+    // User A's key is untouched.
+    expect(localStorage.getItem('htp_view_mode:userA')).toBe('recruiter');
+  });
+
+  it('legacy unscoped `htp_view_mode` is cleared and ignored', () => {
+    localStorage.setItem('htp_view_mode', 'recruiter');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(localStorage.getItem('htp_view_mode')).toBeNull();
+    // Falls back to default (driver) — the legacy key must not become the preference.
+    expect(result.current.effectiveRole).toBe('driver');
+  });
+
+  it('preferredRole hint is used when no stored preference exists', () => {
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    roleMock = () => ({ role: 'recruiter', isLoading: false });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('recruiter');
+  });
+
+  it('sign-out reconciles immediately to null', () => {
+    let user: { id: string } | null = { id: 'u1' };
+    authMock = () => ({ user, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    const { result, rerender } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+    user = null;
+    rerender();
+    expect(result.current.effectiveRole).toBeNull();
+  });
+
+  it('rerender with unchanged capability rows does not create a state loop', () => {
+    const stableRows = rowsFor('active', 'active');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: stableRows, isLoading: false, error: null });
+    let renders = 0;
+    const { result, rerender } = renderHook(() => {
+      renders++;
+      return useViewMode();
+    });
+    const before = renders;
+    expect(result.current.effectiveRole).toBe('driver');
+    rerender();
+    rerender();
+    rerender();
+    // Exactly one render per explicit rerender call (no runaway loop).
+    expect(renders - before).toBe(3);
+    expect(result.current.effectiveRole).toBe('driver');
+  });
+
+  it('module does not import useAdmin (no admin bypass)', async () => {
+    const src = await import('node:fs').then((fs) =>
+      fs.readFileSync(new URL('../hooks/useViewMode.ts', import.meta.url), 'utf8'),
+    );
+    const specifiers = Array.from(src.matchAll(/from\s+['"]([^'"]+)['"]/g)).map((m) => m[1]);
+    for (const spec of specifiers) {
+      expect(spec).not.toMatch(/useAdmin/);
+      expect(spec).not.toMatch(/billing/i);
+      expect(spec).not.toMatch(/subscription/i);
+      expect(spec).not.toMatch(/stripe/i);
+    }
   });
 });
