@@ -33,7 +33,7 @@ interface Props {
   opportunityTitle: string;
   companyName: string;
   driverProfile: DriverOpportunityProfile | null | undefined;
-  onEditProfile: () => void;
+  onOpenPreferences: () => void;
 }
 
 const MESSAGE_LIMIT = 4000;
@@ -45,7 +45,7 @@ export function ApplyNowDialog({
   opportunityTitle,
   companyName,
   driverProfile,
-  onEditProfile,
+  onOpenPreferences,
 }: Props) {
   const { submitApplication } = useOpportunityApplications();
 
@@ -135,17 +135,17 @@ export function ApplyNowDialog({
         <DialogHeader>
           <DialogTitle>Apply to {opportunityTitle}</DialogTitle>
           <DialogDescription>
-            Submit a formal application to {companyName}. Your professional Opportunity Profile is
-            included in the application snapshot. Email, phone, or SMS is shared only when you
-            explicitly consent.
+            Submit a formal application to {companyName}. Your saved Opportunity Preferences and the
+            contact details you select for this application are included in the application
+            snapshot. Email, phone, or SMS is shared only when you explicitly consent.
           </DialogDescription>
         </DialogHeader>
 
         {!profileCompleted ? (
-          <ProfileRequiredPanel onEditProfile={onEditProfile} hasAny={!!driverProfile} />
+          <PreferencesRequiredPanel onOpenPreferences={onOpenPreferences} hasAny={!!driverProfile} />
         ) : (
           <div className="space-y-5">
-            <ProfileSummary profile={driverProfile!} onEditProfile={onEditProfile} />
+            <ProfileSummary profile={driverProfile!} onOpenPreferences={onOpenPreferences} />
 
             <div className="space-y-2">
               <Label htmlFor="apply-message">Message to recruiter (optional)</Label>
@@ -175,7 +175,7 @@ export function ApplyNowDialog({
                 id="apply-availability"
                 checked={availability}
                 onCheckedChange={setAvailability}
-                label="I confirm that my availability and Opportunity Profile information are current."
+                label="I confirm that my Opportunity Preferences and availability are current."
               />
               <AttestCheckbox
                 id="apply-requirements"
@@ -288,11 +288,11 @@ function AttestCheckbox({
   );
 }
 
-function ProfileRequiredPanel({
-  onEditProfile,
+function PreferencesRequiredPanel({
+  onOpenPreferences,
   hasAny,
 }: {
-  onEditProfile: () => void;
+  onOpenPreferences: () => void;
   hasAny: boolean;
 }) {
   return (
@@ -301,16 +301,16 @@ function ProfileRequiredPanel({
         <UserCog className="h-5 w-5 text-primary mt-0.5 shrink-0" aria-hidden />
         <div>
           <p className="text-sm font-semibold text-foreground">
-            Complete your Opportunity Profile to apply
+            Complete your Opportunity Preferences to apply
           </p>
           <p className="text-sm text-muted-foreground">
-            Recruiters review your professional profile alongside every application. Add the
-            required fields to unlock Apply Now.
+            A few required preferences unlock Apply Now and help us improve your opportunity
+            matches.
           </p>
         </div>
       </div>
-      <Button onClick={onEditProfile} className="w-full sm:w-auto">
-        {hasAny ? 'Update Opportunity Profile' : 'Complete Opportunity Profile'}
+      <Button onClick={onOpenPreferences} className="w-full sm:w-auto">
+        {hasAny ? 'Update Opportunity Preferences' : 'Complete Opportunity Preferences'}
       </Button>
     </div>
   );
@@ -318,10 +318,10 @@ function ProfileRequiredPanel({
 
 function ProfileSummary({
   profile,
-  onEditProfile,
+  onOpenPreferences,
 }: {
   profile: DriverOpportunityProfile;
-  onEditProfile: () => void;
+  onOpenPreferences: () => void;
 }) {
   const rows = useMemo(
     () => [
@@ -350,8 +350,8 @@ function ProfileSummary({
             Application snapshot (read-only)
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={onEditProfile}>
-          Edit Opportunity Profile
+        <Button variant="ghost" size="sm" onClick={onOpenPreferences}>
+          Edit Opportunity Preferences
         </Button>
       </div>
       <dl className="grid grid-cols-2 gap-2 text-sm">
