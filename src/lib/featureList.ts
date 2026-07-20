@@ -130,7 +130,7 @@ export const featureList: FeatureCategory[] = [
   {
     category: 'Team & Agency Workflow',
     features: [
-      { icon: Users, title: 'Driver Assistants', description: 'Invite a spouse, dispatcher, or back-office helper into your account with granular permissions (loads, expenses, fuel, reports, settings). Every action is logged and you can revoke access any time.', pro: true },
+      { icon: Users, title: 'Driver Assistants', description: 'Direct driver invitations to a spouse, dispatcher, or back-office helper are available without a Driver Pro subscription. Access always remains driver-approved and permission-based (loads, expenses, fuel, reports, settings). Every action is logged and you can revoke access any time.' },
       { icon: Shield, title: 'Driver Control Center', description: 'One screen at /driver/assistant-control to see every person and agency with access to your account — direct invites and agency delegations — and end any access in one tap.' },
       { icon: Building2, title: 'Agency Workspace', description: 'Run a multi-driver back-office: publish service packages, accept private client requests, manage a shared work queue, and track every action in an agency audit log.' },
       { icon: UserCheck, title: 'Driver-Approved Delegation', description: 'Agencies can only act on a driver\'s account after the driver explicitly approves the delegation request — and the driver can revoke it instantly. No silent access.' },

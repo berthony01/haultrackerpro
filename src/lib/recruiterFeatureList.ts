@@ -16,11 +16,11 @@ export interface RecruiterFeatureCategory {
 
 export const recruiterFeatureList: RecruiterFeatureCategory[] = [
   {
-    category: 'Get Verified',
+    category: 'Recruiter Profile & Trust',
     features: [
-      { icon: Building2, title: 'Recruiter Profile', description: 'Submit your company name, DOT, MC, address, and recruiter contact info for admin review.' },
-      { icon: ShieldCheck, title: 'Admin Verification', description: 'Every recruiter is reviewed by HaulTrackerPro before any opportunity goes live. Drivers see a verified badge on approved listings.' },
-      { icon: AlertCircle, title: 'Status Visibility', description: 'See your verification state at a glance — pending, approved, needs attention, or suspended — plus any reviewer notes.' },
+      { icon: Building2, title: 'Recruiter Profile', description: 'Provide your company name, DOT and/or MC number, address, recruiter email, and contact info. A complete, active recruiter profile with current posting terms accepted unlocks standard posting — no admin approval or paid plan required.' },
+      { icon: ShieldCheck, title: 'Verified Recruiter Badge Review', description: 'A separate trust-display process. HaulTrackerPro reviews eligible recruiter profiles for the Verified Recruiter badge on driver listings. Pending or rejected badge review does not by itself disable standard posting.' },
+      { icon: AlertCircle, title: 'Status Visibility', description: 'See your profile eligibility state and badge review status at a glance — plus any reviewer notes.' },
     ],
   },
   {
@@ -29,7 +29,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: Briefcase, title: 'Structured Opportunity Form', description: 'Capture pay model, CPM/percentage/flat, deductions, deadhead, escrow, home time, equipment, and bonuses in a clear schema drivers actually understand.' },
       { icon: ClipboardList, title: 'Opportunity Manager', description: 'Edit, pause, close, or resubmit your opportunities. See active vs draft vs closed status at a glance.' },
       { icon: Eye, title: 'View Counts', description: 'See how many drivers have viewed each opportunity so you know what is resonating.' },
-      { icon: ShieldCheck, title: 'Unlimited Standard Posts (Verified Recruiters)', description: 'Once your recruiter profile is approved, you can post unlimited standard opportunities — no per-plan post cap. Paid plans add premium visibility and recruiting tools on top.' },
+      { icon: ShieldCheck, title: 'Unlimited Standard Posts (Eligible Recruiters)', description: 'Once your recruiter profile is complete, current posting terms are accepted, and your account is not suspended, you can post unlimited standard opportunities — no per-plan post cap, no paid plan, no Verified Recruiter badge required. Paid plans add premium visibility and recruiting tools on top.' },
     ],
   },
   {
@@ -44,10 +44,10 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
   {
     category: 'Contract Protection',
     features: [
-      { icon: FileText, title: 'Recruiter Contract Upload', description: 'Attach the contract you want a driver to sign directly to an application — PDF or image.' },
-      { icon: Sparkles, title: 'AI Parsing & Risk Review', description: 'HaulTrackerPro extracts key contract details and surfaces plain-English risk flags for the driver. Informational only, not legal advice.' },
-      { icon: FileSignature, title: 'Driver Approval & Signature', description: 'Drivers can approve, request changes to, reject, or sign the contract in-app. You get an audit log of every step.' },
-      { icon: ShieldCheck, title: 'Hired-Status Workflow Protection (Growth & Fleet)', description: "You can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record." },
+      { icon: FileText, title: 'Recruiter Contract Management (Growth & Fleet)', description: 'The recruiter contract-management dashboard and contract upload/management interface let Growth and Fleet recruiters attach the contract you want a driver to sign directly to an application — PDF or image.' },
+      { icon: Sparkles, title: 'AI-Assisted Contract Risk Review (Growth & Fleet)', description: 'HaulTrackerPro extracts key contract details and surfaces plain-English risk flags for the driver on Growth and Fleet recruiter plans. Informational only, not legal advice.' },
+      { icon: FileSignature, title: 'Driver Review, Decision & In-App Signature (Universal)', description: 'Every driver can view the contract sent by a recruiter, approve, request changes to, reject, or record an optional in-app signature. Available on every driver plan.' },
+      { icon: ShieldCheck, title: 'Hired-Status Workflow Protection (Universal)', description: "Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record. This driver protection is universal and does not depend on the recruiter's paid plan." },
     ],
   },
   {

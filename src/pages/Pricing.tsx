@@ -83,7 +83,7 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Approve, reject, or request changes', free: '✓', pro: '✓' },
   { feature: 'Record approval / in-app signature', free: '✓', pro: '✓' },
   { feature: 'Plain-English Clause Rewrite', free: '—', pro: '✓ Included' },
-  { feature: 'Contract history, downloads, version comparison, AI follow-ups', free: '—', pro: 'Planned Pro tools' },
+  { feature: 'Contract history, downloads, version comparison, AI follow-ups', free: '—', pro: 'Coming soon — not included today' },
 ];
 
 const whyProPoints = [
@@ -142,7 +142,7 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Pricing — Truck Driver Profit Tracker & Recruiter Tools | HaulTrackerPro" description="HaulTrackerPro pricing for owner-operators and 1099 truck drivers (Free and Pro at $19.99/mo) plus recruiter plans for verified opportunity posting, premium visibility, and recruiting tools." path="/pricing" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }])} />
+      <SEOHead title="Pricing — Truck Driver Profit Tracker & Recruiter Tools | HaulTrackerPro" description="HaulTrackerPro pricing for owner-operators and 1099 truck drivers (Free and Pro at $19.99/mo) plus recruiter plans — complete, active recruiter workspaces post standard opportunities free, with paid plans for premium visibility, reports, and contract-management with AI risk review." path="/pricing" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }])} />
       <MarketingHeader />
 
 
@@ -157,7 +157,7 @@ export default function Pricing() {
             <span style={{ color: 'hsl(25, 95%, 53%)' }}>For Drivers &amp; Recruiters.</span>
           </h1>
           <p className="mt-4 text-base sm:text-lg max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Choose the right HaulTrackerPro plan for how you use the platform — track your trucking profit as a driver or post approved opportunities as a recruiter.
+            Choose the right HaulTrackerPro plan for how you use the platform — track your trucking profit as a driver or post structured recruiter opportunities.
           </p>
         </div>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -376,43 +376,42 @@ export default function Pricing() {
                 For Recruiters &amp; Carriers
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: 'hsl(220, 20%, 16%)', color: 'hsl(220, 10%, 55%)' }}>
-                Admin review required before posting
+                Profile completion and posting terms required
               </div>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>
               Recruiter &amp; Carrier Plans
             </h2>
             <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-              Verified recruiters can post unlimited standard opportunities. Paid plans unlock premium visibility, recruiter reports, contract workflow tools, and pipeline analytics on top.
+              Complete, active recruiter workspaces can post unlimited standard opportunities for free once required recruiter profile fields are filled in and posting terms are accepted. Paid plans unlock premium visibility, recruiter reports, contract-management with AI-assisted risk review, and pipeline analytics on top. The Verified Recruiter badge shown on driver listings is a separate trust-display review.
             </p>
             <p className="text-[11px] mt-4 max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
-              Standard posting is based on recruiter approval. Premium features are based on your paid plan. Contract workflow tools are designed to make the recruiter–driver workflow clearer — they are not legal advice.
+              Standard posting requires a complete, active recruiter profile with current posting terms accepted. Premium features depend on your paid plan. Universal driver contract protections (review, approve, request changes, reject, optional in-app signature, hired-status protection) do not depend on a paid recruiter plan. Contract-management tools are designed to make the recruiter–driver workflow clearer — they are not legal advice.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
               {
-                name: 'Free Verified',
+                name: 'Recruiter Standard',
                 price: 'Free',
-                limit: 'For approved recruiters',
-                bullets: [
+                limit: 'For complete, active recruiter profiles',
+                availableBullets: [
                   'Unlimited standard opportunity posts',
-                  'Verified Recruiter badge on driver listings',
-                  'Admin-reviewed listings',
-                  'Basic applicant & contact request flow',
                   'Standard marketplace placement',
+                  'Basic applicant and contact-request flow',
+                  'Opportunity management: edit, pause, and close listings',
+                  'Verified Recruiter badge shown only after separate badge approval',
                 ],
               },
               {
                 name: 'Starter',
                 price: '$19',
                 limit: 'Recruiter trust tools',
-                bullets: [
-                  'Everything in Free Verified',
+                availableBullets: [
+                  'Everything in Recruiter Standard',
                   'Enhanced applicant tracking',
                   'Applicant status history',
-                  'Basic applicant pipeline analytics',
                   'Basic referral tracking view',
                 ],
               },
@@ -421,14 +420,15 @@ export default function Pricing() {
                 price: '$49',
                 limit: 'Premium visibility & reports',
                 highlight: true,
-                bullets: [
+                availableBullets: [
                   'Everything in Starter',
-                  'Priority placement in driver listings',
-                  'Featured listing eligibility',
-                  'Recruiter reports (PDF + CSV exports)',
-                  'Contract workflow tools',
-                  'Referral progress tracking',
-                  'Pipeline analytics and recruiter reports',
+                  'Priority-placement eligibility',
+                  'Featured-listing eligibility',
+                  'Recruiter reports (PDF + CSV)',
+                  'Recruiter contract-management dashboard / contract upload-management interface',
+                  'AI-assisted contract risk review',
+                  'Full referral progress tracking',
+                  'Pipeline analytics',
                   'Opportunity performance insights',
                 ],
               },
@@ -436,15 +436,16 @@ export default function Pricing() {
                 name: 'Fleet',
                 price: '$149',
                 limit: 'Advanced recruiting toolkit',
-                bullets: [
+                availableBullets: [
                   'Everything in Growth',
-                  'Top placement eligibility',
-                  'Advanced analytics',
+                  'Top-placement eligibility',
                   'Priority support',
-                  'Team seats (coming soon)',
-                  'Bulk opportunity tools (coming soon)',
-                  'Custom recruiter profile (coming soon)',
-                  'Company-level hiring dashboard (coming soon)',
+                ],
+                comingSoonBullets: [
+                  'Team seats',
+                  'Bulk opportunity tools',
+                  'Custom recruiter profile',
+                  'Company-level hiring dashboard',
                 ],
               },
             ].map((p) => (
@@ -470,17 +471,36 @@ export default function Pricing() {
                     <span className="text-xs ml-1" style={{ color: 'hsl(220, 10%, 55%)' }}>/month</span>
                   )}
                 </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(152, 60%, 52%)' }}>
+                  Available Now
+                </p>
                 <ul className="space-y-2.5 mb-5">
-                  {p.bullets.map((b) => (
+                  {p.availableBullets.map((b) => (
                     <li key={b} className="flex items-start gap-2 text-xs" style={{ color: 'hsl(220, 10%, 70%)' }}>
                       <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: 'hsl(25, 95%, 53%)' }} />
                       {b}
                     </li>
                   ))}
                 </ul>
+                {p.comingSoonBullets && p.comingSoonBullets.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(220, 10%, 50%)' }}>
+                      Coming Soon
+                    </p>
+                    <ul className="space-y-2.5 mb-2">
+                      {p.comingSoonBullets.map((b) => (
+                        <li key={b} className="flex items-start gap-2 text-xs" style={{ color: 'hsl(220, 10%, 50%)' }}>
+                          <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: 'hsl(220, 10%, 40%)' }} />
+                          {b}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </div>
             ))}
           </div>
+
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button
@@ -489,10 +509,10 @@ export default function Pricing() {
               className="text-sm font-bold rounded-xl h-12 px-6 gap-2"
               style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}
             >
-              {user ? 'Open Recruiter Access' : 'Apply for Recruiter Access'} <ArrowRight className="h-4 w-4" />
+              {user ? 'Open Recruiter Workspace' : 'Add Recruiter Workspace'} <ArrowRight className="h-4 w-4" />
             </Button>
             <span className="text-xs" style={{ color: 'hsl(220, 10%, 50%)' }}>
-              Get verified to post standard opportunities. Upgrade for premium recruiting tools.
+              Complete your recruiter profile to unlock standard posting. Upgrade for premium recruiting tools.
             </span>
           </div>
 

@@ -92,7 +92,7 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       notifications: true,
     },
     publicBullets: [
-      '1 agency owner + up to 2 members total',
+      '2 agency members total, including the owner',
       'Up to 5 active driver clients',
       'Up to 3 active service packages',
       'Private agency request link',

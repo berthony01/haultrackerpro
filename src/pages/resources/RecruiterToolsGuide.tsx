@@ -5,18 +5,18 @@ export default function RecruiterToolsGuide() {
     <ResourceArticle
       path="/resources/trucking-recruiter-tools"
       seoTitle="Trucking Recruiter Tools & Driver Referral Tracking | HaulTrackerPro"
-      seoDescription="Verified recruiter access, unlimited standard opportunities, applicant tracking, referral analytics, premium visibility, and contract workflow tools."
+      seoDescription="Recruiter profile eligibility, unlimited standard opportunities, applicant tracking, referral analytics, premium visibility, and contract workflow tools."
       pageTitle="Trucking Recruiter Tools Guide"
-      intro="HaulTrackerPro gives verified recruiters tools to post opportunities, manage applicants, and track driver-to-driver referrals."
+      intro="HaulTrackerPro gives eligible recruiter workspaces tools to post opportunities, manage applicants, and track driver-to-driver referrals."
       sections={[
         {
-          heading: 'Verified recruiter access',
-          body: 'Recruiter accounts go through an approval step. Verified access keeps the opportunity surface accountable for drivers and recruiters alike.',
+          heading: 'Recruiter profile eligibility',
+          body: 'A recruiter workspace can use standard posting once the recruiter profile is complete, a valid recruiter email is on file, at least one DOT or MC number is provided, current posting terms are accepted, and the account is active. Verified Recruiter badge review is a separate trust-display process and is not required to post.',
         },
         {
           heading: 'Posting and applicant management',
           bullets: [
-            'Unlimited standard opportunities after approval',
+            'Unlimited standard opportunities after required profile completion and posting-term acceptance',
             'Applicant and driver-interest management in one place',
             'Driver referral tracking with recruiter-controlled status updates',
             'External referral terms shown on each opportunity',
@@ -24,22 +24,22 @@ export default function RecruiterToolsGuide() {
         },
         {
           heading: 'Premium visibility and analytics',
-          body: 'Paid plans unlock premium visibility for opportunities, referral analytics, and reports that help recruiters understand pipeline performance.',
+          body: 'Paid plans add premium visibility, referral analytics, and reports on top of standard posting. Growth adds recruiter reports, contract-management, and AI-assisted contract review. Fleet adds top-placement eligibility and priority support; team seats, bulk tools, custom recruiter profile, and a company-level hiring dashboard are coming soon.',
         },
         {
           heading: 'Contract workflow tools',
-          body: 'Where contract workflow tools are included, recruiters can structure agreements and share them with drivers in an organized way. Recruiters and drivers remain responsible for their own contracts.',
+          body: 'Universal driver contract review, decision, and hired-state workflow protection are available to all drivers. Growth and Fleet add the recruiter contract-management dashboard, contract upload/management interface, and AI-assisted risk review. Not legal advice.',
         },
         {
           heading: 'How HaulTrackerPro helps',
-          body: 'Recruiters get verified access, a clean applicant view, referral tracking, and analytics — without buying multiple tools.',
+          body: 'Recruiters get an eligible workspace, a clean applicant view, referral tracking, and analytics — without buying multiple tools.',
         },
       ]}
       disclaimer="HaulTrackerPro does not guarantee hires, driver quality, or specific recruiting outcomes. Referral payments, if offered, are paid externally by the recruiter under recruiter-stated terms."
       ctaTitle="Build a cleaner driver recruiting pipeline"
-      ctaDescription="Apply for verified recruiter access, post standard opportunities after approval, and upgrade for premium recruiting tools."
+      ctaDescription="Add the recruiter workspace, complete the required profile and posting terms to unlock standard posting, and upgrade for premium recruiting tools."
       ctas={[
-        { label: 'Apply for Recruiter Access', to: '/recruiters' },
+        { label: 'Add Recruiter Workspace', to: '/recruiters' },
         { label: 'Explore Recruiter Tools', to: '/recruiter/features', variant: 'outline' },
       ]}
       related={[

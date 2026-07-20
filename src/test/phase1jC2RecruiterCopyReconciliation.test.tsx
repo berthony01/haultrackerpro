@@ -33,6 +33,14 @@ const FILES_TO_SCAN = [
   'src/components/opportunities/recruiter/RecruiterAccessPage.tsx',
   'src/components/opportunities/recruiter/RecruiterEntryRoute.tsx',
   'src/components/opportunities/RecruiterOnboarding.tsx',
+  // Phase 1J-D2A public recruiter surfaces (extended scan)
+  'src/pages/Pricing.tsx',
+  'src/pages/Recruiters.tsx',
+  'src/components/landing/RecruiterLanding.tsx',
+  'src/pages/recruiter/RecruiterFAQ.tsx',
+  'src/pages/recruiter/RecruiterGuide.tsx',
+  'src/pages/resources/RecruiterToolsGuide.tsx',
+  'src/lib/recruiterFeatureList.ts',
 ];
 
 const FORBIDDEN: RegExp[] = [

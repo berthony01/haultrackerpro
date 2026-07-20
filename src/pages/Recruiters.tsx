@@ -16,28 +16,30 @@ export default function Recruiters() {
     else navigate('/auth?intent=recruiter');
   };
 
+  const ctaLabel = user ? 'Open Recruiter Workspace' : 'Add Recruiter Workspace';
+
   const why = [
     { icon: Search, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions — they evaluate opportunities by the numbers.' },
     { icon: ClipboardList, title: 'Post structured opportunities', desc: 'Required fields for pay, lanes, equipment, and deductions create clear, comparable listings.' },
     { icon: Handshake, title: 'Manage driver requests', desc: 'A built-in applications dashboard lets you review interest and respond from one place.' },
-    { icon: ShieldCheck, title: 'Build trust through transparency', desc: 'Approved-only access and reviewed listings protect both drivers and recruiters.' },
+    { icon: ShieldCheck, title: 'Build trust through transparency', desc: 'Complete, active recruiter workspaces post standard opportunities. Verified Recruiter badge review is a separate trust-display process, and platform moderation still applies to opportunities.' },
     { icon: Users, title: 'Driver-to-driver referral tracking', desc: 'Drivers can refer other drivers to your opportunities. Track referral progress and set your external referral terms — HaulTrackerPro tracks referral progress only, bonuses are paid externally by you.' },
   ];
 
   const steps = [
-    'Apply for recruiter access',
-    'Submit company / recruiter details',
-    'Get verified by HaulTrackerPro admin review',
+    'Add the recruiter workspace',
+    'Complete required recruiter details and accept posting terms',
     'Post unlimited standard opportunities',
+    'Request separate Verified Recruiter badge review if desired',
     'Manage driver requests',
-    'Upgrade for premium recruiting tools (optional)',
+    'Upgrade for premium tools when needed',
   ];
 
   const plans = [
-    { name: 'Free Verified', price: 'Free', tagline: 'Unlimited standard posts for approved recruiters' },
+    { name: 'Recruiter Standard', price: 'Free', tagline: 'For complete, active recruiter profiles — unlimited standard posts' },
     { name: 'Starter', price: '$19', tagline: 'Enhanced applicant tracking & trust tools' },
-    { name: 'Growth', price: '$49', tagline: 'Priority placement, reports & contract workflow', highlight: true },
-    { name: 'Fleet', price: '$149', tagline: 'Top placement, advanced analytics & priority support' },
+    { name: 'Growth', price: '$49', tagline: 'Priority placement, reports, and contract-management + AI risk review', highlight: true },
+    { name: 'Fleet', price: '$149', tagline: 'Everything in Growth, top-placement eligibility, and priority support today; team seats, bulk opportunity tools, custom recruiter profile, and company-level hiring dashboard coming soon' },
   ];
 
 
@@ -54,7 +56,7 @@ export default function Recruiters() {
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
         title="For Recruiters — Truck Driver Recruiter Platform | HaulTrackerPro"
-        description="Verified trucking recruiter platform: post unlimited standard driver opportunities after approval, manage applicants, track driver referrals, and unlock premium visibility, recruiter analytics, and contract workflow tools on paid plans."
+        description="Trucking recruiter platform: complete, active recruiter workspaces post unlimited standard driver opportunities without badge approval or a paid plan. Verified Recruiter badge review is separate. Paid plans add premium visibility, recruiter reports, and contract-management with AI risk review."
         path="/recruiters"
         jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }])}
       />
@@ -77,21 +79,22 @@ export default function Recruiters() {
             <span style={{ color: 'hsl(25, 95%, 53%)' }}>Profit-First Trucking Platform</span>
           </h1>
           <p className="mt-5 text-base sm:text-lg max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-            HaulTrackerPro helps approved recruiters and carriers post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers.
+            HaulTrackerPro helps complete, active recruiter workspaces post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button onClick={goRecruiterAccess} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)', boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)' }}>
-              Apply for Recruiter Access <ArrowRight className="h-5 w-5" />
+              {ctaLabel} <ArrowRight className="h-5 w-5" />
             </Button>
             <Button onClick={() => navigate('/pricing#for-recruiters')} variant="outline" size="lg" className="text-base font-semibold rounded-xl h-13 px-8" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
               View Recruiter Plans
             </Button>
           </div>
           <p className="text-[11px] mt-6 max-w-xl mx-auto" style={{ color: 'hsl(220, 10%, 40%)' }}>
-            Approval required before posting. Pay and match details shown to drivers are estimates based on recruiter-provided data — no job or income is guaranteed.
+            Profile completion and posting terms are required to unlock standard posting. Verified Recruiter badge review is separate. Pay and match details shown to drivers are estimates based on recruiter-provided data — no job or income is guaranteed.
           </p>
         </div>
       </section>
+
 
       {/* Why */}
       <section className="py-14 sm:py-20" style={{ background: 'hsl(220, 20%, 6%)' }}>
@@ -137,7 +140,7 @@ export default function Recruiters() {
             Recruiter Plans
           </h2>
           <p className="text-center text-sm mb-10 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Verified recruiters can post unlimited standard opportunities for free. Paid plans add premium visibility, recruiter reports, and contract workflow tools.
+            Complete, active recruiter workspaces can post unlimited standard opportunities for free — no badge approval or paid plan required. Paid plans add premium visibility, recruiter reports, and contract-management with AI-assisted risk review.
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
 
@@ -197,18 +200,19 @@ export default function Recruiters() {
         </div>
       </section>
 
-      {/* Trust & approval */}
+      {/* Trust & Eligibility */}
       <section className="py-14 sm:py-20" style={{ background: 'hsl(220, 20%, 6%)' }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <div className="p-6 sm:p-8 rounded-2xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck className="h-5 w-5" style={{ color: 'hsl(25, 95%, 53%)' }} />
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>Trust &amp; Approval</h2>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight" style={{ color: 'hsl(0, 0%, 100%)' }}>Trust &amp; Eligibility</h2>
             </div>
             <ul className="space-y-2.5 text-sm" style={{ color: 'hsl(220, 10%, 70%)' }}>
               {[
-                'Recruiter approval is required before any opportunity goes live',
-                'Opportunities are reviewed before they reach drivers',
+                'Complete, active recruiter profiles can use standard posting — no admin approval or paid plan required',
+                'Verified Recruiter badge review controls the Verified Recruiter badge only, not the right to post',
+                'Opportunity moderation and review remain available to the platform',
                 'Misleading or non-compliant posts may be removed',
                 'Drivers remain protected — their data is never sold',
               ].map((t) => (
@@ -230,7 +234,7 @@ export default function Recruiters() {
           </h2>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button onClick={goRecruiterAccess} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Apply for Recruiter Access <ArrowRight className="h-5 w-5" />
+              {ctaLabel} <ArrowRight className="h-5 w-5" />
             </Button>
             <Button onClick={() => navigate('/pricing#for-recruiters')} variant="outline" size="lg" className="text-base font-semibold rounded-xl h-13 px-8" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
               View Recruiter Plans

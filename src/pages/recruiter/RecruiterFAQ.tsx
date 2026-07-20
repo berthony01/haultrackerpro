@@ -7,16 +7,16 @@ import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 
 const faqs = [
   {
-    q: 'How do I get approved as a recruiter?',
-    a: 'Open the Recruiter Dashboard, click "Apply for Recruiter Access", and submit your company name, DOT, MC, address, hiring states, equipment types, and contact info. A HaulTrackerPro admin reviews every recruiter manually — typically within one business day. You\'ll see your status (pending, approved, needs attention, or suspended) in Recruiter Settings.',
+    q: 'How do I unlock standard recruiter posting?',
+    a: 'Add the recruiter workspace to your account and complete the required recruiter profile fields — company name, DOT and/or MC number, address, hiring states, equipment types, and a valid recruiter contact email — then accept the current posting terms. Once your account is active and not suspended, you can post unlimited standard opportunities. No admin approval and no paid plan are required to post standard opportunities.',
   },
   {
-    q: 'Why was my recruiter profile rejected?',
-    a: 'Common reasons: incomplete or mismatched DOT/MC, a company that does not match your stated identity, or missing contact details. Open Recruiter Settings → Update profile, fix the highlighted fields, and resubmit. Reviewer notes appear directly on the profile.',
+    q: 'How does Verified Recruiter badge review work?',
+    a: 'The Verified Recruiter badge is a separate trust-display process. HaulTrackerPro reviews eligible recruiter profiles for the badge shown on driver listings. Pending or rejected badge review affects the badge and trust display only — it does not by itself remove your ability to post standard opportunities once your profile is complete and active. You will see your badge review status and any reviewer notes in Recruiter Settings.',
   },
   {
-    q: 'What can I post once I am approved?',
-    a: 'Structured opportunities — pay model (CPM, percentage, flat), deductions, deadhead pay, escrow, home time, equipment, sign-on bonuses, and benefits. Pay claims must be truthful and supportable. Vague "up to $X" copy without supporting structure may be flagged or removed by moderation.',
+    q: 'What can I post after setup is complete?',
+    a: 'Structured opportunities — pay model (CPM, percentage, flat), deductions, deadhead pay, escrow, home time, equipment, sign-on bonuses, and benefits. Pay claims must be truthful and supportable. Opportunity moderation and review remain available to the platform; misleading or vague "up to $X" copy without supporting structure may be flagged or removed.',
   },
   {
     q: 'How are pay numbers shown to drivers?',
@@ -24,8 +24,7 @@ const faqs = [
   },
   {
     q: 'What plans are available and what do they include?',
-    a: 'Verified recruiters can post unlimited standard opportunities for free — no paid subscription required. Paid plans add premium recruiting tools on top: Starter ($19/mo) adds enhanced applicant tracking, applicant status history, basic applicant pipeline analytics, basic referral tracking view, and recruiter trust tools. Growth ($49/mo) adds Priority Placement in driver listings, featured listing eligibility, Recruiter Activity & Pipeline reports (PDF + CSV), contract workflow tools, referral progress tracking, and pipeline analytics. Fleet ($149/mo) keeps everything in Growth and adds top placement eligibility, advanced analytics, and priority support — with team seats, bulk opportunity tools, custom recruiter profile, and a company-level hiring dashboard coming soon. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
-
+    a: 'Recruiter Standard is free for complete, active recruiter workspaces and includes unlimited standard opportunity posts — no paid subscription required. Starter ($19/mo) adds enhanced applicant tracking, applicant status history, and a basic referral tracking view. Growth ($49/mo) adds Priority-placement eligibility, featured-listing eligibility, recruiter reports (PDF + CSV), the recruiter contract-management dashboard, AI-assisted contract risk review, full referral progress tracking, pipeline analytics, and opportunity performance insights. Fleet ($149/mo) includes everything in Growth plus top-placement eligibility and priority support today; team seats, bulk opportunity tools, custom recruiter profile, and a company-level hiring dashboard are coming soon. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
   },
   {
     q: 'How are payments processed and is my card data safe?',
@@ -53,8 +52,7 @@ const faqs = [
   },
   {
     q: 'How do contract workflow tools work?',
-    a: "Contract workflow tools are included with the Growth and Fleet recruiter plans. Attach a contract (PDF or image) to any application. HaulTrackerPro parses it and surfaces plain-English risk flags to the driver. The driver can approve, request changes, reject, or sign. Recruiters can't mark a driver hired until the driver approves the current contract. If the driver also signs, HaulTrackerPro stores an in-app signature record. These tools are designed to make the workflow clearer — they are not legal advice.",
-
+    a: "Universal driver contract workflow protections — viewing the contract sent by a recruiter, approving, requesting changes, rejecting, recording an optional in-app signature, and the hired-state protection that prevents recruiters from marking a driver hired until the driver approves the current contract — are available on every driver plan and do not depend on a paid recruiter plan. Growth and Fleet recruiter plans add the recruiter contract-management dashboard, contract upload/management interface, and AI-assisted contract risk review that surfaces plain-English risk flags. These tools are designed to make the workflow clearer — they are not legal advice.",
   },
   {
     q: 'Is the in-app signature legally binding?',
@@ -82,7 +80,7 @@ export default function RecruiterFAQ() {
     <div className="min-h-screen bg-background text-foreground">
       <SEOHead
         title="Recruiter FAQ | HaulTrackerPro"
-        description="Answers for recruiters: verification, posting unlimited standard opportunities, billing, applicants, and contract workflow tools on HaulTrackerPro."
+        description="Answers for recruiters: unlocking standard posting after profile completion, separate Verified Recruiter badge review, billing, applicants, and contract workflow tools on HaulTrackerPro."
         path="/recruiter/faq"
         jsonLd={[jsonLd, buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }, { name: 'Recruiter FAQ', path: '/recruiter/faq' }])]}
       />
