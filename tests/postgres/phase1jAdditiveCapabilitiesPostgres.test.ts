@@ -431,7 +431,7 @@ describe('Phase 1J-A · A. Catalog & ACL (exact matrix)', () => {
       expect(r.owner).toBe(EXPECTED_OWNER);
       expect(r.prosecdef).toBe(true);
       expect(r.provolatile).toBe(expected.volatility);
-      expect(r.config ?? []).toContain('search_path=public');
+      expect(r.config).toEqual(['search_path=public']);
     }
   });
 
