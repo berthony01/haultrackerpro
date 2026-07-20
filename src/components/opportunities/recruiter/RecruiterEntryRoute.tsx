@@ -8,9 +8,20 @@
  * `useViewMode`. No admin flags, intended_role, localStorage reads,
  * billing/plan hooks, payment providers, recruiter profile existence,
  * or URL parameters participate in authorization.
+ *
+ * Stale-async isolation: every activation attempt is bound to both the
+ * initiating user id AND a per-user generation token. Any completion
+ * (success or failure) belonging to a superseded attempt becomes a
+ * no-op — it cannot mutate state for the newly authenticated user.
+ *
+ * Authorized navigation order: automatic recruiter navigation requires
+ * validated capability rows that currently authorize recruiter hub
+ * access. When they do, a single effect first persists the recruiter
+ * view mode, then navigates. There is no render-time `<Navigate>` gated
+ * on capability status alone.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserCapabilities } from '@/hooks/useUserCapabilities';
 import { useViewMode } from '@/hooks/useViewMode';
@@ -63,12 +74,10 @@ export default function RecruiterEntryRoute() {
   const { user, loading: authLoading } = useAuth();
   const caps = useUserCapabilities();
   const view = useViewMode();
+  const navigate = useNavigate();
 
   const [rpcError, setRpcError] = useState<Error | null>(null);
   const [rpcPending, setRpcPending] = useState(false);
-  // Attempt guard bound to the current user id so a rerender does not
-  // fire a second RPC and a user change does not carry over the guard.
-  const attemptedRef = useRef<string | null>(null);
 
   const userId = user?.id ?? null;
   const recruiterStatus = view.recruiterCapabilityStatus;
@@ -76,32 +85,67 @@ export default function RecruiterEntryRoute() {
   const capsError = caps.error;
   const isLoading = authLoading || caps.isLoading;
 
-  // Reset attempt state whenever the authenticated user id changes.
+  // Synchronously track the current user id. Every render updates the
+  // ref so async completions can compare against the most recent id.
+  const currentUserRef = useRef<string | null>(userId);
+  currentUserRef.current = userId;
+
+  // Generation token: incremented whenever the authenticated user
+  // changes. In-flight attempts capture the generation at start and
+  // any completion whose generation is stale becomes a strict no-op.
+  const generationRef = useRef(0);
+  const lastUserIdRef = useRef<string | null>(userId);
+  // Per-generation guard so retry/rerender do not fire duplicate RPCs
+  // for the same user session.
+  const attemptedGenerationRef = useRef<number>(-1);
+
+  // Reset guards and mutation state whenever the authenticated user id
+  // changes. This must run before any effect that could fire an RPC.
+  if (lastUserIdRef.current !== userId) {
+    lastUserIdRef.current = userId;
+    generationRef.current += 1;
+    attemptedGenerationRef.current = -1;
+    // Reset render-visible state synchronously via setState in a
+    // useEffect below; refs above are safe to mutate during render.
+  }
+
   useEffect(() => {
-    if (attemptedRef.current !== null && attemptedRef.current !== userId) {
-      attemptedRef.current = null;
-      setRpcError(null);
-      setRpcPending(false);
-    }
+    // Whenever userId changes, drop any stale error/pending from a
+    // previous user so B never inherits A's UI. Effect runs post-render
+    // and is bound to userId.
+    setRpcError(null);
+    setRpcPending(false);
   }, [userId]);
 
   const beginRecruiterSetup = caps.beginRecruiterSetup;
   const refetch = caps.refetch;
 
   const runActivation = useCallback(async () => {
-    if (!userId) return;
-    if (attemptedRef.current === userId) return;
-    attemptedRef.current = userId;
-    setRpcPending(true);
-    setRpcError(null);
+    const startedUserId = userId;
+    if (!startedUserId) return;
+    const startedGeneration = generationRef.current;
+    if (attemptedGenerationRef.current === startedGeneration) return;
+    attemptedGenerationRef.current = startedGeneration;
+
+    const isCurrent = () =>
+      currentUserRef.current === startedUserId &&
+      generationRef.current === startedGeneration;
+
+    // Only touch state if this attempt is still current.
+    if (isCurrent()) {
+      setRpcPending(true);
+      setRpcError(null);
+    }
+
     try {
       await beginRecruiterSetup();
-      // Never authorize from the mutation's returned status — wait for
-      // validated capability rows.
+      if (!isCurrent()) return; // stale success: no refetch, no state
       await refetch();
+      if (!isCurrent()) return;
+      setRpcPending(false);
     } catch (e) {
+      if (!isCurrent()) return; // stale failure: swallow silently
       setRpcError(e instanceof Error ? e : new Error(String(e)));
-    } finally {
       setRpcPending(false);
     }
   }, [userId, beginRecruiterSetup, refetch]);
@@ -120,25 +164,55 @@ export default function RecruiterEntryRoute() {
 
   useEffect(() => {
     if (!shouldAutoActivate) return;
-    if (attemptedRef.current === userId) return;
+    if (attemptedGenerationRef.current === generationRef.current) return;
     void runActivation();
   }, [shouldAutoActivate, userId, runActivation]);
 
-  // Persist recruiter workspace only when validated capability rows
-  // currently authorize recruiter hub access. `setViewMode` itself also
-  // re-validates against the trusted view — this is defense in depth.
+  // --------------- Authorized recruiter navigation ---------------
+  //
+  // The route only enters recruiter workspace when ALL conditions hold
+  // against currently validated capability rows:
+  //  - authenticated user
+  //  - not loading
+  //  - no capability error
+  //  - recruiterStatus ∈ {setup, active, suspended}
+  //  - recruiterHubAllowed === true
+  //
+  // If eligibility signals are present but hubAllowed is false, we fail
+  // closed on this route: neither setViewMode nor navigate is invoked.
   const recruiterHubAllowed = view.recruiterHubAllowed;
   const setViewMode = view.setViewMode;
+
+  const recruiterDestination: string | null =
+    recruiterStatus === 'setup'
+      ? '/dashboard?page=recruiter-access:onboarding'
+      : recruiterStatus === 'active' || recruiterStatus === 'suspended'
+        ? '/dashboard?page=recruiter-access'
+        : null;
+
+  const mayEnterRecruiter =
+    !isLoading &&
+    !capsError &&
+    !!userId &&
+    recruiterHubAllowed &&
+    recruiterDestination !== null;
+
+  // Prevent redundant navigation loops for the same user/destination.
+  const lastNavigatedRef = useRef<{ userId: string; destination: string } | null>(
+    null,
+  );
+
   useEffect(() => {
-    if (!recruiterHubAllowed) return;
-    if (
-      recruiterStatus === 'setup' ||
-      recruiterStatus === 'active' ||
-      recruiterStatus === 'suspended'
-    ) {
-      setViewMode('recruiter');
+    if (!mayEnterRecruiter || !recruiterDestination || !userId) return;
+    const last = lastNavigatedRef.current;
+    if (last && last.userId === userId && last.destination === recruiterDestination) {
+      return;
     }
-  }, [recruiterHubAllowed, recruiterStatus, setViewMode]);
+    lastNavigatedRef.current = { userId, destination: recruiterDestination };
+    // Order: persist recruiter workspace FIRST, then navigate.
+    setViewMode('recruiter');
+    navigate(recruiterDestination, { replace: true });
+  }, [mayEnterRecruiter, recruiterDestination, userId, setViewMode, navigate]);
 
   // ---------------- Render ----------------
 
@@ -165,11 +239,11 @@ export default function RecruiterEntryRoute() {
     );
   }
 
-  if (recruiterStatus === 'setup') {
-    return <Navigate to="/dashboard?page=recruiter-access:onboarding" replace />;
-  }
-  if (recruiterStatus === 'active' || recruiterStatus === 'suspended') {
-    return <Navigate to="/dashboard?page=recruiter-access" replace />;
+  // Recruiter capability present in an eligible state.
+  if (recruiterDestination !== null) {
+    // If hub is not currently authorized, fail closed on this route
+    // (no mode change, no navigation). Render neutral preparation UI.
+    return <NeutralLoading label="Preparing recruiter workspace…" />;
   }
 
   // recruiterStatus === null past this point.
@@ -193,8 +267,9 @@ export default function RecruiterEntryRoute() {
         <button
           type="button"
           onClick={() => {
-            // Allow exactly one additional attempt per click.
-            attemptedRef.current = null;
+            // Allow exactly one additional attempt per click, bound to
+            // the CURRENT user/generation.
+            attemptedGenerationRef.current = -1;
             setRpcError(null);
             void runActivation();
           }}
