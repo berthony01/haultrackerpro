@@ -208,7 +208,7 @@ describe('Phase 1J-A — canonical recruiter completeness helper source', () => 
 describe('Phase 1J-A — pure capability helper', () => {
   it('driver-only rows → canEnterDriverWorkspace, no recruiter capability', () => {
     const v = deriveUserCapabilitiesView([
-      { capability: 'driver', status: 'active', activated_at: '2026-01-01' },
+      { capability: 'driver', status: 'active', activated_at: '2026-01-01T00:00:00Z' },
     ]);
     expect(v.hasDriverCapability).toBe(true);
     expect(v.hasRecruiterCapability).toBe(false);
@@ -629,14 +629,13 @@ describe('Phase 1J-A — client RPC payload parsers', () => {
     expect(parseUserCapabilityRows('driver' as unknown)).toEqual([]);
   });
 
-  it('parseUserCapabilityRows drops invalid entries and dedupes deterministically (first-wins)', () => {
+  it('parseUserCapabilityRows drops invalid entries and fail-closes on duplicates', () => {
+    // Baseline: mixed valid + invalid rows, no duplicates → keep valids.
     const rows = parseUserCapabilityRows([
       { capability: 'driver', status: 'active', activated_at: null },
-      { capability: 'driver', status: 'revoked', activated_at: null }, // dropped
-      { capability: 'admin', status: 'active', activated_at: null }, // dropped
+      { capability: 'admin', status: 'active', activated_at: null }, // dropped: unknown cap
       null,
       { capability: 'recruiter', status: 'setup', activated_at: null },
-      { capability: 'recruiter', status: 'active', activated_at: null }, // dropped
     ]);
     expect(rows).toEqual([
       { capability: 'driver', status: 'active', activated_at: null },
@@ -664,5 +663,171 @@ describe('Phase 1J-A — client RPC payload parsers', () => {
     expect(v.canEnterRecruiterSetup).toBe(false);
     expect(v.canOperateRecruiterWorkspace).toBe(false);
     expect(v.recruiterCapabilityStatus).toBe('revoked');
+  });
+});
+
+describe('Phase 1J-A — fail-closed duplicate-capability policy', () => {
+  const drvA: UserCapabilityRow = { capability: 'driver', status: 'active', activated_at: null };
+  const drvR: UserCapabilityRow = { capability: 'driver', status: 'revoked', activated_at: null };
+  const recA: UserCapabilityRow = { capability: 'recruiter', status: 'active', activated_at: null };
+  const recR: UserCapabilityRow = { capability: 'recruiter', status: 'revoked', activated_at: null };
+  const recS: UserCapabilityRow = { capability: 'recruiter', status: 'setup', activated_at: null };
+
+  it('duplicate driver active+revoked (either order) → no driver row and no driver workspace access', () => {
+    for (const payload of [[drvA, drvR], [drvR, drvA]]) {
+      const rows = parseUserCapabilityRows(payload);
+      expect(rows.some((r) => r.capability === 'driver')).toBe(false);
+      const v = deriveUserCapabilitiesView(payload);
+      expect(v.hasDriverCapability).toBe(false);
+      expect(v.canEnterDriverWorkspace).toBe(false);
+      expect(v.driverCapabilityStatus).toBeNull();
+    }
+  });
+
+  it('duplicate recruiter active+revoked (either order) → no recruiter row and no recruiter access', () => {
+    for (const payload of [[recA, recR], [recR, recA]]) {
+      const rows = parseUserCapabilityRows(payload);
+      expect(rows.some((r) => r.capability === 'recruiter')).toBe(false);
+      const v = deriveUserCapabilitiesView(payload);
+      expect(v.hasRecruiterCapability).toBe(false);
+      expect(v.canEnterRecruiterSetup).toBe(false);
+      expect(v.canOperateRecruiterWorkspace).toBe(false);
+      expect(v.recruiterCapabilityStatus).toBeNull();
+    }
+  });
+
+  it('duplicate recruiter active+setup (either order) → no recruiter row and no recruiter access', () => {
+    for (const payload of [[recA, recS], [recS, recA]]) {
+      const rows = parseUserCapabilityRows(payload);
+      expect(rows.some((r) => r.capability === 'recruiter')).toBe(false);
+      const v = deriveUserCapabilitiesView(payload);
+      expect(v.hasRecruiterCapability).toBe(false);
+      expect(v.canEnterRecruiterSetup).toBe(false);
+      expect(v.canOperateRecruiterWorkspace).toBe(false);
+    }
+  });
+
+  it('duplicated capability does NOT remove the other unique capability', () => {
+    // Duplicate driver, unique recruiter → recruiter survives, driver dropped.
+    const v1 = deriveUserCapabilitiesView([drvA, drvR, recA]);
+    expect(v1.hasDriverCapability).toBe(false);
+    expect(v1.hasRecruiterCapability).toBe(true);
+    expect(v1.canOperateRecruiterWorkspace).toBe(true);
+
+    // Duplicate recruiter, unique driver → driver survives, recruiter dropped.
+    const v2 = deriveUserCapabilitiesView([recA, recR, drvA]);
+    expect(v2.hasDriverCapability).toBe(true);
+    expect(v2.canEnterDriverWorkspace).toBe(true);
+    expect(v2.hasRecruiterCapability).toBe(false);
+    expect(v2.recruiterCapabilityStatus).toBeNull();
+  });
+
+  it('three duplicates of the same capability also fail closed', () => {
+    const rows = parseUserCapabilityRows([recA, recS, recR]);
+    expect(rows).toEqual([]);
+  });
+});
+
+describe('Phase 1J-A — activated_at strict validation', () => {
+  const base = { capability: 'driver' as const, status: 'active' as const };
+
+  it('accepts null explicitly', () => {
+    expect(isValidActivatedAt(null)).toBe(true);
+    expect(parseUserCapabilityRow({ ...base, activated_at: null })).not.toBeNull();
+  });
+
+  it('accepts RFC3339 with Z', () => {
+    for (const s of ['2026-07-20T12:34:56Z', '2026-07-20T12:34:56.789Z']) {
+      expect(isValidActivatedAt(s)).toBe(true);
+      expect(parseUserCapabilityRow({ ...base, activated_at: s })?.activated_at).toBe(s);
+    }
+  });
+
+  it('accepts RFC3339 with numeric ±HH:MM offset', () => {
+    for (const s of ['2026-07-20T12:34:56+00:00', '2026-07-20T12:34:56-05:30', '2026-07-20T12:34:56.123+09:00']) {
+      expect(isValidActivatedAt(s)).toBe(true);
+      expect(parseUserCapabilityRow({ ...base, activated_at: s })?.activated_at).toBe(s);
+    }
+  });
+
+  it('rejects missing activated_at property (not own property)', () => {
+    const raw: Record<string, unknown> = { capability: 'driver', status: 'active' };
+    expect(Object.prototype.hasOwnProperty.call(raw, 'activated_at')).toBe(false);
+    expect(parseUserCapabilityRow(raw)).toBeNull();
+  });
+
+  it('rejects undefined, date-only, locale text, and timestamp without timezone', () => {
+    const bad = [
+      undefined,
+      '2026-07-20',
+      '07/20/2026',
+      'July 20, 2026',
+      '2026-07-20T12:34:56', // no TZ
+      '2026-07-20 12:34:56Z', // space instead of T
+      '2026-07-20T12:34:56.789', // no TZ
+    ];
+    for (const v of bad) {
+      expect(isValidActivatedAt(v)).toBe(false);
+      expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
+    }
+  });
+
+  it('rejects invalid dates that match the shape but are not real (e.g. Feb 30)', () => {
+    // Regex matches shape; Date.parse detects the impossible calendar date.
+    const v = '2026-02-30T00:00:00Z';
+    expect(isValidActivatedAt(v)).toBe(false);
+    expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
+  });
+
+  it('rejects numbers, booleans, arrays, and objects', () => {
+    for (const v of [0, 12345, true, false, [], ['2026-07-20T00:00:00Z'], { toString: () => '2026-07-20T00:00:00Z' }]) {
+      expect(isValidActivatedAt(v)).toBe(false);
+      expect(parseUserCapabilityRow({ ...base, activated_at: v })).toBeNull();
+    }
+  });
+});
+
+describe('Phase 1J-A — beginRecruiterSetupRpc (mocked)', () => {
+  it('missing user id rejects BEFORE the rpc is invoked (mock never called)', async () => {
+    let calls = 0;
+    const rpc = async () => {
+      calls += 1;
+      return { data: 'setup', error: null };
+    };
+    for (const uid of [null, undefined, '']) {
+      calls = 0;
+      await expect(beginRecruiterSetupRpc(uid as string | null | undefined, rpc)).rejects.toThrow(
+        /Not authenticated/,
+      );
+      expect(calls).toBe(0);
+    }
+  });
+
+  it('valid user id invokes rpc exactly once and validates the returned status', async () => {
+    let calls = 0;
+    const rpc = async () => {
+      calls += 1;
+      return { data: 'setup', error: null };
+    };
+    const status = await beginRecruiterSetupRpc('user-1', rpc);
+    expect(status).toBe('setup');
+    expect(calls).toBe(1);
+  });
+
+  it('rpc-returned error surfaces (rpc still counted as invoked once)', async () => {
+    let calls = 0;
+    const rpc = async () => {
+      calls += 1;
+      return { data: null, error: new Error('boom') };
+    };
+    await expect(beginRecruiterSetupRpc('user-1', rpc)).rejects.toThrow(/boom/);
+    expect(calls).toBe(1);
+  });
+
+  it('unknown status returned by rpc throws through parseUserCapabilityStatus', async () => {
+    const rpc = async () => ({ data: 'premium', error: null });
+    await expect(beginRecruiterSetupRpc('user-1', rpc)).rejects.toThrow(
+      /Invalid user_capability_status/,
+    );
   });
 });
