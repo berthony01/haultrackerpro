@@ -43,6 +43,8 @@ jobs:
 
     env:
       PHASE1J_D2B2_DATABASE_URL: postgres://postgres:postgres@localhost:5432/phase1j_d2b2
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_PUBLISHABLE_KEY: phase1j-d2b2-ci-placeholder-key
 
     steps:
       - name: Checkout repository
