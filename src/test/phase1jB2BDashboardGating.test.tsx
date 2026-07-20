@@ -747,6 +747,65 @@ describe('Source audits', () => {
     expect(before).not.toMatch(/<WhatsNewModal/);
   });
 
+  it('Index.tsx first-time onboarding effect requires driver+driverWorkspaceAllowed and no workspaceError', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    // Locate the effect that toggles setShowOnboardingModal(true).
+    const effectIdx = src.indexOf('setShowOnboardingModal(true)');
+    expect(effectIdx).toBeGreaterThan(-1);
+    // Scan a window of the enclosing effect body.
+    const start = Math.max(0, src.lastIndexOf('useEffect(', effectIdx));
+    const region = src.slice(start, effectIdx);
+    expect(region).toMatch(/if\s*\(\s*workspaceLoading\s*\)\s*return\s*;/);
+    expect(region).toMatch(/if\s*\(\s*workspaceError\s*\)\s*return\s*;/);
+    expect(region).toMatch(/effectiveRole\s*!==\s*['"]driver['"]/);
+    expect(region).toMatch(/!\s*driverWorkspaceAllowed/);
+    // Must not fall back to inferring driver from !isRecruiterView.
+    expect(region).not.toMatch(/isRecruiterView/);
+  });
+
+  it('Index.tsx showOnboarding requires exact driver workspace', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    const m = src.match(/const\s+showOnboarding\s*=[\s\S]{0,400}?;\s*\n/);
+    expect(m).toBeTruthy();
+    const body = m![0];
+    expect(body).toMatch(/effectiveRole\s*===\s*['"]driver['"]/);
+    expect(body).toMatch(/driverWorkspaceAllowed/);
+    expect(body).not.toMatch(/!\s*isRecruiterView/);
+  });
+
+  it('Index.tsx renders AddActionModal only under exact driver workspace', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    const tagIdx = src.indexOf('<AddActionModal');
+    expect(tagIdx).toBeGreaterThan(-1);
+    // Look back a small window for the driver-workspace guard.
+    const window = src.slice(Math.max(0, tagIdx - 300), tagIdx);
+    expect(window).toMatch(/effectiveRole\s*===\s*['"]driver['"]\s*&&\s*driverWorkspaceAllowed/);
+  });
+
+  it('Index.tsx renders OnboardingModal only under exact driver workspace', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    const tagIdx = src.indexOf('<OnboardingModal');
+    expect(tagIdx).toBeGreaterThan(-1);
+    const window = src.slice(Math.max(0, tagIdx - 300), tagIdx);
+    expect(window).toMatch(/effectiveRole\s*===\s*['"]driver['"]\s*&&\s*driverWorkspaceAllowed/);
+  });
+
+  it('Index.tsx FeedbackModal and WhatsNewModal remain shell-blocked but not driver-only', async () => {
+    const src = await readSrc('src/pages/Index.tsx');
+    // Both must live inside the workspaceShellBlocked guard.
+    const guardIdx = src.indexOf('{!workspaceShellBlocked && (');
+    expect(guardIdx).toBeGreaterThan(-1);
+    const region = src.slice(guardIdx);
+    const feedbackIdx = region.indexOf('<FeedbackModal');
+    const whatsNewIdx = region.indexOf('<WhatsNewModal');
+    expect(feedbackIdx).toBeGreaterThan(-1);
+    expect(whatsNewIdx).toBeGreaterThan(-1);
+    // Neither is nested under an exact driver-workspace condition.
+    const fbWindow = region.slice(Math.max(0, feedbackIdx - 200), feedbackIdx);
+    const wnWindow = region.slice(Math.max(0, whatsNewIdx - 200), whatsNewIdx);
+    expect(fbWindow).not.toMatch(/effectiveRole\s*===\s*['"]driver['"]\s*&&\s*driverWorkspaceAllowed/);
+    expect(wnWindow).not.toMatch(/effectiveRole\s*===\s*['"]driver['"]\s*&&\s*driverWorkspaceAllowed/);
+
   it('RecruiterAccessRoute source: no useMemo import, no useMemoSafe helper', async () => {
     const src = await readSrc('src/components/opportunities/recruiter/RecruiterAccessRoute.tsx');
     // useMemo must not be imported.
