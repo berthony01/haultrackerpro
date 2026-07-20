@@ -1,5 +1,11 @@
 /**
- * Phase 1J-C2A — Recruiter wording reconciliation.
+ * Phase 1J-C2A — Recruiter wording reconciliation (supplementary source guards).
+ *
+ * These tests are supplementary source-integrity scans and pure-helper
+ * assertions. The authoritative rendered evidence for visible copy and
+ * posting-button behavior across every recruiter state lives in
+ * `phase1fa22R1aRenderedTrustState.test.tsx`, which mounts the real
+ * production RecruiterAccessPage and RecruiterOnboarding.
  *
  * Product truth (canonical, do not restate in copy):
  *  - Recruiter is an ADDITIONAL workspace on the same account.
@@ -8,12 +14,6 @@
  *  - Verification is separate and controls the Verified Recruiter badge
  *    only. Pending/rejected badge review does NOT disable posting.
  *  - Suspension disables recruiter operations.
- *  - Paid plans are optional and unlock premium tools only.
- *
- * This suite proves that all in-scope user-facing recruiter surfaces
- *  1. contain no misleading approval-gate wording, and
- *  2. the pure eligibility/trust view still returns the correct
- *     posting-enable/disable signal across all eight states.
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
@@ -150,16 +150,11 @@ describe('Phase 1J-C2A — eight-state eligibility parity (posting behavior unch
     expect(e.state).toBe('suspended');
   });
 
-  it('paid-plan status does NOT change eligibility — canPost derives from profile only', () => {
-    // Billing is not a parameter of describeRecruiterEligibility. Prove that
-    // complete + not-suspended returns canPost=true regardless of any paid
-    // plan the recruiter may have (proved by the "unpaid" pending case
-    // above returning canPost=true).
-    const unpaid = describeRecruiterEligibility(baseProfile({ verification_status: 'pending' }));
-    const paidShapedIdentical = describeRecruiterEligibility(baseProfile({ verification_status: 'pending' }));
-    expect(unpaid.canPost).toBe(true);
-    expect(paidShapedIdentical.canPost).toBe(true);
-    // No copy in the eligibility helper implies payment is required to post.
+  it('eligibility helper does not encode payment as a posting gate (supplementary source guard)', () => {
+    // Rendered proof that billing state does not change standard posting
+    // lives in phase1fa22R1aRenderedTrustState.test.tsx (billing INACTIVE
+    // vs ACTIVE against the real RecruiterAccessPage). This is only a
+    // source-level guard against future regressions in the helper.
     const src = fs.readFileSync(
       path.join(process.cwd(), 'src/lib/opportunities/recruiterEligibility.ts'),
       'utf8',
