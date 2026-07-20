@@ -1,5 +1,5 @@
-# CI trigger: validate the Phase 1J-A additive capability candidate on real
-# PostgreSQL 16. Path-filtered to only the files owned by this phase.
+# Temporary final verification: validate Phase 1J-A plus the accepted Phase 1J-B1
+# workspace-decision layer. Comment-only branch change; do not merge.
 name: Phase 1J-A — Postgres 16 Additive Capabilities Gate
 
 on:
@@ -8,6 +8,9 @@ on:
       - '.github/workflows/phase1j-capabilities-postgres.yml'
       - 'tests/postgres/phase1jAdditiveCapabilitiesPostgres.test.ts'
       - 'src/test/phase1jAdditiveCapabilities.test.ts'
+      - 'src/test/phase1jBWorkspaceRouting.test.tsx'
+      - 'src/lib/workspaceAccess.ts'
+      - 'src/hooks/useViewMode.ts'
       - 'vitest.phase1j-capabilities-postgres.config.ts'
       - 'supabase/migration-candidates/20260720110000_phase1j_additive_user_capabilities.sql'
       - 'src/lib/userCapabilities.ts'
@@ -17,6 +20,9 @@ on:
       - '.github/workflows/phase1j-capabilities-postgres.yml'
       - 'tests/postgres/phase1jAdditiveCapabilitiesPostgres.test.ts'
       - 'src/test/phase1jAdditiveCapabilities.test.ts'
+      - 'src/test/phase1jBWorkspaceRouting.test.tsx'
+      - 'src/lib/workspaceAccess.ts'
+      - 'src/hooks/useViewMode.ts'
       - 'vitest.phase1j-capabilities-postgres.config.ts'
       - 'supabase/migration-candidates/20260720110000_phase1j_additive_user_capabilities.sql'
       - 'src/lib/userCapabilities.ts'
@@ -69,8 +75,9 @@ jobs:
         run: |
           if grep -nE '\.only\(|\.skip\(|it\.todo\(|describe\.todo\(' \
               tests/postgres/phase1jAdditiveCapabilitiesPostgres.test.ts \
-              src/test/phase1jAdditiveCapabilities.test.ts; then
-            echo "Forbidden Vitest marker found in Phase 1J-A tests."; exit 1
+              src/test/phase1jAdditiveCapabilities.test.ts \
+              src/test/phase1jBWorkspaceRouting.test.tsx; then
+            echo "Forbidden Vitest marker found in Phase 1J tests."; exit 1
           fi
           echo "clean"
 
@@ -107,6 +114,9 @@ jobs:
 
       - name: Run Phase 1J-A PGlite focused suite
         run: bunx vitest run src/test/phase1jAdditiveCapabilities.test.ts
+
+      - name: Run Phase 1J-B1 workspace routing suite
+        run: bunx vitest run src/test/phase1jBWorkspaceRouting.test.tsx
 
       - name: Typecheck (node)
         run: bunx tsc -p tsconfig.node.json --noEmit
