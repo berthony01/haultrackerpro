@@ -541,6 +541,44 @@ describe('Phase 1J-A · A. Catalog & ACL (exact matrix)', () => {
     }
     expect(Object.keys(byName).sort()).toEqual(Object.keys(expectations).sort());
   });
+
+  it('pg_get_triggerdef: exact normalized definitions (proves intent trigger is UPDATE OF intended_role only)', async () => {
+    const rows = await q<{ tgname: string; def: string }>(
+      `SELECT t.tgname, pg_get_triggerdef(t.oid) AS def
+         FROM pg_trigger t
+        WHERE NOT t.tgisinternal
+          AND t.tgname IN (
+            'trg_provision_driver_capability',
+            'trg_recruiter_profile_capability_sync',
+            'trg_profile_intent_capability_sync',
+            'trg_user_capabilities_updated_at'
+          )
+        ORDER BY t.tgname`,
+    );
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
+    const byName = Object.fromEntries(rows.map((r) => [r.tgname, norm(r.def)]));
+
+    expect(byName['trg_provision_driver_capability']).toBe(
+      'CREATE TRIGGER trg_provision_driver_capability AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public._provision_driver_capability_for_new_user()',
+    );
+    expect(byName['trg_recruiter_profile_capability_sync']).toBe(
+      'CREATE TRIGGER trg_recruiter_profile_capability_sync AFTER INSERT OR DELETE OR UPDATE ON public.recruiter_profiles FOR EACH ROW EXECUTE FUNCTION public._recruiter_profile_capability_sync()',
+    );
+    // Critical: this trigger MUST scope UPDATE to intended_role only,
+    // not every profile column, so unrelated profile writes cannot
+    // demote or churn the recruiter capability.
+    expect(byName['trg_profile_intent_capability_sync']).toBe(
+      'CREATE TRIGGER trg_profile_intent_capability_sync AFTER INSERT OR UPDATE OF intended_role ON public.profiles FOR EACH ROW EXECUTE FUNCTION public._profile_intent_capability_sync()',
+    );
+    expect(byName['trg_user_capabilities_updated_at']).toBe(
+      'CREATE TRIGGER trg_user_capabilities_updated_at BEFORE UPDATE ON public.user_capabilities FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column()',
+    );
+    // Explicit negative: intent trigger def must NOT be a blanket
+    // "UPDATE ON public.profiles" (that would fire on every column).
+    expect(byName['trg_profile_intent_capability_sync']).not.toMatch(
+      /AFTER INSERT OR UPDATE ON public\.profiles/,
+    );
+  });
 });
 
 
