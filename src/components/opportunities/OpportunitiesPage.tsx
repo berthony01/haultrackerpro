@@ -240,6 +240,24 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     [opportunities, selectedId]
   );
 
+  // Phase 1J-C1 hook-order correction: `existingIds` and
+  // `handleResumeApplyConsumed` are declared here — BEFORE the first
+  // conditional return below — so React always calls the same set of
+  // hooks in the same order across every render (list, applications
+  // panel, referrals panel, preferences, and opportunity detail).
+  const existingIds = useMemo(() => opportunities.map((o) => o.id), [opportunities]);
+
+  // Stable resume-consume reducer bound to the currently selected opportunity.
+  // Uses the pure `consumeMatchingResumeState` helper so a callback captured
+  // by a stale render cannot clear a newer resume token or clear resume
+  // state that now targets a different opportunity.
+  const handleResumeApplyConsumed = useCallback(
+    (consumedToken: string) => {
+      setResumeState((prev) => consumeMatchingResumeState(prev, selectedId, consumedToken));
+    },
+    [selectedId],
+  );
+
   if (isError) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -284,18 +302,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     return <DriverReferralsPanel onBack={() => setShowReferrals(false)} isPro={isPro} onUpgrade={onUpgrade} />;
   }
 
-  const existingIds = useMemo(() => opportunities.map((o) => o.id), [opportunities]);
 
-  // Stable resume-consume reducer bound to the currently selected opportunity.
-  // Uses the pure `consumeMatchingResumeState` helper so a callback captured
-  // by a stale render cannot clear a newer resume token or clear resume
-  // state that now targets a different opportunity.
-  const handleResumeApplyConsumed = useCallback(
-    (consumedToken: string) => {
-      setResumeState((prev) => consumeMatchingResumeState(prev, selectedId, consumedToken));
-    },
-    [selectedId],
-  );
 
   if (showProfile) {
     return (
