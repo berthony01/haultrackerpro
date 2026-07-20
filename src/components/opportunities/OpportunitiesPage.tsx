@@ -1,4 +1,47 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+// ---------------------------------------------------------------------------
+// Phase 1J-C1 — Pure fail-closed helpers (exported for direct unit tests).
+// ---------------------------------------------------------------------------
+
+/**
+ * Decides what should happen after a completed Preferences save that
+ * originated from an Apply Now attempt on `originId`.
+ *
+ *  - 'resume'         → origin still exists AND selectedId matches origin;
+ *                       parent may mint a resume token for `originId`.
+ *  - 'clear-to-list'  → origin missing OR selectedId no longer equals origin;
+ *                       parent MUST clear origin/resume, and MUST clear
+ *                       selectedId, and MUST NOT resume Apply anywhere.
+ *  - 'no-origin'      → not an Apply-origin save; do nothing.
+ */
+export function resolveApplyResumeAfterSave(input: {
+  originId: string | null;
+  selectedId: string | null;
+  existingIds: string[];
+}): 'resume' | 'clear-to-list' | 'no-origin' {
+  if (!input.originId) return 'no-origin';
+  const stillExists = input.existingIds.includes(input.originId);
+  const matches = input.selectedId === input.originId;
+  if (stillExists && matches) return 'resume';
+  return 'clear-to-list';
+}
+
+/**
+ * Pure reducer for the onResumeApplyConsumed callback. Returns null ONLY
+ * when both the current opportunity AND the current token match the
+ * consumed token; otherwise returns `prev` unchanged. A stale callback
+ * bound to an older selection/token can never clear newer resume state.
+ */
+export function consumeMatchingResumeState<
+  T extends { opportunityId: string; token: string },
+>(prev: T | null, selectedId: string | null, consumedToken: string): T | null {
+  if (!prev) return prev;
+  if (prev.token !== consumedToken) return prev;
+  if (prev.opportunityId !== selectedId) return prev;
+  return null;
+}
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -66,12 +109,15 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   const resumeTokenCounterRef = useRef(0);
   const mintResumeToken = () => `resume-${++resumeTokenCounterRef.current}`;
   // Manual entry into Preferences must clear any stale Apply origin/resume
-  // state so a completed manual save can never revive an old Apply flow.
+  // state AND any stale selected opportunity so a completed manual save can
+  // never revive an old Apply flow and Back always returns to the list.
   const openPreferencesManual = () => {
     setPreferencesOrigin(null);
     setResumeState(null);
+    setSelectedId(null);
     setShowProfile(true);
   };
+
 
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
@@ -238,41 +284,67 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     return <DriverReferralsPanel onBack={() => setShowReferrals(false)} isPro={isPro} onUpgrade={onUpgrade} />;
   }
 
+  const existingIds = useMemo(() => opportunities.map((o) => o.id), [opportunities]);
+
+  // Stable resume-consume reducer bound to the currently selected opportunity.
+  // Uses the pure `consumeMatchingResumeState` helper so a callback captured
+  // by a stale render cannot clear a newer resume token or clear resume
+  // state that now targets a different opportunity.
+  const handleResumeApplyConsumed = useCallback(
+    (consumedToken: string) => {
+      setResumeState((prev) => consumeMatchingResumeState(prev, selectedId, consumedToken));
+    },
+    [selectedId],
+  );
+
   if (showProfile) {
     return (
       <DriverOpportunityProfile
         onBack={() => {
+          // Capture then clear origin/resume unconditionally — Back must
+          // never auto-open Apply, and stale origin state must never leak.
           const wasApplyOrigin = preferencesOrigin?.kind === 'apply';
           const originId = wasApplyOrigin ? preferencesOrigin!.opportunityId : null;
-          // Always clear origin/resume; Back must never auto-open Apply.
           setPreferencesOrigin(null);
           setResumeState(null);
           setShowProfile(false);
           if (wasApplyOrigin && originId) {
             const stillExists = opportunities.some((o) => o.id === originId);
-            if (stillExists) {
-              // Return to the preserved originating opportunity detail.
-              if (selectedId !== originId) setSelectedId(originId);
+            const selectionMatches = selectedId === originId;
+            if (stillExists && selectionMatches) {
+              // Selection was preserved through Preferences — return to it.
+              // No-op setSelectedId keeps the same detail visible.
             } else {
-              // Origin removed — fall back safely to the list.
+              // Origin missing OR selectedId no longer equals origin —
+              // fail closed to the list. Never force selectedId back to
+              // the old origin after a mismatch.
               setSelectedId(null);
             }
           }
+          // Manual origin (preferencesOrigin === null) — openPreferencesManual
+          // already cleared selectedId, so we return to the list naturally.
         }}
         onSaveSuccess={({ completed }) => {
           if (!completed) return;
           if (preferencesOrigin?.kind !== 'apply') return;
           const originId = preferencesOrigin.opportunityId;
-          const stillExists = opportunities.some((o) => o.id === originId);
-          const selectionMatches = selectedId === originId;
-          if (!stillExists || !selectionMatches) {
-            // Fail closed — never resume Apply on a mismatched/missing target.
+          const decision = resolveApplyResumeAfterSave({
+            originId,
+            selectedId,
+            existingIds,
+          });
+          if (decision === 'clear-to-list') {
+            // Fail closed: clear origin, resume, prefs surface, AND the
+            // stale selectedId unconditionally — never reveal a different
+            // selected opportunity after a stale Apply-origin save.
             setPreferencesOrigin(null);
             setResumeState(null);
             setShowProfile(false);
-            if (!stillExists) setSelectedId(null);
+            setSelectedId(null);
             return;
           }
+          if (decision === 'no-origin') return;
+          // decision === 'resume'
           const token = mintResumeToken();
           setPreferencesOrigin(null);
           setResumeState({ opportunityId: originId, token });
@@ -305,18 +377,9 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
           setShowProfile(true);
         }}
         resumeApplyToken={token}
-        onResumeApplyConsumed={(consumedToken) => {
-          // Only clear when BOTH the opportunity still matches AND the
-          // consumed token equals the current resume token. A stale
-          // callback must not clear a newer token.
-          setResumeState((prev) => {
-            if (!prev) return prev;
-            if (prev.token !== consumedToken) return prev;
-            if (prev.opportunityId !== selected.id) return prev;
-            return null;
-          });
-        }}
+        onResumeApplyConsumed={handleResumeApplyConsumed}
       />
+
     );
   }
 
