@@ -405,3 +405,157 @@ describe('RecruiterOnboarding (production-mounted) — canonical status card', (
     ).toHaveTextContent(/Recruiter Access Suspended/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1J-C2 additive rendered coverage — visible copy + posting behavior
+// for the eight recruiter states, plus DOT/MC clarification and rejected
+// resubmit CTA. Uses the same production mounts as the trust-state suite.
+// ---------------------------------------------------------------------------
+import { useUserRole } from '@/hooks/useUserRole';
+
+const FORBIDDEN_PHRASES: RegExp[] = [
+  /Apply for Recruiter Access/i,
+  /Start Application/i,
+  /submit your recruiter profile for review/i,
+  /before approval/i,
+];
+
+function expectNoForbidden(container: HTMLElement) {
+  const text = container.textContent ?? '';
+  for (const re of FORBIDDEN_PHRASES) {
+    expect(text, `forbidden phrase ${re} found in rendered DOM`).not.toMatch(re);
+  }
+}
+
+describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)', () => {
+  const noop = vi.fn();
+  function renderPage() {
+    return render(
+      <RecruiterAccessPage
+        onBack={noop}
+        onOpenOnboarding={noop}
+        onManage={noop}
+        onApplications={noop}
+      />,
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useUserRole).mockReturnValue({ intentRecruiter: true } as never);
+  });
+
+  it('missing profile + NO recruiter intent → shows "Add Recruiter Workspace" and "Set Up Recruiter Profile"', () => {
+    vi.mocked(useUserRole).mockReturnValue({ intentRecruiter: false } as never);
+    installHooks({ profile: null });
+    const { container } = renderPage();
+    expect(screen.getByRole('heading', { name: /Add Recruiter Workspace/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Set Up Recruiter Profile/ }),
+    ).toBeInTheDocument();
+    // Setup copy uses completion language, not application/review-gate language.
+    expect(container.textContent).toMatch(/no admin approval needed/i);
+    expectNoForbidden(container);
+  });
+
+  it('missing profile + recruiter intent → uses completion language ("not complete yet") and Finish Recruiter Setup CTA', () => {
+    installHooks({ profile: null });
+    const { container } = renderPage();
+    expect(container.textContent).toMatch(/profile is not complete yet/i);
+    expect(container.textContent).not.toMatch(/not submitted yet/i);
+    expect(
+      screen.getByRole('button', { name: /Finish Recruiter Setup/ }),
+    ).toBeInTheDocument();
+    expectNoForbidden(container);
+  });
+
+  it('incomplete profile → mentions DOT or MC and posting terms; top Post disabled', () => {
+    installHooks({ profile: incomplete({ verification_status: 'pending' }) });
+    const { container } = renderPage();
+    expect(container.textContent).toMatch(/DOT or MC/);
+    expect(container.textContent).toMatch(/posting terms/i);
+    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).toBeDisabled();
+    expectNoForbidden(container);
+  });
+
+  it('complete + pending → Post enabled and badge review pending language visible', () => {
+    installHooks({ profile: makeProfile({ verification_status: 'pending' }) });
+    const { container } = renderPage();
+    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).not.toBeDisabled();
+    expect(
+      within(screen.getByTestId('recruiter-trust-status')).getByTestId(
+        'recruiter-verification-label',
+      ),
+    ).toHaveTextContent(/Pending Verification/i);
+    expectNoForbidden(container);
+  });
+
+  it('complete + rejected → Post enabled, badge-not-approved language, resubmission available while posting stays enabled', () => {
+    installHooks({ profile: makeProfile({ verification_status: 'rejected' }) });
+    const { container } = renderPage();
+    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).not.toBeDisabled();
+    expect(
+      within(screen.getByTestId('recruiter-trust-status')).getByTestId(
+        'recruiter-verification-label',
+      ),
+    ).toHaveTextContent(/Verification Not Approved/i);
+    expectNoForbidden(container);
+  });
+
+  it('complete + approved → Post enabled and Verified Recruiter visible', () => {
+    installHooks({ profile: makeProfile({ verification_status: 'approved' }) });
+    const { container } = renderPage();
+    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).not.toBeDisabled();
+    expect(container.textContent).toMatch(/Verified Recruiter/);
+    expectNoForbidden(container);
+  });
+
+  it('suspended → Post disabled', () => {
+    installHooks({ profile: makeProfile({ status: 'suspended' }) });
+    const { container } = renderPage();
+    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).toBeDisabled();
+    expectNoForbidden(container);
+  });
+
+  it('billing ACTIVE vs INACTIVE → posting parity for eligible profile', () => {
+    installHooks({ profile: makeProfile({ verification_status: 'pending' }), isBillingActive: true });
+    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).not.toBeDisabled();
+    // remount in inactive state
+    vi.clearAllMocks();
+    vi.mocked(useUserRole).mockReturnValue({ intentRecruiter: true } as never);
+    installHooks({ profile: makeProfile({ verification_status: 'pending' }), isBillingActive: false });
+    renderPage();
+    const buttons = screen.getAllByRole('button', { name: /Post an Opportunity/i });
+    for (const b of buttons) expect(b).not.toBeDisabled();
+  });
+});
+
+describe('Phase 1J-C2 — RecruiterOnboarding rendered copy (production-mounted)', () => {
+  const noop = vi.fn();
+  function renderOnboarding() {
+    return render(<RecruiterOnboarding onBack={noop} />);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useUserRole).mockReturnValue({ intentRecruiter: true } as never);
+  });
+
+  it('form contains the corrected DOT/MC clarification sentence', () => {
+    installHooks({ profile: null });
+    const { container } = renderOnboarding();
+    expect(container.textContent).toMatch(
+      /Provide at least one DOT or MC number\. It is required to complete your recruiter profile and is also used for Verified Recruiter badge review\. Standard posting unlocks when the required profile and posting terms are complete; badge approval is separate\./,
+    );
+    expectNoForbidden(container);
+  });
+
+  it('rejected profile → shows "Resubmit for Badge Review" button', () => {
+    installHooks({ profile: makeProfile({ verification_status: 'rejected' }) });
+    const { container } = renderOnboarding();
+    expect(
+      screen.getByRole('button', { name: /Resubmit for Badge Review/i }),
+    ).toBeInTheDocument();
+    expectNoForbidden(container);
+  });
+});
