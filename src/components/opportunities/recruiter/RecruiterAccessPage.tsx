@@ -122,9 +122,9 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
 
   const handlePost = () => {
     if (state === 'none' || state === 'incomplete') {
-      // Don't silently open the recruiter-application form from a "Post" button —
+      // Don't silently open the recruiter-profile form from a "Post" button —
       // it looks like the post-opportunity form. Scroll to the explicit
-      // "Apply for Recruiter Access" card instead.
+      // "Add Recruiter Workspace" card instead.
       onboardingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
@@ -251,21 +251,21 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                     ? 'Finish your recruiter profile'
                     : intentRecruiter
                     ? 'Finish Your Recruiter Setup'
-                    : 'Apply for Recruiter Access'}
+                    : 'Add Recruiter Workspace'}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   {state === 'incomplete'
                     ? 'Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Standard posting unlocks the moment those are saved.'
                     : intentRecruiter
-                    ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter application to start posting.'
-                    : 'Submit your recruiter information. Standard posting unlocks as soon as your profile is complete — no admin approval needed to post.'}
+                    ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter profile to start posting.'
+                    : 'Add recruiter as an additional workspace on your account. Standard posting unlocks as soon as your profile is complete — no admin approval needed to post.'}
                 </p>
                 <Button onClick={onOpenOnboarding} data-testid="finish-recruiter-setup-cta">
                   {state === 'incomplete'
                     ? 'Complete Profile'
                     : intentRecruiter
                     ? 'Finish Recruiter Setup'
-                    : 'Start Application'}{' '}
+                    : 'Set Up Recruiter Profile'}{' '}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -767,7 +767,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function HowItWorks() {
   const steps = [
-    { n: 1, title: 'Apply for recruiter access', body: 'Submit your recruiter profile for review.' },
+    { n: 1, title: 'Set up your recruiter profile', body: 'Add recruiter as an additional workspace on your account. Standard posting unlocks the moment your profile is complete — no admin approval needed.' },
     { n: 2, title: 'Post structured opportunities', body: 'Post unlimited standard opportunities as soon as your recruiter profile is complete — drivers see real pay clarity, route info, and your hiring intent.' },
     { n: 3, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
     { n: 4, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },
