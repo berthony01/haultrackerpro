@@ -43,6 +43,8 @@ jobs:
 
     env:
       PHASE1J_D2B2_DATABASE_URL: postgres://postgres:postgres@localhost:5432/phase1j_d2b2
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_PUBLISHABLE_KEY: phase1j-d2b2-ci-placeholder-key
 
     steps:
       - name: Checkout repository
@@ -114,6 +116,22 @@ jobs:
       - name: Prepare artifacts directory
         run: mkdir -p artifacts
 
+      - name: Full default Vitest suite
+        id: full_suite
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run \
+            2>&1 | tee artifacts/phase1j-d2b2-full-suite.log
+          echo "gate_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload full-suite log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1j-d2b2-full-suite-log
+          path: artifacts/phase1j-d2b2-full-suite.log
+
       - name: Real PostgreSQL 16 contract RLS gate
         id: pg_gate
         continue-on-error: true
@@ -142,10 +160,23 @@ jobs:
             exit 1
           fi
 
+      - name: Enforce full-suite outcome
+        run: |
+          set -eu
+          EXIT="${{ steps.full_suite.outputs.gate_exit }}"
+          echo "Full-suite gate exit code: ${EXIT}"
+          if [ "${EXIT}" != "0" ]; then
+            echo "Phase 1J-D2B-2 full-suite gate FAILED." >&2
+            exit 1
+          fi
+
       - name: Typecheck app
         run: bunx tsc -p tsconfig.app.json --noEmit
 
       - name: Typecheck node
         run: bunx tsc -p tsconfig.node.json --noEmit
+
+      - name: Production build
+        run: bun run build
 
 # CI verification trigger: Phase 1J-D2B-2 PostgreSQL 16 PR gate.
