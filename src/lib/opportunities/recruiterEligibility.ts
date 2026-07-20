@@ -83,7 +83,7 @@ export function describeRecruiterEligibility(
         ? 'Finish your recruiter setup'
         : 'Add recruiter workspace',
       body: opts.intentRecruiter
-        ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter profile to start posting opportunities.'
+        ? 'You signed up as a recruiter, but your recruiter profile is not complete yet. Complete the short recruiter profile to start posting opportunities.'
         : 'Add the recruiter workspace to your account. Complete the short recruiter profile to start posting standard opportunities — no admin approval needed.',
       cta: opts.intentRecruiter ? 'Finish Recruiter Setup' : 'Add Recruiter Workspace',
     };
@@ -121,12 +121,15 @@ export function describeRecruiterEligibility(
   }
 
   // pending or rejected (non-suspended): standard posting is fully enabled.
+  const isRejected = profile.verification_status === 'rejected';
   return {
     state: 'active_unverified',
     canPost: true,
     isVerified: false,
     title: 'Standard posting enabled',
-    body: 'Your standard opportunities go live to drivers right away. A Verified Recruiter badge is added later once an admin reviews your profile.',
+    body: isRejected
+      ? 'Standard posting remains enabled. The Verified Recruiter badge was not approved — you can update your verification details and resubmit without losing standard posting.'
+      : 'Your standard opportunities go live to drivers immediately. Verified Recruiter badge review is pending; standard posting remains enabled while review is in progress.',
   };
 }
 
