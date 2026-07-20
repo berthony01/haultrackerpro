@@ -467,7 +467,7 @@ describe('Phase 1J-D2B-2 — policy catalog preservation and tightening', () => 
     expect(wc).toContain(norm('oa.opportunity_id=contracts.opportunity_id'));
     expect(wc).toContain(norm('oa.driver_user_id=contracts.driver_user_id'));
     const growth = wc.match(
-      /current_user_has_recruiter_minimum_paid_plan\('growth'\)/g,
+      /current_user_has_recruiter_minimum_paid_plan\('growth'(::text)?\)/g,
     );
     expect(growth?.length).toBe(1);
     expect(p.qual).toBeNull();
