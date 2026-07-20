@@ -5,8 +5,8 @@
  * Mirrors the PGlite behavioral suite in
  * `src/test/phase1jD2B1RecruiterPaidEntitlementResolver.test.ts` but exercises
  * the candidate SQL against a real PostgreSQL 16 database so ACL, SECURITY
- * DEFINER binding, `auth.uid()` GUC semantics, and catalog behavior all reflect
- * production reality.
+ * DEFINER binding, `auth.uid()` GUC semantics, catalog metadata, and
+ * transaction visibility all reflect production reality.
  *
  * Lives OUTSIDE `src/` so the default `bunx vitest run` never picks it up.
  * Runs only via `vitest.phase1j-d2b1-postgres.config.ts` (locally or in CI).
@@ -58,6 +58,9 @@ function extractBillingTableBlock(): string {
   return src.slice(start, endIdx);
 }
 
+// -- Bootstrap: minimum fixture surface. No update_updated_at_column, no
+// direct-CRUD grant on the billing table — resolver access must flow through
+// the SECURITY DEFINER functions, not through role table privileges.
 const BOOTSTRAP_SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -65,7 +68,7 @@ DO $$ BEGIN CREATE ROLE anon           NOLOGIN NOINHERIT; EXCEPTION WHEN duplica
 DO $$ BEGIN CREATE ROLE authenticated  NOLOGIN NOINHERIT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE service_role   NOLOGIN NOINHERIT BYPASSRLS; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-GRANT anon, authenticated, service_role TO postgres;
+GRANT anon, authenticated, service_role TO CURRENT_USER;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 CREATE SCHEMA IF NOT EXISTS auth;
@@ -80,17 +83,14 @@ LANGUAGE sql STABLE AS $fn$
 $fn$;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $fn$
-BEGIN NEW.updated_at = now(); RETURN NEW; END; $fn$;
-
 CREATE TABLE IF NOT EXISTS public.recruiter_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE
 );
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.recruiter_profiles TO authenticated, service_role;
 `;
 
+// -- RESET: drops every fixture object this suite created and cleans up the
+// role memberships it granted to the connection owner. Idempotent.
 const RESET_SQL = `
 DROP FUNCTION IF EXISTS public.current_user_has_recruiter_minimum_paid_plan(text) CASCADE;
 DROP FUNCTION IF EXISTS public._recruiter_has_minimum_paid_plan(uuid, text) CASCADE;
@@ -98,12 +98,12 @@ DROP FUNCTION IF EXISTS public._recruiter_paid_plan_rank(text) CASCADE;
 DROP TABLE IF EXISTS public.recruiter_billing_profiles CASCADE;
 DROP TABLE IF EXISTS public.recruiter_profiles CASCADE;
 DROP TABLE IF EXISTS auth.users CASCADE;
-DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
 DROP FUNCTION IF EXISTS auth.uid() CASCADE;
 DROP SCHEMA IF EXISTS auth CASCADE;
+DO $$ BEGIN REVOKE anon, authenticated, service_role FROM CURRENT_USER; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 `;
 
-const pool = new pg.Pool({ connectionString: URL_STR, max: 6 });
+const pool = new pg.Pool({ connectionString: URL_STR, max: 8 });
 
 async function q<T = Record<string, unknown>>(
   sql: string,
@@ -113,6 +113,11 @@ async function q<T = Record<string, unknown>>(
   return r.rows as T[];
 }
 
+/**
+ * One-shot authenticated wrapper: BEGIN → SET LOCAL role → run → COMMIT.
+ * Convenient for single-statement checks; not suitable when a test needs to
+ * hold the session open across an out-of-band admin change.
+ */
 async function asAuthenticated<T>(
   userId: string | null,
   fn: (client: pg.PoolClient) => Promise<T>,
@@ -133,6 +138,37 @@ async function asAuthenticated<T>(
   } finally {
     client.release();
   }
+}
+
+/**
+ * Long-lived authenticated session. Opens a dedicated pool client, switches
+ * role to `authenticated`, binds `request.jwt.claim.sub` at session scope
+ * (`set_config(..., false)`), and returns a handle that can be queried
+ * repeatedly. `end()` resets the role and releases the client. The session
+ * is kept OUT of any transaction so autonomous admin commits from a second
+ * connection become visible on the next resolver call.
+ */
+async function openAuthenticatedSession(userId: string): Promise<{
+  query: (sql: string, params?: unknown[]) => Promise<pg.QueryResult>;
+  end: () => Promise<void>;
+}> {
+  const client = await pool.connect();
+  await client.query(`SET SESSION AUTHORIZATION DEFAULT`);
+  await client.query(`SET ROLE authenticated`);
+  await client.query(`SELECT set_config('request.jwt.claim.sub', $1, false)`, [
+    userId,
+  ]);
+  return {
+    query: (sql: string, params: unknown[] = []) => client.query(sql, params),
+    end: async () => {
+      try {
+        await client.query(`RESET ROLE`);
+      } catch {
+        /* ignore */
+      }
+      client.release();
+    },
+  };
 }
 
 async function createUser(): Promise<string> {
@@ -197,6 +233,7 @@ async function curHasAs(
   });
 }
 
+let MIGRATION_OWNER = '';
 let CANONICAL_BLOCK = '';
 let CANDIDATE_SQL = '';
 let PRE_FN_COUNT = 0;
@@ -246,16 +283,17 @@ beforeAll(async () => {
 
   CANONICAL_BLOCK = extractBillingTableBlock();
   await pool.query(CANONICAL_BLOCK);
-  // Grants for the canonical table so the authenticated role can read/write it
-  // through the resolver call sites.
-  await pool.query(
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON public.recruiter_billing_profiles TO authenticated, service_role;`,
-  );
 
   PRE_FN_COUNT = await countPublicFns();
   PRE_TABLE_COUNT = await countPublicTables();
   PRE_POLICY_COUNT = await countPolicies();
   PRE_TRIGGER_COUNT = await countUserTriggers();
+
+  // Capture the effective migration owner at the exact moment the candidate is
+  // applied. Every catalog-owner assertion compares against this value; there
+  // is no hardcoded "postgres" anywhere in this suite.
+  const ownerRow = await q<{ u: string }>(`SELECT current_user AS u`);
+  MIGRATION_OWNER = ownerRow[0].u;
 
   CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, 'utf8');
   await pool.query(CANDIDATE_SQL);
@@ -280,6 +318,10 @@ describe('Phase 1J-D2B-1 · Postgres environment', () => {
     const n = Number(row.n);
     expect(n).toBeGreaterThanOrEqual(160000);
     expect(n).toBeLessThan(170000);
+  });
+
+  it('captured a non-empty migration owner (no hardcoded assumption)', () => {
+    expect(MIGRATION_OWNER).toMatch(/\S/);
   });
 });
 
@@ -368,26 +410,50 @@ describe('Phase 1J-D2B-1 · catalog delta', () => {
   });
 });
 
-describe('Phase 1J-D2B-1 · catalog signature proof', () => {
+describe('Phase 1J-D2B-1 · catalog metadata (exact per-function proof)', () => {
+  // provolatile: 'i' = IMMUTABLE, 's' = STABLE, 'v' = VOLATILE.
+  // prosecdef:   false = SECURITY INVOKER, true = SECURITY DEFINER.
   const expected = [
-    { name: '_recruiter_paid_plan_rank', args: '_plan text', rtype: 'smallint' },
+    {
+      name: '_recruiter_paid_plan_rank',
+      args: '_plan text',
+      rtype: 'smallint',
+      volatile: 'i',
+      secdef: false,
+    },
     {
       name: '_recruiter_has_minimum_paid_plan',
       args: '_recruiter_id uuid, _minimum_plan text',
       rtype: 'boolean',
+      volatile: 's',
+      secdef: true,
     },
     {
       name: 'current_user_has_recruiter_minimum_paid_plan',
       args: '_minimum_plan text',
       rtype: 'boolean',
+      volatile: 's',
+      secdef: true,
     },
-  ];
+  ] as const;
 
-  it('all three functions have exactly one overload, exact identity args, exact result types', async () => {
-    for (const { name, args, rtype } of expected) {
-      const rows = await q<{ args: string; rtype: string }>(
-        `SELECT pg_get_function_identity_arguments(p.oid) AS args,
-                pg_catalog.format_type(p.prorettype, NULL) AS rtype
+  it.each(expected)(
+    'public.$name has exact owner, args, rtype, volatility, secdef, and proconfig',
+    async ({ name, args, rtype, volatile: vol, secdef }) => {
+      const rows = await q<{
+        owner: string;
+        args: string;
+        rtype: string;
+        vol: string;
+        secdef: boolean;
+        cfg: string[] | null;
+      }>(
+        `SELECT pg_get_userbyid(p.proowner)                 AS owner,
+                pg_get_function_identity_arguments(p.oid)   AS args,
+                pg_catalog.format_type(p.prorettype, NULL)  AS rtype,
+                p.provolatile::text                         AS vol,
+                p.prosecdef                                 AS secdef,
+                p.proconfig                                 AS cfg
            FROM pg_proc p
            JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname='public' AND p.proname=$1`,
@@ -396,64 +462,136 @@ describe('Phase 1J-D2B-1 · catalog signature proof', () => {
       expect(rows.length, `expected exactly one overload of public.${name}`).toBe(
         1,
       );
-      expect(rows[0].args).toBe(args);
-      expect(rows[0].rtype).toBe(rtype);
-    }
+      const row = rows[0];
+      expect(row.owner).toBe(MIGRATION_OWNER);
+      expect(row.args).toBe(args);
+      expect(row.rtype).toBe(rtype);
+      expect(row.vol).toBe(vol);
+      expect(row.secdef).toBe(secdef);
+      expect(row.cfg).toEqual(['search_path=public']);
+    },
+  );
+
+  it('caller-bound function exposes no user_id or recruiter_id parameter', () => {
     const caller = expected.find(
       (e) => e.name === 'current_user_has_recruiter_minimum_paid_plan',
     )!;
     expect(caller.args).not.toMatch(/user_id/i);
     expect(caller.args).not.toMatch(/recruiter_id/i);
   });
+});
 
-  it('SECURITY DEFINER binding matches spec (rank INVOKER, resolvers DEFINER)', async () => {
-    const rows = await q<{ name: string; secdef: boolean }>(
-      `SELECT p.proname AS name, p.prosecdef AS secdef
-         FROM pg_proc p
-         JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname='public'
-          AND p.proname IN (
-            '_recruiter_paid_plan_rank',
-            '_recruiter_has_minimum_paid_plan',
-            'current_user_has_recruiter_minimum_paid_plan'
-          )
-        ORDER BY p.proname`,
-    );
-    const map = Object.fromEntries(rows.map((r) => [r.name, r.secdef]));
-    expect(map._recruiter_has_minimum_paid_plan).toBe(true);
-    expect(map.current_user_has_recruiter_minimum_paid_plan).toBe(true);
-  });
+describe('Phase 1J-D2B-1 · EXECUTE ACL (exact per-role matrix)', () => {
+  const FNS = [
+    'public._recruiter_paid_plan_rank(text)',
+    'public._recruiter_has_minimum_paid_plan(uuid, text)',
+    'public.current_user_has_recruiter_minimum_paid_plan(text)',
+  ] as const;
 
-  it('EXECUTE ACL: rank/internal are service_role only; caller-bound is authenticated + service_role', async () => {
-    const rows = await q<{ name: string; grantee: string }>(
-      `SELECT p.proname AS name, r.rolname AS grantee
-         FROM pg_proc p
-         JOIN pg_namespace n ON n.oid = p.pronamespace
-         CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
-         JOIN pg_roles r ON r.oid = a.grantee
-        WHERE n.nspname='public'
-          AND p.proname IN (
-            '_recruiter_paid_plan_rank',
-            '_recruiter_has_minimum_paid_plan',
-            'current_user_has_recruiter_minimum_paid_plan'
-          )
-          AND a.privilege_type = 'EXECUTE'
-          AND r.rolname IN ('anon','authenticated','service_role')
-        ORDER BY p.proname, r.rolname`,
+  // Exact truth table. Only the caller-bound function is EXECUTE-callable by
+  // authenticated; internal helpers are service_role-only; PUBLIC/anon get
+  // nothing anywhere.
+  const truth: Record<
+    (typeof FNS)[number],
+    { anon: boolean; authenticated: boolean; service_role: boolean }
+  > = {
+    'public._recruiter_paid_plan_rank(text)': {
+      anon: false,
+      authenticated: false,
+      service_role: true,
+    },
+    'public._recruiter_has_minimum_paid_plan(uuid, text)': {
+      anon: false,
+      authenticated: false,
+      service_role: true,
+    },
+    'public.current_user_has_recruiter_minimum_paid_plan(text)': {
+      anon: false,
+      authenticated: true,
+      service_role: true,
+    },
+  };
+
+  it.each(FNS)(
+    'has_function_privilege matrix for %s',
+    async (fn) => {
+      const rows = await q<{
+        anon: boolean;
+        authenticated: boolean;
+        service_role: boolean;
+      }>(
+        `SELECT has_function_privilege('anon',          $1, 'EXECUTE') AS anon,
+                has_function_privilege('authenticated', $1, 'EXECUTE') AS authenticated,
+                has_function_privilege('service_role',  $1, 'EXECUTE') AS service_role`,
+        [fn],
+      );
+      const row = rows[0];
+      const t = truth[fn];
+      expect({
+        anon: row.anon,
+        authenticated: row.authenticated,
+        service_role: row.service_role,
+      }).toEqual(t);
+    },
+  );
+
+  it('PUBLIC (grantee OID 0) is absent from every candidate function ACL', async () => {
+    const rows = await q<{ name: string; public_present: boolean }>(
+      `WITH fns AS (
+         SELECT p.oid, p.proname
+           FROM pg_proc p
+           JOIN pg_namespace n ON n.oid=p.pronamespace
+          WHERE n.nspname='public'
+            AND p.proname IN (
+              '_recruiter_paid_plan_rank',
+              '_recruiter_has_minimum_paid_plan',
+              'current_user_has_recruiter_minimum_paid_plan'
+            )
+       )
+       SELECT f.proname AS name,
+              EXISTS (
+                SELECT 1
+                  FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
+                  JOIN pg_proc p ON p.oid = f.oid
+                 WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'
+              ) AS public_present
+         FROM fns f`,
     );
-    const bucket: Record<string, Set<string>> = {};
-    for (const row of rows) {
-      (bucket[row.name] ??= new Set()).add(row.grantee);
+    expect(rows.length).toBe(3);
+    for (const r of rows) {
+      expect(r.public_present, `${r.name} must not grant EXECUTE to PUBLIC`).toBe(
+        false,
+      );
     }
-    expect([...(bucket._recruiter_paid_plan_rank ?? [])].sort()).toEqual([
-      'service_role',
-    ]);
-    expect([...(bucket._recruiter_has_minimum_paid_plan ?? [])].sort()).toEqual([
-      'service_role',
-    ]);
-    expect(
-      [...(bucket.current_user_has_recruiter_minimum_paid_plan ?? [])].sort(),
-    ).toEqual(['authenticated', 'service_role']);
+  });
+});
+
+describe('Phase 1J-D2B-1 · authenticated role direct invocation', () => {
+  it('internal helpers raise permission denied; caller-bound function succeeds', async () => {
+    const u = await createUser();
+    const rid = await createRecruiter(u);
+    await insertBilling(rid, u, 'growth', 'active');
+
+    await asAuthenticated(u, async (client) => {
+      // rank helper: not executable by authenticated.
+      await expect(
+        client.query(`SELECT public._recruiter_paid_plan_rank('starter')`),
+      ).rejects.toThrow(/permission denied/i);
+
+      // internal resolver: not executable by authenticated.
+      await expect(
+        client.query(
+          `SELECT public._recruiter_has_minimum_paid_plan($1,'starter')`,
+          [rid],
+        ),
+      ).rejects.toThrow(/permission denied/i);
+
+      // caller-bound function: executable, returns true for this paid user.
+      const r = await client.query(
+        `SELECT public.current_user_has_recruiter_minimum_paid_plan('starter') AS ok`,
+      );
+      expect((r.rows[0] as { ok: boolean }).ok).toBe(true);
+    });
   });
 });
 
@@ -553,37 +691,123 @@ describe('Phase 1J-D2B-1 · missing billing row', () => {
   });
 });
 
-describe('Phase 1J-D2B-1 · status transitions', () => {
-  it('active growth -> canceled flips entitlement to false', async () => {
+describe('Phase 1J-D2B-1 · same-session status transition (long-lived authenticated client)', () => {
+  it('admin flip active->canceled becomes visible to the next call without resetting jwt sub', async () => {
     const u = await createUser();
     const rid = await createRecruiter(u);
     await insertBilling(rid, u, 'growth', 'active');
-    expect(await recHas(rid, 'growth')).toBe(true);
-    await q(
-      `UPDATE public.recruiter_billing_profiles SET status='canceled' WHERE recruiter_id=$1`,
-      [rid],
-    );
-    expect(await recHas(rid, 'growth')).toBe(false);
-    expect(await recHas(rid, 'starter')).toBe(false);
+
+    const session = await openAuthenticatedSession(u);
+    try {
+      const r1 = await session.query(
+        `SELECT public.current_user_has_recruiter_minimum_paid_plan('growth') AS ok`,
+      );
+      expect((r1.rows[0] as { ok: boolean }).ok).toBe(true);
+
+      // Admin change on a separate connection, autonomously committed.
+      await pool.query(
+        `UPDATE public.recruiter_billing_profiles
+            SET status='canceled' WHERE recruiter_id=$1`,
+        [rid],
+      );
+
+      // Same authenticated session, no JWT reset, no reconnect.
+      const r2 = await session.query(
+        `SELECT public.current_user_has_recruiter_minimum_paid_plan('growth') AS ok`,
+      );
+      expect((r2.rows[0] as { ok: boolean }).ok).toBe(false);
+    } finally {
+      await session.end();
+    }
   });
 });
 
-describe('Phase 1J-D2B-1 · plan downgrade', () => {
-  it('growth -> starter: starter true, growth false, exactly one row preserved', async () => {
+describe('Phase 1J-D2B-1 · same-session plan downgrade (long-lived authenticated client)', () => {
+  it('admin growth->starter downgrade: starter true, growth false, exactly one row retained', async () => {
     const u = await createUser();
     const rid = await createRecruiter(u);
     await insertBilling(rid, u, 'growth', 'active');
-    await q(
-      `UPDATE public.recruiter_billing_profiles SET plan='starter' WHERE recruiter_id=$1`,
+
+    const session = await openAuthenticatedSession(u);
+    try {
+      // Baseline visible in the authenticated session.
+      const before = await session.query(
+        `SELECT public.current_user_has_recruiter_minimum_paid_plan('growth') AS ok`,
+      );
+      expect((before.rows[0] as { ok: boolean }).ok).toBe(true);
+
+      // Admin downgrade over a separate connection.
+      await pool.query(
+        `UPDATE public.recruiter_billing_profiles
+            SET plan='starter' WHERE recruiter_id=$1`,
+        [rid],
+      );
+
+      const starter = await session.query(
+        `SELECT public.current_user_has_recruiter_minimum_paid_plan('starter') AS ok`,
+      );
+      const growth = await session.query(
+        `SELECT public.current_user_has_recruiter_minimum_paid_plan('growth')  AS ok`,
+      );
+      expect((starter.rows[0] as { ok: boolean }).ok).toBe(true);
+      expect((growth.rows[0] as { ok: boolean }).ok).toBe(false);
+
+      const count = await pool.query(
+        `SELECT count(*)::int AS c FROM public.recruiter_billing_profiles WHERE recruiter_id=$1`,
+        [rid],
+      );
+      expect(Number((count.rows[0] as { c: number }).c)).toBe(1);
+    } finally {
+      await session.end();
+    }
+  });
+});
+
+describe('Phase 1J-D2B-1 · admin transaction rollback isolation', () => {
+  it('resolver reflects uncommitted change inside the admin tx, and rollback fully restores it', async () => {
+    const u = await createUser();
+    const rid = await createRecruiter(u);
+    await insertBilling(rid, u, 'growth', 'active');
+
+    const admin = await pool.connect();
+    try {
+      await admin.query('BEGIN');
+      await admin.query(
+        `UPDATE public.recruiter_billing_profiles
+            SET plan='starter', status='canceled' WHERE recruiter_id=$1`,
+        [rid],
+      );
+
+      // Inside the admin tx snapshot: growth entitlement is gone; starter too
+      // (status flipped to canceled).
+      const midG = await admin.query(
+        `SELECT public._recruiter_has_minimum_paid_plan($1,'growth')  AS ok`,
+        [rid],
+      );
+      const midS = await admin.query(
+        `SELECT public._recruiter_has_minimum_paid_plan($1,'starter') AS ok`,
+        [rid],
+      );
+      expect((midG.rows[0] as { ok: boolean }).ok).toBe(false);
+      expect((midS.rows[0] as { ok: boolean }).ok).toBe(false);
+
+      await admin.query('ROLLBACK');
+    } finally {
+      admin.release();
+    }
+
+    // After rollback: original growth/active row is restored and entitlement
+    // is back to true. Row count remains exactly one.
+    const rows = await q<{ plan: string; status: string; c: string }>(
+      `SELECT plan, status, (SELECT count(*)::int FROM public.recruiter_billing_profiles WHERE recruiter_id=$1) AS c
+         FROM public.recruiter_billing_profiles WHERE recruiter_id=$1`,
       [rid],
     );
-    const rows = await q<{ c: string }>(
-      `SELECT count(*)::int AS c FROM public.recruiter_billing_profiles WHERE recruiter_id=$1`,
-      [rid],
-    );
+    expect(rows.length).toBe(1);
+    expect(rows[0].plan).toBe('growth');
+    expect(rows[0].status).toBe('active');
     expect(Number(rows[0].c)).toBe(1);
-    expect(await recHas(rid, 'starter')).toBe(true);
-    expect(await recHas(rid, 'growth')).toBe(false);
+    expect(await recHas(rid, 'growth')).toBe(true);
   });
 });
 
