@@ -31,6 +31,8 @@ jobs:
     env:
       PHASE1H_M2_DATABASE_URL: postgres://postgres:postgres@localhost:5432/phase1h_m2
       PHASE1H_M2_REQUIRE_POSTGRES: '1'
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_PUBLISHABLE_KEY: phase1j-c2-verification-only-key
 
     steps:
       - uses: actions/checkout@v4
