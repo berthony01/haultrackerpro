@@ -2192,7 +2192,7 @@ describe('Phase 1H-M2 Phase 2B-2: spoof resistance + relational invariants', () 
     it('8. terminal-state application (already hired) cannot be re-rejected; no new rejection side effects', async () => {
       const drv = drivers[8]!;
       const app = await submitApply(db, drv, RJ_OPP, 'rj-8-key');
-      await seedApp; // no-op reference to keep TS happy if helper unused elsewhere
+      await asOwner(db);
       await asOwner(db);
       // Force to 'hired' via guard-disabled write; then attempt rejection.
       await db.exec(`
