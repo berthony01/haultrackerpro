@@ -67,22 +67,27 @@ const recruiterHubOnlyNav = [
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
 
-export function BottomNav({
-  active,
-  onNavigate,
-  role,
-  roleLoading,
-  workspaceLoading,
-  recruiterCapabilityStatus = null,
-  recruiterOperationsAllowed = false,
-  assistantPermissions,
-}: BottomNavProps) {
+export function BottomNav(props: BottomNavProps) {
+  const {
+    active,
+    onNavigate,
+    role,
+    roleLoading,
+    workspaceLoading,
+    recruiterOperationsAllowed = false,
+    assistantPermissions,
+  } = props;
   const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
   const isAssistant = !!assistantPermissions;
   const loading = workspaceLoading ?? roleLoading;
 
-  const capabilitySignalled = recruiterCapabilityStatus !== null;
+  // Strict compatibility: capability-aware mode engages whenever the
+  // caller passes the prop at all — including explicit `null`.
+  const capabilitySignalled = 'recruiterCapabilityStatus' in props;
+  const recruiterCapabilityStatus = capabilitySignalled
+    ? props.recruiterCapabilityStatus ?? null
+    : null;
   const tier = capabilitySignalled
     ? resolveRecruiterNavTier(recruiterCapabilityStatus, recruiterOperationsAllowed)
     : role === 'recruiter'
@@ -90,10 +95,16 @@ export function BottomNav({
       : 'none';
 
   let baseNav: typeof driverNav;
-  if (role === 'recruiter' || tier !== 'none') {
-    baseNav = tier === 'active' ? recruiterActiveNav : recruiterHubOnlyNav;
+  if (capabilitySignalled) {
+    if (role === 'recruiter') {
+      if (tier === 'active') baseNav = recruiterActiveNav;
+      else if (tier === 'hub_only') baseNav = recruiterHubOnlyNav;
+      else baseNav = [{ id: 'more', label: 'More', icon: MoreHorizontal }];
+    } else {
+      baseNav = driverNav;
+    }
   } else {
-    baseNav = driverNav;
+    baseNav = role === 'recruiter' ? recruiterActiveNav : driverNav;
   }
 
   const navItems = isAssistant
@@ -143,15 +154,27 @@ export function BottomNav({
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
-  const recruiterMoreItems = tier === 'active'
-    ? recruiterActiveMoreItems
-    : recruiterHubOnlyMoreItems;
+  const recruiterNoTierMoreItems: MoreItem[] = [
+    { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
+  ];
 
-  const moreItems: MoreItem[] = isAssistant
-    ? driverMoreItemsAssistant
-    : (role === 'recruiter' || tier !== 'none')
-      ? recruiterMoreItems
-      : driverMoreItemsFull;
+  let moreItems: MoreItem[];
+  if (isAssistant) {
+    moreItems = driverMoreItemsAssistant;
+  } else if (capabilitySignalled) {
+    if (role === 'recruiter') {
+      moreItems =
+        tier === 'active'
+          ? recruiterActiveMoreItems
+          : tier === 'hub_only'
+            ? recruiterHubOnlyMoreItems
+            : recruiterNoTierMoreItems;
+    } else {
+      moreItems = driverMoreItemsFull;
+    }
+  } else {
+    moreItems = role === 'recruiter' ? recruiterActiveMoreItems : driverMoreItemsFull;
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">

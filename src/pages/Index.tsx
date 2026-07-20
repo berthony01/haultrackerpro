@@ -16,6 +16,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useViewMode } from '@/hooks/useViewMode';
 import {
   resolveDashboardNavigation,
+  isDashboardNavigationSettled,
   isRecruiterPageId,
   parseRecruiterSubviewFromPage,
   DRIVER_ONLY_PAGES,
@@ -776,6 +777,38 @@ const Index = () => {
     setPage('dashboard');
   };
 
+  // ------------------------------------------------------------------
+  // SYNCHRONOUS render-gate — every render re-resolves the policy from
+  // the current page/subview + validated capability state. If the
+  // current state is not yet settled against that decision, no
+  // workspace child may mount this render (the effect above will
+  // reconcile before the next render).
+  // ------------------------------------------------------------------
+  const renderDecision = useMemo(() => {
+    if (workspaceLoading || !effectiveRole) return null;
+    return resolveDashboardNavigation({
+      requestedPage: page,
+      requestedRecruiterSubview: recruiterView,
+      effectiveWorkspace: effectiveRole,
+      recruiterCapabilityStatus,
+      recruiterHubAllowed,
+      recruiterOperationsAllowed,
+    });
+  }, [
+    workspaceLoading,
+    effectiveRole,
+    recruiterCapabilityStatus,
+    recruiterHubAllowed,
+    recruiterOperationsAllowed,
+    page,
+    recruiterView,
+  ]);
+
+  const navigationSettled = isDashboardNavigationSettled(page, recruiterView, renderDecision);
+  const workspaceUnavailable =
+    !workspaceLoading &&
+    (!!workspaceError || !effectiveRole || (renderDecision?.unresolved ?? false));
+
   // Derive sidebar/header key so Recruiter Access has its own label & highlight.
   const navKey =
     page === 'recruiter-access'
@@ -911,10 +944,32 @@ const Index = () => {
         </header>
 
         <main className="px-4 py-5 max-w-7xl mx-auto w-full">
-        {/* Hard render-level role gate. While the role is still resolving,
-            we render a neutral fallback so neither role can flash the wrong
-            UI (driver Add/Onboarding for recruiters, recruiter hub for drivers). */}
+        {/* Hard render-level workspace gate. NO driver/recruiter/shared
+            workspace child may mount until: (1) capability is not loading,
+            (2) no capability error, (3) effectiveRole is non-null, and
+            (4) the policy says the CURRENT page/subview is settled. */}
         {workspaceLoading ? (
+          <ViewFallback />
+        ) : workspaceUnavailable ? (
+          <div
+            role="status"
+            aria-live="polite"
+            data-testid="workspace-unavailable"
+            className="flex min-h-[40vh] flex-col items-center justify-center gap-4 py-12 text-center"
+          >
+            <p className="text-sm text-muted-foreground max-w-md">
+              Your workspace is temporarily unavailable. Please try again in a moment.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+              <Button variant="ghost" size="sm" onClick={signOut}>
+                <LogOut className="h-4 w-4 mr-1.5" /> Sign Out
+              </Button>
+            </div>
+          </div>
+        ) : !navigationSettled ? (
           <ViewFallback />
         ) : (
           <>
@@ -1132,7 +1187,7 @@ const Index = () => {
             ) : (
               <DriverContractsView onOpenApplications={() => handleNavigate('opportunities')} />
             ))}
-            {page === 'recruiter-access' && isRecruiterView && (
+            {page === 'recruiter-access' && isRecruiterView && recruiterCapabilityStatus === 'active' && recruiterOperationsAllowed && (
               <>
                 <ContractActionsCard role="recruiter" onOpen={() => handleNavigate('contracts')} />
               </>
@@ -1150,6 +1205,7 @@ const Index = () => {
                 recruiterHubAllowed={recruiterHubAllowed}
                 recruiterOperationsAllowed={recruiterOperationsAllowed}
                 workspaceLoading={workspaceLoading}
+                workspaceError={workspaceError}
               />
             )}
             {page === 'settings' && (isRecruiterView ? (
