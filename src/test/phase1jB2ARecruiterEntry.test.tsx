@@ -53,8 +53,8 @@ function LocationProbe() {
   return <div data-testid="location">{`${loc.pathname}${loc.search}`}</div>;
 }
 
-function renderRoute() {
-  return render(
+function Tree() {
+  return (
     <MemoryRouter initialEntries={['/recruiter']}>
       <LocationProbe />
       <Routes>
@@ -62,8 +62,12 @@ function renderRoute() {
         <Route path="/dashboard" element={<div data-testid="dashboard-page" />} />
         <Route path="*" element={<div data-testid="other-page" />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderRoute() {
+  return render(<Tree />);
 }
 
 function defaultAuth(): AuthMock {
@@ -143,26 +147,24 @@ describe('RecruiterEntryRoute — missing user defense', () => {
 
 // -----------------------------------------------------------------------
 // C. Active driver + missing recruiter — exactly one auto RPC call
+// (Real rerender proof, not no-op act.)
 // -----------------------------------------------------------------------
 describe('RecruiterEntryRoute — auto-activation', () => {
-  it('C. fires beginRecruiterSetup exactly once across rerenders and waits for refreshed rows before navigating', async () => {
-    renderRoute();
+  it('C. fires beginRecruiterSetup exactly once across a real rerender', async () => {
+    const { rerender } = renderRoute();
     await waitFor(() => {
       expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1);
     });
-    // Refetch must be awaited before any navigation is permitted.
     expect(capsState.refetch).toHaveBeenCalledTimes(1);
-    // No recruiter rows yet → no navigation, no setViewMode.
     expect(viewState.setViewMode).not.toHaveBeenCalled();
     expect(screen.getByTestId('location').textContent).toBe('/recruiter');
 
-    // Force a rerender by re-invoking React — attemptedRef must guard.
-    // (Re-render by state change simulated via router noop.)
+    // Real re-render of the mounted route with identical mock state.
+    rerender(<Tree />);
     await act(async () => {
-      // no-op; capsMock still returns the same state, but effect deps
-      // include stable callbacks. Re-rendering the same tree should NOT
-      // re-fire the guarded RPC.
+      await Promise.resolve();
     });
+    rerender(<Tree />);
     expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1);
   });
 });
@@ -172,7 +174,6 @@ describe('RecruiterEntryRoute — auto-activation', () => {
 // -----------------------------------------------------------------------
 describe('RecruiterEntryRoute — post-activation navigation', () => {
   it('D. persists recruiter mode and routes to onboarding once validated rows show recruiter setup', async () => {
-    // Start with no recruiter, active driver.
     let refetchResolve: (() => void) | null = null;
     capsState = defaultCaps({
       refetch: vi.fn().mockImplementation(
@@ -188,29 +189,18 @@ describe('RecruiterEntryRoute — post-activation navigation', () => {
       expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1);
     });
 
-    // Simulate refetched validated rows arriving: recruiter setup + hub allowed.
+    // Validated rows now indicate setup + hubAllowed.
     viewState = defaultView({
       recruiterCapabilityStatus: 'setup',
       recruiterHubAllowed: true,
     });
 
-    // Complete the pending refetch.
     await act(async () => {
       refetchResolve?.();
       await Promise.resolve();
     });
 
-    // Re-render with new view state.
-    rerender(
-      <MemoryRouter initialEntries={['/recruiter']}>
-        <LocationProbe />
-        <Routes>
-          <Route path="/recruiter" element={<RecruiterEntryRoute />} />
-          <Route path="/dashboard" element={<div data-testid="dashboard-page" />} />
-          <Route path="*" element={<div data-testid="other-page" />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    rerender(<Tree />);
 
     await waitFor(() => {
       expect(viewState.setViewMode).toHaveBeenCalledWith('recruiter');
@@ -220,6 +210,9 @@ describe('RecruiterEntryRoute — post-activation navigation', () => {
         '/dashboard?page=recruiter-access:onboarding',
       );
     });
+    // Order: setViewMode called at least once before location becomes
+    // recruiter destination (both must be true simultaneously).
+    expect(viewState.setViewMode).toHaveBeenCalledWith('recruiter');
   });
 });
 
@@ -227,7 +220,7 @@ describe('RecruiterEntryRoute — post-activation navigation', () => {
 // E/F/G. Existing recruiter states: no RPC, correct destination
 // -----------------------------------------------------------------------
 describe('RecruiterEntryRoute — existing recruiter capability', () => {
-  it('E. existing setup → onboarding, zero RPC', async () => {
+  it('E. existing setup + hubAllowed → onboarding, zero RPC, recruiter mode persisted', async () => {
     viewState = defaultView({
       recruiterCapabilityStatus: 'setup',
       recruiterHubAllowed: true,
@@ -242,7 +235,7 @@ describe('RecruiterEntryRoute — existing recruiter capability', () => {
     expect(viewState.setViewMode).toHaveBeenCalledWith('recruiter');
   });
 
-  it('F. existing active → hub, zero RPC', async () => {
+  it('F. existing active + hubAllowed → hub, zero RPC, recruiter mode persisted', async () => {
     viewState = defaultView({
       recruiterCapabilityStatus: 'active',
       recruiterHubAllowed: true,
@@ -257,17 +250,70 @@ describe('RecruiterEntryRoute — existing recruiter capability', () => {
     expect(viewState.setViewMode).toHaveBeenCalledWith('recruiter');
   });
 
-  it('G. existing suspended → hub, zero RPC', async () => {
+  it('G. existing suspended + hubAllowed → hub with setViewMode(recruiter) persisted', async () => {
     viewState = defaultView({
       recruiterCapabilityStatus: 'suspended',
       recruiterHubAllowed: true,
     });
     renderRoute();
     await waitFor(() => {
+      expect(viewState.setViewMode).toHaveBeenCalledWith('recruiter');
+    });
+    await waitFor(() => {
       expect(screen.getByTestId('location').textContent).toBe(
         '/dashboard?page=recruiter-access',
       );
     });
+    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+  });
+});
+
+// -----------------------------------------------------------------------
+// G2. Eligible status but hubAllowed=false → fail closed on entry route
+// -----------------------------------------------------------------------
+describe('RecruiterEntryRoute — fail-closed when hub not authorized', () => {
+  it('G2a. setup + hubAllowed=false → zero setViewMode, location stays /recruiter', async () => {
+    viewState = defaultView({
+      recruiterCapabilityStatus: 'setup',
+      recruiterHubAllowed: false,
+    });
+    renderRoute();
+    // Allow any pending effects to settle.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(viewState.setViewMode).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
+    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+    // Neutral preparation UI (role=status), not blocked alert.
+    expect(screen.getByRole('status')).toBeTruthy();
+  });
+
+  it('G2b. active + hubAllowed=false → zero setViewMode, location stays /recruiter', async () => {
+    viewState = defaultView({
+      recruiterCapabilityStatus: 'active',
+      recruiterHubAllowed: false,
+    });
+    renderRoute();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(viewState.setViewMode).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
+    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+  });
+
+  it('G2c. suspended + hubAllowed=false → zero setViewMode, location stays /recruiter', async () => {
+    viewState = defaultView({
+      recruiterCapabilityStatus: 'suspended',
+      recruiterHubAllowed: false,
+    });
+    renderRoute();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(viewState.setViewMode).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
     expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
   });
 });
@@ -351,34 +397,120 @@ describe('RecruiterEntryRoute — RPC failure', () => {
 });
 
 // -----------------------------------------------------------------------
-// K. User id change resets attempt state
+// K. In-flight user race: A pending → switch to B → A completes.
+//    A completion must not touch B's state or navigate.
 // -----------------------------------------------------------------------
-describe('RecruiterEntryRoute — user id change resets attempt', () => {
-  it('K. attempt guard does not carry across user id changes', async () => {
+describe('RecruiterEntryRoute — in-flight user race isolation', () => {
+  it('K1. stale A rejection after switch to B does not touch B state or navigate', async () => {
+    // A's RPC never resolves until we release it.
+    let rejectA: ((e: Error) => void) | null = null;
+    const beginA = vi.fn().mockImplementation(
+      () =>
+        new Promise<UserCapabilityStatus>((_res, rej) => {
+          rejectA = (e) => rej(e);
+        }),
+    );
+    const refetchA = vi.fn().mockResolvedValue(undefined);
+    const setViewA = viewState.setViewMode;
+    capsState = defaultCaps({ beginRecruiterSetup: beginA, refetch: refetchA });
+
     const { rerender } = renderRoute();
     await waitFor(() => {
-      expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1);
+      expect(beginA).toHaveBeenCalledTimes(1);
     });
 
-    // Simulate a different signed-in user with same capability shape.
+    // Switch to user B with fresh caps/view (still driver-only).
+    const beginB = vi.fn().mockResolvedValue('setup' as UserCapabilityStatus);
+    const refetchB = vi.fn().mockResolvedValue(undefined);
+    const setViewB = vi.fn();
     authState = { user: { id: 'user-b' }, loading: false };
-    capsState.beginRecruiterSetup.mockClear();
-    capsState.refetch.mockClear();
+    capsState = defaultCaps({ beginRecruiterSetup: beginB, refetch: refetchB });
+    viewState = defaultView({ setViewMode: setViewB });
 
-    rerender(
-      <MemoryRouter initialEntries={['/recruiter']}>
-        <LocationProbe />
-        <Routes>
-          <Route path="/recruiter" element={<RecruiterEntryRoute />} />
-          <Route path="/dashboard" element={<div data-testid="dashboard-page" />} />
-          <Route path="*" element={<div data-testid="other-page" />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    rerender(<Tree />);
 
     await waitFor(() => {
-      expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1);
+      expect(beginB).toHaveBeenCalledTimes(1);
     });
+
+    // Now let A's stale attempt reject.
+    await act(async () => {
+      rejectA?.(new Error('A stale error'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A's completion must be a strict no-op:
+    // - No stale error UI for A.
+    expect(screen.queryByText(/A stale error/i)).toBeNull();
+    // - No refetch fired for A.
+    expect(refetchA).not.toHaveBeenCalled();
+    // - Did not call A's setViewMode.
+    expect(setViewA).not.toHaveBeenCalled();
+    // - Did not navigate anywhere for A.
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
+
+    // Complete B normally with validated recruiter rows.
+    viewState = defaultView({
+      setViewMode: setViewB,
+      recruiterCapabilityStatus: 'setup',
+      recruiterHubAllowed: true,
+    });
+    rerender(<Tree />);
+
+    await waitFor(() => {
+      expect(setViewB).toHaveBeenCalledWith('recruiter');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe(
+        '/dashboard?page=recruiter-access:onboarding',
+      );
+    });
+    // Confirm B did exactly one activation attempt.
+    expect(beginB).toHaveBeenCalledTimes(1);
+  });
+
+  it('K2. stale A success after switch to B does not refetch A, set A mode, or navigate', async () => {
+    let resolveA: ((v: UserCapabilityStatus) => void) | null = null;
+    const beginA = vi.fn().mockImplementation(
+      () =>
+        new Promise<UserCapabilityStatus>((res) => {
+          resolveA = (v) => res(v);
+        }),
+    );
+    const refetchA = vi.fn().mockResolvedValue(undefined);
+    const setViewA = viewState.setViewMode;
+    capsState = defaultCaps({ beginRecruiterSetup: beginA, refetch: refetchA });
+
+    const { rerender } = renderRoute();
+    await waitFor(() => {
+      expect(beginA).toHaveBeenCalledTimes(1);
+    });
+
+    // Switch to B.
+    const beginB = vi.fn().mockResolvedValue('setup' as UserCapabilityStatus);
+    const refetchB = vi.fn().mockResolvedValue(undefined);
+    const setViewB = vi.fn();
+    authState = { user: { id: 'user-b' }, loading: false };
+    capsState = defaultCaps({ beginRecruiterSetup: beginB, refetch: refetchB });
+    viewState = defaultView({ setViewMode: setViewB });
+    rerender(<Tree />);
+
+    await waitFor(() => {
+      expect(beginB).toHaveBeenCalledTimes(1);
+    });
+
+    // Now let A's stale attempt resolve successfully.
+    await act(async () => {
+      resolveA?.('setup' as UserCapabilityStatus);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Captured A refetch must NOT be invoked; only B's may.
+    expect(refetchA).not.toHaveBeenCalled();
+    expect(setViewA).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
   });
 });
 
@@ -414,15 +546,12 @@ describe('RecruiterEntryRoute — import surface', () => {
 describe('RecruiterEntryRoute — App route wiring', () => {
   it('M. /recruiter renders RecruiterEntryRoute while operational deep-link redirects are unchanged', () => {
     const app = readFileSync(resolve(__dirname, '../App.tsx'), 'utf8');
-    // Lazy import present.
     expect(app).toMatch(
       /RecruiterEntryRoute\s*=\s*lazy\(\(\)\s*=>\s*import\(["']\.\/components\/opportunities\/recruiter\/RecruiterEntryRoute["']\)\)/,
     );
-    // /recruiter uses new component under ProtectedRoute.
     expect(app).toMatch(
       /<Route\s+path="\/recruiter"\s+element=\{<ProtectedRoute><RecruiterEntryRoute\s*\/><\/ProtectedRoute>\}\s*\/>/,
     );
-    // Operational deep-links still blind-redirect.
     expect(app).toMatch(
       /path="\/recruiter\/manage"[\s\S]*?Navigate to="\/dashboard\?page=recruiter-access:manager"/,
     );
