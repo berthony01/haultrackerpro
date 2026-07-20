@@ -32,7 +32,7 @@ const M1_PATH = fileURLToPath(
 );
 const M2_PATH = fileURLToPath(
   new URL(
-    "../../supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql",
+    "../../supabase/migrations/20260720000000_phase1h_m2_offer_workflow_rpcs.sql",
     import.meta.url,
   ),
 );
@@ -1557,5 +1557,37 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     expect(appAfter).toBe(appBefore);
     expect(await eventCount(appId, "application_rejected")).toBe(evBefore);
     expect(await notifCountFor(drv, appId, "application_rejected")).toBe(nfBefore);
+  });
+});
+
+// ---------------------------------------------------------------------
+// Source-of-truth: canonical migration path reconciliation proofs.
+// ---------------------------------------------------------------------
+describe("Phase 1H-M2 — canonical migration source of truth", () => {
+  const CANONICAL_REL =
+    "../../supabase/migrations/20260720000000_phase1h_m2_offer_workflow_rpcs.sql";
+  const OBSOLETE_REL =
+    "../../supabase/migration-" + "candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql";
+
+  it("M2_PATH points at the canonical migrations file", () => {
+    const expected = fileURLToPath(new URL(CANONICAL_REL, import.meta.url));
+    expect(M2_PATH).toBe(expected);
+  });
+
+  it("canonical migration file exists and is non-empty", () => {
+    const sql = readFileSync(M2_PATH, "utf8");
+    expect(sql.length).toBeGreaterThan(0);
+  });
+
+  it("obsolete candidate file does not exist", () => {
+    const obsolete = fileURLToPath(new URL(OBSOLETE_REL, import.meta.url));
+    expect(() => readFileSync(obsolete, "utf8")).toThrow();
+  });
+
+  it("loaded M2 SQL includes stable workflow markers", () => {
+    const sql = readFileSync(M2_PATH, "utf8");
+    expect(sql).toContain("public.transition_opportunity_application");
+    expect(sql).toContain("application_rejected");
+    expect(sql).toContain("public.complete_hiring");
   });
 });

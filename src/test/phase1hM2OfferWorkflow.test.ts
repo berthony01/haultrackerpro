@@ -32,7 +32,7 @@ interface AnyPGlite {
 }
 
 const M1_REL = '../../supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql';
-const M2_REL = '../../supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql';
+const M2_REL = '../../supabase/migrations/20260720000000_phase1h_m2_offer_workflow_rpcs.sql';
 
 const read = (rel: string) =>
   fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
