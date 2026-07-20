@@ -347,19 +347,13 @@ beforeAll(async () => {
       years_experience integer,
       preferred_driver_type text,
       preferred_route_type text,
-      preferred_home_time text,
-      preferred_states text[] NOT NULL DEFAULT '{}',
       endorsements text[],
       trailer_experience text[],
       min_weekly_gross numeric,
       min_weekly_net numeric,
       min_effective_rpm numeric,
-      available_start_date date,
-      willing_to_relocate boolean NOT NULL DEFAULT false,
       allow_verified_recruiter_contact boolean NOT NULL DEFAULT false,
-      contact_preference text,
-      visibility text NOT NULL DEFAULT 'private',
-      profile_completed boolean NOT NULL DEFAULT false
+      contact_preference text
     );
     GRANT SELECT, INSERT, UPDATE ON public.driver_opportunity_profiles TO authenticated;
 
