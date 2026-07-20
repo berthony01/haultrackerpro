@@ -203,10 +203,11 @@ describe('RecruiterEntryRoute — post-activation navigation', () => {
     // Re-render with new view state.
     rerender(
       <MemoryRouter initialEntries={['/recruiter']}>
+        <LocationProbe />
         <Routes>
           <Route path="/recruiter" element={<RecruiterEntryRoute />} />
-          <Route path="/dashboard" element={<LocationProbe />} />
-          <Route path="*" element={<LocationProbe />} />
+          <Route path="/dashboard" element={<div data-testid="dashboard-page" />} />
+          <Route path="*" element={<div data-testid="other-page" />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -366,10 +367,11 @@ describe('RecruiterEntryRoute — user id change resets attempt', () => {
 
     rerender(
       <MemoryRouter initialEntries={['/recruiter']}>
+        <LocationProbe />
         <Routes>
           <Route path="/recruiter" element={<RecruiterEntryRoute />} />
-          <Route path="/dashboard" element={<LocationProbe />} />
-          <Route path="*" element={<LocationProbe />} />
+          <Route path="/dashboard" element={<div data-testid="dashboard-page" />} />
+          <Route path="*" element={<div data-testid="other-page" />} />
         </Routes>
       </MemoryRouter>,
     );
