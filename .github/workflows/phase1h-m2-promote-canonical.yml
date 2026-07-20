@@ -1,0 +1,83 @@
+name: Temporary M2 Canonical Promotion
+
+on:
+  push:
+    branches:
+      - phase1h-m2-canonical-promotion
+    paths:
+      - '.github/workflows/phase1h-m2-promote-canonical.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1h-m2-canonical-promotion
+          fetch-depth: 0
+
+      - name: Reconcile canonical references
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old_name = '20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
+          old_rel = f'supabase/migration-candidates/{old_name}'
+          new_rel = f'supabase/migrations/{old_name}'
+
+          replacements = {
+              Path('tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts'): [
+                  (f'../../{old_rel}', f'../../{new_rel}'),
+              ],
+              Path('src/test/phase1hM2OfferWorkflow.test.ts'): [
+                  (f'../../{old_rel}', f'../../{new_rel}'),
+                  (f'../{old_rel}', f'../{new_rel}'),
+              ],
+              Path('.github/workflows/phase1h-m2-postgres.yml'): [
+                  (old_rel, new_rel),
+              ],
+              Path(new_rel): [
+                  ('Phase 1H-M2 CANDIDATE (Turn 2b-i remediation):', 'Phase 1H-M2 CANONICAL:'),
+                  ('STATUS: candidate — not applied live.', 'STATUS: canonical migration; promotion verified before live application.'),
+              ],
+          }
+
+          for path, pairs in replacements.items():
+              text = path.read_text()
+              original = text
+              for old, new in pairs:
+                  text = text.replace(old, new)
+              if text == original and path.suffix != '.sql':
+                  raise SystemExit(f'Expected reference replacement not found in {path}')
+              path.write_text(text)
+
+          candidate = Path(old_rel)
+          if not candidate.exists():
+              raise SystemExit('Obsolete candidate unexpectedly absent before promotion cleanup')
+          candidate.unlink()
+
+          temp_workflow = Path('.github/workflows/phase1h-m2-promote-canonical.yml')
+          temp_workflow.unlink()
+          PY
+
+          test -f supabase/migrations/20260720000000_phase1h_m2_offer_workflow_rpcs.sql
+          test ! -e supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql
+          if git grep -n 'supabase/migration-candidates/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'; then
+            echo 'Obsolete candidate reference remains.'
+            exit 1
+          fi
+
+      - name: Commit promoted source of truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Phase 1H-M2: reconcile and promote canonical migration'
+          git push origin HEAD:phase1h-m2-canonical-promotion
