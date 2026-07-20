@@ -13,8 +13,14 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useUserRole } from '@/hooks/useUserRole';
 import { useViewMode } from '@/hooks/useViewMode';
+import {
+  resolveDashboardNavigation,
+  isRecruiterPageId,
+  parseRecruiterSubviewFromPage,
+  DRIVER_ONLY_PAGES,
+} from '@/lib/dashboardWorkspacePolicy';
+import type { RecruiterSubview } from '@/lib/workspaceAccess';
 import { ViewModeSwitch } from '@/components/ViewModeSwitch';
 // Critical shell — keep eager so first paint never flickers.
 import { BottomNav } from '@/components/BottomNav';
