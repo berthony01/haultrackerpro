@@ -363,7 +363,11 @@ describe('RecruiterAccessRoute — rendered gate matrix', () => {
 // RENDERED — AppSidebar strict capability tiers
 // ==========================================================================
 function renderSidebar(props: any) {
-  return render(<AppSidebar active="dashboard" onNavigate={vi.fn()} {...props} />);
+  return render(
+    <MemoryRouter>
+      <AppSidebar active="dashboard" onNavigate={vi.fn()} {...props} />
+    </MemoryRouter>,
+  );
 }
 
 describe('AppSidebar — capability tier gating', () => {
@@ -419,7 +423,11 @@ describe('AppSidebar — capability tier gating', () => {
 // RENDERED — BottomNav strict capability tiers
 // ==========================================================================
 function renderBottom(props: any) {
-  return render(<BottomNav active="dashboard" onNavigate={vi.fn()} {...props} />);
+  return render(
+    <MemoryRouter>
+      <BottomNav active="dashboard" onNavigate={vi.fn()} {...props} />
+    </MemoryRouter>,
+  );
 }
 
 describe('BottomNav — capability tier gating', () => {

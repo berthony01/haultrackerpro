@@ -34,11 +34,13 @@ const baseProfile: RecruiterProfile = {
 } as unknown as RecruiterProfile;
 
 describe('describeRecruiterBlock', () => {
-  it('returns missing_profile with generic copy when no profile and no intent', () => {
+  it('returns missing_profile with additive-workspace copy when no profile and no intent', () => {
     const r = describeRecruiterBlock(null);
     expect(r.reason).toBe('missing_profile');
-    expect(r.title).toMatch(/Recruiter Access/i);
-    expect(r.body).toMatch(/recruiter application/i);
+    expect(r.title).toMatch(/recruiter workspace/i);
+    expect(r.body).toMatch(/recruiter profile/i);
+    expect(r.body).not.toMatch(/apply|application|before approval/i);
+    expect(r.cta).toMatch(/Add Recruiter Workspace/i);
   });
 
   it('returns missing_profile with "finish setup" copy when intent is recruiter', () => {

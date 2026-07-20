@@ -81,11 +81,11 @@ export function describeRecruiterEligibility(
       isVerified: false,
       title: opts.intentRecruiter
         ? 'Finish your recruiter setup'
-        : 'Recruiter Access Required',
+        : 'Add recruiter workspace',
       body: opts.intentRecruiter
-        ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter application to start posting opportunities.'
-        : 'You need recruiter access before posting opportunities. Complete the recruiter application to start posting.',
-      cta: opts.intentRecruiter ? 'Finish Recruiter Setup' : 'Apply for Recruiter Access',
+        ? 'You signed up as a recruiter, but your recruiter profile is not submitted yet. Complete the short recruiter profile to start posting opportunities.'
+        : 'Add the recruiter workspace to your account. Complete the short recruiter profile to start posting standard opportunities — no admin approval needed.',
+      cta: opts.intentRecruiter ? 'Finish Recruiter Setup' : 'Add Recruiter Workspace',
     };
   }
 

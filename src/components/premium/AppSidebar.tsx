@@ -1,4 +1,5 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { UserRole } from '@/hooks/useUserRole';
 import {
   isAssistantPageAllowed,
@@ -23,7 +24,17 @@ interface AppSidebarProps {
   assistantPermissions?: AssistantPermissions | null;
 }
 
-const driverItems = [
+type NavItem = {
+  id: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** When set, clicking this item calls react-router navigate(href) instead
+   *  of onNavigate(id). Used for cross-shell destinations like /start and
+   *  /driver/assistant-control that live outside the page-state router. */
+  href?: string;
+};
+
+const driverItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
@@ -32,19 +43,23 @@ const driverItems = [
   { id: 'fuel', label: 'Fuel', icon: Fuel },
   { id: 'reports', label: 'Reports', icon: FileText },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  { id: 'nav:assistant-control', label: 'Assistants & Agency', icon: Users, href: '/driver/assistant-control' },
+  { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
-const recruiterActiveItems = [
+const recruiterActiveItems: NavItem[] = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
   { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
-const recruiterHubOnlyItems = [
+const recruiterHubOnlyItems: NavItem[] = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+  { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
 export function AppSidebar(props: AppSidebarProps) {
@@ -57,6 +72,7 @@ export function AppSidebar(props: AppSidebarProps) {
     recruiterOperationsAllowed = false,
     assistantPermissions,
   } = props;
+  const navigate = useNavigate();
   const isAssistant = !!assistantPermissions;
   const loading = workspaceLoading ?? roleLoading;
 
@@ -76,7 +92,7 @@ export function AppSidebar(props: AppSidebarProps) {
   // In capability-aware mode, workspace + tier decide EVERYTHING. `role`
   // (which reflects effectiveRole) chooses driver vs recruiter surface,
   // but the tier gates recruiter items and can never be widened by role.
-  let baseItems: typeof driverItems;
+  let baseItems: NavItem[];
   if (capabilitySignalled) {
     if (role === 'recruiter') {
       if (tier === 'active') baseItems = recruiterActiveItems;
@@ -89,9 +105,12 @@ export function AppSidebar(props: AppSidebarProps) {
     baseItems = role === 'recruiter' ? recruiterActiveItems : driverItems;
   }
 
-  const items = isAssistant
-    ? baseItems.filter((i) => isAssistantPageAllowed(i.id, assistantPermissions))
+  // Acting-assistant mode must never expose cross-shell nav (workspace
+  // switch or the driver's own assistant/agency control center).
+  const filteredForAssistant = isAssistant
+    ? baseItems.filter((i) => !i.href && isAssistantPageAllowed(i.id, assistantPermissions))
     : baseItems;
+  const items = filteredForAssistant;
 
   const isRecruiterConsole = capabilitySignalled
     ? role === 'recruiter' && tier !== 'none'
@@ -129,12 +148,13 @@ export function AppSidebar(props: AppSidebarProps) {
           </div>
         ) : (
           items.map(item => {
-            const isActive = active === item.id;
+            const isActive = !item.href && active === item.id;
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                data-nav-id={item.id}
+                onClick={() => (item.href ? navigate(item.href) : onNavigate(item.id))}
                 aria-current={isActive ? 'page' : undefined}
                 className={`sidebar-link w-full text-left ${isActive ? 'active' : ''}`}
               >

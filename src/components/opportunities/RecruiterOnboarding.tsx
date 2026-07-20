@@ -175,7 +175,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
             toast.error(error.message);
             return;
           }
-          toast.success('Recruiter profile resubmitted for review.');
+          toast.success('Recruiter profile resubmitted for Verified Recruiter badge review.');
         } else {
           toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
         }
@@ -261,7 +261,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
               <Input value={form.mc_number} onChange={(e) => set('mc_number', e.target.value)} />
             </Field>
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              Provide at least one of DOT or MC number. We use this to verify your authority before approval.
+              Provide at least one of DOT or MC number. We use it to verify your authority for the Verified Recruiter badge review — standard posting is not gated on this.
             </p>
           </Section>
 
@@ -320,7 +320,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
                     {isSuspended
                       ? 'Access Suspended'
                       : isRejected
-                      ? 'Resubmit for Review'
+                      ? 'Resubmit for Badge Review'
                       : isEditMode
                       ? 'Save Changes'
                       : 'Submit Recruiter Profile'}

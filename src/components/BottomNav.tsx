@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Plus,
@@ -16,6 +17,7 @@ import {
   LogOut,
   FileSignature,
   BarChart3,
+  ArrowLeftRight,
 } from 'lucide-react';
 import {
   Sheet,
@@ -79,6 +81,7 @@ export function BottomNav(props: BottomNavProps) {
   } = props;
   const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
+  const navigate = useNavigate();
   const isAssistant = !!assistantPermissions;
   const loading = workspaceLoading ?? roleLoading;
 
@@ -115,6 +118,10 @@ export function BottomNav(props: BottomNavProps) {
     setMoreOpen(false);
     onNavigate(page);
   };
+  const goHref = (href: string) => {
+    setMoreOpen(false);
+    navigate(href);
+  };
 
   type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
 
@@ -124,6 +131,8 @@ export function BottomNav(props: BottomNavProps) {
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
     { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') },
     { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') },
+    { label: 'Assistants & Agency', icon: Users, onClick: () => goHref('/driver/assistant-control'), description: 'Delegate access to assistants or an agency.' },
+    { label: 'Switch Workspace', icon: ArrowLeftRight, onClick: () => goHref('/start'), description: 'Choose a different workspace on this account.' },
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
@@ -145,12 +154,14 @@ export function BottomNav(props: BottomNavProps) {
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },
     { label: 'Reports', icon: BarChart3, onClick: () => go('recruiter-access:reports'), description: 'Activity & Pipeline reports (PDF + CSV).' },
     { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Upload, AI review, track approvals.' },
+    { label: 'Switch Workspace', icon: ArrowLeftRight, onClick: () => goHref('/start'), description: 'Choose a different workspace on this account.' },
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
   const recruiterHubOnlyMoreItems: MoreItem[] = [
     { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
+    { label: 'Switch Workspace', icon: ArrowLeftRight, onClick: () => goHref('/start'), description: 'Choose a different workspace on this account.' },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
