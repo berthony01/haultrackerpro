@@ -291,9 +291,9 @@ describe('isWorkspaceAllowed', () => {
 
 describe('plan / billing independence', () => {
   it('workspaceAccess module has no import from billing/subscription/stripe modules', async () => {
-    const src = await import('node:fs').then((fs) =>
-      fs.readFileSync(new URL('../lib/workspaceAccess.ts', import.meta.url), 'utf8'),
-    );
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.resolve(process.cwd(), 'src/lib/workspaceAccess.ts'), 'utf8');
     const specifiers = Array.from(src.matchAll(/from\s+['"]([^'"]+)['"]/g)).map((m) => m[1]);
     for (const spec of specifiers) {
       expect(spec).not.toMatch(/billing/i);
@@ -304,6 +304,7 @@ describe('plan / billing independence', () => {
       expect(spec).not.toMatch(/useAdmin/);
     }
   });
+
 
   it('adding plan/billing-shaped fields to the view does not change decisions', () => {
     const base = view('active', 'active');
