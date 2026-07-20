@@ -1,6 +1,6 @@
-# CI trigger: validate the Phase 1J-A additive capability candidate on real
-# PostgreSQL 16. Path-filtered to only the files owned by this phase.
-name: Phase 1J-A — Postgres 16 Additive Capabilities Gate
+# Temporary verification branch: validate Phase 1J A, B1, B2A, and B2B
+# against real PostgreSQL 16. This workflow-only branch must not be merged.
+name: Phase 1J — Postgres 16 and Dashboard Capability Gate
 
 on:
   push:
@@ -8,26 +8,50 @@ on:
       - '.github/workflows/phase1j-capabilities-postgres.yml'
       - 'tests/postgres/phase1jAdditiveCapabilitiesPostgres.test.ts'
       - 'src/test/phase1jAdditiveCapabilities.test.ts'
+      - 'src/test/phase1jBWorkspaceRouting.test.tsx'
+      - 'src/test/phase1jB2ARecruiterEntry.test.tsx'
+      - 'src/test/phase1jB2BDashboardGating.test.tsx'
       - 'vitest.phase1j-capabilities-postgres.config.ts'
       - 'supabase/migration-candidates/20260720110000_phase1j_additive_user_capabilities.sql'
       - 'src/lib/userCapabilities.ts'
+      - 'src/lib/workspaceAccess.ts'
+      - 'src/lib/dashboardWorkspacePolicy.ts'
       - 'src/hooks/useUserCapabilities.ts'
+      - 'src/hooks/useViewMode.ts'
+      - 'src/components/opportunities/recruiter/RecruiterEntryRoute.tsx'
+      - 'src/components/opportunities/recruiter/RecruiterAccessRoute.tsx'
+      - 'src/components/premium/AppSidebar.tsx'
+      - 'src/components/BottomNav.tsx'
+      - 'src/pages/Index.tsx'
+      - 'src/App.tsx'
   pull_request:
     paths:
       - '.github/workflows/phase1j-capabilities-postgres.yml'
       - 'tests/postgres/phase1jAdditiveCapabilitiesPostgres.test.ts'
       - 'src/test/phase1jAdditiveCapabilities.test.ts'
+      - 'src/test/phase1jBWorkspaceRouting.test.tsx'
+      - 'src/test/phase1jB2ARecruiterEntry.test.tsx'
+      - 'src/test/phase1jB2BDashboardGating.test.tsx'
       - 'vitest.phase1j-capabilities-postgres.config.ts'
       - 'supabase/migration-candidates/20260720110000_phase1j_additive_user_capabilities.sql'
       - 'src/lib/userCapabilities.ts'
+      - 'src/lib/workspaceAccess.ts'
+      - 'src/lib/dashboardWorkspacePolicy.ts'
       - 'src/hooks/useUserCapabilities.ts'
+      - 'src/hooks/useViewMode.ts'
+      - 'src/components/opportunities/recruiter/RecruiterEntryRoute.tsx'
+      - 'src/components/opportunities/recruiter/RecruiterAccessRoute.tsx'
+      - 'src/components/premium/AppSidebar.tsx'
+      - 'src/components/BottomNav.tsx'
+      - 'src/pages/Index.tsx'
+      - 'src/App.tsx'
   workflow_dispatch:
 
 jobs:
   phase1j-capabilities-postgres:
-    name: Real Postgres 16 — Additive capability foundation
+    name: Real Postgres 16 — Phase 1J A/B1/B2A/B2B
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -65,12 +89,15 @@ jobs:
           fi
           echo "database URL present"
 
-      - name: Forbidden-marker scan (no .only / .skip / .todo)
+      - name: Forbidden-marker scan (no only / skip / todo)
         run: |
-          if grep -nE '\.only\(|\.skip\(|it\.todo\(|describe\.todo\(' \
+          if grep -nE '\.only\(|\.skip\(|\.todo\(|xit\(|xdescribe\(' \
               tests/postgres/phase1jAdditiveCapabilitiesPostgres.test.ts \
-              src/test/phase1jAdditiveCapabilities.test.ts; then
-            echo "Forbidden Vitest marker found in Phase 1J-A tests."; exit 1
+              src/test/phase1jAdditiveCapabilities.test.ts \
+              src/test/phase1jBWorkspaceRouting.test.tsx \
+              src/test/phase1jB2ARecruiterEntry.test.tsx \
+              src/test/phase1jB2BDashboardGating.test.tsx; then
+            echo "Forbidden Vitest marker found in Phase 1J tests."; exit 1
           fi
           echo "clean"
 
@@ -96,17 +123,26 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase1j-capabilities-postgres-log
+          name: phase1j-b2b-postgres-log
           path: artifacts/phase1j-capabilities-postgres.log
 
       - name: Enforce PG16 gate result
         if: steps.pg_gate.outcome != 'success'
         run: |
-          echo "Phase 1J-A real-Postgres 16 gate failed. See uploaded log."
+          echo "Phase 1J real-Postgres 16 gate failed. See uploaded log."
           exit 1
 
       - name: Run Phase 1J-A PGlite focused suite
         run: bunx vitest run src/test/phase1jAdditiveCapabilities.test.ts
+
+      - name: Run Phase 1J-B1 workspace routing suite
+        run: bunx vitest run src/test/phase1jBWorkspaceRouting.test.tsx
+
+      - name: Run Phase 1J-B2A recruiter entry suite
+        run: bunx vitest run src/test/phase1jB2ARecruiterEntry.test.tsx
+
+      - name: Run Phase 1J-B2B dashboard gating suite
+        run: bunx vitest run src/test/phase1jB2BDashboardGating.test.tsx
 
       - name: Typecheck (node)
         run: bunx tsc -p tsconfig.node.json --noEmit
