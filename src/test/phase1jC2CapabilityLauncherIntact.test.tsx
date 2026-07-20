@@ -6,15 +6,22 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import CapabilityLauncher from '@/pages/CapabilityLauncher';
+
+function renderLauncher() {
+  return render(
+    <HelmetProvider>
+      <MemoryRouter>
+        <CapabilityLauncher />
+      </MemoryRouter>
+    </HelmetProvider>,
+  );
+}
 
 describe('Phase 1J-C2B — CapabilityLauncher tiles intact', () => {
   it('renders all four capability tiles', () => {
-    render(
-      <MemoryRouter>
-        <CapabilityLauncher />
-      </MemoryRouter>,
-    );
+    renderLauncher();
     expect(screen.getByText(/Track my trucking business/i)).toBeInTheDocument();
     expect(screen.getByText(/Post driver opportunities/i)).toBeInTheDocument();
     expect(screen.getByText(/Help drivers as an assistant/i)).toBeInTheDocument();
