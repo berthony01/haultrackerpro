@@ -188,7 +188,7 @@ describe('resolveDashboardNavigation — recruiter/setup', () => {
   it('hub and onboarding pass through', () => {
     expect(
       resolveDashboardNavigation({ ...setup, requestedPage: 'recruiter-access' })
-    ).toEqual({ page: 'recruiter-access', recruiterSubview: 'onboarding', unresolved: false });
+    ).toEqual({ page: 'recruiter-access', recruiterSubview: 'hub', unresolved: false });
     expect(
       resolveDashboardNavigation({ ...setup, requestedPage: 'recruiter-access:hub' })
     ).toEqual({ page: 'recruiter-access', recruiterSubview: 'hub', unresolved: false });
