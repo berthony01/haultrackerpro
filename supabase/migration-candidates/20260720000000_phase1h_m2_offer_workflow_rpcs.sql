@@ -555,6 +555,26 @@ BEGIN
 
   UPDATE public.opportunity_applications SET status = _target_status WHERE id = _app.id;
 
+  -- Phase 1H-M2 2B-3: canonical rejection side effects.
+  -- Emitted only after all authorization/eligibility/type/transition guards
+  -- have succeeded and the row has been updated to 'rejected'. Idempotent
+  -- via _m2_insert_event_once / _m2_notify_once (offer_id NULL dedup key).
+  IF _target_status = 'rejected' THEN
+    PERFORM public._m2_insert_event_once(_app.id, 'recruiter', _actor,
+      'application_rejected', NULL,
+      jsonb_build_object(
+        'opportunity_id', _app.opportunity_id,
+        'recruiter_id',   _app.recruiter_id,
+        'from_status',    _app.status));
+    PERFORM public._m2_notify_once(_app.driver_user_id, 'application_rejected',
+      'Application not selected',
+      'The recruiter is not moving forward with your application.',
+      _app.id, NULL,
+      jsonb_build_object(
+        'opportunity_id', _app.opportunity_id,
+        'recruiter_id',   _app.recruiter_id));
+  END IF;
+
   IF _note IS NOT NULL AND btrim(_note) <> '' THEN
     INSERT INTO public.application_events(application_id, actor_type, actor_user_id, event_type, metadata)
     VALUES (_app.id, 'recruiter', _actor, 'application_note',
