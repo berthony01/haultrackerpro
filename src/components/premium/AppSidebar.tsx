@@ -1,4 +1,5 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { UserRole } from '@/hooks/useUserRole';
 import {
   isAssistantPageAllowed,
@@ -23,7 +24,17 @@ interface AppSidebarProps {
   assistantPermissions?: AssistantPermissions | null;
 }
 
-const driverItems = [
+type NavItem = {
+  id: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** When set, clicking this item calls react-router navigate(href) instead
+   *  of onNavigate(id). Used for cross-shell destinations like /start and
+   *  /driver/assistant-control that live outside the page-state router. */
+  href?: string;
+};
+
+const driverItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
@@ -32,19 +43,23 @@ const driverItems = [
   { id: 'fuel', label: 'Fuel', icon: Fuel },
   { id: 'reports', label: 'Reports', icon: FileText },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  { id: 'nav:assistant-control', label: 'Assistants & Agency', icon: Users, href: '/driver/assistant-control' },
+  { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
-const recruiterActiveItems = [
+const recruiterActiveItems: NavItem[] = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
   { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
+  { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
-const recruiterHubOnlyItems = [
+const recruiterHubOnlyItems: NavItem[] = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+  { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
 export function AppSidebar(props: AppSidebarProps) {
