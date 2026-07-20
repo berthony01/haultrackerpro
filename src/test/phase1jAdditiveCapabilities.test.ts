@@ -99,7 +99,7 @@ const uid = (n: number) => `${n.toString().padStart(8, '0')}-0000-0000-0000-0000
 
 async function setUid(db: AnyPGlite, user: string | null) {
   await db.query(
-    `SELECT set_config('request.jwt.claim.sub', $1, true)`,
+    `SELECT set_config('request.jwt.claim.sub', $1, false)`,
     [user ?? ''],
   );
 }
