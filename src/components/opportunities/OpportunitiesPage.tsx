@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,14 +52,26 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   const [showProfile, setShowProfile] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
-  // Phase 1J-C1: track why we entered the Preferences screen so that a
-  // successful completion coming from an Apply Now attempt can resume the
-  // apply flow exactly once on the originating opportunity.
+  // Phase 1J-C1: single apply-origin marker + atomic resume state so a
+  // successful Preferences completion can resume Apply Now exactly once
+  // on the originating opportunity — and nothing else.
   const [preferencesOrigin, setPreferencesOrigin] = useState<
-    { kind: 'apply'; opportunityId: string } | { kind: 'manual' } | null
+    { kind: 'apply'; opportunityId: string } | null
   >(null);
-  const [resumeApplyToken, setResumeApplyToken] = useState<string | null>(null);
-  const [resumeApplyOpportunityId, setResumeApplyOpportunityId] = useState<string | null>(null);
+  const [resumeState, setResumeState] = useState<
+    { opportunityId: string; token: string } | null
+  >(null);
+  // Deterministic monotonic per-mount resume-token counter (no timestamps,
+  // no crypto.randomUUID) so tests and audits are reproducible.
+  const resumeTokenCounterRef = useRef(0);
+  const mintResumeToken = () => `resume-${++resumeTokenCounterRef.current}`;
+  // Manual entry into Preferences must clear any stale Apply origin/resume
+  // state so a completed manual save can never revive an old Apply flow.
+  const openPreferencesManual = () => {
+    setPreferencesOrigin(null);
+    setResumeState(null);
+    setShowProfile(true);
+  };
 
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
@@ -78,9 +90,13 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
       const v = sessionStorage.getItem('htp_opportunities_initial_view');
       if (!v) return;
       sessionStorage.removeItem('htp_opportunities_initial_view');
-      if (v === 'driver-profile') setShowProfile(true);
+      if (v === 'driver-profile') {
+        // Deep-link entry is functionally a manual entry: never resume Apply.
+        openPreferencesManual();
+      }
       // 'list' is the default — no-op.
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Notify parent of current top-level view so sidebar/header stay in sync.
@@ -226,46 +242,79 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     return (
       <DriverOpportunityProfile
         onBack={() => {
-          setShowProfile(false);
+          const wasApplyOrigin = preferencesOrigin?.kind === 'apply';
+          const originId = wasApplyOrigin ? preferencesOrigin!.opportunityId : null;
+          // Always clear origin/resume; Back must never auto-open Apply.
           setPreferencesOrigin(null);
+          setResumeState(null);
+          setShowProfile(false);
+          if (wasApplyOrigin && originId) {
+            const stillExists = opportunities.some((o) => o.id === originId);
+            if (stillExists) {
+              // Return to the preserved originating opportunity detail.
+              if (selectedId !== originId) setSelectedId(originId);
+            } else {
+              // Origin removed — fall back safely to the list.
+              setSelectedId(null);
+            }
+          }
         }}
         onSaveSuccess={({ completed }) => {
           if (!completed) return;
-          if (preferencesOrigin?.kind === 'apply') {
-            const oppId = preferencesOrigin.opportunityId;
-            setShowProfile(false);
+          if (preferencesOrigin?.kind !== 'apply') return;
+          const originId = preferencesOrigin.opportunityId;
+          const stillExists = opportunities.some((o) => o.id === originId);
+          const selectionMatches = selectedId === originId;
+          if (!stillExists || !selectionMatches) {
+            // Fail closed — never resume Apply on a mismatched/missing target.
             setPreferencesOrigin(null);
-            setResumeApplyOpportunityId(oppId);
-            setResumeApplyToken(crypto.randomUUID());
-            setSelectedId(oppId);
+            setResumeState(null);
+            setShowProfile(false);
+            if (!stillExists) setSelectedId(null);
+            return;
           }
+          const token = mintResumeToken();
+          setPreferencesOrigin(null);
+          setResumeState({ opportunityId: originId, token });
+          setShowProfile(false);
         }}
       />
     );
   }
 
   if (selected) {
-    const token = resumeApplyOpportunityId === selected.id ? resumeApplyToken : null;
+    const token =
+      resumeState && resumeState.opportunityId === selected.id
+        ? resumeState.token
+        : null;
     return (
       <OpportunityDetail
         opportunity={selected}
         onBack={() => {
           setSelectedId(null);
-          setResumeApplyToken(null);
-          setResumeApplyOpportunityId(null);
+          setResumeState(null);
         }}
         isPro={isPro}
         onUpgrade={onUpgrade}
         driverProfile={profile}
         onOpenPreferencesForApply={() => {
+          // Preserve selectedId — the parent must return to this exact
+          // opportunity after Preferences completion.
           setPreferencesOrigin({ kind: 'apply', opportunityId: selected.id });
-          setSelectedId(null);
+          setResumeState(null);
           setShowProfile(true);
         }}
         resumeApplyToken={token}
-        onResumeApplyConsumed={() => {
-          setResumeApplyToken(null);
-          setResumeApplyOpportunityId(null);
+        onResumeApplyConsumed={(consumedToken) => {
+          // Only clear when BOTH the opportunity still matches AND the
+          // consumed token equals the current resume token. A stale
+          // callback must not clear a newer token.
+          setResumeState((prev) => {
+            if (!prev) return prev;
+            if (prev.token !== consumedToken) return prev;
+            if (prev.opportunityId !== selected.id) return prev;
+            return null;
+          });
         }}
       />
     );
@@ -306,7 +355,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
         <ProfileEntryCard
           state={!profile ? 'none' : profile.profile_completed ? 'complete' : 'incomplete'}
           profile={profile}
-          onClick={() => setShowProfile(true)}
+          onClick={openPreferencesManual}
         />
       )}
 

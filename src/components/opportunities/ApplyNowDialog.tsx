@@ -120,7 +120,7 @@ export function ApplyNowDialog({
       });
       toast.success('Application submitted', {
         description:
-          'The Recruiter can now review your application and professional profile snapshot.',
+          'The Recruiter can now review your application and Opportunity Preferences snapshot.',
       });
       resetForm();
       onOpenChange(false);
