@@ -1,0 +1,3 @@
+Temporary pull-request trigger for the Phase 1J-D2B-1 independent PostgreSQL 16 gate.
+This branch is CI-only and must be closed unmerged.
+Base implementation commit: 08f8b3b443da0b1ffceaa3f1d52042c828f34fdb
