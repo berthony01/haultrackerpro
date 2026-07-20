@@ -302,9 +302,10 @@ export default function RecruiterEntryRoute() {
           type="button"
           onClick={() => {
             // Allow exactly one additional attempt per click, bound to
-            // the CURRENT user/generation.
+            // the CURRENT user/generation. Clear the owned error so
+            // shouldAutoActivate is not blocked by the stale error.
             attemptedGenerationRef.current = -1;
-            setRpcError(null);
+            setAttempt(null);
             void runActivation();
           }}
           className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
