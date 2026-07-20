@@ -58,9 +58,12 @@ const STATUS_SET: ReadonlySet<string> = new Set(USER_CAPABILITY_STATUSES);
  * Strict RFC3339 timestamp: date-time with explicit timezone designator.
  * Accepts `Z` or a numeric ±HH:MM offset. Fractional seconds optional.
  * Rejects: date-only, timestamp without TZ, locale strings, "not-a-date".
+ * Captures numeric components so we can validate the calendar and clock
+ * ourselves — JavaScript's `Date.parse` normalizes impossible dates
+ * (e.g. `2026-02-30` becomes March 2), which would otherwise fail-open.
  */
 const RFC3339_TZ_REGEX =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 export function isUserCapabilityType(v: unknown): v is UserCapabilityType {
   return typeof v === 'string' && CAP_SET.has(v);
@@ -70,18 +73,55 @@ export function isUserCapabilityStatus(v: unknown): v is UserCapabilityStatus {
   return typeof v === 'string' && STATUS_SET.has(v);
 }
 
+/** Leap-year rule per RFC3339 / proleptic Gregorian calendar. */
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+/** Last valid day for a given month (1–12) in a given year. */
+function lastDayOfMonth(year: number, month: number): number {
+  switch (month) {
+    case 1: case 3: case 5: case 7: case 8: case 10: case 12: return 31;
+    case 4: case 6: case 9: case 11: return 30;
+    case 2: return isLeapYear(year) ? 29 : 28;
+    default: return 0;
+  }
+}
+
 /**
  * Validate an `activated_at` field value. `null` is allowed (capability
  * exists but has never been activated). Any string must match the strict
- * RFC3339-with-timezone regex AND parse to a finite Date. Everything
- * else is rejected.
+ * RFC3339-with-timezone regex AND every numeric component must be a real
+ * calendar/clock value — month 01–12, day valid for that month+year
+ * (including leap years), hour 00–23, minute 00–59, second 00–59, and
+ * timezone offset hour 00–23, minute 00–59. We do NOT rely on
+ * `Date.parse` normalization to decide calendar validity.
  */
 export function isValidActivatedAt(v: unknown): v is string | null {
   if (v === null) return true;
   if (typeof v !== 'string') return false;
-  if (!RFC3339_TZ_REGEX.test(v)) return false;
-  return Number.isFinite(Date.parse(v));
+  const m = RFC3339_TZ_REGEX.exec(v);
+  if (!m) return false;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = Number(m[6]);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > lastDayOfMonth(year, month)) return false;
+  if (hour > 23) return false;
+  if (minute > 59) return false;
+  if (second > 59) return false;
+  if (m[7] !== 'Z') {
+    const offHour = Number(m[9]);
+    const offMin = Number(m[10]);
+    if (offHour > 23) return false;
+    if (offMin > 59) return false;
+  }
+  return true;
 }
+
 
 /** Throws on invalid input. Used to validate `begin_recruiter_setup` result. */
 export function parseUserCapabilityStatus(v: unknown): UserCapabilityStatus {
