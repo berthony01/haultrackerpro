@@ -556,17 +556,22 @@ describe('Phase 1J-C1 — Opportunity Apply continuity (integration)', () => {
       path.resolve(__dirname, '../components/opportunities/OpportunitiesPage.tsx'),
       'utf8',
     );
-    // Locate the function body start and every conditional early return.
     const fnStart = src.indexOf('export function OpportunitiesPage');
     expect(fnStart).toBeGreaterThan(-1);
     const body = src.slice(fnStart);
     const idxExisting = body.indexOf('const existingIds = useMemo');
     const idxCallback = body.indexOf('const handleResumeApplyConsumed = useCallback');
-    // First early-return positions inside the function body.
-    const idxIsError = body.indexOf('if (isError) {');
-    const idxApps = body.indexOf('if (showDriverApps) {');
-    const idxRefs = body.indexOf('if (showReferrals) {');
-    const idxProfile = body.indexOf('if (showProfile) {');
+    // Locate top-level early-return patterns (must include the `return`
+    // immediately after the guard to distinguish from `if (showProfile)`
+    // inside effects/side-effect blocks).
+    const findFirstReturn = (marker: RegExp) => {
+      const m = body.match(marker);
+      return m ? (m.index as number) : -1;
+    };
+    const idxIsError = findFirstReturn(/if \(isError\)\s*\{\s*\n\s*return/);
+    const idxApps = findFirstReturn(/if \(showDriverApps\)\s*\{\s*\n\s*return/);
+    const idxRefs = findFirstReturn(/if \(showReferrals\)\s*\{\s*\n\s*return/);
+    const idxProfile = findFirstReturn(/if \(showProfile\)\s*\{\s*\n\s*return/);
     expect(idxExisting).toBeGreaterThan(-1);
     expect(idxCallback).toBeGreaterThan(-1);
     expect(idxIsError).toBeGreaterThan(-1);
@@ -576,8 +581,8 @@ describe('Phase 1J-C1 — Opportunity Apply continuity (integration)', () => {
     const firstReturn = Math.min(idxIsError, idxApps, idxRefs, idxProfile);
     expect(idxExisting).toBeLessThan(firstReturn);
     expect(idxCallback).toBeLessThan(firstReturn);
-    // Additionally, no `useMemo(` or `useCallback(` or `useState(` or `useEffect(`
-    // or `useRef(` may appear AFTER the first conditional return.
+    // Additionally, no `useMemo(` / `useCallback(` / `useState(` /
+    // `useEffect(` / `useRef(` may appear AFTER the first conditional return.
     const afterFirstReturn = body.slice(firstReturn);
     expect(afterFirstReturn).not.toMatch(/\buseMemo\(/);
     expect(afterFirstReturn).not.toMatch(/\buseCallback\(/);
@@ -585,6 +590,7 @@ describe('Phase 1J-C1 — Opportunity Apply continuity (integration)', () => {
     expect(afterFirstReturn).not.toMatch(/\buseEffect\(/);
     expect(afterFirstReturn).not.toMatch(/\buseRef\(/);
   });
+
 
   it('15. rendered proof: View My Requests / My Referrals transitions do not throw a hook-order error and return cleanly to the list', async () => {
     // A hook-order violation surfaces as a synchronous React exception
