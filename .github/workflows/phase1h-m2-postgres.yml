@@ -1,3 +1,4 @@
+# CI trigger: validate the current Phase 1H-M2 candidate on real PostgreSQL 16.
 name: Phase 1H-M2 — Postgres 16 Offer Workflow Gate
 
 on:
