@@ -132,79 +132,48 @@ jobs:
       - name: Phase 1J additive capabilities
         run: bunx vitest run src/test/phase1jAdditiveCapabilities.test.ts
 
-      - name: Phase 4A driver control center
-        id: assistant_driver_control
+      - name: Isolated Assistant Agency, PGlite, typecheck and build audit
+        id: isolated_audit
         continue-on-error: true
-        run: bunx vitest run src/test/phase4aDriverControlCenter.test.ts --reporter=verbose
-
-      - name: Assistant/Agency access integrity A
-        id: assistant_integrity_a
-        if: always()
-        continue-on-error: true
-        run: bunx vitest run src/test/assistantAgencyAccessIntegrity.test.ts --reporter=verbose
-
-      - name: Assistant/Agency access integrity B
-        id: assistant_integrity_b
-        if: always()
-        continue-on-error: true
-        run: bunx vitest run src/test/assistantAgencyAccessIntegrityB.test.ts --reporter=verbose
-
-      - name: Phase 3 agency workflow
-        id: agency_workflow
-        if: always()
-        continue-on-error: true
-        run: bunx vitest run src/test/phase3AgencyWorkflow.test.ts --reporter=verbose
-
-      - name: Phase 1H-M2 PGlite regression
-        id: pglite_m2
-        if: always()
-        continue-on-error: true
-        run: bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
-
-      - name: Typecheck (node)
-        id: typecheck_node
-        if: always()
-        continue-on-error: true
-        run: bunx tsc -p tsconfig.node.json --noEmit
-
-      - name: Typecheck (app)
-        id: typecheck_app
-        if: always()
-        continue-on-error: true
-        run: bunx tsc -p tsconfig.app.json --noEmit
-
-      - name: Production build
-        id: production_build
-        if: always()
-        continue-on-error: true
-        run: bun run build
-
-      - name: Enforce isolated regression and build results
-        if: always()
-        env:
-          DRIVER_CONTROL: ${{ steps.assistant_driver_control.outcome }}
-          INTEGRITY_A: ${{ steps.assistant_integrity_a.outcome }}
-          INTEGRITY_B: ${{ steps.assistant_integrity_b.outcome }}
-          AGENCY_WORKFLOW: ${{ steps.agency_workflow.outcome }}
-          PGLITE_M2: ${{ steps.pglite_m2.outcome }}
-          TYPECHECK_NODE: ${{ steps.typecheck_node.outcome }}
-          TYPECHECK_APP: ${{ steps.typecheck_app.outcome }}
-          PRODUCTION_BUILD: ${{ steps.production_build.outcome }}
         run: |
-          printf '%s\n' \
-            "driver_control=$DRIVER_CONTROL" \
-            "integrity_a=$INTEGRITY_A" \
-            "integrity_b=$INTEGRITY_B" \
-            "agency_workflow=$AGENCY_WORKFLOW" \
-            "pglite_m2=$PGLITE_M2" \
-            "typecheck_node=$TYPECHECK_NODE" \
-            "typecheck_app=$TYPECHECK_APP" \
-            "production_build=$PRODUCTION_BUILD"
-          test "$DRIVER_CONTROL" = success
-          test "$INTEGRITY_A" = success
-          test "$INTEGRITY_B" = success
-          test "$AGENCY_WORKFLOW" = success
-          test "$PGLITE_M2" = success
-          test "$TYPECHECK_NODE" = success
-          test "$TYPECHECK_APP" = success
-          test "$PRODUCTION_BUILD" = success
+          mkdir -p artifacts/c2-isolated
+          : > artifacts/c2-isolated/summary.txt
+          set +e
+
+          run_one() {
+            name="$1"
+            shift
+            echo "===== $name ====="
+            "$@" > "artifacts/c2-isolated/${name}.log" 2>&1
+            rc=$?
+            cat "artifacts/c2-isolated/${name}.log"
+            echo "${name}=${rc}" | tee -a artifacts/c2-isolated/summary.txt
+          }
+
+          run_one driver_control bunx vitest run src/test/phase4aDriverControlCenter.test.ts --reporter=verbose
+          run_one integrity_a bunx vitest run src/test/assistantAgencyAccessIntegrity.test.ts --reporter=verbose
+          run_one integrity_b bunx vitest run src/test/assistantAgencyAccessIntegrityB.test.ts --reporter=verbose
+          run_one agency_workflow bunx vitest run src/test/phase3AgencyWorkflow.test.ts --reporter=verbose
+          run_one pglite_m2 bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
+          run_one typecheck_node bunx tsc -p tsconfig.node.json --noEmit
+          run_one typecheck_app bunx tsc -p tsconfig.app.json --noEmit
+          run_one production_build bun run build
+
+          echo '===== exact exit-code summary ====='
+          cat artifacts/c2-isolated/summary.txt
+          failures=$(awk -F= '$2 != 0 {count++} END {print count+0}' artifacts/c2-isolated/summary.txt)
+          echo "failure_count=${failures}"
+          test "$failures" -eq 0
+
+      - name: Upload isolated gate logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1j-c2-isolated-gate-logs
+          path: artifacts/c2-isolated
+
+      - name: Enforce isolated audit result
+        if: steps.isolated_audit.outcome != 'success'
+        run: |
+          echo 'One or more isolated Assistant/Agency, PGlite, typecheck, or build commands failed. See artifact.'
+          exit 1
