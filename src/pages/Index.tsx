@@ -392,15 +392,18 @@ const Index = () => {
   }, []);
 
   // Show onboarding modal for first-time DRIVERS only.
-  // Gated on workspaceLoading so recruiters never see "Log Your First Load" —
-  // even returning recruiters with cleared session storage.
+  // Requires an exact driver workspace: never infer driver from
+  // !isRecruiterView or a null/unresolved effectiveRole.
   useEffect(() => {
-    if (workspaceLoading || isRecruiterView) return;
+    if (workspaceLoading) return;
+    if (workspaceError) return;
+    if (effectiveRole !== 'driver') return;
+    if (!driverWorkspaceAllowed) return;
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
       if (suppressOnboardingForAddDeepLink) return;
       setShowOnboardingModal(true);
     }
-  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, workspaceLoading, isRecruiterView]);
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, workspaceLoading, workspaceError, effectiveRole, driverWorkspaceAllowed]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboardingModal(false);
@@ -411,12 +414,13 @@ const Index = () => {
     setPage('add');
   };
 
-  // Driver-only onboarding card. Gate on role so recruiters never see
-  // "Log Your First Load" — even during the brief window before the role
-  // guard effect redirects them off /dashboard.
+  // Driver-only onboarding card. Requires the exact driver workspace so
+  // recruiters, unresolved, or capability-error renders never surface
+  // "Log Your First Load".
   const showOnboarding =
     !workspaceLoading &&
-    !isRecruiterView &&
+    effectiveRole === 'driver' &&
+    driverWorkspaceAllowed &&
     !allLoadsQuery.isLoading &&
     allLoadsQuery.loads.length === 0 &&
     page === 'dashboard';
