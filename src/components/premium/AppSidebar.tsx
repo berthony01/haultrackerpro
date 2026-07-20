@@ -72,6 +72,7 @@ export function AppSidebar(props: AppSidebarProps) {
     recruiterOperationsAllowed = false,
     assistantPermissions,
   } = props;
+  const navigate = useNavigate();
   const isAssistant = !!assistantPermissions;
   const loading = workspaceLoading ?? roleLoading;
 
@@ -91,7 +92,7 @@ export function AppSidebar(props: AppSidebarProps) {
   // In capability-aware mode, workspace + tier decide EVERYTHING. `role`
   // (which reflects effectiveRole) chooses driver vs recruiter surface,
   // but the tier gates recruiter items and can never be widened by role.
-  let baseItems: typeof driverItems;
+  let baseItems: NavItem[];
   if (capabilitySignalled) {
     if (role === 'recruiter') {
       if (tier === 'active') baseItems = recruiterActiveItems;
@@ -104,9 +105,12 @@ export function AppSidebar(props: AppSidebarProps) {
     baseItems = role === 'recruiter' ? recruiterActiveItems : driverItems;
   }
 
-  const items = isAssistant
-    ? baseItems.filter((i) => isAssistantPageAllowed(i.id, assistantPermissions))
+  // Acting-assistant mode must never expose cross-shell nav (workspace
+  // switch or the driver's own assistant/agency control center).
+  const filteredForAssistant = isAssistant
+    ? baseItems.filter((i) => !i.href && isAssistantPageAllowed(i.id, assistantPermissions))
     : baseItems;
+  const items = filteredForAssistant;
 
   const isRecruiterConsole = capabilitySignalled
     ? role === 'recruiter' && tier !== 'none'
@@ -144,12 +148,13 @@ export function AppSidebar(props: AppSidebarProps) {
           </div>
         ) : (
           items.map(item => {
-            const isActive = active === item.id;
+            const isActive = !item.href && active === item.id;
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                data-nav-id={item.id}
+                onClick={() => (item.href ? navigate(item.href) : onNavigate(item.id))}
                 aria-current={isActive ? 'page' : undefined}
                 className={`sidebar-link w-full text-left ${isActive ? 'active' : ''}`}
               >
