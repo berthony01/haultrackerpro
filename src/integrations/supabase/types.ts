@@ -3474,6 +3474,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_capabilities: {
+        Row: {
+          activated_at: string | null
+          capability: Database["public"]["Enums"]["user_capability_type"]
+          created_at: string
+          status: Database["public"]["Enums"]["user_capability_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          capability: Database["public"]["Enums"]["user_capability_type"]
+          created_at?: string
+          status: Database["public"]["Enums"]["user_capability_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          capability?: Database["public"]["Enums"]["user_capability_type"]
+          created_at?: string
+          status?: Database["public"]["Enums"]["user_capability_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           buffer_percent: number | null
@@ -3719,6 +3746,14 @@ export type Database = {
         }[]
       }
       _agency_plan_label: { Args: { _plan_key: string }; Returns: string }
+      _derive_recruiter_capability_status: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["user_capability_status"]
+      }
+      _sync_recruiter_capability: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
       accept_agency_invite: {
         Args: { _token: string }
         Returns: {
@@ -3847,6 +3882,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      begin_recruiter_setup: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_capability_status"]
       }
       build_application_submission_snapshot: {
         Args: {
@@ -4146,6 +4185,14 @@ export type Database = {
         }[]
       }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
+      get_my_user_capabilities: {
+        Args: never
+        Returns: {
+          activated_at: string
+          capability: Database["public"]["Enums"]["user_capability_type"]
+          status: Database["public"]["Enums"]["user_capability_status"]
+        }[]
+      }
       get_my_waiting_work_item: {
         Args: { _id: string }
         Returns: {
@@ -4929,6 +4976,8 @@ export type Database = {
         | "signed"
         | "expired"
         | "archived"
+      user_capability_status: "setup" | "active" | "suspended" | "revoked"
+      user_capability_type: "driver" | "recruiter"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5104,6 +5153,8 @@ export const Constants = {
         "expired",
         "archived",
       ],
+      user_capability_status: ["setup", "active", "suspended", "revoked"],
+      user_capability_type: ["driver", "recruiter"],
     },
   },
 } as const
