@@ -147,3 +147,5 @@ jobs:
 
       - name: Typecheck node
         run: bunx tsc -p tsconfig.node.json --noEmit
+
+# Temporary PR verification trigger; do not merge.
