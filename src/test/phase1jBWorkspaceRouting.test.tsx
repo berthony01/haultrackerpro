@@ -471,9 +471,9 @@ describe('useViewMode hook', () => {
   });
 
   it('module does not import useAdmin (no admin bypass)', async () => {
-    const src = await import('node:fs').then((fs) =>
-      fs.readFileSync(new URL('../hooks/useViewMode.ts', import.meta.url), 'utf8'),
-    );
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.resolve(process.cwd(), 'src/hooks/useViewMode.ts'), 'utf8');
     const specifiers = Array.from(src.matchAll(/from\s+['"]([^'"]+)['"]/g)).map((m) => m[1]);
     for (const spec of specifiers) {
       expect(spec).not.toMatch(/useAdmin/);
@@ -482,4 +482,5 @@ describe('useViewMode hook', () => {
       expect(spec).not.toMatch(/stripe/i);
     }
   });
+
 });
