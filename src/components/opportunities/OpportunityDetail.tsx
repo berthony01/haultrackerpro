@@ -79,14 +79,20 @@ export function OpportunityDetail({
     [driverApplications, o.id]
   );
 
-  // One-shot Apply Now resume after Opportunity Preferences completion.
-  const consumedTokenRef = useRef<string | null>(null);
+  // Phase 1J-C1: one-shot Apply Now resume after Opportunity Preferences
+  // completion. Each distinct token opens the dialog at most once. A Set of
+  // consumed tokens (not a single last-token ref) guarantees:
+  //   * ordinary rerenders never reopen
+  //   * closing the resumed dialog does not reopen
+  //   * a later distinct token for the same opportunity opens exactly once
+  //   * active/completed formal state never consumes or opens.
+  const consumedTokensRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!resumeApplyToken) return;
-    if (consumedTokenRef.current === resumeApplyToken) return;
-    if (!driverProfile || !driverProfile.profile_completed) return;
+    if (consumedTokensRef.current.has(resumeApplyToken)) return;
+    if (!driverProfile || driverProfile.profile_completed !== true) return;
     if (formalState.kind !== 'none' && formalState.kind !== 'reapplyable') return;
-    consumedTokenRef.current = resumeApplyToken;
+    consumedTokensRef.current.add(resumeApplyToken);
     setShowApply(true);
     onResumeApplyConsumed?.(resumeApplyToken);
   }, [resumeApplyToken, driverProfile, formalState, onResumeApplyConsumed]);

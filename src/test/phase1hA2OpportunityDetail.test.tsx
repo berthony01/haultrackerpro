@@ -285,3 +285,160 @@ describe('OpportunityDetail — Apply Again fresh idempotency keys', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Phase 1J-C1 additive — resume-token matrix on real OpportunityDetail.
+// ---------------------------------------------------------------------------
+
+function renderDetail(overrides: {
+  apps?: any[];
+  profile?: any;
+  token?: string | null;
+  onConsumed?: (t: string) => void;
+} = {}) {
+  driverApplicationsRef.current = overrides.apps ?? [];
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const onConsumed = overrides.onConsumed ?? vi.fn();
+  const utils = render(
+    <QueryClientProvider client={qc}>
+      <OpportunityDetail
+        opportunity={opportunity}
+        onBack={vi.fn()}
+        isPro={false}
+        onUpgrade={vi.fn()}
+        driverProfile={overrides.profile === undefined ? driverProfile : overrides.profile}
+        onOpenPreferencesForApply={vi.fn()}
+        resumeApplyToken={overrides.token ?? null}
+        onResumeApplyConsumed={onConsumed}
+      />
+    </QueryClientProvider>,
+  );
+  return { ...utils, onConsumed };
+}
+
+function rerenderDetail(
+  rerender: (ui: React.ReactElement) => void,
+  next: { apps?: any[]; profile?: any; token?: string | null; onConsumed?: (t: string) => void },
+) {
+  if (next.apps !== undefined) driverApplicationsRef.current = next.apps;
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  rerender(
+    <QueryClientProvider client={qc}>
+      <OpportunityDetail
+        opportunity={opportunity}
+        onBack={vi.fn()}
+        isPro={false}
+        onUpgrade={vi.fn()}
+        driverProfile={next.profile === undefined ? driverProfile : next.profile}
+        onOpenPreferencesForApply={vi.fn()}
+        resumeApplyToken={next.token ?? null}
+        onResumeApplyConsumed={next.onConsumed ?? vi.fn()}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+describe('OpportunityDetail — Phase 1J-C1 resume-token matrix', () => {
+  it('1. incomplete driverProfile + token: no dialog and no consume', async () => {
+    const consumed = vi.fn();
+    renderDetail({
+      profile: { ...driverProfile, profile_completed: false },
+      token: 'resume-1',
+      onConsumed: consumed,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(consumed).not.toHaveBeenCalled();
+  });
+
+  it('2. same token becomes eligible after completed rerender: opens once, consumes once', async () => {
+    const consumed = vi.fn();
+    const { rerender } = renderDetail({
+      profile: { ...driverProfile, profile_completed: false },
+      token: 'resume-1',
+      onConsumed: consumed,
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    rerenderDetail(rerender, {
+      profile: { ...driverProfile, profile_completed: true },
+      token: 'resume-1',
+      onConsumed: consumed,
+    });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(consumed).toHaveBeenCalledTimes(1);
+    expect(consumed).toHaveBeenCalledWith('resume-1');
+  });
+
+  it('3. rerenders after close do not reopen', async () => {
+    const consumed = vi.fn();
+    const { rerender } = renderDetail({ token: 'resume-1', onConsumed: consumed });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    // Parent clears token after consume.
+    rerenderDetail(rerender, { token: null, onConsumed: consumed });
+    // Close dialog via cancel.
+    await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Ordinary rerenders must not reopen.
+    rerenderDetail(rerender, { token: null, onConsumed: consumed });
+    rerenderDetail(rerender, { token: null, onConsumed: consumed });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(consumed).toHaveBeenCalledTimes(1);
+  });
+
+  it('4. distinct later token on same opportunity opens once', async () => {
+    const consumed = vi.fn();
+    const { rerender } = renderDetail({ token: 'resume-1', onConsumed: consumed });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    rerenderDetail(rerender, { token: null, onConsumed: consumed });
+    await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    // Later distinct token.
+    rerenderDetail(rerender, { token: 'resume-2', onConsumed: consumed });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(consumed).toHaveBeenCalledTimes(2);
+    expect(consumed.mock.calls.map((c) => c[0])).toEqual(['resume-1', 'resume-2']);
+  });
+
+  it('5. active formal state blocks open/consume even with token', async () => {
+    const consumed = vi.fn();
+    renderDetail({
+      apps: [{ opportunity_id: 'opp-1', application_type: 'apply', status: 'interviewing' }],
+      token: 'resume-1',
+      onConsumed: consumed,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(consumed).not.toHaveBeenCalled();
+  });
+
+  it('6. completed (hired) formal state blocks open/consume even with token', async () => {
+    const consumed = vi.fn();
+    renderDetail({
+      apps: [{ opportunity_id: 'opp-1', application_type: 'apply', status: 'hired' }],
+      token: 'resume-1',
+      onConsumed: consumed,
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(consumed).not.toHaveBeenCalled();
+  });
+
+  it('7. reapplyable formal state permits resume', async () => {
+    const consumed = vi.fn();
+    renderDetail({
+      apps: [{ opportunity_id: 'opp-1', application_type: 'apply', status: 'rejected' }],
+      token: 'resume-1',
+      onConsumed: consumed,
+    });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(consumed).toHaveBeenCalledTimes(1);
+  });
+
+  it('8. no token: ordinary behavior unchanged (dialog does not auto-open)', async () => {
+    const consumed = vi.fn();
+    renderDetail({ token: null, onConsumed: consumed });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(consumed).not.toHaveBeenCalled();
+  });
+});
+

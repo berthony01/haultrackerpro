@@ -130,7 +130,7 @@ describe('applicationSubmission helpers', () => {
       ['submission_failed:duplicate_same_type', /active application/i],
       ['submission_failed:opportunity_unavailable', /no longer accepting/i],
       ['submission_failed:self_opportunity', /your own Recruiter/i],
-      ['submission_failed:profile_required', /Opportunity Profile/i],
+      ['submission_failed:profile_required', /Opportunity Preferences/i],
       ['submission_failed:restricted', /not available/i],
       ['submission_failed:invalid_input', /required confirmations/i],
       ['submission_failed:question_required', /question is required/i],
@@ -147,7 +147,7 @@ describe('ApplyNowDialog gating', () => {
   it('shows profile-required panel when profile is incomplete', () => {
     renderDialog({ driverProfile: { ...baseProfile, profile_completed: false } });
     expect(
-      screen.getByText(/Complete your Opportunity Profile to apply/i),
+      screen.getByText(/Complete your Opportunity Preferences to apply/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Submit Application/i })).not.toBeInTheDocument();
   });
@@ -156,7 +156,7 @@ describe('ApplyNowDialog gating', () => {
     const { onEditProfile } = renderDialog({
       driverProfile: { ...baseProfile, profile_completed: false },
     });
-    await userEvent.click(screen.getByRole('button', { name: /Update Opportunity Profile/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Update Opportunity Preferences/i }));
     expect(onEditProfile).toHaveBeenCalled();
   });
 
@@ -164,7 +164,7 @@ describe('ApplyNowDialog gating', () => {
     renderDialog();
     const submit = screen.getByRole('button', { name: /Submit Application/i });
     expect(submit).toBeDisabled();
-    await userEvent.click(screen.getByLabelText(/availability and Opportunity Profile/i));
+    await userEvent.click(screen.getByLabelText(/Opportunity Preferences and availability/i));
     await userEvent.click(screen.getByLabelText(/meet its stated requirements/i));
     expect(submit).toBeDisabled();
     await userEvent.click(screen.getByLabelText(/accurate to the best of my knowledge/i));
@@ -174,7 +174,7 @@ describe('ApplyNowDialog gating', () => {
 
 describe('ApplyNowDialog submission', () => {
   const fillAttestations = async () => {
-    await userEvent.click(screen.getByLabelText(/availability and Opportunity Profile/i));
+    await userEvent.click(screen.getByLabelText(/Opportunity Preferences and availability/i));
     await userEvent.click(screen.getByLabelText(/meet its stated requirements/i));
     await userEvent.click(screen.getByLabelText(/accurate to the best of my knowledge/i));
   };
@@ -268,7 +268,7 @@ const FORBIDDEN_KEYS = [
 ];
 
 async function fillAttest() {
-  await userEvent.click(screen.getByLabelText(/availability and Opportunity Profile/i));
+  await userEvent.click(screen.getByLabelText(/Opportunity Preferences and availability/i));
   await userEvent.click(screen.getByLabelText(/meet its stated requirements/i));
   await userEvent.click(screen.getByLabelText(/accurate to the best of my knowledge/i));
 }
@@ -435,7 +435,7 @@ describe('ApplyNowDialog — public-safe error rendering', () => {
     ['duplicate_same_type', /active application/i],
     ['opportunity_unavailable', /no longer accepting/i],
     ['self_opportunity', /your own Recruiter/i],
-    ['profile_required', /Opportunity Profile/i],
+    ['profile_required', /Opportunity Preferences/i],
     ['restricted', /not available for your account/i],
     ['invalid_input', /required confirmations/i],
     ['empty_response', /could not confirm/i],
@@ -488,7 +488,7 @@ describe('ApplyNowDialog — success reset', () => {
     // Fresh state
     const textarea = screen.getByLabelText(/Message to recruiter/i) as HTMLTextAreaElement;
     expect(textarea.value).toBe('');
-    expect(screen.getByLabelText(/availability and Opportunity Profile/i)).not.toBeChecked();
+    expect(screen.getByLabelText(/Opportunity Preferences and availability/i)).not.toBeChecked();
     expect(screen.getByLabelText(/meet its stated requirements/i)).not.toBeChecked();
     expect(screen.getByLabelText(/accurate to the best of my knowledge/i)).not.toBeChecked();
     expect(screen.getByLabelText(/authorize HaulTracker Pro/i)).not.toBeChecked();
@@ -753,9 +753,12 @@ describe('ApplyNowDialog — privacy copy and success toast', () => {
     const dialog = screen.getByRole('dialog');
     const text = dialog.textContent ?? '';
     expect(text).toMatch(
-      /professional Opportunity Profile is included in the application snapshot/i,
+      /Your saved Opportunity Preferences[\s\S]*included in the application snapshot/i,
     );
     expect(text).toMatch(/shared only when you explicitly consent/i);
+    // No old user-facing literal in the dialog surface.
+    expect(text).not.toMatch(/Opportunity Profile\b/);
+    expect(text).not.toMatch(/professional profile snapshot/i);
   });
 
   it('calls sonner toast.success with "Application submitted" on a successful submission', async () => {
@@ -767,9 +770,10 @@ describe('ApplyNowDialog — privacy copy and success toast', () => {
     await userEvent.click(screen.getByRole('button', { name: /Submit Application/i }));
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
     expect((toast.success as any).mock.calls[0][0]).toBe('Application submitted');
-    // Approved descriptive copy present in the description prop when supplied.
+    // Approved descriptive copy uses Opportunity Preferences, never the old wording.
     const opts = (toast.success as any).mock.calls[0][1];
-    expect(opts?.description).toMatch(/review your application and professional profile snapshot/i);
+    expect(opts?.description).toMatch(/review your application and Opportunity Preferences snapshot/i);
+    expect(opts?.description).not.toMatch(/professional profile snapshot/i);
   });
 });
 
@@ -784,6 +788,65 @@ describe('ApplyNowDialog — error rendering hardening', () => {
     expect(text).not.toMatch(/submission_failed:/);
     expect(text).not.toMatch(/SELECT|INSERT|UPDATE|policy|RLS|pg_/i);
     expect(text).not.toContain('[object Object]');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1J-C1 additive proofs — exact heading/CTA copy, profile_required
+// public message exact copy, onOpenPreferences callback wiring, and a source
+// audit that no old user-facing literal remains in ApplyNowDialog.
+// ---------------------------------------------------------------------------
+import fs from 'node:fs';
+import path from 'node:path';
+
+describe('ApplyNowDialog — Phase 1J-C1 copy + wiring', () => {
+  it('incomplete panel shows exact heading and both CTA variants', () => {
+    // "New" variant (no existing profile row) shows "Complete" CTA.
+    const { unmount } = renderDialog({
+      driverProfile: null as any,
+    });
+    expect(
+      screen.getByText(/^Complete your Opportunity Preferences to apply$/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^Complete Opportunity Preferences$/i }),
+    ).toBeInTheDocument();
+    unmount();
+    // "Existing but incomplete" variant shows "Update" CTA.
+    renderDialog({ driverProfile: { ...baseProfile, profile_completed: false } });
+    expect(
+      screen.getByRole('button', { name: /^Update Opportunity Preferences$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('routes Complete/Update CTA click to onOpenPreferences exactly once', async () => {
+    const { onEditProfile } = renderDialog({
+      driverProfile: { ...baseProfile, profile_completed: false },
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: /Update Opportunity Preferences/i }),
+    );
+    expect(onEditProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('submissionErrorMessage returns the exact public-safe profile_required copy', () => {
+    expect(submissionErrorMessage(new Error('submission_failed:profile_required')))
+      .toBe('Complete your Opportunity Preferences before applying.');
+  });
+
+  it('source audit: ApplyNowDialog contains no user-facing "Opportunity Profile" or "professional profile snapshot" literal', () => {
+    const src = fs.readFileSync(
+      path.resolve(__dirname, '../components/opportunities/ApplyNowDialog.tsx'),
+      'utf8',
+    );
+    expect(src).not.toMatch(/\bOpportunity Profile\b/);
+    expect(src).not.toMatch(/professional profile snapshot/i);
+    // Required copy must remain.
+    expect(src).toMatch(/Complete your Opportunity Preferences to apply/);
+    expect(src).toMatch(/Update Opportunity Preferences/);
+    expect(src).toMatch(/Complete Opportunity Preferences/);
+    expect(src).toMatch(/Opportunity Preferences and availability are current/);
+    expect(src).toMatch(/Opportunity Preferences snapshot/);
   });
 });
 
