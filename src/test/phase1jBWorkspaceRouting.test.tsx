@@ -241,15 +241,22 @@ describe('admin-shaped inputs do not grant recruiter access', () => {
 });
 
 describe('plan / billing independence', () => {
-  it('workspaceAccess module does not import billing or subscription modules', async () => {
+  it('workspaceAccess module has no import from billing/subscription/stripe modules', async () => {
     const src = await import('node:fs').then((fs) =>
       fs.readFileSync(new URL('../lib/workspaceAccess.ts', import.meta.url), 'utf8'),
     );
-    expect(src).not.toMatch(/billing/i);
-    expect(src).not.toMatch(/subscription/i);
-    expect(src).not.toMatch(/stripe/i);
-    expect(src).not.toMatch(/recruiterCapabilities/);
+    // Extract only import specifiers to avoid matching prose comments.
+    const specifiers = Array.from(src.matchAll(/from\s+['"]([^'"]+)['"]/g)).map((m) => m[1]);
+    for (const spec of specifiers) {
+      expect(spec).not.toMatch(/billing/i);
+      expect(spec).not.toMatch(/subscription/i);
+      expect(spec).not.toMatch(/stripe/i);
+      expect(spec).not.toMatch(/recruiterCapabilities/);
+      expect(spec).not.toMatch(/useSubscription/);
+    }
   });
+
+
 
   it('adding plan/billing-shaped fields to the view does not change decisions', () => {
     const base = view('active', 'active');
