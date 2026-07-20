@@ -69,6 +69,19 @@ export function OpportunityDetail({
   const [showRefer, setShowRefer] = useState(false);
   const [showApply, setShowApply] = useState(false);
 
+  // One-shot Apply Now resume after Opportunity Preferences completion.
+  const consumedTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!resumeApplyToken) return;
+    if (consumedTokenRef.current === resumeApplyToken) return;
+    if (!driverProfile || !driverProfile.profile_completed) return;
+    if (formalState.kind !== 'none' && formalState.kind !== 'reapplyable') return;
+    consumedTokenRef.current = resumeApplyToken;
+    setShowApply(true);
+    onResumeApplyConsumed?.(resumeApplyToken);
+  }, [resumeApplyToken, driverProfile, formalState, onResumeApplyConsumed]);
+
+
   const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
   const formalState = useMemo(
     () => classifyFormalApply(driverApplications as any[], o.id),
