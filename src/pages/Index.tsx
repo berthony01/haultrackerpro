@@ -397,12 +397,6 @@ const Index = () => {
     if (workspaceLoading || isRecruiterView) return;
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
       if (suppressOnboardingForAddDeepLink) return;
-      let recruiter = false;
-      try { recruiter = sessionStorage.getItem('htp_recruiter_intent') === '1'; } catch {}
-      if (recruiter) {
-        try { sessionStorage.removeItem('htp_recruiter_intent'); } catch {}
-        return;
-      }
       setShowOnboardingModal(true);
     }
   }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, workspaceLoading, isRecruiterView]);
