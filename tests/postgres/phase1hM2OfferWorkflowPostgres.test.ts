@@ -1198,7 +1198,7 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     }
   });
 
-  it("D4 race: accept vs recruiter cancel — accepted offer cannot be canceled; exactly one terminal winner", async () => {
+  it("D4 race: accept vs recruiter cancel — exact winner with recipient-scoped side effects", async () => {
     const drv = await mintDriver(pool);
     const { appId, offerId } = await setupSentOffer(drv);
     await barrierRace(url, [
@@ -1211,12 +1211,15 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     if (off === "accepted") {
       expect(app).toBe("onboarding");
       expect(await eventCount(appId, "offer_accepted")).toBe(1);
-      expect(await notifCount(appId, "offer_accepted")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(1);
       expect(await eventCount(appId, "offer_canceled")).toBe(0);
+      expect(await notifCountFor(drv, appId, "offer_canceled")).toBe(0);
     } else {
       expect(app).toBe("offer_sent");
       expect(await eventCount(appId, "offer_canceled")).toBe(1);
+      expect(await notifCountFor(drv, appId, "offer_canceled")).toBe(1);
       expect(await eventCount(appId, "offer_accepted")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "offer_accepted")).toBe(0);
     }
   });
 
