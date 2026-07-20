@@ -14,6 +14,7 @@ import {
   resolveInitialWorkspace,
   resolveRecruiterSubview,
   RECRUITER_SUBVIEWS,
+  type RecruiterSubview,
   type WorkspaceRole,
 } from '@/lib/workspaceAccess';
 import {
@@ -576,6 +577,44 @@ describe('useViewMode hook', () => {
     expect(result.current.effectiveRole).toBeNull();
     expect(result.current.error).toBeInstanceOf(Error);
   });
-
 });
+
+
+
+// ==========================================================================
+// PURE — equivalence: resolveRecruiterSubviewForStatus vs resolveRecruiterSubview
+// ==========================================================================
+describe('resolveRecruiterSubviewForStatus ↔ resolveRecruiterSubview equivalence', () => {
+  const requests: (RecruiterSubview | null | 'unknown')[] = [
+    'hub', 'onboarding', 'manager', 'applications', 'reports', null, 'unknown',
+  ];
+  const cases: [UserCapabilityStatus, UserCapabilityStatus | null][] = [
+    ['active', 'setup'],
+    ['active', 'active'],
+    ['active', 'suspended'],
+  ];
+  for (const [driver, recruiter] of cases) {
+    it(`recruiter=${recruiter}: shortcut equals full derivation`, async () => {
+      const { resolveRecruiterSubviewForStatus, resolveRecruiterSubview } =
+        await import('@/lib/workspaceAccess');
+      const v = view(driver, recruiter);
+      for (const req of requests) {
+        expect(
+          resolveRecruiterSubviewForStatus(recruiter, req as RecruiterSubview | null),
+        ).toBe(resolveRecruiterSubview(v, req as RecruiterSubview | null));
+      }
+    });
+  }
+  it('recruiter revoked / missing → shortcut returns null (matches full derivation)', async () => {
+    const { resolveRecruiterSubviewForStatus, resolveRecruiterSubview } =
+      await import('@/lib/workspaceAccess');
+    for (const req of requests) {
+      expect(resolveRecruiterSubviewForStatus('revoked', req as RecruiterSubview | null)).toBeNull();
+      expect(resolveRecruiterSubview(view('active', 'revoked'), req as RecruiterSubview | null)).toBeNull();
+      expect(resolveRecruiterSubviewForStatus(null, req as RecruiterSubview | null)).toBeNull();
+      expect(resolveRecruiterSubview(view('active', null), req as RecruiterSubview | null)).toBeNull();
+    }
+  });
+});
+
 

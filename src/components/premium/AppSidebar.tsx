@@ -47,45 +47,61 @@ const recruiterHubOnlyItems = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
 ];
 
-export function AppSidebar({
-  active,
-  onNavigate,
-  role,
-  roleLoading,
-  workspaceLoading,
-  recruiterCapabilityStatus = null,
-  recruiterOperationsAllowed = false,
-  assistantPermissions,
-}: AppSidebarProps) {
+export function AppSidebar(props: AppSidebarProps) {
+  const {
+    active,
+    onNavigate,
+    role,
+    roleLoading,
+    workspaceLoading,
+    recruiterOperationsAllowed = false,
+    assistantPermissions,
+  } = props;
   const isAssistant = !!assistantPermissions;
   const loading = workspaceLoading ?? roleLoading;
 
-  // Capability-driven recruiter tier takes precedence when supplied.
-  // Falls back to legacy role behavior only when no capability status
-  // was passed (out-of-app callers like Updates.tsx).
-  const capabilitySignalled = recruiterCapabilityStatus !== null;
+  // Strict compatibility: capability-aware mode is engaged whenever the
+  // caller passes the prop AT ALL — even as an explicit `null`. Only a
+  // truly omitted prop preserves the legacy role-driven behavior.
+  const capabilitySignalled = 'recruiterCapabilityStatus' in props;
+  const recruiterCapabilityStatus = capabilitySignalled
+    ? props.recruiterCapabilityStatus ?? null
+    : null;
   const tier = capabilitySignalled
     ? resolveRecruiterNavTier(recruiterCapabilityStatus, recruiterOperationsAllowed)
     : role === 'recruiter'
       ? 'active'
       : 'none';
 
+  // In capability-aware mode, workspace + tier decide EVERYTHING. `role`
+  // (which reflects effectiveRole) chooses driver vs recruiter surface,
+  // but the tier gates recruiter items and can never be widened by role.
   let baseItems: typeof driverItems;
-  if (role === 'recruiter' || tier !== 'none') {
-    baseItems = tier === 'active' ? recruiterActiveItems : recruiterHubOnlyItems;
+  if (capabilitySignalled) {
+    if (role === 'recruiter') {
+      if (tier === 'active') baseItems = recruiterActiveItems;
+      else if (tier === 'hub_only') baseItems = recruiterHubOnlyItems;
+      else baseItems = []; // fail-closed: no recruiter workspace links.
+    } else {
+      baseItems = driverItems;
+    }
   } else {
-    baseItems = driverItems;
+    baseItems = role === 'recruiter' ? recruiterActiveItems : driverItems;
   }
 
   const items = isAssistant
     ? baseItems.filter((i) => isAssistantPageAllowed(i.id, assistantPermissions))
     : baseItems;
 
+  const isRecruiterConsole = capabilitySignalled
+    ? role === 'recruiter' && tier !== 'none'
+    : role === 'recruiter';
+
   const consoleLabel = loading
     ? 'Loading…'
     : isAssistant
       ? 'Assistant Console'
-      : role === 'recruiter' || tier !== 'none'
+      : isRecruiterConsole
         ? 'Recruiter Console'
         : 'Load & Pay Manager';
 
@@ -133,7 +149,7 @@ export function AppSidebar({
         <p className="text-[10px] text-muted-foreground/60 leading-snug">
           {isAssistant
             ? 'You are acting on behalf of a driver. Every change is recorded in the audit log.'
-            : role === 'recruiter' || tier !== 'none'
+            : isRecruiterConsole
               ? 'Post opportunities. Review drivers. Hire smarter.'
               : 'Track every mile. Every dollar. Every decision.'}
         </p>

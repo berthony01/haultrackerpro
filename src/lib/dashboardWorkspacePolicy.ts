@@ -129,6 +129,29 @@ const UNRESOLVED: DashboardNavigationResult = {
 };
 
 /**
+ * Pure settlement check. Returns true when the CURRENT page/subview
+ * exactly matches what the policy would resolve to right now — meaning
+ * it is safe to mount the workspace child for `currentPage`. Anything
+ * else (unresolved, page mismatch, or recruiter subview mismatch) must
+ * render a neutral fallback and let the reconciliation effect update
+ * page/recruiterView state before children mount. Callers must never
+ * rely on this alone: they must first gate on loading/error/null role.
+ */
+export function isDashboardNavigationSettled(
+  currentPage: DashboardPage,
+  currentRecruiterSubview: RecruiterSubview | null | undefined,
+  decision: DashboardNavigationResult | null | undefined,
+): boolean {
+  if (!decision) return false;
+  if (decision.unresolved) return false;
+  if (decision.page !== currentPage) return false;
+  if (decision.page === 'recruiter-access') {
+    return decision.recruiterSubview === (currentRecruiterSubview ?? null);
+  }
+  return true;
+}
+
+/**
  * Full policy matrix. Returns the SAFE page + recruiter subview for the
  * caller to render. Callers MUST honor `unresolved === true` by
  * rendering a neutral/blocked state and NOT the returned `page`.
