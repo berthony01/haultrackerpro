@@ -69,6 +69,19 @@ describe('Phase 1J-C2A — no misleading approval-gate wording in in-scope files
     expect(onboarding).toMatch(/Verified Recruiter badge review/);
     expect(onboarding).toMatch(/Resubmit for Badge Review/);
   });
+
+  it('RecruiterAccessPage.tsx: old How It Works step 1 phrase is absent and new sentence is present (source guard)', () => {
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/opportunities/recruiter/RecruiterAccessPage.tsx'),
+      'utf8',
+    );
+    expect(src).not.toContain(
+      'Add recruiter as an additional workspace on your account. Standard posting unlocks the moment your profile is complete — no admin approval needed.',
+    );
+    expect(src).toContain(
+      'Add the recruiter workspace to your account and complete the required recruiter profile fields and posting terms. Standard posting does not require admin approval or a paid plan.',
+    );
+  });
 });
 
 // -------------------------------------------------------------------------

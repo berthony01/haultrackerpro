@@ -767,7 +767,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function HowItWorks() {
   const steps = [
-    { n: 1, title: 'Set up your recruiter profile', body: 'Add recruiter as an additional workspace on your account. Standard posting unlocks the moment your profile is complete — no admin approval needed.' },
+    { n: 1, title: 'Set up your recruiter profile', body: 'Add the recruiter workspace to your account and complete the required recruiter profile fields and posting terms. Standard posting does not require admin approval or a paid plan.' },
     { n: 2, title: 'Post structured opportunities', body: 'Post unlimited standard opportunities as soon as your recruiter profile is complete — drivers see real pay clarity, route info, and your hiring intent.' },
     { n: 3, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
     { n: 4, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },

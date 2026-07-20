@@ -460,6 +460,13 @@ describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)
     expect(container.textContent).not.toMatch(
       /Add recruiter as an additional workspace on your account\. Standard posting unlocks as soon as your profile is complete — no admin approval needed to post\./,
     );
+    // How It Works step 1 uses the reconciled copy and the old phrase is gone.
+    expect(container.textContent).toContain(
+      'Add the recruiter workspace to your account and complete the required recruiter profile fields and posting terms. Standard posting does not require admin approval or a paid plan.',
+    );
+    expect(container.textContent).not.toContain(
+      'Add recruiter as an additional workspace on your account. Standard posting unlocks the moment your profile is complete — no admin approval needed.',
+    );
     expectNoForbidden(container);
   });
 
