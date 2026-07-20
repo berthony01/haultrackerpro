@@ -1170,7 +1170,15 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} workspaceLoading={workspaceLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
+        <BottomNav
+          active={page}
+          onNavigate={handleNavigate}
+          role={effectiveRole ?? 'driver'}
+          workspaceLoading={workspaceLoading || !effectiveRole}
+          recruiterCapabilityStatus={recruiterCapabilityStatus}
+          recruiterOperationsAllowed={recruiterOperationsAllowed}
+          assistantPermissions={isActingAsAssistant ? actingPermissions : null}
+        />
       </div>
       <AddActionModal
         open={showAddModal}
