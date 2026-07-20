@@ -8,10 +8,18 @@ describe('Capability dashboards — recruiter + assistant first-class UX', () =>
   const app = read('src/App.tsx');
   const launcher = read('src/pages/CapabilityLauncher.tsx');
   const assistant = read('src/pages/AssistantDashboard.tsx');
+  const recruiterEntry = read('src/components/opportunities/recruiter/RecruiterEntryRoute.tsx');
 
-  it('exposes a first-class /recruiter route forwarding into recruiter-access hub', () => {
+  it('exposes a first-class /recruiter route through the controlled recruiter entry', () => {
     expect(app).toMatch(/path="\/recruiter"/);
-    expect(app).toMatch(/to="\/dashboard\?page=recruiter-access"/);
+    expect(app).toMatch(/<RecruiterEntryRoute\s*\/>/);
+    expect(recruiterEntry).toMatch(
+      /recruiterStatus === 'setup'[\s\S]*\? '\/dashboard\?page=recruiter-access:onboarding'/,
+    );
+    expect(recruiterEntry).toMatch(
+      /recruiterStatus === 'active' \|\| recruiterStatus === 'suspended'[\s\S]*\? '\/dashboard\?page=recruiter-access'/,
+    );
+    expect(recruiterEntry).toMatch(/navigate\(recruiterDestination, \{ replace: true \}\)/);
     // sub-views preserved
     expect(app).toMatch(/path="\/recruiter\/manage"/);
     expect(app).toMatch(/path="\/recruiter\/applications"/);
