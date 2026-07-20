@@ -1130,6 +1130,14 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     );
     return q.rows[0].n as number;
   }
+  async function notifCountFor(userId: string, appId: string, type: string) {
+    const q = await pool.query(
+      `SELECT count(*)::int AS n FROM public.notifications
+        WHERE user_id=$1 AND type=$2 AND payload->>'application_id'=$3::text`,
+      [userId, type, appId],
+    );
+    return q.rows[0].n as number;
+  }
 
   it("D1 race: concurrent send of the same draft offer — one offer_sent, one already_sent", async () => {
     const drv = await mintDriver(pool);
