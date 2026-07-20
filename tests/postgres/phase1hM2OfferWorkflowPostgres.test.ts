@@ -1338,10 +1338,9 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     expect(notif.rows[0].n).toBe(1);
   });
 
-  it("D8 race: driver withdrawal vs recruiter rejection — exactly one terminal winner (withdrawn or rejected)", async () => {
+  it("D8 race: driver withdrawal vs recruiter rejection — exact winner with recipient-scoped side effects", async () => {
     const drv = await mintDriver(pool);
     const appId = await submitApply(url, drv, ids.opportunity);
-    // Advance so rejection is a valid transition (from 'new' rejection is allowed).
     await barrierRace(url, [
       { uid: drv, sql: WITHDRAW_SQL, params: [appId] },
       { uid: ids.recruiterUser, sql: REJECT_SQL, params: [appId] },
@@ -1350,14 +1349,14 @@ describe("Phase 1H-M2 — real Postgres 16 offer workflow gate", () => {
     expect(["withdrawn", "rejected"]).toContain(app);
     if (app === "withdrawn") {
       expect(await eventCount(appId, "application_withdrawn")).toBe(1);
+      expect(await notifCountFor(ids.recruiterUser, appId, "application_withdrawn")).toBe(1);
+      expect(await eventCount(appId, "application_rejected")).toBe(0);
+      expect(await notifCountFor(drv, appId, "application_rejected")).toBe(0);
     } else {
-      expect(await eventCount(appId, "application_rejected")).toBeGreaterThanOrEqual(0);
-      // Must not also be withdrawn.
-      const w = await pool.query(
-        `SELECT count(*)::int n FROM public.application_events WHERE application_id=$1 AND event_type='application_withdrawn'`,
-        [appId],
-      );
-      expect(w.rows[0].n).toBe(0);
+      expect(await eventCount(appId, "application_rejected")).toBe(1);
+      expect(await notifCountFor(drv, appId, "application_rejected")).toBe(1);
+      expect(await eventCount(appId, "application_withdrawn")).toBe(0);
+      expect(await notifCountFor(ids.recruiterUser, appId, "application_withdrawn")).toBe(0);
     }
   });
 
