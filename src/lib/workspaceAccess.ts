@@ -2,8 +2,8 @@
  * Phase 1J-B1 — Capability-based workspace access decisions (pure).
  *
  * Single source of truth for "which workspace can this account enter?"
- * Consumes ONLY the validated `UserCapabilitiesView` from
- * `@/lib/userCapabilities`, an optional preferred-role hint
+ * Consumes ONLY validated capability rows through
+ * `deriveUserCapabilitiesView`, an optional preferred-role hint
  * (`profiles.intended_role` intent), and an optional stored preference
  * (localStorage). Never imports billing, subscription, plan, admin, or
  * Supabase clients. All decisions are pure functions.
@@ -13,18 +13,27 @@
  *  - driver.active            → driver workspace allowed.
  *  - recruiter.setup          → recruiter hub / onboarding only.
  *  - recruiter.active         → recruiter operational tools allowed.
- *  - recruiter.suspended      → recruiter hub only (see suspension +
- *                               switch back to driver).
+ *  - recruiter.suspended      → recruiter hub only (only the suspension
+ *                               notice surface — ALL requested subviews
+ *                               collapse to `hub`).
  *  - recruiter.revoked / missing → no recruiter workspace, no switch.
  *
  * Admin status alone NEVER grants recruiter workspace. Plans / billing
  * NEVER decide workspace entry. localStorage/sessionStorage may store
  * a preference only; it never grants access.
+ *
+ * Trust boundary: Only `view.rows` is trusted, and even that is
+ * re-validated through `deriveUserCapabilitiesView` on every call. Any
+ * caller-supplied boolean or status field on the view object (e.g.
+ * `canEnterDriverWorkspace`, `hasRecruiterCapability`) is IGNORED so a
+ * forged view cannot manufacture access.
  */
 
-import type {
-  UserCapabilitiesView,
-  UserCapabilityStatus,
+import {
+  deriveUserCapabilitiesView,
+  type UserCapabilitiesView,
+  type UserCapabilityRow,
+  type UserCapabilityStatus,
 } from '@/lib/userCapabilities';
 
 export type WorkspaceRole = 'driver' | 'recruiter';
@@ -76,18 +85,20 @@ export interface InitialWorkspaceResult {
   shouldClearStoredPreference: boolean;
 }
 
-/** True only when `view` is a real derived view with a defined `rows`
- *  array. Anything else fails closed. */
-function isView(view: unknown): view is UserCapabilitiesView {
-  if (!view || typeof view !== 'object') return false;
-  const v = view as Partial<UserCapabilitiesView>;
-  return Array.isArray(v.rows);
+/** Extract the trusted rows array from an untyped view object. Returns
+ *  `null` when the input does not carry a real rows array — every other
+ *  field on the view is ignored. */
+function extractRows(view: unknown): readonly UserCapabilityRow[] | null {
+  if (!view || typeof view !== 'object') return null;
+  const rows = (view as { rows?: unknown }).rows;
+  return Array.isArray(rows) ? (rows as readonly UserCapabilityRow[]) : null;
 }
 
 export function computeWorkspaceAccess(
   view: UserCapabilitiesView | null | undefined,
 ): WorkspaceAccessDecisions {
-  if (!isView(view)) {
+  const rows = extractRows(view);
+  if (!rows) {
     return {
       driverWorkspaceAllowed: false,
       recruiterHubAllowed: false,
@@ -98,10 +109,14 @@ export function computeWorkspaceAccess(
       recruiterCapabilityStatus: null,
     };
   }
+  // Re-derive from raw rows so forged sibling booleans on the input
+  // object cannot leak in. `deriveUserCapabilitiesView` re-runs the
+  // per-row validators and the fail-closed dedup policy.
+  const safe = deriveUserCapabilitiesView(rows);
 
-  const driverWorkspaceAllowed = view.canEnterDriverWorkspace === true;
-  const recruiterHubAllowed = view.hasRecruiterCapability === true;
-  const recruiterOperationsAllowed = view.canOperateRecruiterWorkspace === true;
+  const driverWorkspaceAllowed = safe.canEnterDriverWorkspace === true;
+  const recruiterHubAllowed = safe.hasRecruiterCapability === true;
+  const recruiterOperationsAllowed = safe.canOperateRecruiterWorkspace === true;
   const switcherAvailable = driverWorkspaceAllowed && recruiterHubAllowed;
 
   let allowedFallbackWorkspace: WorkspaceRole | null = null;
@@ -114,8 +129,8 @@ export function computeWorkspaceAccess(
     recruiterOperationsAllowed,
     switcherAvailable,
     allowedFallbackWorkspace,
-    driverCapabilityStatus: view.driverCapabilityStatus ?? null,
-    recruiterCapabilityStatus: view.recruiterCapabilityStatus ?? null,
+    driverCapabilityStatus: safe.driverCapabilityStatus,
+    recruiterCapabilityStatus: safe.recruiterCapabilityStatus,
   };
 }
 
@@ -176,8 +191,8 @@ function normalizeRole(v: unknown): WorkspaceRole | null {
  *   - No recruiter hub access → null.
  *   - setup     → operational requests collapse to `onboarding`;
  *                 `hub`/`onboarding` allowed as requested (default onboarding).
- *   - suspended → operational requests collapse to `hub`;
- *                 `hub`/`onboarding` allowed as requested (default hub).
+ *   - suspended → ALL requested subviews collapse to `hub`. Only the
+ *                 suspension notice surface is reachable.
  *   - active    → requested subview preserved (default `hub`).
  */
 export function resolveRecruiterSubview(
@@ -198,8 +213,9 @@ export function resolveRecruiterSubview(
     return req ?? 'onboarding';
   }
   if (status === 'suspended') {
-    if (req && OPERATIONAL_SUBVIEWS.has(req)) return 'hub';
-    return req ?? 'hub';
+    // Suspension is a terminal, hub-only surface: every requested
+    // subview — including onboarding — collapses to `hub`.
+    return 'hub';
   }
   return null;
 }
