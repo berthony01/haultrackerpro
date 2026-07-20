@@ -482,3 +482,83 @@ describe('Phase 1J-D2B-1 — read-only invariance (proof 9)', () => {
     expect(JSON.stringify(after)).toBe(JSON.stringify(before));
   });
 });
+
+describe('Phase 1J-D2B-1 — catalog signature proof (proof 13)', () => {
+  const expected = [
+    {
+      name: '_recruiter_paid_plan_rank',
+      args: '_plan text',
+      rtype: 'smallint',
+    },
+    {
+      name: '_recruiter_has_minimum_paid_plan',
+      args: '_recruiter_id uuid, _minimum_plan text',
+      rtype: 'boolean',
+    },
+    {
+      name: 'current_user_has_recruiter_minimum_paid_plan',
+      args: '_minimum_plan text',
+      rtype: 'boolean',
+    },
+  ];
+
+  it('all three functions have exactly one overload, exact identity args, exact result types, and the caller-bound function exposes no user_id/recruiter_id parameter', async () => {
+    for (const { name, args, rtype } of expected) {
+      const r = await db.query<{ args: string; rtype: string }>(
+        `SELECT pg_get_function_identity_arguments(p.oid) AS args,
+                pg_catalog.format_type(p.prorettype, NULL)   AS rtype
+           FROM pg_proc p
+           JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = $1`,
+        [name],
+      );
+      expect(r.rows.length, `expected exactly one overload of public.${name}`).toBe(1);
+      expect(r.rows[0].args, `identity args for public.${name}`).toBe(args);
+      expect(r.rows[0].rtype, `return type for public.${name}`).toBe(rtype);
+    }
+    // Caller-bound public function must accept no user_id or recruiter_id parameter.
+    const caller = expected.find(
+      (e) => e.name === 'current_user_has_recruiter_minimum_paid_plan',
+    )!;
+    expect(caller.args).not.toMatch(/user_id/i);
+    expect(caller.args).not.toMatch(/recruiter_id/i);
+    expect(caller.args).toBe('_minimum_plan text');
+  });
+});
+
+describe('Phase 1J-D2B-1 — null internal identity proof (proof 14)', () => {
+  it('_recruiter_has_minimum_paid_plan(null, "starter") returns false', async () => {
+    expect(await recHas(db, null, 'starter')).toBe(false);
+  });
+});
+
+describe('Phase 1J-D2B-1 — unrelated-GUC spoof proof (proof 15)', () => {
+  it('setting app.user_id to a paid user does not entitle a different auth.uid()', async () => {
+    const uA = uid(0x15a);
+    const uB = uid(0x15b);
+    await makeUser(db, uA);
+    await makeUser(db, uB);
+    const ridA = await makeRecruiter(db, uA);
+    await makeRecruiter(db, uB);
+    await insertBilling(db, ridA, uA, 'growth', 'active');
+
+    // Sanity: paid user A is entitled under their own auth.uid().
+    await setUid(db, uA);
+    expect(await curHas(db, 'growth')).toBe(true);
+
+    // Switch caller to unpaid user B.
+    await setUid(db, uB);
+    expect(await curHas(db, 'starter')).toBe(false);
+
+    // Attempt spoof: set an unrelated GUC to the paid user's id.
+    await db.query(`SELECT set_config('app.user_id', $1, false)`, [uA]);
+
+    // Function must still resolve against auth.uid() (user B), not app.user_id.
+    expect(await curHas(db, 'starter')).toBe(false);
+    expect(await curHas(db, 'growth')).toBe(false);
+
+    // Reset the unrelated GUC.
+    await db.query(`SELECT set_config('app.user_id', '', false)`);
+  });
+});
+
