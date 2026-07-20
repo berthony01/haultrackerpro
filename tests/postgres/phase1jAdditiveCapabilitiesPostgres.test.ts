@@ -27,6 +27,26 @@ const CANDIDATE_PATH = fileURLToPath(
   ),
 );
 
+const CANONICAL_PATH = fileURLToPath(
+  new URL(
+    '../../supabase/migrations/20260717185620_7efcb752-08f0-46b5-aaad-593e410aa818.sql',
+    import.meta.url,
+  ),
+);
+
+function extractRecruiterCanManageBlock(): string {
+  const src = readFileSync(CANONICAL_PATH, 'utf8');
+  const startMarker =
+    'CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(';
+  const endMarker =
+    'GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;';
+  const start = src.indexOf(startMarker);
+  if (start < 0) throw new Error('canonical: start marker not found');
+  const endIdx = src.indexOf(endMarker, start);
+  if (endIdx < 0) throw new Error('canonical: end marker not found');
+  return src.slice(start, endIdx + endMarker.length);
+}
+
 const BOOTSTRAP_SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -76,22 +96,8 @@ CREATE TABLE IF NOT EXISTS public.recruiter_profiles (
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.recruiter_profiles TO authenticated, service_role;
 
-CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(_recruiter_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-    WHERE rp.id = _recruiter_id
-      AND rp.status <> 'suspended' AND rp.verification_status <> 'suspended'
-      AND COALESCE(btrim(rp.recruiter_name), '') <> ''
-      AND COALESCE(btrim(rp.company_name), '') <> ''
-      AND COALESCE(btrim(rp.recruiter_email), '') <> ''
-      AND btrim(rp.recruiter_email) ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
-      AND (COALESCE(btrim(rp.dot_number), '') <> '' OR COALESCE(btrim(rp.mc_number), '') <> '')
-      AND (rp.posting_terms_accepted_at IS NOT NULL OR rp.legacy_terms_grandfathered_at IS NOT NULL)
-  );
-$$;
-REVOKE ALL ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;
+-- Canonical Phase 1F rule is loaded verbatim after this bootstrap runs
+-- (see beforeAll / extractRecruiterCanManageBlock).
 
 -- Billing shadow tables to assert non-interference.
 CREATE TABLE IF NOT EXISTS public.subscriptions (
@@ -196,9 +202,13 @@ async function caps(userId: string) {
   );
 }
 
+let CANONICAL_BLOCK = '';
+
 beforeAll(async () => {
   await pool.query(RESET_SQL);
   await pool.query(BOOTSTRAP_SQL);
+  CANONICAL_BLOCK = extractRecruiterCanManageBlock();
+  await pool.query(CANONICAL_BLOCK);
   const candidate = readFileSync(CANDIDATE_PATH, 'utf8');
   await pool.query(candidate);
 });
@@ -209,7 +219,12 @@ afterAll(async () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('Phase 1J-A · A. Catalog & ACL', () => {
+// Every migration in this project is run by the connection owner (postgres
+// locally and postgres:16 in CI). This is asserted explicitly rather than
+// hard-coded elsewhere so any owner drift surfaces immediately.
+const EXPECTED_OWNER = 'postgres';
+
+describe('Phase 1J-A · A. Catalog & ACL (exact matrix)', () => {
   it('running against real PostgreSQL 16', async () => {
     const [row] = await q<{ n: string; v: string }>(
       `SELECT current_setting('server_version_num') as n, current_setting('server_version') as v`,
@@ -217,6 +232,29 @@ describe('Phase 1J-A · A. Catalog & ACL', () => {
     const n = Number(row.n);
     expect(n).toBeGreaterThanOrEqual(160000);
     expect(n).toBeLessThan(170000);
+  });
+
+  it('canonical Phase 1F helper block is loaded from disk (no handwritten copy)', async () => {
+    expect(CANONICAL_BLOCK).toContain(
+      'CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(',
+    );
+    expect(CANONICAL_BLOCK).toContain(
+      'GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;',
+    );
+    expect(CANONICAL_BLOCK).toContain('SECURITY DEFINER');
+    expect(CANONICAL_BLOCK.length).toBeGreaterThan(200);
+    expect(
+      (BOOTSTRAP_SQL.match(
+        /CREATE OR REPLACE FUNCTION public\.recruiter_profile_can_manage_opportunities/g,
+      ) || []).length,
+    ).toBe(0);
+
+    const fn = await q<{ oid: string }>(
+      `SELECT p.oid::text FROM pg_proc p
+         JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='recruiter_profile_can_manage_opportunities'`,
+    );
+    expect(fn.length).toBe(1);
   });
 
   it('enum vocabulary is exact', async () => {
@@ -232,7 +270,47 @@ describe('Phase 1J-A · A. Catalog & ACL', () => {
     expect(s.map((r) => r.enumlabel)).toEqual(['setup', 'active', 'suspended', 'revoked']);
   });
 
-  it('table PK is (user_id, capability) and FK references auth.users', async () => {
+  it('table columns are exactly the six additive columns — no billing/plan/Stripe fields', async () => {
+    const cols = await q<{ attname: string; typ: string; notnull: boolean }>(
+      `SELECT a.attname, format_type(a.atttypid, a.atttypmod) AS typ, a.attnotnull AS notnull
+         FROM pg_attribute a
+        WHERE a.attrelid = 'public.user_capabilities'::regclass
+          AND a.attnum > 0 AND NOT a.attisdropped
+        ORDER BY a.attnum`,
+    );
+    expect(cols.map((c) => c.attname)).toEqual([
+      'user_id',
+      'capability',
+      'status',
+      'activated_at',
+      'created_at',
+      'updated_at',
+    ]);
+    const byName = Object.fromEntries(cols.map((c) => [c.attname, c]));
+    expect(byName.user_id.typ).toBe('uuid');
+    expect(byName.user_id.notnull).toBe(true);
+    expect(byName.capability.typ).toBe('user_capability_type');
+    expect(byName.status.typ).toBe('user_capability_status');
+    expect(byName.activated_at.typ).toBe('timestamp with time zone');
+    expect(byName.activated_at.notnull).toBe(false);
+    expect(byName.created_at.notnull).toBe(true);
+    expect(byName.updated_at.notnull).toBe(true);
+
+    // Belt-and-braces: no plan/billing vocabulary crept into the table.
+    const forbidden = /plan|billing|subscription|price|stripe|premium/i;
+    for (const c of cols) expect(forbidden.test(c.attname)).toBe(false);
+  });
+
+  it('table owner matches migration owner', async () => {
+    const [row] = await q<{ owner: string }>(
+      `SELECT r.rolname AS owner FROM pg_class c
+         JOIN pg_roles r ON r.oid = c.relowner
+        WHERE c.oid = 'public.user_capabilities'::regclass`,
+    );
+    expect(row.owner).toBe(EXPECTED_OWNER);
+  });
+
+  it('table PK is (user_id, capability) and FK is ON DELETE CASCADE to auth.users', async () => {
     const pk = await q<{ attname: string }>(
       `SELECT a.attname FROM pg_index i
         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -244,18 +322,44 @@ describe('Phase 1J-A · A. Catalog & ACL', () => {
       `SELECT confrelid::regclass::text as confrelid, confdeltype FROM pg_constraint
        WHERE conrelid = 'public.user_capabilities'::regclass AND contype = 'f'`,
     );
+    expect(fk.length).toBe(1);
     expect(fk[0].confrelid).toBe('auth.users');
-    expect(fk[0].confdeltype).toBe('c'); // ON DELETE CASCADE
+    expect(fk[0].confdeltype).toBe('c');
   });
 
-  it('RLS enabled', async () => {
-    const r = await q<{ relrowsecurity: boolean }>(
+  it('RLS enabled and exactly one policy: user_capabilities_self_select', async () => {
+    const [r] = await q<{ relrowsecurity: boolean }>(
       `SELECT relrowsecurity FROM pg_class WHERE oid = 'public.user_capabilities'::regclass`,
     );
-    expect(r[0].relrowsecurity).toBe(true);
+    expect(r.relrowsecurity).toBe(true);
+
+    const pols = await q<{
+      polname: string;
+      polcmd: string;
+      roles: string[];
+      qual: string;
+      withcheck: string | null;
+    }>(
+      `SELECT p.polname,
+              CASE p.polcmd WHEN 'r' THEN 'SELECT' WHEN 'a' THEN 'INSERT'
+                            WHEN 'w' THEN 'UPDATE' WHEN 'd' THEN 'DELETE'
+                            WHEN '*' THEN 'ALL' END AS polcmd,
+              ARRAY(SELECT rolname::text FROM pg_roles WHERE oid = ANY(p.polroles))::text[] AS roles,
+              pg_get_expr(p.polqual, p.polrelid) AS qual,
+              pg_get_expr(p.polwithcheck, p.polrelid) AS withcheck
+         FROM pg_policy p
+        WHERE p.polrelid = 'public.user_capabilities'::regclass
+        ORDER BY p.polname`,
+    );
+    expect(pols.length).toBe(1);
+    expect(pols[0].polname).toBe('user_capabilities_self_select');
+    expect(pols[0].polcmd).toBe('SELECT');
+    expect(pols[0].roles).toEqual(['authenticated']);
+    expect(pols[0].qual.replace(/\s+/g, '')).toBe('(user_id=auth.uid())');
+    expect(pols[0].withcheck).toBeNull();
   });
 
-  it('table ACLs: anon has nothing; authenticated SELECT only; service_role ALL', async () => {
+  it('table ACLs: PUBLIC/anon nothing; authenticated SELECT only; service_role ALL', async () => {
     const priv = async (role: string, p: string) =>
       (
         await q<{ has: boolean }>(
@@ -263,72 +367,182 @@ describe('Phase 1J-A · A. Catalog & ACL', () => {
           [role, p],
         )
       )[0].has;
-    expect(await priv('anon', 'SELECT')).toBe(false);
-    expect(await priv('anon', 'INSERT')).toBe(false);
+
+    for (const p of ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
+      expect(await priv('anon', p)).toBe(false);
     expect(await priv('authenticated', 'SELECT')).toBe(true);
-    expect(await priv('authenticated', 'INSERT')).toBe(false);
-    expect(await priv('authenticated', 'UPDATE')).toBe(false);
-    expect(await priv('authenticated', 'DELETE')).toBe(false);
+    for (const p of ['INSERT', 'UPDATE', 'DELETE'])
+      expect(await priv('authenticated', p)).toBe(false);
     for (const p of ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
       expect(await priv('service_role', p)).toBe(true);
+
+    // PUBLIC ACL check: grantee OID 0 must appear nowhere in relacl.
+    const pub = await q<{ n: number }>(
+      `SELECT COUNT(*)::int AS n
+         FROM pg_class c, LATERAL aclexplode(c.relacl) a
+        WHERE c.oid='public.user_capabilities'::regclass AND a.grantee=0`,
+    );
+    expect(pub[0].n).toBe(0);
   });
 
-  it('RPC signatures, SECURITY DEFINER, and search_path are correct', async () => {
+  const EXPECTED_FUNCTIONS: Array<{
+    name: string;
+    args: string;
+    volatility: 'i' | 's' | 'v';
+  }> = [
+    { name: 'get_my_user_capabilities', args: '', volatility: 's' },
+    { name: 'begin_recruiter_setup', args: '', volatility: 'v' },
+    { name: '_derive_recruiter_capability_status', args: '_user_id uuid', volatility: 's' },
+    { name: '_sync_recruiter_capability', args: '_user_id uuid', volatility: 'v' },
+    { name: '_recruiter_profile_capability_sync', args: '', volatility: 'v' },
+    { name: '_profile_intent_capability_sync', args: '', volatility: 'v' },
+    { name: '_provision_driver_capability_for_new_user', args: '', volatility: 'v' },
+  ];
+
+  it('every new function has exact identity args, owner, SECURITY DEFINER, volatility, and search_path=public', async () => {
+    const names = EXPECTED_FUNCTIONS.map((f) => f.name);
     const rows = await q<{
       proname: string;
-      prosecdef: boolean;
-      config: string[] | null;
+      args: string;
       owner: string;
+      prosecdef: boolean;
+      provolatile: string;
+      config: string[] | null;
     }>(
-      `SELECT p.proname, p.prosecdef, p.proconfig AS config, r.rolname AS owner
-         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-         JOIN pg_roles r ON r.oid=p.proowner
-        WHERE n.nspname='public'
-          AND p.proname IN ('get_my_user_capabilities','begin_recruiter_setup',
-                             '_sync_recruiter_capability','_derive_recruiter_capability_status',
-                             '_recruiter_profile_capability_sync',
-                             '_profile_intent_capability_sync',
-                             '_provision_driver_capability_for_new_user')`,
+      `SELECT p.proname,
+              pg_get_function_identity_arguments(p.oid) AS args,
+              r.rolname AS owner,
+              p.prosecdef,
+              p.provolatile,
+              p.proconfig AS config
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         JOIN pg_roles r ON r.oid = p.proowner
+        WHERE n.nspname='public' AND p.proname = ANY($1::text[])
+        ORDER BY p.proname`,
+      [names],
     );
-    expect(rows.length).toBe(7);
-    for (const r of rows) {
+    expect(rows.length).toBe(EXPECTED_FUNCTIONS.length);
+    const byName = Object.fromEntries(rows.map((r) => [r.proname, r]));
+    for (const expected of EXPECTED_FUNCTIONS) {
+      const r = byName[expected.name];
+      expect(r, `function ${expected.name}`).toBeDefined();
+      expect(r.args).toBe(expected.args);
+      expect(r.owner).toBe(EXPECTED_OWNER);
       expect(r.prosecdef).toBe(true);
-      expect((r.config ?? []).some((c) => c.startsWith('search_path=public'))).toBe(true);
+      expect(r.provolatile).toBe(expected.volatility);
+      expect(r.config ?? []).toContain('search_path=public');
     }
   });
 
-  it('EXECUTE grants: public RPCs authenticated only; internals service_role only', async () => {
+  it('EXECUTE grants: PUBLIC/anon nothing on any RPC or helper; authenticated only on the two public RPCs', async () => {
     const canExec = async (role: string, sig: string) =>
       (await q<{ has: boolean }>(`SELECT has_function_privilege($1, $2, 'EXECUTE') AS has`, [role, sig]))[0].has;
 
-    expect(await canExec('anon', 'public.get_my_user_capabilities()')).toBe(false);
-    expect(await canExec('authenticated', 'public.get_my_user_capabilities()')).toBe(true);
-    expect(await canExec('anon', 'public.begin_recruiter_setup()')).toBe(false);
-    expect(await canExec('authenticated', 'public.begin_recruiter_setup()')).toBe(true);
-    for (const sig of [
+    const publicSigs = ['public.get_my_user_capabilities()', 'public.begin_recruiter_setup()'];
+    const internalSigs = [
       'public._sync_recruiter_capability(uuid)',
       'public._derive_recruiter_capability_status(uuid)',
       'public._recruiter_profile_capability_sync()',
       'public._profile_intent_capability_sync()',
       'public._provision_driver_capability_for_new_user()',
-    ]) {
+    ];
+
+    for (const sig of publicSigs) {
+      expect(await canExec('anon', sig)).toBe(false);
+      expect(await canExec('authenticated', sig)).toBe(true);
+      expect(await canExec('service_role', sig)).toBe(true);
+    }
+    for (const sig of internalSigs) {
       expect(await canExec('anon', sig)).toBe(false);
       expect(await canExec('authenticated', sig)).toBe(false);
       expect(await canExec('service_role', sig)).toBe(true);
     }
+
+    // PUBLIC (grantee OID 0) must not appear on the proacl of any new function.
+    const pub = await q<{ proname: string; n: number }>(
+      `SELECT p.proname, COUNT(a.*)::int AS n
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         LEFT JOIN LATERAL aclexplode(p.proacl) a ON a.grantee = 0
+        WHERE n.nspname='public'
+          AND p.proname = ANY($1::text[])
+        GROUP BY p.proname`,
+      [[...publicSigs, ...internalSigs].map((s) => s.split('.')[1].split('(')[0])],
+    );
+    for (const row of pub) expect(row.n, `PUBLIC on ${row.proname}`).toBe(0);
   });
 
-  it('triggers exist and are enabled', async () => {
-    const trg = await q<{ tgname: string; tgenabled: string }>(
-      `SELECT tgname, tgenabled FROM pg_trigger
-        WHERE tgname IN ('trg_provision_driver_capability',
-                          'trg_recruiter_profile_capability_sync',
-                          'trg_profile_intent_capability_sync')`,
+  it('trigger mapping: exact relation, function, level, timing, event, and enabled state', async () => {
+    const rows = await q<{
+      tgname: string;
+      relname: string;
+      relnspname: string;
+      fname: string;
+      fnspname: string;
+      tgtype: number;
+      tgenabled: string;
+    }>(
+      `SELECT t.tgname,
+              c.relname, nc.nspname AS relnspname,
+              p.proname AS fname, np.nspname AS fnspname,
+              t.tgtype::int AS tgtype,
+              t.tgenabled
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace nc ON nc.oid = c.relnamespace
+         JOIN pg_proc  p ON p.oid = t.tgfoid
+         JOIN pg_namespace np ON np.oid = p.pronamespace
+        WHERE NOT t.tgisinternal
+          AND t.tgname IN (
+            'trg_provision_driver_capability',
+            'trg_recruiter_profile_capability_sync',
+            'trg_profile_intent_capability_sync',
+            'trg_user_capabilities_updated_at'
+          )
+        ORDER BY t.tgname`,
     );
-    expect(trg.length).toBe(3);
-    for (const t of trg) expect(t.tgenabled).toBe('O');
+    const byName = Object.fromEntries(rows.map((r) => [r.tgname, r]));
+
+    // tgtype bitmask reference: 1=row, 2=before, 4=insert, 8=delete, 16=update
+    const expectations: Record<
+      string,
+      { rel: [string, string]; fn: [string, string]; tgtype: number }
+    > = {
+      trg_provision_driver_capability: {
+        rel: ['auth', 'users'],
+        fn: ['public', '_provision_driver_capability_for_new_user'],
+        tgtype: 1 + 4, // AFTER INSERT, row
+      },
+      trg_recruiter_profile_capability_sync: {
+        rel: ['public', 'recruiter_profiles'],
+        fn: ['public', '_recruiter_profile_capability_sync'],
+        tgtype: 1 + 4 + 8 + 16, // AFTER INSERT|UPDATE|DELETE, row
+      },
+      trg_profile_intent_capability_sync: {
+        rel: ['public', 'profiles'],
+        fn: ['public', '_profile_intent_capability_sync'],
+        tgtype: 1 + 4 + 16, // AFTER INSERT|UPDATE, row
+      },
+      trg_user_capabilities_updated_at: {
+        rel: ['public', 'user_capabilities'],
+        fn: ['public', 'update_updated_at_column'],
+        tgtype: 1 + 2 + 16, // BEFORE UPDATE, row
+      },
+    };
+
+    for (const [name, exp] of Object.entries(expectations)) {
+      const row = byName[name];
+      expect(row, `trigger ${name}`).toBeDefined();
+      expect([row.relnspname, row.relname]).toEqual(exp.rel);
+      expect([row.fnspname, row.fname]).toEqual(exp.fn);
+      expect(row.tgtype).toBe(exp.tgtype);
+      expect(row.tgenabled).toBe('O');
+    }
+    expect(Object.keys(byName).sort()).toEqual(Object.keys(expectations).sort());
   });
 });
+
 
 // ---------------------------------------------------------------------------
 describe('Phase 1J-A · B. Runtime authorization', () => {
@@ -641,3 +855,50 @@ describe('Phase 1J-A · E. Capability lifecycle durability', () => {
     expect(drv?.activated_at).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('Phase 1J-A · F. No-intent recruiter lifecycle', () => {
+  it('driver with intended_role null → begin_setup → complete profile → active → delete → setup', async () => {
+    const u = await createUser();
+    await insertProfile(u, null); // no recruiter intent
+    const first = await asUser(u, async (c) =>
+      (await c.query(`SELECT public.begin_recruiter_setup()::text AS s`)).rows[0].s,
+    );
+    expect(first).toBe('setup');
+
+    await completeRecruiter(u, { verification_status: 'approved' });
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('active');
+
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    const rows = await caps(u);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+
+    const [p] = await q<{ intended_role: string | null }>(
+      `SELECT intended_role FROM public.profiles WHERE user_id = $1`,
+      [u],
+    );
+    expect(p.intended_role).toBeNull();
+  });
+
+  it('active recruiter with intended_role null → delete profile → setup, driver still active', async () => {
+    const u = await createUser();
+    await insertProfile(u, null);
+    await completeRecruiter(u, { verification_status: 'approved' });
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    const rows = await caps(u);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+  });
+
+  it("active recruiter with intended_role 'driver' → delete profile → setup, driver still active", async () => {
+    const u = await createUser();
+    await insertProfile(u, 'driver');
+    await completeRecruiter(u, { verification_status: 'approved' });
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    const rows = await caps(u);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+  });
+});
+

@@ -13,12 +13,39 @@ import { PGlite } from '@electric-sql/pglite';
 
 import {
   deriveUserCapabilitiesView,
+  parseUserCapabilityRow,
+  parseUserCapabilityRows,
+  parseUserCapabilityStatus,
+  isUserCapabilityStatus,
+  isUserCapabilityType,
+  USER_CAPABILITY_STATUSES,
+  USER_CAPABILITY_TYPES,
   type UserCapabilityRow,
 } from '@/lib/userCapabilities';
 import {
   getRecruiterPlanCapabilities,
   resolveRecruiterCapabilityTier,
 } from '@/lib/recruiterCapabilities';
+
+const CANONICAL_REL =
+  '../../supabase/migrations/20260717185620_7efcb752-08f0-46b5-aaad-593e410aa818.sql';
+
+/**
+ * Read the canonical Phase 1F migration and slice out the exact block
+ * defining `public.recruiter_profile_can_manage_opportunities(uuid)` up to
+ * and including the service_role GRANT. Never returns a handwritten copy.
+ */
+function extractRecruiterCanManageBlock(): string {
+  const src = read(CANONICAL_REL);
+  const startMarker = 'CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(';
+  const endMarker =
+    'GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;';
+  const start = src.indexOf(startMarker);
+  if (start < 0) throw new Error('canonical: start marker not found');
+  const endIdx = src.indexOf(endMarker, start);
+  if (endIdx < 0) throw new Error('canonical: end marker not found');
+  return src.slice(start, endIdx + endMarker.length);
+}
 
 interface AnyPGlite {
   exec(sql: string): Promise<unknown>;
@@ -68,22 +95,8 @@ CREATE TABLE public.recruiter_profiles (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Canonical Phase 1F rule (reused verbatim).
-CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(_recruiter_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-    WHERE rp.id = _recruiter_id
-      AND rp.status <> 'suspended'
-      AND rp.verification_status <> 'suspended'
-      AND COALESCE(btrim(rp.recruiter_name), '') <> ''
-      AND COALESCE(btrim(rp.company_name), '') <> ''
-      AND COALESCE(btrim(rp.recruiter_email), '') <> ''
-      AND btrim(rp.recruiter_email) ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
-      AND (COALESCE(btrim(rp.dot_number), '') <> '' OR COALESCE(btrim(rp.mc_number), '') <> '')
-      AND (rp.posting_terms_accepted_at IS NOT NULL OR rp.legacy_terms_grandfathered_at IS NOT NULL)
-  );
-$$;
+-- Canonical Phase 1F rule is loaded verbatim from
+-- supabase/migrations/20260717185620_*.sql after this bootstrap runs.
 
 CREATE TABLE public.subscriptions (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -154,11 +167,40 @@ async function capsFor(db: AnyPGlite, userId: string) {
 }
 
 let db: AnyPGlite;
+let CANONICAL_BLOCK: string;
 
 beforeAll(async () => {
   db = new PGlite() as unknown as AnyPGlite;
   await db.exec(BOOTSTRAP);
+  CANONICAL_BLOCK = extractRecruiterCanManageBlock();
+  await db.exec(CANONICAL_BLOCK);
   await db.exec(read(CANDIDATE_REL));
+});
+
+describe('Phase 1J-A — canonical recruiter completeness helper source', () => {
+  it('canonical migration file exists and is nonempty', () => {
+    const src = read(CANONICAL_REL);
+    expect(src.length).toBeGreaterThan(200);
+  });
+
+  it('extracted block contains the exact function signature and service_role GRANT', () => {
+    expect(CANONICAL_BLOCK).toContain(
+      'CREATE OR REPLACE FUNCTION public.recruiter_profile_can_manage_opportunities(',
+    );
+    expect(CANONICAL_BLOCK).toContain(
+      'GRANT EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;',
+    );
+    expect(CANONICAL_BLOCK).toContain('REVOKE ALL ON FUNCTION');
+    expect(CANONICAL_BLOCK).toContain('SECURITY DEFINER');
+    expect(CANONICAL_BLOCK.length).toBeGreaterThan(200);
+  });
+
+  it('bootstrap does not contain a second handwritten definition', () => {
+    const occurrences = (BOOTSTRAP.match(
+      /CREATE OR REPLACE FUNCTION public\.recruiter_profile_can_manage_opportunities/g,
+    ) || []).length;
+    expect(occurrences).toBe(0);
+  });
 });
 
 describe('Phase 1J-A — pure capability helper', () => {
@@ -465,5 +507,160 @@ describe('Phase 1J-A — capability lifecycle durability', () => {
     const drv = (await capsFor(db, id)).find((r) => r.capability === 'driver');
     expect(drv?.status).toBe('active');
     expect(drv?.activated_at).not.toBeNull();
+  });
+});
+
+describe('Phase 1J-A — no-intent recruiter lifecycle', () => {
+  it('ordinary driver (intended_role null) → begin_setup → complete profile → active → delete profile → setup remains', async () => {
+    const id = uid(40);
+    await makeUser(db, id, true, null); // no recruiter intent
+    await setUid(db, id);
+    const s1 = await db.query<{ begin_recruiter_setup: string }>(
+      `SELECT public.begin_recruiter_setup()`,
+    );
+    expect(s1.rows[0].begin_recruiter_setup).toBe('setup');
+    await setUid(db, null);
+
+    await completeRecruiter(db, id, { verification_status: 'approved' });
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe(
+      'active',
+    );
+
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [id]);
+    const rows = await capsFor(db, id);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+
+    // intended_role never touched at any point.
+    const p = await db.query<{ intended_role: string | null }>(
+      `SELECT intended_role FROM public.profiles WHERE user_id = $1`,
+      [id],
+    );
+    expect(p.rows[0].intended_role).toBeNull();
+  });
+
+  it('active recruiter with intended_role null → delete profile → setup remains, driver active', async () => {
+    const id = uid(41);
+    await makeUser(db, id, true, null);
+    await completeRecruiter(db, id, { verification_status: 'approved' });
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe(
+      'active',
+    );
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [id]);
+    const rows = await capsFor(db, id);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+  });
+
+  it("active recruiter with intended_role 'driver' → delete profile → setup remains, driver active", async () => {
+    const id = uid(42);
+    await makeUser(db, id, true, 'driver');
+    await completeRecruiter(db, id, { verification_status: 'approved' });
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [id]);
+    const rows = await capsFor(db, id);
+    expect(rows.find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    expect(rows.find((r) => r.capability === 'driver')?.status).toBe('active');
+  });
+});
+
+describe('Phase 1J-A — client RPC payload parsers', () => {
+  it('exposes the exact enum vocabulary', () => {
+    expect(USER_CAPABILITY_TYPES).toEqual(['driver', 'recruiter']);
+    expect(USER_CAPABILITY_STATUSES).toEqual(['setup', 'active', 'suspended', 'revoked']);
+  });
+
+  it('type/status predicates reject unknowns', () => {
+    expect(isUserCapabilityType('driver')).toBe(true);
+    expect(isUserCapabilityType('recruiter')).toBe(true);
+    expect(isUserCapabilityType('admin')).toBe(false);
+    expect(isUserCapabilityType(null)).toBe(false);
+    expect(isUserCapabilityType(1)).toBe(false);
+
+    for (const s of USER_CAPABILITY_STATUSES) expect(isUserCapabilityStatus(s)).toBe(true);
+    expect(isUserCapabilityStatus('premium')).toBe(false);
+    expect(isUserCapabilityStatus('')).toBe(false);
+    expect(isUserCapabilityStatus(undefined)).toBe(false);
+  });
+
+  it('parseUserCapabilityStatus accepts every valid status and rejects garbage', () => {
+    for (const s of USER_CAPABILITY_STATUSES) expect(parseUserCapabilityStatus(s)).toBe(s);
+    expect(() => parseUserCapabilityStatus('bogus')).toThrow();
+    expect(() => parseUserCapabilityStatus(null)).toThrow();
+    expect(() => parseUserCapabilityStatus({ status: 'active' })).toThrow();
+  });
+
+  it('parseUserCapabilityRow accepts valid rows and rejects malformed shapes', () => {
+    expect(
+      parseUserCapabilityRow({ capability: 'driver', status: 'active', activated_at: null }),
+    ).toEqual({ capability: 'driver', status: 'active', activated_at: null });
+    expect(
+      parseUserCapabilityRow({
+        capability: 'recruiter',
+        status: 'setup',
+        activated_at: '2026-07-20T00:00:00Z',
+      })?.activated_at,
+    ).toBe('2026-07-20T00:00:00Z');
+
+    // Malformed / unknown / non-object:
+    expect(parseUserCapabilityRow(null)).toBeNull();
+    expect(parseUserCapabilityRow('driver')).toBeNull();
+    expect(parseUserCapabilityRow([])).toBeNull();
+    expect(parseUserCapabilityRow({})).toBeNull();
+    expect(
+      parseUserCapabilityRow({ capability: 'admin', status: 'active', activated_at: null }),
+    ).toBeNull();
+    expect(
+      parseUserCapabilityRow({ capability: 'driver', status: 'premium', activated_at: null }),
+    ).toBeNull();
+    expect(
+      parseUserCapabilityRow({ capability: 'driver', status: 'active', activated_at: 'not-a-date' }),
+    ).toBeNull();
+    expect(
+      parseUserCapabilityRow({ capability: 'driver', status: 'active', activated_at: 12345 }),
+    ).toBeNull();
+  });
+
+  it('parseUserCapabilityRows returns [] for non-array payloads', () => {
+    expect(parseUserCapabilityRows(null)).toEqual([]);
+    expect(parseUserCapabilityRows(undefined)).toEqual([]);
+    expect(parseUserCapabilityRows({} as unknown)).toEqual([]);
+    expect(parseUserCapabilityRows('driver' as unknown)).toEqual([]);
+  });
+
+  it('parseUserCapabilityRows drops invalid entries and dedupes deterministically (first-wins)', () => {
+    const rows = parseUserCapabilityRows([
+      { capability: 'driver', status: 'active', activated_at: null },
+      { capability: 'driver', status: 'revoked', activated_at: null }, // dropped
+      { capability: 'admin', status: 'active', activated_at: null }, // dropped
+      null,
+      { capability: 'recruiter', status: 'setup', activated_at: null },
+      { capability: 'recruiter', status: 'active', activated_at: null }, // dropped
+    ]);
+    expect(rows).toEqual([
+      { capability: 'driver', status: 'active', activated_at: null },
+      { capability: 'recruiter', status: 'setup', activated_at: null },
+    ]);
+  });
+
+  it('deriveUserCapabilitiesView re-validates and never trusts unknown vocabulary', () => {
+    const v = deriveUserCapabilitiesView([
+      { capability: 'driver', status: 'active', activated_at: null },
+      // Attackers cannot escalate by injecting a fake status.
+      { capability: 'recruiter', status: 'premium' as unknown as 'active', activated_at: null },
+    ]);
+    expect(v.hasRecruiterCapability).toBe(false);
+    expect(v.canOperateRecruiterWorkspace).toBe(false);
+    expect(v.canEnterDriverWorkspace).toBe(true);
+  });
+
+  it('revoked recruiter is not operable, not setup-enterable, not "has capability"', () => {
+    const v = deriveUserCapabilitiesView([
+      { capability: 'driver', status: 'active', activated_at: null },
+      { capability: 'recruiter', status: 'revoked', activated_at: null },
+    ]);
+    expect(v.hasRecruiterCapability).toBe(false);
+    expect(v.canEnterRecruiterSetup).toBe(false);
+    expect(v.canOperateRecruiterWorkspace).toBe(false);
+    expect(v.recruiterCapabilityStatus).toBe('revoked');
   });
 });
