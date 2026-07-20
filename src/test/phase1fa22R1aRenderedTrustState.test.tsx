@@ -11,7 +11,7 @@
 // button's disabled wiring changes, these tests fail.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
 import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
