@@ -46,7 +46,6 @@ function extractBillingTableBlock(): string {
 }
 
 const BOOTSTRAP = `
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE SCHEMA IF NOT EXISTS auth;
 
