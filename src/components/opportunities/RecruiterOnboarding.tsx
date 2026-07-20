@@ -261,7 +261,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
               <Input value={form.mc_number} onChange={(e) => set('mc_number', e.target.value)} />
             </Field>
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              Provide at least one of DOT or MC number. We use it to verify your authority for the Verified Recruiter badge review — standard posting is not gated on this.
+              Provide at least one DOT or MC number. It is required to complete your recruiter profile and is also used for Verified Recruiter badge review. Standard posting unlocks when the required profile and posting terms are complete; badge approval is separate.
             </p>
           </Section>
 
