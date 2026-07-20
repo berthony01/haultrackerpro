@@ -1,28 +1,17 @@
-# CI trigger: validate the current Phase 1H-M2 candidate on real PostgreSQL 16.
-name: Phase 1H-M2 — Postgres 16 Offer Workflow Gate
+# Temporary verification-only workflow for Phase 1J-C2. Do not merge.
+name: Phase 1J-C2 — Recruiter Copy and Assistant Agency Navigation Gate
 
 on:
-  push:
-    paths:
-      - '.github/workflows/phase1h-m2-postgres.yml'
-      - 'tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts'
-      - 'vitest.phase1h-m2-postgres.config.ts'
-      - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
-      - 'supabase/migrations/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
   pull_request:
     paths:
       - '.github/workflows/phase1h-m2-postgres.yml'
-      - 'tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts'
-      - 'vitest.phase1h-m2-postgres.config.ts'
-      - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
-      - 'supabase/migrations/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
   workflow_dispatch:
 
 jobs:
-  phase1h-m2-postgres:
-    name: Real Postgres 16 — M2 offer workflow
+  phase1j-c2-gate:
+    name: Phase 1J-C2 full production gate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -53,45 +42,105 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
-      - name: Forbidden-marker scan (no .only / .skip / .todo)
+      - name: Forbidden-marker and misleading-copy scans
         run: |
-          if grep -nE '\.only\(|\.skip\(|it\.todo\(|describe\.todo\(' tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts; then
-            echo "Forbidden Vitest marker found in Phase 1H-M2 PG16 test."; exit 1
+          set -euo pipefail
+          files=(
+            src/test/phase1jC2RecruiterCopyReconciliation.test.tsx
+            src/test/phase1jC2NavDiscoverability.test.tsx
+            src/test/phase1jC2CapabilityLauncherIntact.test.tsx
+            src/test/phase1fa22R1aRenderedTrustState.test.tsx
+            src/test/phase1eRecruiterOnboardingContinuity.test.ts
+            src/test/phase1fRecruiterEligibility.test.ts
+            src/test/phase1jB2ARecruiterEntry.test.tsx
+            src/test/phase1jB2BDashboardGating.test.tsx
+            src/test/phase1jBWorkspaceRouting.test.tsx
+            src/test/phase1jAdditiveCapabilities.test.ts
+            src/test/phase4aDriverControlCenter.test.ts
+            src/test/assistantAgencyAccessIntegrity.test.ts
+            src/test/assistantAgencyAccessIntegrityB.test.ts
+            src/test/phase3AgencyWorkflow.test.ts
+          )
+          if grep -nE '\.only\(|\.skip\(|\.todo\(|\b(xit|xdescribe)\b' "${files[@]}"; then
+            echo 'Forbidden test marker found'; exit 1
           fi
-          echo "clean"
+          if grep -nEi 'Apply for Recruiter Access|Start Application|submit your recruiter profile for review|before approval' \
+            src/lib/opportunities/recruiterEligibility.ts \
+            src/components/opportunities/recruiter/RecruiterAccessPage.tsx \
+            src/components/opportunities/RecruiterOnboarding.tsx \
+            src/components/opportunities/recruiter/RecruiterEntryRoute.tsx; then
+            echo 'Misleading recruiter copy found'; exit 1
+          fi
+          echo clean
 
-      - name: Wait for Postgres readiness
+      - name: Wait for PostgreSQL 16
         run: |
           for i in $(seq 1 30); do
             if pg_isready -h localhost -p 5432 -U postgres; then
-              echo "postgres ready"; exit 0
+              echo 'postgres ready'; exit 0
             fi
             sleep 1
           done
-          echo "postgres did not become ready"; exit 1
+          echo 'postgres did not become ready'; exit 1
 
-      - name: Run Phase 1H-M2 real-Postgres 16 gate
+      - name: Run real PostgreSQL 16 M2 regression gate
         id: pg_gate
         run: |
           set -o pipefail
           mkdir -p artifacts
-          bunx vitest run --config vitest.phase1h-m2-postgres.config.ts --reporter=verbose 2>&1 | tee artifacts/phase1h-m2-postgres.log
+          bunx vitest run --config vitest.phase1h-m2-postgres.config.ts --reporter=verbose 2>&1 | tee artifacts/phase1j-c2-postgres16.log
         continue-on-error: true
 
-      - name: Upload PG16 gate log
+      - name: Upload PostgreSQL 16 log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase1h-m2-postgres-log
-          path: artifacts/phase1h-m2-postgres.log
+          name: phase1j-c2-postgres16-log
+          path: artifacts/phase1j-c2-postgres16.log
 
-      - name: Enforce PG16 gate result
+      - name: Enforce PostgreSQL 16 result
         if: steps.pg_gate.outcome != 'success'
-        run: |
-          echo "Phase 1H-M2 real-Postgres 16 gate failed. See uploaded log."
-          exit 1
+        run: exit 1
 
-      - name: Run existing Phase 1H-M2 focused PGlite suite
+      - name: C2 — recruiter copy supplementary guards
+        run: bunx vitest run src/test/phase1jC2RecruiterCopyReconciliation.test.tsx
+
+      - name: C2 — navigation discoverability
+        run: bunx vitest run src/test/phase1jC2NavDiscoverability.test.tsx
+
+      - name: C2 — capability launcher intact
+        run: bunx vitest run src/test/phase1jC2CapabilityLauncherIntact.test.tsx
+
+      - name: Recruiter real rendered trust and copy matrix
+        run: bunx vitest run src/test/phase1fa22R1aRenderedTrustState.test.tsx
+
+      - name: Recruiter onboarding continuity
+        run: bunx vitest run src/test/phase1eRecruiterOnboardingContinuity.test.ts
+
+      - name: Recruiter eligibility policy
+        run: bunx vitest run src/test/phase1fRecruiterEligibility.test.ts
+
+      - name: Phase 1J recruiter entry
+        run: bunx vitest run src/test/phase1jB2ARecruiterEntry.test.tsx
+
+      - name: Phase 1J dashboard gating
+        run: bunx vitest run src/test/phase1jB2BDashboardGating.test.tsx
+
+      - name: Phase 1J workspace routing
+        run: bunx vitest run src/test/phase1jBWorkspaceRouting.test.tsx
+
+      - name: Phase 1J additive capabilities
+        run: bunx vitest run src/test/phase1jAdditiveCapabilities.test.ts
+
+      - name: Assistant and Agency regressions
+        run: >-
+          bunx vitest run
+          src/test/phase4aDriverControlCenter.test.ts
+          src/test/assistantAgencyAccessIntegrity.test.ts
+          src/test/assistantAgencyAccessIntegrityB.test.ts
+          src/test/phase3AgencyWorkflow.test.ts
+
+      - name: Phase 1H-M2 PGlite regression
         run: bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
 
       - name: Typecheck (node)
@@ -99,3 +148,6 @@ jobs:
 
       - name: Typecheck (app)
         run: bunx tsc -p tsconfig.app.json --noEmit
+
+      - name: Production build
+        run: bun run build
