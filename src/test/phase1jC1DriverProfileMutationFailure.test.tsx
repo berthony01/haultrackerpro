@@ -47,11 +47,15 @@ vi.mock('@/hooks/opportunities/useDriverOpportunityProfile', () => ({
   }),
 }));
 
+// A STABLE user object is required — DriverOpportunityProfile's initial
+// `useEffect` depends on `[profile, user]`. Returning a fresh user object
+// every render triggers an infinite re-render loop.
+const STABLE_USER = { id: 'u-iso', email: 'iso@example.com', user_metadata: {} };
+
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({
-    user: { id: 'u-iso', email: 'iso@example.com', user_metadata: {} },
-  }),
+  useAuth: () => ({ user: STABLE_USER }),
 }));
+
 
 vi.mock('sonner', () => ({
   toast: Object.assign(() => {}, {
