@@ -95,7 +95,7 @@ jobs:
         run: bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
 
       - name: Typecheck (node)
-        run: bunx tsgo -p tsconfig.node.json --noEmit
+        run: bunx tsc -p tsconfig.node.json --noEmit
 
       - name: Typecheck (app)
-        run: bunx tsgo -p tsconfig.app.json --noEmit
+        run: bunx tsc -p tsconfig.app.json --noEmit
