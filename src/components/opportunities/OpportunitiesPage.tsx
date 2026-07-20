@@ -52,6 +52,15 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   const [showProfile, setShowProfile] = useState(false);
   const [showDriverApps, setShowDriverApps] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
+  // Phase 1J-C1: track why we entered the Preferences screen so that a
+  // successful completion coming from an Apply Now attempt can resume the
+  // apply flow exactly once on the originating opportunity.
+  const [preferencesOrigin, setPreferencesOrigin] = useState<
+    { kind: 'apply'; opportunityId: string } | { kind: 'manual' } | null
+  >(null);
+  const [resumeApplyToken, setResumeApplyToken] = useState<string | null>(null);
+  const [resumeApplyOpportunityId, setResumeApplyOpportunityId] = useState<string | null>(null);
+
   const [search, setSearch] = useState('');
   const [driverType, setDriverType] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
@@ -214,21 +223,54 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   }
 
   if (showProfile) {
-    return <DriverOpportunityProfile onBack={() => setShowProfile(false)} />;
-  }
-
-  if (selected) {
     return (
-      <OpportunityDetail
-        opportunity={selected}
-        onBack={() => setSelectedId(null)}
-        isPro={isPro}
-        onUpgrade={onUpgrade}
-        driverProfile={profile}
-        onEditProfile={() => { setSelectedId(null); setShowProfile(true); }}
+      <DriverOpportunityProfile
+        onBack={() => {
+          setShowProfile(false);
+          setPreferencesOrigin(null);
+        }}
+        onSaveSuccess={({ completed }) => {
+          if (!completed) return;
+          if (preferencesOrigin?.kind === 'apply') {
+            const oppId = preferencesOrigin.opportunityId;
+            setShowProfile(false);
+            setPreferencesOrigin(null);
+            setResumeApplyOpportunityId(oppId);
+            setResumeApplyToken(crypto.randomUUID());
+            setSelectedId(oppId);
+          }
+        }}
       />
     );
   }
+
+  if (selected) {
+    const token = resumeApplyOpportunityId === selected.id ? resumeApplyToken : null;
+    return (
+      <OpportunityDetail
+        opportunity={selected}
+        onBack={() => {
+          setSelectedId(null);
+          setResumeApplyToken(null);
+          setResumeApplyOpportunityId(null);
+        }}
+        isPro={isPro}
+        onUpgrade={onUpgrade}
+        driverProfile={profile}
+        onOpenPreferencesForApply={() => {
+          setPreferencesOrigin({ kind: 'apply', opportunityId: selected.id });
+          setSelectedId(null);
+          setShowProfile(true);
+        }}
+        resumeApplyToken={token}
+        onResumeApplyConsumed={() => {
+          setResumeApplyToken(null);
+          setResumeApplyOpportunityId(null);
+        }}
+      />
+    );
+  }
+
 
   return (
     <div className="space-y-6 animate-fade-in">
