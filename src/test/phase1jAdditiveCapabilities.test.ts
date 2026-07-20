@@ -32,7 +32,6 @@ const read = (rel: string) =>
   fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 const BOOTSTRAP = `
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
