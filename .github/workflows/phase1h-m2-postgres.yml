@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
-      - name: Forbidden-marker and misleading-copy scans
+      - name: Forbidden-marker and recruiter-copy scans
         run: |
           set -euo pipefail
           files=(
@@ -66,13 +66,17 @@ jobs:
           if grep -nE '\.only\(|\.skip\(|\.todo\(|\b(xit|xdescribe)\b' "${files[@]}"; then
             echo 'Forbidden test marker found'; exit 1
           fi
-          if grep -nEi 'Apply for Recruiter Access|Start Application|submit your recruiter profile for review|before approval|Add recruiter as an additional workspace' \
+          if grep -nEi 'Apply for Recruiter Access|Start Application|submit your recruiter profile for review|before approval' \
             src/lib/opportunities/recruiterEligibility.ts \
             src/components/opportunities/recruiter/RecruiterAccessPage.tsx \
             src/components/opportunities/RecruiterOnboarding.tsx \
             src/components/opportunities/recruiter/RecruiterEntryRoute.tsx; then
-            echo 'Misleading or superseded recruiter copy found'; exit 1
+            echo 'Misleading recruiter copy found'; exit 1
           fi
+          if grep -nF 'Add recruiter as an additional workspace' src/components/opportunities/recruiter/RecruiterAccessPage.tsx; then
+            echo 'Superseded recruiter workspace sentence found'; exit 1
+          fi
+          grep -nFq 'Add the recruiter workspace to your account. Standard posting unlocks as soon as your profile is complete — no admin approval or paid plan is required.' src/components/opportunities/recruiter/RecruiterAccessPage.tsx
           echo clean
 
       - name: Wait for PostgreSQL 16
