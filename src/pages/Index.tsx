@@ -105,10 +105,10 @@ const Index = () => {
     exitActingAs,
   } = useActingContext();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
-  // Compute initial page from URL / sessionStorage so recruiters never even
-  // briefly mount the driver dashboard while their role resolves. Sticky
-  // recruiter intent (from Auth.tsx) and explicit `?page=recruiter-access`
-  // deep links both bypass the 'dashboard' default.
+  // Initial page hint. NEVER an authorization signal — the workspace
+  // effect below re-resolves through the pure dashboard policy after
+  // capabilities load. URL / session intent may only ask for a page;
+  // policy decides whether it mounts.
   const [page, setPage] = useState<string>(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
@@ -116,9 +116,6 @@ const Index = () => {
       if (pageParam === 'recruiter-access' || pageParam?.startsWith('recruiter-access:')) {
         return 'recruiter-access';
       }
-      if (sp.get('intent') === 'recruiter') return 'recruiter-access';
-      if (sessionStorage.getItem('htp_auth_intent') === 'recruiter') return 'recruiter-access';
-      if (sessionStorage.getItem('htp_recruiter_intent') === '1') return 'recruiter-access';
     } catch {}
     return 'dashboard';
   });
