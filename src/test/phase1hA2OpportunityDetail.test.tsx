@@ -85,7 +85,7 @@ function renderPage(overrides: { isPro?: boolean; apps?: any[] } = {}) {
         isPro={overrides.isPro ?? false}
         onUpgrade={vi.fn()}
         driverProfile={driverProfile}
-        onEditProfile={vi.fn()}
+        onOpenPreferencesForApply={vi.fn()}
       />
     </QueryClientProvider>,
   );
@@ -236,7 +236,7 @@ describe('OpportunityDetail — post-success page state', () => {
           isPro={false}
           onUpgrade={vi.fn()}
           driverProfile={driverProfile}
-          onEditProfile={vi.fn()}
+          onOpenPreferencesForApply={vi.fn()}
         />
       </QueryClientProvider>,
     );
