@@ -201,22 +201,31 @@ export function resolveRecruiterSubview(
 ): RecruiterSubview | null {
   const decisions = computeWorkspaceAccess(view);
   if (!decisions.recruiterHubAllowed) return null;
+  return resolveRecruiterSubviewForStatus(
+    decisions.recruiterCapabilityStatus,
+    requested,
+  );
+}
 
+/**
+ * Pure status-based recruiter subview resolver. Same matrix as
+ * `resolveRecruiterSubview`, but takes the validated capability status
+ * directly. Callers that already hold the status (Index / dashboard
+ * policy / RecruiterAccessRoute) must use this to avoid re-deriving the
+ * view. This is NOT an authorization check — callers must have already
+ * confirmed hub access via capability rows.
+ */
+export function resolveRecruiterSubviewForStatus(
+  status: UserCapabilityStatus | null,
+  requested?: RecruiterSubview | string | null,
+): RecruiterSubview | null {
   const req = normalizeSubview(requested);
-  const status = decisions.recruiterCapabilityStatus;
-
-  if (status === 'active') {
-    return req ?? 'hub';
-  }
+  if (status === 'active') return req ?? 'hub';
   if (status === 'setup') {
     if (req && OPERATIONAL_SUBVIEWS.has(req)) return 'onboarding';
     return req ?? 'onboarding';
   }
-  if (status === 'suspended') {
-    // Suspension is a terminal, hub-only surface: every requested
-    // subview — including onboarding — collapses to `hub`.
-    return 'hub';
-  }
+  if (status === 'suspended') return 'hub';
   return null;
 }
 

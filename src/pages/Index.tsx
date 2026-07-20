@@ -13,8 +13,14 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import { useSmartAlerts } from '@/hooks/useSmartAlerts';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useUserRole } from '@/hooks/useUserRole';
 import { useViewMode } from '@/hooks/useViewMode';
+import {
+  resolveDashboardNavigation,
+  isRecruiterPageId,
+  parseRecruiterSubviewFromPage,
+  DRIVER_ONLY_PAGES,
+} from '@/lib/dashboardWorkspacePolicy';
+import type { RecruiterSubview } from '@/lib/workspaceAccess';
 import { ViewModeSwitch } from '@/components/ViewModeSwitch';
 // Critical shell — keep eager so first paint never flickers.
 import { BottomNav } from '@/components/BottomNav';
@@ -76,8 +82,18 @@ const Index = () => {
   const { signOut, user } = useAuth();
   const queryClient = useQueryClient();
   
-  const { role, isLoading: roleLoading } = useUserRole();
-  const { effectiveRole, setViewMode, canSwitch } = useViewMode();
+  const {
+    effectiveRole,
+    setViewMode,
+    canSwitch,
+    isLoading: workspaceLoading,
+    error: workspaceError,
+    driverWorkspaceAllowed,
+    recruiterHubAllowed,
+    recruiterOperationsAllowed,
+    driverCapabilityStatus,
+    recruiterCapabilityStatus,
+  } = useViewMode();
   const { isAdmin } = useAdmin();
   const isRecruiterView = effectiveRole === 'recruiter';
   const { responses: feedbackResponses } = useFeedback();
@@ -89,10 +105,10 @@ const Index = () => {
     exitActingAs,
   } = useActingContext();
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
-  // Compute initial page from URL / sessionStorage so recruiters never even
-  // briefly mount the driver dashboard while their role resolves. Sticky
-  // recruiter intent (from Auth.tsx) and explicit `?page=recruiter-access`
-  // deep links both bypass the 'dashboard' default.
+  // Initial page hint. NEVER an authorization signal — the workspace
+  // effect below re-resolves through the pure dashboard policy after
+  // capabilities load. URL / session intent may only ask for a page;
+  // policy decides whether it mounts.
   const [page, setPage] = useState<string>(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
@@ -100,9 +116,6 @@ const Index = () => {
       if (pageParam === 'recruiter-access' || pageParam?.startsWith('recruiter-access:')) {
         return 'recruiter-access';
       }
-      if (sp.get('intent') === 'recruiter') return 'recruiter-access';
-      if (sessionStorage.getItem('htp_auth_intent') === 'recruiter') return 'recruiter-access';
-      if (sessionStorage.getItem('htp_recruiter_intent') === '1') return 'recruiter-access';
     } catch {}
     return 'dashboard';
   });
@@ -209,7 +222,7 @@ const Index = () => {
     }
     // Prefill from Landing Profit Intelligence demo
     // Prefill from Landing Profit Intelligence demo — driver-only.
-    if (params.get('prefill') === 'load' && !roleLoading && !isRecruiterView) {
+    if (params.get('prefill') === 'load' && !workspaceLoading && !isRecruiterView) {
       try {
         const raw = sessionStorage.getItem('htp_demo_prefill');
         if (raw) {
@@ -258,74 +271,89 @@ const Index = () => {
       } catch {}
       window.history.replaceState({}, '', window.location.pathname);
     }
-    // Route to Opportunities / Recruiter Access from external CTA OR auth intent.
-    // Wait for role resolution so recruiters don't briefly land on the driver
-    // Opportunities page before the role guard redirects them.
-    // Note: we intentionally do NOT remove `htp_auth_intent` here —
-    // `useRoleIntentReconciler` (mounted in App) owns clearing it once the
-    // durable `profiles.intended_role` upsert succeeds. Removing it early
-    // races the reconciler and breaks Google recruiter signups.
-    let recruiterIntent = false;
-    try {
-      const storedAuthIntent = sessionStorage.getItem('htp_auth_intent');
-      if (storedAuthIntent === 'recruiter') {
-        recruiterIntent = true;
-      }
-    } catch {}
+    // Route to Recruiter Access / Opportunities from external CTA. URL
+    // params only HINT; the pure dashboard policy authorizes the mount
+    // once capabilities resolve. `htp_auth_intent` / `htp_recruiter_intent`
+    // sessionStorage keys are no longer authorization inputs here.
+    if (workspaceLoading) return;
     const pageParam = params.get('page');
     const isRecruiterAccessParam =
       pageParam === 'recruiter-access' || (pageParam?.startsWith('recruiter-access:') ?? false);
-    if (roleLoading && (isRecruiterAccessParam || pageParam === 'opportunities' || recruiterIntent)) {
-      // Re-run once role resolves.
-      return;
-    }
+
     if (isRecruiterAccessParam && pageParam) {
-      // Allowlist sub-routes so a recruiter deep-link lands on the right panel.
-      const sub = pageParam.split(':')[1];
-      const allowedSubs = new Set(['manager', 'applications', 'reports', 'onboarding']);
-      if (isRecruiterView) {
-        setRecruiterView(
-          sub && allowedSubs.has(sub) ? (sub as 'manager' | 'applications' | 'reports' | 'onboarding') : 'hub'
-        );
-        setPage('recruiter-access');
-        recruiterIntent = true;
-      } else {
-        // Non-recruiters never land on recruiter pages — guard will redirect.
+      const requestedSub = parseRecruiterSubviewFromPage(pageParam) ?? 'hub';
+      if (recruiterHubAllowed && recruiterCapabilityStatus &&
+          recruiterCapabilityStatus !== 'revoked') {
+        // Authorized: switch view mode + resolve safe subview via policy.
+        setViewMode('recruiter');
+        const decision = resolveDashboardNavigation({
+          requestedPage: 'recruiter-access',
+          requestedRecruiterSubview: requestedSub,
+          effectiveWorkspace: 'recruiter',
+          recruiterCapabilityStatus,
+          recruiterHubAllowed,
+          recruiterOperationsAllowed,
+        });
+        if (!decision.unresolved) {
+          setRecruiterView(decision.recruiterSubview ?? 'hub');
+          setPage(decision.page);
+        }
+      } else if (driverCapabilityStatus === 'active') {
+        // Capability missing but driver active → route to B2A entry.
+        navigate('/recruiter', { replace: true });
+        return;
+      } else if (driverWorkspaceAllowed) {
         setPage('dashboard');
       }
       window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'opportunities') {
       const view = params.get('view');
-      if (view === 'recruiter' || isRecruiterView) {
-        // Backward compat + role guard: recruiters never see the driver Opportunities page.
-        setPage('recruiter-access');
-        recruiterIntent = true;
-      } else {
+      if (view === 'recruiter') {
+        // Recruiter opportunities hint. Route through B2A entry when
+        // driver is active but no recruiter capability. Never mount
+        // recruiter dashboard directly here.
+        if (recruiterHubAllowed && recruiterCapabilityStatus &&
+            recruiterCapabilityStatus !== 'revoked') {
+          setViewMode('recruiter');
+          setRecruiterView('hub');
+          setPage('recruiter-access');
+        } else if (driverCapabilityStatus === 'active') {
+          navigate('/recruiter', { replace: true });
+          return;
+        } else if (driverWorkspaceAllowed) {
+          setPage('dashboard');
+        }
+      } else if (driverWorkspaceAllowed) {
         setPage('opportunities');
         if (view === 'driver-profile') {
-          sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile');
+          try { sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile'); } catch {}
         }
       }
       window.history.replaceState({}, '', window.location.pathname);
-    } else if (recruiterIntent) {
-      setPage('recruiter-access');
     } else if (pageParam === 'add') {
-      // First-load email deep link. Recruiter view never lands on driver add-load.
-      if (isRecruiterView) {
-        setPage('recruiter-access');
-      } else {
+      if (driverWorkspaceAllowed && effectiveRole === 'driver') {
         setSuppressOnboardingForAddDeepLink(true);
         setEditingLoad(null);
         setPage('add');
+      } else if (recruiterHubAllowed && effectiveRole === 'recruiter') {
+        setPage('recruiter-access');
       }
       window.history.replaceState({}, '', window.location.pathname);
     }
-    if (recruiterIntent) {
-      // Suppress driver-first onboarding modal once for recruiter signups
-      try { sessionStorage.setItem('htp_recruiter_intent', '1'); } catch {}
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, subscription.isLoading, subscription.isPro, subscription.planKey, roleLoading, isRecruiterView]);
+  }, [
+    user?.id,
+    subscription.isLoading,
+    subscription.isPro,
+    subscription.planKey,
+    workspaceLoading,
+    effectiveRole,
+    recruiterHubAllowed,
+    recruiterOperationsAllowed,
+    recruiterCapabilityStatus,
+    driverWorkspaceAllowed,
+    driverCapabilityStatus,
+  ]);
 
   // Fire purchase analytics once the resolved plan is available (avoids stale closure)
   useEffect(() => {
@@ -363,21 +391,15 @@ const Index = () => {
   }, []);
 
   // Show onboarding modal for first-time DRIVERS only.
-  // Gated on roleLoading so recruiters never see "Log Your First Load" —
+  // Gated on workspaceLoading so recruiters never see "Log Your First Load" —
   // even returning recruiters with cleared session storage.
   useEffect(() => {
-    if (roleLoading || isRecruiterView) return;
+    if (workspaceLoading || isRecruiterView) return;
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
       if (suppressOnboardingForAddDeepLink) return;
-      let recruiter = false;
-      try { recruiter = sessionStorage.getItem('htp_recruiter_intent') === '1'; } catch {}
-      if (recruiter) {
-        try { sessionStorage.removeItem('htp_recruiter_intent'); } catch {}
-        return;
-      }
       setShowOnboardingModal(true);
     }
-  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, roleLoading, isRecruiterView]);
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, workspaceLoading, isRecruiterView]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboardingModal(false);
@@ -392,7 +414,7 @@ const Index = () => {
   // "Log Your First Load" — even during the brief window before the role
   // guard effect redirects them off /dashboard.
   const showOnboarding =
-    !roleLoading &&
+    !workspaceLoading &&
     !isRecruiterView &&
     !allLoadsQuery.isLoading &&
     allLoadsQuery.loads.length === 0 &&
@@ -613,26 +635,36 @@ const Index = () => {
   const [opportunitiesView, setOpportunitiesView] = useState<'list' | 'recruiter' | 'driver-profile'>('list');
   const [recruiterView, setRecruiterView] = useState<'hub' | 'onboarding' | 'manager' | 'applications' | 'reports'>('hub');
 
-  // Role-based access guard: redirect users away from pages outside their
-  // *effective* role. `contracts` is a shared key (body picks by role), so it
-  // is NOT listed in driverOnlyPages and is allowed in both views.
-  const driverOnlyPages = new Set([
-    'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
-    'opportunities','add','add_expense','add_fuel','closeout','recurring_expenses',
-    'opportunity-preferences',
-  ]);
-  const isRecruiterPageId = (p: string) =>
-    p === 'recruiter-access' || p.startsWith('recruiter-access:');
+  // Capability-authorized guard: whenever the current page/subview no
+  // longer fits the effective workspace + recruiter status, re-resolve
+  // through the pure dashboard policy. Replaces the exclusive-role guard
+  // that used `useUserRole`.
   useEffect(() => {
-    if (roleLoading) return;
-    if (page === 'contracts') return; // shared route, never redirect
-    if (isRecruiterView && driverOnlyPages.has(page)) {
-      setPage('recruiter-access');
-    } else if (!isRecruiterView && isRecruiterPageId(page)) {
-      setPage('dashboard');
+    if (workspaceLoading) return;
+    if (!effectiveRole) return;
+    const decision = resolveDashboardNavigation({
+      requestedPage: page,
+      requestedRecruiterSubview: recruiterView,
+      effectiveWorkspace: effectiveRole,
+      recruiterCapabilityStatus,
+      recruiterHubAllowed,
+      recruiterOperationsAllowed,
+    });
+    if (decision.unresolved) return;
+    if (decision.page !== page) setPage(decision.page);
+    if (decision.recruiterSubview && decision.recruiterSubview !== recruiterView) {
+      setRecruiterView(decision.recruiterSubview);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleLoading, isRecruiterView, page]);
+  }, [
+    workspaceLoading,
+    effectiveRole,
+    recruiterCapabilityStatus,
+    recruiterHubAllowed,
+    recruiterOperationsAllowed,
+    page,
+    recruiterView,
+  ]);
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
@@ -646,9 +678,7 @@ const Index = () => {
   };
 
   const handleNavigate = (p: string, options?: { filter?: string }) => {
-    // Assistant page allow-list. When acting as an assistant, restrict navigation
-    // to pages permitted by the granted permissions; redirect blocked pages to
-    // the first allowed page. Also handles the "exit acting context" pseudo-page.
+    // Assistant allow-list.
     if (isActingAsAssistant) {
       if (p === 'assistant_exit') {
         exitActingAs();
@@ -665,69 +695,85 @@ const Index = () => {
     if (p !== 'add') {
       setSuppressOnboardingForAddDeepLink(false);
     }
+
+    if (p === 'parking') {
+      navigate('/parking');
+      return;
+    }
+    if (!effectiveRole || workspaceLoading) return;
+
     if (p === 'add') {
-      // Defense-in-depth: recruiters never see the Add Load / Add Expense / Fuel modal.
-      if (isRecruiterView || roleLoading) {
-        setPage(isRecruiterView ? 'recruiter-access' : 'dashboard');
+      if (effectiveRole !== 'driver' || !driverWorkspaceAllowed) {
+        if (recruiterHubAllowed) {
+          setRecruiterView('hub');
+          setPage('recruiter-access');
+        }
         return;
       }
       setShowAddModal(true);
       return;
     }
-    if (p === 'parking') {
-      navigate('/parking');
-      return;
-    }
-    // Defensive role gating BEFORE state changes — uniform for all users,
-    // including admins (who control their own view via the switcher).
-    const isRecruiterTarget = isRecruiterPageId(p);
-    const driverOnlyTargets = new Set([
-      'dashboard','loads','expenses','fuel','reports','monthly','alerts','scorecard',
-      'opportunities','add_expense','add_fuel','closeout','recurring_expenses',
-      'opportunity-preferences',
-    ]);
-    if (isRecruiterTarget && !isRecruiterView) {
-      setPage('dashboard');
-      return;
-    }
-    if (!isRecruiterTarget && driverOnlyTargets.has(p) && isRecruiterView) {
-      setPage('recruiter-access');
-      return;
-    }
 
-    if (isRecruiterTarget) {
-      setEditingLoad(null);
-      setEditingStops([]);
-      setEditingExpense(null);
-      setEditingFuelLog(null);
-      setOpportunitiesView('list');
-      const sub = p.split(':')[1];
-      setRecruiterView(
-        sub === 'manager' ? 'manager'
-        : sub === 'applications' ? 'applications'
-        : sub === 'reports' ? 'reports'
-        : sub === 'onboarding' ? 'onboarding'
-        : 'hub'
-      );
-      setPage('recruiter-access');
-      return;
-    }
-    if (p === 'opportunity-preferences') {
+    const requestedSub: RecruiterSubview | null = isRecruiterPageId(p)
+      ? parseRecruiterSubviewFromPage(p)
+      : null;
+
+    const decision = resolveDashboardNavigation({
+      requestedPage: p,
+      requestedRecruiterSubview: requestedSub ?? recruiterView,
+      effectiveWorkspace: effectiveRole,
+      recruiterCapabilityStatus,
+      recruiterHubAllowed,
+      recruiterOperationsAllowed,
+    });
+    if (decision.unresolved) return;
+
+    if (decision.page === 'opportunity-preferences') {
       openOpportunitiesView('driver-profile');
       return;
     }
+
     setEditingLoad(null);
     setEditingStops([]);
     setEditingExpense(null);
     setEditingFuelLog(null);
-    setLoadsPayFilter(p === 'loads' ? options?.filter : undefined);
-    if (p === 'opportunities') {
+
+    if (decision.page === 'recruiter-access') {
+      setOpportunitiesView('list');
+      setRecruiterView(decision.recruiterSubview ?? 'hub');
+      setPage('recruiter-access');
+      return;
+    }
+
+    setLoadsPayFilter(decision.page === 'loads' ? options?.filter : undefined);
+    if (decision.page === 'opportunities') {
       setOpportunitiesView('list');
       setOpportunitiesViewKey((k) => k + 1);
     } else {
       setOpportunitiesView('list');
     }
-    setPage(p);
+    setPage(decision.page);
+  };
+
+  // Dedicated workspace switch — never runs against stale role closure.
+  const handleWorkspaceSwitch = (next: 'driver' | 'recruiter') => {
+    if (workspaceLoading) return;
+    if (next === 'recruiter') {
+      if (!recruiterHubAllowed) return;
+      setViewMode('recruiter');
+      const sub: RecruiterSubview =
+        recruiterOperationsAllowed
+          ? 'hub'
+          : recruiterCapabilityStatus === 'setup'
+            ? 'onboarding'
+            : 'hub';
+      setRecruiterView(sub);
+      setPage('recruiter-access');
+      return;
+    }
+    if (!driverWorkspaceAllowed) return;
+    setViewMode('driver');
+    setPage('dashboard');
   };
 
   // Derive sidebar/header key so Recruiter Access has its own label & highlight.
@@ -793,7 +839,15 @@ const Index = () => {
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
-      <AppSidebar active={navKey} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
+      <AppSidebar
+        active={navKey}
+        onNavigate={handleNavigate}
+        role={effectiveRole ?? 'driver'}
+        workspaceLoading={workspaceLoading || !effectiveRole}
+        recruiterCapabilityStatus={recruiterCapabilityStatus}
+        recruiterOperationsAllowed={recruiterOperationsAllowed}
+        assistantPermissions={isActingAsAssistant ? actingPermissions : null}
+      />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Premium header (mobile + desktop) */}
@@ -807,7 +861,7 @@ const Index = () => {
                 <h1 className="text-base font-black font-heading tracking-tight text-foreground truncate">
                   Haul<span className="text-primary">TrackerPro</span>
                 </h1>
-                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em] truncate">{roleLoading ? 'Loading…' : isRecruiterView ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em] truncate">{workspaceLoading ? 'Loading…' : isRecruiterView ? 'Recruiter Console' : 'Load & Pay Manager'}</p>
               </div>
             </div>
             <div className="hidden lg:block min-w-0">
@@ -815,14 +869,11 @@ const Index = () => {
               <p className="text-xs text-muted-foreground truncate">{navSubtitle}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {canSwitch && !roleLoading && (
+              {canSwitch && !workspaceLoading && (
                 <div className="hidden lg:block">
                   <ViewModeSwitch
-                    value={effectiveRole}
-                    onChange={(next) => {
-                      setViewMode(next);
-                      handleNavigate(next === 'recruiter' ? 'recruiter-access' : 'dashboard');
-                    }}
+                    value={effectiveRole ?? 'driver'}
+                    onChange={handleWorkspaceSwitch}
                   />
                 </div>
               )}
@@ -849,14 +900,11 @@ const Index = () => {
               </Button>
             </div>
           </div>
-          {canSwitch && !roleLoading && (
+          {canSwitch && !workspaceLoading && (
             <div className="lg:hidden px-4 pb-2 -mt-1 flex justify-end">
               <ViewModeSwitch
-                value={effectiveRole}
-                onChange={(next) => {
-                  setViewMode(next);
-                  handleNavigate(next === 'recruiter' ? 'recruiter-access' : 'dashboard');
-                }}
+                value={effectiveRole ?? 'driver'}
+                onChange={handleWorkspaceSwitch}
               />
             </div>
           )}
@@ -866,7 +914,7 @@ const Index = () => {
         {/* Hard render-level role gate. While the role is still resolving,
             we render a neutral fallback so neither role can flash the wrong
             UI (driver Add/Onboarding for recruiters, recruiter hub for drivers). */}
-        {roleLoading ? (
+        {workspaceLoading ? (
           <ViewFallback />
         ) : (
           <>
@@ -1092,14 +1140,16 @@ const Index = () => {
             {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {
-                  // Only users who can switch views have a driver dashboard to go back to.
-                  // Pure recruiters stay on the recruiter hub.
                   if (canSwitch) {
                     setViewMode('driver');
                     setPage('dashboard');
                   }
                 }}
                 initialView={recruiterView}
+                recruiterCapabilityStatus={recruiterCapabilityStatus}
+                recruiterHubAllowed={recruiterHubAllowed}
+                recruiterOperationsAllowed={recruiterOperationsAllowed}
+                workspaceLoading={workspaceLoading}
               />
             )}
             {page === 'settings' && (isRecruiterView ? (
@@ -1120,7 +1170,15 @@ const Index = () => {
       </div>
 
       <div className="lg:hidden">
-        <BottomNav active={page} onNavigate={handleNavigate} role={effectiveRole} roleLoading={roleLoading} assistantPermissions={isActingAsAssistant ? actingPermissions : null} />
+        <BottomNav
+          active={page}
+          onNavigate={handleNavigate}
+          role={effectiveRole ?? 'driver'}
+          workspaceLoading={workspaceLoading || !effectiveRole}
+          recruiterCapabilityStatus={recruiterCapabilityStatus}
+          recruiterOperationsAllowed={recruiterOperationsAllowed}
+          assistantPermissions={isActingAsAssistant ? actingPermissions : null}
+        />
       </div>
       <AddActionModal
         open={showAddModal}

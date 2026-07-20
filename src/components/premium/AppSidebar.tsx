@@ -4,12 +4,20 @@ import {
   isAssistantPageAllowed,
   type AssistantPermissions,
 } from '@/lib/assistantPermissions';
+import type { UserCapabilityStatus } from '@/lib/userCapabilities';
+import { resolveRecruiterNavTier } from '@/lib/dashboardWorkspacePolicy';
 
 interface AppSidebarProps {
   active: string;
   onNavigate: (page: string) => void;
   role: UserRole;
+  /** Kept for backward compatibility; new callers pass workspaceLoading. */
   roleLoading?: boolean;
+  workspaceLoading?: boolean;
+  /** Capability-driven recruiter nav gating. When present, overrides
+   *  role for recruiter item selection. */
+  recruiterCapabilityStatus?: UserCapabilityStatus | null;
+  recruiterOperationsAllowed?: boolean;
   /** When set, this user is acting as an assistant for a driver and nav items
    *  are filtered to the keys the driver has granted. */
   assistantPermissions?: AssistantPermissions | null;
@@ -26,7 +34,7 @@ const driverItems = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-const recruiterItems = [
+const recruiterActiveItems = [
   { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
@@ -35,12 +43,51 @@ const recruiterItems = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-export function AppSidebar({ active, onNavigate, role, roleLoading, assistantPermissions }: AppSidebarProps) {
+const recruiterHubOnlyItems = [
+  { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+];
+
+export function AppSidebar({
+  active,
+  onNavigate,
+  role,
+  roleLoading,
+  workspaceLoading,
+  recruiterCapabilityStatus = null,
+  recruiterOperationsAllowed = false,
+  assistantPermissions,
+}: AppSidebarProps) {
   const isAssistant = !!assistantPermissions;
-  const baseItems = role === 'recruiter' ? recruiterItems : driverItems;
+  const loading = workspaceLoading ?? roleLoading;
+
+  // Capability-driven recruiter tier takes precedence when supplied.
+  // Falls back to legacy role behavior only when no capability status
+  // was passed (out-of-app callers like Updates.tsx).
+  const capabilitySignalled = recruiterCapabilityStatus !== null;
+  const tier = capabilitySignalled
+    ? resolveRecruiterNavTier(recruiterCapabilityStatus, recruiterOperationsAllowed)
+    : role === 'recruiter'
+      ? 'active'
+      : 'none';
+
+  let baseItems: typeof driverItems;
+  if (role === 'recruiter' || tier !== 'none') {
+    baseItems = tier === 'active' ? recruiterActiveItems : recruiterHubOnlyItems;
+  } else {
+    baseItems = driverItems;
+  }
+
   const items = isAssistant
     ? baseItems.filter((i) => isAssistantPageAllowed(i.id, assistantPermissions))
     : baseItems;
+
+  const consoleLabel = loading
+    ? 'Loading…'
+    : isAssistant
+      ? 'Assistant Console'
+      : role === 'recruiter' || tier !== 'none'
+        ? 'Recruiter Console'
+        : 'Load & Pay Manager';
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 bg-card/40 backdrop-blur-md sticky top-0 h-screen">
@@ -53,12 +100,12 @@ export function AppSidebar({ active, onNavigate, role, roleLoading, assistantPer
             Haul<span className="text-primary">TrackerPro</span>
           </h1>
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.18em]">
-            {roleLoading ? 'Loading…' : isAssistant ? 'Assistant Console' : role === 'recruiter' ? 'Recruiter Console' : 'Load & Pay Manager'}
+            {consoleLabel}
           </p>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Primary">
-        {roleLoading ? (
+        {loading ? (
           <div className="px-2 py-3 space-y-2">
             {[0, 1, 2, 3, 4].map(i => (
               <div key={i} className="h-8 rounded-lg bg-muted/30 animate-pulse" />
@@ -86,7 +133,7 @@ export function AppSidebar({ active, onNavigate, role, roleLoading, assistantPer
         <p className="text-[10px] text-muted-foreground/60 leading-snug">
           {isAssistant
             ? 'You are acting on behalf of a driver. Every change is recorded in the audit log.'
-            : role === 'recruiter'
+            : role === 'recruiter' || tier !== 'none'
               ? 'Post opportunities. Review drivers. Hire smarter.'
               : 'Track every mile. Every dollar. Every decision.'}
         </p>

@@ -31,12 +31,17 @@ import {
   hasPerm,
   type AssistantPermissions,
 } from '@/lib/assistantPermissions';
+import type { UserCapabilityStatus } from '@/lib/userCapabilities';
+import { resolveRecruiterNavTier } from '@/lib/dashboardWorkspacePolicy';
 
 interface BottomNavProps {
   active: string;
   onNavigate: (page: string) => void;
   role: UserRole;
   roleLoading?: boolean;
+  workspaceLoading?: boolean;
+  recruiterCapabilityStatus?: UserCapabilityStatus | null;
+  recruiterOperationsAllowed?: boolean;
   /** When set, this user is acting as an assistant for a driver and nav items
    *  are filtered to the keys the driver has granted. */
   assistantPermissions?: AssistantPermissions | null;
@@ -50,18 +55,47 @@ const driverNav = [
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
 
-const recruiterNav = [
+const recruiterActiveNav = [
   { id: 'recruiter-access', label: 'Home', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Opps', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Apps', icon: Users },
   { id: 'more', label: 'More', icon: MoreHorizontal },
 ];
 
-export function BottomNav({ active, onNavigate, role, roleLoading, assistantPermissions }: BottomNavProps) {
+const recruiterHubOnlyNav = [
+  { id: 'recruiter-access', label: 'Home', icon: Handshake },
+  { id: 'more', label: 'More', icon: MoreHorizontal },
+];
+
+export function BottomNav({
+  active,
+  onNavigate,
+  role,
+  roleLoading,
+  workspaceLoading,
+  recruiterCapabilityStatus = null,
+  recruiterOperationsAllowed = false,
+  assistantPermissions,
+}: BottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const { signOut } = useAuth();
   const isAssistant = !!assistantPermissions;
-  const baseNav = role === 'recruiter' ? recruiterNav : driverNav;
+  const loading = workspaceLoading ?? roleLoading;
+
+  const capabilitySignalled = recruiterCapabilityStatus !== null;
+  const tier = capabilitySignalled
+    ? resolveRecruiterNavTier(recruiterCapabilityStatus, recruiterOperationsAllowed)
+    : role === 'recruiter'
+      ? 'active'
+      : 'none';
+
+  let baseNav: typeof driverNav;
+  if (role === 'recruiter' || tier !== 'none') {
+    baseNav = tier === 'active' ? recruiterActiveNav : recruiterHubOnlyNav;
+  } else {
+    baseNav = driverNav;
+  }
+
   const navItems = isAssistant
     ? baseNav.filter((i) => isAssistantPageAllowed(i.id, assistantPermissions))
     : baseNav;
@@ -83,7 +117,6 @@ export function BottomNav({ active, onNavigate, role, roleLoading, assistantPerm
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
-  // Assistant "More": only items their permissions cover; never settings/contracts/prefs.
   const driverMoreItemsAssistant: MoreItem[] = [
     hasPerm(assistantPermissions, 'view_reports') || hasPerm(assistantPermissions, 'export_reports')
       ? { label: 'Reports', icon: FileText, onClick: () => go('reports') } : null,
@@ -95,7 +128,7 @@ export function BottomNav({ active, onNavigate, role, roleLoading, assistantPerm
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ].filter(Boolean) as MoreItem[];
 
-  const recruiterMoreItems: MoreItem[] = [
+  const recruiterActiveMoreItems: MoreItem[] = [
     { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },
@@ -105,14 +138,25 @@ export function BottomNav({ active, onNavigate, role, roleLoading, assistantPerm
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
 
+  const recruiterHubOnlyMoreItems: MoreItem[] = [
+    { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
+    { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
+  ];
+
+  const recruiterMoreItems = tier === 'active'
+    ? recruiterActiveMoreItems
+    : recruiterHubOnlyMoreItems;
+
   const moreItems: MoreItem[] = isAssistant
     ? driverMoreItemsAssistant
-    : role === 'recruiter' ? recruiterMoreItems : driverMoreItemsFull;
+    : (role === 'recruiter' || tier !== 'none')
+      ? recruiterMoreItems
+      : driverMoreItemsFull;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">
       <div className="flex items-center justify-around h-[72px] max-w-lg mx-auto px-2">
-        {(roleLoading ? [{ id: 'more', label: 'More', icon: MoreHorizontal }] : navItems).map(item => {
+        {(loading ? [{ id: 'more', label: 'More', icon: MoreHorizontal }] : navItems).map(item => {
           const isActive = active === item.id;
           const isAdd = item.id === 'add';
           const isMore = item.id === 'more';
