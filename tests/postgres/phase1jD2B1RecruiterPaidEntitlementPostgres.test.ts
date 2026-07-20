@@ -9,7 +9,7 @@
  * transaction visibility all reflect production reality.
  *
  * Lives OUTSIDE `src/` so the default `bunx vitest run` never picks it up.
- * Runs only via `vitest.phase1j-d2b1-postgres.config.ts` (locally or in CI).
+ * Runs only via `vitest.phase1j-d2b1-recruiter-entitlement-postgres.config.ts` (locally or in CI).
  *
  * NEVER SKIPS. Fails hard if PHASE1J_D2B1_DATABASE_URL is absent.
  */
