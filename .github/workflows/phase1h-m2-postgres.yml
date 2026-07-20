@@ -1,17 +1,19 @@
-# CI trigger: validate the current Phase 1H-M2 candidate on real PostgreSQL 16.
-name: Phase 1H-M2 — Postgres 16 Offer Workflow Gate
+# Temporary verification expansion for Phase 1J-C1. Do not merge this workflow-only PR.
+name: Phase 1J-C1 — Full Regression and Postgres 16 Gate
 
 on:
-  push:
-    paths:
-      - '.github/workflows/phase1h-m2-postgres.yml'
-      - 'tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts'
-      - 'vitest.phase1h-m2-postgres.config.ts'
-      - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
-      - 'supabase/migrations/20260720000000_phase1h_m2_offer_workflow_rpcs.sql'
   pull_request:
     paths:
       - '.github/workflows/phase1h-m2-postgres.yml'
+      - 'src/components/opportunities/**'
+      - 'src/test/phase1jC1*.test.tsx'
+      - 'src/test/phase1hA2ApplyNow.test.tsx'
+      - 'src/test/phase1hA2OpportunityDetail.test.tsx'
+      - 'src/test/phase1jPreviewErrorDiagnostics.test.tsx'
+      - 'src/test/phase1jB2BDashboardGating.test.tsx'
+      - 'src/test/phase1jB2ARecruiterEntry.test.tsx'
+      - 'src/test/phase1jBWorkspaceRouting.test.tsx'
+      - 'src/test/phase1jAdditiveCapabilities.test.ts'
       - 'tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts'
       - 'vitest.phase1h-m2-postgres.config.ts'
       - 'supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql'
@@ -19,10 +21,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  phase1h-m2-postgres:
-    name: Real Postgres 16 — M2 offer workflow
+  phase1j-c1-full-gate:
+    name: Phase 1J-C1 full production gate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -53,10 +55,22 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
-      - name: Forbidden-marker scan (no .only / .skip / .todo)
+      - name: Forbidden-marker scan
         run: |
-          if grep -nE '\.only\(|\.skip\(|it\.todo\(|describe\.todo\(' tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts; then
-            echo "Forbidden Vitest marker found in Phase 1H-M2 PG16 test."; exit 1
+          files=(
+            tests/postgres/phase1hM2OfferWorkflowPostgres.test.ts
+            src/test/phase1jC1DriverProfileMutationFailure.test.tsx
+            src/test/phase1jC1OpportunityApplyContinuity.test.tsx
+            src/test/phase1hA2ApplyNow.test.tsx
+            src/test/phase1hA2OpportunityDetail.test.tsx
+            src/test/phase1jPreviewErrorDiagnostics.test.tsx
+            src/test/phase1jB2BDashboardGating.test.tsx
+            src/test/phase1jB2ARecruiterEntry.test.tsx
+            src/test/phase1jBWorkspaceRouting.test.tsx
+            src/test/phase1jAdditiveCapabilities.test.ts
+          )
+          if grep -nE '\.(only|skip|todo)\(|\b(xit|xdescribe)\b' "${files[@]}"; then
+            echo "Forbidden test marker found."; exit 1
           fi
           echo "clean"
 
@@ -70,32 +84,59 @@ jobs:
           done
           echo "postgres did not become ready"; exit 1
 
-      - name: Run Phase 1H-M2 real-Postgres 16 gate
+      - name: Run real PostgreSQL 16 M2 gate
         id: pg_gate
         run: |
           set -o pipefail
           mkdir -p artifacts
-          bunx vitest run --config vitest.phase1h-m2-postgres.config.ts --reporter=verbose 2>&1 | tee artifacts/phase1h-m2-postgres.log
+          bunx vitest run --config vitest.phase1h-m2-postgres.config.ts --reporter=verbose 2>&1 | tee artifacts/phase1j-c1-postgres.log
         continue-on-error: true
 
-      - name: Upload PG16 gate log
+      - name: Upload PostgreSQL 16 gate log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase1h-m2-postgres-log
-          path: artifacts/phase1h-m2-postgres.log
+          name: phase1j-c1-postgres16-log
+          path: artifacts/phase1j-c1-postgres.log
 
-      - name: Enforce PG16 gate result
+      - name: Enforce PostgreSQL 16 gate result
         if: steps.pg_gate.outcome != 'success'
         run: |
-          echo "Phase 1H-M2 real-Postgres 16 gate failed. See uploaded log."
+          echo "Real PostgreSQL 16 gate failed. See uploaded log."
           exit 1
 
-      - name: Run existing Phase 1H-M2 focused PGlite suite
-        run: bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
+      - name: C1 — real DriverOpportunityProfile mutation contract
+        run: bunx vitest run src/test/phase1jC1DriverProfileMutationFailure.test.tsx
+
+      - name: C1 — Apply continuity integration
+        run: bunx vitest run src/test/phase1jC1OpportunityApplyContinuity.test.tsx
+
+      - name: A2 — Apply Now regression
+        run: bunx vitest run src/test/phase1hA2ApplyNow.test.tsx
+
+      - name: A2 — Opportunity detail regression
+        run: bunx vitest run src/test/phase1hA2OpportunityDetail.test.tsx
+
+      - name: Preview diagnostic regression
+        run: bunx vitest run src/test/phase1jPreviewErrorDiagnostics.test.tsx
+
+      - name: Dashboard capability gating regression
+        run: bunx vitest run src/test/phase1jB2BDashboardGating.test.tsx
+
+      - name: Recruiter entry regression
+        run: bunx vitest run src/test/phase1jB2ARecruiterEntry.test.tsx
+
+      - name: Workspace routing regression
+        run: bunx vitest run src/test/phase1jBWorkspaceRouting.test.tsx
+
+      - name: Additive capability regression
+        run: bunx vitest run src/test/phase1jAdditiveCapabilities.test.ts
 
       - name: Typecheck (node)
         run: bunx tsc -p tsconfig.node.json --noEmit
 
       - name: Typecheck (app)
         run: bunx tsc -p tsconfig.app.json --noEmit
+
+      - name: Production build
+        run: bun run build
