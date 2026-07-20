@@ -11,7 +11,7 @@ jobs:
   phase1j-c2-gate:
     name: Phase 1J-C2 full production gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     services:
       postgres:
@@ -132,22 +132,79 @@ jobs:
       - name: Phase 1J additive capabilities
         run: bunx vitest run src/test/phase1jAdditiveCapabilities.test.ts
 
-      - name: Assistant and Agency regressions
-        run: >-
-          bunx vitest run
-          src/test/phase4aDriverControlCenter.test.ts
-          src/test/assistantAgencyAccessIntegrity.test.ts
-          src/test/assistantAgencyAccessIntegrityB.test.ts
-          src/test/phase3AgencyWorkflow.test.ts
+      - name: Phase 4A driver control center
+        id: assistant_driver_control
+        continue-on-error: true
+        run: bunx vitest run src/test/phase4aDriverControlCenter.test.ts --reporter=verbose
+
+      - name: Assistant/Agency access integrity A
+        id: assistant_integrity_a
+        if: always()
+        continue-on-error: true
+        run: bunx vitest run src/test/assistantAgencyAccessIntegrity.test.ts --reporter=verbose
+
+      - name: Assistant/Agency access integrity B
+        id: assistant_integrity_b
+        if: always()
+        continue-on-error: true
+        run: bunx vitest run src/test/assistantAgencyAccessIntegrityB.test.ts --reporter=verbose
+
+      - name: Phase 3 agency workflow
+        id: agency_workflow
+        if: always()
+        continue-on-error: true
+        run: bunx vitest run src/test/phase3AgencyWorkflow.test.ts --reporter=verbose
 
       - name: Phase 1H-M2 PGlite regression
+        id: pglite_m2
+        if: always()
+        continue-on-error: true
         run: bunx vitest run src/test/phase1hM2OfferWorkflow.test.ts
 
       - name: Typecheck (node)
+        id: typecheck_node
+        if: always()
+        continue-on-error: true
         run: bunx tsc -p tsconfig.node.json --noEmit
 
       - name: Typecheck (app)
+        id: typecheck_app
+        if: always()
+        continue-on-error: true
         run: bunx tsc -p tsconfig.app.json --noEmit
 
       - name: Production build
+        id: production_build
+        if: always()
+        continue-on-error: true
         run: bun run build
+
+      - name: Enforce isolated regression and build results
+        if: always()
+        env:
+          DRIVER_CONTROL: ${{ steps.assistant_driver_control.outcome }}
+          INTEGRITY_A: ${{ steps.assistant_integrity_a.outcome }}
+          INTEGRITY_B: ${{ steps.assistant_integrity_b.outcome }}
+          AGENCY_WORKFLOW: ${{ steps.agency_workflow.outcome }}
+          PGLITE_M2: ${{ steps.pglite_m2.outcome }}
+          TYPECHECK_NODE: ${{ steps.typecheck_node.outcome }}
+          TYPECHECK_APP: ${{ steps.typecheck_app.outcome }}
+          PRODUCTION_BUILD: ${{ steps.production_build.outcome }}
+        run: |
+          printf '%s\n' \
+            "driver_control=$DRIVER_CONTROL" \
+            "integrity_a=$INTEGRITY_A" \
+            "integrity_b=$INTEGRITY_B" \
+            "agency_workflow=$AGENCY_WORKFLOW" \
+            "pglite_m2=$PGLITE_M2" \
+            "typecheck_node=$TYPECHECK_NODE" \
+            "typecheck_app=$TYPECHECK_APP" \
+            "production_build=$PRODUCTION_BUILD"
+          test "$DRIVER_CONTROL" = success
+          test "$INTEGRITY_A" = success
+          test "$INTEGRITY_B" = success
+          test "$AGENCY_WORKFLOW" = success
+          test "$PGLITE_M2" = success
+          test "$TYPECHECK_NODE" = success
+          test "$TYPECHECK_APP" = success
+          test "$PRODUCTION_BUILD" = success
