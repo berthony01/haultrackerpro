@@ -1140,14 +1140,16 @@ const Index = () => {
             {page === 'recruiter-access' && isRecruiterView && (
               <RecruiterAccessRoute
                 onBack={() => {
-                  // Only users who can switch views have a driver dashboard to go back to.
-                  // Pure recruiters stay on the recruiter hub.
                   if (canSwitch) {
                     setViewMode('driver');
                     setPage('dashboard');
                   }
                 }}
                 initialView={recruiterView}
+                recruiterCapabilityStatus={recruiterCapabilityStatus}
+                recruiterHubAllowed={recruiterHubAllowed}
+                recruiterOperationsAllowed={recruiterOperationsAllowed}
+                workspaceLoading={workspaceLoading}
               />
             )}
             {page === 'settings' && (isRecruiterView ? (
