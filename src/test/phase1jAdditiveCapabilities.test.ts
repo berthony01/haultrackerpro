@@ -347,3 +347,123 @@ describe('Phase 1J-A — runtime capability matrix', () => {
     await setUid(db, null);
   });
 });
+
+describe('Phase 1J-A — capability lifecycle durability', () => {
+  it('begin_recruiter_setup row survives an unrelated profile update', async () => {
+    const id = uid(20);
+    await makeUser(db, id);
+    await setUid(db, id);
+    await db.query(`SELECT public.begin_recruiter_setup()`);
+    await setUid(db, null);
+    await db.query(
+      `UPDATE public.profiles SET display_name = 'renamed' WHERE user_id = $1`,
+      [id],
+    );
+    const rec = (await capsFor(db, id)).find((r) => r.capability === 'recruiter');
+    expect(rec?.status).toBe('setup');
+  });
+
+  it('clearing intended_role to null does not remove recruiter setup', async () => {
+    const id = uid(21);
+    await makeUser(db, id, true, 'recruiter');
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    await db.query(`UPDATE public.profiles SET intended_role = NULL WHERE user_id = $1`, [id]);
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+  });
+
+  it("clearing intended_role to 'driver' does not remove or demote recruiter setup", async () => {
+    const id = uid(22);
+    await makeUser(db, id, true, 'recruiter');
+    await db.query(`UPDATE public.profiles SET intended_role = 'driver' WHERE user_id = $1`, [id]);
+    const rec = (await capsFor(db, id)).find((r) => r.capability === 'recruiter');
+    expect(rec?.status).toBe('setup');
+  });
+
+  it('clearing intended_role never demotes an active recruiter', async () => {
+    const id = uid(23);
+    await makeUser(db, id, true, 'recruiter');
+    await completeRecruiter(db, id, { verification_status: 'approved' });
+    await db.query(`UPDATE public.profiles SET intended_role = NULL WHERE user_id = $1`, [id]);
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('active');
+  });
+
+  it('deleting recruiter profile: suspended stays suspended', async () => {
+    const id = uid(24);
+    await makeUser(db, id, true, 'recruiter');
+    await completeRecruiter(db, id, { status: 'suspended' });
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [id]);
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('suspended');
+  });
+
+  it('deleting recruiter profile: revoked stays revoked', async () => {
+    const id = uid(25);
+    await makeUser(db, id, true, 'recruiter');
+    await completeRecruiter(db, id);
+    // Force revoked via service-level path (simulating admin action).
+    await db.query(
+      `UPDATE public.user_capabilities SET status = 'revoked' WHERE user_id = $1 AND capability = 'recruiter'`,
+      [id],
+    );
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [id]);
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+  });
+
+  it('deleting recruiter profile when no row exists yet seeds setup', async () => {
+    const id = uid(26);
+    await makeUser(db, id); // no intent
+    // Seed a recruiter row via profile completion, then remove all trace,
+    // then re-insert+delete to prove the seed-on-delete branch.
+    await db.query(
+      `INSERT INTO public.recruiter_profiles(user_id, recruiter_name, company_name)
+       VALUES ($1, 'X', 'C')`,
+      [id],
+    );
+    await db.query(
+      `DELETE FROM public.user_capabilities WHERE user_id = $1 AND capability = 'recruiter'`,
+      [id],
+    );
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [id]);
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+  });
+
+  it('revoked is not reversed by begin_recruiter_setup, intent, or profile completion', async () => {
+    const id = uid(27);
+    await makeUser(db, id);
+    await setUid(db, id);
+    await db.query(`SELECT public.begin_recruiter_setup()`);
+    await setUid(db, null);
+    await db.query(
+      `UPDATE public.user_capabilities SET status='revoked' WHERE user_id=$1 AND capability='recruiter'`,
+      [id],
+    );
+    // begin_recruiter_setup
+    await setUid(db, id);
+    const r = await db.query<{ begin_recruiter_setup: string }>(
+      `SELECT public.begin_recruiter_setup()`,
+    );
+    expect(r.rows[0].begin_recruiter_setup).toBe('revoked');
+    await setUid(db, null);
+    // intent flip
+    await db.query(`UPDATE public.profiles SET intended_role='recruiter' WHERE user_id=$1`, [id]);
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+    // recruiter profile insert + completion
+    await completeRecruiter(db, id, { verification_status: 'approved' });
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+    // recruiter profile delete
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id=$1`, [id]);
+    expect((await capsFor(db, id)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+  });
+
+  it('driver capability is never mutated by any recruiter-side lifecycle event', async () => {
+    const id = uid(28);
+    await makeUser(db, id, true, 'recruiter');
+    await completeRecruiter(db, id, { verification_status: 'approved' });
+    await db.query(`UPDATE public.recruiter_profiles SET status='suspended' WHERE user_id=$1`, [id]);
+    await db.query(`UPDATE public.recruiter_profiles SET status='active' WHERE user_id=$1`, [id]);
+    await db.query(`DELETE FROM public.recruiter_profiles WHERE user_id=$1`, [id]);
+    await db.query(`UPDATE public.profiles SET intended_role=NULL WHERE user_id=$1`, [id]);
+    const drv = (await capsFor(db, id)).find((r) => r.capability === 'driver');
+    expect(drv?.status).toBe('active');
+    expect(drv?.activated_at).not.toBeNull();
+  });
+});

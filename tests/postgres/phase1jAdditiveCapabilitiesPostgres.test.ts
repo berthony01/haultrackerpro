@@ -529,3 +529,115 @@ describe('Phase 1J-A · D. Isolation, rollback, concurrency', () => {
     expect(bill.length).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('Phase 1J-A · E. Capability lifecycle durability', () => {
+  it('begin_recruiter_setup row survives an unrelated profile UPDATE', async () => {
+    const u = await createUser();
+    await insertProfile(u);
+    await asUser(u, (c) => c.query(`SELECT public.begin_recruiter_setup()`));
+    await q(`UPDATE public.profiles SET display_name = 'renamed' WHERE user_id = $1`, [u]);
+    const rec = (await caps(u)).find((r) => r.capability === 'recruiter');
+    expect(rec?.status).toBe('setup');
+  });
+
+  it('clearing intended_role (null/driver) never removes or demotes recruiter capability', async () => {
+    const u = await createUser();
+    await insertProfile(u, 'recruiter');
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    await q(`UPDATE public.profiles SET intended_role = NULL WHERE user_id = $1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+    await q(`UPDATE public.profiles SET intended_role = 'driver' WHERE user_id = $1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+  });
+
+  it('clearing intended_role never demotes an active recruiter', async () => {
+    const u = await createUser();
+    await insertProfile(u, 'recruiter');
+    await completeRecruiter(u, { verification_status: 'approved' });
+    await q(`UPDATE public.profiles SET intended_role = NULL WHERE user_id = $1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('active');
+  });
+
+  it('deleting recruiter_profiles: active → setup', async () => {
+    const u = await createUser();
+    await insertProfile(u, 'recruiter');
+    await completeRecruiter(u, { verification_status: 'approved' });
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+  });
+
+  it('deleting recruiter_profiles: suspended stays suspended', async () => {
+    const u = await createUser();
+    await insertProfile(u, 'recruiter');
+    await completeRecruiter(u, { status: 'suspended' });
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('suspended');
+  });
+
+  it('deleting recruiter_profiles: revoked stays revoked', async () => {
+    const u = await createUser();
+    await insertProfile(u, 'recruiter');
+    await completeRecruiter(u);
+    await q(
+      `UPDATE public.user_capabilities SET status='revoked' WHERE user_id=$1 AND capability='recruiter'`,
+      [u],
+    );
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+  });
+
+  it('deleting recruiter_profiles: missing capability row → seeded as setup', async () => {
+    const u = await createUser();
+    await insertProfile(u); // no intent, no recruiter cap seeded
+    await q(
+      `INSERT INTO public.recruiter_profiles(user_id, recruiter_name, company_name)
+       VALUES ($1, 'X', 'C')`,
+      [u],
+    );
+    // Wipe the capability row so the DELETE branch hits its "no row" path.
+    await q(
+      `DELETE FROM public.user_capabilities WHERE user_id=$1 AND capability='recruiter'`,
+      [u],
+    );
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id = $1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('setup');
+  });
+
+  it('revoked is terminal across every code path', async () => {
+    const u = await createUser();
+    await insertProfile(u);
+    await asUser(u, (c) => c.query(`SELECT public.begin_recruiter_setup()`));
+    await q(
+      `UPDATE public.user_capabilities SET status='revoked' WHERE user_id=$1 AND capability='recruiter'`,
+      [u],
+    );
+
+    const r = await asUser(u, async (c) =>
+      (await c.query(`SELECT public.begin_recruiter_setup()::text AS s`)).rows[0].s,
+    );
+    expect(r).toBe('revoked');
+
+    await q(`UPDATE public.profiles SET intended_role='recruiter' WHERE user_id=$1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+
+    await completeRecruiter(u, { verification_status: 'approved' });
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id=$1`, [u]);
+    expect((await caps(u)).find((r) => r.capability === 'recruiter')?.status).toBe('revoked');
+  });
+
+  it('driver capability is never mutated across full recruiter lifecycle', async () => {
+    const u = await createUser();
+    await insertProfile(u, 'recruiter');
+    await completeRecruiter(u, { verification_status: 'approved' });
+    await q(`UPDATE public.recruiter_profiles SET status='suspended' WHERE user_id=$1`, [u]);
+    await q(`UPDATE public.recruiter_profiles SET status='active' WHERE user_id=$1`, [u]);
+    await q(`DELETE FROM public.recruiter_profiles WHERE user_id=$1`, [u]);
+    await q(`UPDATE public.profiles SET intended_role=NULL WHERE user_id=$1`, [u]);
+    const drv = (await caps(u)).find((r) => r.capability === 'driver');
+    expect(drv?.status).toBe('active');
+    expect(drv?.activated_at).not.toBeNull();
+  });
+});

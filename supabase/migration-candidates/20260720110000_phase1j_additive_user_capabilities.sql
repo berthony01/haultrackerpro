@@ -75,10 +75,11 @@ CREATE TRIGGER trg_user_capabilities_updated_at
 --
 --    Given a user_id, compute the recruiter capability status implied by
 --    that user's recruiter_profiles row (if any), using the canonical
---    completeness rule established in Phase 1F. Returns NULL when the
---    user has no recruiter profile AND no recruiter intent — the caller
---    is responsible for deciding whether to upsert a `setup` row for
---    intent-only accounts.
+--    completeness rule established in Phase 1F. Returns NULL only when the
+--    user has NO recruiter_profiles row — the caller must then decide
+--    whether an existing capability row is preserved or a new `setup` row
+--    should be seeded. This helper NEVER inspects profiles.intended_role;
+--    intent is handled exclusively by the profiles trigger below.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public._derive_recruiter_capability_status(_user_id uuid)
 RETURNS public.user_capability_status
@@ -89,15 +90,9 @@ SET search_path = public
 AS $$
 DECLARE
   _rp public.recruiter_profiles;
-  _intent text;
 BEGIN
   SELECT * INTO _rp FROM public.recruiter_profiles WHERE user_id = _user_id LIMIT 1;
-
   IF NOT FOUND THEN
-    SELECT intended_role INTO _intent FROM public.profiles WHERE user_id = _user_id LIMIT 1;
-    IF _intent = 'recruiter' THEN
-      RETURN 'setup'::public.user_capability_status;
-    END IF;
     RETURN NULL;
   END IF;
 
@@ -117,8 +112,10 @@ REVOKE ALL ON FUNCTION public._derive_recruiter_capability_status(uuid) FROM PUB
 REVOKE EXECUTE ON FUNCTION public._derive_recruiter_capability_status(uuid) FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION public._derive_recruiter_capability_status(uuid) TO service_role;
 
--- Internal sync — upsert recruiter capability for a user. Never touches
--- driver capability. Preserves activated_at across transitions.
+-- Internal sync — upsert recruiter capability from a recruiter_profiles row.
+-- NEVER removes a recruiter capability. NEVER touches driver capability.
+-- Revoked is sticky and cannot be overwritten by profile changes.
+-- Preserves activated_at across transitions.
 CREATE OR REPLACE FUNCTION public._sync_recruiter_capability(_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -126,15 +123,26 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  _desired public.user_capability_status;
+  _desired  public.user_capability_status;
+  _existing public.user_capability_status;
 BEGIN
   IF _user_id IS NULL THEN RETURN; END IF;
+
+  SELECT status INTO _existing
+    FROM public.user_capabilities
+   WHERE user_id = _user_id AND capability = 'recruiter';
+
+  -- Revoked is terminal and cannot be reversed by any profile-derived path.
+  IF _existing = 'revoked' THEN
+    RETURN;
+  END IF;
+
   _desired := public._derive_recruiter_capability_status(_user_id);
+
+  -- No recruiter_profiles row present. Never remove an existing capability;
+  -- keep whatever the current status is (setup row from begin_recruiter_setup
+  -- or intent, active row that has not yet been deleted, etc.).
   IF _desired IS NULL THEN
-    -- No recruiter profile and no intent → make sure no stale row exists,
-    -- but never remove driver capability.
-    DELETE FROM public.user_capabilities
-      WHERE user_id = _user_id AND capability = 'recruiter';
     RETURN;
   END IF;
 
@@ -152,7 +160,8 @@ BEGIN
             THEN now()
           ELSE public.user_capabilities.activated_at
         END,
-        updated_at = now();
+        updated_at = now()
+    WHERE public.user_capabilities.status <> 'revoked';
 END;
 $$;
 
@@ -162,6 +171,14 @@ GRANT EXECUTE ON FUNCTION public._sync_recruiter_capability(uuid) TO service_rol
 
 -- ---------------------------------------------------------------------------
 -- 4. Trigger — recruiter_profiles INSERT/UPDATE/DELETE
+--
+--    Deletion policy (independent of profiles.intended_role):
+--      revoked   → stays revoked
+--      suspended → stays suspended
+--      active    → demoted to setup (profile source of truth is gone)
+--      setup     → stays setup
+--      (no row)  → seed setup
+--    Driver capability is never touched.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public._recruiter_profile_capability_sync()
 RETURNS trigger
@@ -169,12 +186,26 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  _existing public.user_capability_status;
 BEGIN
   IF (TG_OP = 'DELETE') THEN
-    -- Recruiter profile removed. If durable intent still exists, keep a
-    -- `setup` row; otherwise remove recruiter capability entirely. Never
-    -- touch driver capability.
-    PERFORM public._sync_recruiter_capability(OLD.user_id);
+    SELECT status INTO _existing
+      FROM public.user_capabilities
+     WHERE user_id = OLD.user_id AND capability = 'recruiter';
+
+    IF NOT FOUND THEN
+      INSERT INTO public.user_capabilities (user_id, capability, status, activated_at)
+      VALUES (OLD.user_id, 'recruiter'::public.user_capability_type,
+                            'setup'::public.user_capability_status, NULL)
+      ON CONFLICT (user_id, capability) DO NOTHING;
+    ELSIF _existing = 'active' THEN
+      UPDATE public.user_capabilities
+         SET status = 'setup'::public.user_capability_status,
+             updated_at = now()
+       WHERE user_id = OLD.user_id AND capability = 'recruiter';
+    END IF;
+    -- suspended, revoked, setup: leave untouched.
     RETURN OLD;
   END IF;
 
@@ -193,7 +224,11 @@ CREATE TRIGGER trg_recruiter_profile_capability_sync
   FOR EACH ROW EXECUTE FUNCTION public._recruiter_profile_capability_sync();
 
 -- ---------------------------------------------------------------------------
--- 5. Trigger — profiles.intended_role sync (for intent-only recruiters)
+-- 5. Trigger — profiles.intended_role sync (one-way, additive only)
+--
+--    Setting intended_role = 'recruiter' MAY seed a setup row when none
+--    exists. Clearing intent (null, 'driver', anything else) NEVER removes
+--    or demotes an existing capability. Revoked stays revoked.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public._profile_intent_capability_sync()
 RETURNS trigger
@@ -202,7 +237,18 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM public._sync_recruiter_capability(NEW.user_id);
+  IF NEW.user_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.intended_role = 'recruiter' THEN
+    INSERT INTO public.user_capabilities (user_id, capability, status, activated_at)
+    VALUES (NEW.user_id, 'recruiter'::public.user_capability_type,
+                          'setup'::public.user_capability_status, NULL)
+    ON CONFLICT (user_id, capability) DO NOTHING;
+  END IF;
+
+  -- Any other intent value: no-op. One-way trigger.
   RETURN NEW;
 END;
 $$;
@@ -298,8 +344,8 @@ BEGIN
    WHERE user_id = _uid AND capability = 'recruiter'
    FOR UPDATE;
 
-  IF FOUND AND (_existing = 'active' OR _existing = 'suspended') THEN
-    -- Never unsuspend and never demote an active recruiter.
+  IF FOUND AND _existing IN ('active','suspended','revoked') THEN
+    -- Never unsuspend, never demote an active recruiter, never reverse revoked.
     RETURN _existing;
   END IF;
 
@@ -309,7 +355,7 @@ BEGIN
   ON CONFLICT (user_id, capability) DO UPDATE
     SET status = 'setup'::public.user_capability_status,
         updated_at = now()
-    WHERE public.user_capabilities.status NOT IN ('active','suspended');
+    WHERE public.user_capabilities.status NOT IN ('active','suspended','revoked');
 
   SELECT status INTO _existing
     FROM public.user_capabilities
@@ -342,13 +388,16 @@ BEGIN
     PERFORM public._sync_recruiter_capability(_r.user_id);
   END LOOP;
 
-  -- Intent-only recruiters (no profile row yet).
+  -- Intent-only recruiters (no profile row yet) → seed a `setup` row directly.
   FOR _r IN
     SELECT p.user_id
       FROM public.profiles p
       LEFT JOIN public.recruiter_profiles rp ON rp.user_id = p.user_id
      WHERE p.intended_role = 'recruiter' AND rp.user_id IS NULL
   LOOP
-    PERFORM public._sync_recruiter_capability(_r.user_id);
+    INSERT INTO public.user_capabilities (user_id, capability, status, activated_at)
+    VALUES (_r.user_id, 'recruiter'::public.user_capability_type,
+                        'setup'::public.user_capability_status, NULL)
+    ON CONFLICT (user_id, capability) DO NOTHING;
   END LOOP;
 END $$;
