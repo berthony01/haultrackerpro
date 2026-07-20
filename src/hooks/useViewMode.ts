@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useUserRole, UserRole } from '@/hooks/useUserRole';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useUserRole, type UserRole } from '@/hooks/useUserRole';
+import { useUserCapabilities } from '@/hooks/useUserCapabilities';
+import {
+  computeWorkspaceAccess,
+  isWorkspaceAllowed,
+  resolveInitialWorkspace,
+  type WorkspaceRole,
+} from '@/lib/workspaceAccess';
 
 const STORAGE_KEY = 'htp_view_mode';
 
-function readStored(): UserRole | null {
+function readStored(): WorkspaceRole | null {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     return v === 'driver' || v === 'recruiter' ? v : null;
@@ -12,58 +19,67 @@ function readStored(): UserRole | null {
   }
 }
 
+function writeStored(v: WorkspaceRole) {
+  try { localStorage.setItem(STORAGE_KEY, v); } catch {}
+}
+
+function clearStored() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
 /**
- * View-mode hook for accounts that can legitimately render both the driver
- * and recruiter UI (today: admins). For everyone else `effectiveRole` is
- * pinned to the real role from `useUserRole` so localStorage tampering can
- * never grant cross-role access.
+ * Phase 1J-B1 — Capability-driven view mode.
  *
- * canSwitch is intentionally limited to `isAdmin`. We do not yet have a
- * `driver_profiles` table to *confirm* a non-admin is genuinely dual-role,
- * and the plan's safeguard #1 forbids inferring it from load activity.
+ * Authorization comes exclusively from `useUserCapabilities`. `useUserRole`
+ * is consulted ONLY for its `intended_role` hint (preferred initial
+ * workspace when the account can enter both). Admin status is NOT an
+ * authorization signal here — admin alone does not grant recruiter
+ * workspace. localStorage stores a preference; it never grants access.
  */
 export function useViewMode() {
-  const { role, isAdmin, isLoading: roleLoading } = useUserRole();
-  const canSwitch = !!isAdmin;
+  const capabilities = useUserCapabilities();
+  const { role: preferredRole, isLoading: roleLoading } = useUserRole();
+  const decisions = useMemo(() => computeWorkspaceAccess(capabilities), [capabilities]);
 
-  const [viewMode, setViewModeState] = useState<UserRole>(() => {
-    return readStored() ?? 'driver';
-  });
+  const isLoading = capabilities.isLoading || roleLoading;
+  const error = capabilities.error ?? null;
 
-  // When auth/role finishes loading, reconcile the stored value against
-  // what the user is actually allowed to see.
+  const [viewMode, setViewModeState] = useState<WorkspaceRole | null>(null);
+
   useEffect(() => {
-    if (roleLoading) return;
-    if (!canSwitch) {
-      // Non-switchable users: force to real role and clear any stale flag.
-      setViewModeState(role);
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
-      return;
-    }
+    if (isLoading) return;
     const stored = readStored();
-    if (stored) {
-      setViewModeState(stored);
-    } else {
-      // First time for an admin: default to driver view.
-      setViewModeState('driver');
-    }
-  }, [roleLoading, canSwitch, role]);
+    const { workspace, shouldClearStoredPreference } = resolveInitialWorkspace(
+      capabilities,
+      { preferredRole: preferredRole as WorkspaceRole | null, storedPreference: stored },
+    );
+    if (shouldClearStoredPreference) clearStored();
+    setViewModeState(workspace);
+  }, [isLoading, capabilities, preferredRole]);
 
-  const setViewMode = useCallback((next: UserRole) => {
-    if (!canSwitch) return;
-    setViewModeState(next);
-    try { localStorage.setItem(STORAGE_KEY, next); } catch {}
-  }, [canSwitch]);
+  const setViewMode = useCallback(
+    (next: WorkspaceRole) => {
+      if (!isWorkspaceAllowed(capabilities, next)) return;
+      setViewModeState(next);
+      writeStored(next);
+    },
+    [capabilities],
+  );
 
-  // Safety net: if a non-switchable user somehow has a divergent viewMode
-  // (e.g. mid-render before the effect runs), force the real role.
-  const effectiveRole: UserRole = canSwitch ? viewMode : role;
+  const effectiveRole: UserRole =
+    (viewMode ?? decisions.allowedFallbackWorkspace ?? 'driver') as UserRole;
 
   return {
     effectiveRole,
     viewMode: effectiveRole,
     setViewMode,
-    canSwitch,
-    isLoading: roleLoading,
+    canSwitch: decisions.switcherAvailable,
+    isLoading,
+    error,
+    driverWorkspaceAllowed: decisions.driverWorkspaceAllowed,
+    recruiterHubAllowed: decisions.recruiterHubAllowed,
+    recruiterOperationsAllowed: decisions.recruiterOperationsAllowed,
+    driverCapabilityStatus: decisions.driverCapabilityStatus,
+    recruiterCapabilityStatus: decisions.recruiterCapabilityStatus,
   };
 }
