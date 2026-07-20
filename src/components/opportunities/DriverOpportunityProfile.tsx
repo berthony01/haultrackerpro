@@ -31,7 +31,9 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface Props {
   onBack: () => void;
+  onSaveSuccess?: (result: { completed: boolean }) => void;
 }
+
 
 const DRIVER_TYPES = ['Company Driver', 'Owner Operator', 'Lease Purchase', 'Team'];
 const ROUTE_TYPES = ['OTR', 'Regional', 'Local', 'Dedicated'];
@@ -113,8 +115,9 @@ function isComplete(f: FormState) {
 
 const isValidEmail = (e: string) => !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-export function DriverOpportunityProfile({ onBack }: Props) {
+export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
   const { profile, isLoading, upsertProfile } = useDriverOpportunityProfile();
+
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(EMPTY);
 
@@ -209,10 +212,12 @@ export function DriverOpportunityProfile({ onBack }: Props) {
         if (completed) toast.success('Your Opportunity Preferences are ready.');
         else
           toast.success('Preferences saved. Add a few more details later to improve your match quality.');
+        onSaveSuccess?.({ completed });
       },
       onError: (e: Error) => toast.error(e.message),
     });
   };
+
 
   if (isLoading) {
     return (

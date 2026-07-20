@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +42,9 @@ interface Props {
   isPro: boolean;
   onUpgrade: () => void;
   driverProfile?: DriverOpportunityProfile | null;
-  onEditProfile: () => void;
+  onOpenPreferencesForApply: () => void;
+  resumeApplyToken?: string | null;
+  onResumeApplyConsumed?: (token: string) => void;
 }
 
 const fmtMoney = (v: number | null | undefined) =>
@@ -50,7 +52,17 @@ const fmtMoney = (v: number | null | undefined) =>
 const fmtMiles = (v: number | null | undefined) =>
   v == null ? '—' : `${Math.round(Number(v)).toLocaleString()} mi`;
 
-export function OpportunityDetail({ opportunity: o, onBack, isPro, onUpgrade, driverProfile, onEditProfile }: Props) {
+export function OpportunityDetail({
+  opportunity: o,
+  onBack,
+  isPro,
+  onUpgrade,
+  driverProfile,
+  onOpenPreferencesForApply,
+  resumeApplyToken,
+  onResumeApplyConsumed,
+}: Props) {
+
   const { saved, save, unsave } = useSavedOpportunities();
   const { driverApplications, createApplication } = useOpportunityApplications();
   const [submitting, setSubmitting] = useState(false);
