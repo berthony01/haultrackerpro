@@ -10,14 +10,23 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtractedOpportunity } from '@/components/opportunities/PasteOpportunityDialog';
 import type { Json, Tables } from '@/integrations/supabase/types';
+import type {
+  OpportunityInsert,
+  OpportunityUpdate,
+} from '@/hooks/opportunities/useRecruiterOpportunities';
 
-const h = vi.hoisted(() => ({
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-  createMutate: vi.fn(),
-  updateMutate: vi.fn(),
-  pastePayload: {} as ExtractedOpportunity,
-}));
+type UpdateArgs = { id: string; data: OpportunityUpdate };
+
+const h = vi.hoisted(() => {
+  const { vi: viHoisted } = require('vitest') as typeof import('vitest');
+  return {
+    toastError: viHoisted.fn(),
+    toastSuccess: viHoisted.fn(),
+    createMutate: viHoisted.fn<(payload: OpportunityInsert) => void>(),
+    updateMutate: viHoisted.fn<(args: { id: string; data: OpportunityUpdate }) => void>(),
+    pastePayload: {} as ExtractedOpportunity,
+  };
+});
 
 vi.mock('sonner', () => ({
   toast: { error: h.toastError, success: h.toastSuccess },
