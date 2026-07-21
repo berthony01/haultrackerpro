@@ -658,3 +658,133 @@ describe('Legacy calculateOpportunityFinancials regression (34)', () => {
     expect(r.hasLeaseRisk).toBe(true);
   });
 });
+
+describe('Phase 1L-C remediation — semantic gap fixes', () => {
+  it('Fix 1: invalid incentive is diagnosed but does NOT reduce availability', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'flat_weekly',
+        flatWeeklyPay: provided(1500),
+        totalWeeklyMiles: provided(2000),
+        oneTimeIncentives: [
+          { label: 'Bad', amount: provided(-100) },
+          { label: 'Good', amount: provided(250) },
+        ],
+      }),
+    );
+    expect(r.status).toBe('available');
+    expect(r.recurringWeeklyGross).toBe(1500);
+    expect(r.oneTimeIncentiveTotal).toBe(250);
+    expect(r.invalidInputs).toContain('oneTimeIncentive[0]');
+  });
+
+  it('Fix 2: unknown pay model with recruiter gross stays incomplete', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'unknown',
+        recruiterProvidedWeeklyGross: provided(1800),
+        totalWeeklyMiles: provided(2500),
+      }),
+    );
+    expect(r.recurringWeeklyGross).toBe(1800);
+    expect(r.grossSource).toBe('recruiter_provided');
+    expect(r.status).toBe('incomplete');
+    expect(r.missingInputs).toContain('payModel');
+  });
+
+  it('Fix 3a: negative deadhead miles are diagnosed and force incomplete', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'flat_weekly',
+        flatWeeklyPay: provided(1500),
+        totalWeeklyMiles: provided(2000),
+        deadheadWeeklyMiles: provided(-50),
+      }),
+    );
+    expect(r.deadheadPercentage).toBeNull();
+    expect(r.invalidInputs).toContain('deadheadWeeklyMiles');
+    expect(r.status).toBe('incomplete');
+  });
+
+  it('Fix 3b: non-finite deadhead miles diagnosed', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'flat_weekly',
+        flatWeeklyPay: provided(1500),
+        totalWeeklyMiles: provided(2000),
+        deadheadWeeklyMiles: provided(Number.NaN),
+      }),
+    );
+    expect(r.deadheadPercentage).toBeNull();
+    expect(r.invalidInputs).toContain('deadheadWeeklyMiles');
+    expect(r.status).toBe('incomplete');
+  });
+
+  it('Fix 3c: zero deadhead miles remains valid and yields 0%', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'flat_weekly',
+        flatWeeklyPay: provided(1500),
+        totalWeeklyMiles: provided(2000),
+        deadheadWeeklyMiles: provided(0),
+      }),
+    );
+    expect(r.deadheadPercentage).toBe(0);
+    expect(r.invalidInputs).not.toContain('deadheadWeeklyMiles');
+    expect(r.status).toBe('available');
+  });
+
+  it('Fix 4a: complete CPM (with positive total miles) is available; company-driver net_not_applicable', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'cpm',
+        cpm: provided(0.60),
+        loadedWeeklyMiles: provided(2000),
+        totalWeeklyMiles: provided(2500),
+      }),
+    );
+    expect(r.status).toBe('available');
+    expect(r.netStatus).toBe('not_applicable');
+    expect(r.recurringWeeklyGross).toBe(1200);
+    expect(r.effectiveRpm).toBeCloseTo(1200 / 2500, 10);
+  });
+
+  it('Fix 4b: CPM with missing total miles is incomplete and diagnoses totalWeeklyMiles', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'cpm',
+        cpm: provided(0.60),
+        loadedWeeklyMiles: provided(2000),
+        // totalWeeklyMiles intentionally not disclosed
+      }),
+    );
+    expect(r.status).toBe('incomplete');
+    expect(r.missingInputs).toContain('totalWeeklyMiles');
+    expect(r.recurringWeeklyGross).toBe(1200);
+    expect(r.effectiveRpm).toBeNull();
+  });
+
+  it('Fix 4c: CPM does NOT infer total from loaded+deadhead', () => {
+    const r = calculateCanonicalOpportunityFinancials(
+      buildInput({
+        employmentModel: 'company_driver',
+        payModel: 'cpm',
+        cpm: provided(0.60),
+        loadedWeeklyMiles: provided(2000),
+        deadheadWeeklyMiles: provided(500),
+        // totalWeeklyMiles NOT provided
+      }),
+    );
+    expect(r.effectiveRpm).toBeNull();
+    expect(r.deadheadPercentage).toBeNull();
+    expect(r.status).toBe('incomplete');
+  });
+});
+
