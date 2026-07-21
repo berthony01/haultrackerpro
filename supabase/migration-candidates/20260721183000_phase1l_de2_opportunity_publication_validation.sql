@@ -313,33 +313,50 @@ BEGIN
   _lease_relevant := o.employment_model = 'lease_purchase';
 
   IF _cost_bearing THEN
-    FOR _pair IN
-      SELECT * FROM (VALUES
-        ('Insurance'::text,          o.insurance_deductions,    o.insurance_deduction_frequency,    true),
-        ('Maintenance',              o.maintenance_deductions,  o.maintenance_deduction_frequency,  true),
-        ('Other recurring cost',     o.other_deductions,        o.other_deduction_frequency,        true),
-        ('Lease payment',            o.lease_payment,           o.lease_payment_frequency,          _lease_relevant)
-      ) AS t(label, amt, freq, applies)
-    LOOP
-      IF NOT (_pair.applies) THEN CONTINUE; END IF;
-      _pair_label := _pair.label;
-      _amt_col := _pair.amt;
-      _freq_col := _pair.freq;
-
-      IF _amt_col IS NULL AND _freq_col IS NULL THEN
-        -- not disclosed
-        CONTINUE;
+    -- Insurance
+    IF NOT (o.insurance_deductions IS NULL AND o.insurance_deduction_frequency IS NULL) THEN
+      IF o.insurance_deductions IS NULL AND o.insurance_deduction_frequency IS NOT NULL THEN
+        _b := _b || 'Insurance amount is required when a frequency is set.';
+      ELSIF o.insurance_deductions IS NOT NULL
+            AND (NOT public._opportunity_numeric_is_finite(o.insurance_deductions) OR o.insurance_deductions < 0) THEN
+        _b := _b || 'Insurance amount must be zero or a positive number.';
+      ELSIF o.insurance_deductions IS NOT NULL AND o.insurance_deduction_frequency IS NULL THEN
+        _b := _b || 'Insurance frequency is required when an amount is set.';
       END IF;
-
-      IF _amt_col IS NULL AND _freq_col IS NOT NULL THEN
-        _b := _b || (_pair_label || ' amount is required when a frequency is set.');
-      ELSIF _amt_col IS NOT NULL
-            AND (NOT public._opportunity_numeric_is_finite(_amt_col) OR _amt_col < 0) THEN
-        _b := _b || (_pair_label || ' amount must be zero or a positive number.');
-      ELSIF _amt_col IS NOT NULL AND _freq_col IS NULL THEN
-        _b := _b || (_pair_label || ' frequency is required when an amount is set.');
+    END IF;
+    -- Maintenance
+    IF NOT (o.maintenance_deductions IS NULL AND o.maintenance_deduction_frequency IS NULL) THEN
+      IF o.maintenance_deductions IS NULL AND o.maintenance_deduction_frequency IS NOT NULL THEN
+        _b := _b || 'Maintenance amount is required when a frequency is set.';
+      ELSIF o.maintenance_deductions IS NOT NULL
+            AND (NOT public._opportunity_numeric_is_finite(o.maintenance_deductions) OR o.maintenance_deductions < 0) THEN
+        _b := _b || 'Maintenance amount must be zero or a positive number.';
+      ELSIF o.maintenance_deductions IS NOT NULL AND o.maintenance_deduction_frequency IS NULL THEN
+        _b := _b || 'Maintenance frequency is required when an amount is set.';
       END IF;
-    END LOOP;
+    END IF;
+    -- Other recurring cost
+    IF NOT (o.other_deductions IS NULL AND o.other_deduction_frequency IS NULL) THEN
+      IF o.other_deductions IS NULL AND o.other_deduction_frequency IS NOT NULL THEN
+        _b := _b || 'Other recurring cost amount is required when a frequency is set.';
+      ELSIF o.other_deductions IS NOT NULL
+            AND (NOT public._opportunity_numeric_is_finite(o.other_deductions) OR o.other_deductions < 0) THEN
+        _b := _b || 'Other recurring cost amount must be zero or a positive number.';
+      ELSIF o.other_deductions IS NOT NULL AND o.other_deduction_frequency IS NULL THEN
+        _b := _b || 'Other recurring cost frequency is required when an amount is set.';
+      END IF;
+    END IF;
+    -- Lease payment (only for lease_purchase)
+    IF _lease_relevant AND NOT (o.lease_payment IS NULL AND o.lease_payment_frequency IS NULL) THEN
+      IF o.lease_payment IS NULL AND o.lease_payment_frequency IS NOT NULL THEN
+        _b := _b || 'Lease payment amount is required when a frequency is set.';
+      ELSIF o.lease_payment IS NOT NULL
+            AND (NOT public._opportunity_numeric_is_finite(o.lease_payment) OR o.lease_payment < 0) THEN
+        _b := _b || 'Lease payment amount must be zero or a positive number.';
+      ELSIF o.lease_payment IS NOT NULL AND o.lease_payment_frequency IS NULL THEN
+        _b := _b || 'Lease payment frequency is required when an amount is set.';
+      END IF;
+    END IF;
 
     ------------------------------------------------------------------
     -- Escrow rules.
