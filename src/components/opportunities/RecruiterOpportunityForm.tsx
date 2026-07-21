@@ -285,7 +285,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl mt-1">
               Required details adapt to the selected employment arrangement and pay model. Review the
-              canonical information before saving or publishing.
+              live calculation before publishing.
             </p>
           </div>
           <Button
