@@ -237,12 +237,59 @@ let db: AnyPGlite;
 let phase1kDefBefore: string;
 let phase1kTriggerBefore: string;
 
+/** Baselines captured immediately after the FIRST candidate application. */
+const baselineFnDefs: Record<string, string> = {};
+const baselineTriggerDefs: Record<string, string> = {};
+const baselineTriggerCounts: Record<string, number> = {};
+const baselinePublicLacks: Record<string, boolean> = {};
+const baselineAnonLacks: Record<string, boolean> = {};
+const baselineAuthLacks: Record<string, boolean> = {};
+
+const NEW_FN_REGS = [
+  'public._opportunity_numeric_is_finite(numeric)',
+  'public._opportunity_jsonb_number(jsonb)',
+  'public.opportunity_publication_blockers(public.opportunities)',
+  'public.opportunities_canonical_publication_guard()',
+] as const;
+const ALL_FN_REGS = [...NEW_FN_REGS, 'public.opportunities_guard()'] as const;
+const TRG_NAMES = [
+  'trg_opportunities_guard',
+  'trg_opportunities_canonical_publication_guard',
+] as const;
+
 const dbs: AnyPGlite[] = [];
 
 async function makePGlite(): Promise<AnyPGlite> {
   const inst = new PGlite() as unknown as AnyPGlite;
   dbs.push(inst);
   return inst;
+}
+
+/**
+ * Catalog-level check that PUBLIC (grantee OID 0) has no EXECUTE grant
+ * for the given function regprocedure.  Uses aclexplode over the
+ * effective ACL (proacl COALESCED with acldefault('f', proowner)).
+ */
+async function publicLacksExecute(inst: AnyPGlite, fnReg: string): Promise<boolean> {
+  const r = await inst.query<{ v: boolean }>(
+    `SELECT NOT EXISTS(
+       SELECT 1
+         FROM pg_proc p,
+              aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a
+        WHERE p.oid = $1::regprocedure
+          AND a.grantee = 0
+          AND a.privilege_type = 'EXECUTE'
+     ) AS v`,
+    [fnReg],
+  );
+  return r.rows[0].v;
+}
+async function roleLacksExecute(inst: AnyPGlite, role: string, fnReg: string): Promise<boolean> {
+  const r = await inst.query<{ v: boolean }>(
+    `SELECT NOT has_function_privilege($1, $2, 'EXECUTE') AS v`,
+    [role, fnReg],
+  );
+  return r.rows[0].v;
 }
 
 async function setUid(inst: AnyPGlite, uid: string | null) {
@@ -386,31 +433,65 @@ async function tryExec(inst: AnyPGlite, sql: string, params: unknown[] = []): Pr
 // beforeAll — build fixture, capture Phase 1K baseline, apply candidate.
 // ---------------------------------------------------------------------
 beforeAll(async () => {
-  db = await makePGlite();
-  await db.exec(BOOTSTRAP);
-  // Load DE1 canonical CHECK constraints from disk after the base
-  // opportunities table exists so the fixture inherits the applied
-  // storage contract without duplicating any constraint bodies here.
-  await db.exec(PHASE_1L_DE1_SQL);
-  await db.exec(PHASE_1K_SQL);
-  await db.exec(PHASE_1K_TRIGGER_BINDING);
-  await seedIdentities(db);
+  const inst = await makePGlite();
+  db = inst;
+  try {
+    await db.exec(BOOTSTRAP);
+    // Load DE1 canonical CHECK constraints from disk after the base
+    // opportunities table exists so the fixture inherits the applied
+    // storage contract without duplicating any constraint bodies here.
+    await db.exec(PHASE_1L_DE1_SQL);
+    await db.exec(PHASE_1K_SQL);
+    await db.exec(PHASE_1K_TRIGGER_BINDING);
+    await seedIdentities(db);
 
-  // Capture Phase 1K state BEFORE candidate applies.
-  const defR = await db.query<{ def: string }>(
-    `SELECT pg_get_functiondef('public.opportunities_guard()'::regprocedure) AS def`,
-  );
-  phase1kDefBefore = defR.rows[0].def;
+    // Capture Phase 1K state BEFORE candidate applies (proves candidate
+    // does not touch the Phase 1K function or its trigger binding).
+    const defR = await db.query<{ def: string }>(
+      `SELECT pg_get_functiondef('public.opportunities_guard()'::regprocedure) AS def`,
+    );
+    phase1kDefBefore = defR.rows[0].def;
+    const trR = await db.query<{ sig: string }>(
+      `SELECT t.tgname || '|' || pg_get_triggerdef(t.oid) AS sig
+         FROM pg_trigger t
+        WHERE t.tgname = 'trg_opportunities_guard'`,
+    );
+    phase1kTriggerBefore = trR.rows.map((r) => r.sig).join('\n');
 
-  const trR = await db.query<{ sig: string }>(
-    `SELECT t.tgname || '|' || pg_get_triggerdef(t.oid) AS sig
-       FROM pg_trigger t
-      WHERE t.tgname = 'trg_opportunities_guard'`,
-  );
-  phase1kTriggerBefore = trR.rows.map((r) => r.sig).join('\n');
+    // Apply candidate exactly once for the shared harness.
+    await db.exec(CANDIDATE_SQL);
 
-  // Apply candidate for the shared harness.
-  await db.exec(CANDIDATE_SQL);
+    // Immediately capture immutable baselines for every new function
+    // definition, both trigger definitions/counts, and the effective
+    // EXECUTE ACL for PUBLIC (grantee OID 0), anon, and authenticated.
+    for (const reg of NEW_FN_REGS) {
+      const r = await db.query<{ def: string }>(
+        `SELECT pg_get_functiondef($1::regprocedure) AS def`, [reg],
+      );
+      baselineFnDefs[reg] = r.rows[0].def;
+      baselinePublicLacks[reg] = await publicLacksExecute(db, reg);
+      baselineAnonLacks[reg] = await roleLacksExecute(db, 'anon', reg);
+      baselineAuthLacks[reg] = await roleLacksExecute(db, 'authenticated', reg);
+    }
+    // Phase 1K definition is captured pre-candidate; also record it in the
+    // shared map under the ALL_FN_REGS key for the consolidated idempotency
+    // test to compare against.
+    baselineFnDefs['public.opportunities_guard()'] = phase1kDefBefore;
+
+    for (const tg of TRG_NAMES) {
+      const t = await db.query<{ def: string; ct: string }>(
+        `SELECT COALESCE(min(pg_get_triggerdef(oid)), '') AS def,
+                count(*)::text AS ct
+           FROM pg_trigger WHERE tgname = $1`,
+        [tg],
+      );
+      baselineTriggerDefs[tg] = t.rows[0].def;
+      baselineTriggerCounts[tg] = Number(t.rows[0].ct);
+    }
+  } catch (e) {
+    try { await inst.close?.(); } catch { /* ignore */ }
+    throw e;
+  }
 });
 
 afterAll(async () => {
@@ -527,26 +608,11 @@ describe('coexistence with Phase 1K guard and idempotency', () => {
     expect(r.rows.map((x) => x.sig).join('\n')).toBe(phase1kTriggerBefore);
     expect(r.rows.length).toBe(1);
   });
-  it('reapplying the candidate leaves exactly one new trigger and unchanged function definitions', async () => {
-    const defBefore = await db.query<{ def: string }>(
-      `SELECT pg_get_functiondef('public.opportunities_canonical_publication_guard()'::regprocedure) AS def`,
-    );
-    await db.exec(CANDIDATE_SQL);
-    const defAfter = await db.query<{ def: string }>(
-      `SELECT pg_get_functiondef('public.opportunities_canonical_publication_guard()'::regprocedure) AS def`,
-    );
-    expect(defAfter.rows[0].def).toBe(defBefore.rows[0].def);
-    const tr = await db.query<{ ct: string }>(
-      `SELECT count(*)::text AS ct FROM pg_trigger
-        WHERE tgname = 'trg_opportunities_canonical_publication_guard'`,
-    );
-    expect(tr.rows[0].ct).toBe('1');
-    // And Phase 1K guard still byte-identical.
-    const p1k = await db.query<{ def: string }>(
-      `SELECT pg_get_functiondef('public.opportunities_guard()'::regprocedure) AS def`,
-    );
-    expect(p1k.rows[0].def).toBe(phase1kDefBefore);
-  });
+  // NOTE: reapplication invariance and PUBLIC/anon/authenticated ACL
+  // stability under reapplication are consolidated into the final
+  // "definitive idempotency" test at the bottom of this file, which
+  // compares every helper/trigger/ACL against the beforeAll baselines
+  // captured immediately after the first candidate application.
 });
 
 // -------------------- helper: derive parsed detail ---------------------
@@ -1216,7 +1282,50 @@ describe('universal numeric blocker — negative and non-finite', () => {
     expect(upd.ok).toBe(false);
     if (!upd.ok) expect(String(mustErr(upd).code)).toBe('23514');
   });
+  it('-Infinity cpm injected via UPDATE is intercepted as structured 23514 with universal blocker', async () => {
+    await setUid(db, RECR_UID);
+    const seeded = await insertOpportunity(db, publishableRow({ status: 'draft' }));
+    const id = String(seeded.id);
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities
+          SET status = 'active', pay_model = 'cpm', flat_weekly_pay = NULL,
+              cpm = '-Infinity'::numeric, estimated_weekly_miles = 2500,
+              estimated_loaded_miles = 2200, deadhead_paid = true
+        WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      expect(String(mustErr(upd).code)).toBe('23514');
+      const d = parseDetail(mustErr(upd));
+      expect(d.code).toBe('opportunity_publication_invalid');
+      expect(d.blocking_reasons)
+        .toContain('Fix invalid numeric values (must be zero or greater).');
+    }
+  });
+  it('invalid salary_frequency asserts structured 23514 before CHECK', async () => {
+    await setUid(db, RECR_UID);
+    const seeded = await insertOpportunity(db, publishableRow({ status: 'draft' }));
+    const id = String(seeded.id);
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities
+          SET status = 'active', pay_model = 'salary', flat_weekly_pay = NULL,
+              salary_amount = 1000, salary_frequency = 'daily'
+        WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      expect(String(mustErr(upd).code)).toBe('23514');
+      const d = parseDetail(mustErr(upd));
+      expect(d.code).toBe('opportunity_publication_invalid');
+      expect(d.blocking_reasons).toContain('Salary pay period is required.');
+    }
+  });
 });
+
 
 describe('candidate intercepts before underlying CHECK constraints', () => {
   it('canonical_version=2 returns structured publication error (not CHECK failure)', async () => {
@@ -1275,89 +1384,331 @@ describe('candidate intercepts before underlying CHECK constraints', () => {
   });
 });
 
-describe('cost-pair full matrix (all four pairs, contractor_1099)', () => {
-  const base = (o: Row = {}) => publishableRow({
-    employment_model: 'contractor_1099',
-    driver_type: '1099',
-    ...o,
-  });
-  const pairs = [
+/**
+ * One honest, data-driven matrix over ALL FOUR cost pairs:
+ *   Insurance / Maintenance / Other  → contractor_1099
+ *   Lease                            → lease_purchase
+ *
+ * For each pair every scenario produces a real active-row write and
+ * inspects the structured 23514 error (code, DETAIL.code, blocking
+ * reasons array), rather than only `ok === false`.
+ *
+ * Scenarios per pair:
+ *   1. null/null                   → allowed
+ *   2. freq set + NULL amount      → "<label> amount is required when a frequency is set."
+ *   3. positive amount + NULL freq → "<label> frequency is required when an amount is set."
+ *   4. positive amount + 'daily'   → same frequency-required blocker (trigger fires before CHECK)
+ *   5. negative amount             → universal numeric blocker + pair amount-invalid blocker
+ *   6. NaN amount (via UPDATE)     → structured 23514 + universal numeric + amount-invalid blockers
+ *   7. zero + valid freq           → allowed
+ *   8. positive + valid freq       → allowed
+ */
+describe('cost-pair full matrix (all four cost pairs, 8 scenarios each)', () => {
+  interface Pair {
+    label: string;
+    employment: string;
+    driverType: string;
+    amt: 'insurance_deductions' | 'maintenance_deductions' | 'other_deductions' | 'lease_payment';
+    freq:
+      | 'insurance_deduction_frequency'
+      | 'maintenance_deduction_frequency'
+      | 'other_deduction_frequency'
+      | 'lease_payment_frequency';
+    msgFreq: string;
+    msgAmt: string;
+    msgAmtInvalid: string;
+  }
+  const pairs: Pair[] = [
     {
-      label: 'Insurance',
-      amt: 'insurance_deductions',
-      freq: 'insurance_deduction_frequency',
+      label: 'Insurance', employment: 'contractor_1099', driverType: '1099',
+      amt: 'insurance_deductions', freq: 'insurance_deduction_frequency',
       msgFreq: 'Insurance frequency is required when an amount is set.',
       msgAmt:  'Insurance amount is required when a frequency is set.',
       msgAmtInvalid: 'Insurance amount must be zero or a positive number.',
     },
     {
-      label: 'Maintenance',
-      amt: 'maintenance_deductions',
-      freq: 'maintenance_deduction_frequency',
+      label: 'Maintenance', employment: 'contractor_1099', driverType: '1099',
+      amt: 'maintenance_deductions', freq: 'maintenance_deduction_frequency',
       msgFreq: 'Maintenance frequency is required when an amount is set.',
       msgAmt:  'Maintenance amount is required when a frequency is set.',
       msgAmtInvalid: 'Maintenance amount must be zero or a positive number.',
     },
     {
-      label: 'Other',
-      amt: 'other_deductions',
-      freq: 'other_deduction_frequency',
+      label: 'Other', employment: 'contractor_1099', driverType: '1099',
+      amt: 'other_deductions', freq: 'other_deduction_frequency',
       msgFreq: 'Other recurring cost frequency is required when an amount is set.',
       msgAmt:  'Other recurring cost amount is required when a frequency is set.',
       msgAmtInvalid: 'Other recurring cost amount must be zero or a positive number.',
     },
-  ] as const;
+    {
+      label: 'Lease', employment: 'lease_purchase', driverType: 'lease_purchase',
+      amt: 'lease_payment', freq: 'lease_payment_frequency',
+      msgFreq: 'Lease payment frequency is required when an amount is set.',
+      msgAmt:  'Lease payment amount is required when a frequency is set.',
+      msgAmtInvalid: 'Lease payment amount must be zero or a positive number.',
+    },
+  ];
+
+  const UNIVERSAL = 'Fix invalid numeric values (must be zero or greater).';
 
   for (const p of pairs) {
-    it(`${p.label} amount with invalid frequency 'daily' blocks with frequency-required`, async () => {
-      await setUid(db, RECR_UID);
-      const a = await tryInsert(db, base({ [p.amt]: 100, [p.freq]: 'daily' } as Row));
-      expect(a.ok).toBe(false);
-      if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain(p.msgFreq);
+    const base = (o: Row = {}) => publishableRow({
+      employment_model: p.employment,
+      driver_type: p.driverType,
+      ...o,
     });
-    it(`${p.label} amount with NULL frequency blocks with frequency-required`, async () => {
+
+    it(`${p.label} 1/null/null is allowed`, async () => {
       await setUid(db, RECR_UID);
-      const a = await tryInsert(db, base({ [p.amt]: 100, [p.freq]: null } as Row));
-      expect(a.ok).toBe(false);
-      if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain(p.msgFreq);
+      const a = await tryInsert(db, base({ [p.amt]: null, [p.freq]: null } as Row));
+      expect(a.ok).toBe(true);
     });
-    it(`${p.label} NULL amount with any frequency blocks with amount-required`, async () => {
+    it(`${p.label} 2/freq+null-amount → amount-required blocker`, async () => {
       await setUid(db, RECR_UID);
       const a = await tryInsert(db, base({ [p.amt]: null, [p.freq]: 'monthly' } as Row));
       expect(a.ok).toBe(false);
-      if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain(p.msgAmt);
+      if (!a.ok) {
+        expect(String(mustErr(a).code)).toBe('23514');
+        const d = parseDetail(mustErr(a));
+        expect(d.code).toBe('opportunity_publication_invalid');
+        expect(d.blocking_reasons).toContain(p.msgAmt);
+      }
     });
-    it(`${p.label} zero amount + valid frequency is allowed`, async () => {
+    it(`${p.label} 3/positive-amount+null-freq → frequency-required blocker`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: 100, [p.freq]: null } as Row));
+      expect(a.ok).toBe(false);
+      if (!a.ok) {
+        expect(String(mustErr(a).code)).toBe('23514');
+        const d = parseDetail(mustErr(a));
+        expect(d.code).toBe('opportunity_publication_invalid');
+        expect(d.blocking_reasons).toContain(p.msgFreq);
+      }
+    });
+    it(`${p.label} 4/positive-amount+'daily' → frequency-required (before CHECK)`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: 100, [p.freq]: 'daily' } as Row));
+      expect(a.ok).toBe(false);
+      if (!a.ok) {
+        expect(String(mustErr(a).code)).toBe('23514');
+        const d = parseDetail(mustErr(a));
+        expect(d.code).toBe('opportunity_publication_invalid');
+        expect(d.blocking_reasons).toContain(p.msgFreq);
+      }
+    });
+    it(`${p.label} 5/negative amount → universal + pair amount-invalid blockers`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: -1, [p.freq]: 'weekly' } as Row));
+      expect(a.ok).toBe(false);
+      if (!a.ok) {
+        expect(String(mustErr(a).code)).toBe('23514');
+        const d = parseDetail(mustErr(a));
+        expect(d.code).toBe('opportunity_publication_invalid');
+        expect(d.blocking_reasons).toContain(UNIVERSAL);
+        expect(d.blocking_reasons).toContain(p.msgAmtInvalid);
+      }
+    });
+    it(`${p.label} 6/NaN amount via UPDATE → structured 23514 + universal + pair amount-invalid`, async () => {
+      await setUid(db, RECR_UID);
+      const seeded = await insertOpportunity(db, publishableRow({
+        status: 'draft', employment_model: p.employment, driver_type: p.driverType,
+      }));
+      const id = String(seeded.id);
+      const upd = await tryExec(
+        db,
+        `UPDATE public.opportunities
+            SET status = 'active', ${p.amt} = 'NaN'::numeric, ${p.freq} = 'weekly'
+          WHERE id = $1 RETURNING *`,
+        [id],
+      );
+      expect(upd.ok).toBe(false);
+      if (!upd.ok) {
+        expect(String(mustErr(upd).code)).toBe('23514');
+        const d = parseDetail(mustErr(upd));
+        expect(d.code).toBe('opportunity_publication_invalid');
+        expect(d.blocking_reasons).toContain(UNIVERSAL);
+        expect(d.blocking_reasons).toContain(p.msgAmtInvalid);
+      }
+    });
+    it(`${p.label} 7/zero + valid freq is allowed`, async () => {
       await setUid(db, RECR_UID);
       const a = await tryInsert(db, base({ [p.amt]: 0, [p.freq]: 'weekly' } as Row));
       expect(a.ok).toBe(true);
     });
-    it(`${p.label} positive amount + valid frequency is allowed`, async () => {
+    it(`${p.label} 8/positive + valid freq is allowed`, async () => {
       await setUid(db, RECR_UID);
       const a = await tryInsert(db, base({ [p.amt]: 150, [p.freq]: 'biweekly' } as Row));
       expect(a.ok).toBe(true);
     });
   }
 
-  it('Lease amount with invalid frequency on lease_purchase blocks', async () => {
+  // Prove lease fields are IRRELEVANT for non-lease_purchase employment.
+  it('Lease positive+null on contractor_1099 does not block (lease irrelevant)', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({
-      employment_model: 'lease_purchase', driver_type: 'lease_purchase',
-      lease_payment: 500, lease_payment_frequency: 'daily',
+      employment_model: 'contractor_1099', driver_type: '1099',
+      lease_payment: 500, lease_payment_frequency: null,
     }));
-    expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
-      .toContain('Lease payment frequency is required when an amount is set.');
+    expect(a.ok).toBe(true);
   });
-  it('Lease zero + valid frequency on lease_purchase is allowed', async () => {
+  it('Lease positive+null on owner_operator does not block (lease irrelevant)', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({
-      employment_model: 'lease_purchase', driver_type: 'lease_purchase',
-      lease_payment: 0, lease_payment_frequency: 'weekly',
+      employment_model: 'owner_operator', driver_type: 'owner_operator',
+      lease_payment: 500, lease_payment_frequency: null,
     }));
     expect(a.ok).toBe(true);
   });
 });
+
+/**
+ * Full escrow matrix on a cost-bearing employment model.  Every failure
+ * inspects the structured 23514 error and the DETAIL code/blocking
+ * reasons — no cast leak into SQLSTATE 22P02 or CHECK errors.
+ */
+describe('escrow full matrix (contractor_1099)', () => {
+  const base = (o: Row = {}) => publishableRow({
+    employment_model: 'contractor_1099', driver_type: '1099', ...o,
+  });
+  const AMOUNT_REQUIRED = 'Escrow amount is required when escrow is required.';
+  const FREQ_REQUIRED   = 'Escrow frequency is required when escrow is required.';
+  const NOT_REQUIRED_CONFLICT =
+    'Escrow is marked not required but a positive escrow amount was provided. Clear the stale escrow amount before publishing.';
+  const UNIVERSAL = 'Fix invalid numeric values (must be zero or greater).';
+
+  it('required + null amount + valid freq → amount-required blocker', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'required', escrow_amount: null, escrow_amount_frequency: 'weekly',
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(parseDetail(mustErr(a)).blocking_reasons).toContain(AMOUNT_REQUIRED);
+    }
+  });
+  it('required + positive amount + null freq → frequency-required blocker', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'required', escrow_amount: 100, escrow_amount_frequency: null,
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(parseDetail(mustErr(a)).blocking_reasons).toContain(FREQ_REQUIRED);
+    }
+  });
+  it(`required + positive amount + 'daily' → frequency-required blocker (before CHECK)`, async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'required', escrow_amount: 100, escrow_amount_frequency: 'daily',
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      const d = parseDetail(mustErr(a));
+      expect(d.code).toBe('opportunity_publication_invalid');
+      expect(d.blocking_reasons).toContain(FREQ_REQUIRED);
+    }
+  });
+  it('required + negative amount → structured 23514 with universal + amount-required blockers', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'required', escrow_amount: -1, escrow_amount_frequency: 'weekly',
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      const d = parseDetail(mustErr(a));
+      expect(d.code).toBe('opportunity_publication_invalid');
+      expect(d.blocking_reasons).toContain(UNIVERSAL);
+      expect(d.blocking_reasons).toContain(AMOUNT_REQUIRED);
+    }
+  });
+  it('required + NaN amount via UPDATE → structured 23514, no cast-error leak', async () => {
+    await setUid(db, RECR_UID);
+    const seeded = await insertOpportunity(db, publishableRow({
+      status: 'draft', employment_model: 'contractor_1099', driver_type: '1099',
+    }));
+    const id = String(seeded.id);
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities
+          SET status = 'active', escrow_required_state = 'required',
+              escrow_amount = 'NaN'::numeric, escrow_amount_frequency = 'weekly'
+        WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      expect(String(mustErr(upd).code)).toBe('23514');
+      const d = parseDetail(mustErr(upd));
+      expect(d.code).toBe('opportunity_publication_invalid');
+      expect(d.blocking_reasons).toContain(UNIVERSAL);
+      expect(d.blocking_reasons).toContain(AMOUNT_REQUIRED);
+    }
+  });
+  it('required + +Infinity amount via UPDATE → structured 23514, no cast-error leak', async () => {
+    await setUid(db, RECR_UID);
+    const seeded = await insertOpportunity(db, publishableRow({
+      status: 'draft', employment_model: 'contractor_1099', driver_type: '1099',
+    }));
+    const id = String(seeded.id);
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities
+          SET status = 'active', escrow_required_state = 'required',
+              escrow_amount = 'Infinity'::numeric, escrow_amount_frequency = 'weekly'
+        WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) expect(String(mustErr(upd).code)).toBe('23514');
+  });
+  it('required + zero + valid freq is allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'required', escrow_amount: 0, escrow_amount_frequency: 'weekly',
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('required + positive + valid freq is allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'required', escrow_amount: 25, escrow_amount_frequency: 'biweekly',
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('not_required + positive amount → conflict blocker', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'not_required', escrow_amount: 50, escrow_amount_frequency: 'weekly',
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(parseDetail(mustErr(a)).blocking_reasons).toContain(NOT_REQUIRED_CONFLICT);
+    }
+  });
+  it('not_required + zero is allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({
+      escrow_required_state: 'not_required', escrow_amount: 0, escrow_amount_frequency: 'weekly',
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('null escrow_required_state is allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({ escrow_required_state: null }));
+    expect(a.ok).toBe(true);
+  });
+  it('not_disclosed escrow_required_state is allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, base({ escrow_required_state: 'not_disclosed' }));
+    expect(a.ok).toBe(true);
+  });
+});
+
 
 describe('company-driver rows: cost-pair rules are irrelevant', () => {
   it('stray positive insurance without frequency does not block on company_driver', async () => {
@@ -1531,77 +1882,99 @@ describe('gross conflict derivation per pay model (>10% blocks, ≤10% allowed)'
   });
 });
 
-describe('catalog-level revocation — anon and authenticated cannot EXECUTE the four helpers', () => {
-  const fns = [
-    'public._opportunity_numeric_is_finite(numeric)',
-    'public._opportunity_jsonb_number(jsonb)',
-    'public.opportunity_publication_blockers(public.opportunities)',
-    'public.opportunities_canonical_publication_guard()',
-  ] as const;
-  for (const fn of fns) {
+/**
+ * Catalog-level ACL check.  For each new helper, PUBLIC (grantee OID 0),
+ * anon, and authenticated must lack EXECUTE.  PUBLIC is inspected by
+ * exploding the effective ACL rather than has_function_privilege
+ * (which would report the current-role default).
+ */
+describe('catalog-level revocation — PUBLIC, anon, authenticated all lack EXECUTE', () => {
+  for (const fn of NEW_FN_REGS) {
+    it(`PUBLIC (grantee OID 0) lacks EXECUTE on ${fn}`, async () => {
+      expect(await publicLacksExecute(db, fn)).toBe(true);
+    });
     it(`anon lacks EXECUTE on ${fn}`, async () => {
-      const r = await db.query<{ v: boolean }>(
-        `SELECT has_function_privilege('anon', $1, 'EXECUTE') AS v`,
-        [fn],
-      );
-      expect(r.rows[0].v).toBe(false);
+      expect(await roleLacksExecute(db, 'anon', fn)).toBe(true);
     });
     it(`authenticated lacks EXECUTE on ${fn}`, async () => {
-      const r = await db.query<{ v: boolean }>(
-        `SELECT has_function_privilege('authenticated', $1, 'EXECUTE') AS v`,
-        [fn],
-      );
-      expect(r.rows[0].v).toBe(false);
+      expect(await roleLacksExecute(db, 'authenticated', fn)).toBe(true);
     });
   }
 });
 
-describe('full reapplication invariance — every helper and both triggers stay byte-identical', () => {
-  it('reapplying the candidate a second time preserves every function definition and trigger binding', async () => {
-    const fnRegs = [
-      'public._opportunity_numeric_is_finite(numeric)',
-      'public._opportunity_jsonb_number(jsonb)',
-      'public.opportunity_publication_blockers(public.opportunities)',
-      'public.opportunities_canonical_publication_guard()',
-      'public.opportunities_guard()',
-    ];
-    const before: Record<string, string> = {};
-    for (const reg of fnRegs) {
+/**
+ * DEFINITIVE IDEMPOTENCY TEST.
+ *
+ * Compares every helper definition, both trigger definitions/counts,
+ * and PUBLIC/anon/authenticated EXECUTE ACL state against the baselines
+ * captured immediately after the FIRST candidate application in
+ * beforeAll.  Then reapplies the candidate exactly once and re-checks
+ * every dimension.  Consolidates every previous reapplication assertion.
+ */
+describe('definitive idempotency — baselines from first apply, invariant under reapplication', () => {
+  it('every helper def, both trigger bindings, and PUBLIC/anon/authenticated ACL match beforeAll baselines both before and after reapply', async () => {
+    // --- BEFORE reapply: match baselines captured in beforeAll ---
+    for (const reg of ALL_FN_REGS) {
       const r = await db.query<{ def: string }>(
         `SELECT pg_get_functiondef($1::regprocedure) AS def`, [reg],
       );
-      before[reg] = r.rows[0].def;
+      expect(r.rows[0].def).toBe(baselineFnDefs[reg]);
     }
-    const trBefore = await db.query<{ tgname: string; def: string }>(
-      `SELECT tgname, pg_get_triggerdef(oid) AS def FROM pg_trigger
-        WHERE tgname IN ('trg_opportunities_guard','trg_opportunities_canonical_publication_guard')
-        ORDER BY tgname`,
-    );
-    expect(trBefore.rows.length).toBe(2);
+    for (const tg of TRG_NAMES) {
+      const t = await db.query<{ def: string; ct: string }>(
+        `SELECT COALESCE(min(pg_get_triggerdef(oid)), '') AS def,
+                count(*)::text AS ct
+           FROM pg_trigger WHERE tgname = $1`,
+        [tg],
+      );
+      expect(t.rows[0].def).toBe(baselineTriggerDefs[tg]);
+      expect(Number(t.rows[0].ct)).toBe(baselineTriggerCounts[tg]);
+      expect(Number(t.rows[0].ct)).toBe(1); // singly bound
+    }
+    for (const reg of NEW_FN_REGS) {
+      expect(await publicLacksExecute(db, reg)).toBe(baselinePublicLacks[reg]);
+      expect(await publicLacksExecute(db, reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'anon', reg)).toBe(baselineAnonLacks[reg]);
+      expect(await roleLacksExecute(db, 'anon', reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'authenticated', reg)).toBe(baselineAuthLacks[reg]);
+      expect(await roleLacksExecute(db, 'authenticated', reg)).toBe(true);
+    }
 
-    // Reapply the candidate.
+    // --- Reapply the candidate exactly once ---
     await db.exec(CANDIDATE_SQL);
 
-    for (const reg of fnRegs) {
+    // --- AFTER reapply: still identical to baselines ---
+    for (const reg of ALL_FN_REGS) {
       const r = await db.query<{ def: string }>(
         `SELECT pg_get_functiondef($1::regprocedure) AS def`, [reg],
       );
-      expect(r.rows[0].def).toBe(before[reg]);
+      expect(r.rows[0].def).toBe(baselineFnDefs[reg]);
     }
-    const trAfter = await db.query<{ tgname: string; def: string }>(
-      `SELECT tgname, pg_get_triggerdef(oid) AS def FROM pg_trigger
-        WHERE tgname IN ('trg_opportunities_guard','trg_opportunities_canonical_publication_guard')
-        ORDER BY tgname`,
-    );
-    expect(trAfter.rows.length).toBe(2);
-    for (let i = 0; i < trAfter.rows.length; i++) {
-      expect(trAfter.rows[i].tgname).toBe(trBefore.rows[i].tgname);
-      expect(trAfter.rows[i].def).toBe(trBefore.rows[i].def);
+    for (const tg of TRG_NAMES) {
+      const t = await db.query<{ def: string; ct: string }>(
+        `SELECT COALESCE(min(pg_get_triggerdef(oid)), '') AS def,
+                count(*)::text AS ct
+           FROM pg_trigger WHERE tgname = $1`,
+        [tg],
+      );
+      expect(t.rows[0].def).toBe(baselineTriggerDefs[tg]);
+      expect(Number(t.rows[0].ct)).toBe(1);
     }
-    // Phase 1K baseline unchanged.
+    for (const reg of NEW_FN_REGS) {
+      expect(await publicLacksExecute(db, reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'anon', reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'authenticated', reg)).toBe(true);
+    }
+    // Phase 1K guard remains byte-identical to the pre-candidate baseline.
     const p1k = await db.query<{ def: string }>(
       `SELECT pg_get_functiondef('public.opportunities_guard()'::regprocedure) AS def`,
     );
     expect(p1k.rows[0].def).toBe(phase1kDefBefore);
+    // And the trg_opportunities_guard binding signature is unchanged.
+    const tr = await db.query<{ sig: string }>(
+      `SELECT tgname || '|' || pg_get_triggerdef(oid) AS sig
+         FROM pg_trigger WHERE tgname = 'trg_opportunities_guard'`,
+    );
+    expect(tr.rows.map((x) => x.sig).join('\n')).toBe(phase1kTriggerBefore);
   });
 });
