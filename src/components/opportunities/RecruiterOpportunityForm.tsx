@@ -512,8 +512,8 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
         {isCompany && (
           <p className="text-xs text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
-            Company drivers do not carry lease, escrow, insurance, or maintenance deductions. Net take-home is
-            not shown because the current schema does not support a valid company-driver take-home model.
+            Ownership operating-cost fields are not applicable to company-driver listings. Estimated
+            take-home is unavailable under the current canonical model.
           </p>
         )}
 
