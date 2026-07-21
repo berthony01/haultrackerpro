@@ -39,7 +39,9 @@ ALTER TABLE public.opportunities
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_canonical_version_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_canonical_version_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_canonical_version_chk
@@ -47,7 +49,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_employment_model_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_employment_model_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_employment_model_chk
@@ -58,7 +62,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_team_configuration_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_team_configuration_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_team_configuration_chk
@@ -69,7 +75,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_salary_frequency_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_salary_frequency_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_salary_frequency_chk
@@ -77,7 +85,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_insurance_deduction_frequency_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_insurance_deduction_frequency_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_insurance_deduction_frequency_chk
@@ -85,7 +95,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_escrow_required_state_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_escrow_required_state_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_escrow_required_state_chk
@@ -93,7 +105,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_escrow_amount_frequency_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_escrow_amount_frequency_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_escrow_amount_frequency_chk
@@ -101,7 +115,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_lease_payment_frequency_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_lease_payment_frequency_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_lease_payment_frequency_chk
@@ -109,7 +125,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_maintenance_deduction_frequency_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_maintenance_deduction_frequency_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_maintenance_deduction_frequency_chk
@@ -117,7 +135,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_other_deduction_frequency_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_other_deduction_frequency_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_other_deduction_frequency_chk
@@ -125,7 +145,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_mixed_pay_components_array_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_mixed_pay_components_array_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_mixed_pay_components_array_chk
@@ -133,7 +155,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_percentage_weekly_revenue_basis_nonneg_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_percentage_weekly_revenue_basis_nonneg_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_percentage_weekly_revenue_basis_nonneg_chk
@@ -141,7 +165,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_salary_amount_nonneg_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_salary_amount_nonneg_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_salary_amount_nonneg_chk
@@ -149,7 +175,9 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'opportunities_other_weekly_gross_nonneg_chk'
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'opportunities_other_weekly_gross_nonneg_chk'
+      AND conrelid = 'public.opportunities'::regclass
   ) THEN
     ALTER TABLE public.opportunities
       ADD CONSTRAINT opportunities_other_weekly_gross_nonneg_chk
