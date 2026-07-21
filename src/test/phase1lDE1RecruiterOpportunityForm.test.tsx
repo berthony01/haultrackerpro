@@ -426,6 +426,16 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
     expect(screen.queryByTestId('mixed-components-editor')).toBeNull();
   });
 
+  it('CPM keeps miles + deadhead operational inputs visible alongside the CPM rate', () => {
+    renderForm();
+    choosePay('CPM');
+    expect(screen.getByLabelText('CPM Rate ($/mi)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Total Weekly Miles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Loaded Miles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Deadhead Miles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Deadhead Paid?')).toBeInTheDocument();
+  });
+
   it('Mixed reveals the mixed components editor and hides every scalar pay-model input', () => {
     renderForm();
     choosePay('Mixed');
