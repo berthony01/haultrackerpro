@@ -230,7 +230,7 @@ describe('normalizeOpportunityForAuthoring', () => {
   it('canonical mixed components are preserved without inventing legacy hints (canonical_version=1)', () => {
     const result = normalizeOpportunityForAuthoring({
       pay_model: 'mixed', canonical_version: 1,
-      mixed_pay_components: [{ label: 'CPM base', amount: 0.5, frequency: 'weekly' }] as unknown,
+      mixed_pay_components: [{ label: 'CPM base', amount: 0.5, frequency: 'weekly' }] as never,
     });
     expect(result.mixed_pay_components).toEqual([{ label: 'CPM base', amount: '0.5', frequency: 'weekly' }]);
     expect(result.legacy_mixed_pay_hint).toBe(false);
@@ -239,7 +239,7 @@ describe('normalizeOpportunityForAuthoring', () => {
   it('legacy mixed row without canonical_version and no usable components clears components + sets hint', () => {
     const result = normalizeOpportunityForAuthoring({
       pay_model: 'mixed',
-      mixed_pay_components: [{ label: '', amount: null, frequency: null }] as unknown,
+      mixed_pay_components: [{ label: '', amount: null, frequency: null }] as never,
     });
     expect(result.mixed_pay_components).toEqual([]);
     expect(result.legacy_mixed_pay_hint).toBe(true);
@@ -248,7 +248,7 @@ describe('normalizeOpportunityForAuthoring', () => {
   it('malformed partial mixed objects are discarded under the legacy hint path', () => {
     const result = normalizeOpportunityForAuthoring({
       pay_model: 'mixed',
-      mixed_pay_components: [{ label: 'Only label' }] as unknown,
+      mixed_pay_components: [{ label: 'Only label' }] as never,
     });
     expect(result.mixed_pay_components).toEqual([]);
     expect(result.legacy_mixed_pay_hint).toBe(true);
