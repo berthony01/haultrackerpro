@@ -651,13 +651,20 @@ export function validateOpportunityReadiness(
       warns.add('Escrow requirement not disclosed — weekly net will be incomplete.');
     }
     // 'not_required' with a stale amount is diagnosed by the calculator via
-    // the 10% conflict path below; persistence still clears the amount.
+    // the escrow conflict path and surfaced in blocker mapping below.
   }
 
-  // Financial calculator — conflict + status diagnostics
+  // Financial calculator — conflict + status diagnostics. Each calculator
+  // conflict is mapped to a specific recruiter-facing blocker.
   const financialEstimate = calculateCanonicalOpportunityFinancials(buildCanonicalFinancialInput(state));
-  if (financialEstimate.status === 'conflict') {
-    blockers.add('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+  for (const conflict of financialEstimate.conflicts) {
+    if (conflict.includes('Recruiter-provided weekly gross')) {
+      blockers.add('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+    } else if (conflict.includes('Escrow marked not required')) {
+      blockers.add('Escrow is marked not required but a positive escrow amount was provided. Clear the stale escrow amount before publishing.');
+    } else {
+      blockers.add('Resolve the financial input conflict before publishing.');
+    }
   }
 
   const blockingReasons = Array.from(blockers).sort();
