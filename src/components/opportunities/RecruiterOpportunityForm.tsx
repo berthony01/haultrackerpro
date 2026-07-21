@@ -494,7 +494,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="section-costs">
         <SectionHeader n={4} title="Equipment, Costs & Benefits"
           subtitle={isCompany
-            ? 'Employer-borne operating costs — no driver deductions apply.'
+            ? 'Ownership operating-cost fields are not applicable to company-driver listings.'
             : 'Enter recurring costs the driver bears. Use “Not disclosed” to leave blank.'} />
 
         {!isCompany && (
