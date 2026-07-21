@@ -4488,8 +4488,10 @@ export type Database = {
       list_driver_visible_opportunities: {
         Args: { _driver_type?: string; _route_type?: string; _state?: string }
         Returns: {
+          actual_benefits: string | null
           admin_review_status: string
           benefits: string | null
+          canonical_version: number | null
           company_name: string
           cpm: number | null
           created_at: string
@@ -4497,9 +4499,12 @@ export type Database = {
           description: string | null
           detention_pay: string | null
           driver_type: string | null
+          employment_model: string | null
           equipment_year: string | null
           escrow_amount: number | null
+          escrow_amount_frequency: string | null
           escrow_required: boolean
+          escrow_required_state: string | null
           estimated_deadhead_miles: number | null
           estimated_loaded_miles: number | null
           estimated_weekly_gross: number | null
@@ -4513,23 +4518,37 @@ export type Database = {
           hiring_states: string[]
           home_time: string | null
           id: string
+          insurance_deduction_frequency: string | null
           insurance_deductions: number | null
           layover_pay: string | null
           lease_payment: number | null
+          lease_payment_frequency: string | null
+          maintenance_deduction_frequency: string | null
           maintenance_deductions: number | null
+          mixed_pay_components: Json
+          other_deduction_frequency: string | null
           other_deductions: number | null
+          other_pay_method_label: string | null
+          other_weekly_gross: number | null
           pay_model: string | null
+          percentage_basis_label: string | null
           percentage_pay: number | null
+          percentage_weekly_revenue_basis: number | null
           pets_allowed: boolean | null
           published_at: string | null
           recruiter_id: string
+          requirements: string | null
           riders_allowed: boolean | null
           route_type: string | null
+          salary_amount: number | null
+          salary_frequency: string | null
           sign_on_bonus: number | null
           status: string
+          team_configuration: string | null
           title: string
           trailer_type: string | null
           transparency_confirmed: boolean
+          typical_lanes: string | null
           updated_at: string
           view_count: number
         }[]
