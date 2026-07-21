@@ -1,8 +1,7 @@
-// Phase 1L-DE1R2R1 — Rendered behavior of the canonical recruiter authoring
-// form. Covers structure, exact vocabularies, employment/team/pay-model
-// conditional rendering, paste-to-autofill safety, publish/draft routing,
-// stored transparency round trip, publication-readiness surfacing, and
-// source integrity (no wizard, no legacy accordion, no quick post).
+// Phase 1L-DE1R2R2 — Rendered behavior of the canonical recruiter authoring
+// form. Uses exhaustive typed factories (no factory-level casts), exact copy
+// matching where the packet mandates it, and a real user-driven interaction
+// with the two-component mixed editor.
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -10,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtractedOpportunity } from '@/components/opportunities/PasteOpportunityDialog';
-import type { Tables } from '@/integrations/supabase/types';
+import type { Json, Tables } from '@/integrations/supabase/types';
 
 const h = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -45,20 +44,129 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
 type Opportunity = Tables<'opportunities'>;
+type RecruiterProfile = Tables<'recruiter_profiles'>;
 type ProfileHook = ReturnType<typeof useRecruiterProfile>;
 type OppsHook = ReturnType<typeof useRecruiterOpportunities>;
 
-function makeProfileHook(company = 'Acme Trucking'): ProfileHook {
+/* ---------------- exhaustive typed factories ---------------- */
+
+/** Fully-typed baseline row. No factory-level casts. */
+function makeRecruiterProfile(
+  overrides: Partial<RecruiterProfile> = {},
+): RecruiterProfile {
   return {
-    profile: {
-      id: 'r-1', user_id: 'u-1', company_name: company,
-      verification_status: 'approved', status: 'active',
-    },
+    admin_notes: null,
+    company_address: null,
+    company_city: null,
+    company_name: 'Acme Trucking',
+    company_phone: null,
+    company_state: null,
+    company_website: null,
+    created_at: '2026-07-01T00:00:00Z',
+    dot_number: '123456',
+    driver_types_hired: [],
+    equipment_types: [],
+    hiring_states: [],
+    id: 'r-1',
+    legacy_terms_grandfathered_at: null,
+    mc_number: null,
+    posting_terms_accepted_at: '2026-07-17T00:00:00Z',
+    posting_terms_version: '2026-07-17.v1',
+    recruiter_email: 'jane@acme.example',
+    recruiter_name: 'Jane Recruiter',
+    recruiter_phone: null,
+    status: 'active',
+    updated_at: '2026-07-01T00:00:00Z',
+    user_id: 'u-1',
+    verification_status: 'approved',
+    verified_at: '2026-07-01T00:00:00Z',
+    verified_by: 'admin-1',
+    ...overrides,
+  };
+}
+
+function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
+  return {
+    actual_benefits: null,
+    admin_review_status: 'approved',
+    benefits: null,
+    canonical_version: 1,
+    company_name: 'Acme Trucking',
+    cpm: 0.65,
+    created_at: '2026-07-01T00:00:00Z',
+    deadhead_paid: false,
+    description: 'Great regional lane.',
+    detention_pay: null,
+    driver_type: 'company',
+    employment_model: 'company_driver',
+    equipment_year: null,
+    escrow_amount: null,
+    escrow_amount_frequency: null,
+    escrow_required: false,
+    escrow_required_state: null,
+    estimated_deadhead_miles: null,
+    estimated_loaded_miles: 2600,
+    estimated_weekly_gross: null,
+    estimated_weekly_miles: 2800,
+    featured: false,
+    flat_weekly_pay: null,
+    forced_dispatch: null,
+    fuel_paid_by: null,
+    hiring_city: 'Dallas',
+    hiring_state: 'TX',
+    hiring_states: [],
+    home_time: 'Home weekly',
+    id: 'opp-1',
+    insurance_deduction_frequency: null,
+    insurance_deductions: null,
+    layover_pay: null,
+    lease_payment: null,
+    lease_payment_frequency: null,
+    maintenance_deduction_frequency: null,
+    maintenance_deductions: null,
+    mixed_pay_components: [] as Json,
+    other_deduction_frequency: null,
+    other_deductions: null,
+    other_pay_method_label: null,
+    other_weekly_gross: null,
+    pay_model: 'cpm',
+    percentage_basis_label: null,
+    percentage_pay: null,
+    percentage_weekly_revenue_basis: null,
+    pets_allowed: null,
+    published_at: '2026-07-01T00:00:00Z',
+    recruiter_id: 'r-1',
+    requirements: null,
+    riders_allowed: null,
+    route_type: 'Regional',
+    salary_amount: null,
+    salary_frequency: null,
+    sign_on_bonus: null,
+    status: 'active',
+    team_configuration: 'solo',
+    title: 'Regional Dry Van',
+    trailer_type: 'Dry Van',
+    transparency_confirmed: true,
+    typical_lanes: null,
+    updated_at: '2026-07-01T00:00:00Z',
+    view_count: 0,
+    ...overrides,
+  };
+}
+
+/** Boundary cast for hook returns: providing every UseMutationResult field
+ *  is impractical, so consumed properties are asserted at this boundary and
+ *  the assertion is quarantined to one factory per hook. */
+function makeProfileHook(
+  profile: RecruiterProfile = makeRecruiterProfile(),
+): ProfileHook {
+  return {
+    profile,
     isLoading: false,
-    isApproved: true,
-    isSuspended: false,
+    isApproved: profile.verification_status === 'approved' && profile.status === 'active',
+    isSuspended: profile.status === 'suspended' || profile.verification_status === 'suspended',
     canPost: true,
-    isVerified: true,
+    isVerified: profile.verification_status === 'approved' && profile.status === 'active',
     isProfileComplete: true,
     refetch: vi.fn(),
   } as unknown as ProfileHook;
@@ -75,28 +183,9 @@ function makeOppsHook(): OppsHook {
   } as unknown as OppsHook;
 }
 
-function installMocks(company = 'Acme Trucking') {
-  vi.mocked(useRecruiterProfile).mockReturnValue(makeProfileHook(company));
+function installMocks(profile: RecruiterProfile = makeRecruiterProfile()) {
+  vi.mocked(useRecruiterProfile).mockReturnValue(makeProfileHook(profile));
   vi.mocked(useRecruiterOpportunities).mockReturnValue(makeOppsHook());
-}
-
-function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
-  return {
-    id: 'opp-1', recruiter_id: 'r-1',
-    title: 'Regional Dry Van', company_name: 'Acme Trucking',
-    canonical_version: 1, employment_model: 'company_driver', team_configuration: 'solo',
-    route_type: 'Regional', trailer_type: 'Dry Van',
-    hiring_city: 'Dallas', hiring_state: 'TX', hiring_states: [],
-    description: 'Great regional lane.',
-    home_time: 'Home weekly',
-    pay_model: 'cpm', cpm: 0.65,
-    estimated_weekly_miles: 2800, estimated_loaded_miles: 2600,
-    deadhead_paid: false,
-    transparency_confirmed: true,
-    status: 'active', admin_review_status: 'approved',
-    driver_type: 'company',
-    ...overrides,
-  } as unknown as Opportunity;
 }
 
 function renderForm(initial: Opportunity | null = null) {
@@ -122,11 +211,16 @@ function chooseChip(testId: string, label: string) {
 function choosePay(label: string) {
   fireEvent.click(within(screen.getByTestId('pay-model')).getByRole('button', { name: label }));
 }
-function payloadOf(mock: ReturnType<typeof vi.fn>): Record<string, unknown> {
-  return mock.mock.calls[0]?.[0] as Record<string, unknown>;
+type MutationPayload = Partial<Opportunity> & Record<string, unknown>;
+function payloadOf(mock: ReturnType<typeof vi.fn>): MutationPayload {
+  const call = mock.mock.calls[0];
+  if (!call) throw new Error('Mutation not called');
+  return call[0] as MutationPayload;
 }
-function updateArgs(): { id: string; data: Record<string, unknown> } {
-  return h.updateMutate.mock.calls[0]?.[0] as { id: string; data: Record<string, unknown> };
+function updateArgs(): { id: string; data: MutationPayload } {
+  const call = h.updateMutate.mock.calls[0];
+  if (!call) throw new Error('updateOpportunity.mutate not called');
+  return call[0] as { id: string; data: MutationPayload };
 }
 
 beforeEach(() => {
@@ -136,6 +230,8 @@ beforeEach(() => {
 });
 
 afterEach(() => cleanup());
+
+/* ---------------- structure ---------------- */
 
 describe('Phase 1L-DE1R2R1 — form structure', () => {
   it('renders all six canonical sections and a single action area', () => {
@@ -153,7 +249,9 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
 
   it('renders the exact header supporting copy', () => {
     renderForm();
-    expect(screen.getByText(/Required details adapt to the selected employment arrangement and pay model\. Review the/i)).toBeInTheDocument();
+    expect(screen.getByText(
+      'Required details adapt to the selected employment arrangement and pay model. Review the live calculation before publishing.',
+    )).toBeInTheDocument();
   });
 
   it('shows exactly one transparency confirmation with the exact attestation copy', () => {
@@ -161,7 +259,7 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
     expect(screen.getAllByRole('checkbox')).toHaveLength(1);
     expect(screen.getByLabelText('Transparency confirmation')).toBeInTheDocument();
     expect(screen.getByText(
-      /I confirm this opportunity is accurate: pay, miles, costs, and estimated earnings are labeled/i,
+      'I confirm this opportunity is accurate: pay, miles, costs, and estimated earnings are labeled with their source.',
     )).toBeInTheDocument();
     expect(screen.queryByText(/misleading or unverifiable/i)).toBeNull();
   });
@@ -206,19 +304,17 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
   });
 
   it('prefills company from a late-arriving recruiter profile without overwriting typed input', () => {
-    vi.mocked(useRecruiterProfile).mockReturnValue({
-      profile: { id: 'r-1', company_name: '', verification_status: 'approved', status: 'active' },
-      isLoading: false, isApproved: true, isSuspended: false, canPost: true,
-      isVerified: true, isProfileComplete: true, refetch: vi.fn(),
-    } as unknown as ProfileHook);
+    installMocks(makeRecruiterProfile({ company_name: '' }));
     const { rerender } = renderForm();
     expect(screen.getByLabelText('Company Name')).toHaveValue('');
     fireEvent.change(screen.getByLabelText('Company Name'), { target: { value: 'Typed Company' } });
-    installMocks('Late Profile Company');
+    installMocks(makeRecruiterProfile({ company_name: 'Late Profile Company' }));
     rerender(<RecruiterOpportunityForm initial={null} onBack={vi.fn()} onSaved={vi.fn()} />);
     expect(screen.getByLabelText('Company Name')).toHaveValue('Typed Company');
   });
 });
+
+/* ---------------- employment-driven cost visibility ---------------- */
 
 describe('Phase 1L-DE1R2R1 — employment-driven cost visibility', () => {
   it('company-driver hides cost fields, hides fuel, and shows the not-applicable / take-home copy', () => {
@@ -276,6 +372,8 @@ describe('Phase 1L-DE1R2R1 — employment-driven cost visibility', () => {
   });
 });
 
+/* ---------------- pay-model conditional inputs ---------------- */
+
 describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
   const CPM_LABELS = ['CPM Rate ($/mi)'];
   const PCT_LABELS = ['Percentage (%)', 'Percentage Basis Label', 'Weekly Revenue Basis ($)'];
@@ -319,21 +417,52 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
     }
   });
 
-  it('Mixed editor supports two complete components and produces a publishable payload', () => {
+  it('Mixed editor supports two user-authored components and produces a publishable payload', () => {
+    // Start from an otherwise-publishable opportunity with pay_model=mixed
+    // and zero components, then drive the editor by real user events:
+    // click "Add pay component" twice, fill both components, publish.
     renderForm(makeOpportunity({
+      id: 'existing-mixed',
       pay_model: 'mixed',
       cpm: null,
-      mixed_pay_components: [
-        { label: 'CPM base', amount: 0.5, frequency: 'weekly' },
-        { label: 'Weekly guarantee', amount: 250, frequency: 'weekly' },
-      ] as unknown as Opportunity['mixed_pay_components'],
+      mixed_pay_components: [] as Json,
     }));
-    // Both component rows render, so the editor supports two components.
+
+    // Editor is present but empty.
+    expect(screen.getByTestId('mixed-components-editor')).toBeInTheDocument();
+    expect(screen.queryByTestId('mixed-component-0')).toBeNull();
+
+    const addButton = screen.getByRole('button', { name: /Add pay component/i });
+    fireEvent.click(addButton);
+    fireEvent.click(addButton);
+
     expect(screen.getByTestId('mixed-component-0')).toBeInTheDocument();
     expect(screen.getByTestId('mixed-component-1')).toBeInTheDocument();
-    expect(screen.getByLabelText('Mixed component 1 label')).toHaveValue('CPM base');
-    expect(screen.getByLabelText('Mixed component 2 label')).toHaveValue('Weekly guarantee');
+
+    // Component 1: CPM base @ 0.5 weekly.
+    fireEvent.change(screen.getByLabelText('Mixed component 1 label'), {
+      target: { value: 'CPM base' },
+    });
+    fireEvent.change(
+      within(screen.getByTestId('mixed-component-0')).getByLabelText('Amount ($)'),
+      { target: { value: '0.5' } },
+    );
+    fireEvent.click(screen.getByLabelText('Mixed component 1 frequency'));
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'Weekly' }));
+
+    // Component 2: Weekly guarantee @ 250 weekly.
+    fireEvent.change(screen.getByLabelText('Mixed component 2 label'), {
+      target: { value: 'Weekly guarantee' },
+    });
+    fireEvent.change(
+      within(screen.getByTestId('mixed-component-1')).getByLabelText('Amount ($)'),
+      { target: { value: '250' } },
+    );
+    fireEvent.click(screen.getByLabelText('Mixed component 2 frequency'));
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'Weekly' }));
+
     clickPublish();
+
     expect(h.updateMutate).toHaveBeenCalledTimes(1);
     const { data } = updateArgs();
     expect(data.pay_model).toBe('mixed');
@@ -344,6 +473,8 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
     ]);
   });
 });
+
+/* ---------------- review summary ---------------- */
 
 describe('Phase 1L-DE1R2R1 — review summary', () => {
   it('renders $0 for an explicit zero sign-on bonus', () => {
@@ -356,6 +487,8 @@ describe('Phase 1L-DE1R2R1 — review summary', () => {
     expect(screen.getByTestId('review-net')).toHaveTextContent('Not available for company drivers');
   });
 });
+
+/* ---------------- paste-to-autofill safety ---------------- */
 
 describe('Phase 1L-DE1R2R1 — paste-to-autofill safety', () => {
   it('never overwrites resolved title, company, employment, team, or pay model', () => {
@@ -378,10 +511,8 @@ describe('Phase 1L-DE1R2R1 — paste-to-autofill safety', () => {
     const em = screen.getByTestId('employment-arrangement');
     expect(within(em).getByRole('button', { name: 'Owner-Operator' })).toHaveAttribute('aria-pressed', 'true');
     const team = screen.getByTestId('driving-configuration');
-    // Solo was explicitly selected before paste; driver_type=team must not overwrite it.
     expect(within(team).getByRole('button', { name: 'Solo' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(team).getByRole('button', { name: 'Team' })).toHaveAttribute('aria-pressed', 'false');
-    // CPM input still visible.
     expect(screen.getByLabelText('CPM Rate ($/mi)')).toBeInTheDocument();
   });
 
@@ -424,6 +555,8 @@ describe('Phase 1L-DE1R2R1 — paste-to-autofill safety', () => {
   });
 });
 
+/* ---------------- draft / publish routing ---------------- */
+
 describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
   it('minimal draft routes through createOpportunity with status=draft and canonical_version=1', () => {
     renderForm();
@@ -437,7 +570,10 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
   });
 
   it('valid publish emits a fully populated create call with status=active', () => {
-    renderForm(makeOpportunity({ id: undefined as unknown as string }));
+    // Force create-mode with a populated fixture by clearing the id.
+    const seed = makeOpportunity();
+    const seedWithoutId: Opportunity = { ...seed, id: '' };
+    renderForm(seedWithoutId);
     clickPublish();
     expect(h.createMutate).toHaveBeenCalledTimes(1);
     expect(payloadOf(h.createMutate)).toMatchObject({
@@ -460,8 +596,9 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
 
   it('publish is blocked and disabled when readiness surfaces blockers', () => {
     renderForm(makeOpportunity({
-      employment_model: null as unknown as string,
-      driver_type: null, team_configuration: null,
+      employment_model: null,
+      driver_type: null,
+      team_configuration: null,
     }));
     expect(screen.getByRole('button', { name: 'Publish Opportunity' })).toBeDisabled();
     expect(screen.getByTestId('publish-blockers')).toBeInTheDocument();
@@ -526,6 +663,8 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
     expect(blockers).toHaveTextContent('Home time is required.');
   });
 });
+
+/* ---------------- source integrity ---------------- */
 
 describe('Phase 1L-DE1R2R1 — source integrity', () => {
   it('does not reintroduce wizard scaffolding, generic optional accordion, Quick Post, duplicate confirmations, or legacy review-flow copy', () => {
