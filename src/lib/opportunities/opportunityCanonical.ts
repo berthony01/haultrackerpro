@@ -281,23 +281,27 @@ export function normalizeOpportunityForAuthoring(
   base.flat_weekly_pay = base.pay_model === 'flat_weekly' ? numToStr(row.flat_weekly_pay) : '';
 
   // Mixed — canonical only; legacy rows never invent canonical components.
+  // A "usable" canonical component requires all three: nonblank label, finite
+  // nonnegative amount, and a recognized recurring frequency.
   const rawMixed = row.mixed_pay_components as unknown;
-  if (Array.isArray(rawMixed)) {
-    base.mixed_pay_components = rawMixed
-      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && !Array.isArray(c))
-      .map((c) => ({
-        label: s(c.label),
-        amount: numToStr(c.amount),
-        frequency: isFreq(c.frequency) ? (c.frequency as RecurringFrequency) : null,
-      }));
-  }
-
-  // Legacy mixed-pay provenance hint: stored pay_model === 'mixed' with no
-  // usable canonical components and no canonical_version 1.
-  const usableMixed = base.mixed_pay_components.filter(
-    (c) => c.label.trim() || c.amount.trim() || c.frequency != null,
-  );
-  base.legacy_mixed_pay_hint = rowPay === 'mixed' && usableMixed.length === 0 && row.canonical_version !== 1;
+  const normalizedMixed: CanonicalAuthoringMixedComponent[] = Array.isArray(rawMixed)
+    ? rawMixed
+        .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && !Array.isArray(c))
+        .map((c) => ({
+          label: s(c.label),
+          amount: numToStr(c.amount),
+          frequency: isFreq(c.frequency) ? (c.frequency as RecurringFrequency) : null,
+        }))
+    : [];
+  const usableMixed = normalizedMixed.filter((c) => {
+    if (!c.label.trim()) return false;
+    if (!c.frequency) return false;
+    const n = Number(c.amount);
+    return c.amount.trim() !== '' && Number.isFinite(n) && n >= 0;
+  });
+  const legacyMixedHint = rowPay === 'mixed' && usableMixed.length === 0 && row.canonical_version !== 1;
+  base.mixed_pay_components = legacyMixedHint ? [] : normalizedMixed;
+  base.legacy_mixed_pay_hint = legacyMixedHint;
 
   base.other_pay_method_label = s(row.other_pay_method_label);
   base.other_weekly_gross = numToStr(row.other_weekly_gross);
