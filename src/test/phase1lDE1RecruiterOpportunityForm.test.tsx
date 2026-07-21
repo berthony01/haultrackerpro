@@ -163,7 +163,7 @@ function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
 /** Boundary cast for hook returns: providing every UseMutationResult field
  *  is impractical, so consumed properties are asserted at this boundary and
  *  the assertion is quarantined to one factory per hook. The compat cast is
- *  routed through an `unknown` typed local so no `as unknown as` is written. */
+ *  routed through an `unknown` typed local so no double-cast is written. */
 function makeProfileHook(
   profile: RecruiterProfile = makeRecruiterProfile(),
 ): ProfileHook {

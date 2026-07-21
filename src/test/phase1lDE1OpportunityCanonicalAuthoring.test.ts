@@ -103,7 +103,7 @@ function opp(overrides: Partial<OpportunityRow> = {}): Partial<OpportunityRow> {
   return overrides;
 }
 
-/** Json-typed mixed-component fixtures (no Record<string, unknown>). */
+/** Json-typed mixed-component fixtures (structural Json fixtures). */
 type JsonRecord = { [key: string]: Json | undefined };
 function mixedComponents(components: JsonRecord[]): Json {
   // JsonRecord[] is structurally a Json[], which is a Json.
@@ -285,7 +285,7 @@ describe('normalizeOpportunityForAuthoring', () => {
     expect(normalizeOpportunityForAuthoring(opp({ transparency_confirmed: false })).transparency_confirmed).toBe(false);
     // Adversarial historical row where transparency_confirmed slipped through
     // as null: preserve the exhaustive typed row and inject the runtime value
-    // via Object.defineProperty — no cast, no `Record<string, unknown>`.
+    // via Object.defineProperty — no cast, no unsafe assertion.
     const row = makeOpportunityRow();
     Object.defineProperty(row, 'transparency_confirmed', {
       value: null, writable: true, enumerable: true, configurable: true,
