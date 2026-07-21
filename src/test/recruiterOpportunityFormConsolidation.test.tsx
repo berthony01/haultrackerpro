@@ -164,36 +164,46 @@ let opportunitiesState: Opportunity[];
 /** Boundary cast for hook returns: the full UseMutationResult surface is
  *  impractical to spell out; the mock intentionally satisfies only the
  *  properties the manager reads. Both hook mocks are the only casts in
- *  this file — everything else is a real, typed Tables<...> row. */
+ *  this file — everything else is a real, typed Tables<...> row.
+ *
+ *  Eligibility flags MUST be derived on every hook invocation so that a
+ *  test that mutates `profileState` after `beforeEach` observes the new
+ *  eligibility surface (canonical helpers are the single source of truth). */
 function installHookMocks() {
-  // Canonical eligibility is the single source of truth: canPost/isSuspended
-  // are DERIVED, never fabricated locally.
-  const eligibility = describeRecruiterEligibility(profileState, { intentRecruiter: true });
-  const suspended = eligibility.state === 'suspended';
-  const canPost = eligibility.canPost;
-  const isVerified = eligibility.state === 'verified';
+  vi.mocked(useRecruiterProfile).mockImplementation(() => {
+    const eligibility = describeRecruiterEligibility(profileState, { intentRecruiter: true });
+    const suspended = eligibility.state === 'suspended';
+    const canPost = eligibility.canPost;
+    const isVerified = eligibility.state === 'verified';
+    const impl: unknown = {
+      profile: profileState,
+      isLoading: false,
+      isApproved: isVerified,
+      isSuspended: suspended,
+      isVerified,
+      isProfileComplete: isProfileCompleteForPosting(profileState),
+      canPost,
+      refetch: vi.fn(),
+    };
+    return impl as ProfileHook;
+  });
 
-  vi.mocked(useRecruiterProfile).mockImplementation(() => ({
-    profile: profileState,
-    isLoading: false,
-    isApproved: isVerified,
-    isSuspended: suspended,
-    isVerified,
-    isProfileComplete: isProfileCompleteForPosting(profileState),
-    canPost,
-    refetch: vi.fn(),
-  } as unknown as ProfileHook));
-
-  vi.mocked(useRecruiterOpportunities).mockImplementation(() => ({
-    opportunities: opportunitiesState,
-    isLoading: false, isError: false, error: null, refetch: h.refetch,
-    recruiterId: profileState?.id ?? null,
-    isApproved: isVerified,
-    canPost, isVerified,
-    createOpportunity: { mutate: h.createMutate, isPending: false },
-    updateOpportunity: { mutate: h.updateMutate, isPending: false },
-    setStatus: { mutate: h.statusMutate, isPending: false },
-  } as unknown as OppsHook));
+  vi.mocked(useRecruiterOpportunities).mockImplementation(() => {
+    const eligibility = describeRecruiterEligibility(profileState, { intentRecruiter: true });
+    const canPost = eligibility.canPost;
+    const isVerified = eligibility.state === 'verified';
+    const impl: unknown = {
+      opportunities: opportunitiesState,
+      isLoading: false, isError: false, error: null, refetch: h.refetch,
+      recruiterId: profileState?.id ?? null,
+      isApproved: isVerified,
+      canPost, isVerified,
+      createOpportunity: { mutate: h.createMutate, isPending: false },
+      updateOpportunity: { mutate: h.updateMutate, isPending: false },
+      setStatus: { mutate: h.statusMutate, isPending: false },
+    };
+    return impl as OppsHook;
+  });
 }
 
 beforeEach(() => {
