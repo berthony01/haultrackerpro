@@ -9,6 +9,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Json, Tables } from '@/integrations/supabase/types';
+import type {
+  OpportunityInsert,
+  OpportunityUpdate,
+} from '@/hooks/opportunities/useRecruiterOpportunities';
 import {
   describeRecruiterEligibility,
   isProfileCompleteForPosting,
@@ -18,8 +22,8 @@ const h = vi.hoisted(() => ({
   refetch: vi.fn(),
   billingRefresh: vi.fn(),
   statusMutate: vi.fn(),
-  createMutate: vi.fn(),
-  updateMutate: vi.fn(),
+  createMutate: vi.fn<(payload: OpportunityInsert) => void>(),
+  updateMutate: vi.fn<(args: { id: string; data: OpportunityUpdate }) => void>(),
 }));
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
