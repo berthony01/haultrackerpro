@@ -72,6 +72,7 @@ jobs:
           set -eu
           FILES=(
             "src/test/phase1fRecruiterPostingRuntime.test.ts"
+            "src/test/phase1kBRecruiterPublicationStatus.test.tsx"
             "tests/postgres/phase1kAdminRecruiterOpportunityPublicationPostgres.test.ts"
           )
           FORBIDDEN='(it|test|describe)\.(skip|only)\b|\bit\.todo\b|\bxit\b|\bxdescribe\b'
@@ -114,6 +115,12 @@ jobs:
             src/test/phase1fRecruiterEligibility.test.ts \
             src/test/phase1fa22CanonicalEligibility.test.ts \
             src/test/phase1fRecruiterPostingRuntime.test.ts
+
+      - name: Phase 1K-B publication-status UI focused suite
+        run: |
+          bunx vitest run --config vitest.config.ts \
+            src/test/phase1kBRecruiterPublicationStatus.test.tsx \
+            src/test/recruiterOpportunityFormConsolidation.test.tsx
 
       - name: Prepare artifacts directory
         run: mkdir -p artifacts
