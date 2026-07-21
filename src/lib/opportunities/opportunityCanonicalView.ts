@@ -493,18 +493,28 @@ export function calculateListingTransparency(canonicalBase: CanonicalBase): List
     add('loadedWeeklyMiles', c.compensation.mileage.loadedWeeklyMiles.state === 'provided');
     add('deadheadPaid', c.compensation.mileage.deadheadPaid.state === 'provided');
   } else if (pm === 'percentage') {
-    const pctOk = rp.percentage.state === 'provided';
-    const val = pctOk ? rp.percentage.value : null;
-    add('percentageRate', pctOk && val != null && isFin(val.rate) && val.rate > 0);
-    add('percentageBasisLabel', pctOk && val != null && typeof val.basisLabel === 'string' && val.basisLabel.trim() !== '');
-    add('percentageWeeklyRevenueBasis', pctOk && val != null && isFin(val.weeklyRevenueBasis) && (val.weeklyRevenueBasis as number) > 0);
+    const pct = rp.percentage;
+    if (pct.state === 'provided') {
+      const v = pct.value;
+      add('percentageRate', isFin(v.rate) && v.rate > 0);
+      add('percentageBasisLabel', typeof v.basisLabel === 'string' && v.basisLabel.trim() !== '');
+      add('percentageWeeklyRevenueBasis', isFin(v.weeklyRevenueBasis) && (v.weeklyRevenueBasis as number) > 0);
+    } else {
+      add('percentageRate', false);
+      add('percentageBasisLabel', false);
+      add('percentageWeeklyRevenueBasis', false);
+    }
   } else if (pm === 'flat_weekly') {
     add('flatWeeklyPay', rp.flatWeekly.state === 'provided');
   } else if (pm === 'salary') {
-    const sOk = rp.salary.state === 'provided';
-    const sVal = sOk ? rp.salary.value : null;
-    add('salaryAmount', sOk && sVal != null && isFin(sVal.amount) && sVal.amount > 0);
-    add('salaryFrequency', sOk && sVal != null && sVal.frequency != null);
+    const sal = rp.salary;
+    if (sal.state === 'provided') {
+      add('salaryAmount', isFin(sal.value.amount) && sal.value.amount > 0);
+      add('salaryFrequency', sal.value.frequency != null);
+    } else {
+      add('salaryAmount', false);
+      add('salaryFrequency', false);
+    }
   } else if (pm === 'mixed') {
     const completeComponents = rp.mixedComponents.filter((cmp) => {
       if (cmp.amount.state !== 'provided') return false;
