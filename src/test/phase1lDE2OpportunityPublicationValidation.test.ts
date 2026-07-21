@@ -22,9 +22,12 @@
 //     sorted unique blocking_reasons array).
 //   * Correct atomicity on failed INSERT and UPDATE.
 //   * Preserved Phase 1K admin exceptions.
-//   * Legacy pre-candidate active row scenarios: can be moved to draft,
-//     cannot receive an ordinary active→active edit until it becomes
-//     canonical_version=1 + complete.
+//   * Migration-time legacy snapshot grandfathering: only the exact
+//     opportunity IDs captured as active + non-canonical on the first
+//     application of this migration may remain editable while still
+//     active and legacy. Rows inserted or reactivated after the snapshot,
+//     rows whose id is changed, and INSERTs are never grandfathered.
+
 // =====================================================================
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
