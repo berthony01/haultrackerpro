@@ -5,6 +5,8 @@ import { useRecruiterProfile } from './useRecruiterProfile';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Opportunity = Tables<'opportunities'>;
+type Insert = TablesInsert<'opportunities'>;
+type Update = TablesUpdate<'opportunities'>;
 export type OpportunityInsert = Omit<Insert, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at'>;
 export type OpportunityUpdate = Omit<Update, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at' | 'id'>;
 
