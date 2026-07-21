@@ -723,7 +723,7 @@ export function buildOpportunityPersistencePayload(
     trailer_type: state.trailer_type || null,
     hiring_city: state.hiring_city.trim() || null,
     hiring_state: state.hiring_state.trim() || null,
-    hiring_states: state.hiring_states.length ? state.hiring_states : null,
+    hiring_states: state.hiring_states,
     description: state.description.trim() || null,
     pay_model: state.pay_model === 'unknown' ? null : state.pay_model,
     cpm: state.pay_model === 'cpm' ? nOrNull(state.cpm) : null,
@@ -768,6 +768,7 @@ export function buildOpportunityPersistencePayload(
     requirements: state.requirements.trim() || null,
     actual_benefits: state.actual_benefits.trim() || null,
     benefits: legacyBenefits || null,
+    transparency_confirmed: state.transparency_confirmed,
   } as Payload;
 
   return payload;
