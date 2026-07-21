@@ -39,12 +39,15 @@ const CANDIDATE_REL =
   '../../supabase/migration-candidates/20260721183000_phase1l_de2_opportunity_publication_validation.sql';
 const PHASE_1K_MIG_REL =
   '../../supabase/migrations/20260721000000_phase1k_admin_recruiter_opportunity_publication.sql';
+const PHASE_1L_DE1_MIG_REL =
+  '../../supabase/migrations/20260721143000_phase1l_de1_opportunity_authoring_contract.sql';
 
 const read = (rel: string) =>
   fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 const CANDIDATE_SQL = read(CANDIDATE_REL);
 const PHASE_1K_SQL = read(PHASE_1K_MIG_REL);
+const PHASE_1L_DE1_SQL = read(PHASE_1L_DE1_MIG_REL);
 
 // ---------------------------------------------------------------------
 // PGlite helper shim (types).
@@ -151,7 +154,7 @@ CREATE TABLE public.opportunities (
   home_time text,
   hiring_city text,
   hiring_state text,
-  hiring_states text[],
+  hiring_states text[] NOT NULL DEFAULT ARRAY[]::text[],
   driver_type text,
   route_type text,
   trailer_type text,
@@ -298,7 +301,7 @@ function publishableRow(overrides: Row = {}): Row {
     home_time: 'Weekly',
     hiring_city: 'Dallas',
     hiring_state: 'TX',
-    hiring_states: null,
+    hiring_states: [] as string[],
     route_type: 'OTR',
     trailer_type: 'Dry Van',
     employment_model: 'company_driver',
@@ -360,7 +363,7 @@ interface AttemptErr { ok: false; err: Error & Record<string, unknown>; row?: un
 type Attempt = AttemptOk | AttemptErr;
 function mustErr(a: Attempt): Error & Record<string, unknown> {
   if (a.ok) throw new Error('expected failure but write succeeded');
-  return mustErr(a);
+  return a.err;
 }
 async function tryInsert(inst: AnyPGlite, row: Row): Promise<Attempt> {
   try {
@@ -385,6 +388,10 @@ async function tryExec(inst: AnyPGlite, sql: string, params: unknown[] = []): Pr
 beforeAll(async () => {
   db = await makePGlite();
   await db.exec(BOOTSTRAP);
+  // Load DE1 canonical CHECK constraints from disk after the base
+  // opportunities table exists so the fixture inherits the applied
+  // storage contract without duplicating any constraint bodies here.
+  await db.exec(PHASE_1L_DE1_SQL);
   await db.exec(PHASE_1K_SQL);
   await db.exec(PHASE_1K_TRIGGER_BINDING);
   await seedIdentities(db);
@@ -642,7 +649,7 @@ describe('universal blockers — exact messages', () => {
     ['team_configuration',{ team_configuration: null },  'Select a driving configuration (Solo, Team, or Solo or Team).'],
     ['route_type',        { route_type: 'Freeway' },     'Select a route type.'],
     ['trailer_type',      { trailer_type: 'Van' },       'Select a trailer type.'],
-    ['hiring area',       { hiring_city: '', hiring_state: '', hiring_states: null }, 'Provide a hiring city and state, or at least one hiring state.'],
+    ['hiring area',       { hiring_city: '', hiring_state: '', hiring_states: [] }, 'Provide a hiring city and state, or at least one hiring state.'],
     ['description',       { description: '  ' },         'Description is required.'],
     ['home_time',         { home_time: '' },             'Home time is required.'],
     ['pay_model',         { pay_model: null, flat_weekly_pay: null }, 'Select a pay model.'],
@@ -1099,5 +1106,502 @@ describe('legacy pre-candidate active rows', () => {
       [id],
     );
     expect(upd.ok).toBe(true);
+  });
+});
+
+// =====================================================================
+// Extended coverage — helper truth tables, universal-numeric enforcement,
+// per-pay-model derivation, exhaustive cost-pair matrix, mixed malformed
+// element handling, company-driver bypass, catalog-privilege revocation,
+// and full reapplication invariance.
+// =====================================================================
+
+describe('_opportunity_numeric_is_finite truth table', () => {
+  const cases: Array<[string, string, boolean]> = [
+    ['NULL',               'NULL::numeric',            false],
+    ['zero',               '0::numeric',               true],
+    ['positive small',     '0.0001::numeric',          true],
+    ['positive large',     '1e6::numeric',             true],
+    ['negative finite',    '(-1.25)::numeric',         true],
+    ['NaN',                `'NaN'::numeric`,           false],
+    ['+Infinity',          `'Infinity'::numeric`,      false],
+    ['-Infinity',          `'-Infinity'::numeric`,     false],
+  ];
+  it.each(cases)('finite(%s) = %s', async (_lbl, expr, expected) => {
+    const r = await db.query<{ v: boolean }>(
+      `SELECT public._opportunity_numeric_is_finite(${expr}) AS v`,
+    );
+    expect(r.rows[0].v).toBe(expected);
+  });
+});
+
+describe('_opportunity_jsonb_number extractor', () => {
+  const cases: Array<[string, string, number | null]> = [
+    ['SQL NULL',        'NULL::jsonb',           null],
+    ['JSON null',       `'null'::jsonb`,         null],
+    ['JSON string',     `'"7"'::jsonb`,          null],
+    ['JSON boolean',    `'true'::jsonb`,         null],
+    ['JSON object',     `'{"x":1}'::jsonb`,      null],
+    ['JSON array',      `'[1,2]'::jsonb`,        null],
+    ['JSON number 0',   `'0'::jsonb`,            0],
+    ['JSON number pos', `'12.5'::jsonb`,         12.5],
+    ['JSON number neg', `'-3'::jsonb`,           -3],
+  ];
+  it.each(cases)('extract(%s) = %s', async (_lbl, expr, expected) => {
+    const r = await db.query<{ v: string | null }>(
+      `SELECT public._opportunity_jsonb_number(${expr})::text AS v`,
+    );
+    if (expected === null) {
+      expect(r.rows[0].v).toBeNull();
+    } else {
+      expect(Number(r.rows[0].v)).toBe(expected);
+    }
+  });
+});
+
+describe('universal numeric blocker — negative and non-finite', () => {
+  it('negative cpm on an active row raises structured 23514', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'cpm', flat_weekly_pay: null,
+      cpm: -0.1, estimated_weekly_miles: 2500, estimated_loaded_miles: 2200, deadhead_paid: true,
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(parseDetail(mustErr(a)).blocking_reasons)
+        .toContain('Fix invalid numeric values (must be zero or greater).');
+    }
+  });
+  it('negative sign_on_bonus is blocked as invalid numeric', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({ sign_on_bonus: -100 }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Fix invalid numeric values (must be zero or greater).');
+  });
+  it('NaN cpm injected via UPDATE is intercepted as structured 23514', async () => {
+    await setUid(db, RECR_UID);
+    const seeded = await insertOpportunity(db, publishableRow({ status: 'draft' }));
+    const id = String(seeded.id);
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities
+          SET status = 'active', pay_model = 'cpm', flat_weekly_pay = NULL,
+              cpm = 'NaN'::numeric, estimated_weekly_miles = 2500,
+              estimated_loaded_miles = 2200, deadhead_paid = true
+        WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      expect(String(mustErr(upd).code)).toBe('23514');
+      expect(parseDetail(mustErr(upd)).blocking_reasons)
+        .toContain('Fix invalid numeric values (must be zero or greater).');
+    }
+  });
+  it('Infinity cpm injected via UPDATE is intercepted as structured 23514', async () => {
+    await setUid(db, RECR_UID);
+    const seeded = await insertOpportunity(db, publishableRow({ status: 'draft' }));
+    const id = String(seeded.id);
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities
+          SET status = 'active', pay_model = 'cpm', flat_weekly_pay = NULL,
+              cpm = 'Infinity'::numeric, estimated_weekly_miles = 2500,
+              estimated_loaded_miles = 2200, deadhead_paid = true
+        WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) expect(String(mustErr(upd).code)).toBe('23514');
+  });
+});
+
+describe('candidate intercepts before underlying CHECK constraints', () => {
+  it('canonical_version=2 returns structured publication error (not CHECK failure)', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({ canonical_version: 2 }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(String(mustErr(a).message))
+        .toContain('Opportunity does not meet publication requirements.');
+      expect(parseDetail(mustErr(a)).blocking_reasons)
+        .toContain('Canonical opportunity version 1 is required before publication.');
+    }
+  });
+  it('invalid employment_model returns structured publication error', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({ employment_model: 'gig' }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(parseDetail(mustErr(a)).blocking_reasons)
+        .toContain('Select an employment arrangement.');
+    }
+  });
+  it('invalid team_configuration returns structured publication error', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({ team_configuration: 'triple' }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Select a driving configuration (Solo, Team, or Solo or Team).');
+  });
+  it('non-array mixed_pay_components on active row returns structured publication error', async () => {
+    await setUid(db, RECR_UID);
+    // Seed as draft with valid array, then flip to active while corrupting to object.
+    const seeded = await insertOpportunity(db, publishableRow({
+      status: 'draft', pay_model: 'mixed', flat_weekly_pay: null,
+      mixed_pay_components: JSON.stringify([
+        { label: 'Base', amount: 1000, frequency: 'weekly' },
+        { label: 'Bonus', amount: 200, frequency: 'weekly' },
+      ]),
+    }));
+    const id = String(seeded.id);
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities
+          SET status = 'active', mixed_pay_components = '{}'::jsonb
+        WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      expect(String(mustErr(upd).code)).toBe('23514');
+      expect(parseDetail(mustErr(upd)).blocking_reasons)
+        .toContain('Mixed pay requires at least two complete components (label, amount, frequency).');
+    }
+  });
+});
+
+describe('cost-pair full matrix (all four pairs, contractor_1099)', () => {
+  const base = (o: Row = {}) => publishableRow({
+    employment_model: 'contractor_1099',
+    driver_type: '1099',
+    ...o,
+  });
+  const pairs = [
+    {
+      label: 'Insurance',
+      amt: 'insurance_deductions',
+      freq: 'insurance_deduction_frequency',
+      msgFreq: 'Insurance frequency is required when an amount is set.',
+      msgAmt:  'Insurance amount is required when a frequency is set.',
+      msgAmtInvalid: 'Insurance amount must be zero or a positive number.',
+    },
+    {
+      label: 'Maintenance',
+      amt: 'maintenance_deductions',
+      freq: 'maintenance_deduction_frequency',
+      msgFreq: 'Maintenance frequency is required when an amount is set.',
+      msgAmt:  'Maintenance amount is required when a frequency is set.',
+      msgAmtInvalid: 'Maintenance amount must be zero or a positive number.',
+    },
+    {
+      label: 'Other',
+      amt: 'other_deductions',
+      freq: 'other_deduction_frequency',
+      msgFreq: 'Other recurring cost frequency is required when an amount is set.',
+      msgAmt:  'Other recurring cost amount is required when a frequency is set.',
+      msgAmtInvalid: 'Other recurring cost amount must be zero or a positive number.',
+    },
+  ] as const;
+
+  for (const p of pairs) {
+    it(`${p.label} amount with invalid frequency 'daily' blocks with frequency-required`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: 100, [p.freq]: 'daily' } as Row));
+      expect(a.ok).toBe(false);
+      if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain(p.msgFreq);
+    });
+    it(`${p.label} amount with NULL frequency blocks with frequency-required`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: 100, [p.freq]: null } as Row));
+      expect(a.ok).toBe(false);
+      if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain(p.msgFreq);
+    });
+    it(`${p.label} NULL amount with any frequency blocks with amount-required`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: null, [p.freq]: 'monthly' } as Row));
+      expect(a.ok).toBe(false);
+      if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain(p.msgAmt);
+    });
+    it(`${p.label} zero amount + valid frequency is allowed`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: 0, [p.freq]: 'weekly' } as Row));
+      expect(a.ok).toBe(true);
+    });
+    it(`${p.label} positive amount + valid frequency is allowed`, async () => {
+      await setUid(db, RECR_UID);
+      const a = await tryInsert(db, base({ [p.amt]: 150, [p.freq]: 'biweekly' } as Row));
+      expect(a.ok).toBe(true);
+    });
+  }
+
+  it('Lease amount with invalid frequency on lease_purchase blocks', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      employment_model: 'lease_purchase', driver_type: 'lease_purchase',
+      lease_payment: 500, lease_payment_frequency: 'daily',
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Lease payment frequency is required when an amount is set.');
+  });
+  it('Lease zero + valid frequency on lease_purchase is allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      employment_model: 'lease_purchase', driver_type: 'lease_purchase',
+      lease_payment: 0, lease_payment_frequency: 'weekly',
+    }));
+    expect(a.ok).toBe(true);
+  });
+});
+
+describe('company-driver rows: cost-pair rules are irrelevant', () => {
+  it('stray positive insurance without frequency does not block on company_driver', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      employment_model: 'company_driver',
+      insurance_deductions: 250, insurance_deduction_frequency: null,
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('stray positive lease without frequency does not block on company_driver', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      employment_model: 'company_driver',
+      lease_payment: 400, lease_payment_frequency: null,
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('company_driver row with escrow_required is not evaluated for escrow blockers', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      employment_model: 'company_driver',
+      escrow_required_state: 'required', escrow_amount: null, escrow_amount_frequency: null,
+    }));
+    expect(a.ok).toBe(true);
+  });
+});
+
+describe('mixed pay — additional malformed and edge cases', () => {
+  it('scalar element inserted between two valid components blocks with indexed label', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'mixed', flat_weekly_pay: null,
+      mixed_pay_components: JSON.stringify([
+        { label: 'Base', amount: 1000, frequency: 'weekly' },
+        'garbage',
+        { label: 'Bonus', amount: 200, frequency: 'weekly' },
+      ]),
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Mixed component 2 needs a label.');
+  });
+  it('JSON null element is treated as malformed and blocks with indexed label', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'mixed', flat_weekly_pay: null,
+      mixed_pay_components: JSON.stringify([
+        { label: 'A', amount: 500, frequency: 'weekly' },
+        { label: 'B', amount: 500, frequency: 'weekly' },
+        null,
+      ]),
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Mixed component 3 needs a label.');
+  });
+  it('component with zero amount and valid frequency is a valid complete component', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'mixed', flat_weekly_pay: null,
+      mixed_pay_components: JSON.stringify([
+        { label: 'Base', amount: 1000, frequency: 'weekly' },
+        { label: 'Reserve', amount: 0, frequency: 'weekly' },
+      ]),
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('component with invalid frequency emits frequency-required blocker', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'mixed', flat_weekly_pay: null,
+      mixed_pay_components: JSON.stringify([
+        { label: 'A', amount: 500, frequency: 'daily' },
+        { label: 'B', amount: 500, frequency: 'weekly' },
+      ]),
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Mixed component 1 frequency is required.');
+  });
+});
+
+describe('gross conflict derivation per pay model (>10% blocks, ≤10% allowed)', () => {
+  it('CPM: recruiter gross 30% above derived blocks', async () => {
+    await setUid(db, RECR_UID);
+    // derived = 0.6 * 2200 = 1320; recruiter 1800 (+36%)
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'cpm', flat_weekly_pay: null,
+      cpm: 0.6, estimated_weekly_miles: 2500, estimated_loaded_miles: 2200, deadhead_paid: true,
+      estimated_weekly_gross: 1800,
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+  });
+  it('CPM: recruiter gross within 10% is allowed', async () => {
+    await setUid(db, RECR_UID);
+    // derived = 1320; recruiter 1400 (~+6%)
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'cpm', flat_weekly_pay: null,
+      cpm: 0.6, estimated_weekly_miles: 2500, estimated_loaded_miles: 2200, deadhead_paid: true,
+      estimated_weekly_gross: 1400,
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('percentage: recruiter gross conflict >10% blocks', async () => {
+    await setUid(db, RECR_UID);
+    // derived = 5000 * 0.30 = 1500; recruiter 1900 (+26.7%)
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'percentage', flat_weekly_pay: null,
+      percentage_pay: 30, percentage_weekly_revenue_basis: 5000, percentage_basis_label: 'Line-haul',
+      estimated_weekly_gross: 1900,
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+  });
+  it('salary annual: normalized derived is annual/52; conflict >10% blocks', async () => {
+    await setUid(db, RECR_UID);
+    // derived weekly = 52000 / 52 = 1000; recruiter 1300 (+30%)
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'salary', flat_weekly_pay: null,
+      salary_amount: 52000, salary_frequency: 'annual',
+      estimated_weekly_gross: 1300,
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+  });
+  it('salary weekly: derived = amount; matching recruiter gross allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'salary', flat_weekly_pay: null,
+      salary_amount: 1200, salary_frequency: 'weekly', estimated_weekly_gross: 1200,
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('mixed: derived sums normalized-to-weekly components; conflict >10% blocks', async () => {
+    await setUid(db, RECR_UID);
+    // components: 1000 weekly + 2000 monthly (~= 461.5/week) = 1461.5; recruiter 2500 (+71%)
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'mixed', flat_weekly_pay: null,
+      mixed_pay_components: JSON.stringify([
+        { label: 'Base', amount: 1000, frequency: 'weekly' },
+        { label: 'Retention', amount: 2000, frequency: 'monthly' },
+      ]),
+      estimated_weekly_gross: 2500,
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+  });
+  it('other: derived = other_weekly_gross; matching recruiter allowed', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'other', flat_weekly_pay: null,
+      other_pay_method_label: 'Piece-rate', other_weekly_gross: 1500, estimated_weekly_gross: 1500,
+    }));
+    expect(a.ok).toBe(true);
+  });
+  it('other: recruiter gross >10% from other_weekly_gross blocks', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      pay_model: 'other', flat_weekly_pay: null,
+      other_pay_method_label: 'Piece-rate', other_weekly_gross: 1000, estimated_weekly_gross: 1500,
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
+      .toContain('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+  });
+});
+
+describe('catalog-level revocation — anon and authenticated cannot EXECUTE the four helpers', () => {
+  const fns = [
+    'public._opportunity_numeric_is_finite(numeric)',
+    'public._opportunity_jsonb_number(jsonb)',
+    'public.opportunity_publication_blockers(public.opportunities)',
+    'public.opportunities_canonical_publication_guard()',
+  ] as const;
+  for (const fn of fns) {
+    it(`anon lacks EXECUTE on ${fn}`, async () => {
+      const r = await db.query<{ v: boolean }>(
+        `SELECT has_function_privilege('anon', $1, 'EXECUTE') AS v`,
+        [fn],
+      );
+      expect(r.rows[0].v).toBe(false);
+    });
+    it(`authenticated lacks EXECUTE on ${fn}`, async () => {
+      const r = await db.query<{ v: boolean }>(
+        `SELECT has_function_privilege('authenticated', $1, 'EXECUTE') AS v`,
+        [fn],
+      );
+      expect(r.rows[0].v).toBe(false);
+    });
+  }
+});
+
+describe('full reapplication invariance — every helper and both triggers stay byte-identical', () => {
+  it('reapplying the candidate a second time preserves every function definition and trigger binding', async () => {
+    const fnRegs = [
+      'public._opportunity_numeric_is_finite(numeric)',
+      'public._opportunity_jsonb_number(jsonb)',
+      'public.opportunity_publication_blockers(public.opportunities)',
+      'public.opportunities_canonical_publication_guard()',
+      'public.opportunities_guard()',
+    ];
+    const before: Record<string, string> = {};
+    for (const reg of fnRegs) {
+      const r = await db.query<{ def: string }>(
+        `SELECT pg_get_functiondef($1::regprocedure) AS def`, [reg],
+      );
+      before[reg] = r.rows[0].def;
+    }
+    const trBefore = await db.query<{ tgname: string; def: string }>(
+      `SELECT tgname, pg_get_triggerdef(oid) AS def FROM pg_trigger
+        WHERE tgname IN ('trg_opportunities_guard','trg_opportunities_canonical_publication_guard')
+        ORDER BY tgname`,
+    );
+    expect(trBefore.rows.length).toBe(2);
+
+    // Reapply the candidate.
+    await db.exec(CANDIDATE_SQL);
+
+    for (const reg of fnRegs) {
+      const r = await db.query<{ def: string }>(
+        `SELECT pg_get_functiondef($1::regprocedure) AS def`, [reg],
+      );
+      expect(r.rows[0].def).toBe(before[reg]);
+    }
+    const trAfter = await db.query<{ tgname: string; def: string }>(
+      `SELECT tgname, pg_get_triggerdef(oid) AS def FROM pg_trigger
+        WHERE tgname IN ('trg_opportunities_guard','trg_opportunities_canonical_publication_guard')
+        ORDER BY tgname`,
+    );
+    expect(trAfter.rows.length).toBe(2);
+    for (let i = 0; i < trAfter.rows.length; i++) {
+      expect(trAfter.rows[i].tgname).toBe(trBefore.rows[i].tgname);
+      expect(trAfter.rows[i].def).toBe(trBefore.rows[i].def);
+    }
+    // Phase 1K baseline unchanged.
+    const p1k = await db.query<{ def: string }>(
+      `SELECT pg_get_functiondef('public.opportunities_guard()'::regprocedure) AS def`,
+    );
+    expect(p1k.rows[0].def).toBe(phase1kDefBefore);
   });
 });

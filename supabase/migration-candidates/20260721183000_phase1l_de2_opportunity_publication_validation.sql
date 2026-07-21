@@ -109,33 +109,33 @@ BEGIN
   -- Universal foundation
   ------------------------------------------------------------------
   IF o.canonical_version IS DISTINCT FROM 1 THEN
-    _b := _b || 'Canonical opportunity version 1 is required before publication.';
+    _b := array_append(_b, 'Canonical opportunity version 1 is required before publication.');
   END IF;
   IF COALESCE(btrim(o.title), '') = '' THEN
-    _b := _b || 'Opportunity title is required.';
+    _b := array_append(_b, 'Opportunity title is required.');
   END IF;
   IF COALESCE(btrim(o.company_name), '') = '' THEN
-    _b := _b || 'Company name is required.';
+    _b := array_append(_b, 'Company name is required.');
   END IF;
 
   IF o.employment_model IS NULL
      OR o.employment_model NOT IN ('company_driver','contractor_1099','owner_operator','lease_purchase') THEN
-    _b := _b || 'Select an employment arrangement.';
+    _b := array_append(_b, 'Select an employment arrangement.');
   END IF;
 
   IF o.team_configuration IS NULL
      OR o.team_configuration NOT IN ('solo','team','solo_or_team') THEN
-    _b := _b || 'Select a driving configuration (Solo, Team, or Solo or Team).';
+    _b := array_append(_b, 'Select a driving configuration (Solo, Team, or Solo or Team).');
   END IF;
 
   IF o.route_type IS NULL
      OR o.route_type NOT IN ('Local','Regional','OTR','Dedicated','Semi-Dedicated') THEN
-    _b := _b || 'Select a route type.';
+    _b := array_append(_b, 'Select a route type.');
   END IF;
 
   IF o.trailer_type IS NULL
      OR o.trailer_type NOT IN ('Dry Van','Reefer','Flatbed','Tanker','Car Hauler','Intermodal','Other') THEN
-    _b := _b || 'Select a trailer type.';
+    _b := array_append(_b, 'Select a trailer type.');
   END IF;
 
   _has_city_state := COALESCE(btrim(o.hiring_city), '') <> '' AND COALESCE(btrim(o.hiring_state), '') <> '';
@@ -144,23 +144,23 @@ BEGIN
                        SELECT 1 FROM unnest(o.hiring_states) s WHERE COALESCE(btrim(s), '') <> ''
                      );
   IF NOT _has_city_state AND NOT _has_state_list THEN
-    _b := _b || 'Provide a hiring city and state, or at least one hiring state.';
+    _b := array_append(_b, 'Provide a hiring city and state, or at least one hiring state.');
   END IF;
 
   IF COALESCE(btrim(o.description), '') = '' THEN
-    _b := _b || 'Description is required.';
+    _b := array_append(_b, 'Description is required.');
   END IF;
   IF COALESCE(btrim(o.home_time), '') = '' THEN
-    _b := _b || 'Home time is required.';
+    _b := array_append(_b, 'Home time is required.');
   END IF;
 
   IF o.pay_model IS NULL
      OR o.pay_model NOT IN ('cpm','percentage','flat_weekly','salary','mixed','other') THEN
-    _b := _b || 'Select a pay model.';
+    _b := array_append(_b, 'Select a pay model.');
   END IF;
 
   IF o.transparency_confirmed IS NOT TRUE THEN
-    _b := _b || 'Confirm the opportunity is accurate before publishing.';
+    _b := array_append(_b, 'Confirm the opportunity is accurate before publishing.');
   END IF;
 
   ------------------------------------------------------------------
@@ -185,7 +185,7 @@ BEGIN
   OR (o.lease_payment                   IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.lease_payment)                   OR o.lease_payment                   < 0))
   OR (o.escrow_amount                   IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.escrow_amount)                   OR o.escrow_amount                   < 0))
   THEN
-    _b := _b || 'Fix invalid numeric values (must be zero or greater).';
+    _b := array_append(_b, 'Fix invalid numeric values (must be zero or greater).');
   END IF;
 
   ------------------------------------------------------------------
@@ -195,65 +195,72 @@ BEGIN
     IF o.cpm IS NULL
        OR NOT public._opportunity_numeric_is_finite(o.cpm)
        OR o.cpm <= 0 THEN
-      _b := _b || 'CPM must be greater than zero.';
+      _b := array_append(_b, 'CPM must be greater than zero.');
     END IF;
     IF o.estimated_weekly_miles IS NULL
        OR NOT public._opportunity_numeric_is_finite(o.estimated_weekly_miles)
        OR o.estimated_weekly_miles <= 0 THEN
-      _b := _b || 'Total weekly miles must be greater than zero for CPM pay.';
+      _b := array_append(_b, 'Total weekly miles must be greater than zero for CPM pay.');
     END IF;
     IF o.estimated_loaded_miles IS NOT NULL
        AND public._opportunity_numeric_is_finite(o.estimated_loaded_miles)
        AND o.estimated_loaded_miles = 0 THEN
-      _b := _b || 'Loaded miles cannot be zero when provided.';
+      _b := array_append(_b, 'Loaded miles cannot be zero when provided.');
     END IF;
     IF o.deadhead_paid IS NULL THEN
-      _b := _b || 'Specify whether deadhead miles are paid (yes or no).';
+      _b := array_append(_b, 'Specify whether deadhead miles are paid (yes or no).');
     END IF;
 
   ELSIF o.pay_model = 'percentage' THEN
     IF o.percentage_pay IS NULL
        OR NOT public._opportunity_numeric_is_finite(o.percentage_pay)
        OR o.percentage_pay <= 0 THEN
-      _b := _b || 'Percentage rate must be greater than zero.';
+      _b := array_append(_b, 'Percentage rate must be greater than zero.');
     END IF;
     IF COALESCE(btrim(o.percentage_basis_label), '') = '' THEN
-      _b := _b || 'Percentage basis label is required.';
+      _b := array_append(_b, 'Percentage basis label is required.');
     END IF;
     IF o.percentage_weekly_revenue_basis IS NULL
        OR NOT public._opportunity_numeric_is_finite(o.percentage_weekly_revenue_basis)
        OR o.percentage_weekly_revenue_basis <= 0 THEN
-      _b := _b || 'Percentage weekly revenue basis must be greater than zero.';
+      _b := array_append(_b, 'Percentage weekly revenue basis must be greater than zero.');
     END IF;
 
   ELSIF o.pay_model = 'flat_weekly' THEN
     IF o.flat_weekly_pay IS NULL
        OR NOT public._opportunity_numeric_is_finite(o.flat_weekly_pay)
        OR o.flat_weekly_pay <= 0 THEN
-      _b := _b || 'Flat weekly pay must be greater than zero.';
+      _b := array_append(_b, 'Flat weekly pay must be greater than zero.');
     END IF;
 
   ELSIF o.pay_model = 'salary' THEN
     IF o.salary_amount IS NULL
        OR NOT public._opportunity_numeric_is_finite(o.salary_amount)
        OR o.salary_amount <= 0 THEN
-      _b := _b || 'Salary amount must be greater than zero.';
+      _b := array_append(_b, 'Salary amount must be greater than zero.');
     END IF;
     IF o.salary_frequency IS NULL
        OR o.salary_frequency NOT IN ('weekly','biweekly','monthly','annual') THEN
-      _b := _b || 'Salary pay period is required.';
+      _b := array_append(_b, 'Salary pay period is required.');
     END IF;
 
   ELSIF o.pay_model = 'mixed' THEN
     _mixed := o.mixed_pay_components;
     _complete_count := 0;
     IF _mixed IS NULL OR jsonb_typeof(_mixed) <> 'array' THEN
-      _b := _b || 'Mixed pay requires at least two complete components (label, amount, frequency).';
+      _b := array_append(_b, 'Mixed pay requires at least two complete components (label, amount, frequency).');
     ELSE
       _idx := 0;
       FOR _elem IN SELECT value FROM jsonb_array_elements(_mixed)
       LOOP
         _idx := _idx + 1;
+
+        -- Malformed non-object element (scalar, array, JSON null): cannot
+        -- be a valid mixed component. Emit the label blocker and skip.
+        IF jsonb_typeof(_elem) IS DISTINCT FROM 'object' THEN
+          _b := array_append(_b, format('Mixed component %s needs a label.', _idx));
+          CONTINUE;
+        END IF;
 
         _label := CASE WHEN jsonb_typeof(_elem->'label') = 'string' THEN _elem->>'label' ELSE NULL END;
         _label_present := COALESCE(btrim(_label), '') <> '';
@@ -272,13 +279,13 @@ BEGIN
         END IF;
 
         IF NOT _label_present THEN
-          _b := _b || format('Mixed component %s needs a label.', _idx);
+          _b := array_append(_b, format('Mixed component %s needs a label.', _idx));
         END IF;
         IF _amt_present AND NOT _amt_ok THEN
-          _b := _b || format('Mixed component %s amount must be zero or greater.', _idx);
+          _b := array_append(_b, format('Mixed component %s amount must be zero or greater.', _idx));
         END IF;
         IF _amt_present AND NOT _freq_valid THEN
-          _b := _b || format('Mixed component %s frequency is required.', _idx);
+          _b := array_append(_b, format('Mixed component %s frequency is required.', _idx));
         END IF;
 
         IF _label_present AND _amt_ok AND _freq_valid THEN
@@ -286,18 +293,18 @@ BEGIN
         END IF;
       END LOOP;
       IF _complete_count < 2 THEN
-        _b := _b || 'Mixed pay requires at least two complete components (label, amount, frequency).';
+        _b := array_append(_b, 'Mixed pay requires at least two complete components (label, amount, frequency).');
       END IF;
     END IF;
 
   ELSIF o.pay_model = 'other' THEN
     IF COALESCE(btrim(o.other_pay_method_label), '') = '' THEN
-      _b := _b || 'Pay method label is required for “Other”.';
+      _b := array_append(_b, 'Pay method label is required for “Other”.');
     END IF;
     IF o.other_weekly_gross IS NULL
        OR NOT public._opportunity_numeric_is_finite(o.other_weekly_gross)
        OR o.other_weekly_gross <= 0 THEN
-      _b := _b || 'Supported weekly gross must be greater than zero for “Other”.';
+      _b := array_append(_b, 'Supported weekly gross must be greater than zero for “Other”.');
     END IF;
   END IF;
 
@@ -315,46 +322,50 @@ BEGIN
   IF _cost_bearing THEN
     -- Insurance
     IF NOT (o.insurance_deductions IS NULL AND o.insurance_deduction_frequency IS NULL) THEN
-      IF o.insurance_deductions IS NULL AND o.insurance_deduction_frequency IS NOT NULL THEN
-        _b := _b || 'Insurance amount is required when a frequency is set.';
-      ELSIF o.insurance_deductions IS NOT NULL
-            AND (NOT public._opportunity_numeric_is_finite(o.insurance_deductions) OR o.insurance_deductions < 0) THEN
-        _b := _b || 'Insurance amount must be zero or a positive number.';
-      ELSIF o.insurance_deductions IS NOT NULL AND o.insurance_deduction_frequency IS NULL THEN
-        _b := _b || 'Insurance frequency is required when an amount is set.';
+      IF o.insurance_deductions IS NULL THEN
+        _b := array_append(_b, 'Insurance amount is required when a frequency is set.');
+      ELSIF NOT public._opportunity_numeric_is_finite(o.insurance_deductions)
+            OR o.insurance_deductions < 0 THEN
+        _b := array_append(_b, 'Insurance amount must be zero or a positive number.');
+      ELSIF o.insurance_deduction_frequency IS NULL
+         OR o.insurance_deduction_frequency NOT IN ('weekly','biweekly','monthly','annual') THEN
+        _b := array_append(_b, 'Insurance frequency is required when an amount is set.');
       END IF;
     END IF;
     -- Maintenance
     IF NOT (o.maintenance_deductions IS NULL AND o.maintenance_deduction_frequency IS NULL) THEN
-      IF o.maintenance_deductions IS NULL AND o.maintenance_deduction_frequency IS NOT NULL THEN
-        _b := _b || 'Maintenance amount is required when a frequency is set.';
-      ELSIF o.maintenance_deductions IS NOT NULL
-            AND (NOT public._opportunity_numeric_is_finite(o.maintenance_deductions) OR o.maintenance_deductions < 0) THEN
-        _b := _b || 'Maintenance amount must be zero or a positive number.';
-      ELSIF o.maintenance_deductions IS NOT NULL AND o.maintenance_deduction_frequency IS NULL THEN
-        _b := _b || 'Maintenance frequency is required when an amount is set.';
+      IF o.maintenance_deductions IS NULL THEN
+        _b := array_append(_b, 'Maintenance amount is required when a frequency is set.');
+      ELSIF NOT public._opportunity_numeric_is_finite(o.maintenance_deductions)
+            OR o.maintenance_deductions < 0 THEN
+        _b := array_append(_b, 'Maintenance amount must be zero or a positive number.');
+      ELSIF o.maintenance_deduction_frequency IS NULL
+         OR o.maintenance_deduction_frequency NOT IN ('weekly','biweekly','monthly','annual') THEN
+        _b := array_append(_b, 'Maintenance frequency is required when an amount is set.');
       END IF;
     END IF;
     -- Other recurring cost
     IF NOT (o.other_deductions IS NULL AND o.other_deduction_frequency IS NULL) THEN
-      IF o.other_deductions IS NULL AND o.other_deduction_frequency IS NOT NULL THEN
-        _b := _b || 'Other recurring cost amount is required when a frequency is set.';
-      ELSIF o.other_deductions IS NOT NULL
-            AND (NOT public._opportunity_numeric_is_finite(o.other_deductions) OR o.other_deductions < 0) THEN
-        _b := _b || 'Other recurring cost amount must be zero or a positive number.';
-      ELSIF o.other_deductions IS NOT NULL AND o.other_deduction_frequency IS NULL THEN
-        _b := _b || 'Other recurring cost frequency is required when an amount is set.';
+      IF o.other_deductions IS NULL THEN
+        _b := array_append(_b, 'Other recurring cost amount is required when a frequency is set.');
+      ELSIF NOT public._opportunity_numeric_is_finite(o.other_deductions)
+            OR o.other_deductions < 0 THEN
+        _b := array_append(_b, 'Other recurring cost amount must be zero or a positive number.');
+      ELSIF o.other_deduction_frequency IS NULL
+         OR o.other_deduction_frequency NOT IN ('weekly','biweekly','monthly','annual') THEN
+        _b := array_append(_b, 'Other recurring cost frequency is required when an amount is set.');
       END IF;
     END IF;
     -- Lease payment (only for lease_purchase)
     IF _lease_relevant AND NOT (o.lease_payment IS NULL AND o.lease_payment_frequency IS NULL) THEN
-      IF o.lease_payment IS NULL AND o.lease_payment_frequency IS NOT NULL THEN
-        _b := _b || 'Lease payment amount is required when a frequency is set.';
-      ELSIF o.lease_payment IS NOT NULL
-            AND (NOT public._opportunity_numeric_is_finite(o.lease_payment) OR o.lease_payment < 0) THEN
-        _b := _b || 'Lease payment amount must be zero or a positive number.';
-      ELSIF o.lease_payment IS NOT NULL AND o.lease_payment_frequency IS NULL THEN
-        _b := _b || 'Lease payment frequency is required when an amount is set.';
+      IF o.lease_payment IS NULL THEN
+        _b := array_append(_b, 'Lease payment amount is required when a frequency is set.');
+      ELSIF NOT public._opportunity_numeric_is_finite(o.lease_payment)
+            OR o.lease_payment < 0 THEN
+        _b := array_append(_b, 'Lease payment amount must be zero or a positive number.');
+      ELSIF o.lease_payment_frequency IS NULL
+         OR o.lease_payment_frequency NOT IN ('weekly','biweekly','monthly','annual') THEN
+        _b := array_append(_b, 'Lease payment frequency is required when an amount is set.');
       END IF;
     END IF;
 
@@ -365,17 +376,17 @@ BEGIN
       IF o.escrow_amount IS NULL
          OR NOT public._opportunity_numeric_is_finite(o.escrow_amount)
          OR o.escrow_amount < 0 THEN
-        _b := _b || 'Escrow amount is required when escrow is required.';
+        _b := array_append(_b, 'Escrow amount is required when escrow is required.');
       END IF;
       IF o.escrow_amount_frequency IS NULL
          OR o.escrow_amount_frequency NOT IN ('weekly','biweekly','monthly','annual') THEN
-        _b := _b || 'Escrow frequency is required when escrow is required.';
+        _b := array_append(_b, 'Escrow frequency is required when escrow is required.');
       END IF;
     ELSIF o.escrow_required_state = 'not_required' THEN
       IF o.escrow_amount IS NOT NULL
          AND public._opportunity_numeric_is_finite(o.escrow_amount)
          AND o.escrow_amount > 0 THEN
-        _b := _b || 'Escrow is marked not required but a positive escrow amount was provided. Clear the stale escrow amount before publishing.';
+        _b := array_append(_b, 'Escrow is marked not required but a positive escrow amount was provided. Clear the stale escrow amount before publishing.');
       END IF;
     END IF;
     -- NULL / 'not_disclosed' -> allowed (no blocker).
@@ -467,7 +478,7 @@ BEGIN
   THEN
     _diff_ratio := abs(o.estimated_weekly_gross - _derived_gross) / _derived_gross;
     IF _diff_ratio > 0.10 THEN
-      _b := _b || 'Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.';
+      _b := array_append(_b, 'Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
     END IF;
   END IF;
 
