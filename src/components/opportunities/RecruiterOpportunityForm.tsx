@@ -154,29 +154,21 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
     next.hiring_states = [...data.hiring_states];
   }
 
-  // Legacy driver_type → canonical employment/team
+  // Legacy driver_type → canonical employment/team via shared projection.
   if (data.driver_type && next.employment_model === 'unknown') {
-    const dt = data.driver_type.toLowerCase();
-    if (dt === 'team' || dt === 'team_driver') {
+    const proj = projectLegacyDriverType(data.driver_type);
+    if (proj.legacy_team_row) {
       next.team_configuration = 'team';
-    } else if (dt === 'company' || dt === 'company_driver') {
-      next.employment_model = 'company_driver';
-    } else if (dt === '1099' || dt === '1099_contractor' || dt === 'contractor_1099') {
-      next.employment_model = 'contractor_1099';
-    } else if (dt === 'owner_operator') {
-      next.employment_model = 'owner_operator';
-    } else if (dt === 'lease_purchase') {
-      next.employment_model = 'lease_purchase';
+    } else if (proj.employment_model !== 'unknown') {
+      next.employment_model = proj.employment_model;
     }
   }
   if (data.route_type && !next.route_type) next.route_type = data.route_type;
   if (data.trailer_type && !next.trailer_type) next.trailer_type = data.trailer_type;
 
   if (data.pay_model && next.pay_model === 'unknown') {
-    const pm = data.pay_model as CanonicalPayModel;
-    if (['cpm', 'percentage', 'flat_weekly', 'salary', 'mixed', 'other'].includes(pm)) {
-      next.pay_model = pm;
-    }
+    const pm = projectLegacyPayModel(data.pay_model);
+    if (pm !== 'unknown') next.pay_model = pm;
   }
 
   numFill('cpm', data.cpm);
