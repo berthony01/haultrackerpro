@@ -30,6 +30,7 @@ import {
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
+import { getOpportunityPublicationStatus } from '@/lib/opportunities/publicationStatus';
 
 interface Props {
   onBack: () => void;
@@ -114,7 +115,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               Manage Opportunities
             </h1>
             <p className="text-sm text-muted-foreground">
-              Completed Recruiter profiles can post opportunities immediately. Verification adds trust and a badge; it does not control posting access.
+              Completed Recruiter profiles can post opportunities immediately. Verification adds trust and a badge; it does not control posting access. Each listing shows its driver visibility separately from its lifecycle status.
             </p>
           </div>
           <Button onClick={openCreate} className="shrink-0" data-testid="post-opportunity-cta">
@@ -196,15 +197,30 @@ function OpportunityRow({
     closed: 'destructive',
   };
 
+  const publication = getOpportunityPublicationStatus(o);
+
   return (
-    <Card className="p-5 border-border/60">
+    <Card className="p-5 border-border/60" data-testid={`opportunity-row-${o.id}`}>
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <h3 className="text-base font-bold text-foreground truncate">{o.title}</h3>
-            <Badge variant={statusVariant[o.status] ?? 'outline'} className="capitalize">{o.status}</Badge>
+            <Badge variant={statusVariant[o.status] ?? 'outline'} className="capitalize">{`Listing: ${o.status}`}</Badge>
+            <Badge
+              variant={publication.variant}
+              data-testid={`publication-status-${o.id}`}
+              data-publication-state={publication.key}
+            >
+              {publication.label}
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground mb-2">{o.company_name}</p>
+          <p
+            className="text-xs text-muted-foreground mb-2"
+            data-testid={`publication-status-description-${o.id}`}
+          >
+            {publication.description}
+          </p>
           <div className="flex flex-wrap gap-2 text-xs">
             {o.driver_type && <Badge variant="outline">{o.driver_type}</Badge>}
             {o.route_type && <Badge variant="outline">{o.route_type}</Badge>}
