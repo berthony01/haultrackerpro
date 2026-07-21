@@ -836,7 +836,7 @@ function ReviewSummary({ state, readiness }: {
       <SumCard label={`Recurring weekly gross (${grossLabel})`} value={fmt(fe.recurringWeeklyGross)} />
       <SumCard label="Estimated weekly net" value={netLine} testId="review-net" />
       <SumCard label="Effective RPM" value={fe.effectiveRpm == null ? '—' : rpm} />
-      <SumCard label="One-time incentives total" value={fmt(fe.oneTimeIncentiveTotal || null)} testId="review-onetime" />
+      <SumCard label="One-time incentives total" value={fmt(fe.oneTimeIncentiveTotal ?? null)} testId="review-onetime" />
     </div>
   );
 }
