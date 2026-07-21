@@ -303,8 +303,17 @@ export function calculateCanonicalOpportunityFinancials(
 ): CanonicalOpportunityFinancialEstimate {
   const missing = new Set<string>();
   const invalid = new Set<string>();
+  // Subset of `invalid` diagnostics that affect overall status availability.
+  // One-time incentive invalids must be diagnosed but must NOT change availability
+  // per the canonical contract; they are added to `invalid` only.
+  const statusInvalid = new Set<string>();
   const conflicts = new Set<string>();
   const assumptions = new Set<string>();
+
+  const addInvalid = (key: string, affectsStatus = true): void => {
+    invalid.add(key);
+    if (affectsStatus) statusInvalid.add(key);
+  };
 
   // -------- Deterministic gross by pay model --------
   let deterministicGross: number | null = null;
@@ -318,11 +327,11 @@ export function calculateCanonicalOpportunityFinancials(
       isFiniteNumber(input.loadedWeeklyMiles.value) &&
       input.loadedWeeklyMiles.value > 0;
     if (!cpmOk) {
-      if (input.cpm.state === 'provided') invalid.add('cpm');
+      if (input.cpm.state === 'provided') addInvalid('cpm');
       else missing.add('cpm');
     }
     if (!loadedOk) {
-      if (input.loadedWeeklyMiles.state === 'provided') invalid.add('loadedWeeklyMiles');
+      if (input.loadedWeeklyMiles.state === 'provided') addInvalid('loadedWeeklyMiles');
       else missing.add('loadedWeeklyMiles');
     }
     if (cpmOk && loadedOk) {
@@ -338,7 +347,7 @@ export function calculateCanonicalOpportunityFinancials(
       const rateOk = isFiniteNumber(rate) && rate > 0;
       const basisOk = isFiniteNumber(weeklyRevenueBasis) && (weeklyRevenueBasis as number) > 0;
       const labelOk = typeof basisLabel === 'string' && basisLabel.trim() !== '';
-      if (!rateOk) invalid.add('percentageRate');
+      if (!rateOk) addInvalid('percentageRate');
       if (!basisOk) missing.add('percentageWeeklyRevenueBasis');
       if (!labelOk) missing.add('percentageBasisLabel');
       if (rateOk && basisOk && labelOk) {
@@ -350,7 +359,7 @@ export function calculateCanonicalOpportunityFinancials(
       if (isFiniteNumber(input.flatWeeklyPay.value) && input.flatWeeklyPay.value > 0) {
         deterministicGross = input.flatWeeklyPay.value;
       } else {
-        invalid.add('flatWeeklyPay');
+        addInvalid('flatWeeklyPay');
       }
     } else {
       missing.add('flatWeeklyPay');
@@ -358,7 +367,7 @@ export function calculateCanonicalOpportunityFinancials(
   } else if (pm === 'salary') {
     if (input.salary.state === 'provided') {
       const s = input.salary.value;
-      if (!isFiniteNumber(s.amount) || s.amount <= 0) invalid.add('salaryAmount');
+      if (!isFiniteNumber(s.amount) || s.amount <= 0) addInvalid('salaryAmount');
       if (s.frequency == null) missing.add('salaryFrequency');
       const wk = normalizeRecurringAmountToWeekly(s);
       if (wk != null && s.amount > 0) deterministicGross = wk;
@@ -378,7 +387,7 @@ export function calculateCanonicalOpportunityFinancials(
         const wk = normalizeRecurringAmountToWeekly(amt);
         if (wk != null) complete.push(wk);
       } else {
-        invalid.add(`mixedComponent[${i}]`);
+        addInvalid(`mixedComponent[${i}]`);
       }
     }
     if (complete.length < 2) {
@@ -391,12 +400,14 @@ export function calculateCanonicalOpportunityFinancials(
       if (isFiniteNumber(input.otherWeeklyGross.value) && input.otherWeeklyGross.value > 0) {
         deterministicGross = input.otherWeeklyGross.value;
       } else {
-        invalid.add('otherWeeklyGross');
+        addInvalid('otherWeeklyGross');
       }
     } else {
       missing.add('otherWeeklyGross');
     }
   } else {
+    // Unknown pay model — no deterministic gross can be derived.
+    // Still surfaced as a status-affecting missing diagnostic.
     payModelDeterministicRequired = false;
     missing.add('payModel');
   }
@@ -408,7 +419,7 @@ export function calculateCanonicalOpportunityFinancials(
     if (isFiniteNumber(v) && v > 0) {
       recruiterGross = v;
     } else {
-      invalid.add('recruiterProvidedWeeklyGross');
+      addInvalid('recruiterProvidedWeeklyGross');
     }
   }
 
@@ -438,12 +449,26 @@ export function calculateCanonicalOpportunityFinancials(
     input.totalWeeklyMiles.state === 'provided' ? input.totalWeeklyMiles.value : null;
   const totalMilesValid = isFiniteNumber(totalMilesProvided) && (totalMilesProvided as number) > 0;
   if (input.totalWeeklyMiles.state === 'provided' && !totalMilesValid) {
-    invalid.add('totalWeeklyMiles');
+    addInvalid('totalWeeklyMiles');
+  }
+
+  // CPM canonical readiness requires an explicit positive total-weekly-miles.
+  // Do NOT infer total from loaded + deadhead.
+  let cpmTotalMilesIncomplete = false;
+  if (pm === 'cpm' && input.totalWeeklyMiles.state !== 'provided') {
+    missing.add('totalWeeklyMiles');
+    cpmTotalMilesIncomplete = true;
   }
 
   const deadheadMilesProvided =
     input.deadheadWeeklyMiles.state === 'provided' ? input.deadheadWeeklyMiles.value : null;
-  const deadheadMilesValid = isFiniteNumber(deadheadMilesProvided) && (deadheadMilesProvided as number) >= 0;
+  const deadheadMilesValid =
+    input.deadheadWeeklyMiles.state === 'provided' &&
+    isFiniteNumber(deadheadMilesProvided) &&
+    (deadheadMilesProvided as number) >= 0;
+  if (input.deadheadWeeklyMiles.state === 'provided' && !deadheadMilesValid) {
+    addInvalid('deadheadWeeklyMiles');
+  }
 
   const effectiveRpm =
     recurringWeeklyGross != null && totalMilesValid
@@ -484,7 +509,7 @@ export function calculateCanonicalOpportunityFinancials(
       if (ea.state === 'provided') {
         const wk = normalizeRecurringAmountToWeekly(ea.value);
         if (wk == null) {
-          if (!isFiniteNumber(ea.value.amount) || ea.value.amount < 0) invalid.add('escrowAmount');
+          if (!isFiniteNumber(ea.value.amount) || ea.value.amount < 0) addInvalid('escrowAmount');
           else if (ea.value.frequency == null) missing.add('escrowAmountFrequency');
           netIncomplete = true;
         } else {
@@ -519,7 +544,7 @@ export function calculateCanonicalOpportunityFinancials(
       if (disc.state === 'provided') {
         const wk = normalizeRecurringAmountToWeekly(disc.value);
         if (wk == null) {
-          if (!isFiniteNumber(disc.value.amount) || disc.value.amount < 0) invalid.add(`${key}Amount`);
+          if (!isFiniteNumber(disc.value.amount) || disc.value.amount < 0) addInvalid(`${key}Amount`);
           else if (disc.value.frequency == null) missing.add(`${key}Frequency`);
           netIncomplete = true;
         } else {
@@ -549,6 +574,7 @@ export function calculateCanonicalOpportunityFinancials(
       : null;
 
   // -------- One-time incentives --------
+  // Invalid incentives are diagnosed but MUST NOT change availability.
   let oneTimeIncentiveTotal = 0;
   for (let i = 0; i < input.oneTimeIncentives.length; i += 1) {
     const inc = input.oneTimeIncentives[i];
@@ -557,7 +583,7 @@ export function calculateCanonicalOpportunityFinancials(
     if (isFiniteNumber(v) && v >= 0) {
       oneTimeIncentiveTotal += v;
     } else {
-      invalid.add(`oneTimeIncentive[${i}]`);
+      addInvalid(`oneTimeIncentive[${i}]`, false);
     }
   }
 
@@ -581,10 +607,13 @@ export function calculateCanonicalOpportunityFinancials(
   } else {
     let incomplete = false;
     if (payModelDeterministicRequired && deterministicGross == null) incomplete = true;
+    // Unknown pay model is always incomplete unless fully not-applicable (handled above).
+    if (pm === 'unknown') incomplete = true;
     if (isUnknownEm) incomplete = true;
     if (isCostBearing && netStatus === 'incomplete') incomplete = true;
     if (!totalMilesValid && input.totalWeeklyMiles.state === 'provided') incomplete = true;
-    if (invalid.size > 0) incomplete = true;
+    if (cpmTotalMilesIncomplete) incomplete = true;
+    if (statusInvalid.size > 0) incomplete = true;
     status = incomplete ? 'incomplete' : 'available';
   }
 
