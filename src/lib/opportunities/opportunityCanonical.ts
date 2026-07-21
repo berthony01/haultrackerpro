@@ -264,12 +264,13 @@ export function normalizeOpportunityForAuthoring(
   base.percentage_basis_label = s(row.percentage_basis_label);
   base.percentage_weekly_revenue_basis = numToStr(row.percentage_weekly_revenue_basis);
 
-  // Salary — new `salary_amount` takes precedence when present. Otherwise, and
-  // only when the stored pay_model is 'salary', legacy `flat_weekly_pay`
-  // hydrates salary_amount at weekly frequency.
+  // Salary — either new field being present marks canonical salary
+  // provenance and disables the legacy `flat_weekly_pay` fallback. The legacy
+  // fallback only applies when both new fields are absent and stored
+  // pay_model === 'salary'.
   const rowSalaryAmt = row.salary_amount;
   const rowSalaryFreq = row.salary_frequency;
-  if (rowSalaryAmt != null) {
+  if (rowSalaryAmt != null || rowSalaryFreq != null) {
     base.salary_amount = numToStr(rowSalaryAmt);
     base.salary_frequency = isFreq(rowSalaryFreq) ? rowSalaryFreq : null;
   } else if (rowPay === 'salary' && row.flat_weekly_pay != null) {
