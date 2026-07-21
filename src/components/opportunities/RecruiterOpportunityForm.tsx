@@ -210,14 +210,14 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile } = useRecruiterProfile();
   const [state, setState] = useState<State>(() =>
-    initial ? normalizeOpportunityForAuthoring(initial as never) : { ...EMPTY_AUTHORING_STATE },
+    initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
   );
   const [pasteOpen, setPasteOpen] = useState(false);
   const hydratedRef = useRef(!!initial);
 
   useEffect(() => {
     if (initial && !hydratedRef.current) {
-      setState(normalizeOpportunityForAuthoring(initial as never));
+      setState(normalizeOpportunityForAuthoring(initial));
       hydratedRef.current = true;
       return;
     }
