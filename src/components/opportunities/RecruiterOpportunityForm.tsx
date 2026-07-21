@@ -155,12 +155,15 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
   }
 
   // Legacy driver_type → canonical employment/team via shared projection.
-  if (data.driver_type && next.employment_model === 'unknown') {
+  // Employment and team configuration are projected independently and never
+  // overwrite a resolved recruiter selection.
+  if (data.driver_type) {
     const proj = projectLegacyDriverType(data.driver_type);
-    if (proj.legacy_team_row) {
-      next.team_configuration = 'team';
-    } else if (proj.employment_model !== 'unknown') {
+    if (next.employment_model === 'unknown' && proj.employment_model !== 'unknown') {
       next.employment_model = proj.employment_model;
+    }
+    if (next.team_configuration === 'unspecified' && proj.team_configuration !== 'unspecified') {
+      next.team_configuration = proj.team_configuration;
     }
   }
   if (data.route_type && !next.route_type) next.route_type = data.route_type;

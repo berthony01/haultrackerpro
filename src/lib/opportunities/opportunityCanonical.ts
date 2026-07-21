@@ -264,12 +264,13 @@ export function normalizeOpportunityForAuthoring(
   base.percentage_basis_label = s(row.percentage_basis_label);
   base.percentage_weekly_revenue_basis = numToStr(row.percentage_weekly_revenue_basis);
 
-  // Salary — new `salary_amount` takes precedence when present. Otherwise, and
-  // only when the stored pay_model is 'salary', legacy `flat_weekly_pay`
-  // hydrates salary_amount at weekly frequency.
+  // Salary — either new field being present marks canonical salary
+  // provenance and disables the legacy `flat_weekly_pay` fallback. The legacy
+  // fallback only applies when both new fields are absent and stored
+  // pay_model === 'salary'.
   const rowSalaryAmt = row.salary_amount;
   const rowSalaryFreq = row.salary_frequency;
-  if (rowSalaryAmt != null) {
+  if (rowSalaryAmt != null || rowSalaryFreq != null) {
     base.salary_amount = numToStr(rowSalaryAmt);
     base.salary_frequency = isFreq(rowSalaryFreq) ? rowSalaryFreq : null;
   } else if (rowPay === 'salary' && row.flat_weekly_pay != null) {
@@ -280,23 +281,27 @@ export function normalizeOpportunityForAuthoring(
   base.flat_weekly_pay = base.pay_model === 'flat_weekly' ? numToStr(row.flat_weekly_pay) : '';
 
   // Mixed — canonical only; legacy rows never invent canonical components.
+  // A "usable" canonical component requires all three: nonblank label, finite
+  // nonnegative amount, and a recognized recurring frequency.
   const rawMixed = row.mixed_pay_components as unknown;
-  if (Array.isArray(rawMixed)) {
-    base.mixed_pay_components = rawMixed
-      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && !Array.isArray(c))
-      .map((c) => ({
-        label: s(c.label),
-        amount: numToStr(c.amount),
-        frequency: isFreq(c.frequency) ? (c.frequency as RecurringFrequency) : null,
-      }));
-  }
-
-  // Legacy mixed-pay provenance hint: stored pay_model === 'mixed' with no
-  // usable canonical components and no canonical_version 1.
-  const usableMixed = base.mixed_pay_components.filter(
-    (c) => c.label.trim() || c.amount.trim() || c.frequency != null,
-  );
-  base.legacy_mixed_pay_hint = rowPay === 'mixed' && usableMixed.length === 0 && row.canonical_version !== 1;
+  const normalizedMixed: CanonicalAuthoringMixedComponent[] = Array.isArray(rawMixed)
+    ? rawMixed
+        .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && !Array.isArray(c))
+        .map((c) => ({
+          label: s(c.label),
+          amount: numToStr(c.amount),
+          frequency: isFreq(c.frequency) ? (c.frequency as RecurringFrequency) : null,
+        }))
+    : [];
+  const usableMixed = normalizedMixed.filter((c) => {
+    if (!c.label.trim()) return false;
+    if (!c.frequency) return false;
+    const n = Number(c.amount);
+    return c.amount.trim() !== '' && Number.isFinite(n) && n >= 0;
+  });
+  const legacyMixedHint = rowPay === 'mixed' && usableMixed.length === 0 && row.canonical_version !== 1;
+  base.mixed_pay_components = legacyMixedHint ? [] : normalizedMixed;
+  base.legacy_mixed_pay_hint = legacyMixedHint;
 
   base.other_pay_method_label = s(row.other_pay_method_label);
   base.other_weekly_gross = numToStr(row.other_weekly_gross);
@@ -458,7 +463,8 @@ export function buildCanonicalFinancialInput(
   } else {
     // 'unspecified' or 'not_disclosed'
     escrowRequiredDisc = { state: 'not_disclosed' };
-    escrowAmountDisc = state.escrow_amount.trim() !== ''
+    const hasStale = state.escrow_amount.trim() !== '' || state.escrow_frequency != null;
+    escrowAmountDisc = hasStale
       ? amountDisclosure(state.escrow_amount, state.escrow_frequency)
       : { state: 'not_disclosed' };
   }
@@ -608,7 +614,7 @@ export function validateOpportunityReadiness(
         blockers.add(`Mixed component ${i + 1} frequency is required.`);
       }
     });
-    if (state.legacy_mixed_pay_hint) {
+    if (state.legacy_mixed_pay_hint && complete.length < 2) {
       warns.add('Legacy mixed-pay row: reconstruct at least two named recurring components before publishing.');
     }
   } else if (state.pay_model === 'other') {
@@ -645,13 +651,20 @@ export function validateOpportunityReadiness(
       warns.add('Escrow requirement not disclosed — weekly net will be incomplete.');
     }
     // 'not_required' with a stale amount is diagnosed by the calculator via
-    // the 10% conflict path below; persistence still clears the amount.
+    // the escrow conflict path and surfaced in blocker mapping below.
   }
 
-  // Financial calculator — conflict + status diagnostics
+  // Financial calculator — conflict + status diagnostics. Each calculator
+  // conflict is mapped to a specific recruiter-facing blocker.
   const financialEstimate = calculateCanonicalOpportunityFinancials(buildCanonicalFinancialInput(state));
-  if (financialEstimate.status === 'conflict') {
-    blockers.add('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+  for (const conflict of financialEstimate.conflicts) {
+    if (conflict.includes('Recruiter-provided weekly gross')) {
+      blockers.add('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
+    } else if (conflict.includes('Escrow marked not required')) {
+      blockers.add('Escrow is marked not required but a positive escrow amount was provided. Clear the stale escrow amount before publishing.');
+    } else {
+      blockers.add('Resolve the financial input conflict before publishing.');
+    }
   }
 
   const blockingReasons = Array.from(blockers).sort();
