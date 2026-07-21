@@ -1,20 +1,23 @@
-// Phase 1L-DE1R2 — Manager ↔ canonical form integration.
+// Phase 1L-DE1R2R1 — Manager ↔ canonical form integration.
 //
-// Detailed form behavior is covered in
-// `phase1lDE1RecruiterOpportunityForm.test.tsx`. This file focuses on the
-// manager surface: gating, CTA routing to the canonical form, and edit
-// hydration into the same form component.
+// Focused on the manager surface: eligibility gating, CTA routing to the
+// canonical form, edit hydration, mutation routing (create/update), and
+// separation from admin-review semantics. Detailed form behavior is covered
+// in phase1lDE1RecruiterOpportunityForm.test.tsx.
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Tables } from '@/integrations/supabase/types';
 
 const h = vi.hoisted(() => ({
   refetch: vi.fn(),
   billingRefresh: vi.fn(),
   statusMutate: vi.fn(),
+  createMutate: vi.fn(),
+  updateMutate: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
@@ -41,7 +44,12 @@ import { RecruiterOpportunityManager } from '@/components/opportunities/Recruite
 import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
-function makeProfile(overrides: Record<string, unknown> = {}) {
+type Profile = Tables<'recruiter_profiles'>;
+type Opportunity = Tables<'opportunities'>;
+type ProfileHook = ReturnType<typeof useRecruiterProfile>;
+type OppsHook = ReturnType<typeof useRecruiterOpportunities>;
+
+function makeProfile(overrides: Partial<Profile> = {}): Profile {
   return {
     id: 'r-1', user_id: 'u-1',
     recruiter_name: 'Jane Recruiter', company_name: 'Acme Trucking',
@@ -51,10 +59,10 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
     posting_terms_version: '2026-07-17.v1',
     legacy_terms_grandfathered_at: null,
     ...overrides,
-  };
+  } as unknown as Profile;
 }
 
-function makeOpportunity(overrides: Record<string, unknown> = {}) {
+function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
   return {
     id: 'opp-1', recruiter_id: 'r-1',
     title: 'Regional Dry Van', company_name: 'Acme Trucking',
@@ -71,31 +79,39 @@ function makeOpportunity(overrides: Record<string, unknown> = {}) {
     created_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z',
     published_at: '2026-07-01T00:00:00Z',
     ...overrides,
-  };
+  } as unknown as Opportunity;
 }
 
-let profileState: ReturnType<typeof makeProfile> | null;
-let opportunitiesState: ReturnType<typeof makeOpportunity>[];
+let profileState: Profile | null;
+let opportunitiesState: Opportunity[];
 
 function installHookMocks() {
+  const suspended =
+    !!profileState &&
+    (profileState.status === 'suspended' || profileState.verification_status === 'suspended');
+  const canPost = !!profileState && !suspended;
+
   vi.mocked(useRecruiterProfile).mockImplementation(() => ({
     profile: profileState,
     isLoading: false,
     isApproved: profileState?.verification_status === 'approved',
+    isSuspended: suspended,
     isVerified: profileState?.verification_status === 'approved',
-    canPost: true,
+    isProfileComplete: true,
+    canPost,
     refetch: vi.fn(),
-  } as never));
+  } as unknown as ProfileHook));
+
   vi.mocked(useRecruiterOpportunities).mockImplementation(() => ({
     opportunities: opportunitiesState,
     isLoading: false, isError: false, error: null, refetch: h.refetch,
     recruiterId: profileState?.id ?? null,
     isApproved: profileState?.verification_status === 'approved',
-    canPost: true, isVerified: profileState?.verification_status === 'approved',
-    createOpportunity: { mutate: vi.fn(), isPending: false },
-    updateOpportunity: { mutate: vi.fn(), isPending: false },
+    canPost, isVerified: profileState?.verification_status === 'approved',
+    createOpportunity: { mutate: h.createMutate, isPending: false },
+    updateOpportunity: { mutate: h.updateMutate, isPending: false },
     setStatus: { mutate: h.statusMutate, isPending: false },
-  } as never));
+  } as unknown as OppsHook));
 }
 
 beforeEach(() => {
@@ -107,7 +123,7 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-describe('Phase 1L-DE1R2 — manager ↔ canonical form', () => {
+describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
   it('opens the canonical form from the top CTA', () => {
     opportunitiesState = [makeOpportunity()];
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
@@ -122,7 +138,7 @@ describe('Phase 1L-DE1R2 — manager ↔ canonical form', () => {
     expect(screen.getByTestId('recruiter-opportunity-form')).toBeInTheDocument();
   });
 
-  it('edit routes into the same canonical form and hydrates title/company', () => {
+  it('edit routes into the same canonical form and hydrates canonical values', () => {
     opportunitiesState = [makeOpportunity()];
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
@@ -130,11 +146,28 @@ describe('Phase 1L-DE1R2 — manager ↔ canonical form', () => {
     expect(screen.getByRole('heading', { name: 'Edit Opportunity' })).toBeInTheDocument();
     expect(screen.getByLabelText('Opportunity Title')).toHaveValue('Regional Dry Van');
     expect(screen.getByLabelText('Company Name')).toHaveValue('Acme Trucking');
+    expect(screen.getByLabelText('Home Time')).toHaveValue('Home weekly');
+    // Source correction: stored transparency=true must hydrate as checked.
+    expect(screen.getByLabelText('Transparency confirmation')).toBeChecked();
+  });
+
+  it('completed, pending-verification profile may post', () => {
+    profileState = makeProfile({ verification_status: 'pending' });
+    render(<RecruiterOpportunityManager onBack={vi.fn()} />);
+    expect(screen.getByTestId('post-opportunity-cta')).toBeInTheDocument();
+    expect(screen.getByTestId('empty-state-cta')).toBeInTheDocument();
+  });
+
+  it('completed, rejected-verification profile may post', () => {
+    profileState = makeProfile({ verification_status: 'rejected' });
+    render(<RecruiterOpportunityManager onBack={vi.fn()} />);
+    expect(screen.getByTestId('post-opportunity-cta')).toBeInTheDocument();
+    expect(screen.getByTestId('empty-state-cta')).toBeInTheDocument();
   });
 
   it.each([
-    ['status', { status: 'suspended' }],
-    ['verification status', { verification_status: 'suspended' }],
+    ['status', { status: 'suspended' } as Partial<Profile>],
+    ['verification status', { verification_status: 'suspended' } as Partial<Profile>],
   ])('blocks a profile suspended by %s at the manager gate', (_label, overrides) => {
     profileState = makeProfile(overrides);
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
@@ -152,6 +185,32 @@ describe('Phase 1L-DE1R2 — manager ↔ canonical form', () => {
     expect(screen.queryByRole('button', { name: /Resubmit for Review/i })).toBeNull();
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('create flow reaches createOpportunity.mutate with status=draft and canonical_version=1', () => {
+    render(<RecruiterOpportunityManager onBack={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('empty-state-cta'));
+    fireEvent.change(screen.getByLabelText('Opportunity Title'), { target: { value: 'New Draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+    expect(h.createMutate).toHaveBeenCalledTimes(1);
+    const payload = h.createMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      title: 'New Draft', company_name: 'Acme Trucking',
+      status: 'draft', canonical_version: 1,
+    });
+    expect(h.updateMutate).not.toHaveBeenCalled();
+  });
+
+  it('edit flow reaches updateOpportunity.mutate with the exact opportunity ID', () => {
+    opportunitiesState = [makeOpportunity({ id: 'opp-abc' })];
+    render(<RecruiterOpportunityManager onBack={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+    expect(h.updateMutate).toHaveBeenCalledTimes(1);
+    const args = h.updateMutate.mock.calls[0]?.[0] as { id: string; data: Record<string, unknown> };
+    expect(args.id).toBe('opp-abc');
+    expect(args.data.status).toBe('draft');
+    expect(h.createMutate).not.toHaveBeenCalled();
   });
 
   it('does not reintroduce Quick Post, wizard, or legacy confirmations in source', () => {
