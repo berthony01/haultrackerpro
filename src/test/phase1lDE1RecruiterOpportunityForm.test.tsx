@@ -17,16 +17,13 @@ import type {
 
 type UpdateArgs = { id: string; data: OpportunityUpdate };
 
-const h = vi.hoisted(() => {
-  const { vi: viHoisted } = require('vitest') as typeof import('vitest');
-  return {
-    toastError: viHoisted.fn(),
-    toastSuccess: viHoisted.fn(),
-    createMutate: viHoisted.fn<(payload: OpportunityInsert) => void>(),
-    updateMutate: viHoisted.fn<(args: { id: string; data: OpportunityUpdate }) => void>(),
-    pastePayload: {} as ExtractedOpportunity,
-  };
-});
+const h = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  createMutate: vi.fn<(payload: OpportunityInsert) => void>(),
+  updateMutate: vi.fn<(args: { id: string; data: OpportunityUpdate }) => void>(),
+  pastePayload: {} as ExtractedOpportunity,
+}));
 
 vi.mock('sonner', () => ({
   toast: { error: h.toastError, success: h.toastSuccess },
