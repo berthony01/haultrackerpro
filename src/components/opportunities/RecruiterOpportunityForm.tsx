@@ -29,6 +29,8 @@ import {
   buildOpportunityPersistencePayload,
   EMPTY_AUTHORING_STATE,
   normalizeOpportunityForAuthoring,
+  projectLegacyDriverType,
+  projectLegacyPayModel,
   ROUTE_TYPE_VALUES,
   TRAILER_TYPE_VALUES,
   validateOpportunityReadiness,
@@ -152,29 +154,21 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
     next.hiring_states = [...data.hiring_states];
   }
 
-  // Legacy driver_type → canonical employment/team
+  // Legacy driver_type → canonical employment/team via shared projection.
   if (data.driver_type && next.employment_model === 'unknown') {
-    const dt = data.driver_type.toLowerCase();
-    if (dt === 'team' || dt === 'team_driver') {
+    const proj = projectLegacyDriverType(data.driver_type);
+    if (proj.legacy_team_row) {
       next.team_configuration = 'team';
-    } else if (dt === 'company' || dt === 'company_driver') {
-      next.employment_model = 'company_driver';
-    } else if (dt === '1099' || dt === '1099_contractor' || dt === 'contractor_1099') {
-      next.employment_model = 'contractor_1099';
-    } else if (dt === 'owner_operator') {
-      next.employment_model = 'owner_operator';
-    } else if (dt === 'lease_purchase') {
-      next.employment_model = 'lease_purchase';
+    } else if (proj.employment_model !== 'unknown') {
+      next.employment_model = proj.employment_model;
     }
   }
   if (data.route_type && !next.route_type) next.route_type = data.route_type;
   if (data.trailer_type && !next.trailer_type) next.trailer_type = data.trailer_type;
 
   if (data.pay_model && next.pay_model === 'unknown') {
-    const pm = data.pay_model as CanonicalPayModel;
-    if (['cpm', 'percentage', 'flat_weekly', 'salary', 'mixed', 'other'].includes(pm)) {
-      next.pay_model = pm;
-    }
+    const pm = projectLegacyPayModel(data.pay_model);
+    if (pm !== 'unknown') next.pay_model = pm;
   }
 
   numFill('cpm', data.cpm);
@@ -216,14 +210,14 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile } = useRecruiterProfile();
   const [state, setState] = useState<State>(() =>
-    initial ? normalizeOpportunityForAuthoring(initial as never) : { ...EMPTY_AUTHORING_STATE },
+    initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
   );
   const [pasteOpen, setPasteOpen] = useState(false);
   const hydratedRef = useRef(!!initial);
 
   useEffect(() => {
     if (initial && !hydratedRef.current) {
-      setState(normalizeOpportunityForAuthoring(initial as never));
+      setState(normalizeOpportunityForAuthoring(initial));
       hydratedRef.current = true;
       return;
     }
@@ -287,8 +281,8 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
               {initial ? 'Edit Opportunity' : 'Post Opportunity'}
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl mt-1">
-              Recruiters describe the arrangement, compensation, operations, and costs. Drivers see the same
-              canonical view. Only universal facts are required to publish.
+              Required details adapt to the selected employment arrangement and pay model. Review the
+              canonical information before saving or publishing.
             </p>
           </div>
           <Button
@@ -518,8 +512,8 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
         {isCompany && (
           <p className="text-xs text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
-            Company drivers do not carry lease, escrow, insurance, or maintenance deductions. Net take-home is
-            not shown because the current schema does not support a valid company-driver take-home model.
+            Ownership operating-cost fields are not applicable to company-driver listings. Estimated
+            take-home is unavailable under the current canonical model.
           </p>
         )}
 
@@ -609,8 +603,8 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
             aria-label="Transparency confirmation"
           />
           <span className="text-sm text-foreground leading-snug">
-            I confirm this opportunity is accurate. Drivers see the same canonical view: pay, miles, costs,
-            and estimated earnings labeled with their source.
+            I confirm this opportunity is accurate: pay, miles, costs, and estimated earnings are labeled
+            with their source.
           </span>
         </label>
 
@@ -842,7 +836,7 @@ function ReviewSummary({ state, readiness }: {
       <SumCard label={`Recurring weekly gross (${grossLabel})`} value={fmt(fe.recurringWeeklyGross)} />
       <SumCard label="Estimated weekly net" value={netLine} testId="review-net" />
       <SumCard label="Effective RPM" value={fe.effectiveRpm == null ? '—' : rpm} />
-      <SumCard label="One-time incentives total" value={fmt(fe.oneTimeIncentiveTotal || null)} testId="review-onetime" />
+      <SumCard label="One-time incentives total" value={fmt(fe.oneTimeIncentiveTotal ?? null)} testId="review-onetime" />
     </div>
   );
 }
