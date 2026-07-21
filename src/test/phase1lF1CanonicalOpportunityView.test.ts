@@ -412,6 +412,11 @@ describe('listing transparency band coverage', () => {
       description: 'x',
       home_time: 'weekly',
       forced_dispatch: false,
+      pets_allowed: true,
+      riders_allowed: false,
+      equipment_year: '2022',
+      pay_model: 'flat_weekly',
+      flat_weekly_pay: 1500,
     }));
     expect(partial.derived.transparencyScore.band).toBe('partial');
     // Complete
