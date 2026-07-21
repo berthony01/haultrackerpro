@@ -274,34 +274,44 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
     expect(screen.queryByText(/misleading or unverifiable/i)).toBeNull();
   });
 
-  it('renders exact employment and team choices', () => {
+  it('renders the exact ordered employment choices with nothing extra', () => {
     renderForm();
     const em = screen.getByTestId('employment-arrangement');
-    for (const label of ['W-2 Company Driver', '1099 Contractor', 'Owner-Operator', 'Lease Purchase']) {
-      expect(within(em).getByRole('button', { name: label })).toBeInTheDocument();
-    }
-    const team = screen.getByTestId('driving-configuration');
-    for (const label of ['Solo', 'Team', 'Solo or Team']) {
-      expect(within(team).getByRole('button', { name: label })).toBeInTheDocument();
-    }
+    const labels = within(em)
+      .getAllByRole('button')
+      .map((b) => b.textContent?.trim() ?? '');
+    expect(labels).toEqual(['W-2 Company Driver', '1099 Contractor', 'Owner-Operator', 'Lease Purchase']);
   });
 
-  it('route select exposes only the canonical route vocabulary', () => {
+  it('renders the exact ordered driving-configuration choices with nothing extra', () => {
+    renderForm();
+    const team = screen.getByTestId('driving-configuration');
+    const labels = within(team)
+      .getAllByRole('button')
+      .map((b) => b.textContent?.trim() ?? '');
+    expect(labels).toEqual(['Solo', 'Team', 'Solo or Team']);
+  });
+
+  it('route select exposes exactly the canonical route vocabulary in order', () => {
     renderForm();
     fireEvent.click(screen.getByLabelText('Route Type'));
-    for (const label of ['Local', 'Regional', 'OTR', 'Dedicated', 'Semi-Dedicated']) {
-      expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
-    }
+    const options = within(screen.getByRole('listbox'))
+      .getAllByRole('option')
+      .map((o) => o.textContent?.trim() ?? '')
+      .filter((t) => t !== 'Select…');
+    expect(options).toEqual(['Local', 'Regional', 'OTR', 'Dedicated', 'Semi-Dedicated']);
   });
 
-  it('trailer select exposes only the canonical trailer vocabulary; Step Deck / Power Only / Hopper are absent', () => {
+  it('trailer select exposes exactly the canonical trailer vocabulary in order; Step Deck / Power Only / Hopper are absent', () => {
     renderForm();
     fireEvent.click(screen.getByLabelText('Trailer Type'));
-    for (const label of ['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Car Hauler', 'Intermodal', 'Other']) {
-      expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
-    }
+    const options = within(screen.getByRole('listbox'))
+      .getAllByRole('option')
+      .map((o) => o.textContent?.trim() ?? '')
+      .filter((t) => t !== 'Select…');
+    expect(options).toEqual(['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Car Hauler', 'Intermodal', 'Other']);
     for (const forbidden of ['Step Deck', 'Power Only', 'Hopper']) {
-      expect(screen.queryByRole('option', { name: forbidden })).toBeNull();
+      expect(options).not.toContain(forbidden);
     }
   });
 
