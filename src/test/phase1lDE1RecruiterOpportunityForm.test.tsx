@@ -692,6 +692,24 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
     expect(blockers).toHaveTextContent('Confirm the opportunity is accurate before publishing.');
     expect(blockers).toHaveTextContent('Home time is required.');
   });
+
+  it('renders the escrow-not-disclosed warning in publish-warnings without blocking publish', () => {
+    // Contractor opportunity, otherwise publishable, with escrow left as
+    // the canonical "explicitly not disclosed" state. Warning must render;
+    // publish button must remain enabled.
+    renderForm(makeOpportunity({
+      employment_model: 'contractor_1099',
+      driver_type: '1099',
+      escrow_required: false,
+      escrow_required_state: 'not_disclosed',
+      escrow_amount: null,
+      escrow_amount_frequency: null,
+    }));
+    const warnings = screen.getByTestId('publish-warnings');
+    expect(warnings).toHaveTextContent('Escrow requirement not disclosed — weekly net will be incomplete.');
+    expect(screen.queryByTestId('publish-blockers')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Publish Opportunity' })).toBeEnabled();
+  });
 });
 
 /* ---------------- source integrity ---------------- */
