@@ -1,0 +1,164 @@
+name: Verification Only · Phase 1K-D Historical Opportunity Repair
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260721010000_phase1k_repair_historical_admin_recruiter_opportunity.sql'
+      - 'tests/postgres/phase1kHistoricalOpportunityRepairPostgres.test.ts'
+      - 'vitest.phase1k-historical-opportunity-repair-postgres.config.ts'
+      - '.github/workflows/verify-phase1k-d-historical-opportunity-repair.yml'
+  workflow_dispatch:
+
+jobs:
+  phase1k-d-historical-repair:
+    name: PG16 historical repair + regressions + full suite + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: phase1k_d
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d phase1k_d"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      PHASE1K_D_DATABASE_URL: postgres://postgres:postgres@localhost:5432/phase1k_d
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_PUBLISHABLE_KEY: phase1k-d-ci-placeholder-key
+      VITE_SUPABASE_PROJECT_ID: phase1k-d-ci
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun 1.3.14
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Verify repair migration identity and narrow source
+        run: |
+          set -eu
+          FILE='supabase/migrations/20260721010000_phase1k_repair_historical_admin_recruiter_opportunity.sql'
+          test -f "$FILE"
+          ACTUAL="$(sha256sum "$FILE" | awk '{print $1}')"
+          EXPECTED='723e7e30985578fe4fb3f5a2a4881288beafc21a54c39ed83c238630eeab1e76'
+          echo "repair migration SHA-256: $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED"
+          test "$(grep -Ec '^[[:space:]]*UPDATE public\.opportunities' "$FILE")" = '1'
+          ! grep -Eiq 'DISABLE[[:space:]]+TRIGGER|session_replication_role|SET[[:space:]]+ROLE' "$FILE"
+
+      - name: Hard-fail if PHASE1K_D_DATABASE_URL is absent
+        run: |
+          if [ -z "${PHASE1K_D_DATABASE_URL:-}" ]; then
+            echo 'PHASE1K_D_DATABASE_URL is required.' >&2
+            exit 1
+          fi
+
+      - name: Forbidden marker scan
+        run: |
+          set -eu
+          FILE='tests/postgres/phase1kHistoricalOpportunityRepairPostgres.test.ts'
+          test -f "$FILE"
+          FORBIDDEN='(it|test|describe)\.(skip|only)\b|\bit\.todo\b|\bxit\b|\bxdescribe\b'
+          if grep -Enq "$FORBIDDEN" "$FILE"; then
+            grep -En "$FORBIDDEN" "$FILE" >&2
+            exit 1
+          fi
+
+      - name: Wait for PostgreSQL 16
+        run: |
+          set -eu
+          for i in $(seq 1 60); do
+            if pg_isready -h localhost -p 5432 -U postgres -d phase1k_d >/dev/null 2>&1; then
+              echo "Postgres ready on attempt $i"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'Postgres did not become ready.' >&2
+          exit 1
+        env:
+          PGPASSWORD: postgres
+
+      - name: Prepare artifacts directory
+        run: mkdir -p artifacts
+
+      - name: Phase 1K-D real PostgreSQL 16 repair matrix
+        id: repair_gate
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run \
+            --config vitest.phase1k-historical-opportunity-repair-postgres.config.ts \
+            --reporter verbose \
+            2>&1 | tee artifacts/phase1k-d-historical-repair-postgres.log
+          echo "gate_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Phase 1K-D PostgreSQL log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1k-d-historical-repair-postgres-log
+          path: artifacts/phase1k-d-historical-repair-postgres.log
+
+      - name: Existing Phase 1K-A1 focused suite
+        run: bunx vitest run --config vitest.config.ts src/test/phase1fRecruiterPostingRuntime.test.ts
+
+      - name: Phase 1F companion recruiter suites
+        run: |
+          bunx vitest run --config vitest.config.ts \
+            src/test/phase1fRecruiterEligibility.test.ts \
+            src/test/phase1fa22CanonicalEligibility.test.ts \
+            src/test/phase1fRecruiterPostingRuntime.test.ts
+
+      - name: Full application Vitest suite
+        id: full_suite
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run --config vitest.config.ts \
+            2>&1 | tee artifacts/phase1k-d-full-suite.log
+          echo "gate_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload full-suite log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1k-d-full-suite-log
+          path: artifacts/phase1k-d-full-suite.log
+
+      - name: Enforce Phase 1K-D PostgreSQL outcome
+        run: |
+          set -eu
+          EXIT='${{ steps.repair_gate.outputs.gate_exit }}'
+          echo "Repair gate exit code: $EXIT"
+          test "$EXIT" = '0'
+
+      - name: Enforce full-suite outcome
+        run: |
+          set -eu
+          EXIT='${{ steps.full_suite.outputs.gate_exit }}'
+          echo "Full-suite exit code: $EXIT"
+          test "$EXIT" = '0'
+
+      - name: Typecheck app
+        run: bunx tsc -p tsconfig.app.json --noEmit
+
+      - name: Typecheck node
+        run: bunx tsc -p tsconfig.node.json --noEmit
+
+      - name: Production build
+        run: bun run build
