@@ -242,6 +242,7 @@ export function normalizeOpportunityForAuthoring(
 
   base.title = s(row.title);
   base.company_name = s(row.company_name);
+  base.transparency_confirmed = row.transparency_confirmed === true;
   base.employment_model = isEmployment(rowEmployment) ? rowEmployment : legacy.employment_model;
   base.team_configuration = isTeam(rowTeam) ? rowTeam : legacy.team_configuration;
   base.legacy_team_row = base.employment_model === 'unknown' && legacy.legacy_team_row;
