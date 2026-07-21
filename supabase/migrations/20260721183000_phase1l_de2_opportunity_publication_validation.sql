@@ -20,12 +20,46 @@
 -- Idempotent: reapplying the file leaves exactly one row trigger with the
 -- new name and byte-identical function bodies.
 --
+-- Migration-time legacy snapshot: on the first successful application of
+-- this migration, a private snapshot table captures exactly the opportunity
+-- IDs that are active and non-canonical at that instant. Only those captured
+-- row identities may remain editable while still active and legacy.
+-- Reapplication never expands the snapshot, ID transfer never inherits the
+-- exemption, and INSERTs are never grandfathered.
+--
 -- Direct EXECUTE on all four new functions is revoked from PUBLIC, anon,
 -- and authenticated so only the trigger dispatcher (SECURITY DEFINER) may
 -- invoke the SECURITY DEFINER guard, and only internal SQL may consult
 -- the helper functions.
 
 BEGIN;
+
+-- ---------------------------------------------------------------------------
+-- 0. Migration-time immutable legacy snapshot.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.opportunity_publication_legacy_snapshot (
+  snapshot_key text PRIMARY KEY
+    CHECK (snapshot_key = 'phase1l_de2_initial_active_legacy'),
+  opportunity_ids uuid[] NOT NULL,
+  captured_at timestamptz NOT NULL DEFAULT statement_timestamp()
+);
+
+ALTER TABLE public.opportunity_publication_legacy_snapshot ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.opportunity_publication_legacy_snapshot
+  FROM PUBLIC, anon, authenticated;
+
+INSERT INTO public.opportunity_publication_legacy_snapshot (
+  snapshot_key,
+  opportunity_ids
+)
+SELECT
+  'phase1l_de2_initial_active_legacy',
+  COALESCE(array_agg(o.id ORDER BY o.id), ARRAY[]::uuid[])
+FROM public.opportunities o
+WHERE o.status = 'active'
+  AND o.canonical_version IS DISTINCT FROM 1
+ON CONFLICT (snapshot_key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
 -- 1. Finite-numeric helper.  Rejects NULL and non-finite `numeric` values
@@ -521,15 +555,21 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Grandfather only rows that were already active and legacy before this
-  -- validator existed. They may remain editable while still legacy, but the
-  -- first attempt to convert them to canonical_version = 1 must satisfy the
-  -- full canonical publication contract. New or reactivated legacy rows are
-  -- never grandfathered.
+  -- Grandfather only the exact row identities captured when this migration
+  -- was first applied. The exemption cannot transfer to a different row ID,
+  -- cannot be added by migration reapplication, and ends when the row becomes
+  -- canonical or leaves the active state.
   IF TG_OP = 'UPDATE'
+     AND NEW.id = OLD.id
      AND OLD.status = 'active'
      AND OLD.canonical_version IS DISTINCT FROM 1
-     AND NEW.canonical_version IS DISTINCT FROM 1 THEN
+     AND NEW.canonical_version IS DISTINCT FROM 1
+     AND EXISTS (
+       SELECT 1
+       FROM public.opportunity_publication_legacy_snapshot s
+       WHERE s.snapshot_key = 'phase1l_de2_initial_active_legacy'
+         AND OLD.id = ANY(s.opportunity_ids)
+     ) THEN
     RETURN NEW;
   END IF;
 

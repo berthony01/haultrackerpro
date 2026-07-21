@@ -22,9 +22,12 @@
 //     sorted unique blocking_reasons array).
 //   * Correct atomicity on failed INSERT and UPDATE.
 //   * Preserved Phase 1K admin exceptions.
-//   * Legacy pre-candidate active row scenarios: can be moved to draft,
-//     cannot receive an ordinary active→active edit until it becomes
-//     canonical_version=1 + complete.
+//   * Migration-time legacy snapshot grandfathering: only the exact
+//     opportunity IDs captured as active + non-canonical on the first
+//     application of this migration may remain editable while still
+//     active and legacy. Rows inserted or reactivated after the snapshot,
+//     rows whose id is changed, and INSERTs are never grandfathered.
+
 // =====================================================================
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -1127,17 +1130,178 @@ describe('Phase 1K admin exceptions preserved', () => {
   });
 });
 
-describe('legacy pre-candidate active rows — narrow grandfathering (DE2B-1C)', () => {
-  it('existing active legacy row: ordinary recruiter UPDATE (touch updated_at only) remains active + legacy and succeeds', async () => {
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row A',
-      admin_review_status: 'approved', published_at: new Date().toISOString(),
+// =====================================================================
+// Migration-time legacy snapshot grandfathering (DE2B-1C-R2).
+//
+// Dedicated PGlite harness. Legacy rows are seeded BEFORE the candidate
+// migration is applied so the snapshot table captures exactly the
+// pre-candidate active + non-canonical IDs. Rows created after the
+// snapshot, ID transfers, and INSERTs are never grandfathered.
+// =====================================================================
+describe('migration-time legacy snapshot grandfathering (DE2B-1C-R2)', () => {
+  // Captured active legacy IDs (present BEFORE first candidate application).
+  const CAP_META         = 'd1000000-0000-4000-8000-000000000001';
+  const CAP_EDIT         = 'd1000000-0000-4000-8000-000000000002';
+  const CAP_INCOMPLETE   = 'd1000000-0000-4000-8000-000000000003';
+  const CAP_COMPLETE     = 'd1000000-0000-4000-8000-000000000004';
+  const CAP_TO_DRAFT     = 'd1000000-0000-4000-8000-000000000005';
+  const CAP_ID_TRANSFER  = 'd1000000-0000-4000-8000-000000000006';
+  // Not captured (draft at snapshot time).
+  const PRE_DRAFT        = 'd1000000-0000-4000-8000-000000000007';
+  // Created AFTER snapshot.
+  const POST_SNAPSHOT    = 'd1000000-0000-4000-8000-000000000008';
+  const CANONICAL_ACTIVE = 'd1000000-0000-4000-8000-000000000009';
+  const REPLACEMENT_ID   = 'd1000000-0000-4000-8000-000000000010';
+
+  const CAPTURED_SORTED = [
+    CAP_META, CAP_EDIT, CAP_INCOMPLETE, CAP_COMPLETE, CAP_TO_DRAFT, CAP_ID_TRANSFER,
+  ].slice().sort();
+
+  let legacyDb: AnyPGlite;
+
+  beforeAll(async () => {
+    legacyDb = await makePGlite();
+    await legacyDb.exec(BOOTSTRAP);
+    await legacyDb.exec(PHASE_1L_DE1_SQL);
+    await legacyDb.exec(PHASE_1K_SQL);
+    await legacyDb.exec(PHASE_1K_TRIGGER_BINDING);
+    await seedIdentities(legacyDb);
+
+    // Seed six fixed active legacy rows + one fixed draft legacy row as
+    // the ordinary recruiter, BEFORE the candidate applies. The canonical
+    // validator does not exist yet, so ordinary Phase 1K stamping applies.
+    await setUid(legacyDb, RECR_UID);
+
+    // CAP_META — full publishable defaults except non-canonical.
+    await insertOpportunity(legacyDb, publishableRow({
+      id: CAP_META, canonical_version: null, title: 'Cap meta',
     }));
+    // CAP_EDIT — non-canonical, editable-field target.
+    await insertOpportunity(legacyDb, publishableRow({
+      id: CAP_EDIT, canonical_version: null, title: 'Cap edit',
+    }));
+    // CAP_INCOMPLETE — non-canonical AND missing canonical-required fields.
+    await insertOpportunity(legacyDb, publishableRow({
+      id: CAP_INCOMPLETE, canonical_version: null,
+      title: '', description: '', home_time: '',
+    }));
+    // CAP_COMPLETE — non-canonical but otherwise fully publishable.
+    await insertOpportunity(legacyDb, publishableRow({
+      id: CAP_COMPLETE, canonical_version: null, title: 'Cap complete',
+    }));
+    // CAP_TO_DRAFT.
+    await insertOpportunity(legacyDb, publishableRow({
+      id: CAP_TO_DRAFT, canonical_version: null, title: 'Cap to draft',
+    }));
+    // CAP_ID_TRANSFER.
+    await insertOpportunity(legacyDb, publishableRow({
+      id: CAP_ID_TRANSFER, canonical_version: null, title: 'Cap id transfer',
+    }));
+    // PRE_DRAFT — status draft, so NOT captured (snapshot filters status='active').
+    await insertOpportunity(legacyDb, publishableRow({
+      id: PRE_DRAFT, canonical_version: null, title: 'Pre draft', status: 'draft',
+    }));
+
+    // First and only snapshot capture.
+    await legacyDb.exec(CANDIDATE_SQL);
+
+    // Post-snapshot admin-created active legacy row for RECR_RP_ID; admin
+    // acting on ANOTHER recruiter is exempt from canonical validation.
+    await setUid(legacyDb, ADMIN_UID);
+    await insertOpportunity(legacyDb, publishableRow({
+      id: POST_SNAPSHOT, recruiter_id: RECR_RP_ID,
+      canonical_version: null, title: 'Post-snapshot admin insert',
+    }));
+
+    // Ordinary recruiter inserts a fully canonical active row.
+    await setUid(legacyDb, RECR_UID);
+    await insertOpportunity(legacyDb, publishableRow({
+      id: CANONICAL_ACTIVE, canonical_version: 1, title: 'Canonical active',
+    }));
+  });
+
+  // ---- Source / catalog assertions on the candidate SQL itself. ---------
+  it('candidate SQL creates the snapshot table, RLS, revokes, and uses ON CONFLICT DO NOTHING', () => {
+    expect(CANDIDATE_SQL).toContain('CREATE TABLE IF NOT EXISTS public.opportunity_publication_legacy_snapshot');
+    expect(CANDIDATE_SQL).toContain("CHECK (snapshot_key = 'phase1l_de2_initial_active_legacy')");
+    expect(CANDIDATE_SQL).toContain('ALTER TABLE public.opportunity_publication_legacy_snapshot ENABLE ROW LEVEL SECURITY');
+    expect(CANDIDATE_SQL).toContain('REVOKE ALL ON TABLE public.opportunity_publication_legacy_snapshot');
+    expect(CANDIDATE_SQL).toContain('ON CONFLICT (snapshot_key) DO NOTHING');
+  });
+  it('candidate guard body requires NEW.id = OLD.id and snapshot membership', () => {
+    expect(CANDIDATE_SQL).toContain('NEW.id = OLD.id');
+    expect(CANDIDATE_SQL).toContain("s.snapshot_key = 'phase1l_de2_initial_active_legacy'");
+    expect(CANDIDATE_SQL).toContain('OLD.id = ANY(s.opportunity_ids)');
+  });
+
+  // ---- A: Snapshot row + captured IDs ----------------------------------
+  it('A: snapshot table has exactly one row and captured IDs equal exactly the six pre-candidate active legacy IDs', async () => {
+    const r = await legacyDb.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct FROM public.opportunity_publication_legacy_snapshot`,
+    );
+    expect(r.rows[0].ct).toBe('1');
+    const ids = await legacyDb.query<{ id: string }>(
+      `SELECT unnest(opportunity_ids)::text AS id
+         FROM public.opportunity_publication_legacy_snapshot
+        WHERE snapshot_key = 'phase1l_de2_initial_active_legacy'
+        ORDER BY 1`,
+    );
+    const got = ids.rows.map((x) => x.id);
+    expect(got).toEqual(CAPTURED_SORTED);
+    expect(got).not.toContain(PRE_DRAFT);
+    expect(got).not.toContain(POST_SNAPSHOT);
+    expect(got).not.toContain(CANONICAL_ACTIVE);
+  });
+
+  // ---- B: Snapshot table locked down ------------------------------------
+  it('B: snapshot table has RLS enabled, zero policies, and PUBLIC/anon/authenticated lack SELECT/INSERT/UPDATE/DELETE', async () => {
+    const rls = await legacyDb.query<{ v: boolean }>(
+      `SELECT relrowsecurity AS v
+         FROM pg_class
+        WHERE oid = 'public.opportunity_publication_legacy_snapshot'::regclass`,
+    );
+    expect(rls.rows[0].v).toBe(true);
+
+    const pol = await legacyDb.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct
+         FROM pg_policy
+        WHERE polrelid = 'public.opportunity_publication_legacy_snapshot'::regclass`,
+    );
+    expect(pol.rows[0].ct).toBe('0');
+
+    // PUBLIC (grantee OID 0) effective ACL check.
+    for (const priv of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+      const r = await legacyDb.query<{ v: boolean }>(
+        `SELECT EXISTS(
+           SELECT 1
+             FROM pg_class c,
+                  aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) a
+            WHERE c.oid = 'public.opportunity_publication_legacy_snapshot'::regclass
+              AND a.grantee = 0
+              AND a.privilege_type = $1
+         ) AS v`,
+        [priv],
+      );
+      expect(r.rows[0].v).toBe(false);
+    }
+    for (const role of ['anon', 'authenticated']) {
+      for (const priv of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+        const r = await legacyDb.query<{ v: boolean }>(
+          `SELECT has_table_privilege($1, 'public.opportunity_publication_legacy_snapshot', $2) AS v`,
+          [role, priv],
+        );
+        expect(r.rows[0].v).toBe(false);
+      }
+    }
+  });
+
+  // ---- C: metadata update on captured row -------------------------------
+  it('C: captured metadata-update row: ordinary UPDATE (updated_at only) succeeds and remains active + legacy', async () => {
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
+      legacyDb,
       `UPDATE public.opportunities SET updated_at = now() WHERE id = $1 RETURNING *`,
-      [id],
+      [CAP_META],
     );
     expect(upd.ok).toBe(true);
     if (upd.ok) {
@@ -1146,75 +1310,73 @@ describe('legacy pre-candidate active rows — narrow grandfathering (DE2B-1C)',
     }
   });
 
-  it('existing active legacy row: ordinary editable-field UPDATE while remaining legacy succeeds', async () => {
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row B',
-      admin_review_status: 'approved', published_at: new Date().toISOString(),
-    }));
+  // ---- D: editable-field update on captured row -------------------------
+  it('D: captured editable-field row: ordinary edit succeeds and row remains active + legacy', async () => {
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
-      `UPDATE public.opportunities SET description = 'grandfathered edit while active' WHERE id = $1 RETURNING *`,
-      [id],
+      legacyDb,
+      `UPDATE public.opportunities SET description = 'grandfathered edit' WHERE id = $1 RETURNING *`,
+      [CAP_EDIT],
     );
     expect(upd.ok).toBe(true);
     if (upd.ok) {
-      expect(upd.row.description).toBe('grandfathered edit while active');
+      expect(upd.row.description).toBe('grandfathered edit');
       expect(upd.row.status).toBe('active');
       expect(upd.row.canonical_version).toBeNull();
     }
   });
 
-  it('existing active legacy row: attempted canonicalization (canonical_version=1) with missing requirements fails with SQLSTATE 23514 and exact blockers', async () => {
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: '', // incomplete
-      description: '', home_time: '',
-      admin_review_status: 'approved', published_at: new Date().toISOString(),
-    }));
+  // ---- E: incomplete canonicalization fails with exact blockers ---------
+  it('E: captured incomplete row → canonical_version=1 fails 23514 with exact sorted blockers', async () => {
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
+      legacyDb,
       `UPDATE public.opportunities SET canonical_version = 1 WHERE id = $1 RETURNING *`,
-      [id],
+      [CAP_INCOMPLETE],
     );
     expect(upd.ok).toBe(false);
     if (!upd.ok) {
       const err = mustErr(upd);
       expect(err.code).toBe('23514');
-      const blockers = parseDetail(err).blocking_reasons as string[];
-      expect(blockers).toContain('Opportunity title is required.');
-      expect(blockers).toContain('Description is required.');
-      expect(blockers).toContain('Home time is required.');
-      expect(blockers).not.toContain('Canonical opportunity version 1 is required before publication.');
+      expect(parseDetail(err).blocking_reasons).toEqual([
+        'Description is required.',
+        'Home time is required.',
+        'Opportunity title is required.',
+      ]);
     }
   });
 
-  it('existing active legacy row: canonicalization to a fully valid canonical row succeeds', async () => {
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row D',
-      admin_review_status: 'approved', published_at: new Date().toISOString(),
-    }));
-    // publishableRow defaults already satisfy every canonical requirement;
-    // only canonical_version is flipped to 1.
+  // ---- F: complete canonicalization succeeds ----------------------------
+  it('F: captured complete row → canonical_version=1 succeeds', async () => {
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
+      legacyDb,
       `UPDATE public.opportunities SET canonical_version = 1 WHERE id = $1 RETURNING *`,
-      [id],
+      [CAP_COMPLETE],
     );
     expect(upd.ok).toBe(true);
     if (upd.ok) expect(upd.row.canonical_version).toBe(1);
   });
 
-  it('draft legacy row changed to active while remaining legacy fails', async () => {
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy draft', status: 'draft',
-    }));
+  // ---- G: captured row → draft succeeds ---------------------------------
+  it('G: captured move-to-draft row → status=draft succeeds (non-active early return)', async () => {
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
+      legacyDb,
+      `UPDATE public.opportunities SET status = 'draft' WHERE id = $1 RETURNING *`,
+      [CAP_TO_DRAFT],
+    );
+    expect(upd.ok).toBe(true);
+    if (upd.ok) expect(upd.row.status).toBe('draft');
+  });
+
+  // ---- H: pre-candidate draft legacy row → active while legacy fails ----
+  it('H: pre-candidate draft legacy row → active while still legacy fails 23514 with canonical-version blocker', async () => {
+    await setUid(legacyDb, RECR_UID);
+    const upd = await tryExec(
+      legacyDb,
       `UPDATE public.opportunities SET status = 'active' WHERE id = $1 RETURNING *`,
-      [id],
+      [PRE_DRAFT],
     );
     expect(upd.ok).toBe(false);
     if (!upd.ok) {
@@ -1225,10 +1387,11 @@ describe('legacy pre-candidate active rows — narrow grandfathering (DE2B-1C)',
     }
   });
 
-  it('newly INSERTed active legacy row fails (INSERT never grandfathered)', async () => {
-    await setUid(db, RECR_UID);
-    const a = await tryInsert(db, publishableRow({
-      canonical_version: null, title: 'Fresh legacy insert',
+  // ---- I: ordinary INSERT of active legacy fails ------------------------
+  it('I: ordinary INSERT of an active legacy row fails 23514 (INSERT never grandfathered)', async () => {
+    await setUid(legacyDb, RECR_UID);
+    const a = await tryInsert(legacyDb, publishableRow({
+      canonical_version: null, title: 'Ordinary fresh legacy insert',
     }));
     expect(a.ok).toBe(false);
     if (!a.ok) {
@@ -1239,15 +1402,22 @@ describe('legacy pre-candidate active rows — narrow grandfathering (DE2B-1C)',
     }
   });
 
-  it('existing canonical active row cannot be reverted to legacy (canonical_version -> NULL blocks)', async () => {
-    await setUid(db, RECR_UID);
-    const ins = await tryInsert(db, publishableRow({ title: 'Canonical row' }));
-    expect(ins.ok).toBe(true);
-    const id = ins.ok ? String(ins.row.id) : '';
+  // ---- J: post-snapshot admin-created row exists; ordinary edit fails ---
+  it('J: post-snapshot admin-created legacy row exists (active + legacy), and ordinary recruiter active-to-active edit fails 23514', async () => {
+    const chk = await legacyDb.query<{ status: string; cv: number | null }>(
+      `SELECT status, canonical_version AS cv
+         FROM public.opportunities
+        WHERE id = $1`,
+      [POST_SNAPSHOT],
+    );
+    expect(chk.rows[0].status).toBe('active');
+    expect(chk.rows[0].cv).toBeNull();
+
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
-      `UPDATE public.opportunities SET canonical_version = NULL WHERE id = $1 RETURNING *`,
-      [id],
+      legacyDb,
+      `UPDATE public.opportunities SET description = 'not grandfathered' WHERE id = $1 RETURNING *`,
+      [POST_SNAPSHOT],
     );
     expect(upd.ok).toBe(false);
     if (!upd.ok) {
@@ -1258,65 +1428,100 @@ describe('legacy pre-candidate active rows — narrow grandfathering (DE2B-1C)',
     }
   });
 
-  it('existing active legacy row can be moved to draft via the non-active early return', async () => {
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row to draft',
-      admin_review_status: 'approved', published_at: new Date().toISOString(),
-    }));
+  // ---- K: canonical active row cannot revert to legacy ------------------
+  it('K: canonical active row → canonical_version=NULL fails 23514', async () => {
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
-      `UPDATE public.opportunities SET status = 'draft' WHERE id = $1 RETURNING *`,
-      [id],
+      legacyDb,
+      `UPDATE public.opportunities SET canonical_version = NULL WHERE id = $1 RETURNING *`,
+      [CANONICAL_ACTIVE],
     );
-    expect(upd.ok).toBe(true);
-    if (upd.ok) expect(upd.row.status).toBe('draft');
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      const err = mustErr(upd);
+      expect(err.code).toBe('23514');
+      expect(parseDetail(err).blocking_reasons)
+        .toContain('Canonical opportunity version 1 is required before publication.');
+    }
   });
 
-  it('legacy row can be reactivated once canonicalized and complete (draft -> active + canonical_version=1)', async () => {
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row reactivation', status: 'draft',
-    }));
+  // ---- L: ID transfer does not inherit exemption ------------------------
+  it('L: captured active legacy row ID-transferred to a fresh ID while still active + legacy fails 23514; replacement row absent', async () => {
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
-      `UPDATE public.opportunities
-          SET status = 'active', canonical_version = 1
-        WHERE id = $1 RETURNING *`,
-      [id],
+      legacyDb,
+      `UPDATE public.opportunities SET id = $2 WHERE id = $1 RETURNING *`,
+      [CAP_ID_TRANSFER, REPLACEMENT_ID],
     );
-    expect(upd.ok).toBe(true);
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      const err = mustErr(upd);
+      expect(err.code).toBe('23514');
+    }
+    const after = await legacyDb.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct FROM public.opportunities WHERE id = $1`,
+      [REPLACEMENT_ID],
+    );
+    expect(after.rows[0].ct).toBe('0');
+    // Captured row is still present under its captured ID.
+    const orig = await legacyDb.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct FROM public.opportunities WHERE id = $1`,
+      [CAP_ID_TRANSFER],
+    );
+    expect(orig.rows[0].ct).toBe('1');
   });
 
-  it('grandfathering does not create duplicate triggers (single binding preserved)', async () => {
-    const r = await db.query<{ ct: string }>(
-      `SELECT count(*)::text AS ct
-         FROM pg_trigger
+  // ---- M: reapplication is immutable ------------------------------------
+  it('M: reapplying CANDIDATE_SQL preserves snapshot row count, captured UUID array, trigger count, and post-snapshot enforcement', async () => {
+    const beforeIds = await legacyDb.query<{ ids: string }>(
+      `SELECT opportunity_ids::text AS ids
+         FROM public.opportunity_publication_legacy_snapshot
+        WHERE snapshot_key = 'phase1l_de2_initial_active_legacy'`,
+    );
+    const beforeCt = await legacyDb.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct FROM public.opportunity_publication_legacy_snapshot`,
+    );
+
+    await legacyDb.exec(CANDIDATE_SQL);
+
+    const afterCt = await legacyDb.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct FROM public.opportunity_publication_legacy_snapshot`,
+    );
+    expect(afterCt.rows[0].ct).toBe('1');
+    expect(beforeCt.rows[0].ct).toBe('1');
+
+    const afterIds = await legacyDb.query<{ ids: string }>(
+      `SELECT opportunity_ids::text AS ids
+         FROM public.opportunity_publication_legacy_snapshot
+        WHERE snapshot_key = 'phase1l_de2_initial_active_legacy'`,
+    );
+    expect(afterIds.rows[0].ids).toBe(beforeIds.rows[0].ids);
+
+    // Post-snapshot id still absent.
+    const post = await legacyDb.query<{ v: boolean }>(
+      `SELECT $1::uuid = ANY(opportunity_ids) AS v
+         FROM public.opportunity_publication_legacy_snapshot
+        WHERE snapshot_key = 'phase1l_de2_initial_active_legacy'`,
+      [POST_SNAPSHOT],
+    );
+    expect(post.rows[0].v).toBe(false);
+
+    // Trigger count remains one.
+    const trg = await legacyDb.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct FROM pg_trigger
         WHERE tgname = 'trg_opportunities_canonical_publication_guard'`,
     );
-    expect(r.rows[0].ct).toBe('1');
-  });
+    expect(trg.rows[0].ct).toBe('1');
 
-  it('grandfathering remains idempotent: reapplying the migration keeps the grandfathering branch present exactly once and behavior unchanged', async () => {
-    await db.exec(CANDIDATE_SQL);
-    const r = await db.query<{ def: string }>(
-      `SELECT pg_get_functiondef('public.opportunities_canonical_publication_guard()'::regprocedure) AS def`,
-    );
-    const def = r.rows[0].def;
-    const occurrences = def.match(/Grandfather only rows that were already active and legacy/g) ?? [];
-    expect(occurrences.length).toBe(1);
-    // And behavior is invariant after reapply.
-    await setUid(db, RECR_UID);
-    const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row post-reapply',
-      admin_review_status: 'approved', published_at: new Date().toISOString(),
-    }));
+    // Post-snapshot row still fails ordinary edit.
+    await setUid(legacyDb, RECR_UID);
     const upd = await tryExec(
-      db,
-      `UPDATE public.opportunities SET description = 'post reapply edit' WHERE id = $1 RETURNING *`,
-      [id],
+      legacyDb,
+      `UPDATE public.opportunities SET description = 'post-reapply attempt' WHERE id = $1 RETURNING *`,
+      [POST_SNAPSHOT],
     );
-    expect(upd.ok).toBe(true);
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) expect((mustErr(upd)).code).toBe('23514');
   });
 });
 
