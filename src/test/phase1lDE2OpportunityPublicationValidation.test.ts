@@ -355,9 +355,13 @@ async function seedLegacyBypassingCanonical(inst: AnyPGlite, row: Row): Promise<
  * { ok: false, err } where err is the raw pg Error instance so callers
  * may assert on `.code` / `.detail` / `.hint` / `.message`.
  */
-type Attempt =
-  | { ok: true; row: Row }
-  | { ok: false; err: Error & Record<string, unknown> };
+interface AttemptOk { ok: true; row: Row; err?: undefined }
+interface AttemptErr { ok: false; err: Error & Record<string, unknown>; row?: undefined }
+type Attempt = AttemptOk | AttemptErr;
+function mustErr(a: Attempt): Error & Record<string, unknown> {
+  if (a.ok) throw new Error('expected failure but write succeeded');
+  return a.err;
+}
 async function tryInsert(inst: AnyPGlite, row: Row): Promise<Attempt> {
   try {
     const r = await insertOpportunity(inst, row);
