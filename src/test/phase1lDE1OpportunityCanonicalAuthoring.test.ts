@@ -1,4 +1,4 @@
-// Phase 1L-DE1R2R1 — Pure behavioral coverage for the canonical opportunity
+// Phase 1L-DE1R2R2 — Pure behavioral coverage for the canonical opportunity
 // authoring module. Exercises normalization, calculator input projection,
 // publication readiness, and persistence payload construction.
 //
@@ -25,14 +25,89 @@ import { joinBenefits } from '@/lib/opportunities/benefitsFormat';
 
 /* ---------------- typed fixture helpers ---------------- */
 
-type OpportunityRow = Partial<Tables<'opportunities'>>;
+type OpportunityRow = Tables<'opportunities'>;
 
-function opp(overrides: OpportunityRow = {}): OpportunityRow {
+/** Exhaustive baseline row — every non-nullable column set with a plausible
+ *  default. Tests supply targeted overrides. No casts. */
+function makeOpportunityRow(overrides: Partial<OpportunityRow> = {}): OpportunityRow {
+  return {
+    actual_benefits: null,
+    admin_review_status: 'pending',
+    benefits: null,
+    canonical_version: null,
+    company_name: 'Acme Trucking',
+    cpm: null,
+    created_at: '2026-07-01T00:00:00Z',
+    deadhead_paid: null,
+    description: null,
+    detention_pay: null,
+    driver_type: null,
+    employment_model: null,
+    equipment_year: null,
+    escrow_amount: null,
+    escrow_amount_frequency: null,
+    escrow_required: false,
+    escrow_required_state: null,
+    estimated_deadhead_miles: null,
+    estimated_loaded_miles: null,
+    estimated_weekly_gross: null,
+    estimated_weekly_miles: null,
+    featured: false,
+    flat_weekly_pay: null,
+    forced_dispatch: null,
+    fuel_paid_by: null,
+    hiring_city: null,
+    hiring_state: null,
+    hiring_states: [],
+    home_time: null,
+    id: 'opp-fixture',
+    insurance_deduction_frequency: null,
+    insurance_deductions: null,
+    layover_pay: null,
+    lease_payment: null,
+    lease_payment_frequency: null,
+    maintenance_deduction_frequency: null,
+    maintenance_deductions: null,
+    mixed_pay_components: [],
+    other_deduction_frequency: null,
+    other_deductions: null,
+    other_pay_method_label: null,
+    other_weekly_gross: null,
+    pay_model: null,
+    percentage_basis_label: null,
+    percentage_pay: null,
+    percentage_weekly_revenue_basis: null,
+    pets_allowed: null,
+    published_at: null,
+    recruiter_id: 'r-fixture',
+    requirements: null,
+    riders_allowed: null,
+    route_type: null,
+    salary_amount: null,
+    salary_frequency: null,
+    sign_on_bonus: null,
+    status: 'draft',
+    team_configuration: null,
+    title: 'Fixture Title',
+    trailer_type: null,
+    transparency_confirmed: false,
+    typical_lanes: null,
+    updated_at: '2026-07-01T00:00:00Z',
+    view_count: 0,
+    ...overrides,
+  };
+}
+
+/** Convenience: authoring accepts a Partial<Row>. */
+function opp(overrides: Partial<OpportunityRow> = {}): Partial<OpportunityRow> {
   return overrides;
 }
 
-function mixedComponents(components: Array<Record<string, unknown>>): Json {
-  return components as unknown as Json;
+/** Json-typed mixed-component fixtures (no Record<string, unknown>). */
+type JsonRecord = { [key: string]: Json | undefined };
+function mixedComponents(components: JsonRecord[]): Json {
+  // JsonRecord[] is structurally a Json[], which is a Json.
+  return components as Json;
 }
 
 function state(
@@ -96,7 +171,7 @@ describe('projectLegacyDriverType', () => {
 
   it('returns unknown/unspecified for null, blank, and unrecognized values', () => {
     for (const v of [null, undefined, '', '   ', 'freelancer']) {
-      expect(projectLegacyDriverType(v as string | null | undefined)).toEqual({
+      expect(projectLegacyDriverType(v)).toEqual({
         employment_model: 'unknown',
         team_configuration: 'unspecified',
         legacy_team_row: false,
@@ -118,7 +193,7 @@ describe('projectLegacyPayModel', () => {
 
   it('returns unknown for null, blank, or unrecognized values', () => {
     for (const v of [null, undefined, '', 'per_load']) {
-      expect(projectLegacyPayModel(v as string | null | undefined)).toBe('unknown');
+      expect(projectLegacyPayModel(v)).toBe('unknown');
     }
   });
 });
@@ -163,7 +238,7 @@ describe('normalizeOpportunityForAuthoring', () => {
 
   it('preserves recognized stored pay_model as-is', () => {
     expect(normalizeOpportunityForAuthoring(opp({ pay_model: 'percentage' })).pay_model).toBe('percentage');
-    expect(normalizeOpportunityForAuthoring(opp({ pay_model: 'weird' as unknown as string })).pay_model).toBe('unknown');
+    expect(normalizeOpportunityForAuthoring(opp({ pay_model: 'weird' })).pay_model).toBe('unknown');
   });
 
   it('canonical salary amount disables legacy flat_weekly_pay fallback', () => {
@@ -207,8 +282,16 @@ describe('normalizeOpportunityForAuthoring', () => {
   });
 
   it('stored transparency_confirmed=false, null, or absent all normalize to false', () => {
+    // Row.transparency_confirmed is `boolean`; use exhaustive Row baseline for null.
     expect(normalizeOpportunityForAuthoring(opp({ transparency_confirmed: false })).transparency_confirmed).toBe(false);
-    expect(normalizeOpportunityForAuthoring(opp({ transparency_confirmed: null })).transparency_confirmed).toBe(false);
+    const rowWithNull = makeOpportunityRow();
+    // Deliberately model a defensively-null historical row via a narrowed local
+    // type — no `any` and no `Record<string, unknown>`.
+    const nullish: Partial<OpportunityRow> & { transparency_confirmed: boolean | null } = {
+      ...rowWithNull,
+      transparency_confirmed: null,
+    };
+    expect(normalizeOpportunityForAuthoring(nullish as Partial<OpportunityRow>).transparency_confirmed).toBe(false);
     expect(normalizeOpportunityForAuthoring(opp({})).transparency_confirmed).toBe(false);
   });
 
@@ -224,10 +307,20 @@ describe('normalizeOpportunityForAuthoring', () => {
     expect(result.escrow_required_state).toBe('required');
   });
 
-  it.each([false, null])('legacy escrow_required=%p becomes unspecified (never fabricates not_required)', (v) => {
-    const result = normalizeOpportunityForAuthoring(opp({ escrow_required: v }));
-    expect(result.escrow_required_state).toBe('unspecified');
-  });
+  it.each<boolean | null>([false, null])(
+    'legacy escrow_required=%p becomes unspecified (never fabricates not_required)',
+    (v) => {
+      // escrow_required column is non-nullable in the Row, so route null through
+      // the same narrowed-boundary pattern used above.
+      const rowSeed = makeOpportunityRow();
+      const nullish: Partial<OpportunityRow> & { escrow_required: boolean | null } = {
+        ...rowSeed,
+        escrow_required: v,
+      };
+      const result = normalizeOpportunityForAuthoring(nullish as Partial<OpportunityRow>);
+      expect(result.escrow_required_state).toBe('unspecified');
+    },
+  );
 
   it('legacy escrow_required=undefined (absent) becomes unspecified', () => {
     const result = normalizeOpportunityForAuthoring(opp({}));
@@ -309,8 +402,13 @@ describe('normalizeOpportunityForAuthoring', () => {
   });
 
   it('hiring_states is always a new array and ignores non-string fixtures', () => {
-    const source = ['TX', 5, 'OK', null] as unknown as string[];
-    const result = normalizeOpportunityForAuthoring(opp({ hiring_states: source }));
+    // The Row type declares `hiring_states: string[]`. This test exercises
+    // the normalizer's tolerance for JSON-derived heterogeneous arrays that
+    // slip past that type at runtime — a single documented narrow boundary
+    // cast expresses that adversarial payload.
+    const source: unknown[] = ['TX', 5, 'OK', null];
+    const seed = { hiring_states: source } as unknown as Partial<OpportunityRow>;
+    const result = normalizeOpportunityForAuthoring(seed);
     expect(result.hiring_states).toEqual(['TX', 'OK']);
     expect(result.hiring_states).not.toBe(source);
   });
@@ -683,7 +781,6 @@ describe('validateOpportunityReadiness — cost & escrow validation', () => {
     }));
     expect(r.blockingReasons).toContain('Insurance frequency is required when an amount is set.');
     expect(r.financialEstimate.status).toBe('incomplete');
-    // Insurance never contributes to totalKnownWeeklyCosts when frequency missing.
     expect(r.financialEstimate.totalKnownWeeklyCosts).toBeNull();
   });
 
@@ -711,7 +808,7 @@ describe('validateOpportunityReadiness — cost & escrow validation', () => {
 
   it('recruiter-provided gross conflict >10% maps only to the recruiter-gross blocker', () => {
     const r = validateOpportunityReadiness(publishableCpmState({
-      recruiter_provided_weekly_gross: '5000', // derived = 0.65 * 2600 = 1690, ratio > 10%
+      recruiter_provided_weekly_gross: '5000',
     }));
     expect(r.blockingReasons).toContain(
       'Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.',
