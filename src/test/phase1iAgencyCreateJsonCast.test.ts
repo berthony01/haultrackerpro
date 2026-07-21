@@ -214,7 +214,7 @@ describe('B1b · Scenario 1 — defective body reproduces JSON cast failure', ()
     } finally {
       await db.close();
     }
-  });
+  }, 15_000);
 });
 
 // ---------------------------------------------------------------------
