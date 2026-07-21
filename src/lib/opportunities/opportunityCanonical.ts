@@ -39,8 +39,8 @@ export type CanonicalTeamConfiguration = 'solo' | 'team' | 'solo_or_team' | 'uns
 export type YesNoUnknown = 'yes' | 'no' | 'unknown';
 export type EscrowRequiredState = 'required' | 'not_required' | 'not_disclosed';
 
-export const ROUTE_TYPE_VALUES = ['Local', 'Regional', 'OTR', 'Dedicated'] as const;
-export const TRAILER_TYPE_VALUES = ['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Step Deck', 'Power Only', 'Other'] as const;
+export const ROUTE_TYPE_VALUES = ['OTR', 'Regional', 'Local', 'Dedicated'] as const;
+export const TRAILER_TYPE_VALUES = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Tanker', 'Power Only', 'Car Hauler', 'Hopper'] as const;
 
 const EMPLOYMENT_VALUES: readonly CanonicalEmploymentModel[] = [
   'company_driver', 'contractor_1099', 'owner_operator', 'lease_purchase',
