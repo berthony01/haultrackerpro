@@ -59,6 +59,22 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
+      - name: Verify production migration is byte-identical to tested candidate
+        run: |
+          set -eu
+          CANDIDATE="supabase/migration-candidates/20260720233000_phase1k_admin_recruiter_opportunity_publication.sql"
+          PRODUCTION="supabase/migrations/20260721000000_phase1k_admin_recruiter_opportunity_publication.sql"
+          EXPECTED="6177605b03635221ceb68e250ec4c654d83b4a02dac7ae03f0f5266654857831"
+          test -f "$CANDIDATE"
+          test -f "$PRODUCTION"
+          cmp -s "$CANDIDATE" "$PRODUCTION"
+          CANDIDATE_SHA="$(sha256sum "$CANDIDATE" | awk '{print $1}')"
+          PRODUCTION_SHA="$(sha256sum "$PRODUCTION" | awk '{print $1}')"
+          echo "Candidate SHA-256: $CANDIDATE_SHA"
+          echo "Production SHA-256: $PRODUCTION_SHA"
+          test "$CANDIDATE_SHA" = "$EXPECTED"
+          test "$PRODUCTION_SHA" = "$EXPECTED"
+
       - name: Hard-fail if PHASE1K_A2_DATABASE_URL is absent
         run: |
           if [ -z "${PHASE1K_A2_DATABASE_URL:-}" ]; then
