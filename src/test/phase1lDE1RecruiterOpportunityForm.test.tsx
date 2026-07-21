@@ -162,11 +162,12 @@ function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
 
 /** Boundary cast for hook returns: providing every UseMutationResult field
  *  is impractical, so consumed properties are asserted at this boundary and
- *  the assertion is quarantined to one factory per hook. */
+ *  the assertion is quarantined to one factory per hook. The compat cast is
+ *  routed through an `unknown` typed local so no `as unknown as` is written. */
 function makeProfileHook(
   profile: RecruiterProfile = makeRecruiterProfile(),
 ): ProfileHook {
-  return {
+  const impl: unknown = {
     profile,
     isLoading: false,
     isApproved: profile.verification_status === 'approved' && profile.status === 'active',
@@ -175,18 +176,20 @@ function makeProfileHook(
     isVerified: profile.verification_status === 'approved' && profile.status === 'active',
     isProfileComplete: true,
     refetch: vi.fn(),
-  } as unknown as ProfileHook;
+  };
+  return impl as ProfileHook;
 }
 
 function makeOppsHook(): OppsHook {
-  return {
+  const impl: unknown = {
     opportunities: [],
     isLoading: false, isError: false, error: null, refetch: vi.fn(),
     recruiterId: 'r-1', isApproved: true, canPost: true, isVerified: true,
     createOpportunity: { mutate: h.createMutate, isPending: false },
     updateOpportunity: { mutate: h.updateMutate, isPending: false },
     setStatus: { mutate: vi.fn(), isPending: false },
-  } as unknown as OppsHook;
+  };
+  return impl as OppsHook;
 }
 
 function installMocks(profile: RecruiterProfile = makeRecruiterProfile()) {
@@ -217,16 +220,17 @@ function chooseChip(testId: string, label: string) {
 function choosePay(label: string) {
   fireEvent.click(within(screen.getByTestId('pay-model')).getByRole('button', { name: label }));
 }
-type MutationPayload = Partial<Opportunity> & Record<string, unknown>;
-function payloadOf(mock: ReturnType<typeof vi.fn>): MutationPayload {
+function payloadOf(
+  mock: { mock: { calls: Array<[OpportunityInsert]> } },
+): OpportunityInsert {
   const call = mock.mock.calls[0];
   if (!call) throw new Error('Mutation not called');
-  return call[0] as MutationPayload;
+  return call[0];
 }
-function updateArgs(): { id: string; data: MutationPayload } {
+function updateArgs(): UpdateArgs {
   const call = h.updateMutate.mock.calls[0];
   if (!call) throw new Error('updateOpportunity.mutate not called');
-  return call[0] as { id: string; data: MutationPayload };
+  return call[0];
 }
 
 beforeEach(() => {
