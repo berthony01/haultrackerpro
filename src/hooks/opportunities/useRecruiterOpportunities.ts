@@ -7,12 +7,8 @@ import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase
 export type Opportunity = Tables<'opportunities'>;
 type Insert = TablesInsert<'opportunities'>;
 type Update = TablesUpdate<'opportunities'>;
-// The canonical authoring layer builds payloads with all fields optional;
-// the hook accepts that broader shape and rebrands as Insert/Update at the
-// Supabase boundary. Recruiter ownership is still enforced server-side via
-// RLS and set here from the resolved recruiter profile.
-export type OpportunityInsert = Partial<Omit<Insert, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at'>>;
-export type OpportunityUpdate = Partial<Omit<Update, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at' | 'id'>>;
+export type OpportunityInsert = Omit<Insert, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at'>;
+export type OpportunityUpdate = Omit<Update, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at' | 'id'>;
 
 export function useRecruiterOpportunities() {
   const { user } = useAuth();

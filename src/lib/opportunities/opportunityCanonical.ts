@@ -39,8 +39,8 @@ export type CanonicalTeamConfiguration = 'solo' | 'team' | 'solo_or_team' | 'uns
 export type YesNoUnknown = 'yes' | 'no' | 'unknown';
 export type EscrowRequiredState = 'required' | 'not_required' | 'not_disclosed';
 
-export const ROUTE_TYPE_VALUES = ['Local', 'Regional', 'OTR', 'Dedicated'] as const;
-export const TRAILER_TYPE_VALUES = ['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Step Deck', 'Power Only', 'Other'] as const;
+export const ROUTE_TYPE_VALUES = ['OTR', 'Regional', 'Local', 'Dedicated'] as const;
+export const TRAILER_TYPE_VALUES = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Tanker', 'Power Only', 'Car Hauler', 'Hopper'] as const;
 
 const EMPLOYMENT_VALUES: readonly CanonicalEmploymentModel[] = [
   'company_driver', 'contractor_1099', 'owner_operator', 'lease_purchase',
@@ -179,7 +179,32 @@ export const EMPTY_AUTHORING_STATE: CanonicalOpportunityAuthoringState = {
 
 /* ---------------- primitive helpers ---------------- */
 
-type Opp = Partial<Tables<'opportunities'>>;
+// Additive canonical columns land in the 20260721143000 migration candidate.
+// Until that migration is applied and Supabase types regenerate, extend the
+// generated row type locally so authoring code stays strictly typed at the
+// call sites and casts do not silently drop fields at persistence time.
+type CanonicalAdditiveColumns = {
+  canonical_version: number | null;
+  employment_model: string | null;
+  team_configuration: string | null;
+  percentage_basis_label: string | null;
+  percentage_weekly_revenue_basis: number | null;
+  salary_amount: number | null;
+  salary_frequency: string | null;
+  mixed_pay_components: unknown;
+  other_pay_method_label: string | null;
+  other_weekly_gross: number | null;
+  insurance_deduction_frequency: string | null;
+  escrow_required_state: string | null;
+  escrow_amount_frequency: string | null;
+  lease_payment_frequency: string | null;
+  maintenance_deduction_frequency: string | null;
+  other_deduction_frequency: string | null;
+  typical_lanes: string | null;
+  requirements: string | null;
+  actual_benefits: string | null;
+};
+type Opp = Partial<Tables<'opportunities'> & CanonicalAdditiveColumns>;
 
 const s = (v: unknown): string => (v == null ? '' : String(v));
 const parseNum = (v: string): number | null => {
@@ -637,7 +662,10 @@ export function validateOpportunityReadiness(
 
 /* ---------------- state → persistence payload ---------------- */
 
-type Payload = TablesInsert<'opportunities'> | TablesUpdate<'opportunities'>;
+// Payload always sets required Insert fields (title, company_name) so it is
+// safe to type as Insert; the recruiter hook accepts an Update-shaped subset
+// on the update path via a separate cast at the mutation call site.
+type Payload = Omit<TablesInsert<'opportunities'>, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at'>;
 
 function toLegacyDriverType(m: CanonicalEmploymentModel | 'unknown'): string | null {
   switch (m) {
@@ -698,7 +726,7 @@ export function buildOpportunityPersistencePayload(
     trailer_type: state.trailer_type || null,
     hiring_city: state.hiring_city.trim() || null,
     hiring_state: state.hiring_state.trim() || null,
-    hiring_states: state.hiring_states.length ? state.hiring_states : null,
+    hiring_states: state.hiring_states,
     description: state.description.trim() || null,
     pay_model: state.pay_model === 'unknown' ? null : state.pay_model,
     cpm: state.pay_model === 'cpm' ? nOrNull(state.cpm) : null,
@@ -743,6 +771,7 @@ export function buildOpportunityPersistencePayload(
     requirements: state.requirements.trim() || null,
     actual_benefits: state.actual_benefits.trim() || null,
     benefits: legacyBenefits || null,
+    transparency_confirmed: state.transparency_confirmed,
   } as Payload;
 
   return payload;
