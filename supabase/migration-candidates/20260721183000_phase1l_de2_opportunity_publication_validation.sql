@@ -165,37 +165,26 @@ BEGIN
 
   ------------------------------------------------------------------
   -- Universal numeric validity — every non-null stored numeric
-  -- opportunity field must be finite AND nonnegative.
+  -- opportunity field must be finite AND nonnegative.  A single
+  -- diagnostic is emitted regardless of how many fields fail.
   ------------------------------------------------------------------
-  _has_bad_num := false;
-  FOR _amt_col IN
-    SELECT * FROM (VALUES
-      (o.cpm),
-      (o.percentage_pay),
-      (o.percentage_weekly_revenue_basis),
-      (o.flat_weekly_pay),
-      (o.salary_amount),
-      (o.other_weekly_gross),
-      (o.estimated_weekly_gross),
-      (o.estimated_weekly_miles),
-      (o.estimated_loaded_miles),
-      (o.estimated_deadhead_miles),
-      (o.sign_on_bonus),
-      (o.insurance_deductions),
-      (o.maintenance_deductions),
-      (o.other_deductions),
-      (o.lease_payment),
-      (o.escrow_amount)
-    ) AS t(v)
-  LOOP
-    IF _amt_col IS NOT NULL
-       AND (NOT public._opportunity_numeric_is_finite(_amt_col) OR _amt_col < 0)
-    THEN
-      _has_bad_num := true;
-      EXIT;
-    END IF;
-  END LOOP;
-  IF _has_bad_num THEN
+  IF (o.cpm                             IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.cpm)                             OR o.cpm                             < 0))
+  OR (o.percentage_pay                  IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.percentage_pay)                  OR o.percentage_pay                  < 0))
+  OR (o.percentage_weekly_revenue_basis IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.percentage_weekly_revenue_basis) OR o.percentage_weekly_revenue_basis < 0))
+  OR (o.flat_weekly_pay                 IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.flat_weekly_pay)                 OR o.flat_weekly_pay                 < 0))
+  OR (o.salary_amount                   IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.salary_amount)                   OR o.salary_amount                   < 0))
+  OR (o.other_weekly_gross              IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.other_weekly_gross)              OR o.other_weekly_gross              < 0))
+  OR (o.estimated_weekly_gross          IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.estimated_weekly_gross)          OR o.estimated_weekly_gross          < 0))
+  OR (o.estimated_weekly_miles          IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.estimated_weekly_miles)          OR o.estimated_weekly_miles          < 0))
+  OR (o.estimated_loaded_miles          IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.estimated_loaded_miles)          OR o.estimated_loaded_miles          < 0))
+  OR (o.estimated_deadhead_miles        IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.estimated_deadhead_miles)        OR o.estimated_deadhead_miles        < 0))
+  OR (o.sign_on_bonus                   IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.sign_on_bonus)                   OR o.sign_on_bonus                   < 0))
+  OR (o.insurance_deductions            IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.insurance_deductions)            OR o.insurance_deductions            < 0))
+  OR (o.maintenance_deductions          IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.maintenance_deductions)          OR o.maintenance_deductions          < 0))
+  OR (o.other_deductions                IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.other_deductions)                OR o.other_deductions                < 0))
+  OR (o.lease_payment                   IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.lease_payment)                   OR o.lease_payment                   < 0))
+  OR (o.escrow_amount                   IS NOT NULL AND (NOT public._opportunity_numeric_is_finite(o.escrow_amount)                   OR o.escrow_amount                   < 0))
+  THEN
     _b := _b || 'Fix invalid numeric values (must be zero or greater).';
   END IF;
 
