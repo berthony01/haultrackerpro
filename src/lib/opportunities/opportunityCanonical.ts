@@ -283,14 +283,16 @@ export function normalizeOpportunityForAuthoring(
   base.flat_weekly_pay = base.pay_model === 'flat_weekly' ? numToStr(row.flat_weekly_pay) : '';
 
   // Mixed — canonical only; legacy rows never invent canonical components.
-  const rawMixed = (row as Opp).mixed_pay_components;
+  const rawMixed = (row as Opp).mixed_pay_components as unknown;
   if (Array.isArray(rawMixed)) {
     base.mixed_pay_components = rawMixed
-      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+      .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && !Array.isArray(c))
       .map((c) => ({
-        label: s(c.label),
-        amount: numToStr(c.amount),
-        frequency: isFreq(c.frequency) ? c.frequency : null,
+        label: s((c as Record<string, unknown>).label),
+        amount: numToStr((c as Record<string, unknown>).amount),
+        frequency: isFreq((c as Record<string, unknown>).frequency)
+          ? ((c as Record<string, unknown>).frequency as RecurringFrequency)
+          : null,
       }));
   }
 
