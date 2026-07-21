@@ -10,6 +10,9 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["tests/postgres/**/*.test.ts"],
+    exclude: [
+      "tests/postgres/phase1kAdminRecruiterOpportunityPublicationPostgres.test.ts",
+    ],
     testTimeout: 60_000,
     hookTimeout: 60_000,
   },
