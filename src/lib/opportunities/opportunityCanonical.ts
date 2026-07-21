@@ -179,7 +179,32 @@ export const EMPTY_AUTHORING_STATE: CanonicalOpportunityAuthoringState = {
 
 /* ---------------- primitive helpers ---------------- */
 
-type Opp = Partial<Tables<'opportunities'>>;
+// Additive canonical columns land in the 20260721143000 migration candidate.
+// Until that migration is applied and Supabase types regenerate, extend the
+// generated row type locally so authoring code stays strictly typed at the
+// call sites and casts do not silently drop fields at persistence time.
+type CanonicalAdditiveColumns = {
+  canonical_version: number | null;
+  employment_model: string | null;
+  team_configuration: string | null;
+  percentage_basis_label: string | null;
+  percentage_weekly_revenue_basis: number | null;
+  salary_amount: number | null;
+  salary_frequency: string | null;
+  mixed_pay_components: unknown;
+  other_pay_method_label: string | null;
+  other_weekly_gross: number | null;
+  insurance_deduction_frequency: string | null;
+  escrow_required_state: string | null;
+  escrow_amount_frequency: string | null;
+  lease_payment_frequency: string | null;
+  maintenance_deduction_frequency: string | null;
+  other_deduction_frequency: string | null;
+  typical_lanes: string | null;
+  requirements: string | null;
+  actual_benefits: string | null;
+};
+type Opp = Partial<Tables<'opportunities'> & CanonicalAdditiveColumns>;
 
 const s = (v: unknown): string => (v == null ? '' : String(v));
 const parseNum = (v: string): number | null => {
