@@ -1882,77 +1882,99 @@ describe('gross conflict derivation per pay model (>10% blocks, ≤10% allowed)'
   });
 });
 
-describe('catalog-level revocation — anon and authenticated cannot EXECUTE the four helpers', () => {
-  const fns = [
-    'public._opportunity_numeric_is_finite(numeric)',
-    'public._opportunity_jsonb_number(jsonb)',
-    'public.opportunity_publication_blockers(public.opportunities)',
-    'public.opportunities_canonical_publication_guard()',
-  ] as const;
-  for (const fn of fns) {
+/**
+ * Catalog-level ACL check.  For each new helper, PUBLIC (grantee OID 0),
+ * anon, and authenticated must lack EXECUTE.  PUBLIC is inspected by
+ * exploding the effective ACL rather than has_function_privilege
+ * (which would report the current-role default).
+ */
+describe('catalog-level revocation — PUBLIC, anon, authenticated all lack EXECUTE', () => {
+  for (const fn of NEW_FN_REGS) {
+    it(`PUBLIC (grantee OID 0) lacks EXECUTE on ${fn}`, async () => {
+      expect(await publicLacksExecute(db, fn)).toBe(true);
+    });
     it(`anon lacks EXECUTE on ${fn}`, async () => {
-      const r = await db.query<{ v: boolean }>(
-        `SELECT has_function_privilege('anon', $1, 'EXECUTE') AS v`,
-        [fn],
-      );
-      expect(r.rows[0].v).toBe(false);
+      expect(await roleLacksExecute(db, 'anon', fn)).toBe(true);
     });
     it(`authenticated lacks EXECUTE on ${fn}`, async () => {
-      const r = await db.query<{ v: boolean }>(
-        `SELECT has_function_privilege('authenticated', $1, 'EXECUTE') AS v`,
-        [fn],
-      );
-      expect(r.rows[0].v).toBe(false);
+      expect(await roleLacksExecute(db, 'authenticated', fn)).toBe(true);
     });
   }
 });
 
-describe('full reapplication invariance — every helper and both triggers stay byte-identical', () => {
-  it('reapplying the candidate a second time preserves every function definition and trigger binding', async () => {
-    const fnRegs = [
-      'public._opportunity_numeric_is_finite(numeric)',
-      'public._opportunity_jsonb_number(jsonb)',
-      'public.opportunity_publication_blockers(public.opportunities)',
-      'public.opportunities_canonical_publication_guard()',
-      'public.opportunities_guard()',
-    ];
-    const before: Record<string, string> = {};
-    for (const reg of fnRegs) {
+/**
+ * DEFINITIVE IDEMPOTENCY TEST.
+ *
+ * Compares every helper definition, both trigger definitions/counts,
+ * and PUBLIC/anon/authenticated EXECUTE ACL state against the baselines
+ * captured immediately after the FIRST candidate application in
+ * beforeAll.  Then reapplies the candidate exactly once and re-checks
+ * every dimension.  Consolidates every previous reapplication assertion.
+ */
+describe('definitive idempotency — baselines from first apply, invariant under reapplication', () => {
+  it('every helper def, both trigger bindings, and PUBLIC/anon/authenticated ACL match beforeAll baselines both before and after reapply', async () => {
+    // --- BEFORE reapply: match baselines captured in beforeAll ---
+    for (const reg of ALL_FN_REGS) {
       const r = await db.query<{ def: string }>(
         `SELECT pg_get_functiondef($1::regprocedure) AS def`, [reg],
       );
-      before[reg] = r.rows[0].def;
+      expect(r.rows[0].def).toBe(baselineFnDefs[reg]);
     }
-    const trBefore = await db.query<{ tgname: string; def: string }>(
-      `SELECT tgname, pg_get_triggerdef(oid) AS def FROM pg_trigger
-        WHERE tgname IN ('trg_opportunities_guard','trg_opportunities_canonical_publication_guard')
-        ORDER BY tgname`,
-    );
-    expect(trBefore.rows.length).toBe(2);
+    for (const tg of TRG_NAMES) {
+      const t = await db.query<{ def: string; ct: string }>(
+        `SELECT COALESCE(min(pg_get_triggerdef(oid)), '') AS def,
+                count(*)::text AS ct
+           FROM pg_trigger WHERE tgname = $1`,
+        [tg],
+      );
+      expect(t.rows[0].def).toBe(baselineTriggerDefs[tg]);
+      expect(Number(t.rows[0].ct)).toBe(baselineTriggerCounts[tg]);
+      expect(Number(t.rows[0].ct)).toBe(1); // singly bound
+    }
+    for (const reg of NEW_FN_REGS) {
+      expect(await publicLacksExecute(db, reg)).toBe(baselinePublicLacks[reg]);
+      expect(await publicLacksExecute(db, reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'anon', reg)).toBe(baselineAnonLacks[reg]);
+      expect(await roleLacksExecute(db, 'anon', reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'authenticated', reg)).toBe(baselineAuthLacks[reg]);
+      expect(await roleLacksExecute(db, 'authenticated', reg)).toBe(true);
+    }
 
-    // Reapply the candidate.
+    // --- Reapply the candidate exactly once ---
     await db.exec(CANDIDATE_SQL);
 
-    for (const reg of fnRegs) {
+    // --- AFTER reapply: still identical to baselines ---
+    for (const reg of ALL_FN_REGS) {
       const r = await db.query<{ def: string }>(
         `SELECT pg_get_functiondef($1::regprocedure) AS def`, [reg],
       );
-      expect(r.rows[0].def).toBe(before[reg]);
+      expect(r.rows[0].def).toBe(baselineFnDefs[reg]);
     }
-    const trAfter = await db.query<{ tgname: string; def: string }>(
-      `SELECT tgname, pg_get_triggerdef(oid) AS def FROM pg_trigger
-        WHERE tgname IN ('trg_opportunities_guard','trg_opportunities_canonical_publication_guard')
-        ORDER BY tgname`,
-    );
-    expect(trAfter.rows.length).toBe(2);
-    for (let i = 0; i < trAfter.rows.length; i++) {
-      expect(trAfter.rows[i].tgname).toBe(trBefore.rows[i].tgname);
-      expect(trAfter.rows[i].def).toBe(trBefore.rows[i].def);
+    for (const tg of TRG_NAMES) {
+      const t = await db.query<{ def: string; ct: string }>(
+        `SELECT COALESCE(min(pg_get_triggerdef(oid)), '') AS def,
+                count(*)::text AS ct
+           FROM pg_trigger WHERE tgname = $1`,
+        [tg],
+      );
+      expect(t.rows[0].def).toBe(baselineTriggerDefs[tg]);
+      expect(Number(t.rows[0].ct)).toBe(1);
     }
-    // Phase 1K baseline unchanged.
+    for (const reg of NEW_FN_REGS) {
+      expect(await publicLacksExecute(db, reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'anon', reg)).toBe(true);
+      expect(await roleLacksExecute(db, 'authenticated', reg)).toBe(true);
+    }
+    // Phase 1K guard remains byte-identical to the pre-candidate baseline.
     const p1k = await db.query<{ def: string }>(
       `SELECT pg_get_functiondef('public.opportunities_guard()'::regprocedure) AS def`,
     );
     expect(p1k.rows[0].def).toBe(phase1kDefBefore);
+    // And the trg_opportunities_guard binding signature is unchanged.
+    const tr = await db.query<{ sig: string }>(
+      `SELECT tgname || '|' || pg_get_triggerdef(oid) AS sig
+         FROM pg_trigger WHERE tgname = 'trg_opportunities_guard'`,
+    );
+    expect(tr.rows.map((x) => x.sig).join('\n')).toBe(phase1kTriggerBefore);
   });
 });
