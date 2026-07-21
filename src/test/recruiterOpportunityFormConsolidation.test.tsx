@@ -290,7 +290,7 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     expect(h.createMutate).toHaveBeenCalledTimes(1);
     const call = h.createMutate.mock.calls[0];
     if (!call) throw new Error('createOpportunity.mutate not called');
-    const payload = call[0] as Partial<Opportunity>;
+    const payload: OpportunityInsert = call[0];
     expect(payload).toMatchObject({
       title: 'New Draft', company_name: 'Acme Trucking',
       status: 'draft', canonical_version: 1,
@@ -306,7 +306,7 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     expect(h.updateMutate).toHaveBeenCalledTimes(1);
     const call = h.updateMutate.mock.calls[0];
     if (!call) throw new Error('updateOpportunity.mutate not called');
-    const args = call[0] as { id: string; data: Partial<Opportunity> };
+    const args: { id: string; data: OpportunityUpdate } = call[0];
     expect(args.id).toBe('opp-abc');
     expect(args.data.status).toBe('draft');
     expect(h.createMutate).not.toHaveBeenCalled();
