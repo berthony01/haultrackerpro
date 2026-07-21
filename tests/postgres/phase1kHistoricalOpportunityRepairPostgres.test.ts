@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-const URL = process.env.PHASE1K_D_DATABASE_URL;
-if (!URL) throw new Error('PHASE1K_D_DATABASE_URL is required; this suite must never skip.');
+const DATABASE_URL = process.env.PHASE1K_D_DATABASE_URL;
+if (!DATABASE_URL) throw new Error('PHASE1K_D_DATABASE_URL is required; this suite must never skip.');
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const REPAIR_SQL = readFileSync(ROOT + 'supabase/migrations/20260721010000_phase1k_repair_historical_admin_recruiter_opportunity.sql', 'utf8');
@@ -14,7 +14,7 @@ const RECRUITER = 'f6b00b66-cd1c-4037-a382-8b1b9c629f3b';
 const OWNER = 'df860876-4c44-4f93-b31c-72ca9dbd9f3d';
 const DRIVER = '33333333-3333-4333-8333-333333333333';
 const TITLE = 'Looking for OTR company drivers';
-const pool = new Pool({ connectionString: URL, max: 1 });
+const pool = new Pool({ connectionString: DATABASE_URL, max: 1 });
 
 async function q<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   return (await pool.query(sql, params)).rows as T[];
