@@ -2,8 +2,11 @@
 //
 // This module is the sole raw opportunity-row → canonical read-model boundary.
 // It reuses (never duplicates) the Phase 1L-DE1 authoring normalizer and the
-// Phase 1L-C canonical financial calculator. It never talks to the database,
-// performs I/O, invents unstored fields, or measures profitability.
+// Phase 1L-C canonical financial calculator. All financial disclosures are
+// sourced from the single `buildCanonicalFinancialInput(state)` result so the
+// view can never diverge from the calculator's contract. Non-financial
+// disclosures (fuel responsibility, "Other" pay label, operating terms,
+// content) continue to normalize from authoring state.
 
 import type { Tables } from '@/integrations/supabase/types';
 import {
@@ -20,7 +23,6 @@ import {
   type CanonicalPayModel,
   type CanonicalRecurringAmount,
   type Disclosure,
-  type RecurringFrequency,
 } from './opportunityProfit';
 
 export type {
@@ -30,8 +32,6 @@ export type {
   CanonicalOpportunityFinancialEstimate,
   CanonicalEmploymentModel,
   CanonicalPayModel,
-  RecurringFrequency,
-  CanonicalTeamConfiguration,
 };
 
 /* ============================== source shape ============================== */
@@ -43,14 +43,14 @@ export type OpportunitySourceRow = Tables<'opportunities'> & {
   } | null;
 };
 
-/* ============================ canonical shape ============================= */
-
-export type RecruiterVerification =
+type RecruiterVerification =
   | 'approved'
   | 'suspended'
   | 'pending'
   | 'rejected'
   | 'none';
+
+/* ============================ canonical shape ============================= */
 
 export interface CanonicalOpportunity {
   sourceVersion: 'canonical_v1' | 'legacy';
@@ -73,7 +73,7 @@ export interface CanonicalOpportunity {
     displayLabel: string;
   };
   compensation: {
-    payModel: CanonicalPayModel | 'unknown';
+    payModel: CanonicalPayModel;
     recurringPay: {
       cpm: Disclosure<number>;
       percentage: Disclosure<{
@@ -157,20 +157,14 @@ export interface ListingTransparency {
 
 /* ============================== helpers =================================== */
 
-const isFin = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+const isFin = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isFinite(n);
 
-function strDisc(val: string, relevant: boolean): Disclosure<string> {
+function strDisc(value: string, relevant: boolean): Disclosure<string> {
   if (!relevant) return { state: 'not_applicable' };
-  const t = val.trim();
+  const t = value.trim();
   if (t === '') return { state: 'not_disclosed' };
   return { state: 'provided', value: t };
-}
-
-function numDiscFromStr(val: string, relevant: boolean): Disclosure<number> {
-  if (!relevant) return { state: 'not_applicable' };
-  const t = val.trim();
-  if (t === '') return { state: 'not_disclosed' };
-  return { state: 'provided', value: Number(t) };
 }
 
 function boolDiscFromYNU(
@@ -183,24 +177,21 @@ function boolDiscFromYNU(
   return { state: 'not_disclosed' };
 }
 
-function recurringDisc(
-  amountStr: string,
-  freq: RecurringFrequency | null,
-  relevant: boolean,
-): Disclosure<CanonicalRecurringAmount> {
-  if (!relevant) return { state: 'not_applicable' };
-  const blank = amountStr.trim() === '';
-  if (blank && freq == null) return { state: 'not_disclosed' };
-  if (blank) return { state: 'provided', value: { amount: NaN, frequency: freq } };
-  return { state: 'provided', value: { amount: Number(amountStr), frequency: freq } };
+// Wrap an already-built financial-input disclosure with view-side relevance.
+// Never re-parses raw source values.
+function naIfIrrelevant<T>(d: Disclosure<T>, relevant: boolean): Disclosure<T> {
+  return relevant ? d : { state: 'not_applicable' };
 }
 
-function hiringAreaDisplay(city: string, state: string, states: string[]): string {
+function hiringAreaDisplay(
+  city: string,
+  state: string,
+  filteredStates: string[],
+): string {
   const c = city.trim();
   const s = state.trim();
   if (c && s) return `${c}, ${s}`;
-  const nonblank = states.map((x) => (x ?? '').trim()).filter((x) => x !== '');
-  if (nonblank.length > 0) return nonblank.join(', ');
+  if (filteredStates.length > 0) return filteredStates.join(', ');
   return 'Hiring area not disclosed';
 }
 
@@ -216,132 +207,57 @@ function mapRecruiterVerification(
   return 'none';
 }
 
-function isRecurringComplete(d: Disclosure<CanonicalRecurringAmount>): boolean {
-  if (d.state !== 'provided') return false;
-  const { amount, frequency } = d.value;
-  if (!isFin(amount) || amount < 0) return false;
-  if (frequency == null) return false;
-  return true;
-}
-
 /* ============================== normalize ================================= */
 
 export function normalizeOpportunity(source: OpportunitySourceRow): CanonicalOpportunity {
   const state: CanonicalOpportunityAuthoringState = normalizeOpportunityForAuthoring(source);
+  const financialInput = buildCanonicalFinancialInput(state);
+  const financialEstimate = calculateCanonicalOpportunityFinancials(financialInput);
 
   const employmentModel: CanonicalEmploymentModel =
     state.employment_model === 'unknown' ? 'unknown' : state.employment_model;
-  const isCompany = employmentModel === 'company_driver';
   const leaseRelevant = employmentModel === 'lease_purchase';
   const costBearing =
     employmentModel === 'contractor_1099' ||
     employmentModel === 'owner_operator' ||
     leaseRelevant;
 
-  const payModel: CanonicalPayModel | 'unknown' = state.pay_model;
+  const payModel: CanonicalPayModel = state.pay_model;
+  const otherRelevant = payModel === 'other';
 
-  // Mileage relevance
+  // Mileage view relevance — wraps calculator-input disclosures.
   const anyMileageProvided =
-    state.estimated_weekly_miles.trim() !== '' ||
-    state.estimated_loaded_miles.trim() !== '' ||
-    state.estimated_deadhead_miles.trim() !== '';
+    financialInput.totalWeeklyMiles.state === 'provided' ||
+    financialInput.loadedWeeklyMiles.state === 'provided' ||
+    financialInput.deadheadWeeklyMiles.state === 'provided';
   const payUsesMiles = payModel === 'cpm' || payModel === 'percentage';
   const totalMilesRelevant = payUsesMiles;
   const loadedMilesRelevant = payModel === 'cpm';
   const deadheadMilesRelevant = payUsesMiles || anyMileageProvided;
   const deadheadPaidRelevant = payUsesMiles;
 
-  // Pay model per-field relevance
-  const cpmRelevant = payModel === 'cpm';
-  const percentageRelevant = payModel === 'percentage';
-  const flatRelevant = payModel === 'flat_weekly';
-  const salaryRelevant = payModel === 'salary';
-  const mixedRelevant = payModel === 'mixed';
-  const otherRelevant = payModel === 'other';
+  // Escrow amount view relevance — cost-bearing AND explicitly required.
+  const escrowExplicitlyRequired =
+    financialInput.costs.escrowRequired.state === 'provided' &&
+    financialInput.costs.escrowRequired.value === true;
+  const escrowAmountRelevant = costBearing && escrowExplicitlyRequired;
 
-  /* ---- percentage disclosure ---- */
-  const pctDisc: Disclosure<{ rate: number; weeklyRevenueBasis: number | null; basisLabel: string | null }> =
-    (() => {
-      if (!percentageRelevant) return { state: 'not_applicable' };
-      const rateT = state.percentage_rate.trim();
-      const basisT = state.percentage_weekly_revenue_basis.trim();
-      const label = state.percentage_basis_label.trim();
-      if (!rateT && !basisT && !label) return { state: 'not_disclosed' };
-      return {
-        state: 'provided',
-        value: {
-          rate: rateT ? Number(rateT) : 0,
-          weeklyRevenueBasis: basisT ? Number(basisT) : null,
-          basisLabel: label || null,
-        },
-      };
-    })();
-
-  /* ---- salary disclosure ---- */
-  const salaryDisc: Disclosure<CanonicalRecurringAmount> = (() => {
-    if (!salaryRelevant) return { state: 'not_applicable' };
-    const amt = state.salary_amount.trim();
-    const freq = state.salary_frequency;
-    if (amt === '' && freq == null) return { state: 'not_disclosed' };
-    if (amt === '') return { state: 'provided', value: { amount: NaN, frequency: freq } };
-    return { state: 'provided', value: { amount: Number(amt), frequency: freq } };
-  })();
-
-  /* ---- mixed components ---- */
-  const mixedComponents: CanonicalMixedPayComponent[] = mixedRelevant
-    ? state.mixed_pay_components.map((c) => {
-        const blank = c.amount.trim() === '';
-        const amountDisc: Disclosure<CanonicalRecurringAmount> = (() => {
-          if (blank && c.frequency == null) return { state: 'not_disclosed' };
-          if (blank) return { state: 'provided', value: { amount: NaN, frequency: c.frequency } };
-          return { state: 'provided', value: { amount: Number(c.amount), frequency: c.frequency } };
-        })();
-        return { label: c.label, amount: amountDisc };
-      })
-    : [];
-
-  /* ---- costs / escrow ---- */
-  const insurance = recurringDisc(state.insurance_amount, state.insurance_frequency, costBearing);
-  const maintenance = recurringDisc(state.maintenance_amount, state.maintenance_frequency, costBearing);
-  const otherRecurringCost = recurringDisc(state.other_cost_amount, state.other_cost_frequency, costBearing);
-  const lease = recurringDisc(state.lease_amount, state.lease_frequency, leaseRelevant);
-
-  let escrowRequired: Disclosure<boolean>;
-  let escrowAmount: Disclosure<CanonicalRecurringAmount>;
-  if (!costBearing) {
-    escrowRequired = { state: 'not_applicable' };
-    escrowAmount = { state: 'not_applicable' };
-  } else if (state.escrow_required_state === 'required') {
-    escrowRequired = { state: 'provided', value: true };
-    escrowAmount = recurringDisc(state.escrow_amount, state.escrow_frequency, true);
-  } else if (state.escrow_required_state === 'not_required') {
-    escrowRequired = { state: 'provided', value: false };
-    escrowAmount = { state: 'not_applicable' };
-  } else {
-    escrowRequired = { state: 'not_disclosed' };
-    escrowAmount = { state: 'not_disclosed' };
-  }
-
-  /* ---- one-time incentives ---- */
-  const signOnBonus: Disclosure<number> = (() => {
-    const t = state.sign_on_bonus.trim();
-    if (t === '') return { state: 'not_disclosed' };
-    return { state: 'provided', value: Number(t) };
-  })();
-
-  /* ---- financial estimate (reuse Phase 1L-C) ---- */
-  const financialEstimate = calculateCanonicalOpportunityFinancials(
-    buildCanonicalFinancialInput(state),
-  );
-
-  /* ---- hiring area ---- */
-  const displayLabel = hiringAreaDisplay(state.hiring_city, state.hiring_state, state.hiring_states);
-  const statesDisc: Disclosure<string[]> =
-    state.hiring_states.length > 0
-      ? { state: 'provided', value: state.hiring_states.slice() }
+  // Sign-on bonus — sourced from calculator input's one-time incentives.
+  const signOnBonus: Disclosure<number> =
+    financialInput.oneTimeIncentives.length > 0
+      ? financialInput.oneTimeIncentives[0].amount
       : { state: 'not_disclosed' };
 
-  /* ---- trust ---- */
+  // Hiring area — trim + filter blanks once, use everywhere.
+  const filteredStates = state.hiring_states
+    .map((x) => (x ?? '').trim())
+    .filter((x) => x !== '');
+  const statesDisc: Disclosure<string[]> =
+    filteredStates.length > 0
+      ? { state: 'provided', value: filteredStates.slice() }
+      : { state: 'not_disclosed' };
+  const displayLabel = hiringAreaDisplay(state.hiring_city, state.hiring_state, filteredStates);
+
   const recruiterVerification = mapRecruiterVerification(source.recruiter ?? null);
   const publishedAt: Disclosure<string> = source.published_at
     ? { state: 'provided', value: source.published_at }
@@ -353,9 +269,10 @@ export function normalizeOpportunity(source: OpportunitySourceRow): CanonicalOpp
       id: source.id,
       recruiterId: source.recruiter_id,
       title: state.title,
-      companyName: state.company_name.trim() === ''
-        ? { state: 'not_disclosed' }
-        : { state: 'provided', value: state.company_name.trim() },
+      companyName:
+        state.company_name.trim() === ''
+          ? { state: 'not_disclosed' }
+          : { state: 'provided', value: state.company_name.trim() },
     },
     classification: {
       employmentModel,
@@ -372,23 +289,23 @@ export function normalizeOpportunity(source: OpportunitySourceRow): CanonicalOpp
     compensation: {
       payModel,
       recurringPay: {
-        cpm: numDiscFromStr(state.cpm, cpmRelevant),
-        percentage: pctDisc,
-        flatWeekly: numDiscFromStr(state.flat_weekly_pay, flatRelevant),
-        salary: salaryDisc,
-        mixedComponents,
+        cpm: financialInput.cpm,
+        percentage: financialInput.percentage,
+        flatWeekly: financialInput.flatWeeklyPay,
+        salary: financialInput.salary,
+        mixedComponents: financialInput.mixedComponents,
         otherMethod: {
           label: strDisc(state.other_pay_method_label, otherRelevant),
-          weeklyGross: numDiscFromStr(state.other_weekly_gross, otherRelevant),
+          weeklyGross: financialInput.otherWeeklyGross,
         },
-        recruiterProvidedWeeklyGross: numDiscFromStr(state.recruiter_provided_weekly_gross, true),
+        recruiterProvidedWeeklyGross: financialInput.recruiterProvidedWeeklyGross,
       },
       oneTimeIncentives: { signOnBonus },
       mileage: {
-        totalWeeklyMiles: numDiscFromStr(state.estimated_weekly_miles, totalMilesRelevant),
-        loadedWeeklyMiles: numDiscFromStr(state.estimated_loaded_miles, loadedMilesRelevant),
-        deadheadWeeklyMiles: numDiscFromStr(state.estimated_deadhead_miles, deadheadMilesRelevant),
-        deadheadPaid: boolDiscFromYNU(state.deadhead_paid, deadheadPaidRelevant),
+        totalWeeklyMiles: naIfIrrelevant(financialInput.totalWeeklyMiles, totalMilesRelevant),
+        loadedWeeklyMiles: naIfIrrelevant(financialInput.loadedWeeklyMiles, loadedMilesRelevant),
+        deadheadWeeklyMiles: naIfIrrelevant(financialInput.deadheadWeeklyMiles, deadheadMilesRelevant),
+        deadheadPaid: naIfIrrelevant(financialInput.deadheadPaid, deadheadPaidRelevant),
       },
       accessorialPay: {
         detention: strDisc(state.detention_pay, true),
@@ -404,12 +321,12 @@ export function normalizeOpportunity(source: OpportunitySourceRow): CanonicalOpp
     },
     costs: {
       fuelPaidBy: strDisc(state.fuel_paid_by, costBearing),
-      insurance,
-      maintenance,
-      otherRecurringCost,
-      lease,
-      escrowRequired,
-      escrowAmount,
+      insurance: financialInput.costs.insurance,
+      maintenance: financialInput.costs.maintenance,
+      otherRecurringCost: financialInput.costs.other,
+      lease: financialInput.costs.lease,
+      escrowRequired: financialInput.costs.escrowRequired,
+      escrowAmount: naIfIrrelevant(financialInput.costs.escrowAmount, escrowAmountRelevant),
     },
     content: {
       description: strDisc(state.description, true),
@@ -425,7 +342,6 @@ export function normalizeOpportunity(source: OpportunitySourceRow): CanonicalOpp
       recruiterVerification,
     },
     derived: {
-      // filled below to close reference cycle cleanly
       financialEstimate,
       transparencyScore: {
         score: 0,
@@ -438,25 +354,34 @@ export function normalizeOpportunity(source: OpportunitySourceRow): CanonicalOpp
   };
 
   canonical.derived.transparencyScore = calculateListingTransparency(canonical);
-  // isCompany used implicitly for readability; retained to signal intent.
-  void isCompany;
   return canonical;
 }
 
 /* ========================== listing transparency ========================== */
 
-// Types accepted by the transparency calculator. Accept any object with the
-// canonical shape sans transparencyScore so it can be safely called from
-// within `normalizeOpportunity` before `transparencyScore` is finalized.
-type CanonicalBase = CanonicalOpportunity;
+const strComplete = (d: Disclosure<string>): boolean =>
+  d.state === 'provided' && typeof d.value === 'string' && d.value.trim() !== '';
 
-export function calculateListingTransparency(canonicalBase: CanonicalBase): ListingTransparency {
+const boolComplete = (d: Disclosure<boolean>): boolean => d.state === 'provided';
+
+const numPosComplete = (d: Disclosure<number>): boolean =>
+  d.state === 'provided' && isFin(d.value) && d.value > 0;
+
+const recurringComplete = (d: Disclosure<CanonicalRecurringAmount>): boolean => {
+  if (d.state !== 'provided') return false;
+  const { amount, frequency } = d.value;
+  if (!isFin(amount) || amount < 0) return false;
+  if (frequency == null) return false;
+  return true;
+};
+
+export function calculateListingTransparency(canonical: CanonicalOpportunity): ListingTransparency {
   const missing = new Set<string>();
   const notes: string[] = [
     'Listing transparency measures disclosure completeness and consistency, not profitability.',
   ];
-  if (canonicalBase.sourceVersion === 'legacy') {
-    notes.push('Legacy opportunity row; some canonical fields may be inferred from stored legacy columns.');
+  if (canonical.sourceVersion === 'legacy') {
+    notes.push('Legacy opportunity row; some canonical disclosures may be unavailable.');
   }
 
   const checklist: { key: string; complete: boolean }[] = [];
@@ -465,52 +390,60 @@ export function calculateListingTransparency(canonicalBase: CanonicalBase): List
     if (!complete) missing.add(key);
   };
 
-  const c = canonicalBase;
+  const c = canonical;
 
-  // Universal
-  add('companyName', c.identity.companyName.state === 'provided');
+  /* --- Universal --- */
+  add('companyName', strComplete(c.identity.companyName));
   add('employmentModel', c.classification.employmentModel !== 'unknown');
   add('teamConfiguration', c.classification.teamConfiguration !== 'unspecified');
-  add('routeType', c.classification.routeType.state === 'provided');
-  add('trailerType', c.classification.trailerType.state === 'provided');
-  add('hiringArea', c.hiringArea.displayLabel !== 'Hiring area not disclosed');
-  add('description', c.content.description.state === 'provided');
-  add('homeTime', c.operatingTerms.homeTime.state === 'provided');
-  add('forcedDispatch', c.operatingTerms.forcedDispatch.state === 'provided');
-  add('petsAllowed', c.operatingTerms.petsAllowed.state === 'provided');
-  add('ridersAllowed', c.operatingTerms.ridersAllowed.state === 'provided');
-  add('equipmentYear', c.operatingTerms.equipmentYear.state === 'provided');
-  add('typicalLanes', c.content.typicalLanes.state === 'provided');
-  add('requirements', c.content.requirements.state === 'provided');
-  add('actualBenefits', c.content.actualBenefits.state === 'provided');
+  add('routeType', strComplete(c.classification.routeType));
+  add('trailerType', strComplete(c.classification.trailerType));
+  const hiringComplete =
+    (strComplete(c.hiringArea.city) && strComplete(c.hiringArea.state)) ||
+    (c.hiringArea.states.state === 'provided' && c.hiringArea.states.value.length > 0);
+  add('hiringArea', hiringComplete);
+  add('description', strComplete(c.content.description));
+  add('homeTime', strComplete(c.operatingTerms.homeTime));
+  add('forcedDispatch', boolComplete(c.operatingTerms.forcedDispatch));
+  add('petsAllowed', boolComplete(c.operatingTerms.petsAllowed));
+  add('ridersAllowed', boolComplete(c.operatingTerms.ridersAllowed));
+  add('equipmentYear', strComplete(c.operatingTerms.equipmentYear));
+  add('typicalLanes', strComplete(c.content.typicalLanes));
+  add('requirements', strComplete(c.content.requirements));
+  add('actualBenefits', strComplete(c.content.actualBenefits));
 
-  // Pay-model additions
+  /* --- Pay-model additions --- */
   const pm = c.compensation.payModel;
   const rp = c.compensation.recurringPay;
   if (pm === 'cpm') {
-    add('cpm', rp.cpm.state === 'provided');
-    add('totalWeeklyMiles', c.compensation.mileage.totalWeeklyMiles.state === 'provided');
-    add('loadedWeeklyMiles', c.compensation.mileage.loadedWeeklyMiles.state === 'provided');
-    add('deadheadPaid', c.compensation.mileage.deadheadPaid.state === 'provided');
+    add('cpm', numPosComplete(rp.cpm));
+    add('totalWeeklyMiles', numPosComplete(c.compensation.mileage.totalWeeklyMiles));
+    add('loadedWeeklyMiles', numPosComplete(c.compensation.mileage.loadedWeeklyMiles));
+    add('deadheadPaid', boolComplete(c.compensation.mileage.deadheadPaid));
   } else if (pm === 'percentage') {
-    const pct = rp.percentage;
-    if (pct.state === 'provided') {
-      const v = pct.value;
+    if (rp.percentage.state === 'provided') {
+      const v = rp.percentage.value;
       add('percentageRate', isFin(v.rate) && v.rate > 0);
-      add('percentageBasisLabel', typeof v.basisLabel === 'string' && v.basisLabel.trim() !== '');
-      add('percentageWeeklyRevenueBasis', isFin(v.weeklyRevenueBasis) && (v.weeklyRevenueBasis as number) > 0);
+      add(
+        'percentageBasisLabel',
+        typeof v.basisLabel === 'string' && v.basisLabel.trim() !== '',
+      );
+      add(
+        'percentageWeeklyRevenueBasis',
+        isFin(v.weeklyRevenueBasis) && (v.weeklyRevenueBasis as number) > 0,
+      );
     } else {
       add('percentageRate', false);
       add('percentageBasisLabel', false);
       add('percentageWeeklyRevenueBasis', false);
     }
   } else if (pm === 'flat_weekly') {
-    add('flatWeeklyPay', rp.flatWeekly.state === 'provided');
+    add('flatWeeklyPay', numPosComplete(rp.flatWeekly));
   } else if (pm === 'salary') {
-    const sal = rp.salary;
-    if (sal.state === 'provided') {
-      add('salaryAmount', isFin(sal.value.amount) && sal.value.amount > 0);
-      add('salaryFrequency', sal.value.frequency != null);
+    if (rp.salary.state === 'provided') {
+      const s = rp.salary.value;
+      add('salaryAmount', isFin(s.amount) && s.amount > 0);
+      add('salaryFrequency', s.frequency != null);
     } else {
       add('salaryAmount', false);
       add('salaryFrequency', false);
@@ -526,47 +459,51 @@ export function calculateListingTransparency(canonicalBase: CanonicalBase): List
     });
     add('mixedComponents', completeComponents.length >= 2);
   } else if (pm === 'other') {
-    add('otherPayMethodLabel', rp.otherMethod.label.state === 'provided');
-    add('otherWeeklyGross', rp.otherMethod.weeklyGross.state === 'provided');
+    add('otherPayMethodLabel', strComplete(rp.otherMethod.label));
+    add('otherWeeklyGross', numPosComplete(rp.otherMethod.weeklyGross));
   } else {
     // unknown
     add('payModel', false);
   }
 
-  // Cost-bearing additions
+  /* --- Cost-bearing additions --- */
   const em = c.classification.employmentModel;
   if (em === 'contractor_1099' || em === 'owner_operator' || em === 'lease_purchase') {
-    add('fuelPaidBy', c.costs.fuelPaidBy.state === 'provided');
-    add('insurance', isRecurringComplete(c.costs.insurance));
-    add('maintenance', isRecurringComplete(c.costs.maintenance));
-    add('otherRecurringCost', isRecurringComplete(c.costs.otherRecurringCost));
-    add('escrowRequired', c.costs.escrowRequired.state === 'provided');
+    add('fuelPaidBy', strComplete(c.costs.fuelPaidBy));
+    add('insurance', recurringComplete(c.costs.insurance));
+    add('maintenance', recurringComplete(c.costs.maintenance));
+    add('otherRecurringCost', recurringComplete(c.costs.otherRecurringCost));
+    add('escrowRequired', boolComplete(c.costs.escrowRequired));
     if (em === 'lease_purchase') {
-      add('leasePayment', isRecurringComplete(c.costs.lease));
+      add('leasePayment', recurringComplete(c.costs.lease));
     }
     if (
       c.costs.escrowRequired.state === 'provided' &&
       c.costs.escrowRequired.value === true
     ) {
-      add('escrowAmount', isRecurringComplete(c.costs.escrowAmount));
+      add('escrowAmount', recurringComplete(c.costs.escrowAmount));
     }
   }
 
-  // Base score
+  /* --- Score --- */
   const total = checklist.length;
-  const complete = checklist.filter((x) => x.complete).length;
-  const basePct = total > 0 ? Math.round((complete / total) * 100) : 0;
+  const completeCount = checklist.filter((x) => x.complete).length;
+  const basePct = total > 0 ? Math.round((completeCount / total) * 100) : 0;
 
-  // Conflict penalty (from canonical financial estimate). 15 each, capped at 30.
-  const conflictArr = c.derived.financialEstimate.conflicts.slice().sort((a, b) => a.localeCompare(b));
+  // Conflict deduplication + capped penalty.
+  const conflictArr = Array.from(new Set(c.derived.financialEstimate.conflicts))
+    .sort((a, b) => a.localeCompare(b));
   const penalty = Math.min(conflictArr.length * 15, 30);
 
   const score = Math.max(0, Math.min(100, basePct - penalty));
 
   const band: ListingTransparencyBand =
-    score >= 90 ? 'complete'
-      : score >= 75 ? 'mostly_complete'
-        : score >= 50 ? 'partial'
+    score >= 90
+      ? 'complete'
+      : score >= 75
+        ? 'mostly_complete'
+        : score >= 50
+          ? 'partial'
           : 'sparse';
 
   const missingSorted = Array.from(missing).sort((a, b) => a.localeCompare(b));
