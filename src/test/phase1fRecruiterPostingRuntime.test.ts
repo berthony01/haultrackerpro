@@ -129,6 +129,21 @@ function loadPhase1FA22Sql(): { source: string; sql: string } {
   return { source: fixturePath, sql: fs.readFileSync(fixturePath, "utf8") };
 }
 
+// Phase 1K-A1 admin recruiter opportunity publication candidate. Applied
+// after Phase 1F-A.2.2 to reproduce the exact post-live migration sequence
+// this A1 correction lands on. Sourced from supabase/migration-candidates/
+// and never promoted here.
+function loadPhase1KAdminRecruiterPublicationSql(): { source: string; sql: string } {
+  const p = path.join(
+    process.cwd(),
+    "supabase/migration-candidates/20260720233000_phase1k_admin_recruiter_opportunity_publication.sql",
+  );
+  if (!fs.existsSync(p)) {
+    throw new Error("Phase 1K-A1 candidate migration not found: " + p);
+  }
+  return { source: p, sql: fs.readFileSync(p, "utf8") };
+}
+
 
 const RECR_A_USER = "11111111-1111-1111-1111-111111111111";
 const RECR_B_USER = "22222222-2222-2222-2222-222222222222";
@@ -154,6 +169,9 @@ const SENTINEL_TS = "2025-01-01T12:34:56Z";
 const SENTINEL_VERSION = "2026-07-17.v1";
 // Pre-fixture snapshot of service_role UPDATE privilege on the table.
 let serviceRoleUpdateBefore: boolean;
+// Phase 1K-A1: eligible recruiter profile OWNED by ADMIN_USER. Seeded after
+// Phase 1F-A.2.2 and after the Phase 1K-A1 candidate is applied.
+let adminOwnedRpId: string;
 
 
 /** Run a block as an authenticated user with a JWT sub claim. */
@@ -543,6 +561,25 @@ beforeAll(async () => {
   // Phase 1F-A.2.2: apply the acceptance-idempotency + duplicate-trigger
   // cleanup last so the harness exercises the exact post-live sequence.
   await db.exec(loadPhase1FA22Sql().sql);
+
+  // Phase 1K-A1: apply the admin recruiter opportunity publication candidate
+  // after all Phase 1F migrations so the focused block below exercises the
+  // exact post-live migration sequence this correction lands on.
+  await db.exec(loadPhase1KAdminRecruiterPublicationSql().sql);
+
+  // Seed an eligible recruiter profile OWNED by the admin. Admin JWT is set
+  // as the default above so recruiter_profile_guard() takes its admin bypass
+  // branch during seeding.
+  const admOwn = await db.query<{ id: string }>(
+    `INSERT INTO public.recruiter_profiles
+       (user_id, recruiter_name, company_name, recruiter_email, dot_number,
+        status, verification_status, posting_terms_accepted_at, posting_terms_version)
+     VALUES ($1,'AdminRecruiter','AdminCo','admin-recruiter@a.example','9999999',
+             'active','pending', now(), '2026-07-17.v1')
+     RETURNING id`,
+    [ADMIN_USER],
+  );
+  adminOwnedRpId = admOwn.rows[0].id;
 });
 
 describe("Phase 1F-A.1 — canonical eligibility (SQL helper)", () => {
@@ -2304,5 +2341,232 @@ describe("Phase 1F-A.2.2 — acceptance idempotency + duplicate-guard-trigger cl
     expect(svc.rows[0].b).toBe(true);
   });
 });
+
+// ============================================================================
+// Phase 1K-A1 — admin recruiter opportunity publication integrity.
+//
+// Every assertion below would fail against the pre-candidate opportunities_guard
+// (which returns NEW unconditionally for any admin), because admin-own INSERT/
+// UPDATE would bypass publication stamping. After the candidate applies the
+// owner-aware classification, admin-own writes normalize like ordinary
+// recruiter writes and only explicit protected-field UPDATEs bypass.
+// ============================================================================
+describe("Phase 1K-A1 — admin recruiter opportunity publication integrity", () => {
+  const title = (name: string) => `1K-${name}`;
+
+  it("1K.1 admin INSERT active under own eligible profile → approved + published + featured=false + view_count=0", async () => {
+    await asUser(ADMIN_USER, async () => {
+      const r = await db.query<{
+        admin_review_status: string;
+        published_at: string | null;
+        featured: boolean;
+        view_count: number;
+      }>(
+        `INSERT INTO public.opportunities (recruiter_id, title, status)
+         VALUES ($1, $2, 'active')
+         RETURNING admin_review_status, published_at, featured, view_count`,
+        [adminOwnedRpId, title("admin-own-insert-active")],
+      );
+      expect(r.rows[0].admin_review_status).toBe("approved");
+      expect(r.rows[0].published_at).not.toBeNull();
+      expect(r.rows[0].featured).toBe(false);
+      expect(r.rows[0].view_count).toBe(0);
+    });
+  });
+
+  it("1K.2 admin INSERT draft under own eligible profile → approved + published_at NULL", async () => {
+    await asUser(ADMIN_USER, async () => {
+      const r = await db.query<{ admin_review_status: string; published_at: string | null }>(
+        `INSERT INTO public.opportunities (recruiter_id, title, status)
+         VALUES ($1, $2, 'draft')
+         RETURNING admin_review_status, published_at`,
+        [adminOwnedRpId, title("admin-own-insert-draft")],
+      );
+      expect(r.rows[0].admin_review_status).toBe("approved");
+      expect(r.rows[0].published_at).toBeNull();
+    });
+  });
+
+  it("1K.3 admin activates own draft via ordinary UPDATE → active + approved + published_at not null", async () => {
+    let oppId!: string;
+    await asUser(ADMIN_USER, async () => {
+      const seed = await db.query<{ id: string }>(
+        `INSERT INTO public.opportunities (recruiter_id, title, status)
+         VALUES ($1, $2, 'draft') RETURNING id`,
+        [adminOwnedRpId, title("admin-own-activate")],
+      );
+      oppId = seed.rows[0].id;
+      await db.query(`UPDATE public.opportunities SET status='active' WHERE id=$1`, [oppId]);
+    });
+    const r = await db.query<{ status: string; admin_review_status: string; published_at: string | null }>(
+      `SELECT status, admin_review_status, published_at FROM public.opportunities WHERE id=$1`,
+      [oppId],
+    );
+    expect(r.rows[0].status).toBe("active");
+    expect(r.rows[0].admin_review_status).toBe("approved");
+    expect(r.rows[0].published_at).not.toBeNull();
+  });
+
+  it("1K.4 admin ordinary edit of already-live own opp preserves original published_at", async () => {
+    let oppId!: string;
+    let originalTs!: string;
+    await asUser(ADMIN_USER, async () => {
+      const seed = await db.query<{ id: string; published_at: string }>(
+        `INSERT INTO public.opportunities (recruiter_id, title, status)
+         VALUES ($1, $2, 'active')
+         RETURNING id, published_at::text published_at`,
+        [adminOwnedRpId, title("admin-own-edit-live")],
+      );
+      oppId = seed.rows[0].id;
+      originalTs = seed.rows[0].published_at;
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    await asUser(ADMIN_USER, async () => {
+      await db.query(
+        `UPDATE public.opportunities SET title=$1 WHERE id=$2`,
+        [title("admin-own-edit-live-v2"), oppId],
+      );
+    });
+    const r = await db.query<{ title: string; admin_review_status: string; published_at: string }>(
+      `SELECT title, admin_review_status, published_at::text published_at
+       FROM public.opportunities WHERE id=$1`,
+      [oppId],
+    );
+    expect(r.rows[0].title).toBe(title("admin-own-edit-live-v2"));
+    expect(r.rows[0].admin_review_status).toBe("approved");
+    expect(new Date(r.rows[0].published_at).getTime()).toBe(new Date(originalTs).getTime());
+  });
+
+  it("1K.5 admin explicit self-moderation to rejected on own opp persists", async () => {
+    let oppId!: string;
+    await asUser(ADMIN_USER, async () => {
+      const seed = await db.query<{ id: string }>(
+        `INSERT INTO public.opportunities (recruiter_id, title, status)
+         VALUES ($1, $2, 'active') RETURNING id`,
+        [adminOwnedRpId, title("admin-own-self-reject")],
+      );
+      oppId = seed.rows[0].id;
+      await db.query(
+        `UPDATE public.opportunities SET admin_review_status='rejected' WHERE id=$1`,
+        [oppId],
+      );
+    });
+    const r = await db.query<{ admin_review_status: string }>(
+      `SELECT admin_review_status FROM public.opportunities WHERE id=$1`,
+      [oppId],
+    );
+    expect(r.rows[0].admin_review_status).toBe("rejected");
+  });
+
+  it("1K.6 admin moderation of another recruiter's opportunity still persists (bypass preserved)", async () => {
+    const seed = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status, published_at)
+       VALUES ($1, $2, 'active', 'approved', now()) RETURNING id`,
+      [recrAId, title("admin-other-reject")],
+    );
+    const oppId = seed.rows[0].id;
+    await asUser(ADMIN_USER, async () => {
+      await db.query(
+        `UPDATE public.opportunities SET admin_review_status='rejected' WHERE id=$1`,
+        [oppId],
+      );
+    });
+    const r = await db.query<{ admin_review_status: string }>(
+      `SELECT admin_review_status FROM public.opportunities WHERE id=$1`,
+      [oppId],
+    );
+    expect(r.rows[0].admin_review_status).toBe("rejected");
+  });
+
+  it("1K.7 driver visibility RPC returns newly published admin-owned recruiter opportunity", async () => {
+    let oppId!: string;
+    await asUser(ADMIN_USER, async () => {
+      const seed = await db.query<{ id: string }>(
+        `INSERT INTO public.opportunities (recruiter_id, title, status)
+         VALUES ($1, $2, 'active') RETURNING id`,
+        [adminOwnedRpId, title("admin-own-driver-visible")],
+      );
+      oppId = seed.rows[0].id;
+    });
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ id: string }>(
+        `SELECT id FROM public.list_driver_visible_opportunities(NULL, NULL, NULL) WHERE id=$1`,
+        [oppId],
+      );
+      expect(r.rows.length).toBe(1);
+    });
+  });
+
+  it("1K.8 driver visibility RPC excludes active+pending row admin-inserted under another recruiter", async () => {
+    // Admin acts on recrBId (not owned by admin). Owner-aware guard preserves
+    // the explicit admin_review_status='pending' via the admin-other bypass.
+    const seed = await db.query<{ id: string; admin_review_status: string; status: string }>(
+      `INSERT INTO public.opportunities (recruiter_id, title, status, admin_review_status)
+       VALUES ($1, $2, 'active', 'pending')
+       RETURNING id, admin_review_status, status`,
+      [recrBId, title("admin-other-active-pending")],
+    );
+    expect(seed.rows[0].admin_review_status).toBe("pending");
+    expect(seed.rows[0].status).toBe("active");
+    const oppId = seed.rows[0].id;
+    await asUser(DRIVER_USER, async () => {
+      const r = await db.query<{ id: string }>(
+        `SELECT id FROM public.list_driver_visible_opportunities(NULL, NULL, NULL) WHERE id=$1`,
+        [oppId],
+      );
+      expect(r.rows.length).toBe(0);
+    });
+  });
+
+  it("1K.9 non-admin eligible recruiter INSERT active — normal normalization preserved unchanged", async () => {
+    await asUser(RECR_A_USER, async () => {
+      const r = await db.query<{
+        admin_review_status: string;
+        published_at: string | null;
+        featured: boolean;
+        view_count: number;
+      }>(
+        `INSERT INTO public.opportunities (recruiter_id, title, status, featured, view_count)
+         VALUES ($1, $2, 'active', true, 999)
+         RETURNING admin_review_status, published_at, featured, view_count`,
+        [recrAId, title("nonadmin-preserved")],
+      );
+      expect(r.rows[0].admin_review_status).toBe("approved");
+      expect(r.rows[0].published_at).not.toBeNull();
+      expect(r.rows[0].featured).toBe(false);
+      expect(r.rows[0].view_count).toBe(0);
+    });
+  });
+
+  it("1K.10 catalog contract — SECURITY DEFINER, pinned search_path, single guard trigger, no top-level unconditional admin RETURN NEW", async () => {
+    const meta = await db.query<{ psec: boolean; cfg: string[] | null; src: string }>(
+      `SELECT prosecdef psec, proconfig cfg, prosrc src
+       FROM pg_proc
+       WHERE pronamespace='public'::regnamespace
+         AND proname='opportunities_guard'`,
+    );
+    expect(meta.rows[0].psec).toBe(true);
+    expect(meta.rows[0].cfg?.some((c) => c.startsWith("search_path="))).toBe(true);
+
+    const src = meta.rows[0].src;
+    const firstOwnerRef = src.indexOf("_owns_recruiter_profile");
+    const firstReturnMatch = src.match(/RETURN\s+NEW\s*;/i);
+    expect(firstOwnerRef).toBeGreaterThanOrEqual(0);
+    expect(firstReturnMatch).not.toBeNull();
+    const firstReturnIdx = src.indexOf(firstReturnMatch![0]);
+    expect(firstReturnIdx).toBeGreaterThan(firstOwnerRef);
+
+    const trg = await db.query<{ n: number }>(
+      `SELECT count(*)::int n FROM pg_trigger t
+       JOIN pg_class c ON c.oid = t.tgrelid
+       JOIN pg_proc  p ON p.oid = t.tgfoid
+       WHERE c.relname='opportunities'
+         AND p.proname='opportunities_guard'
+         AND NOT t.tgisinternal`,
+    );
+    expect(trg.rows[0].n).toBe(1);
+  });
+});
+
 
 
