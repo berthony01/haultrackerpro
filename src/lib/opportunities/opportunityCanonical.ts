@@ -614,7 +614,7 @@ export function validateOpportunityReadiness(
         blockers.add(`Mixed component ${i + 1} frequency is required.`);
       }
     });
-    if (state.legacy_mixed_pay_hint) {
+    if (state.legacy_mixed_pay_hint && complete.length < 2) {
       warns.add('Legacy mixed-pay row: reconstruct at least two named recurring components before publishing.');
     }
   } else if (state.pay_model === 'other') {
