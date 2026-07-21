@@ -301,6 +301,9 @@ describe('Phase 1L-DE1R2 — draft / publish routing', () => {
 
   it('valid publish emits a fully populated create call with status=active', () => {
     renderForm(makeOpportunity({ id: undefined }));
+    // Transparency must be re-affirmed each authoring session (normalize
+    // deliberately never rehydrates the checkbox from stored rows).
+    fireEvent.click(screen.getByLabelText('Transparency confirmation'));
     clickPublish();
     expect(h.createMutate).toHaveBeenCalledTimes(1);
     expect(payloadOf(h.createMutate)).toMatchObject({
@@ -314,6 +317,7 @@ describe('Phase 1L-DE1R2 — draft / publish routing', () => {
 
   it('edit publish routes through updateOpportunity with the exact ID', () => {
     renderForm(makeOpportunity({ id: 'existing-42' }));
+    fireEvent.click(screen.getByLabelText('Transparency confirmation'));
     clickPublish();
     expect(h.updateMutate).toHaveBeenCalledTimes(1);
     const { id, data } = updateArgs();
@@ -331,11 +335,15 @@ describe('Phase 1L-DE1R2 — draft / publish routing', () => {
     expect(h.updateMutate).not.toHaveBeenCalled();
   });
 
-  it('transparency confirmation change is reflected in the persisted payload', () => {
+  it('transparency confirmation is not rehydrated from a stored row and must be re-affirmed', () => {
     renderForm(makeOpportunity({ transparency_confirmed: true }));
-    fireEvent.click(screen.getByLabelText('Transparency confirmation'));
+    // Initial state should show transparency as unchecked despite stored true.
     clickSaveDraft();
     expect(updateArgs().data.transparency_confirmed).toBe(false);
+    h.updateMutate.mockClear();
+    fireEvent.click(screen.getByLabelText('Transparency confirmation'));
+    clickSaveDraft();
+    expect(h.updateMutate.mock.calls[0]?.[0]?.data?.transparency_confirmed).toBe(true);
   });
 
   it('legacy benefits column persisted from canonical lanes + requirements only', () => {
