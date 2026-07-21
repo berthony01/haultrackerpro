@@ -103,7 +103,7 @@ function opp(overrides: Partial<OpportunityRow> = {}): Partial<OpportunityRow> {
   return overrides;
 }
 
-/** Json-typed mixed-component fixtures (no Record<string, unknown>). */
+/** Json-typed mixed-component fixtures (structural Json fixtures). */
 type JsonRecord = { [key: string]: Json | undefined };
 function mixedComponents(components: JsonRecord[]): Json {
   // JsonRecord[] is structurally a Json[], which is a Json.
@@ -282,16 +282,15 @@ describe('normalizeOpportunityForAuthoring', () => {
   });
 
   it('stored transparency_confirmed=false, null, or absent all normalize to false', () => {
-    // Row.transparency_confirmed is `boolean`; use exhaustive Row baseline for null.
     expect(normalizeOpportunityForAuthoring(opp({ transparency_confirmed: false })).transparency_confirmed).toBe(false);
-    const rowWithNull = makeOpportunityRow();
-    // Deliberately model a defensively-null historical row via a narrowed local
-    // type — no `any` and no `Record<string, unknown>`.
-    const nullish: Partial<OpportunityRow> & { transparency_confirmed: boolean | null } = {
-      ...rowWithNull,
-      transparency_confirmed: null,
-    };
-    expect(normalizeOpportunityForAuthoring(nullish as Partial<OpportunityRow>).transparency_confirmed).toBe(false);
+    // Adversarial historical row where transparency_confirmed slipped through
+    // as null: preserve the exhaustive typed row and inject the runtime value
+    // via Object.defineProperty — no cast, no unsafe assertion.
+    const row = makeOpportunityRow();
+    Object.defineProperty(row, 'transparency_confirmed', {
+      value: null, writable: true, enumerable: true, configurable: true,
+    });
+    expect(normalizeOpportunityForAuthoring(row).transparency_confirmed).toBe(false);
     expect(normalizeOpportunityForAuthoring(opp({})).transparency_confirmed).toBe(false);
   });
 
@@ -310,14 +309,13 @@ describe('normalizeOpportunityForAuthoring', () => {
   it.each<boolean | null>([false, null])(
     'legacy escrow_required=%p becomes unspecified (never fabricates not_required)',
     (v) => {
-      // escrow_required column is non-nullable in the Row, so route null through
-      // the same narrowed-boundary pattern used above.
-      const rowSeed = makeOpportunityRow();
-      const nullish: Partial<OpportunityRow> & { escrow_required: boolean | null } = {
-        ...rowSeed,
-        escrow_required: v,
-      };
-      const result = normalizeOpportunityForAuthoring(nullish as Partial<OpportunityRow>);
+      // escrow_required is non-nullable in the Row; assign the adversarial
+      // runtime value onto a typed row via Object.defineProperty.
+      const row = makeOpportunityRow();
+      Object.defineProperty(row, 'escrow_required', {
+        value: v, writable: true, enumerable: true, configurable: true,
+      });
+      const result = normalizeOpportunityForAuthoring(row);
       expect(result.escrow_required_state).toBe('unspecified');
     },
   );
@@ -402,13 +400,14 @@ describe('normalizeOpportunityForAuthoring', () => {
   });
 
   it('hiring_states is always a new array and ignores non-string fixtures', () => {
-    // The Row type declares `hiring_states: string[]`. This test exercises
-    // the normalizer's tolerance for JSON-derived heterogeneous arrays that
-    // slip past that type at runtime — a single documented narrow boundary
-    // cast expresses that adversarial payload.
+    // Adversarial JSON-derived heterogeneous array injected onto the typed
+    // row via Object.defineProperty — no cast at the fixture boundary.
+    const row = makeOpportunityRow();
     const source: unknown[] = ['TX', 5, 'OK', null];
-    const seed = { hiring_states: source } as unknown as Partial<OpportunityRow>;
-    const result = normalizeOpportunityForAuthoring(seed);
+    Object.defineProperty(row, 'hiring_states', {
+      value: source, writable: true, enumerable: true, configurable: true,
+    });
+    const result = normalizeOpportunityForAuthoring(row);
     expect(result.hiring_states).toEqual(['TX', 'OK']);
     expect(result.hiring_states).not.toBe(source);
   });
@@ -792,6 +791,16 @@ describe('validateOpportunityReadiness — cost & escrow validation', () => {
     expect(r.blockingReasons).not.toContain('Escrow requirement not disclosed — weekly net will be incomplete.');
   });
 
+  it('cost-bearing explicit not_disclosed escrow emits the same warning and never blocks', () => {
+    const r = validateOpportunityReadiness(publishableCpmState({
+      employment_model: 'contractor_1099',
+      escrow_required_state: 'not_disclosed',
+    }));
+    expect(r.warnings).toContain('Escrow requirement not disclosed — weekly net will be incomplete.');
+    expect(r.blockingReasons).not.toContain('Escrow requirement not disclosed — weekly net will be incomplete.');
+    expect(r.canPublish).toBe(true);
+  });
+
   it('not_required escrow with a stale positive amount maps only to the escrow blocker', () => {
     const r = validateOpportunityReadiness(publishableCpmState({
       employment_model: 'contractor_1099',
@@ -863,12 +872,23 @@ describe('validateOpportunityReadiness — warnings & structural rules', () => {
     expect(typeof r.financialEstimate.status).toBe('string');
   });
 
-  it('one-time sign-on bonus never contributes to recurringWeeklyGross', () => {
-    const withBonus = validateOpportunityReadiness(publishableCpmState({ sign_on_bonus: '5000' }));
-    const withoutBonus = validateOpportunityReadiness(publishableCpmState());
-    expect(withBonus.financialEstimate.recurringWeeklyGross)
-      .toBe(withoutBonus.financialEstimate.recurringWeeklyGross);
-    expect(withBonus.financialEstimate.oneTimeIncentiveTotal).toBe(5000);
+  it('sign-on bonus (positive or zero) leaves every recurring financial output identical to the no-bonus baseline', () => {
+    const baseline = validateOpportunityReadiness(publishableCpmState());
+    const withPositive = validateOpportunityReadiness(publishableCpmState({ sign_on_bonus: '5000' }));
+    const withZero = validateOpportunityReadiness(publishableCpmState({ sign_on_bonus: '0' }));
+
+    for (const other of [withPositive, withZero]) {
+      expect(other.financialEstimate.status).toBe(baseline.financialEstimate.status);
+      expect(other.financialEstimate.recurringWeeklyGross).toBe(baseline.financialEstimate.recurringWeeklyGross);
+      expect(other.financialEstimate.estimatedWeeklyNet).toBe(baseline.financialEstimate.estimatedWeeklyNet);
+      expect(other.financialEstimate.netStatus).toBe(baseline.financialEstimate.netStatus);
+      expect(other.financialEstimate.effectiveRpm).toBe(baseline.financialEstimate.effectiveRpm);
+    }
+
+    // Only the one-time total surface reflects the bonus.
+    expect(baseline.financialEstimate.oneTimeIncentiveTotal).toBe(0);
+    expect(withPositive.financialEstimate.oneTimeIncentiveTotal).toBe(5000);
+    expect(withZero.financialEstimate.oneTimeIncentiveTotal).toBe(0);
   });
 });
 

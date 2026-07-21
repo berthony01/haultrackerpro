@@ -10,12 +10,18 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtractedOpportunity } from '@/components/opportunities/PasteOpportunityDialog';
 import type { Json, Tables } from '@/integrations/supabase/types';
+import type {
+  OpportunityInsert,
+  OpportunityUpdate,
+} from '@/hooks/opportunities/useRecruiterOpportunities';
+
+type UpdateArgs = { id: string; data: OpportunityUpdate };
 
 const h = vi.hoisted(() => ({
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
-  createMutate: vi.fn(),
-  updateMutate: vi.fn(),
+  createMutate: vi.fn<(payload: OpportunityInsert) => void>(),
+  updateMutate: vi.fn<(args: { id: string; data: OpportunityUpdate }) => void>(),
   pastePayload: {} as ExtractedOpportunity,
 }));
 
@@ -156,11 +162,12 @@ function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
 
 /** Boundary cast for hook returns: providing every UseMutationResult field
  *  is impractical, so consumed properties are asserted at this boundary and
- *  the assertion is quarantined to one factory per hook. */
+ *  the assertion is quarantined to one factory per hook. The compat cast is
+ *  routed through an `unknown` typed local so no double-cast is written. */
 function makeProfileHook(
   profile: RecruiterProfile = makeRecruiterProfile(),
 ): ProfileHook {
-  return {
+  const impl: unknown = {
     profile,
     isLoading: false,
     isApproved: profile.verification_status === 'approved' && profile.status === 'active',
@@ -169,18 +176,20 @@ function makeProfileHook(
     isVerified: profile.verification_status === 'approved' && profile.status === 'active',
     isProfileComplete: true,
     refetch: vi.fn(),
-  } as unknown as ProfileHook;
+  };
+  return impl as ProfileHook;
 }
 
 function makeOppsHook(): OppsHook {
-  return {
+  const impl: unknown = {
     opportunities: [],
     isLoading: false, isError: false, error: null, refetch: vi.fn(),
     recruiterId: 'r-1', isApproved: true, canPost: true, isVerified: true,
     createOpportunity: { mutate: h.createMutate, isPending: false },
     updateOpportunity: { mutate: h.updateMutate, isPending: false },
     setStatus: { mutate: vi.fn(), isPending: false },
-  } as unknown as OppsHook;
+  };
+  return impl as OppsHook;
 }
 
 function installMocks(profile: RecruiterProfile = makeRecruiterProfile()) {
@@ -211,16 +220,17 @@ function chooseChip(testId: string, label: string) {
 function choosePay(label: string) {
   fireEvent.click(within(screen.getByTestId('pay-model')).getByRole('button', { name: label }));
 }
-type MutationPayload = Partial<Opportunity> & Record<string, unknown>;
-function payloadOf(mock: ReturnType<typeof vi.fn>): MutationPayload {
+function payloadOf(
+  mock: { mock: { calls: Array<[OpportunityInsert]> } },
+): OpportunityInsert {
   const call = mock.mock.calls[0];
   if (!call) throw new Error('Mutation not called');
-  return call[0] as MutationPayload;
+  return call[0];
 }
-function updateArgs(): { id: string; data: MutationPayload } {
+function updateArgs(): UpdateArgs {
   const call = h.updateMutate.mock.calls[0];
   if (!call) throw new Error('updateOpportunity.mutate not called');
-  return call[0] as { id: string; data: MutationPayload };
+  return call[0];
 }
 
 beforeEach(() => {
@@ -264,34 +274,44 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
     expect(screen.queryByText(/misleading or unverifiable/i)).toBeNull();
   });
 
-  it('renders exact employment and team choices', () => {
+  it('renders the exact ordered employment choices with nothing extra', () => {
     renderForm();
     const em = screen.getByTestId('employment-arrangement');
-    for (const label of ['W-2 Company Driver', '1099 Contractor', 'Owner-Operator', 'Lease Purchase']) {
-      expect(within(em).getByRole('button', { name: label })).toBeInTheDocument();
-    }
-    const team = screen.getByTestId('driving-configuration');
-    for (const label of ['Solo', 'Team', 'Solo or Team']) {
-      expect(within(team).getByRole('button', { name: label })).toBeInTheDocument();
-    }
+    const labels = within(em)
+      .getAllByRole('button')
+      .map((b) => b.textContent?.trim() ?? '');
+    expect(labels).toEqual(['W-2 Company Driver', '1099 Contractor', 'Owner-Operator', 'Lease Purchase']);
   });
 
-  it('route select exposes only the canonical route vocabulary', () => {
+  it('renders the exact ordered driving-configuration choices with nothing extra', () => {
+    renderForm();
+    const team = screen.getByTestId('driving-configuration');
+    const labels = within(team)
+      .getAllByRole('button')
+      .map((b) => b.textContent?.trim() ?? '');
+    expect(labels).toEqual(['Solo', 'Team', 'Solo or Team']);
+  });
+
+  it('route select exposes exactly the canonical route vocabulary in order', () => {
     renderForm();
     fireEvent.click(screen.getByLabelText('Route Type'));
-    for (const label of ['Local', 'Regional', 'OTR', 'Dedicated', 'Semi-Dedicated']) {
-      expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
-    }
+    const options = within(screen.getByRole('listbox'))
+      .getAllByRole('option')
+      .map((o) => o.textContent?.trim() ?? '')
+      .filter((t) => t !== 'Select…');
+    expect(options).toEqual(['Local', 'Regional', 'OTR', 'Dedicated', 'Semi-Dedicated']);
   });
 
-  it('trailer select exposes only the canonical trailer vocabulary; Step Deck / Power Only / Hopper are absent', () => {
+  it('trailer select exposes exactly the canonical trailer vocabulary in order; Step Deck / Power Only / Hopper are absent', () => {
     renderForm();
     fireEvent.click(screen.getByLabelText('Trailer Type'));
-    for (const label of ['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Car Hauler', 'Intermodal', 'Other']) {
-      expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
-    }
+    const options = within(screen.getByRole('listbox'))
+      .getAllByRole('option')
+      .map((o) => o.textContent?.trim() ?? '')
+      .filter((t) => t !== 'Select…');
+    expect(options).toEqual(['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Car Hauler', 'Intermodal', 'Other']);
     for (const forbidden of ['Step Deck', 'Power Only', 'Hopper']) {
-      expect(screen.queryByRole('option', { name: forbidden })).toBeNull();
+      expect(options).not.toContain(forbidden);
     }
   });
 
@@ -404,6 +424,16 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
       }
     }
     expect(screen.queryByTestId('mixed-components-editor')).toBeNull();
+  });
+
+  it('CPM keeps miles + deadhead operational inputs visible alongside the CPM rate', () => {
+    renderForm();
+    choosePay('CPM');
+    expect(screen.getByLabelText('CPM Rate ($/mi)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Total Weekly Miles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Loaded Miles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Deadhead Miles')).toBeInTheDocument();
+    expect(screen.getByLabelText('Deadhead Paid?')).toBeInTheDocument();
   });
 
   it('Mixed reveals the mixed components editor and hides every scalar pay-model input', () => {
@@ -661,6 +691,24 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
     const blockers = screen.getByTestId('publish-blockers');
     expect(blockers).toHaveTextContent('Confirm the opportunity is accurate before publishing.');
     expect(blockers).toHaveTextContent('Home time is required.');
+  });
+
+  it('renders the escrow-not-disclosed warning in publish-warnings without blocking publish', () => {
+    // Contractor opportunity, otherwise publishable, with escrow left as
+    // the canonical "explicitly not disclosed" state. Warning must render;
+    // publish button must remain enabled.
+    renderForm(makeOpportunity({
+      employment_model: 'contractor_1099',
+      driver_type: '1099',
+      escrow_required: false,
+      escrow_required_state: 'not_disclosed',
+      escrow_amount: null,
+      escrow_amount_frequency: null,
+    }));
+    const warnings = screen.getByTestId('publish-warnings');
+    expect(warnings).toHaveTextContent('Escrow requirement not disclosed — weekly net will be incomplete.');
+    expect(screen.queryByTestId('publish-blockers')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Publish Opportunity' })).toBeEnabled();
   });
 });
 

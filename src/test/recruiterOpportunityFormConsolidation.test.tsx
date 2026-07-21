@@ -9,6 +9,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Json, Tables } from '@/integrations/supabase/types';
+import type {
+  OpportunityInsert,
+  OpportunityUpdate,
+} from '@/hooks/opportunities/useRecruiterOpportunities';
 import {
   describeRecruiterEligibility,
   isProfileCompleteForPosting,
@@ -18,8 +22,8 @@ const h = vi.hoisted(() => ({
   refetch: vi.fn(),
   billingRefresh: vi.fn(),
   statusMutate: vi.fn(),
-  createMutate: vi.fn(),
-  updateMutate: vi.fn(),
+  createMutate: vi.fn<(payload: OpportunityInsert) => void>(),
+  updateMutate: vi.fn<(args: { id: string; data: OpportunityUpdate }) => void>(),
 }));
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
@@ -160,36 +164,46 @@ let opportunitiesState: Opportunity[];
 /** Boundary cast for hook returns: the full UseMutationResult surface is
  *  impractical to spell out; the mock intentionally satisfies only the
  *  properties the manager reads. Both hook mocks are the only casts in
- *  this file — everything else is a real, typed Tables<...> row. */
+ *  this file — everything else is a real, typed Tables<...> row.
+ *
+ *  Eligibility flags MUST be derived on every hook invocation so that a
+ *  test that mutates `profileState` after `beforeEach` observes the new
+ *  eligibility surface (canonical helpers are the single source of truth). */
 function installHookMocks() {
-  // Canonical eligibility is the single source of truth: canPost/isSuspended
-  // are DERIVED, never fabricated locally.
-  const eligibility = describeRecruiterEligibility(profileState, { intentRecruiter: true });
-  const suspended = eligibility.state === 'suspended';
-  const canPost = eligibility.canPost;
-  const isVerified = eligibility.state === 'verified';
+  vi.mocked(useRecruiterProfile).mockImplementation(() => {
+    const eligibility = describeRecruiterEligibility(profileState, { intentRecruiter: true });
+    const suspended = eligibility.state === 'suspended';
+    const canPost = eligibility.canPost;
+    const isVerified = eligibility.state === 'verified';
+    const impl: unknown = {
+      profile: profileState,
+      isLoading: false,
+      isApproved: isVerified,
+      isSuspended: suspended,
+      isVerified,
+      isProfileComplete: isProfileCompleteForPosting(profileState),
+      canPost,
+      refetch: vi.fn(),
+    };
+    return impl as ProfileHook;
+  });
 
-  vi.mocked(useRecruiterProfile).mockImplementation(() => ({
-    profile: profileState,
-    isLoading: false,
-    isApproved: isVerified,
-    isSuspended: suspended,
-    isVerified,
-    isProfileComplete: isProfileCompleteForPosting(profileState),
-    canPost,
-    refetch: vi.fn(),
-  } as unknown as ProfileHook));
-
-  vi.mocked(useRecruiterOpportunities).mockImplementation(() => ({
-    opportunities: opportunitiesState,
-    isLoading: false, isError: false, error: null, refetch: h.refetch,
-    recruiterId: profileState?.id ?? null,
-    isApproved: isVerified,
-    canPost, isVerified,
-    createOpportunity: { mutate: h.createMutate, isPending: false },
-    updateOpportunity: { mutate: h.updateMutate, isPending: false },
-    setStatus: { mutate: h.statusMutate, isPending: false },
-  } as unknown as OppsHook));
+  vi.mocked(useRecruiterOpportunities).mockImplementation(() => {
+    const eligibility = describeRecruiterEligibility(profileState, { intentRecruiter: true });
+    const canPost = eligibility.canPost;
+    const isVerified = eligibility.state === 'verified';
+    const impl: unknown = {
+      opportunities: opportunitiesState,
+      isLoading: false, isError: false, error: null, refetch: h.refetch,
+      recruiterId: profileState?.id ?? null,
+      isApproved: isVerified,
+      canPost, isVerified,
+      createOpportunity: { mutate: h.createMutate, isPending: false },
+      updateOpportunity: { mutate: h.updateMutate, isPending: false },
+      setStatus: { mutate: h.statusMutate, isPending: false },
+    };
+    return impl as OppsHook;
+  });
 }
 
 beforeEach(() => {
@@ -276,7 +290,7 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     expect(h.createMutate).toHaveBeenCalledTimes(1);
     const call = h.createMutate.mock.calls[0];
     if (!call) throw new Error('createOpportunity.mutate not called');
-    const payload = call[0] as Partial<Opportunity>;
+    const payload: OpportunityInsert = call[0];
     expect(payload).toMatchObject({
       title: 'New Draft', company_name: 'Acme Trucking',
       status: 'draft', canonical_version: 1,
@@ -292,7 +306,7 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     expect(h.updateMutate).toHaveBeenCalledTimes(1);
     const call = h.updateMutate.mock.calls[0];
     if (!call) throw new Error('updateOpportunity.mutate not called');
-    const args = call[0] as { id: string; data: Partial<Opportunity> };
+    const args: { id: string; data: OpportunityUpdate } = call[0];
     expect(args.id).toBe('opp-abc');
     expect(args.data.status).toBe('draft');
     expect(h.createMutate).not.toHaveBeenCalled();
