@@ -281,8 +281,8 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
               {initial ? 'Edit Opportunity' : 'Post Opportunity'}
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl mt-1">
-              Recruiters describe the arrangement, compensation, operations, and costs. Drivers see the same
-              canonical view. Only universal facts are required to publish.
+              Required details adapt to the selected employment arrangement and pay model. Review the
+              canonical information before saving or publishing.
             </p>
           </div>
           <Button
