@@ -603,8 +603,8 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
             aria-label="Transparency confirmation"
           />
           <span className="text-sm text-foreground leading-snug">
-            I confirm this opportunity is accurate. Drivers see the same canonical view: pay, miles, costs,
-            and estimated earnings labeled with their source.
+            I confirm this opportunity is accurate: pay, miles, costs, and estimated earnings are labeled
+            with their source.
           </span>
         </label>
 
