@@ -360,7 +360,7 @@ interface AttemptErr { ok: false; err: Error & Record<string, unknown>; row?: un
 type Attempt = AttemptOk | AttemptErr;
 function mustErr(a: Attempt): Error & Record<string, unknown> {
   if (a.ok) throw new Error('expected failure but write succeeded');
-  return a.err;
+  return mustErr(a);
 }
 async function tryInsert(inst: AnyPGlite, row: Row): Promise<Attempt> {
   try {
@@ -653,7 +653,7 @@ describe('universal blockers — exact messages', () => {
     const a = await tryInsert(db, publishableRow(overrides));
     expect(a.ok).toBe(false);
     if (!a.ok) {
-      const d = parseDetail(a.err);
+      const d = parseDetail(mustErr(a));
       expect(d.blocking_reasons).toContain(expected);
     }
   });
@@ -688,7 +688,7 @@ describe('route/trailer/hiring alternatives', () => {
     }));
     expect(a.ok).toBe(false);
     if (!a.ok) {
-      expect(parseDetail(a.err).blocking_reasons)
+      expect(parseDetail(mustErr(a)).blocking_reasons)
         .toContain('Provide a hiring city and state, or at least one hiring state.');
     }
   });
@@ -700,19 +700,19 @@ describe('CPM boundaries', () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ ...cpmBase, cpm: null }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('CPM must be greater than zero.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('CPM must be greater than zero.');
   });
   it('missing weekly miles blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ ...cpmBase, estimated_weekly_miles: null }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Total weekly miles must be greater than zero for CPM pay.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Total weekly miles must be greater than zero for CPM pay.');
   });
   it('explicit zero loaded miles blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ ...cpmBase, estimated_loaded_miles: 0 }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Loaded miles cannot be zero when provided.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Loaded miles cannot be zero when provided.');
   });
   it('null loaded miles is allowed', async () => {
     await setUid(db, RECR_UID);
@@ -723,7 +723,7 @@ describe('CPM boundaries', () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ ...cpmBase, deadhead_paid: null }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Specify whether deadhead miles are paid (yes or no).');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Specify whether deadhead miles are paid (yes or no).');
   });
 });
 
@@ -733,41 +733,41 @@ describe('percentage / flat / salary boundaries', () => {
     const a = await tryInsert(db, publishableRow({ pay_model: 'percentage', flat_weekly_pay: null,
       percentage_pay: null, percentage_basis_label: 'Line-haul', percentage_weekly_revenue_basis: 5000 }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Percentage rate must be greater than zero.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Percentage rate must be greater than zero.');
   });
   it('missing basis label blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ pay_model: 'percentage', flat_weekly_pay: null,
       percentage_pay: 30, percentage_basis_label: '', percentage_weekly_revenue_basis: 5000 }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Percentage basis label is required.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Percentage basis label is required.');
   });
   it('missing basis amount blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ pay_model: 'percentage', flat_weekly_pay: null,
       percentage_pay: 30, percentage_basis_label: 'x', percentage_weekly_revenue_basis: null }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Percentage weekly revenue basis must be greater than zero.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Percentage weekly revenue basis must be greater than zero.');
   });
   it('zero flat weekly pay blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ flat_weekly_pay: 0 }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Flat weekly pay must be greater than zero.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Flat weekly pay must be greater than zero.');
   });
   it('missing salary amount blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ pay_model: 'salary', flat_weekly_pay: null,
       salary_amount: null, salary_frequency: 'annual' }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Salary amount must be greater than zero.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Salary amount must be greater than zero.');
   });
   it('invalid salary frequency blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ pay_model: 'salary', flat_weekly_pay: null,
       salary_amount: 100000, salary_frequency: 'quarterly' }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Salary pay period is required.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Salary pay period is required.');
   });
 });
 
@@ -777,7 +777,7 @@ describe('mixed pay boundaries', () => {
     const a = await tryInsert(db, publishableRow({ pay_model: 'mixed', flat_weekly_pay: null,
       mixed_pay_components: JSON.stringify([{ label: 'Base', amount: 1000, frequency: 'weekly' }]) }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons)
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
       .toContain('Mixed pay requires at least two complete components (label, amount, frequency).');
   });
   it('completely blank component is ignored', async () => {
@@ -799,7 +799,7 @@ describe('mixed pay boundaries', () => {
         { label: 'Perf', amount: 100, frequency: 'weekly' },
       ]) }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Mixed component 2 needs a label.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Mixed component 2 needs a label.');
   });
   it('malformed JSON string amount produces structured 23514, not cast error', async () => {
     await setUid(db, RECR_UID);
@@ -810,8 +810,8 @@ describe('mixed pay boundaries', () => {
       ]) }));
     expect(a.ok).toBe(false);
     if (!a.ok) {
-      expect(String(a.err.code)).toBe('23514');
-      expect(parseDetail(a.err).blocking_reasons).toContain('Mixed component 1 amount must be zero or greater.');
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Mixed component 1 amount must be zero or greater.');
     }
   });
   it('component amount without frequency blocks by index', async () => {
@@ -822,7 +822,7 @@ describe('mixed pay boundaries', () => {
         { label: 'B', amount: 300, frequency: 'weekly' },
       ]) }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Mixed component 1 frequency is required.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Mixed component 1 frequency is required.');
   });
 });
 
@@ -832,14 +832,14 @@ describe('"other" boundaries', () => {
     const a = await tryInsert(db, publishableRow({ pay_model: 'other', flat_weekly_pay: null,
       other_pay_method_label: '', other_weekly_gross: 1200 }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Pay method label is required for “Other”.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Pay method label is required for “Other”.');
   });
   it('missing weekly gross blocks', async () => {
     await setUid(db, RECR_UID);
     const a = await tryInsert(db, publishableRow({ pay_model: 'other', flat_weekly_pay: null,
       other_pay_method_label: 'Piece-rate', other_weekly_gross: null }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Supported weekly gross must be greater than zero for “Other”.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Supported weekly gross must be greater than zero for “Other”.');
   });
 });
 
@@ -860,7 +860,7 @@ describe('cost pairs and escrow (contractor_1099)', () => {
       insurance_deductions: null, insurance_deduction_frequency: 'weekly',
     }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons)
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
       .toContain('Insurance amount is required when a frequency is set.');
   });
   it('amount without frequency blocks (Maintenance)', async () => {
@@ -869,7 +869,7 @@ describe('cost pairs and escrow (contractor_1099)', () => {
       maintenance_deductions: 100, maintenance_deduction_frequency: null,
     }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons)
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
       .toContain('Maintenance frequency is required when an amount is set.');
   });
   it('zero + valid frequency is allowed (Other recurring cost)', async () => {
@@ -892,7 +892,7 @@ describe('cost pairs and escrow (contractor_1099)', () => {
       lease_payment: 500, lease_payment_frequency: null,
     }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons)
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
       .toContain('Lease payment frequency is required when an amount is set.');
   });
   it('escrow required with missing amount blocks', async () => {
@@ -901,7 +901,7 @@ describe('cost pairs and escrow (contractor_1099)', () => {
       escrow_required_state: 'required', escrow_amount: null, escrow_amount_frequency: 'weekly',
     }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Escrow amount is required when escrow is required.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Escrow amount is required when escrow is required.');
   });
   it('escrow required with missing frequency blocks', async () => {
     await setUid(db, RECR_UID);
@@ -909,7 +909,7 @@ describe('cost pairs and escrow (contractor_1099)', () => {
       escrow_required_state: 'required', escrow_amount: 100, escrow_amount_frequency: null,
     }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons).toContain('Escrow frequency is required when escrow is required.');
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons).toContain('Escrow frequency is required when escrow is required.');
   });
   it('escrow not_required with positive stale amount blocks', async () => {
     await setUid(db, RECR_UID);
@@ -917,7 +917,7 @@ describe('cost pairs and escrow (contractor_1099)', () => {
       escrow_required_state: 'not_required', escrow_amount: 50, escrow_amount_frequency: 'weekly',
     }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons)
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
       .toContain('Escrow is marked not required but a positive escrow amount was provided. Clear the stale escrow amount before publishing.');
   });
   it('escrow not_disclosed is allowed', async () => {
@@ -935,7 +935,7 @@ describe('gross conflict > 10% (and boundary + bonus invariance)', () => {
       flat_weekly_pay: 1000, estimated_weekly_gross: 1200,
     }));
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(parseDetail(a.err).blocking_reasons)
+    if (!a.ok) expect(parseDetail(mustErr(a)).blocking_reasons)
       .toContain('Recruiter-provided weekly gross differs from derived gross by more than 10%. Resolve the conflict before publishing.');
   });
   it('recruiter gross differing by exactly 10% is allowed', async () => {
@@ -965,10 +965,10 @@ describe('structured 23514 error shape', () => {
     }));
     expect(a.ok).toBe(false);
     if (!a.ok) {
-      expect(String(a.err.code)).toBe('23514');
-      expect(String(a.err.message)).toContain('Opportunity does not meet publication requirements.');
-      expect(String(a.err.hint)).toBe('Save as draft or correct the listed fields before publishing.');
-      const d = parseDetail(a.err);
+      expect(String(mustErr(a).code)).toBe('23514');
+      expect(String(mustErr(a).message)).toContain('Opportunity does not meet publication requirements.');
+      expect(String(mustErr(a).hint)).toBe('Save as draft or correct the listed fields before publishing.');
+      const d = parseDetail(mustErr(a));
       expect(d.code).toBe('opportunity_publication_invalid');
       // Must be sorted asc, unique.
       const sorted = [...d.blocking_reasons].sort();
@@ -1068,7 +1068,7 @@ describe('legacy pre-candidate active rows', () => {
     );
     expect(upd.ok).toBe(false);
     if (!upd.ok) {
-      expect(parseDetail(upd.err).blocking_reasons)
+      expect(parseDetail(mustErr(upd)).blocking_reasons)
         .toContain('Canonical opportunity version 1 is required before publication.');
     }
   });
