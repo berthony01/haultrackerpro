@@ -88,7 +88,6 @@ DECLARE
   _b               text[] := ARRAY[]::text[];
   _has_city_state  boolean;
   _has_state_list  boolean;
-  _has_bad_num     boolean;
   _mixed           jsonb;
   _elem            jsonb;
   _idx             int;
@@ -103,10 +102,6 @@ DECLARE
   _complete_count  int;
   _cost_bearing    boolean;
   _lease_relevant  boolean;
-  _amt_col         numeric;
-  _freq_col        text;
-  _pair_label      text;
-  _pair            record;
   _derived_gross   numeric;
   _diff_ratio      numeric;
 BEGIN
