@@ -2613,6 +2613,24 @@ export type Database = {
           },
         ]
       }
+      opportunity_publication_legacy_snapshot: {
+        Row: {
+          captured_at: string
+          opportunity_ids: string[]
+          snapshot_key: string
+        }
+        Insert: {
+          captured_at?: string
+          opportunity_ids: string[]
+          snapshot_key: string
+        }
+        Update: {
+          captured_at?: string
+          opportunity_ids?: string[]
+          snapshot_key?: string
+        }
+        Relationships: []
+      }
       opportunity_reports: {
         Row: {
           admin_notes: string | null
@@ -3807,6 +3825,8 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["user_capability_status"]
       }
+      _opportunity_jsonb_number: { Args: { j: Json }; Returns: number }
+      _opportunity_numeric_is_finite: { Args: { v: number }; Returns: boolean }
       _sync_recruiter_capability: {
         Args: { _user_id: string }
         Returns: undefined
@@ -4719,6 +4739,10 @@ export type Database = {
         Returns: number
       }
       notification_category: { Args: { _type: string }; Returns: string }
+      opportunity_publication_blockers: {
+        Args: { o: Database["public"]["Tables"]["opportunities"]["Row"] }
+        Returns: string[]
+      }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
