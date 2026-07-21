@@ -463,7 +463,8 @@ export function buildCanonicalFinancialInput(
   } else {
     // 'unspecified' or 'not_disclosed'
     escrowRequiredDisc = { state: 'not_disclosed' };
-    escrowAmountDisc = state.escrow_amount.trim() !== ''
+    const hasStale = state.escrow_amount.trim() !== '' || state.escrow_frequency != null;
+    escrowAmountDisc = hasStale
       ? amountDisclosure(state.escrow_amount, state.escrow_frequency)
       : { state: 'not_disclosed' };
   }
