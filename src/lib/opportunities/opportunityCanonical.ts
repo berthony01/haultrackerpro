@@ -662,7 +662,10 @@ export function validateOpportunityReadiness(
 
 /* ---------------- state → persistence payload ---------------- */
 
-type Payload = TablesInsert<'opportunities'> | TablesUpdate<'opportunities'>;
+// Payload always sets required Insert fields (title, company_name) so it is
+// safe to type as Insert; the recruiter hook accepts an Update-shaped subset
+// on the update path via a separate cast at the mutation call site.
+type Payload = TablesInsert<'opportunities'>;
 
 function toLegacyDriverType(m: CanonicalEmploymentModel | 'unknown'): string | null {
   switch (m) {
