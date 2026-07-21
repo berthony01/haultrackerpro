@@ -13,7 +13,7 @@
 //
 // It never talks to the database or performs I/O.
 
-import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 import {
   calculateCanonicalOpportunityFinancials,
   type CanonicalEmploymentModel,
@@ -39,8 +39,8 @@ export type CanonicalTeamConfiguration = 'solo' | 'team' | 'solo_or_team' | 'uns
 export type YesNoUnknown = 'yes' | 'no' | 'unknown';
 export type EscrowRequiredState = 'required' | 'not_required' | 'not_disclosed';
 
-export const ROUTE_TYPE_VALUES = ['OTR', 'Regional', 'Local', 'Dedicated'] as const;
-export const TRAILER_TYPE_VALUES = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Tanker', 'Power Only', 'Car Hauler', 'Hopper'] as const;
+export const ROUTE_TYPE_VALUES = ['Local', 'Regional', 'OTR', 'Dedicated', 'Semi-Dedicated'] as const;
+export const TRAILER_TYPE_VALUES = ['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Car Hauler', 'Intermodal', 'Other'] as const;
 
 const EMPLOYMENT_VALUES: readonly CanonicalEmploymentModel[] = [
   'company_driver', 'contractor_1099', 'owner_operator', 'lease_purchase',
@@ -83,6 +83,7 @@ export interface CanonicalOpportunityAuthoringState {
   salary_amount: string;
   salary_frequency: RecurringFrequency | null;
   mixed_pay_components: CanonicalAuthoringMixedComponent[];
+  legacy_mixed_pay_hint: boolean;
   other_pay_method_label: string;
   other_weekly_gross: string;
   recruiter_provided_weekly_gross: string;
@@ -144,6 +145,7 @@ export const EMPTY_AUTHORING_STATE: CanonicalOpportunityAuthoringState = {
   salary_amount: '',
   salary_frequency: null,
   mixed_pay_components: [],
+  legacy_mixed_pay_hint: false,
   other_pay_method_label: '',
   other_weekly_gross: '',
   recruiter_provided_weekly_gross: '',
@@ -179,40 +181,9 @@ export const EMPTY_AUTHORING_STATE: CanonicalOpportunityAuthoringState = {
 
 /* ---------------- primitive helpers ---------------- */
 
-// Additive canonical columns land in the 20260721143000 migration candidate.
-// Until that migration is applied and Supabase types regenerate, extend the
-// generated row type locally so authoring code stays strictly typed at the
-// call sites and casts do not silently drop fields at persistence time.
-type CanonicalAdditiveColumns = {
-  canonical_version: number | null;
-  employment_model: string | null;
-  team_configuration: string | null;
-  percentage_basis_label: string | null;
-  percentage_weekly_revenue_basis: number | null;
-  salary_amount: number | null;
-  salary_frequency: string | null;
-  mixed_pay_components: unknown;
-  other_pay_method_label: string | null;
-  other_weekly_gross: number | null;
-  insurance_deduction_frequency: string | null;
-  escrow_required_state: string | null;
-  escrow_amount_frequency: string | null;
-  lease_payment_frequency: string | null;
-  maintenance_deduction_frequency: string | null;
-  other_deduction_frequency: string | null;
-  typical_lanes: string | null;
-  requirements: string | null;
-  actual_benefits: string | null;
-};
-type Opp = Partial<Tables<'opportunities'> & CanonicalAdditiveColumns>;
+type Opp = Partial<Tables<'opportunities'>>;
 
 const s = (v: unknown): string => (v == null ? '' : String(v));
-const parseNum = (v: string): number | null => {
-  const t = v.trim();
-  if (!t) return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : NaN;
-};
 const numToStr = (v: unknown): string => {
   if (v == null || v === '') return '';
   const n = Number(v);
@@ -224,7 +195,7 @@ const isEmployment = (v: unknown): v is CanonicalEmploymentModel => typeof v ===
 const isTeam = (v: unknown): v is CanonicalTeamConfiguration => typeof v === 'string' && (TEAM_VALUES as readonly string[]).includes(v);
 const isPay = (v: unknown): v is CanonicalPayModel => typeof v === 'string' && (PAY_VALUES as readonly string[]).includes(v);
 
-/* ---------------- legacy → canonical normalization ---------------- */
+/* ---------------- legacy → canonical projections ---------------- */
 
 interface LegacyProjection {
   employment_model: CanonicalEmploymentModel | 'unknown';
@@ -254,6 +225,11 @@ export function projectLegacyDriverType(driverType: string | null | undefined): 
   }
 }
 
+export function projectLegacyPayModel(payModel: string | null | undefined): CanonicalPayModel | 'unknown' {
+  const pm = (payModel ?? '').trim().toLowerCase();
+  return isPay(pm) ? pm : 'unknown';
+}
+
 export function normalizeOpportunityForAuthoring(
   row: Opp | null | undefined,
 ): CanonicalOpportunityAuthoringState {
@@ -261,8 +237,8 @@ export function normalizeOpportunityForAuthoring(
   if (!row) return base;
 
   const legacy = projectLegacyDriverType(row.driver_type ?? null);
-  const rowEmployment = (row as Opp).employment_model;
-  const rowTeam = (row as Opp).team_configuration;
+  const rowEmployment = row.employment_model;
+  const rowTeam = row.team_configuration;
 
   base.title = s(row.title);
   base.company_name = s(row.company_name);
@@ -278,29 +254,25 @@ export function normalizeOpportunityForAuthoring(
     : [];
   base.description = s(row.description);
 
-  // Pay model
-  const rowPay = (row as Opp).pay_model;
-  base.pay_model = isPay(rowPay) ? rowPay : (row.cpm != null && Number(row.cpm) > 0)
-    ? 'cpm'
-    : (row.percentage_pay != null && Number(row.percentage_pay) > 0)
-      ? 'percentage'
-      : (row.flat_weekly_pay != null && Number(row.flat_weekly_pay) > 0)
-        ? 'salary' // legacy flat_weekly_pay was explicitly labeled weekly salary in old form
-        : 'unknown';
+  // Pay model — preserve recognized stored value exactly; never infer from
+  // legacy numeric fields when stored pay_model is missing or unrecognized.
+  const rowPay = row.pay_model;
+  base.pay_model = isPay(rowPay) ? rowPay : 'unknown';
 
   base.cpm = numToStr(row.cpm);
   base.percentage_rate = numToStr(row.percentage_pay);
-  base.percentage_basis_label = s((row as Opp).percentage_basis_label);
-  base.percentage_weekly_revenue_basis = numToStr((row as Opp).percentage_weekly_revenue_basis);
+  base.percentage_basis_label = s(row.percentage_basis_label);
+  base.percentage_weekly_revenue_basis = numToStr(row.percentage_weekly_revenue_basis);
 
-  // Salary — legacy `flat_weekly_pay` hydrates salary_amount at weekly frequency;
-  // new `salary_amount` takes precedence when present.
-  const rowSalaryAmt = (row as Opp).salary_amount;
-  const rowSalaryFreq = (row as Opp).salary_frequency;
+  // Salary — new `salary_amount` takes precedence when present. Otherwise, and
+  // only when the stored pay_model is 'salary', legacy `flat_weekly_pay`
+  // hydrates salary_amount at weekly frequency.
+  const rowSalaryAmt = row.salary_amount;
+  const rowSalaryFreq = row.salary_frequency;
   if (rowSalaryAmt != null) {
     base.salary_amount = numToStr(rowSalaryAmt);
     base.salary_frequency = isFreq(rowSalaryFreq) ? rowSalaryFreq : null;
-  } else if (base.pay_model === 'salary' && row.flat_weekly_pay != null) {
+  } else if (rowPay === 'salary' && row.flat_weekly_pay != null) {
     base.salary_amount = numToStr(row.flat_weekly_pay);
     base.salary_frequency = 'weekly';
   }
@@ -308,21 +280,26 @@ export function normalizeOpportunityForAuthoring(
   base.flat_weekly_pay = base.pay_model === 'flat_weekly' ? numToStr(row.flat_weekly_pay) : '';
 
   // Mixed — canonical only; legacy rows never invent canonical components.
-  const rawMixed = (row as Opp).mixed_pay_components as unknown;
+  const rawMixed = row.mixed_pay_components as unknown;
   if (Array.isArray(rawMixed)) {
     base.mixed_pay_components = rawMixed
       .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && !Array.isArray(c))
       .map((c) => ({
-        label: s((c as Record<string, unknown>).label),
-        amount: numToStr((c as Record<string, unknown>).amount),
-        frequency: isFreq((c as Record<string, unknown>).frequency)
-          ? ((c as Record<string, unknown>).frequency as RecurringFrequency)
-          : null,
+        label: s(c.label),
+        amount: numToStr(c.amount),
+        frequency: isFreq(c.frequency) ? (c.frequency as RecurringFrequency) : null,
       }));
   }
 
-  base.other_pay_method_label = s((row as Opp).other_pay_method_label);
-  base.other_weekly_gross = numToStr((row as Opp).other_weekly_gross);
+  // Legacy mixed-pay provenance hint: stored pay_model === 'mixed' with no
+  // usable canonical components and no canonical_version 1.
+  const usableMixed = base.mixed_pay_components.filter(
+    (c) => c.label.trim() || c.amount.trim() || c.frequency != null,
+  );
+  base.legacy_mixed_pay_hint = rowPay === 'mixed' && usableMixed.length === 0 && row.canonical_version !== 1;
+
+  base.other_pay_method_label = s(row.other_pay_method_label);
+  base.other_weekly_gross = numToStr(row.other_weekly_gross);
   base.recruiter_provided_weekly_gross = numToStr(row.estimated_weekly_gross);
 
   base.estimated_weekly_miles = numToStr(row.estimated_weekly_miles);
@@ -341,61 +318,60 @@ export function normalizeOpportunityForAuthoring(
 
   base.fuel_paid_by = s(row.fuel_paid_by);
   base.insurance_amount = numToStr(row.insurance_deductions);
-  base.insurance_frequency = isFreq((row as Opp).insurance_deduction_frequency) ? ((row as Opp).insurance_deduction_frequency as RecurringFrequency) : null;
+  base.insurance_frequency = isFreq(row.insurance_deduction_frequency) ? (row.insurance_deduction_frequency as RecurringFrequency) : null;
   base.maintenance_amount = numToStr(row.maintenance_deductions);
-  base.maintenance_frequency = isFreq((row as Opp).maintenance_deduction_frequency) ? ((row as Opp).maintenance_deduction_frequency as RecurringFrequency) : null;
+  base.maintenance_frequency = isFreq(row.maintenance_deduction_frequency) ? (row.maintenance_deduction_frequency as RecurringFrequency) : null;
   base.other_cost_amount = numToStr(row.other_deductions);
-  base.other_cost_frequency = isFreq((row as Opp).other_deduction_frequency) ? ((row as Opp).other_deduction_frequency as RecurringFrequency) : null;
+  base.other_cost_frequency = isFreq(row.other_deduction_frequency) ? (row.other_deduction_frequency as RecurringFrequency) : null;
   base.lease_amount = numToStr(row.lease_payment);
-  base.lease_frequency = isFreq((row as Opp).lease_payment_frequency) ? ((row as Opp).lease_payment_frequency as RecurringFrequency) : null;
+  base.lease_frequency = isFreq(row.lease_payment_frequency) ? (row.lease_payment_frequency as RecurringFrequency) : null;
 
-  const escrowState = (row as Opp).escrow_required_state;
+  // Escrow — new state wins; absent-new + legacy true -> required; absent-new
+  // + legacy false or null -> unspecified (never synthesize "not_required").
+  const escrowState = row.escrow_required_state;
   if (escrowState === 'required' || escrowState === 'not_required' || escrowState === 'not_disclosed') {
     base.escrow_required_state = escrowState;
   } else if (row.escrow_required === true) {
     base.escrow_required_state = 'required';
-  } else if (row.escrow_required === false) {
-    base.escrow_required_state = 'not_required';
   } else {
     base.escrow_required_state = 'unspecified';
   }
   base.escrow_amount = numToStr(row.escrow_amount);
-  base.escrow_frequency = isFreq((row as Opp).escrow_amount_frequency) ? ((row as Opp).escrow_amount_frequency as RecurringFrequency) : null;
+  base.escrow_frequency = isFreq(row.escrow_amount_frequency) ? (row.escrow_amount_frequency as RecurringFrequency) : null;
 
-  // Content — new columns take precedence over legacy `benefits`.
-  const canonLanes = s((row as Opp).typical_lanes);
-  const canonReqs = s((row as Opp).requirements);
-  const canonBenefits = s((row as Opp).actual_benefits);
-  if (!isEmptyStr(canonLanes) || !isEmptyStr(canonReqs) || !isEmptyStr(canonBenefits)) {
-    base.typical_lanes = canonLanes;
-    base.requirements = canonReqs;
-    base.actual_benefits = canonBenefits;
-  } else {
-    const legacyBenefits = row.benefits ?? null;
-    const split = splitBenefits(legacyBenefits);
-    base.typical_lanes = split.typical_lanes;
-    base.requirements = split.requirements;
-    base.actual_benefits = '';
-  }
+  // Content — field-by-field precedence. Dedicated canonical fields win
+  // individually; the dedicated `actual_benefits` field never falls back to
+  // legacy `benefits`.
+  const canonLanes = s(row.typical_lanes);
+  const canonReqs = s(row.requirements);
+  const canonBenefits = s(row.actual_benefits);
+  const split = splitBenefits(row.benefits ?? null);
+  base.typical_lanes = !isEmptyStr(canonLanes) ? canonLanes : split.typical_lanes;
+  base.requirements = !isEmptyStr(canonReqs) ? canonReqs : split.requirements;
+  base.actual_benefits = canonBenefits;
 
   return base;
 }
 
 /* ---------------- state → canonical calculator input ---------------- */
 
+// Blank amount + no frequency -> not disclosed. Any nonblank amount preserves
+// zero, negative, and NaN so the calculator can produce diagnostics. A blank
+// amount paired with a selected frequency is preserved as an invalid amount
+// (NaN) with that frequency so validation still surfaces the missing amount.
 function amountDisclosure(amountStr: string, freq: RecurringFrequency | null): Disclosure<CanonicalRecurringAmount> {
-  const n = parseNum(amountStr);
-  if (n === null && freq == null) return { state: 'not_disclosed' };
-  if (n === null || !Number.isFinite(n) || n < 0) return { state: 'not_disclosed' };
-  if (freq == null) return { state: 'not_disclosed' };
-  return { state: 'provided', value: { amount: n, frequency: freq } };
+  const blank = amountStr.trim() === '';
+  if (blank && freq == null) return { state: 'not_disclosed' };
+  if (blank) return { state: 'provided', value: { amount: NaN, frequency: freq } };
+  return { state: 'provided', value: { amount: Number(amountStr), frequency: freq } };
 }
 
+// Blank -> not disclosed. Any nonblank string -> provided(Number(v)),
+// preserving zero, negative, and NaN. Never downgrade a nonblank invalid
+// value to not disclosed — the calculator diagnoses it.
 function numDisclosure(v: string): Disclosure<number> {
-  const n = parseNum(v);
-  if (n === null) return { state: 'not_disclosed' };
-  if (!Number.isFinite(n) || n < 0) return { state: 'not_disclosed' };
-  return { state: 'provided', value: n };
+  if (v.trim() === '') return { state: 'not_disclosed' };
+  return { state: 'provided', value: Number(v) };
 }
 
 function boolDisclosure(v: YesNoUnknown): Disclosure<boolean> {
@@ -416,15 +392,17 @@ export function buildCanonicalFinancialInput(
   const percentageDisc: Disclosure<{ rate: number; weeklyRevenueBasis: number | null; basisLabel: string | null }> =
     (() => {
       if (payModel !== 'percentage') return { state: 'not_applicable' };
-      const rate = parseNum(state.percentage_rate);
-      const basis = parseNum(state.percentage_weekly_revenue_basis);
+      const rateTrim = state.percentage_rate.trim();
+      const basisTrim = state.percentage_weekly_revenue_basis.trim();
       const label = state.percentage_basis_label.trim();
-      if (rate === null && basis === null && !label) return { state: 'not_disclosed' };
+      if (!rateTrim && !basisTrim && !label) return { state: 'not_disclosed' };
+      const rate = rateTrim ? Number(rateTrim) : 0;
+      const basis = basisTrim ? Number(basisTrim) : null;
       return {
         state: 'provided',
         value: {
-          rate: rate ?? 0,
-          weeklyRevenueBasis: basis === null ? null : basis,
+          rate,
+          weeklyRevenueBasis: basis,
           basisLabel: label || null,
         },
       };
@@ -446,27 +424,44 @@ export function buildCanonicalFinancialInput(
     : [];
 
   const oneTime: CanonicalOneTimeIncentive[] = (() => {
-    const n = parseNum(state.sign_on_bonus);
-    if (n === null) return [];
-    if (!Number.isFinite(n) || n < 0) return [{ label: 'Sign-on bonus', amount: { state: 'not_disclosed' } }];
-    return [{ label: 'Sign-on bonus', amount: { state: 'provided', value: n } }];
+    if (state.sign_on_bonus.trim() === '') return [];
+    return [{ label: 'Sign-on bonus', amount: numDisclosure(state.sign_on_bonus) }];
   })();
 
   const na: Disclosure<CanonicalRecurringAmount> = { state: 'not_applicable' };
   const naB: Disclosure<boolean> = { state: 'not_applicable' };
 
-  const escrowRequiredDisc: Disclosure<boolean> = !costBearing
-    ? naB
-    : state.escrow_required_state === 'required'
-      ? { state: 'provided', value: true }
-      : state.escrow_required_state === 'not_required'
-        ? { state: 'provided', value: false }
-        : { state: 'not_disclosed' };
-  const escrowAmountDisc: Disclosure<CanonicalRecurringAmount> = !costBearing
-    ? na
-    : state.escrow_required_state === 'required'
+  // Escrow calculator input:
+  //  * company driver -> both not applicable
+  //  * non-cost-bearing (unknown employment) -> both not applicable
+  //  * required -> pass required=true + amount disclosure
+  //  * not_required + no stale amount/frequency -> amount not applicable
+  //  * not_required + any stale amount/frequency -> amount disclosure (so
+  //    positive stale amounts still trigger the calculator's conflict)
+  //  * unspecified / not_disclosed -> required not disclosed; amount not
+  //    disclosed unless a nonblank amount must be diagnosed
+  let escrowRequiredDisc: Disclosure<boolean>;
+  let escrowAmountDisc: Disclosure<CanonicalRecurringAmount>;
+
+  if (isCompany || !costBearing) {
+    escrowRequiredDisc = naB;
+    escrowAmountDisc = na;
+  } else if (state.escrow_required_state === 'required') {
+    escrowRequiredDisc = { state: 'provided', value: true };
+    escrowAmountDisc = amountDisclosure(state.escrow_amount, state.escrow_frequency);
+  } else if (state.escrow_required_state === 'not_required') {
+    escrowRequiredDisc = { state: 'provided', value: false };
+    const hasStale = state.escrow_amount.trim() !== '' || state.escrow_frequency != null;
+    escrowAmountDisc = hasStale
       ? amountDisclosure(state.escrow_amount, state.escrow_frequency)
       : { state: 'not_applicable' };
+  } else {
+    // 'unspecified' or 'not_disclosed'
+    escrowRequiredDisc = { state: 'not_disclosed' };
+    escrowAmountDisc = state.escrow_amount.trim() !== ''
+      ? amountDisclosure(state.escrow_amount, state.escrow_frequency)
+      : { state: 'not_disclosed' };
+  }
 
   return {
     employmentModel: employment,
@@ -478,9 +473,7 @@ export function buildCanonicalFinancialInput(
     mixedComponents: mixed,
     otherWeeklyGross: otherDisc,
     recruiterProvidedWeeklyGross: numDisclosure(state.recruiter_provided_weekly_gross),
-    totalWeeklyMiles: isCompany
-      ? numDisclosure(state.estimated_weekly_miles)
-      : numDisclosure(state.estimated_weekly_miles),
+    totalWeeklyMiles: numDisclosure(state.estimated_weekly_miles),
     loadedWeeklyMiles: numDisclosure(state.estimated_loaded_miles),
     deadheadWeeklyMiles: numDisclosure(state.estimated_deadhead_miles),
     deadheadPaid: boolDisclosure(state.deadhead_paid),
@@ -504,6 +497,13 @@ export interface PublicationReadiness {
   blockingReasons: string[];
   warnings: string[];
   financialEstimate: CanonicalOpportunityFinancialEstimate;
+}
+
+function parseNumStrict(v: string): number | null {
+  const t = v.trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
 }
 
 function anyInvalidNumericProvided(state: CanonicalOpportunityAuthoringState): boolean {
@@ -567,30 +567,30 @@ export function validateOpportunityReadiness(
 
   // Pay-model specific
   if (state.pay_model === 'cpm') {
-    const cpm = parseNum(state.cpm);
+    const cpm = parseNumStrict(state.cpm);
     if (cpm === null || !Number.isFinite(cpm) || cpm <= 0) blockers.add('CPM must be greater than zero.');
-    const total = parseNum(state.estimated_weekly_miles);
+    const total = parseNumStrict(state.estimated_weekly_miles);
     if (total === null || !Number.isFinite(total) || total <= 0) blockers.add('Total weekly miles must be greater than zero for CPM pay.');
-    const loaded = parseNum(state.estimated_loaded_miles);
+    const loaded = parseNumStrict(state.estimated_loaded_miles);
     if (loaded !== null && Number.isFinite(loaded) && loaded === 0) blockers.add('Loaded miles cannot be zero when provided.');
     if (state.deadhead_paid === 'unknown') blockers.add('Specify whether deadhead miles are paid (yes or no).');
   } else if (state.pay_model === 'percentage') {
-    const rate = parseNum(state.percentage_rate);
+    const rate = parseNumStrict(state.percentage_rate);
     if (rate === null || !Number.isFinite(rate) || rate <= 0) blockers.add('Percentage rate must be greater than zero.');
     if (isEmptyStr(state.percentage_basis_label)) blockers.add('Percentage basis label is required.');
-    const basis = parseNum(state.percentage_weekly_revenue_basis);
+    const basis = parseNumStrict(state.percentage_weekly_revenue_basis);
     if (basis === null || !Number.isFinite(basis) || basis <= 0) blockers.add('Percentage weekly revenue basis must be greater than zero.');
   } else if (state.pay_model === 'flat_weekly') {
-    const flat = parseNum(state.flat_weekly_pay);
+    const flat = parseNumStrict(state.flat_weekly_pay);
     if (flat === null || !Number.isFinite(flat) || flat <= 0) blockers.add('Flat weekly pay must be greater than zero.');
   } else if (state.pay_model === 'salary') {
-    const amt = parseNum(state.salary_amount);
+    const amt = parseNumStrict(state.salary_amount);
     if (amt === null || !Number.isFinite(amt) || amt <= 0) blockers.add('Salary amount must be greater than zero.');
     if (!isFreq(state.salary_frequency)) blockers.add('Salary pay period is required.');
   } else if (state.pay_model === 'mixed') {
     const complete = state.mixed_pay_components.filter((c) => {
       if (!c.label.trim()) return false;
-      const n = parseNum(c.amount);
+      const n = parseNumStrict(c.amount);
       if (n === null || !Number.isFinite(n) || n < 0) return false;
       if (!isFreq(c.frequency)) return false;
       return true;
@@ -600,7 +600,7 @@ export function validateOpportunityReadiness(
       if (!c.label.trim() && (c.amount.trim() || c.frequency != null)) {
         blockers.add(`Mixed component ${i + 1} needs a label.`);
       }
-      const n = parseNum(c.amount);
+      const n = parseNumStrict(c.amount);
       if (c.amount.trim() && (n === null || !Number.isFinite(n) || n < 0)) {
         blockers.add(`Mixed component ${i + 1} amount must be zero or greater.`);
       }
@@ -608,9 +608,12 @@ export function validateOpportunityReadiness(
         blockers.add(`Mixed component ${i + 1} frequency is required.`);
       }
     });
+    if (state.legacy_mixed_pay_hint) {
+      warns.add('Legacy mixed-pay row: reconstruct at least two named recurring components before publishing.');
+    }
   } else if (state.pay_model === 'other') {
     if (isEmptyStr(state.other_pay_method_label)) blockers.add('Pay method label is required for “Other”.');
-    const gross = parseNum(state.other_weekly_gross);
+    const gross = parseNumStrict(state.other_weekly_gross);
     if (gross === null || !Number.isFinite(gross) || gross <= 0) blockers.add('Supported weekly gross must be greater than zero for “Other”.');
   }
 
@@ -632,15 +635,17 @@ export function validateOpportunityReadiness(
       validateCostPair('Lease payment', state.lease_amount, state.lease_frequency, push, warn);
     }
     if (state.escrow_required_state === 'required') {
-      const amt = parseNum(state.escrow_amount);
+      const amt = parseNumStrict(state.escrow_amount);
       if (amt === null || !Number.isFinite(amt) || amt < 0) blockers.add('Escrow amount is required when escrow is required.');
       if (!isFreq(state.escrow_frequency)) blockers.add('Escrow frequency is required when escrow is required.');
-    } else if (state.escrow_required_state === 'not_required') {
-      const amt = parseNum(state.escrow_amount);
-      if (amt !== null && Number.isFinite(amt) && amt > 0) blockers.add('Escrow amount conflicts with “Escrow not required”.');
-    } else if (state.escrow_required_state === 'unspecified') {
+    } else if (
+      state.escrow_required_state === 'unspecified'
+      || state.escrow_required_state === 'not_disclosed'
+    ) {
       warns.add('Escrow requirement not disclosed — weekly net will be incomplete.');
     }
+    // 'not_required' with a stale amount is diagnosed by the calculator via
+    // the 10% conflict path below; persistence still clears the amount.
   }
 
   // Financial calculator — conflict + status diagnostics
@@ -662,10 +667,10 @@ export function validateOpportunityReadiness(
 
 /* ---------------- state → persistence payload ---------------- */
 
-// Payload always sets required Insert fields (title, company_name) so it is
-// safe to type as Insert; the recruiter hook accepts an Update-shaped subset
-// on the update path via a separate cast at the mutation call site.
-type Payload = Omit<TablesInsert<'opportunities'>, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at'>;
+export type OpportunityPersistencePayload = Omit<
+  TablesInsert<'opportunities'>,
+  'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at'
+>;
 
 function toLegacyDriverType(m: CanonicalEmploymentModel | 'unknown'): string | null {
   switch (m) {
@@ -687,7 +692,7 @@ function nOrNull(v: string): number | null {
 export function buildOpportunityPersistencePayload(
   state: CanonicalOpportunityAuthoringState,
   mode: 'draft' | 'publish',
-): Payload {
+): OpportunityPersistencePayload {
   const em = state.employment_model === 'unknown' ? null : state.employment_model;
   const isCompany = em === 'company_driver';
   const leaseRelevant = em === 'lease_purchase';
@@ -708,13 +713,7 @@ export function buildOpportunityPersistencePayload(
         }))
     : [];
 
-  const escrowRequiredBool = state.escrow_required_state === 'required'
-    ? true
-    : state.escrow_required_state === 'not_required'
-      ? false
-      : null;
-
-  const payload: Payload = {
+  return {
     canonical_version: 1,
     title: state.title.trim(),
     company_name: state.company_name.trim(),
@@ -726,7 +725,7 @@ export function buildOpportunityPersistencePayload(
     trailer_type: state.trailer_type || null,
     hiring_city: state.hiring_city.trim() || null,
     hiring_state: state.hiring_state.trim() || null,
-    hiring_states: state.hiring_states,
+    hiring_states: state.hiring_states.slice(),
     description: state.description.trim() || null,
     pay_model: state.pay_model === 'unknown' ? null : state.pay_model,
     cpm: state.pay_model === 'cpm' ? nOrNull(state.cpm) : null,
@@ -761,7 +760,9 @@ export function buildOpportunityPersistencePayload(
     other_deduction_frequency: costBearing ? state.other_cost_frequency : null,
     lease_payment: leaseRelevant ? nOrNull(state.lease_amount) : null,
     lease_payment_frequency: leaseRelevant ? state.lease_frequency : null,
-    escrow_required: isCompany ? false : (escrowRequiredBool ?? false),
+    escrow_required: isCompany
+      ? false
+      : (state.escrow_required_state === 'required'),
     escrow_required_state: costBearing
       ? (state.escrow_required_state === 'unspecified' ? null : state.escrow_required_state)
       : null,
@@ -772,7 +773,5 @@ export function buildOpportunityPersistencePayload(
     actual_benefits: state.actual_benefits.trim() || null,
     benefits: legacyBenefits || null,
     transparency_confirmed: state.transparency_confirmed,
-  } as Payload;
-
-  return payload;
+  };
 }
