@@ -521,6 +521,18 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Grandfather only rows that were already active and legacy before this
+  -- validator existed. They may remain editable while still legacy, but the
+  -- first attempt to convert them to canonical_version = 1 must satisfy the
+  -- full canonical publication contract. New or reactivated legacy rows are
+  -- never grandfathered.
+  IF TG_OP = 'UPDATE'
+     AND OLD.status = 'active'
+     AND OLD.canonical_version IS DISTINCT FROM 1
+     AND NEW.canonical_version IS DISTINCT FROM 1 THEN
+    RETURN NEW;
+  END IF;
+
   -- Preserve Phase 1K administrative exceptions verbatim.
   IF _is_admin AND NOT _owns_recruiter_profile THEN
     RETURN NEW;
