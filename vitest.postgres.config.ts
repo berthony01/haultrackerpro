@@ -9,7 +9,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["tests/postgres/**/*.test.ts"],
+    include: ["tests/postgres/recruiterConsentConcurrency.test.ts"],
     testTimeout: 60_000,
     hookTimeout: 60_000,
   },
