@@ -1127,28 +1127,141 @@ describe('Phase 1K admin exceptions preserved', () => {
   });
 });
 
-describe('legacy pre-candidate active rows', () => {
-  it('ordinary active→active edit on a legacy incomplete row is blocked', async () => {
+describe('legacy pre-candidate active rows — narrow grandfathering (DE2B-1C)', () => {
+  it('existing active legacy row: ordinary recruiter UPDATE (touch updated_at only) remains active + legacy and succeeds', async () => {
     await setUid(db, RECR_UID);
     const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row',
+      canonical_version: null, title: 'Legacy row A',
       admin_review_status: 'approved', published_at: new Date().toISOString(),
     }));
     const upd = await tryExec(
       db,
-      `UPDATE public.opportunities SET description = 'edit while active' WHERE id = $1 RETURNING *`,
+      `UPDATE public.opportunities SET updated_at = now() WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(true);
+    if (upd.ok) {
+      expect(upd.row.status).toBe('active');
+      expect(upd.row.canonical_version).toBeNull();
+    }
+  });
+
+  it('existing active legacy row: ordinary editable-field UPDATE while remaining legacy succeeds', async () => {
+    await setUid(db, RECR_UID);
+    const id = await seedLegacyBypassingCanonical(db, publishableRow({
+      canonical_version: null, title: 'Legacy row B',
+      admin_review_status: 'approved', published_at: new Date().toISOString(),
+    }));
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities SET description = 'grandfathered edit while active' WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(true);
+    if (upd.ok) {
+      expect(upd.row.description).toBe('grandfathered edit while active');
+      expect(upd.row.status).toBe('active');
+      expect(upd.row.canonical_version).toBeNull();
+    }
+  });
+
+  it('existing active legacy row: attempted canonicalization (canonical_version=1) with missing requirements fails with SQLSTATE 23514 and exact blockers', async () => {
+    await setUid(db, RECR_UID);
+    const id = await seedLegacyBypassingCanonical(db, publishableRow({
+      canonical_version: null, title: '', // incomplete
+      description: '', home_time: '',
+      admin_review_status: 'approved', published_at: new Date().toISOString(),
+    }));
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities SET canonical_version = 1 WHERE id = $1 RETURNING *`,
       [id],
     );
     expect(upd.ok).toBe(false);
     if (!upd.ok) {
-      expect(parseDetail(mustErr(upd)).blocking_reasons)
+      const err = mustErr(upd);
+      expect(err.code).toBe('23514');
+      const blockers = parseDetail(err).blocking_reasons as string[];
+      expect(blockers).toContain('Opportunity title is required.');
+      expect(blockers).toContain('Description is required.');
+      expect(blockers).toContain('Home time is required.');
+      expect(blockers).not.toContain('Canonical opportunity version 1 is required before publication.');
+    }
+  });
+
+  it('existing active legacy row: canonicalization to a fully valid canonical row succeeds', async () => {
+    await setUid(db, RECR_UID);
+    const id = await seedLegacyBypassingCanonical(db, publishableRow({
+      canonical_version: null, title: 'Legacy row D',
+      admin_review_status: 'approved', published_at: new Date().toISOString(),
+    }));
+    // publishableRow defaults already satisfy every canonical requirement;
+    // only canonical_version is flipped to 1.
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities SET canonical_version = 1 WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(true);
+    if (upd.ok) expect(upd.row.canonical_version).toBe(1);
+  });
+
+  it('draft legacy row changed to active while remaining legacy fails', async () => {
+    await setUid(db, RECR_UID);
+    const id = await seedLegacyBypassingCanonical(db, publishableRow({
+      canonical_version: null, title: 'Legacy draft', status: 'draft',
+    }));
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities SET status = 'active' WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      const err = mustErr(upd);
+      expect(err.code).toBe('23514');
+      expect(parseDetail(err).blocking_reasons)
         .toContain('Canonical opportunity version 1 is required before publication.');
     }
   });
-  it('same legacy row can be moved to draft', async () => {
+
+  it('newly INSERTed active legacy row fails (INSERT never grandfathered)', async () => {
+    await setUid(db, RECR_UID);
+    const a = await tryInsert(db, publishableRow({
+      canonical_version: null, title: 'Fresh legacy insert',
+    }));
+    expect(a.ok).toBe(false);
+    if (!a.ok) {
+      const err = mustErr(a);
+      expect(err.code).toBe('23514');
+      expect(parseDetail(err).blocking_reasons)
+        .toContain('Canonical opportunity version 1 is required before publication.');
+    }
+  });
+
+  it('existing canonical active row cannot be reverted to legacy (canonical_version -> NULL blocks)', async () => {
+    await setUid(db, RECR_UID);
+    const ins = await tryInsert(db, publishableRow({ title: 'Canonical row' }));
+    expect(ins.ok).toBe(true);
+    const id = ins.ok ? String(ins.row.id) : '';
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities SET canonical_version = NULL WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(false);
+    if (!upd.ok) {
+      const err = mustErr(upd);
+      expect(err.code).toBe('23514');
+      expect(parseDetail(err).blocking_reasons)
+        .toContain('Canonical opportunity version 1 is required before publication.');
+    }
+  });
+
+  it('existing active legacy row can be moved to draft via the non-active early return', async () => {
     await setUid(db, RECR_UID);
     const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row 2',
+      canonical_version: null, title: 'Legacy row to draft',
       admin_review_status: 'approved', published_at: new Date().toISOString(),
     }));
     const upd = await tryExec(
@@ -1157,13 +1270,14 @@ describe('legacy pre-candidate active rows', () => {
       [id],
     );
     expect(upd.ok).toBe(true);
+    if (upd.ok) expect(upd.row.status).toBe('draft');
   });
-  it('legacy row can be reactivated once canonicalized and complete', async () => {
+
+  it('legacy row can be reactivated once canonicalized and complete (draft -> active + canonical_version=1)', async () => {
     await setUid(db, RECR_UID);
     const id = await seedLegacyBypassingCanonical(db, publishableRow({
-      canonical_version: null, title: 'Legacy row 3', status: 'draft',
+      canonical_version: null, title: 'Legacy row reactivation', status: 'draft',
     }));
-    // Fill it out then flip back to active.
     const upd = await tryExec(
       db,
       `UPDATE public.opportunities
@@ -1173,7 +1287,39 @@ describe('legacy pre-candidate active rows', () => {
     );
     expect(upd.ok).toBe(true);
   });
+
+  it('grandfathering does not create duplicate triggers (single binding preserved)', async () => {
+    const r = await db.query<{ ct: string }>(
+      `SELECT count(*)::text AS ct
+         FROM pg_trigger
+        WHERE tgname = 'trg_opportunities_canonical_publication_guard'`,
+    );
+    expect(r.rows[0].ct).toBe('1');
+  });
+
+  it('grandfathering remains idempotent: reapplying the migration keeps the grandfathering branch present exactly once and behavior unchanged', async () => {
+    await db.exec(CANDIDATE_SQL);
+    const r = await db.query<{ def: string }>(
+      `SELECT pg_get_functiondef('public.opportunities_canonical_publication_guard()'::regprocedure) AS def`,
+    );
+    const def = r.rows[0].def;
+    const occurrences = def.match(/Grandfather only rows that were already active and legacy/g) ?? [];
+    expect(occurrences.length).toBe(1);
+    // And behavior is invariant after reapply.
+    await setUid(db, RECR_UID);
+    const id = await seedLegacyBypassingCanonical(db, publishableRow({
+      canonical_version: null, title: 'Legacy row post-reapply',
+      admin_review_status: 'approved', published_at: new Date().toISOString(),
+    }));
+    const upd = await tryExec(
+      db,
+      `UPDATE public.opportunities SET description = 'post reapply edit' WHERE id = $1 RETURNING *`,
+      [id],
+    );
+    expect(upd.ok).toBe(true);
+  });
 });
+
 
 // =====================================================================
 // Extended coverage — helper truth tables, universal-numeric enforcement,
