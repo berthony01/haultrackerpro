@@ -36,7 +36,7 @@ import { PGlite } from '@electric-sql/pglite';
 // Source paths (repo-relative, resolved once).
 // ---------------------------------------------------------------------
 const CANDIDATE_REL =
-  '../../supabase/migration-candidates/20260721183000_phase1l_de2_opportunity_publication_validation.sql';
+  '../../supabase/migrations/20260721183000_phase1l_de2_opportunity_publication_validation.sql';
 const PHASE_1K_MIG_REL =
   '../../supabase/migrations/20260721000000_phase1k_admin_recruiter_opportunity_publication.sql';
 const PHASE_1L_DE1_MIG_REL =
