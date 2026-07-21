@@ -29,6 +29,8 @@ import {
   buildOpportunityPersistencePayload,
   EMPTY_AUTHORING_STATE,
   normalizeOpportunityForAuthoring,
+  projectLegacyDriverType,
+  projectLegacyPayModel,
   ROUTE_TYPE_VALUES,
   TRAILER_TYPE_VALUES,
   validateOpportunityReadiness,
