@@ -379,7 +379,17 @@ describe('Phase 1L-F2B-P3 — Canonical KPI strip', () => {
   });
 
   it('3b. Zero recurring weekly gross counts as a finite disclosed value in Available and Gross Disclosed', () => {
-    opportunitiesStore.set([completeRow({ id: 'zero', flat_weekly_pay: 0 })]);
+    opportunitiesStore.set([
+      completeRow({
+        id: 'zero',
+        pay_model: 'mixed',
+        flat_weekly_pay: null,
+        mixed_pay_components: [
+          { label: 'Base', amount: 0, frequency: 'weekly' },
+          { label: 'Bonus', amount: 0, frequency: 'weekly' },
+        ] as unknown as Row['mixed_pay_components'],
+      }),
+    ]);
     renderPage();
     expect(within(kpiCard('Available')).getByText('1')).toBeInTheDocument();
     expect(within(kpiCard('Gross Disclosed')).getByText('1')).toBeInTheDocument();
