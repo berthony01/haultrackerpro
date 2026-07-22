@@ -77,6 +77,11 @@ import { DriverReferralsPanel } from './DriverReferralsPanel';
 import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info, UserPlus } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
+import {
+  normalizeOpportunity,
+  type OpportunitySourceRow,
+  type CanonicalOpportunity,
+} from '@/lib/opportunities/opportunityCanonicalView';
 
 interface Props {
   onUpgrade: () => void;
@@ -84,6 +89,19 @@ interface Props {
 }
 
 const ANY = 'any';
+
+// Phase 1L-F2B-P3 — sortable timestamp helper: published_at first,
+// then created_at; invalid or missing sort last (null).
+function getSortableTs(o: { published_at: string | null; created_at: string | null }): number | null {
+  const parse = (s: string | null): number | null => {
+    if (!s) return null;
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? t : null;
+  };
+  const p = parse(o.published_at);
+  if (p != null) return p;
+  return parse(o.created_at);
+}
 
 export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
   const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
@@ -120,12 +138,14 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
 
 
   const [search, setSearch] = useState('');
-  const [driverType, setDriverType] = useState<string>(ANY);
+  const [employment, setEmployment] = useState<string>(ANY);
+  const [teamSetup, setTeamSetup] = useState<string>(ANY);
   const [routeType, setRouteType] = useState<string>(ANY);
   const [trailerType, setTrailerType] = useState<string>(ANY);
   const [minGross, setMinGross] = useState<string>('');
   const [paidDeadheadOnly, setPaidDeadheadOnly] = useState(false);
   const [matchTierFilter, setMatchTierFilter] = useState<string>(ANY);
+  const [sortBy, setSortBy] = useState<string>('recommended');
 
   const matchEnabled = !!profile && profile.profile_completed;
 
@@ -157,74 +177,146 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
 
   const savedIds = useMemo(() => new Set(saved.map((s) => s.opportunity_id)), [saved]);
 
-  const driverTypes = useMemo(
-    () => Array.from(new Set(opportunities.map((o) => o.driver_type).filter(Boolean))) as string[],
-    [opportunities]
-  );
-  const routeTypes = useMemo(
-    () => Array.from(new Set(opportunities.map((o) => o.route_type).filter(Boolean))) as string[],
-    [opportunities]
-  );
-  const trailerTypes = useMemo(
-    () => Array.from(new Set(opportunities.map((o) => o.trailer_type).filter(Boolean))) as string[],
-    [opportunities]
+  // Phase 1L-F2B-P3 — SINGLE canonical map: exactly one normalizeOpportunity
+  // call per raw row. All list-page KPIs, filters, search, disclosure
+  // decisions, and non-match sorting consume the canonical object below.
+  const canonicalRows = useMemo(
+    () =>
+      opportunities.map((o) => ({
+        opportunity: o,
+        canonical: normalizeOpportunity(o as OpportunitySourceRow),
+      })),
+    [opportunities],
   );
 
-  const filtered = useMemo(() => {
+  const routeTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const { canonical: c } of canonicalRows) {
+      if (c.classification.routeType.state === 'provided') set.add(c.classification.routeType.value);
+    }
+    return Array.from(set).sort();
+  }, [canonicalRows]);
+
+  const trailerTypes = useMemo(() => {
+    const set = new Set<string>();
+    for (const { canonical: c } of canonicalRows) {
+      if (c.classification.trailerType.state === 'provided') set.add(c.classification.trailerType.value);
+    }
+    return Array.from(set).sort();
+  }, [canonicalRows]);
+
+  type Entry = {
+    opportunity: (typeof canonicalRows)[number]['opportunity'];
+    canonical: CanonicalOpportunity;
+    match: ReturnType<typeof calculateOpportunityMatch> | null;
+  };
+
+  const filtered = useMemo<Entry[]>(() => {
     const min = Number(minGross) || 0;
     const q = search.trim().toLowerCase();
-    const base = opportunities.filter((o) => {
+    const base = canonicalRows.filter(({ canonical: c }) => {
       if (q) {
-        const hay = [o.title, o.company_name, o.hiring_city, o.hiring_state]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
+        const parts: string[] = [c.identity.title];
+        if (c.identity.companyName.state === 'provided') parts.push(c.identity.companyName.value);
+        parts.push(c.hiringArea.displayLabel);
+        if (!parts.join(' ').toLowerCase().includes(q)) return false;
       }
-      if (driverType !== ANY && o.driver_type !== driverType) return false;
-      if (routeType !== ANY && o.route_type !== routeType) return false;
-      if (trailerType !== ANY && o.trailer_type !== trailerType) return false;
+      if (employment !== ANY && c.classification.employmentModel !== employment) return false;
+      if (teamSetup !== ANY && c.classification.teamConfiguration !== teamSetup) return false;
+      if (routeType !== ANY) {
+        if (c.classification.routeType.state !== 'provided' || c.classification.routeType.value !== routeType) return false;
+      }
+      if (trailerType !== ANY) {
+        if (c.classification.trailerType.state !== 'provided' || c.classification.trailerType.value !== trailerType) return false;
+      }
       if (min > 0) {
-        const gross = calculateOpportunityFinancials(o).estimatedGross;
-        if (gross == null || gross < min) return false;
+        const g = c.derived.financialEstimate.recurringWeeklyGross;
+        if (g == null || !Number.isFinite(g) || g < min) return false;
       }
-      if (paidDeadheadOnly && o.deadhead_paid !== true) return false;
+      if (paidDeadheadOnly) {
+        const d = c.compensation.mileage.deadheadPaid;
+        if (d.state !== 'provided' || d.value !== true) return false;
+      }
       return true;
     });
 
-    if (!matchEnabled || !profile) {
-      return base.map((o) => ({ opportunity: o, match: null as ReturnType<typeof calculateOpportunityMatch> | null }));
+    let scored: Entry[];
+    if (matchEnabled && profile) {
+      // Legacy calculator is ONLY invoked inside the completed-profile
+      // match-scoring branch, exactly once per candidate row, purely as
+      // opportunityFinancials input to calculateOpportunityMatch.
+      scored = base.map(({ opportunity: o, canonical }) => {
+        const f = calculateOpportunityFinancials(o);
+        const match = calculateOpportunityMatch({ opportunity: o, driverProfile: profile, opportunityFinancials: f });
+        return { opportunity: o, canonical, match };
+      });
+      if (matchTierFilter !== ANY) {
+        scored = scored.filter((s) => s.match?.matchTier === matchTierFilter);
+      }
+    } else {
+      scored = base.map(({ opportunity: o, canonical }) => ({ opportunity: o, canonical, match: null }));
     }
 
-    const scored = base.map((o) => {
-      const f = calculateOpportunityFinancials(o);
-      const match = calculateOpportunityMatch({ opportunity: o, driverProfile: profile, opportunityFinancials: f });
-      return { opportunity: o, match };
-    });
+    const newestCompare = (a: Entry, b: Entry): number => {
+      const at = getSortableTs(a.opportunity);
+      const bt = getSortableTs(b.opportunity);
+      if (at == null && bt == null) return a.opportunity.id.localeCompare(b.opportunity.id);
+      if (at == null) return 1;
+      if (bt == null) return -1;
+      if (bt !== at) return bt - at;
+      return a.opportunity.id.localeCompare(b.opportunity.id);
+    };
 
-    const tierFiltered = matchTierFilter === ANY
-      ? scored
-      : scored.filter((s) => s.match?.matchTier === matchTierFilter);
-
-    return tierFiltered.sort((a, b) => (b.match?.matchScore ?? 0) - (a.match?.matchScore ?? 0));
-  }, [opportunities, search, driverType, routeType, trailerType, minGross, paidDeadheadOnly, matchEnabled, profile, matchTierFilter]);
+    // Never mutate source arrays: copy first.
+    const sorted = [...scored];
+    if (sortBy === 'recommended') {
+      if (matchEnabled) {
+        sorted.sort((a, b) => ((b.match?.matchScore ?? 0) - (a.match?.matchScore ?? 0)) || newestCompare(a, b));
+      } else {
+        sorted.sort(newestCompare);
+      }
+    } else if (sortBy === 'newest') {
+      sorted.sort(newestCompare);
+    } else if (sortBy === 'transparency') {
+      sorted.sort((a, b) =>
+        (b.canonical.derived.transparencyScore.score - a.canonical.derived.transparencyScore.score) ||
+        newestCompare(a, b),
+      );
+    } else if (sortBy === 'weekly_gross') {
+      sorted.sort((a, b) => {
+        const ag = a.canonical.derived.financialEstimate.recurringWeeklyGross;
+        const bg = b.canonical.derived.financialEstimate.recurringWeeklyGross;
+        const aFin = typeof ag === 'number' && Number.isFinite(ag);
+        const bFin = typeof bg === 'number' && Number.isFinite(bg);
+        if (aFin && bFin) {
+          if (bg !== ag) return (bg as number) - (ag as number);
+        } else if (aFin) {
+          return -1;
+        } else if (bFin) {
+          return 1;
+        }
+        const t = b.canonical.derived.transparencyScore.score - a.canonical.derived.transparencyScore.score;
+        if (t !== 0) return t;
+        return newestCompare(a, b);
+      });
+    }
+    return sorted;
+  }, [canonicalRows, search, employment, teamSetup, routeType, trailerType, minGross, paidDeadheadOnly, matchEnabled, profile, matchTierFilter, sortBy]);
 
   const kpis = useMemo(() => {
-    const recruiterIds = new Set(opportunities.map((o) => o.recruiter_id));
-    let maxNet = 0;
-    let bestRpm = 0;
-    for (const o of opportunities) {
-      const f = calculateOpportunityFinancials(o);
-      if (f.estimatedNet != null && f.estimatedNet > maxNet) maxNet = f.estimatedNet;
-      if (f.effectiveRpm != null && f.effectiveRpm > bestRpm) bestRpm = f.effectiveRpm;
+    const total = canonicalRows.length;
+    let completeCount = 0;
+    let sumScore = 0;
+    let grossDisclosed = 0;
+    for (const { canonical: c } of canonicalRows) {
+      if (c.derived.transparencyScore.band === 'complete') completeCount++;
+      sumScore += c.derived.transparencyScore.score;
+      const g = c.derived.financialEstimate.recurringWeeklyGross;
+      if (typeof g === 'number' && Number.isFinite(g)) grossDisclosed++;
     }
-    return {
-      count: opportunities.length,
-      recruiters: recruiterIds.size,
-      maxNet,
-      bestRpm,
-    };
-  }, [opportunities]);
+    const avg = total > 0 ? Math.round(sumScore / total) : 0;
+    return { total, completeCount, avg, grossDisclosed };
+  }, [canonicalRows]);
 
   const handleToggleSave = (id: string) => {
     const isSaved = savedIds.has(id);
@@ -271,7 +363,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
                 Opportunities
               </h1>
               <p className="text-sm text-muted-foreground">
-                Profit-first trucking opportunities with real pay clarity.
+                Compare trucking opportunities using disclosed pay, operating terms, and listing transparency.
               </p>
             </div>
           </div>
@@ -404,7 +496,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
               Opportunities
             </h1>
             <p className="text-sm text-muted-foreground">
-              Profit-first trucking opportunities with real pay clarity.
+              Compare trucking opportunities using disclosed pay, operating terms, and listing transparency.
             </p>
           </div>
         </div>
@@ -467,18 +559,10 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={BriefcaseBusiness} label="Available" value={kpis.count.toString()} />
-        <Kpi icon={ShieldCheck} label="Active Recruiters" value={kpis.recruiters.toString()} />
-        <Kpi
-          icon={DollarSign}
-          label="Highest Estimated Net"
-          value={kpis.maxNet > 0 ? `$${Math.round(kpis.maxNet).toLocaleString()}` : '—'}
-        />
-        <Kpi
-          icon={Gauge}
-          label="Best Effective RPM"
-          value={kpis.bestRpm > 0 ? `$${kpis.bestRpm.toFixed(2)}` : '—'}
-        />
+        <Kpi icon={BriefcaseBusiness} label="Available" value={kpis.total.toString()} />
+        <Kpi icon={ShieldCheck} label="Complete Listings" value={kpis.completeCount.toString()} />
+        <Kpi icon={Gauge} label="Avg. Transparency" value={`${kpis.avg}/100`} />
+        <Kpi icon={DollarSign} label="Gross Disclosed" value={kpis.grossDisclosed.toString()} />
       </div>
 
       {/* Filters */}
@@ -493,20 +577,68 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
           />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <FilterSelect label="Driver type" value={driverType} onChange={setDriverType} options={driverTypes} />
-          <FilterSelect label="Route type" value={routeType} onChange={setRouteType} options={routeTypes} />
-          <FilterSelect label="Trailer" value={trailerType} onChange={setTrailerType} options={trailerTypes} />
+          <FilterSelect
+            label="Employment"
+            value={employment}
+            onChange={setEmployment}
+            options={[
+              { value: 'company_driver', label: 'Company Driver' },
+              { value: 'contractor_1099', label: '1099 Contractor' },
+              { value: 'owner_operator', label: 'Owner-Operator' },
+              { value: 'lease_purchase', label: 'Lease-Purchase' },
+            ]}
+          />
+          <FilterSelect
+            label="Team setup"
+            value={teamSetup}
+            onChange={setTeamSetup}
+            options={[
+              { value: 'solo', label: 'Solo' },
+              { value: 'team', label: 'Team' },
+              { value: 'solo_or_team', label: 'Team optional' },
+            ]}
+          />
+          <FilterSelect
+            label="Route type"
+            value={routeType}
+            onChange={setRouteType}
+            options={routeTypes.map((v) => ({ value: v, label: v }))}
+          />
+          <FilterSelect
+            label="Trailer"
+            value={trailerType}
+            onChange={setTrailerType}
+            options={trailerTypes.map((v) => ({ value: v, label: v }))}
+          />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Min weekly gross</label>
+            <label htmlFor="min-gross" className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              Min recurring weekly gross
+            </label>
             <Input
+              id="min-gross"
               type="number"
               inputMode="numeric"
               min={0}
               placeholder="0"
               value={minGross}
               onChange={(e) => setMinGross(e.target.value)}
+              aria-label="Min recurring weekly gross"
             />
           </div>
+          <FilterSelect
+            label="Sort by"
+            value={sortBy}
+            onChange={setSortBy}
+            options={[
+              { value: 'recommended', label: 'Recommended' },
+              { value: 'newest', label: 'Newest' },
+              { value: 'transparency', label: 'Listing transparency' },
+              { value: 'weekly_gross', label: 'Weekly gross' },
+            ]}
+            includeAny={false}
+          />
         </div>
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <div className="flex items-center gap-2">
@@ -518,7 +650,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
           {matchEnabled && (
             <div className="ml-auto min-w-[180px]">
               <Select value={matchTierFilter} onValueChange={setMatchTierFilter}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Match tier">
                   <SelectValue placeholder="All matches" />
                 </SelectTrigger>
                 <SelectContent>
@@ -544,7 +676,7 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
       ) : opportunities.length === 0 ? (
         <EmptyState
           title="No opportunities yet"
-          body="Recruiters are joining HaulTrackerPro now. Check back soon for profit-first openings."
+          body="Recruiters are joining HaulTrackerPro now. Check back soon for new openings."
           action={
             <Button variant="outline" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" /> Refresh
@@ -554,17 +686,19 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
       ) : filtered.length === 0 ? (
         <EmptyState
           title="No results match your filters"
-          body="Try clearing filters or broadening your minimum weekly gross."
+          body="Try clearing filters or broadening your criteria."
           action={
             <Button
               variant="outline"
               onClick={() => {
                 setSearch('');
-                setDriverType(ANY);
+                setEmployment(ANY);
+                setTeamSetup(ANY);
                 setRouteType(ANY);
                 setTrailerType(ANY);
                 setMinGross('');
                 setPaidDeadheadOnly(false);
+                setMatchTierFilter(ANY);
               }}
             >
               Clear filters
@@ -608,23 +742,25 @@ function FilterSelect({
   value,
   onChange,
   options,
+  includeAny = true,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: string[];
+  options: { value: string; label: string }[];
+  includeAny?: boolean;
 }) {
   return (
     <div>
       <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue placeholder="Any" />
+        <SelectTrigger aria-label={label}>
+          <SelectValue placeholder={includeAny ? 'Any' : undefined} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ANY}>Any</SelectItem>
+          {includeAny && <SelectItem value={ANY}>Any</SelectItem>}
           {options.map((opt) => (
-            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
           ))}
         </SelectContent>
       </Select>
