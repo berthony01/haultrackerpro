@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 
 const CANDIDATE_REL =
-  '../../supabase/migrations/20260722153000_phase1l_f2d_safe_recruiter_opportunity_delete.sql';
+  '../../supabase/migrations/20260722170358_93a70bd3-5a69-464e-85a2-6c4fbc1b7861.sql';
 const CANDIDATE_SQL = fs.readFileSync(
   fileURLToPath(new URL(CANDIDATE_REL, import.meta.url)),
   'utf8',
