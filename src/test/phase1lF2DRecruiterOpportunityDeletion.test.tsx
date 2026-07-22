@@ -100,31 +100,6 @@ vi.mock('@/components/opportunities/RecruiterReferralsPanel', () => ({
   RecruiterReferralsPanel: () => <div data-testid="stub-referrals" />,
 }));
 
-const OPPS = [
-  makeOpp({ id: 'opp-draft', title: 'Draft Row', company_name: 'Acme Trucking', status: 'draft' }),
-  makeOpp({ id: 'opp-closed', title: 'Closed Row', company_name: 'Acme Trucking', status: 'closed' }),
-  makeOpp({ id: 'opp-active', title: 'Active Row', company_name: 'Acme Trucking', status: 'active', published_at: '2026-07-15T00:00:00Z' }),
-  makeOpp({ id: 'opp-paused', title: 'Paused Row', company_name: 'Acme Trucking', status: 'paused' }),
-];
-
-function makeOpp(overrides: Record<string, unknown>) {
-  return {
-    id: 'opp',
-    recruiter_id: 'r-1',
-    title: 'Row',
-    company_name: 'Acme Trucking',
-    status: 'draft',
-    admin_review_status: 'approved',
-    published_at: null,
-    driver_type: null,
-    route_type: null,
-    trailer_type: null,
-    estimated_weekly_gross: null,
-    created_at: '2026-07-01T00:00:00Z',
-    updated_at: '2026-07-01T00:00:00Z',
-    ...overrides,
-  };
-}
 
 vi.mock('@/integrations/supabase/client', () => {
   const from = vi.fn(() => ({
