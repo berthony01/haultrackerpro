@@ -74,10 +74,10 @@ describe('Phase 1M-A — recruiter audience', () => {
 describe('Phase 1M-A — back-office (agency) audience', () => {
   it('mounts only assistant/agency plans; driver toggle and recruiter cards are absent', () => {
     renderAt('/pricing?audience=agency');
-    expect(screen.getByRole('tab', { name: /Back-Office/i }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Back-Office Businesses' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByRole('heading', { name: /Agency Workspace/i })).toBeTruthy();
-    // Driver Assistant free callout present
-    expect(screen.getByText(/Driver Assistant/i)).toBeTruthy();
+    // Driver Assistant free callout present (h3 heading)
+    expect(screen.getByRole('heading', { name: /^Driver Assistant$/, level: 3 })).toBeTruthy();
     expect(screen.queryByTestId('driver-billing-toggle')).toBeNull();
     expect(screen.queryByRole('heading', { name: /Recruiter Standard/i, level: 3 })).toBeNull();
   });
