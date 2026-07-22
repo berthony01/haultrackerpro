@@ -115,7 +115,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const deletionPending = deleteOpportunity.isPending;
   const busy = setStatus.isPending || deletionPending;
 
-  const confirmDelete = (event: React.MouseEvent) => {
+  const confirmDelete = (event: MouseEvent) => {
     event.preventDefault();
     if (!pendingDelete) return;
     deleteOpportunity.mutate(pendingDelete.id, {
