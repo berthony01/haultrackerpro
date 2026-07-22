@@ -1,28 +1,25 @@
-// Phase 1L-F2B-P2 — Canonical OpportunityDetail + Financial Disclosure adoption tests.
+// Phase 1L-F2B-P2-R1 — canonical OpportunityDetail adoption tests.
 //
-// Verifies OpportunityDetail is now a strict consumer of the Phase 1L-F1
-// canonical read model: identity/trust/classification/pay/mileage/costs come
-// from `normalizeOpportunity(source)` exclusively; the Listing Transparency
-// Score replaces the legacy Profit Clarity Score; and Est. weekly net is
-// only rendered for cost-bearing employment models.
-
+// Strict, deterministic coverage of the driver-facing detail rendering as the
+// second production consumer of the Phase 1L-F1 canonical view model. Every
+// assertion is scoped to a labeled KV row or a named Card region so we never
+// prove text by counting global occurrences of a value like "No" or
+// "Not disclosed".
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Tables } from '@/integrations/supabase/types';
 import type { OpportunitySourceRow } from '@/lib/opportunities/opportunityCanonicalView';
 
-// ---------- Radix pointer-capture polyfill for jsdom ----------
 beforeAll(() => {
-  const proto = window.HTMLElement.prototype as any;
+  const proto = window.HTMLElement.prototype as unknown as Record<string, unknown>;
   proto.hasPointerCapture = () => false;
   proto.releasePointerCapture = () => {};
   proto.setPointerCapture = () => {};
   proto.scrollIntoView = () => {};
 });
 
-// ---------- Data-hook mocks (keep the component real) ----------
-const driverApplicationsRef: { current: any[] } = { current: [] };
+const driverApplicationsRef: { current: unknown[] } = { current: [] };
 vi.mock('@/hooks/opportunities/useOpportunityApplications', () => ({
   useOpportunityApplications: () => ({
     driverApplications: driverApplicationsRef.current,
@@ -32,7 +29,7 @@ vi.mock('@/hooks/opportunities/useOpportunityApplications', () => ({
 }));
 vi.mock('@/hooks/opportunities/useSavedOpportunities', () => ({
   useSavedOpportunities: () => ({
-    saved: [] as any[],
+    saved: [] as unknown[],
     save: { mutate: vi.fn() },
     unsave: { mutate: vi.fn() },
   }),
@@ -125,11 +122,10 @@ function source(overrides: Partial<OpportunitySourceRow> = {}): OpportunitySourc
   return { ...makeRow(rest as Partial<Row>), recruiter: recruiter ?? null };
 }
 
-/** Fully populated canonical row (CPM contractor_1099). */
 function fullBase(overrides: Partial<OpportunitySourceRow> = {}): OpportunitySourceRow {
   return source({
     canonical_version: 1,
-    title: 'OTR Reefer',
+    title: 'OTR Reefer Solo',
     company_name: 'Acme Freight',
     employment_model: 'contractor_1099',
     team_configuration: 'solo',
@@ -137,15 +133,15 @@ function fullBase(overrides: Partial<OpportunitySourceRow> = {}): OpportunitySou
     trailer_type: 'Reefer',
     hiring_city: 'Dallas',
     hiring_state: 'TX',
-    description: 'A full description.',
+    description: 'A full description of the opportunity.',
     home_time: 'Weekly',
     forced_dispatch: false,
     pets_allowed: true,
     riders_allowed: false,
     equipment_year: '2022',
     typical_lanes: 'TX -> OK',
-    requirements: 'Class A CDL',
-    actual_benefits: 'PTO and health',
+    requirements: 'Class A CDL, 1yr experience.',
+    actual_benefits: 'PTO and health.',
     pay_model: 'cpm',
     cpm: 0.6,
     estimated_weekly_miles: 2500,
@@ -169,126 +165,140 @@ function fullBase(overrides: Partial<OpportunitySourceRow> = {}): OpportunitySou
   });
 }
 
-const driverProfile: any = {
-  id: 'p1',
-  user_id: 'u1',
-  profile_completed: true,
-  allow_verified_recruiter_contact: true,
-  contact_preference: 'in_app',
-};
+const incompleteProfile = { id: 'p2', user_id: 'u2', profile_completed: false } as never;
 
 function renderDetail(row: OpportunitySourceRow, isPro = false) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <OpportunityDetail
-        opportunity={row as any}
+        opportunity={row as never}
         onBack={vi.fn()}
         isPro={isPro}
         onUpgrade={vi.fn()}
-        driverProfile={driverProfile}
+        driverProfile={incompleteProfile}
         onOpenPreferencesForApply={vi.fn()}
       />
     </QueryClientProvider>,
   );
 }
 
+// Scope helper: return the KV wrapper div for a given label. The KV renders
+// <div class="rounded-lg bg-muted/30 p-3"><p>label</p><p>value</p></div>, so
+// `.closest('div')` on the label lands on that wrapper. Throws if the label
+// resolves to more than one node so tests never silently rely on ordering.
+function kvRow(label: string): HTMLElement {
+  const els = screen.getAllByText(label);
+  expect(els.length, `expected exactly 1 KV label "${label}", got ${els.length}`).toBe(1);
+  const wrapper = els[0].closest('div');
+  if (!wrapper) throw new Error(`no wrapper for KV "${label}"`);
+  return wrapper as HTMLElement;
+}
+
+function financialCard(): HTMLElement {
+  const heading = screen.getByText('Financial Disclosure');
+  const card = heading.closest('.p-5');
+  if (!card) throw new Error('Financial Disclosure card not found');
+  return card as HTMLElement;
+}
+
+function feKV(label: string): HTMLElement {
+  const card = financialCard();
+  let el: HTMLElement | null = within(card).getByText(label);
+  while (el && !el.classList.contains('bg-muted/30')) el = el.parentElement;
+  if (!el) throw new Error(`no financial KV wrapper for "${label}"`);
+  return el;
+}
+
 beforeEach(() => {
   driverApplicationsRef.current = [];
 });
 
-describe('OpportunityDetail — canonical identity, trust & classification', () => {
-  it('01. renders canonical title and company name', () => {
+/* =========================================================================
+ * Listing Transparency (exact hydration)
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Listing Transparency', () => {
+  it('renders exact "Transparency 100 · Complete" badge, matching title and aria-label, and neutral disclaimer', () => {
     renderDetail(fullBase());
-    expect(screen.getByRole('heading', { level: 1, name: 'OTR Reefer' })).toBeInTheDocument();
-    expect(screen.getByText('Acme Freight')).toBeInTheDocument();
+    expect(screen.getByText('Transparency 100 · Complete')).toBeInTheDocument();
+    const descriptor =
+      'Listing transparency: 100 out of 100, Complete. Measures disclosure completeness and consistency, not profitability.';
+    expect(screen.getByTitle(descriptor)).toBeInTheDocument();
+    expect(screen.getByLabelText(descriptor)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Listing Transparency measures disclosure completeness and consistency, not profitability.',
+      ),
+    ).toBeInTheDocument();
   });
+});
 
-  it('02. shows "Company not disclosed" when company_name is blank', () => {
-    renderDetail(fullBase({ company_name: '' }));
-    expect(screen.getByText('Company not disclosed')).toBeInTheDocument();
-  });
-
-  it('03. renders "Priority placement" badge when featured', () => {
+/* =========================================================================
+ * Trust separation (Featured vs. Verified Recruiter)
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Trust separation', () => {
+  it('Featured with no recruiter shows Priority placement and no Verified Recruiter', () => {
     renderDetail(fullBase({ featured: true }));
     expect(screen.getByText('Priority placement')).toBeInTheDocument();
+    expect(screen.queryByText('Verified Recruiter')).toBeNull();
   });
 
-  it('04. renders "Verified Recruiter" when recruiter is approved', () => {
+  it('Approved active recruiter shows Verified Recruiter without requiring Featured', () => {
     renderDetail(
       fullBase({
+        featured: false,
         recruiter: { verification_status: 'approved', status: 'active' },
       }),
     );
     expect(screen.getByText('Verified Recruiter')).toBeInTheDocument();
+    expect(screen.queryByText('Priority placement')).toBeNull();
   });
 
-  it('05. does NOT render "Verified Recruiter" when recruiter is not approved', () => {
-    renderDetail(fullBase());
-    expect(screen.queryByText('Verified Recruiter')).toBeNull();
-  });
-
-  it('06. renders canonical employment + team labels', () => {
-    renderDetail(fullBase({ employment_model: 'lease_purchase', team_configuration: 'team' }));
-    expect(screen.getByText('Lease-Purchase')).toBeInTheDocument();
-    expect(screen.getByText('Team')).toBeInTheDocument();
-  });
-
-  it('07. renders "Employment not disclosed" when employment_model is null', () => {
-    renderDetail(fullBase({ employment_model: null }));
-    expect(screen.getByText('Employment not disclosed')).toBeInTheDocument();
-  });
-
-  it('08. hiring area label uses "City, State" when both provided', () => {
-    renderDetail(fullBase());
-    expect(screen.getByText('Dallas, TX')).toBeInTheDocument();
-  });
-
-  it('09. hiring area label falls back to states list when city/state blank', () => {
+  it('Approved but suspended recruiter does not show Verified Recruiter', () => {
     renderDetail(
       fullBase({
-        hiring_city: '',
-        hiring_state: '',
-        hiring_states: ['TX', 'OK'],
+        featured: false,
+        recruiter: { verification_status: 'approved', status: 'suspended' },
       }),
     );
-    expect(screen.getByText('TX, OK')).toBeInTheDocument();
-  });
-
-  it('10. hiring area label is "Hiring area not disclosed" when all blank', () => {
-    renderDetail(
-      fullBase({ hiring_city: '', hiring_state: '', hiring_states: [] }),
-    );
-    expect(screen.getByText('Hiring area not disclosed')).toBeInTheDocument();
+    expect(screen.queryByText('Verified Recruiter')).toBeNull();
   });
 });
 
-describe('OpportunityDetail — canonical pay breakdown', () => {
-  it('11. CPM contractor_1099 renders "CPM" pay-model label and derived weekly gross $1,380', () => {
+/* =========================================================================
+ * Legacy language removal
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Legacy profit language removed', () => {
+  it('removes legacy phrases and tone words while keeping the neutral profitability disclaimer', () => {
     renderDetail(fullBase());
-    expect(screen.getAllByText('CPM').length).toBeGreaterThan(0);
-    expect(screen.getByText('Derived weekly gross')).toBeInTheDocument();
-    expect(screen.getByText('$1,380')).toBeInTheDocument();
+    for (const phrase of ['Approved Opportunity', 'Profit Intelligence', 'Profit Clarity Score']) {
+      expect(screen.queryByText(phrase)).toBeNull();
+    }
+    for (const word of ['Strong', 'Solid', 'Mixed', 'Risky']) {
+      expect(screen.queryAllByText(word)).toHaveLength(0);
+    }
+    expect(
+      screen.getByText(
+        'Listing Transparency measures disclosure completeness and consistency, not profitability.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+/* =========================================================================
+ * All seven pay-model states
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Pay-model states', () => {
+  it('CPM contractor_1099 (fullBase) renders CPM value, loaded miles, and derived weekly gross', () => {
+    renderDetail(fullBase());
+    expect(within(kvRow('Pay model')).getByText('CPM')).toBeInTheDocument();
+    expect(within(kvRow('Loaded weekly miles')).getByText('2,300 mi')).toBeInTheDocument();
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,380')).toBeInTheDocument();
+    // CPM value $0.60/mi is unique to the CPM KV.
+    expect(screen.getByText('$0.60/mi')).toBeInTheDocument();
   });
 
-  it('12. Salary company_driver renders derived weekly gross $1,500 (78000 / 52)', () => {
-    renderDetail(
-      fullBase({
-        employment_model: 'company_driver',
-        pay_model: 'salary',
-        cpm: null,
-        estimated_weekly_miles: null,
-        estimated_loaded_miles: null,
-        estimated_deadhead_miles: null,
-        salary_amount: 78000,
-        salary_frequency: 'annual',
-      }),
-    );
-    expect(screen.getByText('Derived weekly gross')).toBeInTheDocument();
-    expect(screen.getByText('$1,500')).toBeInTheDocument();
-  });
-
-  it('13. Percentage owner_operator renders derived weekly gross from rate × basis', () => {
+  it('Percentage owner_operator renders rate, revenue basis, basis label, and derived gross', () => {
     renderDetail(
       fullBase({
         employment_model: 'owner_operator',
@@ -299,56 +309,14 @@ describe('OpportunityDetail — canonical pay breakdown', () => {
         percentage_basis_label: 'linehaul revenue',
       }),
     );
-    expect(screen.getByText('Derived weekly gross')).toBeInTheDocument();
-    expect(screen.getByText('$1,500')).toBeInTheDocument();
-    expect(screen.getByText('linehaul revenue')).toBeInTheDocument();
+    expect(within(kvRow('Pay model')).getByText('Percentage')).toBeInTheDocument();
+    expect(within(kvRow('Percentage rate')).getByText('25%')).toBeInTheDocument();
+    expect(within(kvRow('Weekly revenue basis')).getByText('$6,000')).toBeInTheDocument();
+    expect(within(kvRow('Percentage basis')).getByText('linehaul revenue')).toBeInTheDocument();
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,500')).toBeInTheDocument();
   });
 
-  it('14. unknown pay model with recruiter-provided weekly gross uses "Recruiter weekly gross" label', () => {
-    renderDetail(
-      fullBase({
-        pay_model: null,
-        cpm: null,
-        estimated_weekly_gross: 1500,
-      }),
-    );
-    expect(screen.getByText('Recruiter weekly gross')).toBeInTheDocument();
-    expect(screen.getByText('$1,500')).toBeInTheDocument();
-  });
-
-  it('15. Sign-on bonus renders $5,000 when provided; "Not disclosed" when absent', () => {
-    const { unmount } = renderDetail(fullBase());
-    expect(screen.getByText('$5,000')).toBeInTheDocument();
-    unmount();
-    renderDetail(fullBase({ sign_on_bonus: null }));
-    expect(screen.getByText('Sign-on bonus')).toBeInTheDocument();
-  });
-
-  it('16. Detention & Layover pay disclose canonical strings', () => {
-    renderDetail(fullBase());
-    expect(screen.getByText('$25/hr after 2 hr')).toBeInTheDocument();
-    expect(screen.getByText('$150/night')).toBeInTheDocument();
-  });
-});
-
-describe('OpportunityDetail — canonical mileage & deadhead', () => {
-  it('17. CPM row renders 2,500 mi total, 2,300 mi loaded, 200 mi deadhead', () => {
-    renderDetail(fullBase());
-    expect(screen.getAllByText('2,500 mi').length).toBeGreaterThan(0);
-    // Loaded miles appears in both the Pay Breakdown (CPM extras) and Mileage sections.
-    expect(screen.getAllByText('2,300 mi').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('200 mi')).toBeInTheDocument();
-  });
-
-  it('18. deadhead_paid=true renders "Paid"; deadhead_paid=false renders "Unpaid"', () => {
-    const { unmount } = renderDetail(fullBase());
-    expect(screen.getByText('Paid')).toBeInTheDocument();
-    unmount();
-    renderDetail(fullBase({ deadhead_paid: false }));
-    expect(screen.getByText('Unpaid')).toBeInTheDocument();
-  });
-
-  it('19. flat_weekly pay model marks mileage rows as "Not applicable"', () => {
+  it('Flat weekly company_driver renders flat pay row and derived weekly gross', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
@@ -361,32 +329,234 @@ describe('OpportunityDetail — canonical mileage & deadhead', () => {
         deadhead_paid: null,
       }),
     );
-    // Multiple "Not applicable" labels expected (weekly, loaded, deadhead miles + paid).
-    expect(screen.getAllByText('Not applicable').length).toBeGreaterThanOrEqual(3);
+    expect(within(kvRow('Pay model')).getByText('Flat weekly')).toBeInTheDocument();
+    expect(within(kvRow('Flat weekly pay')).getByText('$1,600')).toBeInTheDocument();
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
+  });
+
+  it('Salary company_driver renders amount, frequency, and derived weekly gross', () => {
+    renderDetail(
+      fullBase({
+        employment_model: 'company_driver',
+        pay_model: 'salary',
+        cpm: null,
+        salary_amount: 78000,
+        salary_frequency: 'annual',
+        estimated_weekly_miles: null,
+        estimated_loaded_miles: null,
+        estimated_deadhead_miles: null,
+        deadhead_paid: null,
+      }),
+    );
+    expect(within(kvRow('Salary amount')).getByText('$78,000')).toBeInTheDocument();
+    expect(within(kvRow('Salary frequency')).getByText('annual')).toBeInTheDocument();
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,500')).toBeInTheDocument();
+  });
+
+  it('Mixed company_driver renders each component label + amount and derived weekly gross', () => {
+    renderDetail(
+      fullBase({
+        employment_model: 'company_driver',
+        pay_model: 'mixed',
+        cpm: null,
+        flat_weekly_pay: null,
+        estimated_weekly_miles: null,
+        estimated_loaded_miles: null,
+        estimated_deadhead_miles: null,
+        deadhead_paid: null,
+        mixed_pay_components: [
+          { label: 'Base', amount: 1000, frequency: 'weekly' },
+          { label: 'Bonus', amount: 200, frequency: 'weekly' },
+        ] as unknown as Row['mixed_pay_components'],
+      }),
+    );
+    expect(screen.getByText('Base')).toBeInTheDocument();
+    expect(screen.getByText('Bonus')).toBeInTheDocument();
+    expect(screen.getByText('$1,000 weekly')).toBeInTheDocument();
+    expect(screen.getByText('$200 weekly')).toBeInTheDocument();
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,200')).toBeInTheDocument();
+  });
+
+  it('Other company_driver renders method label, other weekly gross, and derived weekly gross', () => {
+    renderDetail(
+      fullBase({
+        employment_model: 'company_driver',
+        pay_model: 'other',
+        cpm: null,
+        other_pay_method_label: 'per-load',
+        other_weekly_gross: 1500,
+        estimated_weekly_miles: null,
+        estimated_loaded_miles: null,
+        estimated_deadhead_miles: null,
+        deadhead_paid: null,
+      }),
+    );
+    expect(within(kvRow('Other pay method')).getByText('per-load')).toBeInTheDocument();
+    expect(within(kvRow('Other weekly gross')).getByText('$1,500')).toBeInTheDocument();
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,500')).toBeInTheDocument();
+  });
+
+  it('Unknown pay_model with recruiter-provided gross renders "Not disclosed" pay model and Recruiter weekly gross and no formula rows', () => {
+    renderDetail(
+      fullBase({
+        employment_model: 'company_driver',
+        pay_model: null,
+        cpm: null,
+        estimated_weekly_gross: 1500,
+        estimated_weekly_miles: null,
+        estimated_loaded_miles: null,
+        estimated_deadhead_miles: null,
+        deadhead_paid: null,
+      }),
+    );
+    expect(within(kvRow('Pay model')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(within(kvRow('Recruiter weekly gross')).getByText('$1,500')).toBeInTheDocument();
+    for (const label of [
+      'Flat weekly pay',
+      'Salary amount',
+      'Percentage rate',
+      'Other pay method',
+      'Loaded weekly miles',
+      'Mixed pay components',
+    ]) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
   });
 });
 
-describe('OpportunityDetail — Listing Transparency (replaces legacy Profit Clarity)', () => {
-  it('20. Listing Transparency Score section is always rendered', () => {
-    renderDetail(fullBase());
-    expect(screen.getByText('Listing Transparency')).toBeInTheDocument();
-    expect(screen.getByText(/Transparency \d+ · /)).toBeInTheDocument();
+/* =========================================================================
+ * One-time incentive isolation
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · One-time incentive isolation', () => {
+  const base = (bonus: number | null) =>
+    fullBase({
+      employment_model: 'company_driver',
+      pay_model: 'flat_weekly',
+      cpm: null,
+      flat_weekly_pay: 1600,
+      sign_on_bonus: bonus,
+      estimated_weekly_miles: null,
+      estimated_loaded_miles: null,
+      estimated_deadhead_miles: null,
+      deadhead_paid: null,
+    });
+
+  it('null sign-on bonus: recurring gross unchanged, Sign-on bonus row Not disclosed', () => {
+    renderDetail(base(null));
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
+    expect(within(kvRow('Sign-on bonus')).getByText('Not disclosed')).toBeInTheDocument();
   });
 
-  it('21. Listing Transparency has an explanatory caption; no "Profit Clarity" copy', () => {
-    renderDetail(fullBase());
+  it('$10,000 sign-on bonus: recurring gross still $1,600 and Sign-on bonus row shows $10,000', () => {
+    renderDetail(base(10000));
+    expect(within(kvRow('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
+    expect(within(kvRow('Sign-on bonus')).getByText('$10,000')).toBeInTheDocument();
+  });
+});
+
+/* =========================================================================
+ * Ownership-cost gating (company_driver / unknown employment)
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Ownership-cost gating', () => {
+  it('Pro company_driver: no ownership-cost KVs and exact company-driver note', () => {
+    renderDetail(
+      fullBase({
+        employment_model: 'company_driver',
+        pay_model: 'flat_weekly',
+        cpm: null,
+        flat_weekly_pay: 1600,
+        insurance_deductions: 100,
+        insurance_deduction_frequency: 'weekly',
+        lease_payment: 400,
+        lease_payment_frequency: 'weekly',
+        escrow_required_state: 'required',
+        escrow_amount: 500,
+        escrow_amount_frequency: 'weekly',
+        estimated_weekly_miles: null,
+        estimated_loaded_miles: null,
+        estimated_deadhead_miles: null,
+        deadhead_paid: null,
+      }),
+      true,
+    );
+    for (const label of [
+      'Known weekly costs',
+      'Estimated weekly net',
+      'Net per total mile',
+      'Lease payment',
+      'Escrow amount',
+    ]) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
     expect(
-      screen.getByText(/Listing Transparency measures disclosure completeness/i),
+      screen.getByText('Company driver: employer-borne operating costs are excluded.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Profit Clarity/i)).toBeNull();
   });
 
-  it('22. Missing disclosure count renders (0+) — proves the checklist ran', () => {
-    renderDetail(fullBase());
-    expect(screen.getByText('Missing disclosures')).toBeInTheDocument();
+  it('Pro unknown employment: no ownership-cost KVs and exact unknown-employment note', () => {
+    renderDetail(fullBase({ employment_model: null }), true);
+    for (const label of [
+      'Known weekly costs',
+      'Estimated weekly net',
+      'Net per total mile',
+      'Lease payment',
+      'Escrow amount',
+    ]) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+    expect(
+      screen.getByText(
+        'Employment arrangement must be disclosed before ownership-cost net can be estimated.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+/* =========================================================================
+ * Cost-bearing financial estimate (Pro)
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Cost-bearing financial estimate', () => {
+  it('Complete 1099 fullBase renders exact recurring gross, costs, net, rpm, and deadhead percent', () => {
+    renderDetail(fullBase(), true);
+    expect(within(feKV('Derived weekly gross')).getByText('$1,380')).toBeInTheDocument();
+    expect(within(feKV('Known weekly costs')).getByText('$175')).toBeInTheDocument();
+    expect(within(feKV('Estimated weekly net')).getByText('$1,205')).toBeInTheDocument();
+    expect(within(feKV('Gross per total mile')).getByText('$0.55/mi')).toBeInTheDocument();
+    expect(within(feKV('Net per total mile')).getByText('$0.48/mi')).toBeInTheDocument();
+    expect(within(feKV('Deadhead %')).getByText('8%')).toBeInTheDocument();
   });
 
-  it('23. Conflict count is shown when recruiter-provided gross conflicts with derived >10%', () => {
+  it('Lease-purchase renders Lease payment KV, updated known weekly costs, and updated net', () => {
+    renderDetail(
+      fullBase({
+        employment_model: 'lease_purchase',
+        lease_payment: 400,
+        lease_payment_frequency: 'weekly',
+      }),
+      true,
+    );
+    expect(within(feKV('Lease payment')).getByText('$400 weekly')).toBeInTheDocument();
+    expect(within(feKV('Known weekly costs')).getByText('$575')).toBeInTheDocument();
+    expect(within(feKV('Estimated weekly net')).getByText('$805')).toBeInTheDocument();
+  });
+
+  it('Incomplete cost-bearing: Financial Disclosure marked Incomplete, Missing disclosures list includes Insurance, no fabricated $0 for unknown metrics', () => {
+    renderDetail(
+      fullBase({
+        insurance_deductions: null,
+        insurance_deduction_frequency: null,
+      }),
+      true,
+    );
+    const card = financialCard();
+    expect(within(card).getByText('Incomplete')).toBeInTheDocument();
+    const missing = within(card).getByText('Missing disclosures').parentElement as HTMLElement;
+    expect(within(missing).getByText('Insurance')).toBeInTheDocument();
+    expect(within(feKV('Known weekly costs')).getByText('—')).toBeInTheDocument();
+    expect(within(feKV('Estimated weekly net')).getByText('—')).toBeInTheDocument();
+  });
+
+  it('Recruiter/derived conflict: status "Conflict" with exact conflict line', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
@@ -397,29 +567,57 @@ describe('OpportunityDetail — Listing Transparency (replaces legacy Profit Cla
         estimated_weekly_miles: null,
         estimated_loaded_miles: null,
         estimated_deadhead_miles: null,
+        deadhead_paid: null,
       }),
       true,
     );
-    expect(screen.getAllByText('Conflicts').length).toBeGreaterThan(0);
+    const card = financialCard();
+    expect(within(card).getByText('Conflict')).toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        'Recruiter-provided weekly gross ($1500.00) differs from derived gross ($1000.00) by more than 10%.',
+      ),
+    ).toBeInTheDocument();
   });
 });
 
-describe('OpportunityDetail — Financial Disclosure gating', () => {
-  it('24. Free tier renders the neutral upgrade panel — no "Est. weekly net" leak', () => {
-    renderDetail(fullBase(), false);
-    expect(screen.getByText('Unlock detailed financial disclosures')).toBeInTheDocument();
-    expect(screen.queryByText('Estimated weekly net')).toBeNull();
+/* =========================================================================
+ * Zero / false preservation
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
+  it('zero mileage disclosures render "0 mi" in each mileage KV', () => {
+    renderDetail(
+      fullBase({
+        estimated_weekly_miles: 0,
+        estimated_loaded_miles: 0,
+        estimated_deadhead_miles: 0,
+      }),
+    );
+    expect(within(kvRow('Weekly miles')).getByText('0 mi')).toBeInTheDocument();
+    expect(within(kvRow('Loaded miles')).getByText('0 mi')).toBeInTheDocument();
+    expect(within(kvRow('Deadhead miles')).getByText('0 mi')).toBeInTheDocument();
   });
 
-  it('25. Pro tier + contractor_1099 shows Estimated weekly net $1,205 (1380 - 175)', () => {
-    renderDetail(fullBase(), true);
-    expect(screen.getByText('Estimated weekly net')).toBeInTheDocument();
-    expect(screen.getByText('$1,205')).toBeInTheDocument();
-    expect(screen.getByText('Known weekly costs')).toBeInTheDocument();
-    expect(screen.getByText('$175')).toBeInTheDocument();
+  it('deadhead_paid=false with positive deadhead miles renders "Unpaid" in its own KV', () => {
+    renderDetail(fullBase({ deadhead_paid: false }));
+    expect(within(kvRow('Deadhead paid?')).getByText('Unpaid')).toBeInTheDocument();
   });
 
-  it('26. Pro tier + company_driver hides Estimated weekly net and shows the company-driver note', () => {
+  it('forced_dispatch/pets_allowed/riders_allowed = false render "No" in each labeled KV', () => {
+    renderDetail(
+      fullBase({ forced_dispatch: false, pets_allowed: false, riders_allowed: false }),
+    );
+    expect(within(kvRow('Forced dispatch')).getByText('No')).toBeInTheDocument();
+    expect(within(kvRow('Pets allowed')).getByText('No')).toBeInTheDocument();
+    expect(within(kvRow('Riders allowed')).getByText('No')).toBeInTheDocument();
+  });
+});
+
+/* =========================================================================
+ * Disclosure distinction (not_disclosed vs not_applicable)
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
+  it('flat-weekly company_driver with no mileage: mileage KVs Not applicable', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
@@ -429,66 +627,53 @@ describe('OpportunityDetail — Financial Disclosure gating', () => {
         estimated_weekly_miles: null,
         estimated_loaded_miles: null,
         estimated_deadhead_miles: null,
+        deadhead_paid: null,
       }),
-      true,
     );
-    expect(screen.queryByText('Estimated weekly net')).toBeNull();
-    expect(
-      screen.getByText(/Company driver: employer-borne operating costs are excluded/i),
-    ).toBeInTheDocument();
+    expect(within(kvRow('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
+    expect(within(kvRow('Loaded miles')).getByText('Not applicable')).toBeInTheDocument();
+    expect(within(kvRow('Deadhead miles')).getByText('Not applicable')).toBeInTheDocument();
   });
 
-  it('27. Pro tier + unknown employment shows the unknown-employment note', () => {
-    renderDetail(fullBase({ employment_model: null }), true);
-    expect(
-      screen.getByText(/Employment arrangement must be disclosed/i),
-    ).toBeInTheDocument();
-  });
-
-  it('28. Pro tier + lease_purchase shows Lease payment cost row', () => {
+  it('content sections keep all four headings and render Not disclosed fallback for empty content', () => {
     renderDetail(
       fullBase({
-        employment_model: 'lease_purchase',
-        lease_payment: 400,
-        lease_payment_frequency: 'weekly',
+        actual_benefits: null,
+        typical_lanes: null,
+        requirements: null,
+        description: null,
       }),
-      true,
     );
-    expect(screen.getByText('Lease payment')).toBeInTheDocument();
-    expect(screen.getByText('$400 weekly')).toBeInTheDocument();
-  });
-
-  it('29. Financial disclaimer copy is present on Pro tier', () => {
-    renderDetail(fullBase(), true);
-    expect(
-      screen.getByText(/They are not guaranteed pay\./i),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Benefits' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Typical Lanes' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Requirements' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'About this Opportunity' })).toBeInTheDocument();
+    // Four content sections, each falls back to "Not disclosed".
+    expect(screen.getAllByText('Not disclosed').length).toBeGreaterThanOrEqual(4);
   });
 });
 
-describe('OpportunityDetail — content sections + apply action bar preserved', () => {
-  it('30. Benefits / Typical Lanes / Requirements / About sections render canonical values', () => {
-    renderDetail(fullBase());
-    expect(screen.getByText('PTO and health')).toBeInTheDocument();
-    expect(screen.getByText('TX -> OK')).toBeInTheDocument();
-    expect(screen.getByText('Class A CDL')).toBeInTheDocument();
-    expect(screen.getByText('A full description.')).toBeInTheDocument();
-  });
-
-  it('31. Apply Now + Request Info + Save action buttons remain rendered', () => {
-    renderDetail(fullBase());
-    expect(screen.getByRole('button', { name: /^Apply Now$/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Request Info/ })).toBeInTheDocument();
+/* =========================================================================
+ * Action bar, Free CTA, and Refer-a-Driver gating
+ * ========================================================================= */
+describe('Phase 1L-F2B-P2-R1 · Actions and Free CTA', () => {
+  it('Free renders unlock CTA, all action buttons, and Refer a Driver gated with Pro suffix', () => {
+    renderDetail(fullBase(), false);
+    expect(screen.getByText('Unlock detailed financial disclosures')).toBeInTheDocument();
+    expect(screen.queryByText('Financial Disclosure')).toBeNull();
+    expect(screen.getByRole('button', { name: /Back to Opportunities/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Save$/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Request Info/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Apply Now$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Refer a Driver — Pro feature' }),
+    ).toBeInTheDocument();
   });
 
-  it('32. Home Time & Lifestyle renders equipment year + forced dispatch answer', () => {
-    renderDetail(fullBase());
-    expect(screen.getByText('2022')).toBeInTheDocument();
-    // Home time badge + section value both render 'Weekly' -> at least one match.
-    expect(screen.getAllByText('Weekly').length).toBeGreaterThan(0);
-    // forced_dispatch=false -> "No"
-    const noNodes = screen.getAllByText('No');
-    expect(noNodes.length).toBeGreaterThan(0);
+  it('Pro renders Refer a Driver without the Pro suffix and shows Financial Disclosure card', () => {
+    renderDetail(fullBase(), true);
+    expect(screen.getByRole('button', { name: /^Refer a Driver$/ })).toBeInTheDocument();
+    expect(screen.getByText('Financial Disclosure')).toBeInTheDocument();
+    expect(screen.queryByText('Unlock detailed financial disclosures')).toBeNull();
   });
 });

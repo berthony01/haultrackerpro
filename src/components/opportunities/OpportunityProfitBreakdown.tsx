@@ -229,7 +229,7 @@ export function OpportunityProfitBreakdown({ canonical, isPro, onUpgrade }: Prop
 
           {isCompanyDriver && (
             <p className="text-xs text-muted-foreground mb-3">
-              Company driver: employer-borne operating costs are excluded from any net estimate.
+              Company driver: employer-borne operating costs are excluded.
             </p>
           )}
           {isUnknownEm && (
@@ -255,10 +255,10 @@ export function OpportunityProfitBreakdown({ canonical, isPro, onUpgrade }: Prop
             </div>
           )}
 
-          {t.missingRelevantFields.length > 0 && (
+          {fe.missingInputs.length > 0 && (
             <DiagBlock
               title="Missing disclosures"
-              items={t.missingRelevantFields.map(humanize)}
+              items={fe.missingInputs.map(humanize)}
               tone="warn"
             />
           )}
@@ -279,8 +279,8 @@ export function OpportunityProfitBreakdown({ canonical, isPro, onUpgrade }: Prop
           <div className="flex items-start gap-2 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground mt-3">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              Estimates use only the recruiter's disclosed recurring compensation and, for
-              cost-bearing models, disclosed recurring costs. They are not guaranteed pay.
+              Estimates use disclosed recurring compensation and relevant recurring costs.
+              They are not guaranteed pay.
             </span>
           </div>
         </Card>
