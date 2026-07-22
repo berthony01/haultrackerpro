@@ -801,7 +801,7 @@ describe('Phase 1L-F2C · Save wiring', () => {
   it('12. Save on card invokes save.mutate with exact opportunity id; then Unsave invokes unsave.mutate with same id', async () => {
     const row = contractorFullBase({ id: 'opp-save', title: 'Save Row' });
     opportunitiesStore.set([row as unknown as Row]);
-    renderPage();
+    const firstRender = renderPage();
 
     const card = cardFor('Save Row');
     fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
@@ -809,10 +809,13 @@ describe('Phase 1L-F2C · Save wiring', () => {
     expect(saveSpy.mock.calls[0][0]).toBe('opp-save');
     expect(unsaveSpy).not.toHaveBeenCalled();
 
-    // Seed the saved store so Unsave surfaces.
+    // Unmount before mutating the saved store, then seed and rerender so
+    // the newly mounted tree observes the saved row deterministically.
+    firstRender.unmount();
     savedStore.set([
       { id: 's1', user_id: 'u1', opportunity_id: 'opp-save', created_at: '2026-07-01T00:00:00Z' },
     ]);
+    renderPage();
     const card2 = cardFor('Save Row');
     const unsaveBtn = within(card2).getByRole('button', { name: 'Unsave' });
     fireEvent.click(unsaveBtn);
