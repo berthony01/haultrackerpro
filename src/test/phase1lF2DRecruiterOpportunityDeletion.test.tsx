@@ -105,7 +105,7 @@ vi.mock('@/integrations/supabase/client', () => {
   const from = vi.fn(() => ({
     select: () => ({
       eq: () => ({
-        order: async () => ({ data: OPPS, error: null }),
+        order: async () => ({ data: h.opportunities, error: null }),
       }),
     }),
     update: () => ({
