@@ -6,13 +6,36 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const h = vi.hoisted(() => ({
-  rpc: vi.fn(),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-  billingRefresh: vi.fn(),
-  updateEq2: vi.fn(async () => ({ error: null })),
-}));
+const h = vi.hoisted(() => {
+  function makeOpp(overrides: Record<string, unknown>) {
+    return {
+      id: 'opp',
+      recruiter_id: 'r-1',
+      title: 'Row',
+      company_name: 'Acme Trucking',
+      status: 'draft',
+      admin_review_status: 'approved',
+      published_at: null,
+      driver_type: null,
+      route_type: null,
+      trailer_type: null,
+      estimated_weekly_gross: null,
+      created_at: '2026-07-01T00:00:00Z',
+      updated_at: '2026-07-01T00:00:00Z',
+      ...overrides,
+    };
+  }
+  const opportunities = [
+    makeOpp({ id: 'opp-draft', title: 'Draft Row', company_name: 'Acme Trucking', status: 'draft' }),
+    makeOpp({ id: 'opp-closed', title: 'Closed Row', company_name: 'Acme Trucking', status: 'closed' }),
+    makeOpp({ id: 'opp-active', title: 'Active Row', company_name: 'Acme Trucking', status: 'active', published_at: '2026-07-15T00:00:00Z' }),
+    makeOpp({ id: 'opp-paused', title: 'Paused Row', company_name: 'Acme Trucking', status: 'paused' }),
+  ];
+  return {
+    rpc: (globalThis as unknown as { vi: typeof import('vitest').vi }).vi ? undefined : undefined,
+  } as never;
+});
+// Re-declare hoisted h using vi.hoisted directly (the block above is replaced below)
 
 vi.mock('sonner', () => ({
   toast: { success: h.toastSuccess, error: h.toastError },
