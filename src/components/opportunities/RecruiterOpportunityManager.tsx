@@ -112,7 +112,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const openCreate = () => { setEditing(null); setView('form'); };
   const openEdit = (o: Opportunity) => { setEditing(o); setView('form'); };
   const canActivate = true;
-  const deletionPending = deleteOpportunity.isPending;
+  const deletionPending = deleteOpportunity?.isPending ?? false;
   const busy = setStatus.isPending || deletionPending;
 
   const confirmDelete = (event: MouseEvent) => {
