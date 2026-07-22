@@ -255,10 +255,10 @@ export function OpportunityProfitBreakdown({ canonical, isPro, onUpgrade }: Prop
             </div>
           )}
 
-          {t.missingRelevantFields.length > 0 && (
+          {fe.missingInputs.length > 0 && (
             <DiagBlock
               title="Missing disclosures"
-              items={t.missingRelevantFields.map(humanize)}
+              items={fe.missingInputs.map(humanize)}
               tone="warn"
             />
           )}
