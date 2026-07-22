@@ -59,31 +59,31 @@ BEGIN
     SELECT 1 FROM public.opportunity_applications a
      WHERE a.opportunity_id = p_opportunity_id
   ) INTO v_exists;
-  IF v_exists THEN v_blockers := v_blockers || 'applications'; END IF;
+  IF v_exists THEN v_blockers := array_append(v_blockers, 'applications'); END IF;
 
   SELECT EXISTS (
     SELECT 1 FROM public.driver_referrals r
      WHERE r.opportunity_id = p_opportunity_id
   ) INTO v_exists;
-  IF v_exists THEN v_blockers := v_blockers || 'referrals'; END IF;
+  IF v_exists THEN v_blockers := array_append(v_blockers, 'referrals'); END IF;
 
   SELECT EXISTS (
     SELECT 1 FROM public.opportunity_offers f
      WHERE f.opportunity_id = p_opportunity_id
   ) INTO v_exists;
-  IF v_exists THEN v_blockers := v_blockers || 'offers'; END IF;
+  IF v_exists THEN v_blockers := array_append(v_blockers, 'offers'); END IF;
 
   SELECT EXISTS (
     SELECT 1 FROM public.contracts c
      WHERE c.opportunity_id = p_opportunity_id
   ) INTO v_exists;
-  IF v_exists THEN v_blockers := v_blockers || 'contracts'; END IF;
+  IF v_exists THEN v_blockers := array_append(v_blockers, 'contracts'); END IF;
 
   SELECT EXISTS (
     SELECT 1 FROM public.opportunity_reports rp
      WHERE rp.opportunity_id = p_opportunity_id
   ) INTO v_exists;
-  IF v_exists THEN v_blockers := v_blockers || 'reports'; END IF;
+  IF v_exists THEN v_blockers := array_append(v_blockers, 'reports'); END IF;
 
   IF array_length(v_blockers, 1) IS NOT NULL THEN
     RETURN jsonb_build_object(
