@@ -4143,6 +4143,10 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      delete_recruiter_opportunity: {
+        Args: { p_opportunity_id: string }
+        Returns: Json
+      }
       driver_can_access_opportunity: {
         Args: { _opportunity_id: string; _recruiter_id: string }
         Returns: boolean
