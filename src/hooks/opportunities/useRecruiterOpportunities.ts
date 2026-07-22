@@ -10,6 +10,47 @@ type Update = TablesUpdate<'opportunities'>;
 export type OpportunityInsert = Omit<Insert, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at'>;
 export type OpportunityUpdate = Omit<Update, 'recruiter_id' | 'admin_review_status' | 'featured' | 'view_count' | 'published_at' | 'id'>;
 
+// Phase 1L-F2D — canonical result contract for the safe delete RPC.
+export type DeleteRecruiterOpportunityResult = {
+  result_code: 'deleted' | 'not_found' | 'status_blocked' | 'related_records';
+  blockers?: string[];
+};
+
+// Local narrow adapter for the newly added RPC. Generated types have not been
+// regenerated yet because the migration is still a candidate. The adapter is
+// the sole authorized workaround; no `any`, `@ts-ignore`, or generated-type
+// edits are used.
+type DeleteRecruiterOpportunityRpc = (
+  fn: 'delete_recruiter_opportunity',
+  args: { p_opportunity_id: string },
+) => PromiseLike<{ data: unknown; error: unknown }>;
+
+const callDeleteRecruiterOpportunity = supabase.rpc.bind(supabase) as unknown as DeleteRecruiterOpportunityRpc;
+
+const GENERIC_DELETE_ERROR = 'Unable to delete this opportunity right now.';
+
+function parseDeleteResult(x: unknown): DeleteRecruiterOpportunityResult | null {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+  const obj = x as Record<string, unknown>;
+  const code = obj.result_code;
+  if (
+    code !== 'deleted' &&
+    code !== 'not_found' &&
+    code !== 'status_blocked' &&
+    code !== 'related_records'
+  ) {
+    return null;
+  }
+  if (code === 'related_records') {
+    const b = obj.blockers;
+    if (!Array.isArray(b) || b.length === 0 || !b.every((x) => typeof x === 'string')) {
+      return null;
+    }
+    return { result_code: 'related_records', blockers: [...(b as string[])] };
+  }
+  return { result_code: code };
+}
+
 export function useRecruiterOpportunities() {
   const { user } = useAuth();
   const { profile, isApproved, canPost, isVerified } = useRecruiterProfile();
@@ -82,6 +123,43 @@ export function useRecruiterOpportunities() {
     onSuccess: invalidate,
   });
 
+  const deleteOpportunity = useMutation({
+    mutationFn: async (id: string): Promise<DeleteRecruiterOpportunityResult> => {
+      requireCanPost();
+      let resp: { data: unknown; error: unknown };
+      try {
+        resp = await callDeleteRecruiterOpportunity(
+          'delete_recruiter_opportunity',
+          { p_opportunity_id: id },
+        );
+      } catch {
+        throw new Error(GENERIC_DELETE_ERROR);
+      }
+      if (resp.error) {
+        throw new Error(GENERIC_DELETE_ERROR);
+      }
+      const parsed = parseDeleteResult(resp.data);
+      if (!parsed) {
+        throw new Error(GENERIC_DELETE_ERROR);
+      }
+      switch (parsed.result_code) {
+        case 'deleted':
+          return parsed;
+        case 'status_blocked':
+          throw new Error('Close this opportunity before deleting it permanently.');
+        case 'related_records':
+          throw new Error(
+            'This opportunity cannot be deleted because it has connected applications, referrals, offers, contracts, or reports. Keep it closed to preserve those records.',
+          );
+        case 'not_found':
+          throw new Error(
+            'This opportunity could not be found or you do not have permission to delete it.',
+          );
+      }
+    },
+    onSuccess: invalidate,
+  });
+
   return {
     opportunities: listQuery.data ?? [],
     isLoading: listQuery.isLoading,
@@ -95,5 +173,6 @@ export function useRecruiterOpportunities() {
     createOpportunity,
     updateOpportunity,
     setStatus,
+    deleteOpportunity,
   };
 }
