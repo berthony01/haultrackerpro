@@ -56,7 +56,7 @@ describe('Phase 1M-A — driver audience', () => {
 describe('Phase 1M-A — recruiter audience', () => {
   it('mounts only recruiter plans; driver toggle and agency callout are absent', () => {
     renderAt('/pricing?audience=recruiter');
-    expect(screen.getByRole('tab', { name: /Recruiters/i }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Recruiters & Carriers' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByRole('heading', { name: /Recruiter Standard/i, level: 3 })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /^Starter$/, level: 3 })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /^Growth$/, level: 3 })).toBeTruthy();
