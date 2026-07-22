@@ -204,10 +204,10 @@ function financialCard(): HTMLElement {
 
 function feKV(label: string): HTMLElement {
   const card = financialCard();
-  const p = within(card).getByText(label);
-  const wrapper = p.closest('div');
-  if (!wrapper) throw new Error(`no wrapper for financial KV "${label}"`);
-  return wrapper as HTMLElement;
+  let el: HTMLElement | null = within(card).getByText(label);
+  while (el && !el.classList.contains('bg-muted/30')) el = el.parentElement;
+  if (!el) throw new Error(`no financial KV wrapper for "${label}"`);
+  return el;
 }
 
 beforeEach(() => {
