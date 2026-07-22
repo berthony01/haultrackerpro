@@ -5,24 +5,30 @@ import {
   Truck,
   CheckCircle2,
   Check,
-  AlertTriangle,
   Users,
   Briefcase,
   Menu,
   X,
   Sparkles,
+  ClipboardList,
+  FileCheck2,
+  UserCheck,
+  Fuel,
+  Receipt,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 import SEOHead from '@/components/SEOHead';
 import { trackStarterKitCTAClicked } from '@/lib/analytics';
+import { ASSISTANT_AGENCY_PLANS } from '@/lib/agencyPlans';
 
 const faqs = [
   { q: 'Is it really free?', a: 'Yes. The Free plan gives drivers unlimited load logging, expense tracking, multi-stop loads, basic smart alerts, and CSV exports — no credit card. Pro ($19.99/mo or $179.88/yr) adds AI automation, advanced insights, and the Driver Scorecard.' },
   { q: 'How do recruiters get verified?', a: 'Recruiters apply for verified access on the Recruiters page. Once approved, they can post unlimited standard opportunities, manage applicants, and track referrals. Paid recruiter plans add premium visibility, analytics, and contract workflow tools.' },
-  { q: 'Can I use HaulTracker Pro to help other drivers as a side hustle?', a: 'Yes. Driver Assistants can help one or more drivers, and Agencies can manage multiple approved driver clients. Access requires explicit driver approval, drivers can revoke at any time, and every action is audit-logged. Payments between drivers and assistants/agencies are arranged outside HaulTracker Pro for now — opportunity only, no promise of clients or income.' },
+  { q: 'Can I use HaulTracker Pro to help other drivers as a back-office professional?', a: 'Yes. Driver Assistants can help one or more drivers, and Agencies can manage multiple approved driver clients. Access requires explicit driver approval, drivers can revoke at any time, and every action is audit-logged. Payments between drivers and assistants or agencies are arranged outside HaulTracker Pro for now — opportunity only, no promise of clients or income.' },
   { q: 'Do assistants or agencies get access automatically?', a: 'No. Submitting an agency request never grants access. A driver must approve a specific delegation and choose exactly which permissions are granted (loads, expenses, fuel, reports, limited settings). Drivers can revoke instantly from the Driver Control Center.' },
   { q: 'Is my data secure?', a: 'All data is encrypted in transit and stored securely. We never sell or share your data.' },
   { q: 'How is this different from a spreadsheet?', a: 'Instant profit calculations, weekly closeouts, pay variance alerts, and exports built specifically for trucking — no formulas to maintain.' },
@@ -47,14 +53,22 @@ const TEXT_MUTED = 'hsl(220, 10%, 65%)';
 const TEXT_DIM = 'hsl(220, 10%, 50%)';
 const GREEN = 'hsl(152, 60%, 45%)';
 
+type WorkspaceKey = 'driver' | 'recruiter' | 'backoffice';
+
+const AGENCY_STARTER_PRICE = ASSISTANT_AGENCY_PLANS.agency_starter.monthlyPrice;
+
 export default function Landing() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [workspace, setWorkspace] = useState<WorkspaceKey>('driver');
 
   const goToDriver = () => navigate('/auth?intent=driver');
-  const goToRecruiter = () => navigate('/auth?intent=recruiter');
-  const goToRecruiterInfo = () => navigate('/recruiters');
+
+  const scrollToSolutions = useCallback(() => {
+    const el = document.getElementById('solutions');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   useEffect(() => {
     if (!window.location.hash) return;
@@ -71,11 +85,27 @@ export default function Landing() {
     requestAnimationFrame(tryScroll);
   }, []);
 
+  const desktopNav = [
+    { label: 'Features', href: '/features' },
+    { label: 'Pricing', href: '/pricing' },
+    { label: 'Resources', href: '/resources' },
+  ];
+
+  const mobileNav = [
+    { label: 'Solutions', kind: 'scroll' as const },
+    { label: 'Features', href: '/features' },
+    { label: 'Pricing', href: '/pricing' },
+    { label: 'Resources', href: '/resources' },
+    { label: 'For Recruiters', href: '/recruiters' },
+    { label: 'Assistants & Agencies', href: '/assistants-agencies' },
+    { label: 'Sign In', href: '/auth' },
+  ];
+
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: NAVY_BG }}>
       <SEOHead
-        title="HaulTrackerPro — Trucking Profit, Verified Jobs, and Back-Office Agency Tools"
-        description="HaulTracker Pro helps truck drivers track real profit, recruiters post verified jobs, and driver assistants or back-office agencies manage approved driver accounts with permission-based access and full audit logs."
+        title="HaulTrackerPro — The Business Platform Behind Every Truck"
+        description="HaulTracker Pro helps truck drivers track real profit, recruiters post verified opportunities, and back-office professionals manage approved driver accounts with permission-based access and full audit logs."
         path="/"
         jsonLd={[
           {
@@ -86,7 +116,7 @@ export default function Landing() {
             applicationSubCategory: 'Trucking Software',
             operatingSystem: 'Web',
             description:
-              'Truck driver profit tracker and verified recruiter opportunity platform.',
+              'Truck driver profit tracker, verified recruiter opportunity platform, and back-office workspace for driver assistants and agencies.',
             url: 'https://haultrackerpro.com',
             offers: [
               { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Driver Free' },
@@ -101,6 +131,7 @@ export default function Landing() {
       <nav
         className="sticky top-0 z-50 border-b"
         style={{ background: NAVY_BG, borderColor: 'hsl(220, 16%, 16%)' }}
+        data-testid="landing-header"
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <button
@@ -111,15 +142,12 @@ export default function Landing() {
             <Truck className="h-6 w-6" style={{ color: AMBER }} />
             <span className="text-lg font-black tracking-tight text-white">HaulTrackerPro</span>
           </button>
-          <div className="hidden md:flex items-center gap-1">
-            {[
-              { label: 'Features', href: '/features' },
-              { label: 'Pricing', href: '/pricing' },
-              { label: 'Resources', href: '/resources' },
-              { label: 'For Recruiters', href: '/recruiters' },
-              { label: 'Assistants & Agencies', href: '/assistants-agencies' },
-              { label: 'Sign In', href: '/auth' },
-            ].map((item) => (
+
+          <div
+            className="hidden lg:flex items-center gap-1"
+            data-testid="landing-header-desktop-nav"
+          >
+            {desktopNav.map((item) => (
               <Button
                 key={item.href}
                 variant="ghost"
@@ -131,22 +159,31 @@ export default function Landing() {
               </Button>
             ))}
             <Button
-              onClick={goToRecruiter}
-              variant="outline"
-              className="text-sm font-bold rounded-xl px-4 ml-1 hover:bg-transparent"
-              style={{ borderColor: AMBER, color: AMBER_BRIGHT, background: 'transparent', borderWidth: 2 }}
+              variant="ghost"
+              onClick={scrollToSolutions}
+              className="text-sm px-3"
+              style={{ color: TEXT_MUTED }}
             >
-              Recruiter Sign Up
+              Solutions
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/auth')}
+              className="text-sm px-3"
+              style={{ color: TEXT_MUTED }}
+            >
+              Sign In
             </Button>
             <Button
               onClick={goToDriver}
-              className="text-sm font-bold rounded-xl px-5"
+              className="text-sm font-bold rounded-xl px-5 ml-1"
               style={{ background: AMBER, color: 'white' }}
             >
-              Driver Sign Up
+              Start Free
             </Button>
           </div>
-          <div className="flex md:hidden items-center gap-2">
+
+          <div className="flex lg:hidden items-center gap-2">
             <Button
               onClick={goToDriver}
               className="text-xs font-bold rounded-xl px-3"
@@ -157,7 +194,7 @@ export default function Landing() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg"
-              aria-label="Toggle menu"
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
               style={{ color: TEXT_MUTED }}
             >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -166,24 +203,21 @@ export default function Landing() {
         </div>
         {mobileMenuOpen && (
           <div
-            className="md:hidden border-t"
+            className="lg:hidden border-t"
             style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}
+            data-testid="landing-header-mobile-menu"
           >
             <div className="flex flex-col px-4 py-3 space-y-1">
-              {[
-                { label: 'Features', href: '/features' },
-                { label: 'Pricing', href: '/pricing' },
-                { label: 'Resources', href: '/resources' },
-                { label: 'For Recruiters', href: '/recruiters' },
-                { label: 'Assistants & Agencies', href: '/assistants-agencies' },
-                { label: 'FAQ', href: '/faq' },
-                { label: 'Sign In', href: '/auth' },
-              ].map((item) => (
+              {mobileNav.map((item) => (
                 <button
-                  key={item.href}
+                  key={item.label}
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    navigate(item.href);
+                    if (item.kind === 'scroll') {
+                      scrollToSolutions();
+                    } else {
+                      navigate(item.href);
+                    }
                   }}
                   className="w-full text-left px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/5"
                   style={{ color: TEXT_MUTED }}
@@ -197,10 +231,8 @@ export default function Landing() {
       </nav>
 
       <main>
-        {/* ═══════════════════════════════════════════ */}
-        {/* 1 · UNIFIED HERO — both audiences above the fold */}
-        {/* ═══════════════════════════════════════════ */}
-        <section className="relative overflow-hidden">
+        {/* HERO */}
+        <section className="relative overflow-hidden" data-testid="landing-hero">
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -213,24 +245,20 @@ export default function Landing() {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
               style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
             >
-              <Sparkles className="h-3.5 w-3.5" /> For drivers, recruiters, assistants &amp; agencies
+              <Sparkles className="h-3.5 w-3.5" /> One platform for drivers, recruiters &amp; back-office pros
             </div>
-            <h1
-              className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] text-white max-w-4xl mx-auto"
-            >
-              Track trucking profit. Post real jobs.{' '}
-              <span style={{ color: AMBER }}>Build a back-office side hustle.</span>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] text-white max-w-4xl mx-auto">
+              The business platform behind every truck.
             </h1>
             <p
               className="mt-6 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto"
               style={{ color: TEXT_MUTED }}
             >
-              Drivers track real profit per load. Recruiters post verified opportunities. Driver
-              assistants and agencies can help truckers manage loads, expenses, fuel logs, reports,
-              and back-office work — with driver-approved access and a full audit log on every action.
+              Drivers track real profit on every load. Recruiters post verified opportunities and
+              manage applicants. Back-office professionals — driver assistants and agencies —
+              support approved driver accounts through permission-based access and audit records.
             </p>
 
-            {/* Dual primary CTAs */}
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <Button
                 onClick={goToDriver}
@@ -242,10 +270,10 @@ export default function Landing() {
                   boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
                 }}
               >
-                <Truck className="h-5 w-5" /> Start Tracking Free
+                <Truck className="h-5 w-5" /> Start Free as a Driver
               </Button>
               <Button
-                onClick={goToRecruiter}
+                onClick={scrollToSolutions}
                 size="lg"
                 variant="outline"
                 className="text-base sm:text-lg font-bold rounded-xl h-14 px-8 gap-2 w-full sm:w-auto hover:bg-transparent"
@@ -256,449 +284,494 @@ export default function Landing() {
                   borderWidth: 2,
                 }}
               >
-                <Users className="h-5 w-5" /> Post Jobs Free as a Recruiter
-              </Button>
-              <Button
-                onClick={() => navigate('/assistants-agencies')}
-                size="lg"
-                variant="ghost"
-                className="text-base sm:text-lg font-bold rounded-xl h-14 px-6 gap-2 w-full sm:w-auto"
-                style={{ color: AMBER_BRIGHT }}
-              >
-                <Briefcase className="h-5 w-5" /> Build a Back-Office Service
+                Explore Solutions <ArrowRight className="h-5 w-5" />
               </Button>
             </div>
 
-            <p className="mt-4 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
-              Drivers track loads, expenses, and profit free — no credit card. Verified recruiters can post standard opportunities free.{' '}
-              <button onClick={goToRecruiterInfo} className="underline-offset-4 hover:underline font-semibold" style={{ color: AMBER_BRIGHT }}>
-                Learn about recruiter access →
-              </button>
+            {/* Compact audience-path chips */}
+            <div
+              className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto"
+              data-testid="hero-audience-paths"
+            >
+              {[
+                {
+                  key: 'driver',
+                  icon: Truck,
+                  label: 'Drivers',
+                  outcome: 'Know real profit on every load.',
+                  href: '/auth?intent=driver',
+                },
+                {
+                  key: 'recruiter',
+                  icon: Users,
+                  label: 'Recruiters & Carriers',
+                  outcome: 'Post verified opportunities and manage applicants.',
+                  href: '/recruiters',
+                },
+                {
+                  key: 'backoffice',
+                  icon: Briefcase,
+                  label: 'Back-Office Businesses',
+                  outcome: 'Support approved driver clients with audited access.',
+                  href: '/assistants-agencies',
+                },
+              ].map((p) => (
+                <button
+                  key={p.key}
+                  data-testid={`hero-path-${p.key}`}
+                  onClick={() => navigate(p.href)}
+                  className="text-left rounded-xl border p-4 hover:border-[hsl(25,95%,53%)] transition-colors"
+                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-md" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                      <p.icon className="h-4 w-4" style={{ color: AMBER }} />
+                    </div>
+                    <span className="text-sm font-bold text-white">{p.label}</span>
+                  </div>
+                  <p className="mt-2 text-xs" style={{ color: TEXT_MUTED }}>{p.outcome}</p>
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-6 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
+              Drivers start free — no credit card. Verified recruiters post standard opportunities free.
+              Driver Assistant access is free after a driver approves it.
             </p>
-
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-medium" style={{ color: TEXT_DIM }}>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free driver plan</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Free standard recruiter posting (verified)</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" style={{ color: GREEN }} /> Paid upgrades are optional</span>
-            </div>
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════ */}
-        {/* 2 · SPLIT PROBLEM → SOLUTION */}
-        {/* ═══════════════════════════════════════════ */}
-        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+        {/* PRODUCT PROOF — Workspaces */}
+        <section
+          className="border-t"
+          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          data-testid="workspaces-section"
+        >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-            <div className="text-center mb-10 sm:mb-14">
+            <div className="text-center mb-8 sm:mb-10">
               <h2 className="text-2xl sm:text-3xl font-black text-white">
-                One platform. Two sides of the trucking business — solved.
+                One platform. Three connected workspaces.
               </h2>
               <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
-                Drivers and recruiters have been working blind in opposite directions. HaulTrackerPro brings them onto the same data.
+                Each role gets a purpose-built workspace, all sharing the same trusted data.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-5">
-              {/* DRIVERS */}
-              <div
-                className="rounded-2xl border p-6 sm:p-8 flex flex-col"
-                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                    <Truck className="h-5 w-5" style={{ color: AMBER }} />
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>For Drivers</span>
-                </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
-                  Stop driving blind. Know your real profit per load.
-                </h3>
-
-                <div className="mt-6 space-y-2.5">
-                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'hsl(0, 70%, 65%)' }}>
-                    <AlertTriangle className="h-3.5 w-3.5" /> The problem
-                  </p>
-                  {[
-                    'Pay statements that don\'t match what you actually earned',
-                    'Receipts lost between fuel stops and tax season',
-                    'No clue which lanes and brokers really pay',
-                  ].map((t) => (
-                    <p key={t} className="text-sm" style={{ color: TEXT_MUTED }}>— {t}</p>
-                  ))}
-                </div>
-
-                <div className="mt-5 space-y-2.5">
-                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: GREEN }}>
-                    <CheckCircle2 className="h-3.5 w-3.5" /> What you get
-                  </p>
-                  {[
-                    'Real RPM and net profit on every load',
-                    'Fuel, expenses, and tax-ready records in one app',
-                    'Smart alerts when a lane, broker, or pay starts slipping',
-                  ].map((t) => (
-                    <p key={t} className="text-sm text-white/90">— {t}</p>
-                  ))}
-                </div>
-
-                <Button
-                  onClick={goToDriver}
-                  className="mt-7 rounded-xl font-bold gap-2 self-start"
-                  style={{ background: AMBER, color: 'white' }}
-                >
-                  Start tracking free <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* RECRUITERS */}
-              <div
-                className="rounded-2xl border p-6 sm:p-8 flex flex-col"
-                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                    <Briefcase className="h-5 w-5" style={{ color: AMBER }} />
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>For Recruiters</span>
-                </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
-                  Reach drivers who actually know their numbers.
-                </h3>
-
-                <div className="mt-6 space-y-2.5">
-                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'hsl(0, 70%, 65%)' }}>
-                    <AlertTriangle className="h-3.5 w-3.5" /> The problem
-                  </p>
-                  {[
-                    'Ghost applicants and wasted ad spend',
-                    'No way to prove your pay claims to skeptical drivers',
-                    'Referrals slip through cracks with no tracking',
-                  ].map((t) => (
-                    <p key={t} className="text-sm" style={{ color: TEXT_MUTED }}>— {t}</p>
-                  ))}
-                </div>
-
-                <div className="mt-5 space-y-2.5">
-                  <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: GREEN }}>
-                    <CheckCircle2 className="h-3.5 w-3.5" /> What you get
-                  </p>
-                  {[
-                    'Verified recruiter access — only real recruiters post',
-                    'Unlimited standard opportunities and applicant management',
-                    'Driver referral tracking and recruiter analytics',
-                  ].map((t) => (
-                    <p key={t} className="text-sm text-white/90">— {t}</p>
-                  ))}
-                </div>
-
-                <Button
-                  onClick={goToRecruiter}
-                  variant="outline"
-                  className="mt-7 rounded-xl font-bold gap-2 self-start hover:bg-transparent"
-                  style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}
-                >
-                  Post jobs free as a recruiter <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
+            <div
+              role="tablist"
+              aria-label="Workspace previews"
+              className="flex flex-wrap justify-center gap-2 mb-6"
+            >
+              {[
+                { key: 'driver' as WorkspaceKey, label: 'Driver Workspace' },
+                { key: 'recruiter' as WorkspaceKey, label: 'Recruiter Workspace' },
+                { key: 'backoffice' as WorkspaceKey, label: 'Back-Office Workspace' },
+              ].map((t) => {
+                const selected = workspace === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    role="tab"
+                    id={`workspace-tab-${t.key}`}
+                    aria-selected={selected}
+                    aria-controls={`workspace-panel-${t.key}`}
+                    onClick={() => setWorkspace(t.key)}
+                    className="rounded-xl px-4 py-2 text-sm font-bold border transition-colors"
+                    style={{
+                      background: selected ? AMBER : 'transparent',
+                      color: selected ? 'white' : TEXT_MUTED,
+                      borderColor: selected ? AMBER : NAVY_BORDER,
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
             </div>
-          </div>
-        </section>
 
-        {/* ═══════════════════════════════════════════ */}
-        {/* 3 · PRODUCT VISUAL */}
-        {/* ═══════════════════════════════════════════ */}
-        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl sm:text-3xl font-black text-white">
-                One dashboard. One source of truth.
-              </h2>
-              <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
-                Drivers see their real profit, fuel, and expenses. Recruiters see verified applicants and referral performance. Same data. Honest numbers.
-              </p>
-            </div>
-            <div className="relative">
+            {workspace === 'driver' && (
               <div
-                className="rounded-2xl overflow-hidden border"
-                style={{
-                  borderColor: NAVY_BORDER,
-                  boxShadow: '0 32px 64px -16px hsl(0, 0%, 0%, 0.55), 0 0 0 1px hsl(220, 16%, 16%)',
-                }}
+                role="tabpanel"
+                id="workspace-panel-driver"
+                aria-labelledby="workspace-tab-driver"
+                className="rounded-2xl border overflow-hidden"
+                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
               >
                 <img
                   src={dashboardMockup}
-                  alt="HaulTrackerPro dashboard showing load tracking, real RPM, and net profit"
+                  alt="Driver workspace showing load tracking, real RPM, expenses, and net profit"
                   className="w-full"
                   width={1536}
                   height={1024}
                   loading="lazy"
                   decoding="async"
                 />
+                <div className="p-5 sm:p-6">
+                  <p className="text-sm sm:text-base" style={{ color: TEXT_MUTED }}>
+                    Track every load, log fuel and expenses in seconds, and see your real RPM and
+                    net profit — not just gross pay.
+                  </p>
+                </div>
               </div>
+            )}
+
+            {workspace === 'recruiter' && (
               <div
-                className="absolute -bottom-6 right-0 w-40 h-40 rounded-full blur-3xl pointer-events-none"
-                style={{ background: 'hsl(25, 95%, 53%, 0.18)' }}
-              />
-            </div>
+                role="tabpanel"
+                id="workspace-panel-recruiter"
+                aria-labelledby="workspace-tab-recruiter"
+                className="rounded-2xl border p-5 sm:p-8"
+                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+              >
+                <div className="grid sm:grid-cols-3 gap-4">
+                  {[
+                    { icon: FileCheck2, title: 'Verified opportunities', body: 'Publish standard postings after verified recruiter approval.' },
+                    { icon: ClipboardList, title: 'Applicant management', body: 'Track applicant status and history on paid plans.' },
+                    { icon: BarChart3, title: 'Referrals & reports', body: 'Referral tracking and pipeline reports on paid plans.' },
+                  ].map((c) => (
+                    <div
+                      key={c.title}
+                      className="rounded-xl border p-4"
+                      style={{ background: 'hsl(220, 20%, 9%)', borderColor: NAVY_BORDER }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <c.icon className="h-4 w-4" style={{ color: AMBER }} />
+                        <span className="text-sm font-bold text-white">{c.title}</span>
+                      </div>
+                      <p className="text-xs" style={{ color: TEXT_MUTED }}>{c.body}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-5 text-sm" style={{ color: TEXT_MUTED }}>
+                  Recruiter access requires verified approval. Contract workflow and advanced
+                  analytics are available on paid recruiter plans.
+                </p>
+              </div>
+            )}
+
+            {workspace === 'backoffice' && (
+              <div
+                role="tabpanel"
+                id="workspace-panel-backoffice"
+                aria-labelledby="workspace-tab-backoffice"
+                className="rounded-2xl border p-5 sm:p-8"
+                style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+              >
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {[
+                    { icon: UserCheck, title: 'Approved driver clients', body: 'Access is granted only after explicit driver approval.' },
+                    { icon: Shield, title: 'Permission state', body: 'Loads, expenses, fuel, and reports each toggle individually.' },
+                    { icon: ClipboardList, title: 'Work queue', body: 'Shared queue with waiting-on-driver responses.' },
+                    { icon: Receipt, title: 'Audit record', body: 'Every action is timestamped and audit-logged.' },
+                  ].map((c) => (
+                    <div
+                      key={c.title}
+                      className="rounded-xl border p-4"
+                      style={{ background: 'hsl(220, 20%, 9%)', borderColor: NAVY_BORDER }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <c.icon className="h-4 w-4" style={{ color: AMBER }} />
+                        <span className="text-sm font-bold text-white">{c.title}</span>
+                      </div>
+                      <p className="text-xs" style={{ color: TEXT_MUTED }}>{c.body}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-5 text-xs" style={{ color: TEXT_DIM }}>
+                  HaulTracker Pro does not process service payments between drivers and assistants
+                  or agencies.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════ */}
-        {/* 3b · TEAM & AGENCY — solo, team, agency */}
-        {/* ═══════════════════════════════════════════ */}
-        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }} id="team-agency">
+        {/* SOLUTIONS */}
+        <section
+          id="solutions"
+          className="border-t scroll-mt-20"
+          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          data-testid="solutions-section"
+        >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-            <div className="text-center mb-10 sm:mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}>
-                <Sparkles className="h-3.5 w-3.5" /> New
-              </div>
+            <div className="text-center mb-10">
               <h2 className="text-2xl sm:text-3xl font-black text-white">
-                Turn trucking paperwork into a service business.
+                Every trucking business role gets a purpose-built workspace.
               </h2>
-              <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
-                Many drivers don't want to enter loads, expenses, fuel logs, and reports themselves.
-                Driver Assistants can help one driver. Agencies can manage multiple approved driver
-                clients. Drivers stay in control, access is permission-based, and every action is
-                audit-logged. Payments for assistant or agency services are arranged outside
-                HaulTracker Pro for now — opportunity only, not a promise of income.
-              </p>
             </div>
-
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
                 {
+                  key: 'driver',
                   icon: Truck,
-                  tag: 'Solo Driver',
-                  title: 'Stay in full control',
-                  bullets: ['Single sign-in, you own everything', 'One-tap Driver Control Center to see who has access', 'Revoke any access instantly'],
+                  audience: 'Drivers',
+                  tagline: 'Know what every load really earns.',
+                  who: 'For company drivers, owner-operators, and small fleets.',
+                  problem: 'Pay statements and fuel receipts scattered across notebooks and apps.',
+                  outcomes: [
+                    'Real RPM and net profit on every load',
+                    'Fuel, expenses, and tax-ready records in one place',
+                    'Weekly closeouts and smart alerts when pay slips',
+                  ],
+                  ctaLabel: 'Start Free as a Driver',
+                  onClick: () => navigate('/auth?intent=driver'),
                 },
                 {
+                  key: 'recruiter',
                   icon: Users,
-                  tag: 'Driver + Assistant',
-                  title: 'Invite a helper',
-                  bullets: ['Granular permissions (loads, expenses, fuel, reports)', 'Every action stamped and audit-logged', 'Pro feature — invite in seconds'],
+                  audience: 'Recruiters & Carriers',
+                  tagline: 'Publish verified opportunities and manage applicants.',
+                  who: 'For verified recruiters and carrier hiring teams.',
+                  problem: 'Ghost applicants, unverifiable pay claims, and lost referrals.',
+                  outcomes: [
+                    'Verified recruiter access — only approved recruiters post',
+                    'Standard opportunity posting with applicant flow',
+                    'Referral tracking and reports on paid plans',
+                  ],
+                  ctaLabel: 'Explore Recruiter Access',
+                  onClick: () => navigate('/recruiters'),
                 },
                 {
+                  key: 'backoffice',
                   icon: Briefcase,
-                  tag: 'Agency / Back-Office',
-                  title: 'Run multiple drivers',
-                  bullets: ['Service packages + private client request links', 'Driver-approved delegation, never silent access', 'Shared work queue with waiting-on-driver responses'],
+                  audience: 'Back-Office Businesses',
+                  tagline: 'Help approved drivers manage authorized operations.',
+                  who: 'For driver assistants and back-office agencies.',
+                  problem: 'Managing paperwork for multiple drivers without a system of record.',
+                  outcomes: [
+                    'Driver-approved delegation with granular permissions',
+                    'Shared work queue and waiting-on-driver responses',
+                    'Full audit log on every action taken',
+                  ],
+                  ctaLabel: 'Explore Back-Office Plans',
+                  onClick: () => navigate('/assistants-agencies'),
                 },
-              ].map((card) => (
-                <div key={card.tag} className="rounded-2xl border p-6 flex flex-col" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
+              ].map((c) => (
+                <div
+                  key={c.key}
+                  data-testid={`solution-card-${c.key}`}
+                  className="rounded-2xl border p-6 flex flex-col"
+                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+                >
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                      <card.icon className="h-5 w-5" style={{ color: AMBER }} />
+                      <c.icon className="h-5 w-5" style={{ color: AMBER }} />
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>{card.tag}</span>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>
+                      {c.audience}
+                    </span>
                   </div>
-                  <h3 className="text-lg font-black text-white leading-tight">{card.title}</h3>
-                  <div className="mt-4 space-y-2">
-                    {card.bullets.map((b) => (
-                      <p key={b} className="text-sm flex items-start gap-2 text-white/90">
+                  <h3 className="text-lg font-black text-white leading-tight">{c.tagline}</h3>
+                  <p className="mt-2 text-xs" style={{ color: TEXT_DIM }}>{c.who}</p>
+                  <p className="mt-3 text-sm" style={{ color: TEXT_MUTED }}>{c.problem}</p>
+                  <ul className="mt-4 space-y-2 flex-1">
+                    {c.outcomes.map((o) => (
+                      <li key={o} className="flex items-start gap-2 text-sm text-white/90">
                         <Check className="h-4 w-4 mt-0.5 shrink-0" style={{ color: GREEN }} />
-                        <span>{b}</span>
-                      </p>
+                        <span>{o}</span>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
+                  <Button
+                    onClick={c.onClick}
+                    className="mt-6 rounded-xl font-bold gap-2 self-start"
+                    style={{ background: AMBER, color: 'white' }}
+                  >
+                    {c.ctaLabel} <ArrowRight className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </div>
-
-            <div className="mt-8 text-center flex flex-col sm:flex-row gap-3 justify-center">
-              <Button
-                onClick={() => navigate('/assistants-agencies')}
-                className="rounded-xl font-bold gap-2"
-                style={{ background: AMBER, color: 'white' }}
-              >
-                Explore the Assistants &amp; Agencies opportunity <ArrowRight className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={() => navigate('/features#team-agency')}
-                variant="outline"
-                className="rounded-xl font-bold gap-2 hover:bg-transparent"
-                style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}
-              >
-                See team &amp; agency features <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
         </section>
 
-
-
-        {/* ═══════════════════════════════════════════ */}
-        {/* 4 · TRUST + PRICING STRIP */}
-        {/* ═══════════════════════════════════════════ */}
-        <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
+        {/* HOW IT WORKS */}
+        <section
+          className="border-t"
+          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          data-testid="how-it-works-section"
+        >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-            <div className="flex items-center justify-center gap-2 mb-8">
-              <Shield className="h-4 w-4" style={{ color: GREEN }} />
-              <span className="text-sm" style={{ color: TEXT_MUTED }}>
-                Encrypted in transit, stored securely. Your data is never sold or shared.
-              </span>
+            <div className="text-center mb-10">
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
+                How HaulTracker Pro works for you.
+              </h2>
             </div>
-
-            {/* Driver Plans */}
-            <div className="mb-10">
-              <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: TEXT_DIM }}>For Drivers</h3>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {[
-                  {
-                    name: 'Free',
-                    price: '$0',
-                    unit: 'forever',
-                    bullets: ['Unlimited loads & expenses', 'Multi-stop loads, real RPM', 'CSV exports'],
-                    cta: 'Start free',
-                    onClick: goToDriver,
-                    primary: false,
-                  },
-                  {
-                    name: 'Pro',
-                    price: '$19.99',
-                    unit: '/month',
-                    bullets: ['AI automation & insights', 'Driver Scorecard, smart alerts', 'PDF reports + Pro analytics'],
-                    cta: 'See Pro',
-                    onClick: () => navigate('/pricing'),
-                    primary: true,
-                  },
-                ].map((tier) => (
-                  <div
-                    key={tier.name}
-                    className="rounded-2xl border p-6 flex flex-col"
-                    style={{
-                      background: tier.primary ? 'hsl(25, 95%, 53%, 0.06)' : NAVY_SURFACE,
-                      borderColor: tier.primary ? AMBER : NAVY_BORDER,
-                    }}
-                  >
-                    <h3 className="text-xl font-black text-white">{tier.name}</h3>
-                    <div className="mt-3 flex items-baseline gap-1">
-                      <span className="text-3xl font-black text-white">{tier.price}</span>
-                      <span className="text-xs" style={{ color: TEXT_DIM }}>{tier.unit}</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                {
+                  key: 'driver',
+                  audience: 'Drivers',
+                  icon: Truck,
+                  steps: [
+                    'Start free.',
+                    'Track loads, fuel, and expenses.',
+                    'Review real profit and reports.',
+                  ],
+                },
+                {
+                  key: 'recruiter',
+                  audience: 'Recruiters',
+                  icon: Users,
+                  steps: [
+                    'Apply for verified recruiter access.',
+                    'Publish standard opportunities.',
+                    'Manage applicants and referrals.',
+                  ],
+                },
+                {
+                  key: 'backoffice',
+                  audience: 'Back-Office',
+                  icon: Briefcase,
+                  steps: [
+                    'Choose the assistant or agency path.',
+                    'Receive explicit driver-approved permissions.',
+                    'Manage only authorized work with audit visibility.',
+                  ],
+                },
+              ].map((col) => (
+                <div
+                  key={col.key}
+                  data-testid={`how-it-works-${col.key}`}
+                  className="rounded-2xl border p-6"
+                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                      <col.icon className="h-5 w-5" style={{ color: AMBER }} />
                     </div>
-                    <ul className="mt-5 space-y-2 flex-1">
-                      {tier.bullets.map((b) => (
-                        <li key={b} className="flex items-start gap-2 text-sm" style={{ color: TEXT_MUTED }}>
-                          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: GREEN }} />
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      onClick={tier.onClick}
-                      className="mt-6 rounded-xl font-bold w-full"
-                      style={
-                        tier.primary
-                          ? { background: AMBER, color: 'white' }
-                          : { background: 'transparent', color: AMBER_BRIGHT, border: `1.5px solid ${AMBER}` }
-                      }
-                    >
-                      {tier.cta}
-                    </Button>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>
+                      {col.audience}
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recruiter Plans */}
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: TEXT_DIM }}>For Recruiters</h3>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  {
-                    name: 'Free Verified',
-                    price: 'Free',
-                    unit: 'for approved recruiters',
-                    bullets: ['Unlimited standard posts', 'Verified badge', 'Basic applicant flow'],
-                    cta: 'Apply',
-                    onClick: goToRecruiter,
-                    highlight: false,
-                  },
-                  {
-                    name: 'Starter',
-                    price: '$19',
-                    unit: '/month',
-                    bullets: ['Enhanced applicant tracking', 'Status history', 'Basic referral view'],
-                    cta: 'See Starter',
-                    onClick: () => navigate('/pricing#for-recruiters'),
-                    highlight: false,
-                  },
-                  {
-                    name: 'Growth',
-                    price: '$49',
-                    unit: '/month',
-                    bullets: ['Priority placement', 'Featured listings', 'Contract tools', 'Pipeline analytics'],
-                    cta: 'See Growth',
-                    onClick: () => navigate('/pricing#for-recruiters'),
-                    highlight: true,
-                  },
-                  {
-                    name: 'Fleet',
-                    price: '$149',
-                    unit: '/month',
-                    bullets: ['Everything in Growth', 'Top placement', 'Priority support', 'Advanced analytics'],
-                    cta: 'See Fleet',
-                    onClick: () => navigate('/pricing#for-recruiters'),
-                    highlight: false,
-                  },
-                ].map((tier) => (
-                  <div
-                    key={tier.name}
-                    className="rounded-2xl border p-5 flex flex-col relative"
-                    style={{
-                      background: tier.highlight ? 'hsl(25, 95%, 53%, 0.06)' : NAVY_SURFACE,
-                      borderColor: tier.highlight ? AMBER : NAVY_BORDER,
-                    }}
-                  >
-                    {tier.highlight && (
-                      <div className="absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: AMBER, color: 'white' }}>
-                        POPULAR
-                      </div>
-                    )}
-                    <h3 className="text-base font-black text-white">{tier.name}</h3>
-                    <div className="mt-2 flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-white">{tier.price}</span>
-                      {tier.price !== 'Free' && <span className="text-[10px]" style={{ color: TEXT_DIM }}>{tier.unit}</span>}
-                    </div>
-                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_DIM }}>{tier.price === 'Free' ? tier.unit : ''}</p>
-                    <ul className="mt-4 space-y-1.5 flex-1">
-                      {tier.bullets.map((b) => (
-                        <li key={b} className="flex items-start gap-1.5 text-xs" style={{ color: TEXT_MUTED }}>
-                          <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: tier.highlight ? AMBER : GREEN }} />
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      onClick={tier.onClick}
-                      className="mt-4 rounded-xl font-bold w-full text-xs"
-                      style={
-                        tier.highlight
-                          ? { background: AMBER, color: 'white' }
-                          : { background: 'transparent', color: AMBER_BRIGHT, border: `1.5px solid ${AMBER}` }
-                      }
-                    >
-                      {tier.cta}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="text-center mt-6">
-              <button
-                onClick={() => navigate('/pricing')}
-                className="text-sm font-semibold underline-offset-4 hover:underline"
-                style={{ color: AMBER_BRIGHT }}
-              >
-                See full pricing & feature comparison →
-              </button>
+                  <ol className="space-y-3">
+                    {col.steps.map((s, i) => (
+                      <li key={s} className="flex items-start gap-3">
+                        <span
+                          className="shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-xs font-black"
+                          style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: AMBER_BRIGHT }}
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="text-sm text-white/90">{s}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* ═══════════════════════════════════════════ */}
-        {/* 5 · FAQ + FINAL CTA */}
-        {/* ═══════════════════════════════════════════ */}
+        {/* CREDIBILITY */}
+        <section
+          className="border-t"
+          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          data-testid="credibility-section"
+        >
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20 text-center">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-5"
+              style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
+            >
+              <Fuel className="h-3.5 w-3.5" /> Built by an operator
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-white">
+              Built from firsthand trucking experience.
+            </h2>
+            <p className="mt-4 text-sm sm:text-base leading-relaxed" style={{ color: TEXT_MUTED }}>
+              HaulTracker Pro was designed around the real difficulty drivers face tracking pay,
+              expenses, paperwork, and profitability on the road. Every workflow — from a single
+              load entry to a full back-office delegation — comes from the day-to-day reality of
+              running a trucking business, not a template.
+            </p>
+          </div>
+        </section>
+
+        {/* PRICING PREVIEW */}
+        <section
+          className="border-t"
+          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          data-testid="pricing-preview-section"
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
+                Simple pricing for every role.
+              </h2>
+              <p className="mt-3 text-sm sm:text-base max-w-2xl mx-auto" style={{ color: TEXT_MUTED }}>
+                Start free where it makes sense. Upgrade only when you need more.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                {
+                  key: 'driver',
+                  audience: 'Drivers',
+                  icon: Truck,
+                  lines: ['Free plan available', 'Pro from $19.99/month'],
+                  ctaLabel: 'See driver pricing',
+                  href: '/pricing?audience=driver',
+                },
+                {
+                  key: 'recruiter',
+                  audience: 'Recruiters & Carriers',
+                  icon: Users,
+                  lines: ['Free verified workspace', 'Paid plans from $19/month'],
+                  ctaLabel: 'See recruiter pricing',
+                  href: '/pricing?audience=recruiter',
+                },
+                {
+                  key: 'agency',
+                  audience: 'Back-Office Businesses',
+                  icon: Briefcase,
+                  lines: [
+                    'Driver Assistant access is free',
+                    `Agency plans from $${AGENCY_STARTER_PRICE}/month`,
+                  ],
+                  ctaLabel: 'See back-office pricing',
+                  href: '/pricing?audience=agency',
+                },
+              ].map((c) => (
+                <div
+                  key={c.key}
+                  data-testid={`pricing-preview-${c.key}`}
+                  className="rounded-2xl border p-6 flex flex-col"
+                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 rounded-lg" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
+                      <c.icon className="h-5 w-5" style={{ color: AMBER }} />
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER_BRIGHT }}>
+                      {c.audience}
+                    </span>
+                  </div>
+                  <ul className="space-y-2 flex-1">
+                    {c.lines.map((l) => (
+                      <li key={l} className="flex items-start gap-2 text-sm text-white/90">
+                        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" style={{ color: GREEN }} />
+                        <span>{l}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    onClick={() => navigate(c.href)}
+                    className="mt-6 rounded-xl font-bold gap-2 self-start"
+                    style={{ background: 'transparent', color: AMBER_BRIGHT, border: `1.5px solid ${AMBER}` }}
+                  >
+                    {c.ctaLabel} <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <p className="mt-6 text-center text-xs" style={{ color: TEXT_DIM }}>
+              HaulTracker Pro does not process payments between drivers and assistants or agencies.
+            </p>
+          </div>
+        </section>
+
+        {/* FAQ + FINAL CTA */}
         <section className="border-t" style={{ borderColor: 'hsl(220, 16%, 14%)' }}>
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
             <h2 className="text-2xl sm:text-3xl font-black text-white text-center">
@@ -739,16 +812,17 @@ export default function Landing() {
               </button>
             </div>
 
-            <div className="mt-14 text-center">
+            <div className="mt-14 text-center" data-testid="final-cta-section">
               <h2 className="text-2xl sm:text-3xl font-black text-white">
-                Pick your side. Start in under a minute.
+                Choose the workspace that fits your role.
               </h2>
               <p className="mt-3 text-sm" style={{ color: TEXT_MUTED }}>
-                Free for drivers. Verified access for recruiters.
+                Drivers start free. Recruiters need verified access. Back-office access begins only
+                with driver approval.
               </p>
               <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
                 <Button
-                  onClick={goToDriver}
+                  onClick={() => navigate('/auth?intent=driver')}
                   size="lg"
                   className="text-base font-bold rounded-xl h-13 px-7 gap-2"
                   style={{
@@ -757,10 +831,10 @@ export default function Landing() {
                     boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
                   }}
                 >
-                  <Truck className="h-5 w-5" /> Start Tracking Free
+                  <Truck className="h-5 w-5" /> Start Free as a Driver
                 </Button>
                 <Button
-                  onClick={goToRecruiter}
+                  onClick={() => navigate('/recruiters')}
                   size="lg"
                   variant="outline"
                   className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent"
@@ -771,7 +845,21 @@ export default function Landing() {
                     borderWidth: 2,
                   }}
                 >
-                  <Users className="h-5 w-5" /> Post Jobs Free as a Recruiter
+                  <Users className="h-5 w-5" /> Explore Recruiter Access
+                </Button>
+                <Button
+                  onClick={() => navigate('/assistants-agencies')}
+                  size="lg"
+                  variant="outline"
+                  className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent"
+                  style={{
+                    borderColor: AMBER,
+                    color: AMBER_BRIGHT,
+                    background: 'transparent',
+                    borderWidth: 2,
+                  }}
+                >
+                  <Briefcase className="h-5 w-5" /> Explore Back-Office Plans
                 </Button>
               </div>
               <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs">
