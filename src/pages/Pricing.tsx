@@ -19,10 +19,8 @@ import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { PLANS } from '@/lib/billing/plans';
 import {
   trackBeginCheckout,
-  trackPricingProfitIntelClick,
   trackStarterKitCTAClicked,
 } from '@/lib/analytics';
 import MarketingHeader from '@/components/marketing/MarketingHeader';
@@ -58,15 +56,27 @@ function isAudience(value: unknown): value is Audience {
 }
 
 /**
- * Resolve audience from URL. Precedence:
- *   1. Valid `?audience=` query.
- *   2. Legacy hash mapping (#driver-plans, #for-recruiters, #assistants-agencies).
- *   3. Default 'driver'.
+ * Resolve audience from URL with explicit, non-fall-through precedence:
+ *
+ *  1. If the `?audience=` query parameter is PRESENT (even if invalid), the
+ *     query controls resolution:
+ *       - a valid value ('driver' | 'recruiter' | 'agency') selects that
+ *         audience;
+ *       - any invalid value defaults to 'driver' and MUST NOT fall through
+ *         to a legacy hash. Present-but-invalid query beats any hash.
+ *  2. Only when the `audience` query parameter is COMPLETELY ABSENT may
+ *     the legacy hash select an audience:
+ *       - '#driver-plans'         → 'driver'
+ *       - '#for-recruiters'       → 'recruiter'
+ *       - '#assistants-agencies'  → 'agency'
+ *  3. Missing query and missing/invalid hash defaults to 'driver'.
  */
 function resolveAudience(search: string, hash: string): Audience {
   const params = new URLSearchParams(search);
-  const q = params.get('audience');
-  if (isAudience(q)) return q;
+  if (params.has('audience')) {
+    const q = params.get('audience');
+    return isAudience(q) ? q : 'driver';
+  }
   const h = hash.replace(/^#/, '');
   if (h === 'driver-plans') return 'driver';
   if (h === 'for-recruiters') return 'recruiter';
@@ -463,7 +473,7 @@ function DriverView({
   onStarterKit: () => void;
 }) {
   return (
-    <>
+    <div data-testid="pricing-driver-view">
       {/* Billing Toggle — driver only */}
       <div className="flex justify-center mb-8">
         <div
@@ -696,9 +706,13 @@ function DriverView({
                 comparison, and AI follow-ups are planned future Pro additions.
               </p>
               <div
-                className="rounded-xl border overflow-hidden"
-                style={{ borderColor: 'hsl(220, 16%, 16%)' }}
+                data-testid="driver-comparison-scroll"
+                className="overflow-x-auto -mx-2 sm:mx-0"
               >
+                <div
+                  className="rounded-xl border overflow-hidden min-w-[640px]"
+                  style={{ borderColor: 'hsl(220, 16%, 16%)' }}
+                >
                 <div
                   className="grid grid-cols-3 text-sm font-bold"
                   style={{ background: 'hsl(220, 20%, 12%)' }}
@@ -751,6 +765,7 @@ function DriverView({
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
             </div>
           </details>
@@ -827,7 +842,7 @@ function DriverView({
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -845,6 +860,7 @@ function RecruiterView({
   return (
     <section
       id="for-recruiters"
+      data-testid="pricing-recruiter-view"
       className="py-8 sm:py-12 scroll-mt-24"
       style={{ background: 'hsl(220, 20%, 6%)' }}
     >
@@ -922,7 +938,7 @@ function RecruiterView({
         </div>
 
         {/* Paid recruiter cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div data-testid="recruiter-paid-grid" className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {recruiterPaidPlans.map((p) => (
             <div
               key={p.name}
@@ -1087,6 +1103,7 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
   return (
     <section
       id="assistants-agencies"
+      data-testid="pricing-agency-view"
       className="py-8 sm:py-12 scroll-mt-24"
       style={{ background: 'hsl(220, 20%, 8%)' }}
     >
@@ -1181,7 +1198,7 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
         </div>
 
         {/* Agency plan cards */}
-        <div className="grid sm:grid-cols-3 gap-5">
+        <div data-testid="agency-paid-grid" className="grid sm:grid-cols-3 gap-5">
           {agencyPlans.map((p, i) => {
             const highlight = i === 1; // Team is the recommended middle tier
             return (
@@ -1345,6 +1362,3 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
   );
 }
 
-// Silence unused-import warnings for symbols kept intentionally.
-void PLANS;
-void trackPricingProfitIntelClick;
