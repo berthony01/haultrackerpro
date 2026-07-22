@@ -1286,9 +1286,8 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
           </h3>
           <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
             HaulTracker Pro does <b>not</b> currently process payments between drivers and
-            assistants or agencies. Service agreements and payments are handled outside the
-            platform for now. HaulTracker Pro does not guarantee clients, customers, or income
-            for assistants or agencies.
+            assistants or agencies. Service agreements and payments happen outside the platform for now.
+            HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
           </p>
           <p className="sr-only">{OUTSIDE_PAYMENTS_DISCLAIMER}</p>
         </div>
