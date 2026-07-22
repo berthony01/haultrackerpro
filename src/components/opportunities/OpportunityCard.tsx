@@ -70,7 +70,7 @@ const EMPLOYMENT_LABEL: Record<CanonicalEmploymentModel, string> = {
 const TEAM_LABEL: Record<CanonicalTeamConfiguration, string> = {
   solo: 'Solo',
   team: 'Team',
-  team_optional: 'Team optional',
+  solo_or_team: 'Team optional',
   unspecified: 'Team setup not disclosed',
 };
 
