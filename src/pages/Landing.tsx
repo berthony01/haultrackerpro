@@ -216,7 +216,7 @@ export default function Landing() {
                     if (item.kind === 'scroll') {
                       scrollToSolutions();
                     } else {
-                      navigate(item.href);
+                      navigate(item.href!);
                     }
                   }}
                   className="w-full text-left px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/5"
