@@ -91,14 +91,14 @@ export default function Landing() {
     { label: 'Resources', href: '/resources' },
   ];
 
-  const mobileNav = [
-    { label: 'Solutions', kind: 'scroll' as const },
-    { label: 'Features', href: '/features' },
-    { label: 'Pricing', href: '/pricing' },
-    { label: 'Resources', href: '/resources' },
-    { label: 'For Recruiters', href: '/recruiters' },
-    { label: 'Assistants & Agencies', href: '/assistants-agencies' },
-    { label: 'Sign In', href: '/auth' },
+  const mobileNav: Array<{ label: string; kind: 'scroll' | 'link'; href?: string }> = [
+    { label: 'Solutions', kind: 'scroll' },
+    { label: 'Features', kind: 'link', href: '/features' },
+    { label: 'Pricing', kind: 'link', href: '/pricing' },
+    { label: 'Resources', kind: 'link', href: '/resources' },
+    { label: 'For Recruiters', kind: 'link', href: '/recruiters' },
+    { label: 'Assistants & Agencies', kind: 'link', href: '/assistants-agencies' },
+    { label: 'Sign In', kind: 'link', href: '/auth' },
   ];
 
   return (
