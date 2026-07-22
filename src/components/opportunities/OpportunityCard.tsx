@@ -24,7 +24,6 @@ import {
   type Disclosure,
   type ListingTransparencyBand,
   type CanonicalEmploymentModel,
-  type CanonicalPayModel,
 } from '@/lib/opportunities/opportunityCanonicalView';
 import type { CanonicalTeamConfiguration } from '@/lib/opportunities/opportunityCanonical';
 import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
