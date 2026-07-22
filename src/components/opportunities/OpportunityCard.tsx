@@ -144,6 +144,7 @@ export function OpportunityCard({
   const costBearing = isCostBearing(employment);
 
 
+
   
 
   const featured = canonical.trust.featured;
