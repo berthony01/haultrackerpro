@@ -624,25 +624,33 @@ describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
  * Disclosure distinction (not_disclosed vs not_applicable)
  * ========================================================================= */
 describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
-  it('flat-weekly company_driver with no mileage: mileage KVs Not applicable', () => {
+  it('flat-weekly company_driver with no mileage: mileage KVs Not applicable and header/home-time Not disclosed', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
         pay_model: 'flat_weekly',
         cpm: null,
         flat_weekly_pay: 1600,
+        route_type: null,
+        trailer_type: null,
+        home_time: null,
         estimated_weekly_miles: null,
         estimated_loaded_miles: null,
         estimated_deadhead_miles: null,
         deadhead_paid: null,
       }),
     );
+    const headerHeading = screen.getByRole('heading', { level: 1, name: 'OTR Reefer Solo' });
+    const headerCard = headerHeading.closest('.p-6');
+    if (!headerCard) throw new Error('header card not found');
+    expect(within(headerCard as HTMLElement).getAllByText('Not disclosed')).toHaveLength(3);
+    expect(within(kvRow('Home time')).getByText('Not disclosed')).toBeInTheDocument();
     expect(within(kvRow('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
     expect(within(kvRow('Loaded miles')).getByText('Not applicable')).toBeInTheDocument();
     expect(within(kvRow('Deadhead miles')).getByText('Not applicable')).toBeInTheDocument();
   });
 
-  it('content sections keep all four headings and render Not disclosed fallback for empty content', () => {
+  it('content sections keep all four headings and each independently owns Not disclosed fallback for empty content', () => {
     renderDetail(
       fullBase({
         actual_benefits: null,
@@ -651,12 +659,10 @@ describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
         description: null,
       }),
     );
-    expect(screen.getByRole('heading', { name: 'Benefits' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Typical Lanes' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Requirements' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'About this Opportunity' })).toBeInTheDocument();
-    // Four content sections, each falls back to "Not disclosed".
-    expect(screen.getAllByText('Not disclosed').length).toBeGreaterThanOrEqual(4);
+    expect(within(sectionCard('Benefits')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(within(sectionCard('Typical Lanes')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(within(sectionCard('Requirements')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(within(sectionCard('About this Opportunity')).getByText('Not disclosed')).toBeInTheDocument();
   });
 });
 
