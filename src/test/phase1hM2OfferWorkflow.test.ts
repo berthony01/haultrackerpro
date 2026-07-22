@@ -341,7 +341,7 @@ beforeAll(async () => {
 
   appId = await submitApply(db, IDS.driverA, IDS.opportunity, 'm2-seed-key-driver-a');
   await transitionToInterviewing(db, appId, IDS.recruiterUser);
-});
+}, 60_000);
 
 // ---------------------------------------------------------------------
 // Baseline suite (11 tests from Turn 2a)

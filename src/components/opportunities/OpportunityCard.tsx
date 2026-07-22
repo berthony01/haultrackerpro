@@ -24,7 +24,6 @@ import {
   type Disclosure,
   type ListingTransparencyBand,
   type CanonicalEmploymentModel,
-  type CanonicalPayModel,
 } from '@/lib/opportunities/opportunityCanonicalView';
 import type { CanonicalTeamConfiguration } from '@/lib/opportunities/opportunityCanonical';
 import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
@@ -143,8 +142,6 @@ export function OpportunityCard({
   const employment = canonical.classification.employmentModel;
   const team = canonical.classification.teamConfiguration;
   const costBearing = isCostBearing(employment);
-  const payModel: CanonicalPayModel = canonical.compensation.payModel;
-
   const featured = canonical.trust.featured;
   const isVerifiedRecruiter = canonical.trust.recruiterVerification === 'approved';
 
