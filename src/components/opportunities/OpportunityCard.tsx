@@ -142,7 +142,7 @@ export function OpportunityCard({
   const employment = canonical.classification.employmentModel;
   const team = canonical.classification.teamConfiguration;
   const costBearing = isCostBearing(employment);
-  const payModel: CanonicalPayModel = canonical.compensation.payModel;
+  
 
   const featured = canonical.trust.featured;
   const isVerifiedRecruiter = canonical.trust.recruiterVerification === 'approved';
