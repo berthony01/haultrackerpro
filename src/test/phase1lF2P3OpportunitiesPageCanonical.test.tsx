@@ -663,7 +663,7 @@ describe('Phase 1L-F2B-P3 — Preserved entries and selection', () => {
 });
 
 // 24. Hygiene: this file uses no describe.skip/it.skip, no .only, no .todo,
-// and no toMatchSnapshot(). Enforced by a self-audit that reads this file.
+// and no snapshot matchers. Enforced by a self-audit that reads this file.
 describe('Phase 1L-F2B-P3 — Test hygiene', () => {
   it('24. this test file contains no skipped/todo/only/snapshot tests', async () => {
     const fs = await import('node:fs');
