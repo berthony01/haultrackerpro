@@ -229,7 +229,7 @@ export function OpportunityProfitBreakdown({ canonical, isPro, onUpgrade }: Prop
 
           {isCompanyDriver && (
             <p className="text-xs text-muted-foreground mb-3">
-              Company driver: employer-borne operating costs are excluded from any net estimate.
+              Company driver: employer-borne operating costs are excluded.
             </p>
           )}
           {isUnknownEm && (
