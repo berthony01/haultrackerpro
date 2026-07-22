@@ -17,11 +17,15 @@ describe('Phase 4 cleanup — assistant/agency showcase wiring', () => {
   );
   const sitemap = read('public/sitemap.xml');
 
-  it('Landing hero positions for drivers, recruiters, assistants, and agencies', () => {
-    expect(landing).toMatch(/back-office side hustle/i);
-    expect(landing).toMatch(/driver\s*\n?\s*assistants and agencies|assistants and agencies/i);
-    // Not framed only as drivers/recruiters
-    expect(landing).not.toMatch(/honest trucking platform/i);
+  it('Landing positions all three trucking-business audiences professionally', () => {
+    expect(landing).toContain('The business platform behind every truck.');
+    expect(landing).toMatch(/Drivers/);
+    expect(landing).toMatch(/Recruiters & Carriers/);
+    expect(landing).toMatch(/Back-Office Businesses/);
+    expect(landing).toMatch(/\/assistants-agencies/);
+    expect(landing).not.toMatch(/side hustle/i);
+    expect(landing).not.toMatch(/pick your side/i);
+    expect(landing).not.toMatch(/two sides/i);
   });
 
   it('Landing nav exposes Assistants & Agencies', () => {
@@ -29,10 +33,12 @@ describe('Phase 4 cleanup — assistant/agency showcase wiring', () => {
     expect(landing).toMatch(/\/assistants-agencies/);
   });
 
-  it('Landing FAQ includes side-hustle / driver-approval / no-payment-processing entries', () => {
-    expect(landing).toMatch(/side hustle/i);
+  it('Landing FAQ preserves driver approval, revocation, audit, and outside-payment safeguards', () => {
+    expect(landing).toMatch(/driver approval|driver-approved|driver must approve/i);
     expect(landing).toMatch(/revoke/i);
-    expect(landing).toMatch(/outside HaulTracker Pro/i);
+    expect(landing).toMatch(/audit-logged|audit records|audit visibility/i);
+    expect(landing).toMatch(/outside HaulTracker Pro|does not process service payments/i);
+    expect(landing).not.toMatch(/side hustle/i);
   });
 
   it('Landing does not promise guaranteed income or clients', () => {
@@ -62,9 +68,10 @@ describe('Phase 4 cleanup — assistant/agency showcase wiring', () => {
     expect(md).not.toMatch(/public marketplace/i);
   });
 
-  it('Pricing page includes Assistants & Agencies payment-limitation copy', () => {
-    expect(pricing).toMatch(/Assistants & Agencies/);
-    expect(pricing).toMatch(/does\s*<\/?b?>?\s*not\s*<\/?b?>?\s*currently process payments|does not currently process payments/i);
+  it('Pricing page includes current back-office audience and payment-limitation copy', () => {
+    expect(pricing).toMatch(/Driver Assistants\s*&(?:amp;)?\s*Back-Office Agencies|Back-Office Business Plans/i);
+    expect(pricing).toMatch(/Agency Workspace/i);
+    expect(pricing).toMatch(/does not\s*\n?\s*process service payments/i);
     expect(pricing).not.toMatch(/guaranteed income/i);
   });
 
