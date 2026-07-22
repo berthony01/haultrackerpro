@@ -148,11 +148,13 @@ describe('Phase 1J-D2A — Pricing.tsx source structure', () => {
 });
 
 describe('Phase 1J-D2A — Pricing.tsx rendered proof', () => {
-  it('renders every recruiter card with an AVAILABLE NOW label, and Fleet with a distinct COMING SOON', () => {
+  it('recruiter audience view: every card has an AVAILABLE NOW label and Fleet has a distinct COMING SOON', () => {
     render(
-      <HelmetProvider><MemoryRouter initialEntries={["/pricing#for-recruiters"]}>
-        <Pricing />
-      </MemoryRouter></HelmetProvider>,
+      <HelmetProvider>
+        <MemoryRouter initialEntries={["/pricing?audience=recruiter"]}>
+          <Pricing />
+        </MemoryRouter>
+      </HelmetProvider>,
     );
 
     // Recruiter section heading — anchor.
@@ -179,8 +181,7 @@ describe('Phase 1J-D2A — Pricing.tsx rendered proof', () => {
       'Fleet card must render a distinct COMING SOON heading.',
     ).toBeGreaterThanOrEqual(1);
 
-    // Fleet coming-soon items must be visible, and current features must not
-    // mention them with "(coming soon)".
+    // Fleet coming-soon items must be visible.
     for (const item of [
       'Team seats',
       'Bulk opportunity tools',
@@ -202,14 +203,23 @@ describe('Phase 1J-D2A — Pricing.tsx rendered proof', () => {
       'Recruiter Standard must advertise opportunity management: edit, pause, and close listings.',
     ).toBeTruthy();
 
-    // Planned driver contract additions row uses the required label.
+    // Starter must not advertise "Basic applicant pipeline analytics".
+    expect(screen.queryByText(/Basic applicant pipeline analytics/i)).toBeNull();
+  });
+
+  it('driver audience view: planned contract additions row uses the required "Coming soon — not included today" label', () => {
+    render(
+      <HelmetProvider>
+        <MemoryRouter initialEntries={["/pricing?audience=driver"]}>
+          <Pricing />
+        </MemoryRouter>
+      </HelmetProvider>,
+    );
+
     expect(
       screen.getAllByText(/Coming soon — not included today/i).length,
       'Driver comparison row for planned contract additions must render "Coming soon — not included today".',
     ).toBeGreaterThanOrEqual(1);
-
-    // Starter must not advertise "Basic applicant pipeline analytics".
-    expect(screen.queryByText(/Basic applicant pipeline analytics/i)).toBeNull();
   });
 });
 
