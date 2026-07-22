@@ -202,6 +202,13 @@ function financialCard(): HTMLElement {
   return card as HTMLElement;
 }
 
+function sectionCard(title: string): HTMLElement {
+  const heading = screen.getByRole('heading', { name: title });
+  const card = heading.closest('.p-5');
+  if (!card) throw new Error(`section card not found for heading "${title}"`);
+  return card as HTMLElement;
+}
+
 function feKV(label: string): HTMLElement {
   const card = financialCard();
   let el: HTMLElement | null = within(card).getByText(label);
