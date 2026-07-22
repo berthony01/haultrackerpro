@@ -304,7 +304,7 @@ describe('Phase 1L-F2D — pending RPC disables all controls', () => {
     expect(dlg.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     const row = within(screen.getByTestId('opportunity-row-opp-draft'));
     expect(row.getByTestId('delete-opportunity-opp-draft')).toBeDisabled();
-    expect(row.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    expect(row.getByRole('button', { name: 'Edit', hidden: true })).toBeDisabled();
     resolveRpc({ data: { result_code: 'deleted' }, error: null });
   });
 });
