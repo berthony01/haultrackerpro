@@ -625,13 +625,21 @@ describe('Phase 1L-F2C · Disclosure-state consistency', () => {
     renderPage();
 
     const card = cardFor('Sparse Details');
-    expect(within(card).getAllByText('Not disclosed').length).toBeGreaterThanOrEqual(3);
+    const cardBadgeRow = within(card).getByText('Company Driver').parentElement as HTMLElement;
+    const cardBadges = Array.from(cardBadgeRow.children)
+      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'DIV')
+      .map((el) => (el.textContent ?? '').trim());
+    expect(cardBadges).toEqual(['Company Driver', 'Solo', 'Not disclosed', 'Not disclosed', 'Not disclosed']);
     expect(within(cardRowFor(card, 'Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
     expect(within(cardRowFor(card, 'Deadhead')).getByText('Not applicable')).toBeInTheDocument();
 
     await openDetailByTitle('Sparse Details');
     const header = detailHeaderCard('Sparse Details');
-    expect(within(header).getAllByText('Not disclosed')).toHaveLength(3);
+    const detailBadgeRow = within(header).getByText('Company Driver').parentElement as HTMLElement;
+    const detailBadges = Array.from(detailBadgeRow.children)
+      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'DIV')
+      .map((el) => (el.textContent ?? '').trim());
+    expect(detailBadges).toEqual(['Company Driver', 'Solo', 'Not disclosed', 'Not disclosed', 'Not disclosed']);
     expect(within(detailKV('Home time')).getByText('Not disclosed')).toBeInTheDocument();
     expect(within(detailKV('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
     expect(within(detailKV('Loaded miles')).getByText('Not applicable')).toBeInTheDocument();
