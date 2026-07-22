@@ -334,8 +334,9 @@ describe('OpportunityDetail — canonical pay breakdown', () => {
 describe('OpportunityDetail — canonical mileage & deadhead', () => {
   it('17. CPM row renders 2,500 mi total, 2,300 mi loaded, 200 mi deadhead', () => {
     renderDetail(fullBase());
-    expect(screen.getByText('2,500 mi')).toBeInTheDocument();
-    expect(screen.getByText('2,300 mi')).toBeInTheDocument();
+    expect(screen.getAllByText('2,500 mi').length).toBeGreaterThan(0);
+    // Loaded miles appears in both the Pay Breakdown (CPM extras) and Mileage sections.
+    expect(screen.getAllByText('2,300 mi').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('200 mi')).toBeInTheDocument();
   });
 
@@ -399,7 +400,7 @@ describe('OpportunityDetail — Listing Transparency (replaces legacy Profit Cla
       }),
       true,
     );
-    expect(screen.getByText('Conflicts')).toBeInTheDocument();
+    expect(screen.getAllByText('Conflicts').length).toBeGreaterThan(0);
   });
 });
 
