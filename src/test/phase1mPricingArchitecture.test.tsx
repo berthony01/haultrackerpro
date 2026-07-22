@@ -29,9 +29,9 @@ function renderAt(url: string) {
 describe('Phase 1M-A — audience selector renders three tabs', () => {
   it('renders the three audience tabs regardless of active view', () => {
     renderAt('/pricing');
-    expect(screen.getByRole('tab', { name: /Drivers/i })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /Recruiters/i })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /Back-Office/i })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Drivers' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Recruiters & Carriers' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Back-Office Businesses' })).toBeTruthy();
   });
 });
 
