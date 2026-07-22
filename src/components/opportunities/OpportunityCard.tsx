@@ -142,6 +142,8 @@ export function OpportunityCard({
   const employment = canonical.classification.employmentModel;
   const team = canonical.classification.teamConfiguration;
   const costBearing = isCostBearing(employment);
+
+
   
 
   const featured = canonical.trust.featured;
