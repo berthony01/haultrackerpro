@@ -6,24 +6,6 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-function makeOppFactory(overrides: Record<string, unknown>) {
-  return {
-    id: 'opp',
-    recruiter_id: 'r-1',
-    title: 'Row',
-    company_name: 'Acme Trucking',
-    status: 'draft',
-    admin_review_status: 'approved',
-    published_at: null,
-    driver_type: null,
-    route_type: null,
-    trailer_type: null,
-    estimated_weekly_gross: null,
-    created_at: '2026-07-01T00:00:00Z',
-    updated_at: '2026-07-01T00:00:00Z',
-    ...overrides,
-  };
-}
 
 const h = vi.hoisted(() => {
   function makeOpp(overrides: Record<string, unknown>) {
