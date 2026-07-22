@@ -38,7 +38,7 @@ describe('Phase 1M-A — audience selector renders three tabs', () => {
 describe('Phase 1M-A — driver audience', () => {
   it('mounts only driver plans and the monthly/annual toggle', () => {
     renderAt('/pricing?audience=driver');
-    expect(screen.getByRole('tab', { name: /Drivers/i }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Drivers' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByTestId('driver-billing-toggle')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /^Free$/, level: 3 })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /^Pro$/, level: 3 })).toBeTruthy();
