@@ -1,6 +1,7 @@
-// Phase 1L-F2B-P1 — Canonical OpportunityCard adoption tests.
+// Phase 1L-F2B-P1-R1 — Canonical OpportunityCard adoption tests (strengthened).
 
 import { describe, it, expect, vi } from 'vitest';
+import type { ComponentProps } from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import type { Tables } from '@/integrations/supabase/types';
 import { OpportunityCard } from '@/components/opportunities/OpportunityCard';
@@ -155,9 +156,11 @@ function completedDriverProfile(
   };
 }
 
-function renderCard(props: Partial<React.ComponentProps<typeof OpportunityCard>> & {
-  opportunity: OpportunitySourceRow;
-}) {
+function renderCard(
+  props: Partial<ComponentProps<typeof OpportunityCard>> & {
+    opportunity: OpportunitySourceRow;
+  },
+) {
   const defaults = {
     isSaved: false,
     onView: vi.fn(),
@@ -169,27 +172,37 @@ function renderCard(props: Partial<React.ComponentProps<typeof OpportunityCard>>
   return render(<OpportunityCard {...defaults} {...props} opportunity={props.opportunity as never} />);
 }
 
+/** Locate the metric row for a given canonical stat label (e.g. "Est. net"). */
+function rowFor(label: string): HTMLElement {
+  const labelNode = screen.getByText(label);
+  return labelNode.closest('div')!.parentElement as HTMLElement;
+}
+
 /* ================================ 1. Transparency badge ============================== */
 
 describe('Phase 1L-F2B-P1 · Transparency badge', () => {
-  it('renders transparency badge with exact visible text, title, and aria-label for Free user', () => {
-    const opp = fullBase({});
-    renderCard({ opportunity: opp, isPro: false });
-    // Score is deterministic from canonical view; probe via aria-label.
-    const badge = screen.getByLabelText(/^Listing transparency: \d{1,3} out of 100, /);
+  it('renders exact transparency 100 · Complete text, title, and aria-label for Free user', () => {
+    renderCard({ opportunity: fullBase({}), isPro: false });
+    const badge = screen.getByLabelText(
+      'Listing transparency: 100 out of 100, Complete. Measures disclosure completeness and consistency, not profitability.',
+    );
     expect(badge).toBeInTheDocument();
-    expect(badge.getAttribute('title')).toBe(badge.getAttribute('aria-label'));
-    const aria = badge.getAttribute('aria-label')!;
-    const m = aria.match(/^Listing transparency: (\d{1,3}) out of 100, (Complete|Mostly complete|Partial|Sparse)\. Measures disclosure completeness and consistency, not profitability\.$/);
-    expect(m).not.toBeNull();
-    const [, score, band] = m!;
-    expect(badge.textContent).toContain(`Transparency ${score} · ${band}`);
+    expect(badge.getAttribute('title')).toBe(
+      'Listing transparency: 100 out of 100, Complete. Measures disclosure completeness and consistency, not profitability.',
+    );
+    expect(badge.textContent).toContain('Transparency 100 · Complete');
   });
 
-  it('renders transparency badge for a sparse listing too (no subscription gate)', () => {
+  it('renders the same 100 · Complete badge when isPro is true (no subscription gate)', () => {
+    renderCard({ opportunity: fullBase({}), isPro: true });
+    expect(screen.getByText(/Transparency 100 · Complete/)).toBeInTheDocument();
+  });
+
+  it('renders a Sparse-band transparency badge for a bare listing', () => {
     renderCard({ opportunity: source({}), isPro: false });
     const badge = screen.getByLabelText(/^Listing transparency: \d{1,3} out of 100, Sparse\./);
     expect(badge).toBeInTheDocument();
+    expect(badge.textContent).toMatch(/Transparency \d{1,3} · Sparse/);
   });
 });
 
@@ -197,23 +210,22 @@ describe('Phase 1L-F2B-P1 · Transparency badge', () => {
 
 describe('Phase 1L-F2B-P1 · No legacy profit copy', () => {
   it('does not render any legacy profit-score badge or wording, even for Pro', () => {
-    const opp = fullBase({});
-    const { container } = renderCard({ opportunity: opp, isPro: true });
-    expect(container.textContent || '').not.toMatch(/Profit Clarity|Profit Score|Profitability/i);
-    // Legacy tone labels must not appear as standalone text.
+    const { container } = renderCard({ opportunity: fullBase({}), isPro: true });
+    expect(container.textContent || '').not.toMatch(/Profit Clarity|Profit Score/i);
+    // "Profitability" only appears inside the required disclosure disclaimer;
+    // no standalone legacy tone labels may exist.
     for (const word of ['Strong', 'Solid', 'Mixed', 'Risky']) {
       expect(screen.queryByText(new RegExp(`^${word}$`))).toBeNull();
     }
   });
 });
 
-/* ================================ 3-4. Non-cost-bearing suppresses net ============== */
+/* ================================ 3. Company-driver / unknown suppress net =========== */
 
 describe('Phase 1L-F2B-P1 · Company driver / unknown employment suppress Est. net', () => {
-  it('company driver with raw deductions present renders canonical mileage, not Est. net', () => {
+  it('company driver with raw deductions renders exact canonical mileage, no Est. net or RPM', () => {
     const opp = fullBase({
       employment_model: 'company_driver',
-      // Raw deductions present but must be ignored for company drivers.
       insurance_deductions: 200,
       insurance_deduction_frequency: 'weekly',
       maintenance_deductions: 100,
@@ -223,11 +235,11 @@ describe('Phase 1L-F2B-P1 · Company driver / unknown employment suppress Est. n
     expect(screen.queryByText('Est. net')).toBeNull();
     expect(screen.queryByText('Gross per total mile')).toBeNull();
     expect(screen.queryByText(/Based on your cost profile|After your cost profile/)).toBeNull();
-    expect(screen.getByText('Weekly miles')).toBeInTheDocument();
-    expect(screen.getByText('Deadhead')).toBeInTheDocument();
+    expect(within(rowFor('Weekly miles')).getByText('2,500 mi')).toBeInTheDocument();
+    expect(within(rowFor('Deadhead')).getByText('200 mi · paid')).toBeInTheDocument();
   });
 
-  it('unknown employment does not render Est. net', () => {
+  it('unknown employment does not render Est. net or Gross per total mile', () => {
     const opp = fullBase({ employment_model: null, canonical_version: null, driver_type: null });
     renderCard({ opportunity: opp, isPro: true });
     expect(screen.queryByText('Est. net')).toBeNull();
@@ -235,51 +247,47 @@ describe('Phase 1L-F2B-P1 · Company driver / unknown employment suppress Est. n
   });
 });
 
-/* ================================ 5-7. Cost-bearing employment renders net ========== */
+/* ================================ 4. Cost-bearing exact values ====================== */
 
-describe('Phase 1L-F2B-P1 · Cost-bearing employment renders canonical net', () => {
-  it('1099 contractor with complete recurring costs renders Est. net and Gross per total mile', () => {
-    const opp = fullBase({ employment_model: 'contractor_1099' });
-    renderCard({ opportunity: opp, isPro: true });
-    expect(screen.getByText('Est. net')).toBeInTheDocument();
-    expect(screen.getByText('Gross per total mile')).toBeInTheDocument();
+describe('Phase 1L-F2B-P1 · Cost-bearing employment renders exact canonical net + RPM', () => {
+  it('1099 contractor renders Est. net $1,205 and Gross per total mile $0.55', () => {
+    renderCard({ opportunity: fullBase({ employment_model: 'contractor_1099' }), isPro: true });
+    expect(within(rowFor('Est. net')).getByText('$1,205')).toBeInTheDocument();
+    expect(within(rowFor('Gross per total mile')).getByText('$0.55')).toBeInTheDocument();
   });
 
-  it('owner-operator is cost-bearing and can render net', () => {
-    const opp = fullBase({ employment_model: 'owner_operator' });
-    renderCard({ opportunity: opp, isPro: true });
-    expect(screen.getByText('Est. net')).toBeInTheDocument();
-    expect(screen.getByText('Gross per total mile')).toBeInTheDocument();
+  it('owner-operator renders Est. net $1,205 and Gross per total mile $0.55', () => {
+    renderCard({ opportunity: fullBase({ employment_model: 'owner_operator' }), isPro: true });
+    expect(within(rowFor('Est. net')).getByText('$1,205')).toBeInTheDocument();
+    expect(within(rowFor('Gross per total mile')).getByText('$0.55')).toBeInTheDocument();
   });
 
-  it('lease-purchase is cost-bearing and can render net', () => {
+  it('lease-purchase with $400/wk lease renders Est. net $805 and Gross per total mile $0.55', () => {
     const opp = fullBase({
       employment_model: 'lease_purchase',
       lease_payment: 400,
       lease_payment_frequency: 'weekly',
     });
     renderCard({ opportunity: opp, isPro: true });
-    expect(screen.getByText('Est. net')).toBeInTheDocument();
-    expect(screen.getByText('Gross per total mile')).toBeInTheDocument();
+    expect(within(rowFor('Est. net')).getByText('$805')).toBeInTheDocument();
+    expect(within(rowFor('Gross per total mile')).getByText('$0.55')).toBeInTheDocument();
   });
 });
 
-/* ================================ 8. Deadhead unpaid preserved ====================== */
+/* ================================ 5. Deadhead unpaid preserved ====================== */
 
 describe('Phase 1L-F2B-P1 · Deadhead disclosure', () => {
-  it('deadhead_paid=false renders unpaid; the false disclosure is not dropped', () => {
+  it('deadhead_paid=false renders exact "150 mi · unpaid"; false is preserved', () => {
     const opp = fullBase({ deadhead_paid: false, estimated_deadhead_miles: 150 });
     renderCard({ opportunity: opp, isPro: false });
-    const label = screen.getByText('Deadhead');
-    const row = label.closest('div')!.parentElement!;
-    expect(within(row).getByText(/150 mi · unpaid/)).toBeInTheDocument();
+    expect(within(rowFor('Deadhead')).getByText('150 mi · unpaid')).toBeInTheDocument();
   });
 });
 
-/* ================================ 9. Provided zero mileage renders 0 mi ============= */
+/* ================================ 6. Zero mileage preserved ========================= */
 
 describe('Phase 1L-F2B-P1 · Zero mileage disclosure', () => {
-  it('provided zero total weekly miles renders "0 mi", not an em dash or Not disclosed', () => {
+  it('provided zero total weekly miles renders exact "0 mi"', () => {
     const opp = fullBase({
       pay_model: 'cpm',
       cpm: 0.6,
@@ -289,15 +297,14 @@ describe('Phase 1L-F2B-P1 · Zero mileage disclosure', () => {
       deadhead_paid: true,
     });
     renderCard({ opportunity: opp, isPro: false });
-    const label = screen.getByText('Weekly miles');
-    const row = label.closest('div')!.parentElement!;
+    const row = rowFor('Weekly miles');
     expect(within(row).getByText('0 mi')).toBeInTheDocument();
     expect(within(row).queryByText('—')).toBeNull();
     expect(within(row).queryByText('Not disclosed')).toBeNull();
   });
 });
 
-/* ================================ 10. Canonical labels ============================== */
+/* ================================ 7. Canonical labels =============================== */
 
 describe('Phase 1L-F2B-P1 · Canonical classification and disclosure labels', () => {
   it('renders canonical employment, team, route, trailer, home time, hiring, and company labels', () => {
@@ -315,9 +322,7 @@ describe('Phase 1L-F2B-P1 · Canonical classification and disclosure labels', ()
     expect(screen.getByText('Acme Freight')).toBeInTheDocument();
   });
 
-  it('distinguishes Not disclosed from Not applicable via canonical disclosures', () => {
-    // Route / trailer / home_time are always relevant → not_disclosed.
-    // Fuel paid by is not_applicable for company driver.
+  it('distinguishes Not disclosed (route/trailer/home) from Not applicable (mileage) for flat_weekly company driver', () => {
     const opp = source({
       canonical_version: 1,
       employment_model: 'company_driver',
@@ -329,10 +334,12 @@ describe('Phase 1L-F2B-P1 · Canonical classification and disclosure labels', ()
     renderCard({ opportunity: opp });
     expect(screen.getByText('Company Driver')).toBeInTheDocument();
     expect(screen.getByText('Team setup not disclosed')).toBeInTheDocument();
-    // Company disclosure fallback.
     expect(screen.getByText('Company not disclosed')).toBeInTheDocument();
-    // Route/trailer/home_time all not_disclosed → three "Not disclosed" badges rendered.
+    // Route / trailer / home_time badges — always relevant → Not disclosed.
     expect(screen.getAllByText('Not disclosed').length).toBeGreaterThanOrEqual(3);
+    // Weekly miles / Deadhead — irrelevant under flat_weekly → Not applicable.
+    expect(within(rowFor('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
+    expect(within(rowFor('Deadhead')).getByText('Not applicable')).toBeInTheDocument();
   });
 
   it('renders "Employment not disclosed" for unknown employment', () => {
@@ -342,7 +349,7 @@ describe('Phase 1L-F2B-P1 · Canonical classification and disclosure labels', ()
   });
 });
 
-/* ================================ 11. Trust independence ============================ */
+/* ================================ 8. Trust independence ============================ */
 
 describe('Phase 1L-F2B-P1 · Featured and Verified Recruiter are independent', () => {
   it('Featured alone does not render Verified Recruiter', () => {
@@ -352,7 +359,7 @@ describe('Phase 1L-F2B-P1 · Featured and Verified Recruiter are independent', (
     expect(screen.queryByText('Verified Recruiter')).toBeNull();
   });
 
-  it('Approved recruiter renders Verified Recruiter', () => {
+  it('Approved active recruiter renders Verified Recruiter without Featured', () => {
     const opp = fullBase({
       featured: false,
       recruiter: { verification_status: 'approved', status: 'active' },
@@ -371,53 +378,103 @@ describe('Phase 1L-F2B-P1 · Featured and Verified Recruiter are independent', (
   });
 });
 
-/* ================================ 12. Interactions ================================== */
+/* ================================ 9. Match + interactions =========================== */
 
-describe('Phase 1L-F2B-P1 · Interactions preserved', () => {
-  it('Save / Unsave / View Details / match callback still work', () => {
-    const onView = vi.fn();
-    const onToggleSave = vi.fn();
-    const opp = fullBase({});
-    const profile = completedDriverProfile();
+describe('Phase 1L-F2B-P1 · Match badge and interactions preserved', () => {
+  it('renders exact "70% Strong Fit" match badge for canonical fullBase + completed driver profile', () => {
     render(
       <OpportunityCard
-        opportunity={opp as never}
+        opportunity={fullBase({}) as never}
         isSaved={false}
-        onView={onView}
-        onToggleSave={onToggleSave}
-        driverProfile={profile}
+        onView={vi.fn()}
+        onToggleSave={vi.fn()}
+        driverProfile={completedDriverProfile()}
         isPro={false}
       />,
     );
-    // Match badge computed and rendered from opportunityMatch (unchanged pass-through).
-    // We assert the callbacks work; match badge existence is validated via a labeled button click.
+    expect(screen.getByText(/70% Strong Fit/)).toBeInTheDocument();
+  });
+
+  it('Save triggers onToggleSave, View Details triggers onView', () => {
+    const onView = vi.fn();
+    const onToggleSave = vi.fn();
+    render(
+      <OpportunityCard
+        opportunity={fullBase({}) as never}
+        isSaved={false}
+        onView={onView}
+        onToggleSave={onToggleSave}
+        driverProfile={null}
+        isPro={false}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(onToggleSave).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'View Details' }));
     expect(onView).toHaveBeenCalledTimes(1);
   });
 
-  it('Unsave label toggles when isSaved is true', () => {
-    const opp = fullBase({});
-    renderCard({ opportunity: opp, isSaved: true });
+  it('isSaved=true renders the Unsave control', () => {
+    renderCard({ opportunity: fullBase({}), isSaved: true });
     expect(screen.getByRole('button', { name: 'Unsave' })).toBeInTheDocument();
+  });
+
+  it('saving=true disables the save control and clicking it does not invoke onToggleSave', () => {
+    const onToggleSave = vi.fn();
+    render(
+      <OpportunityCard
+        opportunity={fullBase({}) as never}
+        isSaved={false}
+        onView={vi.fn()}
+        onToggleSave={onToggleSave}
+        driverProfile={null}
+        isPro={false}
+        saving
+      />,
+    );
+    const btn = screen.getByRole('button', { name: 'Save' });
+    expect(btn).toBeDisabled();
+    fireEvent.click(btn);
+    expect(onToggleSave).not.toHaveBeenCalled();
   });
 });
 
-/* ================================ 13. Sign-on bonus excluded ======================== */
+/* ================================ 10. Gross source behavior ========================= */
 
-describe('Phase 1L-F2B-P1 · Sign-on bonus does not alter weekly gross', () => {
-  it('displayed weekly gross is identical with and without a sign-on bonus', () => {
-    const withoutBonus = fullBase({ sign_on_bonus: null, pay_model: 'flat_weekly', flat_weekly_pay: 1600 });
-    const withBonus = fullBase({ sign_on_bonus: 10000, pay_model: 'flat_weekly', flat_weekly_pay: 1600 });
+describe('Phase 1L-F2B-P1 · Gross value and source labels', () => {
+  it('sign-on bonus does not alter recurring weekly gross; both display $1,600', () => {
+    const withoutBonus = fullBase({
+      sign_on_bonus: null,
+      pay_model: 'flat_weekly',
+      flat_weekly_pay: 1600,
+    });
+    const withBonus = fullBase({
+      sign_on_bonus: 10000,
+      pay_model: 'flat_weekly',
+      flat_weekly_pay: 1600,
+    });
 
     const { unmount } = renderCard({ opportunity: withoutBonus });
-    const grossA = screen.getByText(/weekly gross/i).parentElement!.parentElement!.textContent;
+    expect(within(rowFor('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
     unmount();
 
     renderCard({ opportunity: withBonus });
-    const grossB = screen.getByText(/weekly gross/i).parentElement!.parentElement!.textContent;
-    expect(grossB).toBe(grossA);
-    expect(grossB).toMatch(/\$1,600/);
+    expect(within(rowFor('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
+  });
+
+  it('CPM-derived weekly gross renders as "Derived weekly gross" with exact value $1,380', () => {
+    renderCard({ opportunity: fullBase({}) });
+    expect(within(rowFor('Derived weekly gross')).getByText('$1,380')).toBeInTheDocument();
+  });
+
+  it('Recruiter-provided weekly gross under unknown pay model renders as "Recruiter weekly gross" $1,500', () => {
+    const opp = source({
+      canonical_version: 1,
+      employment_model: 'company_driver',
+      pay_model: null,
+      estimated_weekly_gross: 1500,
+    });
+    renderCard({ opportunity: opp });
+    expect(within(rowFor('Recruiter weekly gross')).getByText('$1,500')).toBeInTheDocument();
   });
 });
