@@ -4,6 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   ArrowLeft,
   Briefcase,
   Plus,
@@ -18,6 +28,7 @@ import {
   Send,
   UserPlus,
   ArrowRight,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
@@ -41,11 +52,13 @@ type View = 'list' | 'form' | 'referrals';
 export function RecruiterOpportunityManager({ onBack }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
   const { intentRecruiter } = useUserRole();
-  const { opportunities, isLoading, setStatus, refetch } = useRecruiterOpportunities();
+  const { opportunities, isLoading, setStatus, deleteOpportunity, refetch } =
+    useRecruiterOpportunities();
   const billing = useRecruiterBilling();
 
   const [view, setView] = useState<View>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Opportunity | null>(null);
 
   if (profileLoading) {
     return (
@@ -99,6 +112,22 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const openCreate = () => { setEditing(null); setView('form'); };
   const openEdit = (o: Opportunity) => { setEditing(o); setView('form'); };
   const canActivate = true;
+  const deletionPending = deleteOpportunity.isPending;
+  const busy = setStatus.isPending || deletionPending;
+
+  const confirmDelete = (event: React.MouseEvent) => {
+    event.preventDefault();
+    if (!pendingDelete) return;
+    deleteOpportunity.mutate(pendingDelete.id, {
+      onSuccess: () => {
+        toast.success('Opportunity deleted permanently');
+        setPendingDelete(null);
+      },
+      onError: (e: Error) => {
+        toast.error(e.message);
+      },
+    });
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -169,24 +198,61 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               onPause={() => handleStatus(o.id, 'paused')}
               onActivate={() => handleStatus(o.id, 'active')}
               onClose={() => handleStatus(o.id, 'closed')}
-              busy={setStatus.isPending}
+              onDelete={() => setPendingDelete(o)}
+              busy={busy}
               canActivate={canActivate}
             />
           ))}
         </div>
       )}
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletionPending) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete opportunity permanently?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  {`You are about to permanently delete "${pendingDelete?.title ?? ''}" at ${pendingDelete?.company_name ?? ''}.`}
+                </p>
+                <p>This cannot be undone.</p>
+                <p>
+                  Listings with connected applications, referrals, offers, contracts, or reports cannot be deleted.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletionPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="confirm-delete-opportunity"
+              disabled={deletionPending}
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 function OpportunityRow({
-  o, onEdit, onPause, onActivate, onClose, busy, canActivate,
+  o, onEdit, onPause, onActivate, onClose, onDelete, busy, canActivate,
 }: {
   o: Opportunity;
   onEdit: () => void;
   onPause: () => void;
   onActivate: () => void;
   onClose: () => void;
+  onDelete: () => void;
   busy: boolean;
   canActivate: boolean;
 }) {
@@ -198,6 +264,7 @@ function OpportunityRow({
   };
 
   const publication = getOpportunityPublicationStatus(o);
+  const canDelete = o.status === 'draft' || o.status === 'closed';
 
   return (
     <Card className="p-5 border-border/60" data-testid={`opportunity-row-${o.id}`}>
@@ -255,6 +322,17 @@ function OpportunityRow({
           {o.status !== 'closed' && (
             <Button size="sm" variant="outline" onClick={onClose} disabled={busy}>
               <XCircle className="h-4 w-4" /> Close
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={onDelete}
+              disabled={busy}
+              data-testid={`delete-opportunity-${o.id}`}
+            >
+              <Trash2 className="h-4 w-4" /> Delete permanently
             </Button>
           )}
         </div>
