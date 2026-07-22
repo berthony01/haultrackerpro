@@ -550,8 +550,8 @@ describe('Phase 1L-F2B-P2-R1 · Cost-bearing financial estimate', () => {
     );
     const card = financialCard();
     expect(within(card).getByText('Incomplete')).toBeInTheDocument();
-    expect(within(card).getByText('Missing disclosures')).toBeInTheDocument();
-    expect(within(card).getByText('Insurance')).toBeInTheDocument();
+    const missing = within(card).getByText('Missing disclosures').parentElement as HTMLElement;
+    expect(within(missing).getByText('Insurance')).toBeInTheDocument();
     expect(within(feKV('Known weekly costs')).getByText('—')).toBeInTheDocument();
     expect(within(feKV('Estimated weekly net')).getByText('—')).toBeInTheDocument();
   });
