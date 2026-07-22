@@ -6,13 +6,40 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const h = vi.hoisted(() => ({
-  rpc: vi.fn(),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-  billingRefresh: vi.fn(),
-  updateEq2: vi.fn(async () => ({ error: null })),
-}));
+
+const h = vi.hoisted(() => {
+  function makeOpp(overrides: Record<string, unknown>) {
+    return {
+      id: 'opp',
+      recruiter_id: 'r-1',
+      title: 'Row',
+      company_name: 'Acme Trucking',
+      status: 'draft',
+      admin_review_status: 'approved',
+      published_at: null,
+      driver_type: null,
+      route_type: null,
+      trailer_type: null,
+      estimated_weekly_gross: null,
+      created_at: '2026-07-01T00:00:00Z',
+      updated_at: '2026-07-01T00:00:00Z',
+      ...overrides,
+    };
+  }
+  return {
+    rpc: vi.fn(),
+    toastSuccess: vi.fn(),
+    toastError: vi.fn(),
+    billingRefresh: vi.fn(),
+    updateEq2: vi.fn(async () => ({ error: null })),
+    opportunities: [
+      makeOpp({ id: 'opp-draft', title: 'Draft Row', company_name: 'Acme Trucking', status: 'draft' }),
+      makeOpp({ id: 'opp-closed', title: 'Closed Row', company_name: 'Acme Trucking', status: 'closed' }),
+      makeOpp({ id: 'opp-active', title: 'Active Row', company_name: 'Acme Trucking', status: 'active', published_at: '2026-07-15T00:00:00Z' }),
+      makeOpp({ id: 'opp-paused', title: 'Paused Row', company_name: 'Acme Trucking', status: 'paused' }),
+    ],
+  };
+});
 
 vi.mock('sonner', () => ({
   toast: { success: h.toastSuccess, error: h.toastError },
@@ -55,37 +82,12 @@ vi.mock('@/components/opportunities/RecruiterReferralsPanel', () => ({
   RecruiterReferralsPanel: () => <div data-testid="stub-referrals" />,
 }));
 
-const OPPS = [
-  makeOpp({ id: 'opp-draft', title: 'Draft Row', company_name: 'Acme Trucking', status: 'draft' }),
-  makeOpp({ id: 'opp-closed', title: 'Closed Row', company_name: 'Acme Trucking', status: 'closed' }),
-  makeOpp({ id: 'opp-active', title: 'Active Row', company_name: 'Acme Trucking', status: 'active', published_at: '2026-07-15T00:00:00Z' }),
-  makeOpp({ id: 'opp-paused', title: 'Paused Row', company_name: 'Acme Trucking', status: 'paused' }),
-];
-
-function makeOpp(overrides: Record<string, unknown>) {
-  return {
-    id: 'opp',
-    recruiter_id: 'r-1',
-    title: 'Row',
-    company_name: 'Acme Trucking',
-    status: 'draft',
-    admin_review_status: 'approved',
-    published_at: null,
-    driver_type: null,
-    route_type: null,
-    trailer_type: null,
-    estimated_weekly_gross: null,
-    created_at: '2026-07-01T00:00:00Z',
-    updated_at: '2026-07-01T00:00:00Z',
-    ...overrides,
-  };
-}
 
 vi.mock('@/integrations/supabase/client', () => {
   const from = vi.fn(() => ({
     select: () => ({
       eq: () => ({
-        order: async () => ({ data: OPPS, error: null }),
+        order: async () => ({ data: h.opportunities, error: null }),
       }),
     }),
     update: () => ({
@@ -302,7 +304,7 @@ describe('Phase 1L-F2D — pending RPC disables all controls', () => {
     expect(dlg.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     const row = within(screen.getByTestId('opportunity-row-opp-draft'));
     expect(row.getByTestId('delete-opportunity-opp-draft')).toBeDisabled();
-    expect(row.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    expect(row.getByRole('button', { name: 'Edit', hidden: true })).toBeDisabled();
     resolveRpc({ data: { result_code: 'deleted' }, error: null });
   });
 });

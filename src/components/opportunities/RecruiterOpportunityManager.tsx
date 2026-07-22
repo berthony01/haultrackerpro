@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -112,10 +112,10 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const openCreate = () => { setEditing(null); setView('form'); };
   const openEdit = (o: Opportunity) => { setEditing(o); setView('form'); };
   const canActivate = true;
-  const deletionPending = deleteOpportunity.isPending;
+  const deletionPending = deleteOpportunity?.isPending ?? false;
   const busy = setStatus.isPending || deletionPending;
 
-  const confirmDelete = (event: React.MouseEvent) => {
+  const confirmDelete = (event: MouseEvent) => {
     event.preventDefault();
     if (!pendingDelete) return;
     deleteOpportunity.mutate(pendingDelete.id, {
