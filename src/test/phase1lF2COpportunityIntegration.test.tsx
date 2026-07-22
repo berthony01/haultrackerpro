@@ -576,7 +576,8 @@ describe('Phase 1L-F2C · Unknown employment gating', () => {
     expect(within(card).queryByText('Gross per total mile')).toBeNull();
 
     await openDetailByTitle('Unknown Job');
-    expect(screen.getAllByText('Employment not disclosed').length).toBeGreaterThan(0);
+    const header = detailHeaderCard('Unknown Job');
+    expect(within(header).getByText('Employment not disclosed')).toBeInTheDocument();
     for (const label of ['Known weekly costs', 'Estimated weekly net', 'Net per total mile']) {
       expect(screen.queryByText(label)).toBeNull();
     }
