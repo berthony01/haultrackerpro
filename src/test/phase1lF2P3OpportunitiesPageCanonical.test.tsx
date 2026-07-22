@@ -49,6 +49,9 @@ type Profile = any | null;
 
 const opportunitiesStore = createStore<Row[]>([]);
 const profileStore = createStore<Profile>(null);
+type LoadState = { isLoading: boolean; isError: boolean; error: Error | null };
+const defaultLoadState: LoadState = { isLoading: false, isError: false, error: null };
+const loadStateStore = createStore<LoadState>({ ...defaultLoadState });
 
 // -------- Hoisted spies preserve real canonical modules -----------------
 const hoisted = vi.hoisted(() => {
@@ -80,7 +83,14 @@ const hoisted = vi.hoisted(() => {
 vi.mock('@/hooks/opportunities/useOpportunities', () => ({
   useOpportunities: () => {
     const opportunities = opportunitiesStore.use();
-    return { opportunities, isLoading: false, isError: false, error: null, refetch: vi.fn() };
+    const ls = loadStateStore.use();
+    return {
+      opportunities,
+      isLoading: ls.isLoading,
+      isError: ls.isError,
+      error: ls.error,
+      refetch: vi.fn(),
+    };
   },
 }));
 vi.mock('@/hooks/opportunities/useSavedOpportunities', () => ({
@@ -292,12 +302,11 @@ function cardIds(): string[] {
   );
 }
 
-function kpiValue(label: string): string {
+function kpiCard(label: string): HTMLElement {
   const labelNode = screen.getByText(label);
   const card = labelNode.closest('.p-4') as HTMLElement | null;
   if (!card) throw new Error(`KPI card not found for "${label}"`);
-  const valueP = card.querySelector('.font-mono') as HTMLElement | null;
-  return valueP?.textContent ?? '';
+  return card;
 }
 
 async function openCombobox(name: string) {
@@ -310,16 +319,31 @@ beforeEach(() => {
   hoisted.matchSpy.reset();
   opportunitiesStore.set([]);
   profileStore.set(null);
+  loadStateStore.set({ ...defaultLoadState });
 });
 afterEach(() => {
   opportunitiesStore.set([]);
   profileStore.set(null);
+  loadStateStore.set({ ...defaultLoadState });
 });
 
 // =========================================================================
 describe('Phase 1L-F2B-P3 — Header + no legacy copy', () => {
   it('1. renders the exact canonical header description and no Profit-first / real pay clarity', () => {
     opportunitiesStore.set([completeRow({ id: 'a' })]);
+    renderPage();
+    expect(
+      screen.getAllByText(
+        'Compare trucking opportunities using disclosed pay, operating terms, and listing transparency.',
+      ).length,
+    ).toBeGreaterThan(0);
+    const body = document.body.textContent || '';
+    expect(body).not.toMatch(/Profit-first/i);
+    expect(body).not.toMatch(/real pay clarity/i);
+  });
+
+  it('1b. Error branch renders the exact canonical header description with no legacy wording', () => {
+    loadStateStore.set({ isLoading: false, isError: true, error: new Error('boom') });
     renderPage();
     expect(
       screen.getAllByText(
@@ -339,10 +363,10 @@ describe('Phase 1L-F2B-P3 — Canonical KPI strip', () => {
       completeRow({ id: 'b', flat_weekly_pay: 2000 }),
     ]);
     renderPage();
-    expect(kpiValue('Available')).toBe('2');
-    expect(kpiValue('Complete Listings')).toBe('2');
-    expect(kpiValue('Avg. Transparency')).toBe('100/100');
-    expect(kpiValue('Gross Disclosed')).toBe('2');
+    expect(within(kpiCard('Available')).getByText('2')).toBeInTheDocument();
+    expect(within(kpiCard('Complete Listings')).getByText('2')).toBeInTheDocument();
+    expect(within(kpiCard('Avg. Transparency')).getByText('100/100')).toBeInTheDocument();
+    expect(within(kpiCard('Gross Disclosed')).getByText('2')).toBeInTheDocument();
   });
 
   it('3. legacy KPI labels are absent (Active Recruiters, Highest Estimated Net, Best Effective RPM)', () => {
@@ -354,12 +378,11 @@ describe('Phase 1L-F2B-P3 — Canonical KPI strip', () => {
     expect(body).not.toMatch(/Best Effective RPM/);
   });
 
-  it('KPI Avg. Transparency displays 0/100 when there are no opportunities', () => {
-    opportunitiesStore.set([]);
+  it('3b. Zero recurring weekly gross counts as a finite disclosed value in Available and Gross Disclosed', () => {
+    opportunitiesStore.set([completeRow({ id: 'zero', flat_weekly_pay: 0 })]);
     renderPage();
-    expect(kpiValue('Available')).toBe('0');
-    expect(kpiValue('Avg. Transparency')).toBe('0/100');
-    expect(kpiValue('Gross Disclosed')).toBe('0');
+    expect(within(kpiCard('Available')).getByText('1')).toBeInTheDocument();
+    expect(within(kpiCard('Gross Disclosed')).getByText('1')).toBeInTheDocument();
   });
 });
 
@@ -544,18 +567,24 @@ describe('Phase 1L-F2B-P3 — Sort behavior', () => {
     expect(hoisted.finSpy.calls.length).toBe(3);
   });
 
-  it('17. Newest sort uses published_at before created_at; missing published falls back to created_at; id tie-break', async () => {
+  it('17. Newest sort — valid dates first; invalid/missing dates sort after all valid rows, id ascending as final tie-break', async () => {
     opportunitiesStore.set([
       completeRow({ id: 'a', published_at: null, created_at: '2026-07-01T00:00:00Z' }),
       completeRow({ id: 'b', published_at: '2026-07-05T00:00:00Z', created_at: '2026-06-01T00:00:00Z' }),
       // c and d share same published timestamp → deterministic id tie-break (c before d).
       completeRow({ id: 'd', published_at: '2026-07-10T00:00:00Z', created_at: '2026-06-01T00:00:00Z' }),
       completeRow({ id: 'c', published_at: '2026-07-10T00:00:00Z', created_at: '2026-06-01T00:00:00Z' }),
+      // e: both invalid timestamp strings → sorts among null-timestamp rows.
+      completeRow({ id: 'e', published_at: 'not-a-date', created_at: 'also-bad' }),
+      // f: published null AND created empty string → also null-timestamp.
+      completeRow({ id: 'f', published_at: null, created_at: '' }),
     ]);
     renderPage();
     await openCombobox('Sort by');
     await userEvent.click(await screen.findByRole('option', { name: 'Newest' }));
-    expect(cardIds()).toEqual(['c', 'd', 'b', 'a']);
+    // Valid-date rows first (c,d tie → id asc; b next; a via created_at fallback),
+    // then invalid/missing rows last with id-asc tie-break (e before f).
+    expect(cardIds()).toEqual(['c', 'd', 'b', 'a', 'e', 'f']);
   });
 
   it('18. Listing transparency sort orders by descending canonical transparency score', async () => {
@@ -570,16 +599,17 @@ describe('Phase 1L-F2B-P3 — Sort behavior', () => {
     expect(cardIds()).toEqual(['hi', 'lo']);
   });
 
-  it('19. Weekly gross sort places finite recurring gross first, descending; null gross last', async () => {
+  it('19. Weekly gross sort — positives desc, finite zero after positives but before null gross', async () => {
     opportunitiesStore.set([
       completeRow({ id: 'low', flat_weekly_pay: 1000 }),
       makeRow({ id: 'nul', title: 'No pay' }), // gross null
       completeRow({ id: 'hi', flat_weekly_pay: 2000 }),
+      completeRow({ id: 'zero', flat_weekly_pay: 0 }),
     ]);
     renderPage();
     await openCombobox('Sort by');
     await userEvent.click(await screen.findByRole('option', { name: 'Weekly gross' }));
-    expect(cardIds()).toEqual(['hi', 'low', 'nul']);
+    expect(cardIds()).toEqual(['hi', 'low', 'zero', 'nul']);
   });
 });
 
@@ -597,8 +627,9 @@ describe('Phase 1L-F2B-P3 — Options never expose unknown / unspecified', () =>
 });
 
 describe('Phase 1L-F2B-P3 — Clear filters and empty state copy', () => {
-  it('21. Clear filters restores all rows after search/employment/team/route/trailer/minimum/paid-deadhead/match filters are applied', async () => {
+  it('21. Full matrix — apply all eight resettable filters, prove state, then Clear resets every resettable state', async () => {
     profileStore.set(completedProfile);
+    hoisted.matchSpy.scoreMap = { a: 60, b: 30 };
     hoisted.matchSpy.tierMap = { a: 'possible', b: 'weak' };
     opportunitiesStore.set([
       completeRow({
@@ -609,6 +640,7 @@ describe('Phase 1L-F2B-P3 — Clear filters and empty state copy', () => {
         team_configuration: 'solo',
         route_type: 'OTR',
         trailer_type: 'Dry Van',
+        pay_model: 'flat_weekly',
         flat_weekly_pay: 2000,
       }),
       completeRow({
@@ -619,15 +651,69 @@ describe('Phase 1L-F2B-P3 — Clear filters and empty state copy', () => {
         team_configuration: 'team',
         route_type: 'Regional',
         trailer_type: 'Reefer',
-        flat_weekly_pay: 1500,
+        pay_model: 'cpm',
+        cpm: 0.6,
+        estimated_weekly_miles: 2500,
+        estimated_loaded_miles: 2300,
+        estimated_deadhead_miles: 200,
+        deadhead_paid: true,
+        fuel_paid_by: 'company',
+        insurance_deductions: 100,
+        insurance_deduction_frequency: 'weekly',
+        maintenance_deductions: 50,
+        maintenance_deduction_frequency: 'weekly',
+        other_deductions: 25,
+        other_deduction_frequency: 'weekly',
+        escrow_required_state: 'not_required',
+        flat_weekly_pay: null,
       }),
     ]);
     renderPage();
-    // Apply a filter that yields zero to force the no-results empty state.
+
+    // Apply all eight resettable filters so only row 'b' remains.
+    await userEvent.type(screen.getByPlaceholderText(/Search title/i), 'Beta');
+    await openCombobox('Employment');
+    await userEvent.click(await screen.findByRole('option', { name: '1099 Contractor' }));
+    await openCombobox('Team setup');
+    await userEvent.click(await screen.findByRole('option', { name: 'Team' }));
+    await openCombobox('Route type');
+    await userEvent.click(await screen.findByRole('option', { name: 'Regional' }));
+    await openCombobox('Trailer');
+    await userEvent.click(await screen.findByRole('option', { name: 'Reefer' }));
+    await userEvent.type(screen.getByLabelText('Min recurring weekly gross'), '1300');
+    await userEvent.click(screen.getByLabelText('Paid deadhead only'));
+    await openCombobox('Match tier');
+    await userEvent.click(await screen.findByRole('option', { name: 'Weak Fit' }));
+
+    // Prove DOM state directly before clearing.
+    expect(cardIds()).toEqual(['b']);
+    expect(screen.getByRole('combobox', { name: 'Employment' })).toHaveTextContent('1099 Contractor');
+    expect(screen.getByRole('combobox', { name: 'Team setup' })).toHaveTextContent('Team');
+    expect(screen.getByRole('combobox', { name: 'Route type' })).toHaveTextContent('Regional');
+    expect(screen.getByRole('combobox', { name: 'Trailer' })).toHaveTextContent('Reefer');
+    expect(screen.getByRole('combobox', { name: 'Match tier' })).toHaveTextContent('Weak Fit');
+    expect(screen.getByPlaceholderText(/Search title/i)).toHaveValue('Beta');
+    expect(screen.getByLabelText('Min recurring weekly gross')).toHaveValue(1300);
+    expect(screen.getByLabelText('Paid deadhead only')).toBeChecked();
+
+    // Replace search with a no-hit string; other seven filters remain selected.
+    await userEvent.clear(screen.getByPlaceholderText(/Search title/i));
     await userEvent.type(screen.getByPlaceholderText(/Search title/i), 'zzzz-no-hit');
     expect(cardIds()).toEqual([]);
-    expect(screen.getByText(/No results match your filters/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Try clearing filters or broadening your criteria.'),
+    ).toBeInTheDocument();
+
+    // Clear filters and prove every resettable state resets.
     await userEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
+    expect(screen.getByPlaceholderText(/Search title/i)).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Employment' })).toHaveTextContent('Any');
+    expect(screen.getByRole('combobox', { name: 'Team setup' })).toHaveTextContent('Any');
+    expect(screen.getByRole('combobox', { name: 'Route type' })).toHaveTextContent('Any');
+    expect(screen.getByRole('combobox', { name: 'Trailer' })).toHaveTextContent('Any');
+    expect(screen.getByLabelText('Min recurring weekly gross')).toHaveValue(null);
+    expect(screen.getByLabelText('Paid deadhead only')).not.toBeChecked();
+    expect(screen.getByRole('combobox', { name: 'Match tier' })).toHaveTextContent('All matches');
     expect(new Set(cardIds())).toEqual(new Set(['a', 'b']));
   });
 
