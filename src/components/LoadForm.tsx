@@ -191,6 +191,16 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [userTouchedLoadDate, setUserTouchedLoadDate] = useState(false);
   const [userTouchedDropoffDate, setUserTouchedDropoffDate] = useState(false);
 
+  // Phase 1N-A: untouched-today confirmation for NEW completed loads.
+  // Blocks the first submit when the pickup date is still the auto-filled
+  // local "today" and the user hasn't intentionally set it. The user
+  // acknowledges by clicking "Save as Today", which sets ack=true so the
+  // next submit passes cleanly. Any real date change flips
+  // `userTouchedLoadDate` and skips the guard entirely.
+  const [showTodayConfirm, setShowTodayConfirm] = useState(false);
+  const [acknowledgedTodayDate, setAcknowledgedTodayDate] = useState(false);
+  const initialTodayRef = useRef<string>(localTodayYMD());
+
   // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
   // user changes anything that could move the load into or out of the risky
   // missing-final-stop-date state. Without this, once a user dismisses the
@@ -199,6 +209,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   useEffect(() => {
     setAcknowledgedDropWarning(false);
   }, [multiStop, stops, form.dropoff_date, form.load_date]);
+
+  // Phase 1N-A: any real change to the pickup date or status resets the
+  // untouched-today acknowledgement so the guard behaves safely if the user
+  // toggles back into the risky state.
+  useEffect(() => {
+    setAcknowledgedTodayDate(false);
+    setShowTodayConfirm(false);
+  }, [form.load_date, form.status, saveAsPending]);
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
