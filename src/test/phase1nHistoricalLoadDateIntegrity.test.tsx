@@ -4,15 +4,29 @@
  * Behavior-focused tests for LoadForm's local-calendar-safe date defaults,
  * pickup-date shortcuts, reporting-date summary, and the untouched-today
  * confirmation guard for new completed loads.
+ *
+ * Phase 1N-A-R1 acceptance repair: proves cancelled bypass explicitly,
+ * proves Copy Last Load resets touched/acknowledgement state, and looks up
+ * switches by accessible name rather than DOM order.
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { format, subDays } from 'date-fns';
 
 // Radix Switch relies on ResizeObserver which jsdom does not provide.
 class RO { observe() {} unobserve() {} disconnect() {} }
 (globalThis as any).ResizeObserver = (globalThis as any).ResizeObserver ?? RO;
+
+// Radix Select relies on pointer-capture/scrollIntoView APIs jsdom lacks.
+(() => {
+  const proto = (globalThis as any).Element?.prototype;
+  if (!proto) return;
+  proto.hasPointerCapture = () => false;
+  proto.releasePointerCapture = () => {};
+  proto.scrollIntoView = () => {};
+})();
 
 // --- Isolate LoadForm from data hooks / heavy children ---------------------
 
@@ -38,8 +52,20 @@ vi.mock('@/hooks/useProfitCheck', () => ({
   useProfitCheck: () => ({ result: null }),
 }));
 
+// Narrow SmartChips mock: renders a real Copy Last Load button that calls the
+// production onCopyLastLoad prop when a recentLoads entry exists. All other
+// SmartChips behavior stays out of scope.
 vi.mock('@/components/SmartChips', () => ({
-  SmartChips: () => null,
+  SmartChips: ({ lastLoad, onCopyLastLoad }: any) =>
+    lastLoad ? (
+      <button
+        type="button"
+        data-testid="mock-copy-last-load"
+        onClick={onCopyLastLoad}
+      >
+        Copy Last Load
+      </button>
+    ) : null,
 }));
 
 vi.mock('@/components/PasteLoadParser', () => ({
@@ -79,6 +105,7 @@ vi.mock('@/components/MultiStopEditor', () => ({
 
 // Import AFTER mocks so LoadForm resolves to the mocked deps.
 import { LoadForm } from '@/components/LoadForm';
+import type { Load } from '@/hooks/useLoads';
 
 const TODAY = format(new Date(), 'yyyy-MM-dd');
 const THREE_DAYS_AGO = format(subDays(new Date(), 3), 'yyyy-MM-dd');
@@ -96,10 +123,53 @@ function fillRequired() {
   setById('rate_per_mile', '2.5');
 }
 
-function renderNew(onSubmit = vi.fn()) {
-  const utils = render(<LoadForm onSubmit={onSubmit} />);
+function renderNew(onSubmit = vi.fn(), recentLoads: Load[] = []) {
+  const utils = render(<LoadForm onSubmit={onSubmit} recentLoads={recentLoads} />);
   return { onSubmit, ...utils };
 }
+
+/** Pick an option from a Radix Select combobox by accessible name. */
+async function selectStatus(optionName: RegExp) {
+  const user = userEvent.setup();
+  const trigger = screen.getByRole('combobox', { name: /status/i });
+  await user.click(trigger);
+  const option = await screen.findByRole('option', { name: optionName });
+  await user.click(option);
+}
+
+const RECENT_LOAD_FIXTURE: Load = {
+  id: 'last-1',
+  user_id: 'u1',
+  load_date: THREE_DAYS_AGO,
+  dropoff_date: THREE_DAYS_AGO,
+  pickup_location: 'Houston, TX',
+  dropoff_location: 'Nashville, TN',
+  loaded_miles: 780,
+  deadhead_miles: 40,
+  rate_per_mile: 2.8,
+  wait_fee: 0,
+  detention_fee: 0,
+  other_fees: 0,
+  actual_pay_received: null,
+  notes: null,
+  status: 'completed',
+  gross_revenue: null,
+  invoice_submitted_date: null,
+  pod_submitted_date: null,
+  payment_due_date: null,
+  paid_date: null,
+  short_paid_amount: null,
+  payment_status: 'unpaid',
+  payment_notes: null,
+  pay_model: 'loaded_miles_only',
+  total_miles: null,
+  flat_rate_amount: null,
+  deadhead_rate_per_mile: null,
+  broker_id: null,
+  estimated_pay: 2184,
+  created_at: '2026-07-01T00:00:00Z',
+  updated_at: '2026-07-01T00:00:00Z',
+} as unknown as Load;
 
 describe('Phase 1N-A — historical load-date integrity', () => {
   beforeEach(() => {
@@ -110,7 +180,6 @@ describe('Phase 1N-A — historical load-date integrity', () => {
     renderNew();
     const trigger = document.getElementById('load_date') as HTMLElement;
     expect(trigger).toBeTruthy();
-    // DateInput renders MM/DD/YYYY label for the ISO value.
     const [y, m, d] = TODAY.split('-');
     expect(trigger.textContent).toContain(`${m}/${d}/${y}`);
   });
@@ -155,7 +224,6 @@ describe('Phase 1N-A — historical load-date integrity', () => {
     const changeBtn = screen.getByRole('button', { name: /change date/i });
     act(() => { fireEvent.click(changeBtn); });
     expect(onSubmit).not.toHaveBeenCalled();
-    // Confirmation panel dismissed; Pickup Date received focus or its popover opened.
     expect(screen.queryByTestId('today-confirm-panel')).toBeNull();
     const focused = document.activeElement as HTMLElement | null;
     const pickup = document.getElementById('load_date') as HTMLElement;
@@ -169,13 +237,12 @@ describe('Phase 1N-A — historical load-date integrity', () => {
     fireEvent.click(screen.getByTestId('load-form-submit'));
     fireEvent.click(screen.getByRole('button', { name: /save as today/i }));
     expect(onSubmit).not.toHaveBeenCalled();
-    // Second submit passes cleanly.
     fireEvent.click(screen.getByTestId('load-form-submit'));
     expect(onSubmit).toHaveBeenCalledTimes(1);
     const payload = onSubmit.mock.calls[0][0];
     expect(payload.load_date).toBe(TODAY);
     expect(payload.dropoff_date).toBe(TODAY);
-    // 11. Payload does not carry created_at/updated_at manipulation.
+    // Payload does not carry created_at/updated_at manipulation.
     expect(payload).not.toHaveProperty('created_at');
     expect(payload).not.toHaveProperty('updated_at');
   });
@@ -192,16 +259,24 @@ describe('Phase 1N-A — historical load-date integrity', () => {
     expect(payload.dropoff_date).toBe(THREE_DAYS_AGO);
   });
 
-  it('8. new pending load never receives the completed-today warning', () => {
+  it('8. new PENDING load never receives the completed-today warning', () => {
     const { onSubmit } = renderNew();
     fillRequired();
-    // Flip the "Save as Pending" switch (last switch rendered on the form).
-    const switches = document.querySelectorAll('[role="switch"]');
-    fireEvent.click(switches[switches.length - 1] as HTMLElement);
+    fireEvent.click(screen.getByRole('switch', { name: /save as pending/i }));
     fireEvent.click(screen.getByTestId('load-form-submit'));
     expect(screen.queryByTestId('today-confirm-panel')).toBeNull();
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit.mock.calls[0][0].status).toBe('pending');
+  });
+
+  it('8b. new CANCELLED load never receives the completed-today warning', async () => {
+    const { onSubmit } = renderNew();
+    fillRequired();
+    await selectStatus(/cancelled/i);
+    fireEvent.click(screen.getByTestId('load-form-submit'));
+    expect(screen.queryByTestId('today-confirm-panel')).toBeNull();
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].status).toBe('cancelled');
   });
 
   it('9. edit mode never receives the untouched-today warning', () => {
@@ -230,10 +305,7 @@ describe('Phase 1N-A — historical load-date integrity', () => {
   it('10. multi-stop missing-final-drop warning still fires independently', () => {
     const { onSubmit } = renderNew();
     fillRequired();
-    // Enable multi-stop — first switch on the form.
-    const switches = document.querySelectorAll('[role="switch"]');
-    fireEvent.click(switches[0] as HTMLElement);
-    // Add one interior stop with no stop_date via mocked editor.
+    fireEvent.click(screen.getByRole('switch', { name: /multi-stop load/i }));
     fireEvent.click(screen.getByTestId('mock-add-stop'));
     // Acknowledge the today-untouched guard first (it fires before multi-stop
     // check because pickup date is still auto-filled today).
@@ -241,10 +313,8 @@ describe('Phase 1N-A — historical load-date integrity', () => {
     if (screen.queryByTestId('today-confirm-panel')) {
       fireEvent.click(screen.getByRole('button', { name: /save as today/i }));
     }
-    // First submit after today-ack triggers multi-stop drop warning (returns).
     fireEvent.click(screen.getByTestId('load-form-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
-    // Second submit acknowledges drop warning and proceeds.
     fireEvent.click(screen.getByTestId('load-form-submit'));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
@@ -258,5 +328,35 @@ describe('Phase 1N-A — historical load-date integrity', () => {
       expect(b.getAttribute('type')).toBe('button');
       expect(b.getAttribute('aria-label')).toBeTruthy();
     }
+  });
+
+  it('13. Copy Last Load resets touched/ack state → completed-today guard still fires', async () => {
+    const { onSubmit } = renderNew(vi.fn(), [RECENT_LOAD_FIXTURE]);
+
+    // 1) Intentionally touch pickup date to a historical value first.
+    fireEvent.click(screen.getByRole('button', { name: /set pickup date to 3 days ago/i }));
+    const pickup = document.getElementById('load_date') as HTMLElement;
+    const [ty, tm, td] = THREE_DAYS_AGO.split('-');
+    expect(pickup.textContent).toContain(`${tm}/${td}/${ty}`);
+
+    // 2) Trigger Copy Last Load via the narrow SmartChips mock.
+    fireEvent.click(screen.getByTestId('mock-copy-last-load'));
+
+    // 3) Copied form: pickup back to local today, Save as Pending is on.
+    const [y, m, d] = TODAY.split('-');
+    await waitFor(() => {
+      expect(pickup.textContent).toContain(`${m}/${d}/${y}`);
+    });
+    const pendingSwitch = screen.getByRole('switch', { name: /save as pending/i });
+    expect(pendingSwitch.getAttribute('data-state')).toBe('checked');
+
+    // 4) Flip Save as Pending off and set Status = Completed.
+    fireEvent.click(pendingSwitch);
+    await selectStatus(/completed/i);
+
+    // 5) Submit → completed-today confirmation MUST appear (state was reset).
+    fireEvent.click(screen.getByTestId('load-form-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByTestId('today-confirm-panel')).toBeTruthy();
   });
 });
