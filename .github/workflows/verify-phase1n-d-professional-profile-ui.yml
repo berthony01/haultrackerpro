@@ -15,6 +15,9 @@ jobs:
     name: Exact test repair and complete acceptance gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_PUBLISHABLE_KEY: test-publishable-key
 
     steps:
       - name: Checkout dedicated test-fix branch
@@ -86,7 +89,10 @@ jobs:
             --reporter verbose 2>&1 | tee artifacts/adjacent.log
           ADJACENT=${PIPESTATUS[0]}
 
-          bunx tsgo --noEmit 2>&1 | tee artifacts/typecheck.log
+          {
+            bunx tsc --noEmit -p tsconfig.app.json
+            bunx tsc --noEmit -p tsconfig.node.json
+          } 2>&1 | tee artifacts/typecheck.log
           TYPECHECK=${PIPESTATUS[0]}
 
           bunx vitest run 2>&1 | tee artifacts/full-suite.log
