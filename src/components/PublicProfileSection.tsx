@@ -93,7 +93,7 @@ export function PublicProfileSection() {
     <div className="premium-card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold flex items-center gap-1.5">
-            <UserCircle2 className="h-3.5 w-3.5" /> Public Profile
+            <UserCircle2 className="h-3.5 w-3.5" /> Leaderboard Identity
           </p>
           {profile?.handle_public && profile.driver_handle && (
             <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-primary border-primary/40">
@@ -103,7 +103,7 @@ export function PublicProfileSection() {
         </div>
 
         <p className="text-[11px] text-muted-foreground -mt-1">
-          Choose how you appear on the weekly leaderboard. Default is anonymous (Driver #XXXX).
+          This controls only how you appear on the weekly leaderboard. It is not your recruiter or job profile. By default you remain anonymous as Driver #XXXX.
         </p>
 
         <div className="space-y-1.5">
