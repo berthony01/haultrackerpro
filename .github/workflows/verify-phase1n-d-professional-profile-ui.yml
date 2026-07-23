@@ -1,0 +1,71 @@
+name: Verification Only - Phase 1N-D Professional Profile UI
+
+on:
+  pull_request:
+    branches:
+      - verify/phase1n-d-ui-base
+    paths:
+      - 'src/hooks/useProfessionalProfile.ts'
+      - 'src/components/profiles/ProfessionalProfileCard.tsx'
+      - 'src/pages/ProfessionalProfile.tsx'
+      - 'src/App.tsx'
+      - 'src/pages/AssistantDashboard.tsx'
+      - 'src/pages/AgencyDashboard.tsx'
+      - 'src/components/assistants/AssistantsPanel.tsx'
+      - 'src/pages/DriverDelegationApprovals.tsx'
+      - 'src/test/phase1nProfessionalProfileFoundation.test.tsx'
+      - '.github/workflows/verify-phase1n-d-professional-profile-ui.yml'
+
+jobs:
+  phase1n-professional-profile-ui:
+    name: Target, regressions, full suite, typecheck, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout verification head
+        uses: actions/checkout@v4
+
+      - name: Setup Bun 1.3.14
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Forbidden marker scan
+        run: |
+          set -eu
+          FILE='src/test/phase1nProfessionalProfileFoundation.test.tsx'
+          FORBIDDEN='(it|test|describe)\.(skip|only)\b|\bit\.todo\b|\bxit\b|\bxdescribe\b'
+          test -f "$FILE"
+          if grep -Enq "$FORBIDDEN" "$FILE"; then
+            grep -En "$FORBIDDEN" "$FILE" >&2 || true
+            exit 1
+          fi
+
+      - name: Phase 1N-D target acceptance test
+        run: bunx vitest run src/test/phase1nProfessionalProfileFoundation.test.tsx
+
+      - name: Adjacent agency and assistant regressions
+        run: >-
+          bunx vitest run
+          src/test/assistantAgencyAccessIntegrity.test.ts
+          src/test/agencySeparation.test.tsx
+          src/test/phase3AgencyWorkflow.test.ts
+          src/test/phase4aDriverControlCenter.test.ts
+
+      - name: Application typecheck
+        run: bunx tsgo --noEmit
+
+      - name: Full default Vitest suite
+        run: bunx vitest run
+
+      - name: Production build
+        run: bun run build
+
+      - name: Diff and working-tree integrity
+        run: |
+          git diff --check
+          test -z "$(git status --short)"
