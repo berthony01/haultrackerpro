@@ -54,6 +54,7 @@ import { ExpenseDonut } from '@/components/premium/ExpenseDonut';
 import { ProfitByLoadTable } from '@/components/premium/ProfitByLoadTable';
 import { DashboardFooterCTA } from '@/components/premium/DashboardFooterCTA';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
+import { RecommendedOpportunityCard } from '@/components/opportunities/RecommendedOpportunityCard';
 
 
 interface DashboardViewProps {
@@ -64,6 +65,11 @@ interface DashboardViewProps {
   onNavigate?: (page: string, options?: { filter?: string }) => void;
   smartAlerts?: { alerts: any[]; dismissAlert: { mutate: (key: string) => void } };
   isPro?: boolean;
+  /** Phase 1N-B — when true (and onNavigate is present), render the driver
+   *  "Recommended Opportunity" card between the primary dashboard grid and
+   *  the ProfitByLoadTable. Default false so existing standalone consumers
+   *  of DashboardView don't unexpectedly mount opportunity data hooks. */
+  showRecommendedOpportunity?: boolean;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
