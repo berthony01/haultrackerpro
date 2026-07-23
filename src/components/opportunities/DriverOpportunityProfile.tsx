@@ -223,7 +223,10 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
       min_weekly_net: form.min_weekly_net ? Number(form.min_weekly_net) : null,
       min_effective_rpm: form.min_effective_rpm ? Number(form.min_effective_rpm) : null,
       visibility: form.visibility,
-      allow_verified_recruiter_contact: form.allow_verified_recruiter_contact,
+      // Fail-closed: enabling recruiter-contact is impossible outside verified_recruiters,
+      // regardless of any stale toggle value in local state.
+      allow_verified_recruiter_contact:
+        form.visibility === 'verified_recruiters' && form.allow_verified_recruiter_contact,
       contact_preference: form.contact_preference,
       profile_completed: completed,
     };
