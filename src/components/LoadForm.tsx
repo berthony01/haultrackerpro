@@ -1,4 +1,24 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { format as formatDate, subDays } from 'date-fns';
+
+/**
+ * Phase 1N — Local-calendar-safe "today" as YYYY-MM-DD.
+ * Avoids `new Date().toISOString()` which shifts negative-UTC users a day.
+ */
+function localTodayYMD(): string {
+  return formatDate(new Date(), 'yyyy-MM-dd');
+}
+function localDaysAgoYMD(days: number): string {
+  return formatDate(subDays(new Date(), days), 'yyyy-MM-dd');
+}
+/** Human-readable rendering for the reporting summary, e.g. "July 19, 2026". */
+function formatReportingDate(ymd: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return null;
+  return formatDate(dt, 'MMMM d, yyyy');
+}
 import { Load, LoadInsert } from '@/hooks/useLoads';
 import { LoadStopInput } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
