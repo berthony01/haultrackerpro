@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,6 +26,8 @@ import { Shield, Users, Building2 } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAssistantsWithSource, type AssistantWithSourceRow } from '@/hooks/useAssistantsWithSource';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthorizedProfessionalProfiles } from '@/hooks/useProfessionalProfile';
+import { ProfessionalProfileSummaryCard } from '@/components/profiles/ProfessionalProfileCard';
 
 function StatusBadge({ status }: { status: AssistantWithSourceRow["status"] }) {
   const map: Record<AssistantWithSourceRow['status'], { label: string; variant: any }> = {
@@ -131,6 +133,13 @@ export function AssistantsPanel() {
   const { isPro } = useSubscription();
 
   const assistants = rows;
+  const assistantProfileIds = useMemo(
+    () => assistants.map((assistant) => assistant.assistant_user_id),
+    [assistants],
+  );
+  const { data: professionalProfiles = {} } =
+    useAuthorizedProfessionalProfiles(assistantProfileIds);
+
   const active = assistants.filter((a) => a.status === 'active');
   const pending = assistants.filter((a) => a.status === 'pending');
   const inactive = assistants.filter((a) => a.status === 'revoked' || a.status === 'expired');
@@ -215,34 +224,43 @@ export function AssistantsPanel() {
                 <h3 className="text-sm font-medium text-muted-foreground">{g.title}</h3>
                 <div className="rounded-md border divide-y">
                   {g.rows.map((row) => (
-                    <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium truncate">{row.invite_email}</span>
-                          <StatusBadge status={row.status} />
-                          {row.source === 'agency' ? (
-                            <Badge variant="secondary" className="gap-1">
-                              <Building2 className="h-3 w-3" />
-                              via agency{row.agency_name ? ` · ${row.agency_name}` : ''}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">direct invite</Badge>
+                    <div key={row.id} className="p-3 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium truncate">{row.invite_email}</span>
+                            <StatusBadge status={row.status} />
+                            {row.source === 'agency' ? (
+                              <Badge variant="secondary" className="gap-1">
+                                <Building2 className="h-3 w-3" />
+                                via agency{row.agency_name ? ` · ${row.agency_name}` : ''}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">direct invite</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {Object.keys(row.permissions ?? {}).filter((k) => (row.permissions as any)[k]).length} permissions
+                            {row.accepted_at && ` · joined ${new Date(row.accepted_at).toLocaleDateString()}`}
+                            {row.last_active_at && ` · last active ${new Date(row.last_active_at).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(row.status === 'active' || row.status === 'pending') && (
+                            <>
+                              <PermissionEditor row={row} />
+                              <RevokeButton row={row} />
+                            </>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {Object.keys(row.permissions ?? {}).filter((k) => (row.permissions as any)[k]).length} permissions
-                          {row.accepted_at && ` · joined ${new Date(row.accepted_at).toLocaleDateString()}`}
-                          {row.last_active_at && ` · last active ${new Date(row.last_active_at).toLocaleDateString()}`}
-                        </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {(row.status === 'active' || row.status === 'pending') && (
-                          <>
-                            <PermissionEditor row={row} />
-                            <RevokeButton row={row} />
-                          </>
-                        )}
-                      </div>
+                      <ProfessionalProfileSummaryCard
+                        summary={
+                          row.assistant_user_id
+                            ? professionalProfiles[row.assistant_user_id]
+                            : null
+                        }
+                      />
                     </div>
                   ))}
                 </div>
