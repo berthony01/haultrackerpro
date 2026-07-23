@@ -468,8 +468,13 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const handleCopyLastLoad = () => {
     if (!lastLoad) return;
     const lastDh = readDhFromNotes(lastLoad.notes ?? null);
+    // Phase 1N-A-R1: single local-today value drives both the copied form's
+    // pickup date and the untouched-today baseline ref, so the completed-today
+    // guard still fires if the user later flips this copied load to completed
+    // without intentionally changing Pickup Date.
+    const copyToday = localTodayYMD();
     setForm({
-      load_date: localTodayYMD(),
+      load_date: copyToday,
       dropoff_date: '',
       pickup_location: lastLoad.pickup_location,
       dropoff_location: lastLoad.dropoff_location,
@@ -503,6 +508,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     setStops([]);
     setMultiStopBanner(null);
     setSaveAsPending(true);
+    // Phase 1N-A-R1: reset date-intent + today-confirmation state so a
+    // previously touched historical date on the prior form does not carry
+    // forward into the copied form and silently bypass the completed-today guard.
+    initialTodayRef.current = copyToday;
+    setUserTouchedLoadDate(false);
+    setUserTouchedDropoffDate(false);
+    setAcknowledgedTodayDate(false);
+    setShowTodayConfirm(false);
     toast.success('Last load copied');
   };
 
@@ -832,7 +845,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           <div>
             <Label htmlFor="status">Status</Label>
             <Select value={form.status} onValueChange={v => { update('status', v); if (v === 'cancelled' && !form.notes) update('notes', 'Cancelled by dispatcher'); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="status"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
@@ -873,7 +886,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               <p className="text-sm font-medium">Multi-stop load?</p>
               <p className="text-xs text-muted-foreground">Add route stops between pickup and final delivery</p>
             </div>
-            <Switch checked={multiStop} onCheckedChange={setMultiStop} />
+            <Switch aria-label="Multi-stop load" checked={multiStop} onCheckedChange={setMultiStop} />
           </div>
 
           {multiStop && (
@@ -1117,7 +1130,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 <p className="text-sm font-medium">Save as Pending</p>
                 <p className="text-xs text-muted-foreground">I will finalize later</p>
               </div>
-              <Switch checked={saveAsPending} onCheckedChange={setSaveAsPending} />
+              <Switch aria-label="Save as Pending" checked={saveAsPending} onCheckedChange={setSaveAsPending} />
             </div>
           )}
 
