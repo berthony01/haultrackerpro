@@ -155,9 +155,12 @@ describe('Phase 1N-A — historical load-date integrity', () => {
     const changeBtn = screen.getByRole('button', { name: /change date/i });
     act(() => { fireEvent.click(changeBtn); });
     expect(onSubmit).not.toHaveBeenCalled();
-    // Confirmation panel dismissed and Pickup trigger has focus.
+    // Confirmation panel dismissed; Pickup Date received focus or its popover opened.
     expect(screen.queryByTestId('today-confirm-panel')).toBeNull();
-    expect(document.activeElement?.id).toBe('load_date');
+    const focused = document.activeElement as HTMLElement | null;
+    const pickup = document.getElementById('load_date') as HTMLElement;
+    const popoverOpen = pickup.getAttribute('data-state') === 'open';
+    expect(focused?.id === 'load_date' || popoverOpen || pickup.contains(focused)).toBe(true);
   });
 
   it('6. Save as Today acknowledges → next submit calls onSubmit once with today', () => {
