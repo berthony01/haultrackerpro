@@ -227,9 +227,9 @@ describe('Phase 1N-A — historical load-date integrity', () => {
   it('10. multi-stop missing-final-drop warning still fires independently', () => {
     const { onSubmit } = renderNew();
     fillRequired();
-    // Enable multi-stop.
-    const multiSwitch = screen.getByRole('switch', { name: /multi-stop load/i });
-    fireEvent.click(multiSwitch);
+    // Enable multi-stop — first switch on the form.
+    const switches = document.querySelectorAll('[role="switch"]');
+    fireEvent.click(switches[0] as HTMLElement);
     // Add one interior stop with no stop_date via mocked editor.
     fireEvent.click(screen.getByTestId('mock-add-stop'));
     // Acknowledge the today-untouched guard first (it fires before multi-stop
