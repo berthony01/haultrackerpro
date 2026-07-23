@@ -354,6 +354,42 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
     [selectedId],
   );
 
+  // Phase 1N-B — Dashboard "Recommended Opportunity" deep-link continuity.
+  // Hook-order-safe: declared BEFORE the first conditional return below and
+  // scheduled once, after opportunities finish loading, to consume any
+  // sessionStorage id set by the dashboard card. Uses the safe RPC result
+  // as the only allowlist. Removing the key here prevents Back from
+  // reopening the detail. Invalid/missing/stale ids fail closed to the list.
+  const recommendedOpenIdProcessedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading) return;
+    if (recommendedOpenIdProcessedRef.current) return;
+    recommendedOpenIdProcessedRef.current = true;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(RECOMMENDED_OPPORTUNITY_OPEN_KEY);
+      sessionStorage.removeItem(RECOMMENDED_OPPORTUNITY_OPEN_KEY);
+    } catch {
+      raw = null;
+    }
+    if (raw == null) return;
+    const resolved = resolveRequestedOpportunityId(
+      raw,
+      opportunities.map((o) => o.id),
+    );
+    if (!resolved) return;
+    // Clear any stale Preferences Apply-origin/resume state and close all
+    // sibling subviews so the resolved opportunity opens cleanly.
+    setPreferencesOrigin(null);
+    setResumeState(null);
+    setShowProfile(false);
+    setShowDriverApps(false);
+    setShowReferrals(false);
+    setSelectedId(resolved);
+  }, [isLoading, opportunities]);
+
+
+
   if (isError) {
     return (
       <div className="space-y-6 animate-fade-in">
