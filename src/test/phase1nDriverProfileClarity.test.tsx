@@ -137,16 +137,21 @@ beforeEach(() => {
 describe('Phase 1N-C · Leaderboard Identity clarity', () => {
   it('renders the Leaderboard Identity heading and drops "Public Profile"', () => {
     renderLeaderboard();
-    expect(screen.getByText(/Leaderboard Identity/i)).toBeInTheDocument();
-    expect(screen.queryByText(/^Public Profile$/i)).not.toBeInTheDocument();
+    // Heading paragraph (case-sensitive, exact) — button label uses
+    // lowercase "leaderboard identity" so a case-insensitive match would
+    // legitimately find both nodes.
+    expect(screen.getByText('Leaderboard Identity')).toBeInTheDocument();
+    expect(screen.queryByText('Public Profile')).toBeNull();
   });
 
   it('explains leaderboard-only purpose and anonymous default', () => {
     renderLeaderboard();
-    const copy = screen.getByText((_, el) =>
-      !!el && /weekly leaderboard/i.test(el.textContent ?? '') &&
-      /not your recruiter or job profile/i.test(el.textContent ?? '') &&
-      /Driver\s*#XXXX/i.test(el.textContent ?? ''),
+    const copy = screen.getByText(
+      (_, el) =>
+        el?.tagName === 'P' &&
+        /weekly leaderboard/i.test(el.textContent ?? '') &&
+        /not your recruiter or job profile/i.test(el.textContent ?? '') &&
+        /Driver\s*#XXXX/i.test(el.textContent ?? ''),
     );
     expect(copy).toBeInTheDocument();
   });
