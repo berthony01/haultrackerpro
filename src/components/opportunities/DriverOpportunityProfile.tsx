@@ -264,26 +264,44 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
           Opportunity Preferences
         </h1>
         <p className="text-sm text-muted-foreground">
-          Help HaulTrackerPro match you with opportunities that fit your pay goals, route style, experience, and home-time needs.
+          This is your recruiter-facing / job-matching information used to match you with opportunities. It is separate from your account settings and from your Leaderboard Identity.
         </p>
         <p className="text-xs text-muted-foreground/80 mt-2">
-          Your main HaulTrackerPro account stays the same. These preferences only improve opportunity matches and show approved recruiters the information you choose to share when you request info.
+          Your HaulTrackerPro sign-in and Leaderboard Identity stay the same. These preferences only improve opportunity matches and show approved recruiters what you choose to share.
         </p>
       </Card>
 
-      <Section icon={User} title="Basic Contact Info">
+      <Section icon={User} title="Recruiter Contact Information">
         <p className="text-xs text-muted-foreground -mt-1">
-          Pulled from your HaulTrackerPro account when available.
+          These are the contact details used for opportunity applications and recruiter sharing according to your privacy choices below. Changing them does not change your sign-in email or your Leaderboard Identity.
         </p>
         <Grid>
-          <Field label="Full name">
+          <Field label="Name shown to recruiters">
             <Input value={form.full_name} onChange={(e) => set('full_name', e.target.value)} placeholder="John Doe" />
           </Field>
-          <Field label="Phone">
+          <Field label="Recruiter contact phone">
             <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="(555) 555-5555" />
+            {accountPhone && (
+              <button
+                type="button"
+                onClick={() => set('phone', accountPhone)}
+                className="text-[11px] font-semibold text-primary hover:underline mt-1 self-start"
+              >
+                Use account phone
+              </button>
+            )}
           </Field>
-          <Field label="Email">
+          <Field label="Recruiter contact email">
             <Input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" />
+            {accountEmail && (
+              <button
+                type="button"
+                onClick={() => set('email', accountEmail)}
+                className="text-[11px] font-semibold text-primary hover:underline mt-1 self-start"
+              >
+                Use account email
+              </button>
+            )}
           </Field>
           <Field label="City">
             <Input value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="Dallas" />
