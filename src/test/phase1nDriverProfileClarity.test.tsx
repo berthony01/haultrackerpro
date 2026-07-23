@@ -181,7 +181,8 @@ describe('Phase 1N-C · Opportunity Preferences recruiter framing', () => {
     renderOpp();
     expect(screen.getByRole('heading', { name: /Opportunity Preferences/i })).toBeInTheDocument();
     const copy = screen.getByText((_, el) => {
-      const t = el?.textContent ?? '';
+      if (el?.tagName !== 'P') return false;
+      const t = el.textContent ?? '';
       return /recruiter-facing/i.test(t) &&
         /separate/i.test(t) &&
         /Leaderboard Identity/i.test(t);
