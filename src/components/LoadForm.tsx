@@ -845,7 +845,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           <div>
             <Label htmlFor="status">Status</Label>
             <Select value={form.status} onValueChange={v => { update('status', v); if (v === 'cancelled' && !form.notes) update('notes', 'Cancelled by dispatcher'); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="status"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
