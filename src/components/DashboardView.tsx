@@ -188,7 +188,7 @@ export function getCancelledFootnote(n: number): string | null {
 }
 
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, showRecommendedOpportunity = false }: DashboardViewProps) {
   const { settings } = useUserSettings();
   const { profile: costProfile } = useCostProfile();
   useTierUpDetector();
