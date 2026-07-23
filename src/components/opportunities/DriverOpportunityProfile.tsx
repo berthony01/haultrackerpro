@@ -121,8 +121,20 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(EMPTY);
 
+  const accountEmail = user?.email ?? '';
+  const accountPhone = (() => {
+    const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+    const v = meta.phone;
+    return typeof v === 'string' && v.trim() ? v.trim() : '';
+  })();
+
   useEffect(() => {
     if (profile) {
+      const loadedVisibility = (profile.visibility as FormState['visibility']) ?? 'private';
+      // Fail-closed: never render recruiter-contact enabled unless
+      // visibility explicitly permits verified recruiters.
+      const loadedAllow =
+        loadedVisibility === 'verified_recruiters' && !!profile.allow_verified_recruiter_contact;
       setForm({
         full_name: profile.full_name ?? '',
         phone: profile.phone ?? '',
@@ -142,8 +154,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         min_weekly_gross: profile.min_weekly_gross != null ? String(profile.min_weekly_gross) : '',
         min_weekly_net: profile.min_weekly_net != null ? String(profile.min_weekly_net) : '',
         min_effective_rpm: profile.min_effective_rpm != null ? String(profile.min_effective_rpm) : '',
-        visibility: (profile.visibility as FormState['visibility']) ?? 'private',
-        allow_verified_recruiter_contact: !!profile.allow_verified_recruiter_contact,
+        visibility: loadedVisibility,
+        allow_verified_recruiter_contact: loadedAllow,
         contact_preference: (profile.contact_preference as FormState['contact_preference']) ?? 'in_app',
       });
     } else if (user) {
@@ -160,6 +172,15 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
       }));
     }
   }, [profile, user]);
+
+  const changeVisibility = (v: FormState['visibility']) =>
+    setForm((p) => ({
+      ...p,
+      visibility: v,
+      // Fail-closed: leaving verified_recruiters immediately clears the toggle.
+      allow_verified_recruiter_contact:
+        v === 'verified_recruiters' ? p.allow_verified_recruiter_contact : false,
+    }));
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((p) => ({ ...p, [k]: v }));
