@@ -45,7 +45,7 @@ export function useUpdateDriverProfile() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['driver-profile', user?.id] });
       qc.invalidateQueries({ queryKey: ['driver-leaderboard'] });
-      toast.success('Public profile updated');
+      toast.success('Leaderboard identity updated');
     },
     onError: (err: Error) => {
       toast.error(err.message || 'Could not save handle');

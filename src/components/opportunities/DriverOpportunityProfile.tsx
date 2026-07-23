@@ -121,8 +121,20 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(EMPTY);
 
+  const accountEmail = user?.email ?? '';
+  const accountPhone = (() => {
+    const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+    const v = meta.phone;
+    return typeof v === 'string' && v.trim() ? v.trim() : '';
+  })();
+
   useEffect(() => {
     if (profile) {
+      const loadedVisibility = (profile.visibility as FormState['visibility']) ?? 'private';
+      // Fail-closed: never render recruiter-contact enabled unless
+      // visibility explicitly permits verified recruiters.
+      const loadedAllow =
+        loadedVisibility === 'verified_recruiters' && !!profile.allow_verified_recruiter_contact;
       setForm({
         full_name: profile.full_name ?? '',
         phone: profile.phone ?? '',
@@ -142,8 +154,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         min_weekly_gross: profile.min_weekly_gross != null ? String(profile.min_weekly_gross) : '',
         min_weekly_net: profile.min_weekly_net != null ? String(profile.min_weekly_net) : '',
         min_effective_rpm: profile.min_effective_rpm != null ? String(profile.min_effective_rpm) : '',
-        visibility: (profile.visibility as FormState['visibility']) ?? 'private',
-        allow_verified_recruiter_contact: !!profile.allow_verified_recruiter_contact,
+        visibility: loadedVisibility,
+        allow_verified_recruiter_contact: loadedAllow,
         contact_preference: (profile.contact_preference as FormState['contact_preference']) ?? 'in_app',
       });
     } else if (user) {
@@ -160,6 +172,15 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
       }));
     }
   }, [profile, user]);
+
+  const changeVisibility = (v: FormState['visibility']) =>
+    setForm((p) => ({
+      ...p,
+      visibility: v,
+      // Fail-closed: leaving verified_recruiters immediately clears the toggle.
+      allow_verified_recruiter_contact:
+        v === 'verified_recruiters' ? p.allow_verified_recruiter_contact : false,
+    }));
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((p) => ({ ...p, [k]: v }));
@@ -202,7 +223,10 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
       min_weekly_net: form.min_weekly_net ? Number(form.min_weekly_net) : null,
       min_effective_rpm: form.min_effective_rpm ? Number(form.min_effective_rpm) : null,
       visibility: form.visibility,
-      allow_verified_recruiter_contact: form.allow_verified_recruiter_contact,
+      // Fail-closed: enabling recruiter-contact is impossible outside verified_recruiters,
+      // regardless of any stale toggle value in local state.
+      allow_verified_recruiter_contact:
+        form.visibility === 'verified_recruiters' && form.allow_verified_recruiter_contact,
       contact_preference: form.contact_preference,
       profile_completed: completed,
     };
@@ -240,26 +264,44 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
           Opportunity Preferences
         </h1>
         <p className="text-sm text-muted-foreground">
-          Help HaulTrackerPro match you with opportunities that fit your pay goals, route style, experience, and home-time needs.
+          This is your recruiter-facing / job-matching information used to match you with opportunities. It is separate from your account settings and from your Leaderboard Identity.
         </p>
         <p className="text-xs text-muted-foreground/80 mt-2">
-          Your main HaulTrackerPro account stays the same. These preferences only improve opportunity matches and show approved recruiters the information you choose to share when you request info.
+          Your HaulTrackerPro sign-in and Leaderboard Identity stay the same. These preferences only improve opportunity matches and show approved recruiters what you choose to share.
         </p>
       </Card>
 
-      <Section icon={User} title="Basic Contact Info">
+      <Section icon={User} title="Recruiter Contact Information">
         <p className="text-xs text-muted-foreground -mt-1">
-          Pulled from your HaulTrackerPro account when available.
+          These are the contact details used for opportunity applications and recruiter sharing according to your privacy choices below. Changing them does not change your sign-in email or your Leaderboard Identity.
         </p>
         <Grid>
-          <Field label="Full name">
+          <Field label="Name shown to recruiters">
             <Input value={form.full_name} onChange={(e) => set('full_name', e.target.value)} placeholder="John Doe" />
           </Field>
-          <Field label="Phone">
+          <Field label="Recruiter contact phone">
             <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="(555) 555-5555" />
+            {accountPhone && (
+              <button
+                type="button"
+                onClick={() => set('phone', accountPhone)}
+                className="text-[11px] font-semibold text-primary hover:underline mt-1 self-start"
+              >
+                Use account phone
+              </button>
+            )}
           </Field>
-          <Field label="Email">
+          <Field label="Recruiter contact email">
             <Input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="you@example.com" />
+            {accountEmail && (
+              <button
+                type="button"
+                onClick={() => set('email', accountEmail)}
+                className="text-[11px] font-semibold text-primary hover:underline mt-1 self-start"
+              >
+                Use account email
+              </button>
+            )}
           </Field>
           <Field label="City">
             <Input value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="Dallas" />
@@ -353,7 +395,7 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
       <Section icon={ShieldCheck} title="Privacy & Recruiter Contact">
         <Field label="Preferences visibility">
-          <Select value={form.visibility} onValueChange={(v) => set('visibility', v as FormState['visibility'])}>
+          <Select value={form.visibility} onValueChange={(v) => changeVisibility(v as FormState['visibility'])}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {VISIBILITY.map((o) => (
@@ -361,6 +403,14 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {form.visibility === 'private' &&
+              'Private — recruiters cannot initiate contact.'}
+            {form.visibility === 'apply_only' &&
+              'Application only — your details are shared only through your own application or request-info action.'}
+            {form.visibility === 'verified_recruiters' &&
+              'Approved recruiters — you may choose whether approved recruiters can initiate contact.'}
+          </p>
         </Field>
         <Field label="Preferred contact method">
           <Select value={form.contact_preference} onValueChange={(v) => set('contact_preference', v as FormState['contact_preference'])}>
@@ -372,11 +422,22 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
             </SelectContent>
           </Select>
         </Field>
-        <ToggleRow
-          label="Allow approved recruiters to contact me"
-          checked={form.allow_verified_recruiter_contact}
-          onChange={(v) => set('allow_verified_recruiter_contact', v)}
-        />
+        <div className="flex items-center justify-between rounded-lg bg-muted/20 border border-border/60 p-3">
+          <div className="min-w-0 pr-3">
+            <p className="text-sm font-medium text-foreground">Allow approved recruiters to contact me</p>
+            {form.visibility !== 'verified_recruiters' && (
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Available only when visibility is set to Approved recruiters.
+              </p>
+            )}
+          </div>
+          <Switch
+            aria-label="Allow approved recruiters to contact me"
+            checked={form.visibility === 'verified_recruiters' && form.allow_verified_recruiter_contact}
+            disabled={form.visibility !== 'verified_recruiters'}
+            onCheckedChange={(v) => set('allow_verified_recruiter_contact', v)}
+          />
+        </div>
       </Section>
 
       {/* Spacer so fixed mobile action bar doesn't cover content */}
