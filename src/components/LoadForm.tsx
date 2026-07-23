@@ -120,7 +120,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const initialDh = useMemo(() => readDhFromNotes(initialData?.notes ?? null), [initialData?.notes]);
 
   const [form, setForm] = useState({
-    load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
+    load_date: initialData?.load_date || localTodayYMD(),
     dropoff_date: initialData?.dropoff_date || '',
     pickup_location: initialData?.pickup_location || (useSample ? SAMPLE_LOAD.pickup_location : ''),
     dropoff_location: initialData?.dropoff_location || (useSample ? SAMPLE_LOAD.dropoff_location : ''),
