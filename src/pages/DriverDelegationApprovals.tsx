@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageNav } from '@/components/layout/PageNav';
@@ -5,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, ArrowLeft } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   useDriverDecideDelegation,
@@ -16,6 +17,8 @@ import {
   ASSISTANT_PERMISSION_KEYS,
   PERMISSION_LABELS,
 } from '@/lib/assistantPermissions';
+import { useAuthorizedProfessionalProfiles } from '@/hooks/useProfessionalProfile';
+import { ProfessionalProfileSummaryCard } from '@/components/profiles/ProfessionalProfileCard';
 
 /**
  * Driver-facing page where the driver explicitly approves or declines a
@@ -28,6 +31,12 @@ export default function DriverDelegationApprovals() {
   const { data: rows, isLoading } = useMyPendingDelegations();
   const decide = useDriverDecideDelegation();
   const { toast } = useToast();
+  const memberUserIds = useMemo(
+    () => (rows ?? []).map((row) => row.member_user_id),
+    [rows],
+  );
+  const { data: professionalProfiles = {} } =
+    useAuthorizedProfessionalProfiles(memberUserIds);
 
   if (loading) return null;
   if (!user) {
@@ -66,6 +75,9 @@ export default function DriverDelegationApprovals() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
+              <ProfessionalProfileSummaryCard
+                summary={professionalProfiles[r.member_user_id]}
+              />
               {r.package_name && (
                 <p>
                   Package: <span className="font-medium">{r.package_name}</span>
