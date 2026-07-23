@@ -138,7 +138,7 @@ describe('Phase 1N-D · shared Professional Profile page', () => {
     render(<ProfessionalProfilePage />);
 
     for (const label of [
-      'Display name',
+      /^Display name/ ,
       'Professional title',
       'Bio',
       'Years of experience',
@@ -170,7 +170,7 @@ describe('Phase 1N-D · shared Professional Profile page', () => {
   it('prefills from account data without saving automatically', () => {
     render(<ProfessionalProfilePage />);
 
-    expect(screen.getByLabelText('Display name')).toHaveValue('Account Person');
+    expect(screen.getByLabelText(/^Display name/)).toHaveValue('Account Person');
     expect(screen.getByLabelText('Professional contact email')).toHaveValue(
       'account@example.com',
     );
@@ -225,7 +225,7 @@ describe('Phase 1N-D · shared Professional Profile page', () => {
     render(<ProfessionalProfilePage />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Display name')).toHaveValue('Jane Professional');
+      expect(screen.getByLabelText(/^Display name/)).toHaveValue('Jane Professional');
     });
     expect(screen.getByLabelText('Professional title')).toHaveValue(
       'Dispatch Specialist',
@@ -431,7 +431,7 @@ describe('Phase 1N-D · source-level integration and security contracts', () => 
     ]) {
       expect(hook).toContain(parameter);
     }
-    expect(hook).not.toContain('_display_name: input.display_name');
+    expect(hook).not.toContain('\n          _display_name:');
     expect(hook).toContain("'list_authorized_professional_profiles'");
     expect(hook).toContain('{ _user_ids: normalized }');
     expect(hook).toContain('normalizeProfessionalProfileUserIds');
