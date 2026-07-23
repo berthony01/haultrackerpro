@@ -30,6 +30,7 @@ import {
   formatAuditAction,
 } from '@/hooks/useAssistantAudit';
 import { useMyAgency } from '@/hooks/useAgency';
+import { MyProfessionalProfileCard } from '@/components/profiles/ProfessionalProfileCard';
 
 export default function AssistantDashboard() {
   const { user } = useAuth();
@@ -80,6 +81,8 @@ export default function AssistantDashboard() {
         <StatCard icon={<Users className="h-4 w-4" />} label="Approved drivers" value={activeCount} />
         <StatCard icon={<Inbox className="h-4 w-4" />} label="Pending invites" value={pendingCount} />
       </div>
+
+      <MyProfessionalProfileCard context="assistant" />
 
       {/* Pending invites */}
       {pendingCount > 0 && (
