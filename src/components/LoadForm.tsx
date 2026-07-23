@@ -698,6 +698,52 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   update('dropoff_date', val);
                 }
               }} />
+              {/* Phase 1N-A: pickup date shortcuts for historical entry. */}
+              <div className="flex flex-wrap gap-1.5 mt-2" data-testid="pickup-date-shortcuts">
+                {[
+                  { label: 'Today', days: 0 },
+                  { label: 'Yesterday', days: 1 },
+                  { label: '2 days ago', days: 2 },
+                  { label: '3 days ago', days: 3 },
+                ].map(({ label, days }) => (
+                  <Button
+                    key={label}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label={`Set pickup date to ${label.toLowerCase()}`}
+                    className="h-7 px-2 text-[11px] rounded-md"
+                    onClick={() => {
+                      const val = localDaysAgoYMD(days);
+                      const prevPickup = form.load_date;
+                      setUserTouchedLoadDate(true);
+                      update('load_date', val);
+                      if (!multiStop && (!form.dropoff_date || form.dropoff_date === prevPickup)) {
+                        update('dropoff_date', val);
+                      }
+                    }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label="Choose pickup date"
+                  className="h-7 px-2 text-[11px] rounded-md"
+                  onClick={() => {
+                    // Reuse the existing DateInput contract: its trigger is a
+                    // button with id={id}, so clicking it opens the calendar
+                    // popover without introducing a second date input.
+                    const el = document.getElementById('load_date') as HTMLElement | null;
+                    el?.focus();
+                    el?.click();
+                  }}
+                >
+                  Choose date
+                </Button>
+              </div>
               <FieldError field="load_date" />
             </div>
             <div>
@@ -717,6 +763,71 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               })()}
             </div>
           </div>
+
+          {/* Phase 1N-A: live reporting-date summary. */}
+          {(() => {
+            const effective = form.dropoff_date && /^\d{4}-\d{2}-\d{2}$/.test(form.dropoff_date)
+              ? form.dropoff_date
+              : (form.load_date && /^\d{4}-\d{2}-\d{2}$/.test(form.load_date) ? form.load_date : '');
+            const pretty = effective ? formatReportingDate(effective) : null;
+            return (
+              <p
+                className="text-[11px] text-muted-foreground leading-snug"
+                data-testid="reporting-date-summary"
+              >
+                {pretty ? (
+                  <>This load will count toward <span className="font-semibold text-foreground">{pretty}</span> in dashboard totals and reports.</>
+                ) : (
+                  <>This load will count toward the delivery date you enter in dashboard totals and reports.</>
+                )}
+              </p>
+            );
+          })()}
+
+          {/* Phase 1N-A: untouched-today confirmation panel. */}
+          {showTodayConfirm && (
+            <div
+              className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-2"
+              role="alertdialog"
+              aria-label="Confirm today's date"
+              data-testid="today-confirm-panel"
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold text-foreground leading-relaxed">
+                  This completed load is dated today. Did this load actually happen today?
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs flex-1"
+                  onClick={() => {
+                    setShowTodayConfirm(false);
+                    const el = document.getElementById('load_date') as HTMLElement | null;
+                    el?.focus();
+                    el?.click();
+                  }}
+                >
+                  Change Date
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 text-xs flex-1"
+                  onClick={() => {
+                    setAcknowledgedTodayDate(true);
+                    setShowTodayConfirm(false);
+                  }}
+                >
+                  Save as Today
+                </Button>
+              </div>
+            </div>
+          )}
+
 
           <div>
             <Label htmlFor="status">Status</Label>
