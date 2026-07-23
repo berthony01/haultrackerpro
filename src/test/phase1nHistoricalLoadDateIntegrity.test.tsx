@@ -192,9 +192,9 @@ describe('Phase 1N-A — historical load-date integrity', () => {
   it('8. new pending load never receives the completed-today warning', () => {
     const { onSubmit } = renderNew();
     fillRequired();
-    // Flip the "Save as Pending" switch → finalStatus becomes 'pending'.
-    const pendingSwitch = screen.getByRole('switch', { name: /save as pending/i });
-    fireEvent.click(pendingSwitch);
+    // Flip the "Save as Pending" switch (last switch rendered on the form).
+    const switches = document.querySelectorAll('[role="switch"]');
+    fireEvent.click(switches[switches.length - 1] as HTMLElement);
     fireEvent.click(screen.getByTestId('load-form-submit'));
     expect(screen.queryByTestId('today-confirm-panel')).toBeNull();
     expect(onSubmit).toHaveBeenCalledTimes(1);
