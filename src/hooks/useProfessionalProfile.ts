@@ -61,10 +61,15 @@ export interface UpsertProfessionalProfileInput {
 const MY_KEY = ['professional_profile', 'me'] as const;
 const SUMMARY_KEY_PREFIX = ['professional_profile', 'summaries'] as const;
 
-function normalizeIds(userIds: readonly (string | null | undefined)[]): string[] {
+export function normalizeProfessionalProfileUserIds(
+  userIds: readonly (string | null | undefined)[],
+): string[] {
   const set = new Set<string>();
   for (const raw of userIds) {
-    if (typeof raw === 'string' && raw.length > 0) set.add(raw);
+    if (typeof raw === 'string') {
+      const id = raw.trim();
+      if (id) set.add(id);
+    }
   }
   return Array.from(set).sort();
 }
@@ -81,7 +86,8 @@ export function useMyProfessionalProfile() {
       const { data, error } = await (supabase as any).rpc('get_my_professional_profile');
       if (error) throw error;
       if (!data) return null;
-      // RPC returns the row; PostgREST may wrap it as an array or an object.
+      // SETOF RPCs are normally returned as an array. Keep the object branch
+      // for compatibility with connector/mocking layers that unwrap one row.
       const row = Array.isArray(data) ? data[0] : data;
       if (!row || !row.user_id) return null;
       return row as ProfessionalProfile;
@@ -95,7 +101,11 @@ export function useMyProfessionalProfile() {
 export function useAuthorizedProfessionalProfiles(
   userIds: readonly (string | null | undefined)[],
 ) {
-  const normalized = useMemo(() => normalizeIds(userIds), [userIds]);
+  const normalized = useMemo(
+    () => normalizeProfessionalProfileUserIds(userIds),
+    [userIds],
+  );
+
   return useQuery({
     queryKey: [...SUMMARY_KEY_PREFIX, normalized],
     enabled: normalized.length > 0,
@@ -107,7 +117,7 @@ export function useAuthorizedProfessionalProfiles(
       if (error) throw error;
       const rows = (data ?? []) as ProfessionalProfileSummary[];
       const out: Record<string, ProfessionalProfileSummary> = {};
-      for (const r of rows) out[r.user_id] = r;
+      for (const row of rows) out[row.user_id] = row;
       return out;
     },
   });
@@ -127,22 +137,30 @@ export function useProfessionalProfileMutations() {
   const upsert = useMutation({
     mutationFn: async (input: UpsertProfessionalProfileInput): Promise<ProfessionalProfile> => {
       const share =
-        input.visibility === 'authorized_connections' && input.share_contact_details === true;
-      const { data, error } = await (supabase as any).rpc('upsert_my_professional_profile', {
-        _display_name: input.display_name,
-        _professional_title: input.professional_title,
-        _bio: input.bio,
-        _years_experience: input.years_experience,
-        _services: input.services,
-        _service_areas: input.service_areas,
-        _availability: input.availability,
-        _contact_email: input.contact_email,
-        _contact_phone: input.contact_phone,
-        _visibility: input.visibility,
-        _share_contact_details: share,
-      });
+        input.visibility === 'authorized_connections' &&
+        input.share_contact_details === true;
+
+      const { data, error } = await (supabase as any).rpc(
+        'upsert_my_professional_profile',
+        {
+          p_display_name: input.display_name,
+          p_professional_title: input.professional_title,
+          p_bio: input.bio,
+          p_years_experience: input.years_experience,
+          p_services: input.services,
+          p_service_areas: input.service_areas,
+          p_availability: input.availability,
+          p_contact_email: input.contact_email,
+          p_contact_phone: input.contact_phone,
+          p_visibility: input.visibility,
+          p_share_contact_details: share,
+        },
+      );
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
+      if (!row || !row.user_id) {
+        throw new Error('Professional profile save returned no row.');
+      }
       return row as ProfessionalProfile;
     },
     onSuccess: invalidate,
@@ -150,9 +168,11 @@ export function useProfessionalProfileMutations() {
 
   const remove = useMutation({
     mutationFn: async (): Promise<boolean> => {
-      const { data, error } = await (supabase as any).rpc('delete_my_professional_profile');
+      const { data, error } = await (supabase as any).rpc(
+        'delete_my_professional_profile',
+      );
       if (error) throw error;
-      return Boolean(data);
+      return Boolean(Array.isArray(data) ? data[0] : data);
     },
     onSuccess: invalidate,
   });
