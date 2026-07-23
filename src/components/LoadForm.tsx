@@ -353,6 +353,22 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (!validate()) return;
     const finalStatus = saveAsPending ? 'pending' : form.status;
 
+    // Phase 1N-A: untouched-today confirmation guard for NEW completed loads.
+    // Only fires when: new load, final status completed, pickup date never
+    // intentionally touched, and the pickup date still equals the local
+    // "today" that was auto-filled when the form mounted. Skipped in edit
+    // mode, for pending/cancelled, and once the user acknowledges.
+    const isNewCompletedUntouched =
+      !initialData &&
+      finalStatus === 'completed' &&
+      !userTouchedLoadDate &&
+      form.load_date === initialTodayRef.current &&
+      form.load_date === localTodayYMD();
+    if (isNewCompletedUntouched && !acknowledgedTodayDate) {
+      setShowTodayConfirm(true);
+      return;
+    }
+
     // Format stop locations
     const rawFormattedStops = multiStop ? stops.map((s, i) => ({
       ...s,
