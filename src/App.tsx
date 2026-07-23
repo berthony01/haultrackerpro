@@ -82,6 +82,7 @@ const DriverWorkItems = lazy(() => import("./pages/DriverWorkItems"));
 const AgencySlugRedirect = lazy(() => import("./pages/AgencySlugRedirect"));
 const AssistantsAgencies = lazy(() => import("./pages/AssistantsAgencies"));
 const CapabilityLauncher = lazy(() => import("./pages/CapabilityLauncher"));
+const ProfessionalProfile = lazy(() => import("./pages/ProfessionalProfile"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -290,6 +291,7 @@ const App = () => (
               <Route path="/recruiter/applications" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:applications" replace /></ProtectedRoute>} />
               <Route path="/recruiter/reports" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:reports" replace /></ProtectedRoute>} />
               <Route path="/recruiter/onboarding" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:onboarding" replace /></ProtectedRoute>} />
+              <Route path="/professional-profile" element={<ProtectedRoute><ProfessionalProfile /></ProtectedRoute>} />
               <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
               <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
               <Route path="/assistant/settings" element={<ProtectedRoute><AssistantLimitedSettings /></ProtectedRoute>} />
