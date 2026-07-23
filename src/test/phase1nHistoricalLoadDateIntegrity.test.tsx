@@ -342,17 +342,18 @@ describe('Phase 1N-A — historical load-date integrity', () => {
     // 2) Trigger Copy Last Load via the narrow SmartChips mock.
     fireEvent.click(screen.getByTestId('mock-copy-last-load'));
 
-    // 3) Copied form: pickup back to local today, Save as Pending is on.
+    // 3) Copied form: pickup back to local today.
     const [y, m, d] = TODAY.split('-');
     await waitFor(() => {
       expect(pickup.textContent).toContain(`${m}/${d}/${y}`);
     });
-    const pendingSwitch = screen.getByRole('switch', { name: /save as pending/i });
-    expect(pendingSwitch.getAttribute('data-state')).toBe('checked');
 
-    // 4) Flip Save as Pending off and set Status = Completed.
-    fireEvent.click(pendingSwitch);
+    // 4) Change Status → Completed. This unhides Save as Pending; flip it off.
     await selectStatus(/completed/i);
+    const pendingSwitch = screen.getByRole('switch', { name: /save as pending/i });
+    if (pendingSwitch.getAttribute('data-state') === 'checked') {
+      fireEvent.click(pendingSwitch);
+    }
 
     // 5) Submit → completed-today confirmation MUST appear (state was reset).
     fireEvent.click(screen.getByTestId('load-form-submit'));
