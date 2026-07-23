@@ -45,8 +45,31 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare verification logs
+        run: mkdir -p artifacts
+
       - name: Phase 1N-D target acceptance test
-        run: bunx vitest run src/test/phase1nProfessionalProfileFoundation.test.tsx
+        id: target_test
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run src/test/phase1nProfessionalProfileFoundation.test.tsx \
+            --reporter verbose 2>&1 | tee artifacts/phase1n-professional-profile-target.log
+          echo "target_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload target acceptance log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1n-professional-profile-target-log
+          path: artifacts/phase1n-professional-profile-target.log
+
+      - name: Enforce target acceptance result
+        run: |
+          set -eu
+          EXIT="${{ steps.target_test.outputs.target_exit }}"
+          echo "Target acceptance exit code: ${EXIT}"
+          test "${EXIT}" = "0"
 
       - name: Adjacent agency and assistant regressions
         run: >-
