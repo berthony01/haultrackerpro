@@ -1,4 +1,24 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { format as formatDate, subDays } from 'date-fns';
+
+/**
+ * Phase 1N — Local-calendar-safe "today" as YYYY-MM-DD.
+ * Avoids `new Date().toISOString()` which shifts negative-UTC users a day.
+ */
+function localTodayYMD(): string {
+  return formatDate(new Date(), 'yyyy-MM-dd');
+}
+function localDaysAgoYMD(days: number): string {
+  return formatDate(subDays(new Date(), days), 'yyyy-MM-dd');
+}
+/** Human-readable rendering for the reporting summary, e.g. "July 19, 2026". */
+function formatReportingDate(ymd: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return null;
+  return formatDate(dt, 'MMMM d, yyyy');
+}
 import { Load, LoadInsert } from '@/hooks/useLoads';
 import { LoadStopInput } from '@/hooks/useLoadStops';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -100,7 +120,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const initialDh = useMemo(() => readDhFromNotes(initialData?.notes ?? null), [initialData?.notes]);
 
   const [form, setForm] = useState({
-    load_date: initialData?.load_date || new Date().toISOString().split('T')[0],
+    load_date: initialData?.load_date || localTodayYMD(),
     dropoff_date: initialData?.dropoff_date || '',
     pickup_location: initialData?.pickup_location || (useSample ? SAMPLE_LOAD.pickup_location : ''),
     dropoff_location: initialData?.dropoff_location || (useSample ? SAMPLE_LOAD.dropoff_location : ''),
@@ -171,6 +191,16 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [userTouchedLoadDate, setUserTouchedLoadDate] = useState(false);
   const [userTouchedDropoffDate, setUserTouchedDropoffDate] = useState(false);
 
+  // Phase 1N-A: untouched-today confirmation for NEW completed loads.
+  // Blocks the first submit when the pickup date is still the auto-filled
+  // local "today" and the user hasn't intentionally set it. The user
+  // acknowledges by clicking "Save as Today", which sets ack=true so the
+  // next submit passes cleanly. Any real date change flips
+  // `userTouchedLoadDate` and skips the guard entirely.
+  const [showTodayConfirm, setShowTodayConfirm] = useState(false);
+  const [acknowledgedTodayDate, setAcknowledgedTodayDate] = useState(false);
+  const initialTodayRef = useRef<string>(localTodayYMD());
+
   // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
   // user changes anything that could move the load into or out of the risky
   // missing-final-stop-date state. Without this, once a user dismisses the
@@ -179,6 +209,14 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   useEffect(() => {
     setAcknowledgedDropWarning(false);
   }, [multiStop, stops, form.dropoff_date, form.load_date]);
+
+  // Phase 1N-A: any real change to the pickup date or status resets the
+  // untouched-today acknowledgement so the guard behaves safely if the user
+  // toggles back into the risky state.
+  useEffect(() => {
+    setAcknowledgedTodayDate(false);
+    setShowTodayConfirm(false);
+  }, [form.load_date, form.status, saveAsPending]);
 
   const isCancelled = (saveAsPending ? 'pending' : form.status) === 'cancelled';
 
@@ -315,6 +353,22 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (!validate()) return;
     const finalStatus = saveAsPending ? 'pending' : form.status;
 
+    // Phase 1N-A: untouched-today confirmation guard for NEW completed loads.
+    // Only fires when: new load, final status completed, pickup date never
+    // intentionally touched, and the pickup date still equals the local
+    // "today" that was auto-filled when the form mounted. Skipped in edit
+    // mode, for pending/cancelled, and once the user acknowledges.
+    const isNewCompletedUntouched =
+      !initialData &&
+      finalStatus === 'completed' &&
+      !userTouchedLoadDate &&
+      form.load_date === initialTodayRef.current &&
+      form.load_date === localTodayYMD();
+    if (isNewCompletedUntouched && !acknowledgedTodayDate) {
+      setShowTodayConfirm(true);
+      return;
+    }
+
     // Format stop locations
     const rawFormattedStops = multiStop ? stops.map((s, i) => ({
       ...s,
@@ -415,7 +469,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (!lastLoad) return;
     const lastDh = readDhFromNotes(lastLoad.notes ?? null);
     setForm({
-      load_date: new Date().toISOString().split('T')[0],
+      load_date: localTodayYMD(),
       dropoff_date: '',
       pickup_location: lastLoad.pickup_location,
       dropoff_location: lastLoad.dropoff_location,
@@ -644,6 +698,52 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   update('dropoff_date', val);
                 }
               }} />
+              {/* Phase 1N-A: pickup date shortcuts for historical entry. */}
+              <div className="flex flex-wrap gap-1.5 mt-2" data-testid="pickup-date-shortcuts">
+                {[
+                  { label: 'Today', days: 0 },
+                  { label: 'Yesterday', days: 1 },
+                  { label: '2 days ago', days: 2 },
+                  { label: '3 days ago', days: 3 },
+                ].map(({ label, days }) => (
+                  <Button
+                    key={label}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label={`Set pickup date to ${label.toLowerCase()}`}
+                    className="h-7 px-2 text-[11px] rounded-md"
+                    onClick={() => {
+                      const val = localDaysAgoYMD(days);
+                      const prevPickup = form.load_date;
+                      setUserTouchedLoadDate(true);
+                      update('load_date', val);
+                      if (!multiStop && (!form.dropoff_date || form.dropoff_date === prevPickup)) {
+                        update('dropoff_date', val);
+                      }
+                    }}
+                  >
+                    {label}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label="Choose pickup date"
+                  className="h-7 px-2 text-[11px] rounded-md"
+                  onClick={() => {
+                    // Reuse the existing DateInput contract: its trigger is a
+                    // button with id={id}, so clicking it opens the calendar
+                    // popover without introducing a second date input.
+                    const el = document.getElementById('load_date') as HTMLElement | null;
+                    el?.focus();
+                    el?.click();
+                  }}
+                >
+                  Choose date
+                </Button>
+              </div>
               <FieldError field="load_date" />
             </div>
             <div>
@@ -663,6 +763,71 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               })()}
             </div>
           </div>
+
+          {/* Phase 1N-A: live reporting-date summary. */}
+          {(() => {
+            const effective = form.dropoff_date && /^\d{4}-\d{2}-\d{2}$/.test(form.dropoff_date)
+              ? form.dropoff_date
+              : (form.load_date && /^\d{4}-\d{2}-\d{2}$/.test(form.load_date) ? form.load_date : '');
+            const pretty = effective ? formatReportingDate(effective) : null;
+            return (
+              <p
+                className="text-[11px] text-muted-foreground leading-snug"
+                data-testid="reporting-date-summary"
+              >
+                {pretty ? (
+                  <>This load will count toward <span className="font-semibold text-foreground">{pretty}</span> in dashboard totals and reports.</>
+                ) : (
+                  <>This load will count toward the delivery date you enter in dashboard totals and reports.</>
+                )}
+              </p>
+            );
+          })()}
+
+          {/* Phase 1N-A: untouched-today confirmation panel. */}
+          {showTodayConfirm && (
+            <div
+              className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-2"
+              role="alertdialog"
+              aria-label="Confirm today's date"
+              data-testid="today-confirm-panel"
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                <p className="text-xs font-semibold text-foreground leading-relaxed">
+                  This completed load is dated today. Did this load actually happen today?
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs flex-1"
+                  onClick={() => {
+                    setShowTodayConfirm(false);
+                    const el = document.getElementById('load_date') as HTMLElement | null;
+                    el?.focus();
+                    el?.click();
+                  }}
+                >
+                  Change Date
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 text-xs flex-1"
+                  onClick={() => {
+                    setAcknowledgedTodayDate(true);
+                    setShowTodayConfirm(false);
+                  }}
+                >
+                  Save as Today
+                </Button>
+              </div>
+            </div>
+          )}
+
 
           <div>
             <Label htmlFor="status">Status</Label>
