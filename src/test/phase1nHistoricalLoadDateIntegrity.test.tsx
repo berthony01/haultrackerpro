@@ -83,27 +83,17 @@ import { LoadForm } from '@/components/LoadForm';
 const TODAY = format(new Date(), 'yyyy-MM-dd');
 const THREE_DAYS_AGO = format(subDays(new Date(), 3), 'yyyy-MM-dd');
 
+function setById(id: string, value: string) {
+  const el = document.getElementById(id) as HTMLInputElement | null;
+  if (!el) throw new Error(`missing #${id}`);
+  fireEvent.change(el, { target: { value } });
+}
+
 function fillRequired() {
-  fireEvent.change(screen.getByLabelText(/pickup/i, { selector: 'input#pickup_location' }), {
-    target: { value: 'Dallas, TX' },
-  });
-  fireEvent.change(screen.getByLabelText(/drop-off/i, { selector: 'input#dropoff_location' }), {
-    target: { value: 'Atlanta, GA' },
-  });
-  fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '500' } });
-  // rate per mile — find by role=spinbutton isn't reliable; use placeholder scan.
-  const numInputs = document.querySelectorAll('input[inputmode="decimal"]') as NodeListOf<HTMLInputElement>;
-  // Set rate_per_mile (2nd decimal input in the layout).
-  // Deterministic: find by id.
-  (document.getElementById('rate_per_mile') as HTMLInputElement | null)?.setAttribute('value', '2.5');
-  const rate = document.getElementById('rate_per_mile') as HTMLInputElement | null;
-  if (rate) fireEvent.change(rate, { target: { value: '2.5' } });
-  // fallback: if not found by id, fill first empty decimal.
-  if (!rate) {
-    for (const el of Array.from(numInputs)) {
-      if (!el.value) { fireEvent.change(el, { target: { value: '2.5' } }); break; }
-    }
-  }
+  setById('pickup_location', 'Dallas, TX');
+  setById('dropoff_location', 'Atlanta, GA');
+  setById('loaded_miles', '500');
+  setById('rate_per_mile', '2.5');
 }
 
 function renderNew(onSubmit = vi.fn()) {
