@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageNav } from '@/components/layout/PageNav';
@@ -36,7 +36,11 @@ import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
 import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
 import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 import { AgencyPlanLimitsCard } from '@/components/agency/AgencyPlanLimitsCard';
-
+import {
+  MyProfessionalProfileCard,
+  ProfessionalProfileSummaryCard,
+} from '@/components/profiles/ProfessionalProfileCard';
+import { useAuthorizedProfessionalProfiles } from '@/hooks/useProfessionalProfile';
 
 /**
  * Private agency area. Anyone signed-in can create one personal agency profile
@@ -97,7 +101,6 @@ export default function AgencyDashboard() {
         </div>
       </header>
 
-
       {!agency ? (
         <CreateAgencyCard />
       ) : (
@@ -123,6 +126,7 @@ export default function AgencyDashboard() {
                 ))}
               </TabsList>
               <TabsContent value="overview" className="space-y-4">
+                <MyProfessionalProfileCard context="agency" />
                 <AgencyDetailCard agency={agency} />
                 {isOwner && <AgencyPlanLimitsCard agencyId={agency.id} />}
                 {!isOwner && (
@@ -249,6 +253,13 @@ function AgencyDetailCard({
   const { data: clients } = useAgencyClients(agency.id);
   const { toast } = useToast();
 
+  const memberUserIds = useMemo(
+    () => (members ?? []).map((member) => member.member_user_id),
+    [members],
+  );
+  const { data: memberProfiles = {} } =
+    useAuthorizedProfessionalProfiles(memberUserIds);
+
   const [name, setName] = useState(agency.name);
   const [desc, setDesc] = useState(agency.description ?? '');
   const [email, setEmail] = useState(agency.contact_email ?? '');
@@ -323,7 +334,6 @@ function AgencyDetailCard({
 
       <AgencySlugCard agencyId={agency.id} isOwner={isOwner} />
 
-
       <div className="grid grid-cols-2 gap-3">
         <Stat
           label="Active clients"
@@ -336,7 +346,6 @@ function AgencyDetailCard({
           icon={<ShieldCheck className="h-4 w-4" />}
         />
       </div>
-
 
       <Card>
         <CardHeader>
@@ -412,55 +421,64 @@ function AgencyDetailCard({
           ) : (
             <div className="rounded-md border divide-y">
               {members.map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{m.invite_email}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {m.role.replace('agency_', '')} · {m.status}
-                    </p>
-                  </div>
-                  {isOwner && m.role !== 'agency_owner' && m.status !== 'revoked' && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive"
-                        >
-                          Revoke
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Remove this member?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {m.invite_email} will lose access to your agency. Their driver
-                            delegations are not affected.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={async () => {
-                              try {
-                                await revoke.mutateAsync(m.id);
-                                toast({ title: 'Member removed' });
-                              } catch (e: any) {
-                                toast({
-                                  title: 'Could not remove',
-                                  description: e?.message,
-                                  variant: 'destructive',
-                                });
-                              }
-                            }}
+                <div key={m.id} className="p-3 text-sm space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{m.invite_email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.role.replace('agency_', '')} · {m.status}
+                      </p>
+                    </div>
+                    {isOwner && m.role !== 'agency_owner' && m.status !== 'revoked' && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
                           >
-                            Remove
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
+                            Revoke
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove this member?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {m.invite_email} will lose access to your agency. Their driver
+                              delegations are not affected.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={async () => {
+                                try {
+                                  await revoke.mutateAsync(m.id);
+                                  toast({ title: 'Member removed' });
+                                } catch (e: any) {
+                                  toast({
+                                    title: 'Could not remove',
+                                    description: e?.message,
+                                    variant: 'destructive',
+                                  });
+                                }
+                              }}
+                            >
+                              Remove
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                  <ProfessionalProfileSummaryCard
+                    summary={
+                      m.member_user_id
+                        ? memberProfiles[m.member_user_id]
+                        : null
+                    }
+                  />
                 </div>
               ))}
             </div>
