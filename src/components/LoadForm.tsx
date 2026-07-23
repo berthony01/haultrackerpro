@@ -435,7 +435,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (!lastLoad) return;
     const lastDh = readDhFromNotes(lastLoad.notes ?? null);
     setForm({
-      load_date: new Date().toISOString().split('T')[0],
+      load_date: localTodayYMD(),
       dropoff_date: '',
       pickup_location: lastLoad.pickup_location,
       dropoff_location: lastLoad.dropoff_location,
