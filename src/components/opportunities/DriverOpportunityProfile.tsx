@@ -395,7 +395,7 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
       <Section icon={ShieldCheck} title="Privacy & Recruiter Contact">
         <Field label="Preferences visibility">
-          <Select value={form.visibility} onValueChange={(v) => set('visibility', v as FormState['visibility'])}>
+          <Select value={form.visibility} onValueChange={(v) => changeVisibility(v as FormState['visibility'])}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {VISIBILITY.map((o) => (
@@ -403,6 +403,14 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
               ))}
             </SelectContent>
           </Select>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {form.visibility === 'private' &&
+              'Private — recruiters cannot initiate contact.'}
+            {form.visibility === 'apply_only' &&
+              'Application only — your details are shared only through your own application or request-info action.'}
+            {form.visibility === 'verified_recruiters' &&
+              'Approved recruiters — you may choose whether approved recruiters can initiate contact.'}
+          </p>
         </Field>
         <Field label="Preferred contact method">
           <Select value={form.contact_preference} onValueChange={(v) => set('contact_preference', v as FormState['contact_preference'])}>
@@ -414,11 +422,22 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
             </SelectContent>
           </Select>
         </Field>
-        <ToggleRow
-          label="Allow approved recruiters to contact me"
-          checked={form.allow_verified_recruiter_contact}
-          onChange={(v) => set('allow_verified_recruiter_contact', v)}
-        />
+        <div className="flex items-center justify-between rounded-lg bg-muted/20 border border-border/60 p-3">
+          <div className="min-w-0 pr-3">
+            <p className="text-sm font-medium text-foreground">Allow approved recruiters to contact me</p>
+            {form.visibility !== 'verified_recruiters' && (
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Available only when visibility is set to Approved recruiters.
+              </p>
+            )}
+          </div>
+          <Switch
+            aria-label="Allow approved recruiters to contact me"
+            checked={form.visibility === 'verified_recruiters' && form.allow_verified_recruiter_contact}
+            disabled={form.visibility !== 'verified_recruiters'}
+            onCheckedChange={(v) => set('allow_verified_recruiter_contact', v)}
+          />
+        </div>
       </Section>
 
       {/* Spacer so fixed mobile action bar doesn't cover content */}
