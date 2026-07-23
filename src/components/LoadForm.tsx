@@ -1130,7 +1130,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 <p className="text-sm font-medium">Save as Pending</p>
                 <p className="text-xs text-muted-foreground">I will finalize later</p>
               </div>
-              <Switch checked={saveAsPending} onCheckedChange={setSaveAsPending} />
+              <Switch aria-label="Save as Pending" checked={saveAsPending} onCheckedChange={setSaveAsPending} />
             </div>
           )}
 
