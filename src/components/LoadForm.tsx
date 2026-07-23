@@ -886,7 +886,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               <p className="text-sm font-medium">Multi-stop load?</p>
               <p className="text-xs text-muted-foreground">Add route stops between pickup and final delivery</p>
             </div>
-            <Switch checked={multiStop} onCheckedChange={setMultiStop} />
+            <Switch aria-label="Multi-stop load" checked={multiStop} onCheckedChange={setMultiStop} />
           </div>
 
           {multiStop && (
