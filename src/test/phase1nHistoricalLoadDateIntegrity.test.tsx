@@ -10,6 +10,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { format, subDays } from 'date-fns';
 
+// Radix Switch relies on ResizeObserver which jsdom does not provide.
+class RO { observe() {} unobserve() {} disconnect() {} }
+(globalThis as any).ResizeObserver = (globalThis as any).ResizeObserver ?? RO;
+
 // --- Isolate LoadForm from data hooks / heavy children ---------------------
 
 vi.mock('sonner', () => ({
