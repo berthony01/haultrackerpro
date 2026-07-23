@@ -187,7 +187,7 @@ export function PublicProfileSection() {
           className="w-full h-10"
           size="sm"
         >
-          {updateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save profile'}
+          {updateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save leaderboard identity'}
         </Button>
       </div>
   );
