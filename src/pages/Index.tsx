@@ -1069,6 +1069,7 @@ const Index = () => {
                   onNavigate={handleNavigate}
                   smartAlerts={smartAlerts}
                   isPro={isPro}
+                  showRecommendedOpportunity={!isActingAsAssistant && effectiveRole === 'driver' && driverWorkspaceAllowed}
                 />
               </>
             )}
