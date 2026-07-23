@@ -82,6 +82,10 @@ import {
   type OpportunitySourceRow,
   type CanonicalOpportunity,
 } from '@/lib/opportunities/opportunityCanonicalView';
+import {
+  RECOMMENDED_OPPORTUNITY_OPEN_KEY,
+  resolveRequestedOpportunityId,
+} from '@/lib/opportunities/recommendedOpportunity';
 
 interface Props {
   onUpgrade: () => void;
