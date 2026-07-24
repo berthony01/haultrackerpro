@@ -268,7 +268,7 @@ BEGIN
       _phone,
       ''
     )
-    ON CONFLICT (user_id) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING id INTO _inserted_id;
 
     IF _inserted_id IS NOT NULL THEN
