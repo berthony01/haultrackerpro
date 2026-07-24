@@ -18,10 +18,14 @@ jobs:
       VITE_SUPABASE_PROJECT_ID: example
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
-      - name: Checkout full history
+      - name: Checkout exact product commit with full history
         uses: actions/checkout@v4
         with:
+          ref: 08206a82d6705a772b9d1158ee531e7bc0232b01
           fetch-depth: 0
+
+      - name: Prove exact product commit
+        run: test "$(git rev-parse HEAD)" = "08206a82d6705a772b9d1158ee531e7bc0232b01"
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -59,5 +63,5 @@ jobs:
             src/pages/Docs.tsx \
             src/pages/LegalCenter.tsx \
             src/test/phase1nF2DocsLegalFoundation.test.ts | sort)
-          actual=$(git diff --name-only 3926bec94121cfca616a56e006d2a952e654a338...HEAD -- ':!.github/workflows/verify-f2b-r1.yml' | sort)
+          actual=$(git diff --name-only 3926bec94121cfca616a56e006d2a952e654a338...HEAD | sort)
           test "$actual" = "$expected"
