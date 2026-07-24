@@ -1,17 +1,35 @@
 /**
- * Phase 1N-E1-R1 — Real PostgreSQL 16 gate for the legacy recruiter
+ * Phase 1N-E1-R2 — Real PostgreSQL 16 gate for the legacy recruiter
  * compatibility candidate.
  *
- * Repaired proof: seeds ALL legacy fixtures BEFORE applying the exact full
- * candidate from disk (one application, not the extracted DO-block),
- * snapshots the full protected catalog surface pre- and post-application,
- * proves idempotency by re-applying the full candidate a second time, and
- * cleans every suite-created object and role in afterAll with a hard
- * post-cleanup catalog check.
+ * R2 structural repairs on top of R1:
+ *   1. No CREATE EXTENSION — the fixture depends only on core PG16
+ *      (`gen_random_uuid()` is built in). The suite captures the extension
+ *      baseline before any fixture work and hard-fails afterAll if the set
+ *      is not restored byte-identically.
+ *   2. Role MEMBERSHIP is tracked separately from role EXISTENCE. Only
+ *      memberships that were not already explicit before the suite ran are
+ *      granted, and only those grants are revoked in afterAll — regardless
+ *      of whether the underlying role pre-existed.
+ *   3. Protected-function proof no longer relies on a manual name/argument
+ *      lookup. Every pre-existing function in schema `public` is snapshotted
+ *      by unambiguous identity `public.<proname>(<pg_get_function_identity_arguments>)`
+ *      with definition/ACL/owner/definer/config/volatility/prokind. After
+ *      candidate application, the only added identity must be
+ *      `public.ensure_my_recruiter_setup_state()` with exactly one overload;
+ *      every other identity must be byte-identical.
+ *   4. A real RLS policy surface is provisioned on all three protected
+ *      tables (`profiles`, `recruiter_profiles`, `user_capabilities`) with
+ *      owner/self SELECT policies bound to `auth.uid()`. `relrowsecurity`
+ *      and `relforcerowsecurity` are snapshotted alongside `pg_policies`.
  *
- * NEVER SKIPS. Fails hard if PHASE1N_LEGACY_RECRUITER_DATABASE_URL is
- * absent. Test-runner exclusion markers are prohibited; the workflow
- * scans this file for them and hard-fails.
+ * All valid R1 behavior is preserved: legacy rows are seeded BEFORE the
+ * exact full candidate is applied once; idempotency is proved by re-applying
+ * the exact full candidate a second time; the historical trigger disable in
+ * `seedHistoricalProfile` is bracketed by try/finally; RPC state, security,
+ * concurrency and canonical-token ordering tests are unchanged; the
+ * database URL requirement hard-fails; forbidden runner markers are still
+ * scanned by the workflow. Runs against real PostgreSQL 16 ONLY.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -36,28 +54,34 @@ const CANDIDATE_PATH = fileURLToPath(
 const CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, 'utf8');
 
 const CANDIDATE_RPC = 'ensure_my_recruiter_setup_state';
+const CANDIDATE_RPC_IDENT = `public.${CANDIDATE_RPC}()`;
 
-// Roles the suite may need. Only ones absent BEFORE beforeAll runs are
-// created (and consequently dropped) by this suite.
+// Roles the suite may need. Only ones absent before beforeAll runs are
+// created (and consequently dropped) by this suite. Memberships are tracked
+// SEPARATELY so a pre-existing role does not leak explicit membership.
 const CANDIDATE_ROLES = ['anon', 'authenticated', 'service_role'] as const;
 
-// Pre-existing (fixture) functions whose byte-exact definition/ACL/owner
-// must not change after applying the candidate.
-const PROTECTED_FUNCTIONS: { name: string; args: string }[] = [
-  { name: 'update_updated_at_column', args: '' },
-  { name: 'is_admin', args: 'uuid' },
-  { name: 'recruiter_profile_can_manage_opportunities', args: 'uuid' },
-  { name: 'recruiter_profile_guard', args: '' },
-  { name: '_derive_recruiter_capability_status', args: 'uuid' },
-  { name: '_sync_recruiter_capability', args: 'uuid' },
-  { name: '_recruiter_profile_capability_sync', args: '' },
-];
+// Canonical fixture functions the pre-candidate snapshot MUST contain.
+// Identity keys use `pg_get_function_identity_arguments`, which strips
+// parameter names — so `_uid uuid` becomes just `uuid`.
+const CANONICAL_FIXTURE_FUNCTION_IDENTS = [
+  'public.update_updated_at_column()',
+  'public.is_admin(uuid)',
+  'public.recruiter_profile_can_manage_opportunities(uuid)',
+  'public.recruiter_profile_guard()',
+  'public._derive_recruiter_capability_status(uuid)',
+  'public._sync_recruiter_capability(uuid)',
+  'public._recruiter_profile_capability_sync()',
+] as const;
 
 const PROTECTED_TABLES = [
   'public.recruiter_profiles',
   'public.user_capabilities',
   'public.profiles',
 ];
+const PROTECTED_TABLE_NAMES = PROTECTED_TABLES.map((t) =>
+  t.replace(/^public\./, ''),
+);
 
 // ---------------------------------------------------------------------------
 // Fresh-database-safe cleanup. NEVER references triggers by relation to
@@ -80,10 +104,10 @@ DROP TYPE IF EXISTS public.user_capability_status CASCADE;
 DROP SCHEMA IF EXISTS auth CASCADE;
 `;
 
-// Bootstrap body (roles handled separately so we can track which we own).
+// Bootstrap body. NO CREATE EXTENSION here — PG16 core provides everything
+// the fixture needs (gen_random_uuid is built in). Role creation and
+// membership grants happen in beforeAll so we can track what we created.
 const BOOTSTRAP_SQL = `
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 CREATE SCHEMA IF NOT EXISTS auth;
@@ -279,6 +303,28 @@ END; $$;
 CREATE TRIGGER trg_recruiter_profile_capability_sync
   AFTER INSERT OR UPDATE OR DELETE ON public.recruiter_profiles
   FOR EACH ROW EXECUTE FUNCTION public._recruiter_profile_capability_sync();
+
+-- Real RLS policy surface on every protected table. Owner/self SELECT
+-- policies bound to auth.uid(); no permissive-write policy is added because
+-- the fixture writes as the database owner (which bypasses RLS anyway).
+ALTER TABLE public.profiles           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recruiter_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_capabilities  ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY profiles_self_select
+  ON public.profiles
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY recruiter_profiles_self_select
+  ON public.recruiter_profiles
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY user_capabilities_self_select
+  ON public.user_capabilities
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
 `;
 
 const pool = new pg.Pool({ connectionString: URL_STR, max: 8 });
@@ -371,12 +417,6 @@ async function getCap(userId: string) {
   return rows[0]?.status ?? null;
 }
 
-/**
- * Insert a legitimately-shaped historical recruiter_profiles row that the
- * production guard would otherwise blank. Uses a controlled trigger
- * disable protected by try/finally so the trigger is guaranteed to be
- * re-enabled even on error.
- */
 async function seedHistoricalProfile(
   userId: string,
   overrides: Record<string, unknown>,
@@ -401,40 +441,74 @@ async function seedHistoricalProfile(
 }
 
 // ---------------------------------------------------------------------------
-// Catalog-backed snapshot helpers. Compared before vs. after candidate
-// application to prove non-interference.
+// Catalog snapshot helpers.
 // ---------------------------------------------------------------------------
-async function snapshotFunctionIdentSet(): Promise<string[]> {
-  const rows = await q<{ ident: string }>(
-    `SELECT n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident
-       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE n.nspname = 'public'
-      ORDER BY 1`,
-  );
-  return rows.map((r) => r.ident);
-}
 
-async function snapshotProtectedFunctions() {
-  const out: Record<string, any> = {};
-  for (const f of PROTECTED_FUNCTIONS) {
-    const rows = await q<any>(
-      `SELECT pg_get_functiondef(p.oid) AS def,
-              p.provolatile::text AS provolatile,
-              p.prosecdef,
-              p.proconfig,
-              pg_get_userbyid(p.proowner) AS owner,
-              (SELECT array_agg(privilege_type ORDER BY privilege_type||grantee)
-                 FROM information_schema.routine_privileges
-                WHERE routine_schema='public' AND routine_name=p.proname) AS privs,
-              (SELECT array_agg(grantee ORDER BY grantee||privilege_type)
-                 FROM information_schema.routine_privileges
-                WHERE routine_schema='public' AND routine_name=p.proname) AS grantees
-         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname='public' AND p.proname=$1
-          AND pg_get_function_identity_arguments(p.oid)=$2`,
-      [f.name, f.args],
-    );
-    out[`${f.name}(${f.args})`] = rows[0] ?? null;
+/**
+ * Snapshot EVERY function in schema `public`, keyed by unambiguous identity.
+ * Records the canonical, byte-comparable fields required to prove that no
+ * pre-existing function was altered.
+ */
+type PublicFunctionRecord = {
+  ident: string;
+  def: string;
+  prokind: string;
+  provolatile: string;
+  prosecdef: boolean;
+  proconfig: string[] | null;
+  owner: string;
+  acl: { grantee: string; privilege_type: string; is_grantable: string }[];
+};
+
+async function snapshotAllPublicFunctions(): Promise<Record<string, PublicFunctionRecord>> {
+  const rows = await q<any>(
+    `SELECT
+       'public.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident,
+       pg_get_functiondef(p.oid) AS def,
+       p.prokind::text AS prokind,
+       p.provolatile::text AS provolatile,
+       p.prosecdef,
+       p.proconfig,
+       pg_get_userbyid(p.proowner) AS owner
+     FROM pg_proc p
+     JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+     ORDER BY 1`,
+  );
+
+  // ACL grouped by identity — routine_privileges reports by name only, which
+  // would collapse overloads together. Instead read pg_proc.proacl and expand.
+  const aclRows = await q<any>(
+    `SELECT
+        'public.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident,
+        COALESCE(
+          (SELECT jsonb_agg(jsonb_build_object(
+             'grantee', COALESCE(pg_get_userbyid((acl).grantee), 'PUBLIC'),
+             'privilege_type', (acl).privilege_type,
+             'is_grantable', (acl).is_grantable
+           ) ORDER BY (acl).grantee, (acl).privilege_type)
+             FROM aclexplode(p.proacl) acl),
+          '[]'::jsonb
+        ) AS acl
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'`,
+  );
+  const aclByIdent = new Map<string, any[]>();
+  for (const r of aclRows) aclByIdent.set(r.ident, r.acl ?? []);
+
+  const out: Record<string, PublicFunctionRecord> = {};
+  for (const r of rows) {
+    out[r.ident] = {
+      ident: r.ident,
+      def: r.def,
+      prokind: r.prokind,
+      provolatile: r.provolatile,
+      prosecdef: r.prosecdef,
+      proconfig: r.proconfig,
+      owner: r.owner,
+      acl: aclByIdent.get(r.ident) ?? [],
+    };
   }
   return out;
 }
@@ -459,7 +533,21 @@ async function snapshotPolicies() {
        FROM pg_policies
       WHERE schemaname='public' AND tablename = ANY($1)
       ORDER BY tablename, policyname`,
-    [PROTECTED_TABLES.map((t) => t.replace(/^public\./, ''))],
+    [PROTECTED_TABLE_NAMES],
+  );
+}
+
+async function snapshotRlsFlags() {
+  return q<{ tbl: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+    `SELECT c.oid::regclass::text AS tbl,
+            c.relrowsecurity,
+            c.relforcerowsecurity
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relname = ANY($1)
+      ORDER BY tbl`,
+    [PROTECTED_TABLE_NAMES],
   );
 }
 
@@ -469,7 +557,7 @@ async function snapshotTableGrants() {
        FROM information_schema.table_privileges
       WHERE table_schema='public' AND table_name = ANY($1)
       ORDER BY table_name, grantee, privilege_type`,
-    [PROTECTED_TABLES.map((t) => t.replace(/^public\./, ''))],
+    [PROTECTED_TABLE_NAMES],
   );
 }
 
@@ -480,7 +568,7 @@ async function snapshotColumns() {
        FROM information_schema.columns
       WHERE table_schema='public' AND table_name = ANY($1)
       ORDER BY table_name, ordinal_position`,
-    [PROTECTED_TABLES.map((t) => t.replace(/^public\./, ''))],
+    [PROTECTED_TABLE_NAMES],
   );
 }
 
@@ -502,16 +590,23 @@ async function snapshotIndexes() {
        FROM pg_indexes
       WHERE schemaname='public' AND tablename = ANY($1)
       ORDER BY tablename, indexname`,
-    [PROTECTED_TABLES.map((t) => t.replace(/^public\./, ''))],
+    [PROTECTED_TABLE_NAMES],
   );
+}
+
+async function snapshotExtensions(): Promise<string[]> {
+  const rows = await q<{ extname: string }>(
+    `SELECT extname FROM pg_extension ORDER BY extname`,
+  );
+  return rows.map((r) => r.extname);
 }
 
 async function snapshotAll() {
   return {
-    functionIdentSet: await snapshotFunctionIdentSet(),
-    protectedFunctions: await snapshotProtectedFunctions(),
+    publicFunctions: await snapshotAllPublicFunctions(),
     triggers: await snapshotTriggerDefs(),
     policies: await snapshotPolicies(),
+    rlsFlags: await snapshotRlsFlags(),
     tableGrants: await snapshotTableGrants(),
     columns: await snapshotColumns(),
     constraints: await snapshotConstraints(),
@@ -520,24 +615,45 @@ async function snapshotAll() {
 }
 
 // ---------------------------------------------------------------------------
-// Suite-created role/state tracking. Only roles the suite itself creates
-// are ever dropped in afterAll.
+// Suite-created state tracking.
 // ---------------------------------------------------------------------------
 const rolesCreated: string[] = [];
+const membershipsCreated: string[] = []; // role names granted to CURRENT_USER by this suite
+let extensionBaseline: string[] = [];
 
-// Seeded fixture user ids (all seeded BEFORE the candidate is applied).
 const seeded: Record<string, string> = {};
 
-// Pre- / post-candidate snapshots.
 let SNAP_BEFORE: Awaited<ReturnType<typeof snapshotAll>>;
 let SNAP_AFTER_FIRST: Awaited<ReturnType<typeof snapshotAll>>;
-
-// Frozen snapshot of every pre-existing recruiter_profiles row (byte-exact)
-// keyed by user_id. Compared after candidate to prove unchanged.
 let EXISTING_ROWS_BEFORE: Record<string, any> = {};
 
+async function currentUserName(): Promise<string> {
+  const rows = await q<{ u: string }>(`SELECT current_user::text AS u`);
+  return rows[0].u;
+}
+
+async function existingExplicitMemberships(
+  member: string,
+  roles: readonly string[],
+): Promise<Set<string>> {
+  const rows = await q<{ role: string }>(
+    `SELECT r.rolname AS role
+       FROM pg_auth_members m
+       JOIN pg_roles r ON r.oid = m.roleid
+       JOIN pg_roles u ON u.oid = m.member
+      WHERE u.rolname = $1
+        AND r.rolname = ANY($2)`,
+    [member, roles as unknown as string[]],
+  );
+  return new Set(rows.map((r) => r.role));
+}
+
 beforeAll(async () => {
-  // 1. Detect which required roles already exist BEFORE we touch anything.
+  // 0. Extension baseline BEFORE any fixture work. Snapshot must be
+  //    restored exactly in afterAll.
+  extensionBaseline = await snapshotExtensions();
+
+  // 1. Detect which required roles already exist.
   const existingRoles = new Set(
     (
       await q<{ rolname: string }>(
@@ -547,10 +663,10 @@ beforeAll(async () => {
     ).map((r) => r.rolname),
   );
 
-  // 2. Fresh-DB-safe cleanup (no DROP TRIGGER ... ON <maybe-missing>).
+  // 2. Fresh-DB-safe cleanup.
   await pool.query(RESET_SQL);
 
-  // 3. Create only the roles that were absent (track for afterAll).
+  // 3. Create only the roles that were absent (track for afterAll drop).
   for (const role of CANDIDATE_ROLES) {
     if (!existingRoles.has(role)) {
       const opts = role === 'service_role'
@@ -560,16 +676,26 @@ beforeAll(async () => {
       rolesCreated.push(role);
     }
   }
-  await q(
-    `GRANT ${CANDIDATE_ROLES.join(', ')} TO CURRENT_USER`,
-  );
 
-  // 4. Bootstrap the canonical fixture (schema, tables, guard, sync).
+  // 4. Grant only memberships CURRENT_USER doesn't already explicitly hold.
+  //    Superuser's implicit ability is NOT recorded in pg_auth_members and
+  //    is therefore never treated as a pre-existing membership.
+  const me = await currentUserName();
+  const preExistingMemberships = await existingExplicitMemberships(
+    me,
+    CANDIDATE_ROLES,
+  );
+  for (const role of CANDIDATE_ROLES) {
+    if (!preExistingMemberships.has(role)) {
+      await q(`GRANT ${role} TO CURRENT_USER`);
+      membershipsCreated.push(role);
+    }
+  }
+
+  // 5. Bootstrap canonical fixture (schema, tables, guard, sync, RLS).
   await pool.query(BOOTSTRAP_SQL);
 
-  // 5. Seed ALL legacy backfill fixtures BEFORE the candidate is applied.
-
-  // Eligible setup users covering every trusted-name priority source.
+  // 6. Seed ALL legacy backfill fixtures BEFORE the candidate is applied.
   seeded.eligibleFromProfile = await createUser('valid@example.com');
   await insertProfile(seeded.eligibleFromProfile, '  Alice Profile  ');
   await setCap(seeded.eligibleFromProfile, 'setup');
@@ -590,11 +716,9 @@ beforeAll(async () => {
   });
   await setCap(seeded.eligibleFromName, 'setup');
 
-  // Eligible with no trusted name at all — must NOT invent from email.
   seeded.eligibleNoName = await createUser('nameless@example.com', {});
   await setCap(seeded.eligibleNoName, 'setup');
 
-  // Invalid, whitespace, and NULL account emails.
   seeded.eligibleBadEmail = await createUser('not-an-email', {
     display_name: 'BadEmail',
   });
@@ -610,7 +734,6 @@ beforeAll(async () => {
   });
   await setCap(seeded.eligibleNullEmail, 'setup');
 
-  // Nonblank and blank phone metadata.
   seeded.eligibleWithPhone = await createUser('phone@example.com', {
     display_name: 'Phone User',
     phone: '  555-1212  ',
@@ -623,7 +746,6 @@ beforeAll(async () => {
   });
   await setCap(seeded.eligibleBlankPhone, 'setup');
 
-  // Active / suspended / revoked / no-capability users missing profiles.
   seeded.notargetActive = await createUser('active@example.com');
   await setCap(seeded.notargetActive, 'active');
 
@@ -634,9 +756,7 @@ beforeAll(async () => {
   await setCap(seeded.notargetRevoked, 'revoked');
 
   seeded.notargetNoCap = await createUser('nocap@example.com');
-  // no capability row
 
-  // Existing complete + accepted-terms profile.
   seeded.existingComplete = await createUser('complete@example.com');
   await seedHistoricalProfile(seeded.existingComplete, {
     recruiter_name: 'Existing',
@@ -649,7 +769,6 @@ beforeAll(async () => {
     status: 'active',
   });
 
-  // Existing grandfathered profile.
   seeded.existingGrandfathered = await createUser('gf@example.com');
   await seedHistoricalProfile(seeded.existingGrandfathered, {
     recruiter_name: 'GF',
@@ -661,14 +780,12 @@ beforeAll(async () => {
     status: 'active',
   });
 
-  // Existing malformed / incomplete profile.
   seeded.existingMalformed = await createUser('malf@example.com');
   await seedHistoricalProfile(seeded.existingMalformed, {
     recruiter_name: '',
     company_name: '',
   });
 
-  // Existing suspended profile.
   seeded.existingSuspended = await createUser('esusp@example.com');
   await seedHistoricalProfile(seeded.existingSuspended, {
     recruiter_name: 'Susp',
@@ -686,8 +803,7 @@ beforeAll(async () => {
     throw new Error('Guard trigger left disabled after fixture seeding');
   }
 
-  // 6. Freeze pre-candidate snapshots of every existing recruiter_profiles
-  //    row and the full protected catalog surface.
+  // 7. Freeze pre-candidate snapshots.
   const existingRows = await q<any>(
     `SELECT * FROM public.recruiter_profiles ORDER BY user_id`,
   );
@@ -696,23 +812,52 @@ beforeAll(async () => {
   );
   SNAP_BEFORE = await snapshotAll();
 
-  // 7. Apply the EXACT full candidate SQL from disk exactly once.
+  // Hard-fail if the pre-candidate policy surface is empty or missing any
+  // protected table — an empty snapshot proves nothing.
+  if (SNAP_BEFORE.policies.length === 0) {
+    throw new Error('Pre-candidate policy snapshot is empty');
+  }
+  for (const t of PROTECTED_TABLE_NAMES) {
+    const anyForTable = SNAP_BEFORE.policies.some(
+      (p: any) => p.tablename === t,
+    );
+    if (!anyForTable) {
+      throw new Error(`Pre-candidate policy snapshot missing table ${t}`);
+    }
+  }
+
+  // Hard-fail if any canonical fixture function is not present in the
+  // pre-candidate snapshot — the lookup must not pass silently.
+  for (const ident of CANONICAL_FIXTURE_FUNCTION_IDENTS) {
+    if (!(ident in SNAP_BEFORE.publicFunctions)) {
+      throw new Error(
+        `Canonical fixture function absent from pre-candidate snapshot: ${ident}`,
+      );
+    }
+  }
+
+  // 8. Apply the EXACT full candidate SQL from disk exactly once.
   await pool.query(CANDIDATE_SQL);
 
-  // 8. Post-first-application snapshot for the idempotency comparison.
+  // 9. Post-first-application snapshot for the idempotency comparison.
   SNAP_AFTER_FIRST = await snapshotAll();
 });
 
 afterAll(async () => {
   try {
-    // Best-effort object cleanup.
+    // 1. Object cleanup.
     await pool.query(RESET_SQL);
 
-    // Drop only roles this suite itself created.
-    for (const role of rolesCreated) {
+    // 2. Revoke ONLY memberships this suite explicitly granted, regardless
+    //    of whether the underlying role was suite-created or pre-existing.
+    for (const role of membershipsCreated) {
       await pool
         .query(`REVOKE ${role} FROM CURRENT_USER`)
         .catch(() => undefined);
+    }
+
+    // 3. Drop only roles this suite created (after ownership cleanup).
+    for (const role of rolesCreated) {
       await pool
         .query(`REASSIGN OWNED BY ${role} TO CURRENT_USER`)
         .catch(() => undefined);
@@ -722,7 +867,7 @@ afterAll(async () => {
       await pool.query(`DROP ROLE IF EXISTS ${role}`);
     }
 
-    // Hard-fail if any suite-created object or suite-created role remains.
+    // 4. Hard-fail if any suite-created object remains.
     const leftoverFuncs = await q<{ n: number }>(
       `SELECT count(*)::int AS n FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='public' AND p.proname IN (
@@ -744,6 +889,26 @@ afterAll(async () => {
     if (leftoverTables[0].n !== 0) {
       throw new Error(`afterAll leftover tables: ${leftoverTables[0].n}`);
     }
+    const leftoverPolicies = await q<{ n: number }>(
+      `SELECT count(*)::int AS n FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = ANY($1)`,
+      [PROTECTED_TABLE_NAMES],
+    );
+    if (leftoverPolicies[0].n !== 0) {
+      throw new Error(`afterAll leftover policies: ${leftoverPolicies[0].n}`);
+    }
+    const leftoverTriggers = await q<{ n: number }>(
+      `SELECT count(*)::int AS n FROM pg_trigger
+        WHERE NOT tgisinternal
+          AND tgname IN ('trg_recruiter_profile_guard',
+                         'trg_recruiter_profile_capability_sync')`,
+    );
+    if (leftoverTriggers[0].n !== 0) {
+      throw new Error(`afterAll leftover triggers: ${leftoverTriggers[0].n}`);
+    }
+
+    // 5. Suite-created roles must all be gone.
     if (rolesCreated.length > 0) {
       const remainingRoles = await q<{ rolname: string }>(
         `SELECT rolname FROM pg_roles WHERE rolname = ANY($1)`,
@@ -755,6 +920,32 @@ afterAll(async () => {
         );
       }
     }
+
+    // 6. Suite-created memberships must all be gone.
+    if (membershipsCreated.length > 0) {
+      const me = await currentUserName();
+      const stillGranted = await existingExplicitMemberships(
+        me,
+        membershipsCreated,
+      );
+      if (stillGranted.size > 0) {
+        throw new Error(
+          `afterAll leftover memberships: ${[...stillGranted].join(',')}`,
+        );
+      }
+    }
+
+    // 7. Extension set must equal the baseline captured before any fixture
+    //    work — the suite must not add or remove extensions.
+    const extensionsNow = await snapshotExtensions();
+    if (
+      extensionsNow.length !== extensionBaseline.length ||
+      extensionsNow.some((e, i) => e !== extensionBaseline[i])
+    ) {
+      throw new Error(
+        `Extension set drifted. baseline=[${extensionBaseline.join(',')}] now=[${extensionsNow.join(',')}]`,
+      );
+    }
   } finally {
     await pool.end();
   }
@@ -763,7 +954,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
-describe('Phase 1N-E1-R1 — environment / candidate application', () => {
+describe('Phase 1N-E1-R2 — environment / candidate application', () => {
   it('runs against PostgreSQL major version exactly 16', async () => {
     const rows = await q<{ n: number }>(
       `SELECT (current_setting('server_version_num'))::int / 10000 AS n`,
@@ -776,9 +967,13 @@ describe('Phase 1N-E1-R1 — environment / candidate application', () => {
     expect(CANDIDATE_PATH).not.toMatch(/\/supabase\/migrations\//);
     expect(CANDIDATE_SQL.length).toBeGreaterThan(100);
   });
+
+  it('candidate SQL does NOT contain any CREATE EXTENSION statement', () => {
+    expect(CANDIDATE_SQL).not.toMatch(/create\s+extension/i);
+  });
 });
 
-describe('Phase 1N-E1-R1 — backfill semantics (candidate applied once, post-seed)', () => {
+describe('Phase 1N-E1-R2 — backfill semantics (candidate applied once, post-seed)', () => {
   it('creates exactly one profile per eligible setup user missing a profile', async () => {
     const ids = [
       seeded.eligibleFromProfile,
@@ -883,14 +1078,13 @@ describe('Phase 1N-E1-R1 — backfill semantics (candidate applied once, post-se
     for (const row of after) {
       expect(row).toEqual(EXISTING_ROWS_BEFORE[row.user_id]);
     }
-    // Also make sure the set is exactly the same.
     expect(after.map((r) => r.user_id).sort()).toEqual(
       Object.keys(EXISTING_ROWS_BEFORE).sort(),
     );
   });
 });
 
-describe('Phase 1N-E1-R1 — full-candidate idempotency', () => {
+describe('Phase 1N-E1-R2 — full-candidate idempotency', () => {
   it('re-applying the exact full candidate a second time is a no-op (rows, protected catalog surface)', async () => {
     const beforeRowCount = (await q<{ n: number }>(
       `SELECT count(*)::int AS n FROM public.recruiter_profiles`,
@@ -902,8 +1096,6 @@ describe('Phase 1N-E1-R1 — full-candidate idempotency', () => {
          FROM public.recruiter_profiles ORDER BY user_id`,
     );
 
-    // Second full-candidate application — must fail-safe against duplicate
-    // rows, function overloads, privilege drift, or catalog drift.
     await pool.query(CANDIDATE_SQL);
 
     const afterRowCount = (await q<{ n: number }>(
@@ -919,14 +1111,15 @@ describe('Phase 1N-E1-R1 — full-candidate idempotency', () => {
     );
     expect(afterRows).toEqual(beforeRows);
 
-    // Protected catalog surface after the SECOND application must equal the
-    // snapshot taken after the FIRST application.
+    // Full catalog snapshot (including full public-function surface, RLS
+    // flags, and policy definitions) after the SECOND application must
+    // equal the snapshot taken after the FIRST application.
     const afterSecond = await snapshotAll();
     expect(afterSecond).toEqual(SNAP_AFTER_FIRST);
   });
 });
 
-describe('Phase 1N-E1-R1 — RPC contract', () => {
+describe('Phase 1N-E1-R2 — RPC contract', () => {
   it('creates the RPC with correct signature, ACL, definer, search_path, volatility, owner', async () => {
     const rows = await q<any>(
       `SELECT p.prosecdef,
@@ -1185,31 +1378,58 @@ describe('Phase 1N-E1-R1 — RPC contract', () => {
   });
 });
 
-describe('Phase 1N-E1-R1 — protected catalog surface non-interference', () => {
-  it('the set of new public functions added by the candidate is exactly the RPC', () => {
-    const beforeSet = new Set(SNAP_BEFORE.functionIdentSet);
-    const added = SNAP_AFTER_FIRST.functionIdentSet.filter(
-      (i) => !beforeSet.has(i),
-    );
-    expect(added).toEqual([`public.${CANDIDATE_RPC}()`]);
-    const removed = SNAP_BEFORE.functionIdentSet.filter(
-      (i) => !new Set(SNAP_AFTER_FIRST.functionIdentSet).has(i),
-    );
-    expect(removed).toEqual([]);
+describe('Phase 1N-E1-R2 — protected catalog surface non-interference', () => {
+  it('pre-candidate snapshot contains every canonical fixture function identity', () => {
+    for (const ident of CANONICAL_FIXTURE_FUNCTION_IDENTS) {
+      expect(SNAP_BEFORE.publicFunctions[ident]).toBeDefined();
+    }
   });
 
-  it('every pre-existing protected function is byte-identical (definition/ACL/owner/definer/config/volatility)', () => {
-    expect(SNAP_AFTER_FIRST.protectedFunctions).toEqual(
-      SNAP_BEFORE.protectedFunctions,
+  it('the only added public function identity is the RPC, with exactly one overload', () => {
+    const beforeIdents = new Set(Object.keys(SNAP_BEFORE.publicFunctions));
+    const afterIdents = Object.keys(SNAP_AFTER_FIRST.publicFunctions);
+    const added = afterIdents.filter((i) => !beforeIdents.has(i));
+    expect(added).toEqual([CANDIDATE_RPC_IDENT]);
+
+    const removed = [...beforeIdents].filter(
+      (i) => !new Set(afterIdents).has(i),
     );
+    expect(removed).toEqual([]);
+
+    const overloads = afterIdents.filter((i) =>
+      i.startsWith(`public.${CANDIDATE_RPC}(`),
+    );
+    expect(overloads).toEqual([CANDIDATE_RPC_IDENT]);
+  });
+
+  it('every pre-existing public-function identity is byte-identical (def/ACL/owner/definer/config/volatility/prokind)', () => {
+    for (const [ident, before] of Object.entries(SNAP_BEFORE.publicFunctions)) {
+      const after = SNAP_AFTER_FIRST.publicFunctions[ident];
+      expect(after).toBeDefined();
+      expect(after).toEqual(before);
+    }
   });
 
   it('trigger definitions on protected tables are unchanged', () => {
     expect(SNAP_AFTER_FIRST.triggers).toEqual(SNAP_BEFORE.triggers);
   });
 
-  it('table policies on protected tables are unchanged', () => {
+  it('table policies on protected tables are unchanged and non-empty for every protected table', () => {
     expect(SNAP_AFTER_FIRST.policies).toEqual(SNAP_BEFORE.policies);
+    expect(SNAP_BEFORE.policies.length).toBeGreaterThan(0);
+    for (const t of PROTECTED_TABLE_NAMES) {
+      const forTable = SNAP_BEFORE.policies.filter(
+        (p: any) => p.tablename === t,
+      );
+      expect(forTable.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('relrowsecurity / relforcerowsecurity on protected tables are unchanged', () => {
+    expect(SNAP_AFTER_FIRST.rlsFlags).toEqual(SNAP_BEFORE.rlsFlags);
+    for (const row of SNAP_BEFORE.rlsFlags) {
+      expect(row.relrowsecurity).toBe(true);
+    }
   });
 
   it('table grants on protected tables are unchanged', () => {
