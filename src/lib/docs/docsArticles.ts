@@ -178,9 +178,9 @@ const ARTICLE_DELETION: DocsArticle = {
       callouts: [
         {
           tone: 'caution',
-          title: 'Export first — the process is intended to be irreversible',
+          title: 'Export first — treat successful deletion as irreversible',
           body:
-            'Once the deletion flow completes, HaulTrackerPro is not able to restore your personal records for you.',
+            'Treat a successful permanent deletion as irreversible. There is no self-service undo or restore flow in HaulTrackerPro. Export any records you still need before you confirm deletion. This callout does not promise that no backup ever exists or that no retained or third-party-held record can ever be recovered — see the retained records section below.',
         },
       ],
     },
