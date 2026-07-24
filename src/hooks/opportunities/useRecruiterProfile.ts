@@ -31,10 +31,31 @@ export function useRecruiterProfile() {
       if (!user) return null;
       // Phase 28: use safe RPC that omits admin_notes / verified_by so
       // recruiters never read internal moderation fields about themselves.
-      const { data, error } = await (supabase as any).rpc('get_my_recruiter_profile_safe');
-      if (error) throw error;
-      const rows = (data ?? []) as Array<Record<string, any>>;
-      return (rows[0] ?? null) as RecruiterProfile | null;
+      const readSafeProfile = async () => {
+        const { data, error } = await (supabase as any).rpc(
+          'get_my_recruiter_profile_safe',
+        );
+        if (error) throw error;
+        const rows = (data ?? []) as Array<Record<string, any>>;
+        return (rows[0] ?? null) as RecruiterProfile | null;
+      };
+
+      // 1. First safe read. Any error propagates immediately — self-heal
+      //    is never attempted before a successful first read.
+      const first = await readSafeProfile();
+      if (first) return first;
+
+      // Phase 1N-E4-A: only when the first safe read returns no row do we
+      // invoke the caller-only self-heal RPC. It takes zero arguments —
+      // never pass user_id or any identity — and any error propagates.
+      const { error: healErr } = await (supabase as any).rpc(
+        'ensure_my_recruiter_setup_state',
+        {},
+      );
+      if (healErr) throw healErr;
+
+      // 2. Exactly one second safe read after successful self-heal.
+      return await readSafeProfile();
     },
     enabled: !!user,
     // Phase 1E: pick up admin approval / status changes without a hard reload.
