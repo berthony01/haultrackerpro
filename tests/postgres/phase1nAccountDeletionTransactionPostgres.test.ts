@@ -203,7 +203,7 @@ CREATE TABLE public.driver_assistants (
   driver_user_id uuid NOT NULL,
   assistant_user_id uuid NULL,
   invite_email text NOT NULL,
-  status public.driver_assistant_status NOT NULL DEFAULT 'pending',
+  status public.assistant_status NOT NULL DEFAULT 'pending',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
