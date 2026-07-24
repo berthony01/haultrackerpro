@@ -1,0 +1,137 @@
+name: Phase 1N-F1-B Transactional Account Cleanup PostgreSQL 16
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migration-candidates/20260724060000_phase1n_f1b_transactional_account_cleanup.sql'
+      - 'tests/postgres/phase1nAccountDeletionTransactionPostgres.test.ts'
+      - 'vitest.phase1n-account-deletion-postgres.config.ts'
+      - '.github/workflows/phase1n-account-deletion-postgres.yml'
+  pull_request:
+    paths:
+      - 'supabase/migration-candidates/20260724060000_phase1n_f1b_transactional_account_cleanup.sql'
+      - 'tests/postgres/phase1nAccountDeletionTransactionPostgres.test.ts'
+      - 'vitest.phase1n-account-deletion-postgres.config.ts'
+      - '.github/workflows/phase1n-account-deletion-postgres.yml'
+  workflow_dispatch:
+
+jobs:
+  phase1n-account-deletion-postgres:
+    name: PG16 transactional account-cleanup gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: phase1n_f1b
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d phase1n_f1b"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      PHASE1N_ACCOUNT_DELETION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/phase1n_f1b
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun 1.3.14
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Hard-fail if PHASE1N_ACCOUNT_DELETION_DATABASE_URL is absent
+        run: |
+          if [ -z "${PHASE1N_ACCOUNT_DELETION_DATABASE_URL:-}" ]; then
+            echo "PHASE1N_ACCOUNT_DELETION_DATABASE_URL is required for the Phase 1N-F1-B gate." >&2
+            exit 1
+          fi
+          echo "PHASE1N_ACCOUNT_DELETION_DATABASE_URL is set."
+
+      - name: Forbidden marker scan (no .only / .skip / .todo)
+        run: |
+          set -eu
+          FILE="tests/postgres/phase1nAccountDeletionTransactionPostgres.test.ts"
+          FORBIDDEN='(it|test|describe)\.(skip|only)\b|\bit\.todo\b|\bxit\b|\bxdescribe\b'
+          if [ ! -f "$FILE" ]; then
+            echo "MISSING required file: $FILE" >&2
+            exit 1
+          fi
+          if grep -Enq "$FORBIDDEN" "$FILE"; then
+            echo "FORBIDDEN marker found in $FILE:" >&2
+            grep -En "$FORBIDDEN" "$FILE" >&2 || true
+            exit 1
+          fi
+
+      - name: Candidate-only location scan (no same-version production migration)
+        run: |
+          set -eu
+          CAND="supabase/migration-candidates/20260724060000_phase1n_f1b_transactional_account_cleanup.sql"
+          if [ ! -f "$CAND" ]; then
+            echo "MISSING candidate: $CAND" >&2
+            exit 1
+          fi
+          if ls supabase/migrations 2>/dev/null | grep -q '^20260724060000_'; then
+            echo "FORBIDDEN: production migration exists with the same version stamp as the candidate." >&2
+            ls supabase/migrations | grep '^20260724060000_' >&2 || true
+            exit 1
+          fi
+
+      - name: Wait for PostgreSQL 16 to accept connections
+        run: |
+          set -eu
+          for i in $(seq 1 60); do
+            if pg_isready -h localhost -p 5432 -U postgres -d phase1n_f1b >/dev/null 2>&1; then
+              echo "Postgres is ready (attempt $i)."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Postgres did not become ready in time." >&2
+          exit 1
+        env:
+          PGPASSWORD: postgres
+
+      - name: Prepare artifacts directory
+        run: mkdir -p artifacts
+
+      - name: Real PostgreSQL 16 transactional account-cleanup gate
+        id: pg_gate
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run \
+            --config vitest.phase1n-account-deletion-postgres.config.ts \
+            --reporter verbose \
+            2>&1 | tee artifacts/phase1n-account-deletion-postgres.log
+          echo "gate_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload real-Postgres gate log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1n-account-deletion-postgres-log
+          path: artifacts/phase1n-account-deletion-postgres.log
+
+      - name: Enforce real-Postgres gate outcome
+        run: |
+          set -eu
+          EXIT="${{ steps.pg_gate.outputs.gate_exit }}"
+          echo "PostgreSQL gate exit code: ${EXIT}"
+          if [ "${EXIT}" != "0" ]; then
+            echo "Phase 1N-F1-B real-Postgres 16 gate FAILED." >&2
+            exit 1
+          fi
