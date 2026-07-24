@@ -47,11 +47,45 @@ const CANDIDATE_PATH = fileURLToPath(
     import.meta.url,
   ),
 );
+// Frozen provenance source. Retained ONLY to prove executable-body parity
+// against the promoted production migration. No database application uses it.
 const CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, 'utf8');
 
 const MIGRATIONS_DIR = fileURLToPath(
   new URL('../../supabase/migrations/', import.meta.url),
 );
+
+// Phase 1N-F1-C — production migration path. Every database application
+// (initial apply, second-apply DDL idempotency) and every source scan MUST
+// operate on this file, not on the candidate.
+const MIGRATION_FILENAME =
+  '20260724060000_phase1n_f1b_transactional_account_cleanup.sql';
+const MIGRATION_PATH = path.join(MIGRATIONS_DIR, MIGRATION_FILENAME);
+const MIGRATION_SQL = readFileSync(MIGRATION_PATH, 'utf8');
+
+// Deterministic executable-body extractor. Finds the first exact
+// `CREATE OR REPLACE FUNCTION public.finalize_my_account_data_deletion()`
+// marker and returns the substring from that marker through end-of-file with
+// only final trailing whitespace normalized via trimEnd(). No SQL parsing or
+// rewriting. Hard-fails if the marker is absent.
+const CREATE_MARKER =
+  'CREATE OR REPLACE FUNCTION public.finalize_my_account_data_deletion()';
+function extractExecutableBody(sql: string, label: string): string {
+  const i = sql.indexOf(CREATE_MARKER);
+  if (i < 0) {
+    throw new Error(
+      `${label} is missing required marker: ${CREATE_MARKER}`,
+    );
+  }
+  return sql.slice(i).trimEnd();
+}
+
+// Fixed expected SHA-256 of the accepted candidate executable body, computed
+// against the frozen candidate blob (git hash-object
+// dddeef8c98b6223e5a332fe44baef614d5640a15). Locked here so any drift in
+// either the candidate or the promoted migration will fail this suite.
+const EXPECTED_EXECUTABLE_BODY_SHA256 =
+  '7019d4450615cd175dbb6dc52f42fd151d251001175ad0a1a393b7d3e04a0e70';
 
 const RPC = 'finalize_my_account_data_deletion';
 const RPC_IDENT = `public.${RPC}()`;
