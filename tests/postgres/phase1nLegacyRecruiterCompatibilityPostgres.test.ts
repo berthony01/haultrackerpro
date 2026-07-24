@@ -895,13 +895,40 @@ beforeAll(async () => {
   }
 
   // Hard-fail if any canonical fixture function is not present in the
-  // pre-candidate snapshot — the lookup must not pass silently.
+  // pre-candidate snapshot — the type-only lookup must not pass silently.
   for (const ident of CANONICAL_FIXTURE_FUNCTION_IDENTS) {
-    if (!(ident in SNAP_BEFORE.publicFunctions)) {
+    const record = SNAP_BEFORE.publicFunctions[ident];
+    if (!record) {
       throw new Error(
         `Canonical fixture function absent from pre-candidate snapshot: ${ident}`,
       );
     }
+    if (!record.identityArguments && !ident.endsWith('()')) {
+      throw new Error(
+        `Canonical fixture function missing identity-argument field: ${ident}`,
+      );
+    }
+  }
+
+  const defaultAclFn = SNAP_BEFORE.publicFunctions['public.update_updated_at_column()'];
+  if (defaultAclFn.rawAcl !== null) {
+    throw new Error('Expected update_updated_at_column() to exercise NULL proacl default ACL fallback');
+  }
+  const defaultPublicExecute = defaultAclFn.acl.some(
+    (acl) => acl.grantee === 'PUBLIC' && acl.privilege_type === 'EXECUTE',
+  );
+  if (!defaultPublicExecute) {
+    throw new Error('Default ACL fallback did not expose PUBLIC EXECUTE for update_updated_at_column()');
+  }
+
+  const hardenedFn = SNAP_BEFORE.publicFunctions['public.recruiter_profile_can_manage_opportunities(uuid)'];
+  const hardenedAclLeak = hardenedFn.acl.filter(
+    (acl) =>
+      acl.privilege_type === 'EXECUTE' &&
+      (acl.grantee === 'PUBLIC' || acl.grantee === 'authenticated'),
+  );
+  if (hardenedAclLeak.length > 0) {
+    throw new Error('recruiter_profile_can_manage_opportunities(uuid) exposes EXECUTE to PUBLIC/authenticated');
   }
 
   // 8. Apply the EXACT full candidate SQL from disk exactly once.
