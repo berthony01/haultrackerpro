@@ -4272,6 +4272,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      finalize_my_account_data_deletion: {
+        Args: never
+        Returns: {
+          agency_memberships_revoked: number
+          deleted_user_id: string
+          direct_rows_deleted: number
+          relationship_rows_deleted: number
+          shared_assignments_cleared: number
+        }[]
+      }
       get_agency_entitlement: {
         Args: { _agency_id: string }
         Returns: {
