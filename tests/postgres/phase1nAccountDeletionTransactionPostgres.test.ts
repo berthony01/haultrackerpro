@@ -696,10 +696,10 @@ describe('Phase 1N-F1-B — function identity and return contract', () => {
     expect(fn.prokind).toBe('f');
     // proconfig must be exactly one entry — no other GUCs allowed.
     expect(fn.proconfig).toEqual(['search_path=pg_catalog, public, auth']);
-    // Owner must equal the executor observed before candidate application; the
-    // candidate must never explicitly transfer ownership.
+    // Owner must equal the executor observed before migration application; the
+    // migration must never explicitly transfer ownership.
     expect(fn.owner).toBe(preCandidateOwner);
-    expect(/ALTER\s+FUNCTION[\s\S]*OWNER\s+TO/i.test(CANDIDATE_SQL)).toBe(false);
+    expect(/ALTER\s+FUNCTION[\s\S]*OWNER\s+TO/i.test(MIGRATION_SQL)).toBe(false);
   });
 
   it('returns exactly the five TABLE columns in the required order/modes/types', async () => {
