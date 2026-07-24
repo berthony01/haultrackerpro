@@ -17,8 +17,8 @@
 --      the same backfill for the authenticated caller and returns a
 --      deterministic setup summary.
 --
--- No other behavior. No trigger changes. No opportunity/billing/consent
--- policy changes. No modifications to existing functions.
+-- No other behavior. No trigger changes. No opportunity or billing policy
+-- changes. No modifications to existing functions.
 --
 -- Staged in supabase/migration-candidates/ per Phase 1N-E1 packet: DO NOT
 -- apply to any production or connected database from this pass.
