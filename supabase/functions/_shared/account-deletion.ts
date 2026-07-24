@@ -1,18 +1,20 @@
-// Phase 1B-1 — shared, runtime-neutral account-deletion orchestration
-// (DEF-01 / DEF-02). Moved out of supabase/functions/delete-account/index.ts
-// so it can be imported directly by src/test/phase1aDriverBillingResolution.test.ts
-// under Node/Vitest without pulling a Deno Edge Function entrypoint into the
-// frontend test graph.
+// Phase 1N-F1-A — shared, runtime-neutral account-deletion orchestration.
+// Repairs Phase 1A/1B by (1) blocking personal-account deletion when the
+// caller canonically owns one or more agency_profiles (agency must be
+// transferred or closed via a dedicated flow, not silently destroyed here),
+// (2) replacing a broken generic `.eq('user_id', userId)` loop with
+// explicit role-aware relationship cleanup keyed on the real identity
+// columns (driver_user_id / assistant_user_id / member_user_id /
+// assigned_member_user_id), and (3) reserving direct user_id deletion for
+// tables that truly own a user_id column.
 //
 // This module deliberately:
 //   - never calls Deno.serve
 //   - never imports a Deno-only URL dependency (https://..., npm:...)
 //   - never reads Deno.env
-// The Edge Function adapter (./index.ts, sibling `delete-account` folder)
-// is a thin runtime wrapper: it reads environment variables, constructs the
-// real Supabase/Stripe clients, authenticates the caller, calls
-// performAccountDeletion from here, deletes the auth user last, and formats
-// the HTTP response.
+// The Edge Function adapter (../delete-account/index.ts) is a thin runtime
+// wrapper that constructs Supabase/Stripe clients, authenticates the
+// caller, calls performAccountDeletion, then deletes the auth user last.
 import {
   dedupePendingCancellations,
   isTerminalStripeStatus,
@@ -22,14 +24,15 @@ import {
 import type { DriverPriceConfig } from "./driver-billing-pure.ts";
 
 export const GENERIC_DELETE_ERROR = "Account deletion failed. Please contact support.";
+export const AGENCY_OWNER_BLOCK_MESSAGE =
+  "You own an agency workspace. Transfer ownership or close the agency before deleting your personal account.";
 
 export type DeletionResult = { ok: true } | { ok: false; status: number; message: string };
 
 /** Minimal structural shape of the Stripe subscription actions this module
  *  calls. Not importing the full Stripe SDK type here on purpose — this
  *  module must stay importable under Node/Vitest with zero Deno/URL
- *  dependencies. The real Edge Function adapter passes a real `Stripe`
- *  instance, which is structurally compatible with this interface. */
+ *  dependencies. */
 export interface StripeSubscriptionActionsLike {
   subscriptions: {
     retrieve(id: string): Promise<any>;
@@ -41,26 +44,14 @@ export interface DeletionDeps {
   adminClient: any;
   stripe: StripeSubscriptionActionsLike;
   userId: string;
-  /** Must be supplied by the caller (read from Deno.env in the real Edge
-   *  Function adapter). This module never reads process-wide environment
-   *  state itself. */
   driverPriceConfig: DriverPriceConfig;
 }
 
-// FK-safe deletion order. Phase 1A (DEF-02) additions are the six tables
-// starting at cost_profile, plus driver-owned rows on agency/assistant
-// relationship tables and recruiter_billing_profiles, none of which have a
-// cascade FK to auth.users (confirmed via pg_constraint).
-//
-// Deliberately NOT included here (documented, not silently dropped):
-// agency_audit_log and assistant_audit_log (driver_user_id) — these are
-// shared compliance/audit trail records that also describe another party's
-// (agency/assistant) actions; hard-deleting them on driver deletion could
-// erase that other party's audit evidence. admin_users is also excluded —
-// it is a platform-governance table, not user content. All three require a
-// deliberate product decision (delete vs redact-and-retain) outside this
-// narrowly-scoped billing-identity/deletion-integrity phase.
-const LOCAL_TABLES_IN_ORDER = [
+// Tables whose real identity column IS `user_id`. Relationship tables that
+// key on driver_user_id / assistant_user_id / member_user_id /
+// assigned_member_user_id are handled explicitly below and must NOT appear
+// here. FK-safe within this category: children before parents (profiles).
+const DIRECT_USER_ID_TABLES_IN_ORDER = [
   "load_stops",
   "expenses",
   "fuel_logs",
@@ -82,85 +73,63 @@ const LOCAL_TABLES_IN_ORDER = [
   "parking_verifications",
   "driver_point_events",
   "driver_points",
-  "driver_assistants",
-  "agency_client_requests",
-  "agency_delegation_requests",
-  "agency_work_items",
   "driver_opportunity_profiles",
   "saved_opportunities",
   "notifications",
   "notification_preferences",
-  "recruiter_contact_requests",
   "recruiter_billing_profiles",
   "subscriptions",
   "user_settings",
   "profiles",
 ];
 
+function logAndFail(userId: string, where: string, err: unknown): DeletionResult {
+  console.error(`[account-deletion] user=${userId} ${where} failed:`, err);
+  return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
+}
+
 /**
- * Core, dependency-injected account-deletion logic (Phase 1A / DEF-01,
- * DEF-02). Runtime-neutral: importable and executable identically under
- * Node/Vitest and the real Deno Edge Function runtime.
+ * Core, dependency-injected account-deletion logic. Runtime-neutral.
  *
- * Strict ordering:
- *   1. Collect every Stripe subscription owned by this account across all
- *      three billing contexts (driver via subscriptions, recruiter via
- *      recruiter_billing_profiles, agency ONLY where this user is an
- *      active agency_owner — never merely an admin/member).
- *   2. Validate + cancel every one of them. Any context mismatch or
- *      non-transient Stripe failure aborts here — nothing is deleted, the
- *      auth user is not touched, and the account remains fully
- *      recoverable.
- *   3. Only once every subscription is confirmed canceled or already
- *      terminal, delete local rows in FK-safe order, clear (not delete)
- *      any owned agency entitlement so the agency and its other members
- *      are not destroyed, then the caller deletes the auth user last.
+ * Ordering:
+ *   1. Canonical owned-agency check via agency_profiles.owner_user_id.
+ *      If any owned agency exists → hard block (409). No Stripe call, no
+ *      mutation. The caller remains fully recoverable.
+ *   2. Read driver + recruiter billing rows for the caller.
+ *   3. Retrieve, context-validate, and cancel every non-terminal Stripe
+ *      subscription. Any read/retrieve/context/non-idempotent cancel error
+ *      aborts before any local mutation.
+ *   4. Explicit role-aware relationship cleanup on real identity columns.
+ *   5. Direct user_id cleanup on tables that truly own user_id.
+ *   6. Return ok:true; the edge adapter deletes the auth user last.
  */
 export async function performAccountDeletion(deps: DeletionDeps): Promise<DeletionResult> {
   const { adminClient, stripe, userId, driverPriceConfig } = deps;
 
+  // 1. Canonical agency-owner hard block.
+  const { data: ownedProfiles, error: ownedProfilesErr } = await adminClient
+    .from("agency_profiles").select("agency_id").eq("owner_user_id", userId);
+  if (ownedProfilesErr) return logAndFail(userId, "reading agency_profiles.owner_user_id", ownedProfilesErr);
+  if ((ownedProfiles ?? []).length > 0) {
+    return { ok: false, status: 409, message: AGENCY_OWNER_BLOCK_MESSAGE };
+  }
+
+  // 2. Billing collection (driver + recruiter only; agency billing never
+  //    touched in personal deletion — owners were blocked above).
   const { data: driverSub, error: driverSubErr } = await adminClient
     .from("subscriptions").select("stripe_subscription_id").eq("user_id", userId).maybeSingle();
-  if (driverSubErr) {
-    console.error(`[account-deletion] user=${userId} failed reading driver subscription:`, driverSubErr);
-    return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
-  }
+  if (driverSubErr) return logAndFail(userId, "reading driver subscription", driverSubErr);
 
   const { data: recruiterBilling, error: recruiterBillingErr } = await adminClient
     .from("recruiter_billing_profiles").select("stripe_subscription_id").eq("user_id", userId).maybeSingle();
-  if (recruiterBillingErr) {
-    console.error(`[account-deletion] user=${userId} failed reading recruiter billing:`, recruiterBillingErr);
-    return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
-  }
-
-  const { data: ownedAgencies, error: ownedAgenciesErr } = await adminClient
-    .from("agency_members").select("agency_id")
-    .eq("member_user_id", userId).eq("role", "agency_owner").eq("status", "active");
-  if (ownedAgenciesErr) {
-    console.error(`[account-deletion] user=${userId} failed reading agency ownership:`, ownedAgenciesErr);
-    return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
-  }
-  const ownedAgencyIds: string[] = (ownedAgencies ?? []).map((r: { agency_id: string }) => r.agency_id);
-
-  let ownedAgencyEntitlements: { agency_id: string; stripe_subscription_id: string | null }[] = [];
-  if (ownedAgencyIds.length > 0) {
-    const { data: ents, error: entsErr } = await adminClient
-      .from("agency_entitlements").select("agency_id, stripe_subscription_id").in("agency_id", ownedAgencyIds);
-    if (entsErr) {
-      console.error(`[account-deletion] user=${userId} failed reading agency entitlements:`, entsErr);
-      return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
-    }
-    ownedAgencyEntitlements = ents ?? [];
-  }
+  if (recruiterBillingErr) return logAndFail(userId, "reading recruiter billing", recruiterBillingErr);
 
   const pending: PendingCancellation[] = [];
   if (driverSub?.stripe_subscription_id) pending.push({ context: "driver", subscriptionId: driverSub.stripe_subscription_id });
   if (recruiterBilling?.stripe_subscription_id) pending.push({ context: "recruiter", subscriptionId: recruiterBilling.stripe_subscription_id });
-  for (const ent of ownedAgencyEntitlements) {
-    if (ent.stripe_subscription_id) pending.push({ context: "agency", subscriptionId: ent.stripe_subscription_id });
-  }
   const deduped = dedupePendingCancellations(pending);
 
+  // 3. Retrieve + validate + cancel every pending subscription.
   for (const item of deduped) {
     let sub: any;
     try {
@@ -191,23 +160,72 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
     }
   }
 
-  for (const table of LOCAL_TABLES_IN_ORDER) {
-    const { error } = await adminClient.from(table).delete().eq("user_id", userId);
-    if (error) {
-      console.error(`[account-deletion] user=${userId} table=${table} failed:`, error);
-      return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
-    }
+  // 4. Explicit role-aware relationship cleanup.
+
+  // driver_assistants: caller is either the driver or the assistant on this row.
+  {
+    const { error } = await adminClient.from("driver_assistants").delete().eq("driver_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup driver_assistants(driver_user_id)", error);
+  }
+  {
+    const { error } = await adminClient.from("driver_assistants").delete().eq("assistant_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup driver_assistants(assistant_user_id)", error);
   }
 
-  if (ownedAgencyIds.length > 0) {
+  // agency_work_items: delete rows belonging to the departing driver's
+  // managed relationship; separately null out the departing agency
+  // member's assignment on shared rows. Do not rewrite created_by_user_id.
+  {
+    const { error } = await adminClient.from("agency_work_items").delete().eq("driver_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup agency_work_items(driver_user_id)", error);
+  }
+  {
     const { error } = await adminClient
-      .from("agency_entitlements")
-      .update({ status: "cancelled", stripe_subscription_id: null, current_period_end: null, updated_at: new Date().toISOString() })
-      .in("agency_id", ownedAgencyIds);
-    if (error) {
-      console.error(`[account-deletion] user=${userId} failed clearing owned agency entitlements:`, error);
-      return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
-    }
+      .from("agency_work_items").update({ assigned_member_user_id: null })
+      .eq("assigned_member_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup agency_work_items(assigned_member_user_id)", error);
+  }
+
+  // agency_delegation_requests: caller as driver OR as agency member.
+  {
+    const { error } = await adminClient.from("agency_delegation_requests").delete().eq("driver_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup agency_delegation_requests(driver_user_id)", error);
+  }
+  {
+    const { error } = await adminClient.from("agency_delegation_requests").delete().eq("member_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup agency_delegation_requests(member_user_id)", error);
+  }
+
+  // agency_client_requests: null the caller's assignment FIRST so the
+  // subsequent membership revoke doesn't leave dangling assignments; then
+  // delete rows keyed to the departing driver.
+  {
+    const { error } = await adminClient
+      .from("agency_client_requests").update({ assigned_member_user_id: null })
+      .eq("assigned_member_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup agency_client_requests(assigned_member_user_id)", error);
+  }
+  {
+    const { error } = await adminClient.from("agency_client_requests").delete().eq("driver_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup agency_client_requests(driver_user_id)", error);
+  }
+
+  // agency_members: caller is a non-owner (owners were hard-blocked). Do
+  // NOT cancel agency billing, delete the profile, or delete the row —
+  // preserve the invite/membership record as shared agency history and
+  // revoke it in place, detaching the personal identity.
+  {
+    const { error } = await adminClient
+      .from("agency_members")
+      .update({ status: "revoked", revoked_at: new Date().toISOString(), member_user_id: null })
+      .eq("member_user_id", userId);
+    if (error) return logAndFail(userId, "cleanup agency_members(member_user_id revoke)", error);
+  }
+
+  // 5. Direct user_id cleanup.
+  for (const table of DIRECT_USER_ID_TABLES_IN_ORDER) {
+    const { error } = await adminClient.from(table).delete().eq("user_id", userId);
+    if (error) return logAndFail(userId, `direct user_id cleanup table=${table}`, error);
   }
 
   return { ok: true };
