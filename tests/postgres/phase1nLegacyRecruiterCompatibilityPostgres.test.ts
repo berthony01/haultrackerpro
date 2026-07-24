@@ -1560,11 +1560,15 @@ describe('Phase 1N-E1-R3 — protected catalog surface non-interference', () => 
 
   it('no new triggers exist on protected tables (only the pre-existing fixture triggers)', async () => {
     const rows = await q<{ tgname: string }>(
-      `SELECT tgname FROM pg_trigger
-        WHERE NOT tgisinternal
-          AND tgrelid::regclass::text = ANY($1)
-        ORDER BY tgname`,
-      [PROTECTED_TABLES],
+      `SELECT t.tgname
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE NOT t.tgisinternal
+          AND n.nspname = 'public'
+          AND c.relname = ANY($1)
+        ORDER BY t.tgname`,
+      [PROTECTED_TABLE_NAMES],
     );
     expect(rows.map((r) => r.tgname).sort()).toEqual(
       [
@@ -1573,4 +1577,5 @@ describe('Phase 1N-E1-R3 — protected catalog surface non-interference', () => 
       ].sort(),
     );
   });
+
 });
