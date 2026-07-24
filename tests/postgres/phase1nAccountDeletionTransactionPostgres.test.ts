@@ -30,7 +30,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
 import path from 'node:path';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import pg from 'pg';
 
 const DATABASE_URL = process.env.PHASE1N_ACCOUNT_DELETION_DATABASE_URL;
@@ -86,8 +86,8 @@ const FORBIDDEN_TABLES: readonly string[] = [
 const FIXTURE_ENUMS: readonly string[] = [
   'agency_member_status',
   'agency_member_role',
-  'driver_assistant_status',
-  'agency_delegation_request_status',
+  'assistant_status',
+  'agency_delegation_status',
   'agency_client_request_status',
 ];
 
@@ -126,10 +126,10 @@ GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 
 -- Real enums (D fidelity).
 CREATE TYPE public.agency_member_status AS ENUM ('pending','active','revoked');
-CREATE TYPE public.agency_member_role AS ENUM ('owner','admin','member');
-CREATE TYPE public.driver_assistant_status AS ENUM ('pending','active','revoked','expired');
-CREATE TYPE public.agency_delegation_request_status AS ENUM ('pending','accepted','declined','revoked','expired');
-CREATE TYPE public.agency_client_request_status AS ENUM ('pending','accepted','declined','revoked','completed');
+CREATE TYPE public.agency_member_role AS ENUM ('agency_owner','agency_admin','agency_member');
+CREATE TYPE public.assistant_status AS ENUM ('pending','active','revoked','expired');
+CREATE TYPE public.agency_delegation_status AS ENUM ('pending_driver_approval','approved','declined','revoked','expired');
+CREATE TYPE public.agency_client_request_status AS ENUM ('pending','approved','declined','cancelled','converted_to_client');
 
 -- Forbidden (D5) tables.
 CREATE TABLE public.agency_profiles (
@@ -203,7 +203,7 @@ CREATE TABLE public.driver_assistants (
   driver_user_id uuid NOT NULL,
   assistant_user_id uuid NULL,
   invite_email text NOT NULL,
-  status public.driver_assistant_status NOT NULL DEFAULT 'pending',
+  status public.assistant_status NOT NULL DEFAULT 'pending',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -223,7 +223,7 @@ CREATE TABLE public.agency_delegation_requests (
   member_user_id uuid NOT NULL,
   created_by_user_id uuid NOT NULL,
   member_invite_email text NOT NULL,
-  status public.agency_delegation_request_status NOT NULL DEFAULT 'pending'
+  status public.agency_delegation_status NOT NULL DEFAULT 'pending_driver_approval'
 );
 
 CREATE TABLE public.agency_client_requests (
@@ -239,7 +239,7 @@ CREATE TABLE public.agency_members (
   agency_id uuid NOT NULL REFERENCES public.agency_profiles(id) ON DELETE CASCADE,
   member_user_id uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL,
   invite_email text NOT NULL,
-  role public.agency_member_role NOT NULL DEFAULT 'member',
+  role public.agency_member_role NOT NULL DEFAULT 'agency_member',
   status public.agency_member_status NOT NULL DEFAULT 'pending',
   revoked_at timestamptz NULL,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -694,18 +694,35 @@ describe('Phase 1N-F1-B — function identity and return contract', () => {
 
 describe('Phase 1N-F1-B — ACL / authentication', () => {
   it('has_function_privilege confirms authenticated has EXECUTE; PUBLIC/anon/service_role do not', async () => {
-    const acl = await q<any>(
-      `SELECT
-         has_function_privilege('public'::regnamespace::text || '.${RPC}()', 'EXECUTE') AS current_user_execute,
-         has_function_privilege('authenticated', 'public.${RPC}()', 'EXECUTE') AS authenticated_execute,
-         has_function_privilege('anon',          'public.${RPC}()', 'EXECUTE') AS anon_execute,
-         has_function_privilege('service_role',  'public.${RPC}()', 'EXECUTE') AS service_role_execute`,
+    // Resolve exact zero-argument candidate function OID from pg_proc.
+    const oidRows = await q<{ oid: number }>(
+      `SELECT p.oid
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+          AND p.proname = $1
+          AND pg_get_function_identity_arguments(p.oid) = ''`,
+      [RPC],
     );
-    expect(acl[0].authenticated_execute).toBe(true);
-    expect(acl[0].anon_execute).toBe(false);
-    expect(acl[0].service_role_execute).toBe(false);
-    // PUBLIC is proxied via a fresh session in a role with no direct grants.
-    // The pg_proc ACL snapshot below covers PUBLIC explicitly.
+    expect(oidRows).toHaveLength(1);
+    const fnOid = oidRows[0].oid;
+
+    // True per-role has_function_privilege proofs. PUBLIC is grantee OID 0 in
+    // PostgreSQL's ACL representation.
+    const priv = await q<any>(
+      `SELECT
+         has_function_privilege(0::oid,         $1::oid, 'EXECUTE') AS public_execute,
+         has_function_privilege('anon',         $1::oid, 'EXECUTE') AS anon_execute,
+         has_function_privilege('authenticated',$1::oid, 'EXECUTE') AS authenticated_execute,
+         has_function_privilege('service_role', $1::oid, 'EXECUTE') AS service_role_execute`,
+      [fnOid],
+    );
+    expect(priv[0].public_execute).toBe(false);
+    expect(priv[0].anon_execute).toBe(false);
+    expect(priv[0].authenticated_execute).toBe(true);
+    expect(priv[0].service_role_execute).toBe(false);
+
+    // Independent second proof: the pg_proc ACL snapshot captured post-apply.
     const rec = SNAP_AFTER_FIRST.publicFunctions[RPC_IDENT];
     expect(rec).toBeDefined();
     const grantees = new Set(rec.acl.map((a: any) => a.grantee));
@@ -1329,6 +1346,33 @@ describe('Phase 1N-F1-B — forbidden-target and required-target source scan', (
   });
 });
 
-// Placate the linter — afterEach is intentionally unused; leaving as future
-// hook if catalog-restoring cleanup becomes necessary.
-afterEach(async () => { /* no-op */ });
+describe('Phase 1N-F1-B — fixture enum catalog fidelity', () => {
+  const EXPECTED_ENUMS: ReadonlyArray<{ name: string; labels: readonly string[] }> = [
+    { name: 'agency_member_status',         labels: ['pending', 'active', 'revoked'] },
+    { name: 'agency_member_role',           labels: ['agency_owner', 'agency_admin', 'agency_member'] },
+    { name: 'assistant_status',             labels: ['pending', 'active', 'revoked', 'expired'] },
+    { name: 'agency_delegation_status',     labels: ['pending_driver_approval', 'approved', 'declined', 'revoked', 'expired'] },
+    { name: 'agency_client_request_status', labels: ['pending', 'approved', 'declined', 'cancelled', 'converted_to_client'] },
+  ];
+
+  for (const { name, labels } of EXPECTED_ENUMS) {
+    it(`enum public.${name} exists with exact ordered labels`, async () => {
+      const rows = await q<{ label: string; sortorder: number }>(
+        `SELECT e.enumlabel AS label, e.enumsortorder AS sortorder
+           FROM pg_type t
+           JOIN pg_namespace n ON n.oid = t.typnamespace
+           JOIN pg_enum e ON e.enumtypid = t.oid
+          WHERE n.nspname = 'public'
+            AND t.typname = $1
+            AND t.typtype = 'e'
+          ORDER BY e.enumsortorder ASC`,
+        [name],
+      );
+      expect(rows.map((r) => r.label)).toEqual(labels);
+      // Sort order is strictly ascending and unique.
+      const orders = rows.map((r) => Number(r.sortorder));
+      expect(orders).toEqual([...orders].sort((a, b) => a - b));
+      expect(new Set(orders).size).toBe(orders.length);
+    });
+  }
+});
