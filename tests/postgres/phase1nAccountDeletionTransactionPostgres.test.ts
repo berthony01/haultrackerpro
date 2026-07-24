@@ -86,8 +86,8 @@ const FORBIDDEN_TABLES: readonly string[] = [
 const FIXTURE_ENUMS: readonly string[] = [
   'agency_member_status',
   'agency_member_role',
-  'driver_assistant_status',
-  'agency_delegation_request_status',
+  'assistant_status',
+  'agency_delegation_status',
   'agency_client_request_status',
 ];
 
