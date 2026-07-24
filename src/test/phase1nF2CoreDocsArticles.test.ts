@@ -347,22 +347,83 @@ describe('article factual content', () => {
     expect(t).toMatch(/not the employer/);
   });
 
-  it('no article promises jobs, earnings, parking, tax outcomes, compliance, refunds, erasure, or protection from liability', () => {
+  it('no article makes affirmative platform guarantees; warning language about third-party claims is allowed', () => {
+    // Fail-closed: prohibit affirmative platform promises only. Warnings that
+    // caution users about third-party "guaranteed earnings" claims are risk
+    // advice and must remain permitted.
+    const forbiddenAffirmative: RegExp[] = [
+      /haultrackerpro guarantees/,
+      /\bwe guarantee\b/,
+      /\byou are guaranteed\b/,
+      /\bwill always\b/,
+      /all data will be deleted/,
+      /complete erasure is guaranteed/,
+      /protection from liability/,
+      /immune from liability/,
+    ];
     for (const a of getAllArticles()) {
       const t = fullText(a);
-      const forbidden = [
-        /guaranteed job/,
-        /guaranteed earnings/,
-        /guaranteed parking/,
-        /guaranteed tax (outcome|savings|refund)/,
-        /guaranteed compliance/,
-        /guaranteed refund/,
-        /guaranteed erasure/,
-        /protection from liability/,
-        /immune from liability/,
-      ];
-      for (const re of forbidden) expect(t, `${a.slug} contains forbidden absolute`).not.toMatch(re);
+      for (const re of forbiddenAffirmative) {
+        expect(t, `${a.slug} contains forbidden affirmative promise ${re}`).not.toMatch(re);
+      }
     }
+  });
+
+  it('opportunity article warns about third-party "guaranteed earnings" claims in a red-flag/warning context and never states HaulTrackerPro guarantees earnings', () => {
+    const a = getArticleBySlug('opportunity-recruiting-safety')!;
+    const t = fullText(a);
+    // Warning language is present.
+    expect(t).toMatch(/guaranteed earnings/);
+    // Presented as a caution / red flag / warning, not as a platform promise.
+    expect(t).toMatch(/red flag|red-flag|warning|caution/);
+    // Never an affirmative HaulTrackerPro earnings promise.
+    expect(t).not.toMatch(/haultrackerpro guarantees earnings/);
+    expect(t).not.toMatch(/we guarantee earnings/);
+    expect(t).not.toMatch(/you are guaranteed earnings/);
+  });
+
+  it('billing article no longer says every context has "its own Stripe subscription" and documents shared-ID deduplication', () => {
+    const a = getArticleBySlug('billing-cancellation')!;
+    const t = fullText(a);
+    expect(t).not.toMatch(/each context has its own stripe subscription/);
+    expect(t).toMatch(/contexts are tracked separately/);
+    expect(t).toMatch(/same stripe subscription id/);
+    expect(t).toMatch(/deduplicate/);
+  });
+
+  it('deletion article owner-block text does not use an "active agency workspace" qualifier and refers to any agency profile/workspace recording the caller as owner', () => {
+    const a = getArticleBySlug('account-deletion-data-retention')!;
+    const t = fullText(a);
+    expect(t).not.toMatch(/active agency workspace/);
+    expect(t).toMatch(/agency profile\/workspace still records you as its owner|records you as (its )?owner/);
+    expect(t).toMatch(/does not inspect an active\/inactive qualifier/);
+  });
+
+  it('deletion article does not absolutely promise HaulTrackerPro cannot restore records; it says treat successful deletion as irreversible with no self-service undo/restore', () => {
+    const a = getArticleBySlug('account-deletion-data-retention')!;
+    const t = fullText(a);
+    expect(t).not.toMatch(/haultrackerpro is not able to restore/);
+    expect(t).not.toMatch(/haultrackerpro cannot restore/);
+    expect(t).not.toMatch(/we cannot restore/);
+    expect(t).toMatch(/treat (a )?successful (permanent )?deletion as irreversible/);
+    expect(t).toMatch(/no self-service undo/);
+    expect(t).toMatch(/export .* before you confirm deletion/);
+  });
+
+  it('article source and flattened article text contain no literal backslash-u escape sequences', () => {
+    const src = readFileSync('src/lib/docs/docsArticles.ts', 'utf8');
+    // Source: no literal "\u2019" or generic backslash-u escape in article strings.
+    expect(src).not.toMatch(/\\u2019/);
+    expect(src).not.toMatch(/\\u[0-9a-fA-F]{4}/);
+    for (const a of getAllArticles()) {
+      const t = fullText(a);
+      expect(t).not.toContain('\\u');
+      expect(t).not.toContain('\\u2019');
+    }
+    // Platform-own-obligations sentence remains present with a real apostrophe.
+    const opp = getArticleBySlug('opportunity-recruiting-safety')!;
+    const oppText = fullText(opp);
+    expect(oppText).toMatch(/haultrackerpro's own legal obligations/);
   });
 });
 
