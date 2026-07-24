@@ -108,7 +108,7 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
 
   // 1. Canonical agency-owner hard block.
   const { data: ownedProfiles, error: ownedProfilesErr } = await adminClient
-    .from("agency_profiles").select("agency_id").eq("owner_user_id", userId);
+    .from("agency_profiles").select("id").eq("owner_user_id", userId);
   if (ownedProfilesErr) return logAndFail(userId, "reading agency_profiles.owner_user_id", ownedProfilesErr);
   if ((ownedProfiles ?? []).length > 0) {
     return { ok: false, status: 409, message: AGENCY_OWNER_BLOCK_MESSAGE };
