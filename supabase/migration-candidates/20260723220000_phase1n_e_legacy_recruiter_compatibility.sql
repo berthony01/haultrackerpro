@@ -301,23 +301,23 @@ BEGIN
 
   -- Deterministic missing-requirement calculation (canonical posting rule).
   IF COALESCE(btrim(_rp.recruiter_name), '') = '' THEN
-    _missing := _missing || 'recruiter_name';
+    _missing := array_append(_missing, 'recruiter_name');
   END IF;
   IF COALESCE(btrim(_rp.company_name), '') = '' THEN
-    _missing := _missing || 'company_name';
+    _missing := array_append(_missing, 'company_name');
   END IF;
   IF COALESCE(btrim(_rp.recruiter_email), '') = ''
      OR btrim(COALESCE(_rp.recruiter_email, '')) !~
         '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
-    _missing := _missing || 'recruiter_email';
+    _missing := array_append(_missing, 'recruiter_email');
   END IF;
   IF COALESCE(btrim(_rp.dot_number), '') = ''
      AND COALESCE(btrim(_rp.mc_number), '') = '' THEN
-    _missing := _missing || 'dot_or_mc_number';
+    _missing := array_append(_missing, 'dot_or_mc_number');
   END IF;
   IF _rp.posting_terms_accepted_at IS NULL
      AND _rp.legacy_terms_grandfathered_at IS NULL THEN
-    _missing := _missing || 'posting_terms';
+    _missing := array_append(_missing, 'posting_terms');
   END IF;
 
   IF _cap_status = 'active'
