@@ -239,7 +239,7 @@ CREATE TABLE public.agency_members (
   agency_id uuid NOT NULL REFERENCES public.agency_profiles(id) ON DELETE CASCADE,
   member_user_id uuid NULL REFERENCES auth.users(id) ON DELETE SET NULL,
   invite_email text NOT NULL,
-  role public.agency_member_role NOT NULL DEFAULT 'member',
+  role public.agency_member_role NOT NULL DEFAULT 'agency_member',
   status public.agency_member_status NOT NULL DEFAULT 'pending',
   revoked_at timestamptz NULL,
   created_at timestamptz NOT NULL DEFAULT now()
