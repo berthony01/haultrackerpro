@@ -724,15 +724,13 @@ beforeAll(async () => {
   // 0. Extension baseline BEFORE any fixture work. Snapshot must be
   //    restored exactly in afterAll.
   extensionBaseline = await snapshotExtensions();
+  const me = await currentUserName();
+  requiredRoleBaseline = await snapshotRequiredRoles();
+  explicitMembershipBaseline = await snapshotExplicitRequiredMemberships(me);
 
   // 1. Detect which required roles already exist.
   const existingRoles = new Set(
-    (
-      await q<{ rolname: string }>(
-        `SELECT rolname FROM pg_roles WHERE rolname = ANY($1)`,
-        [CANDIDATE_ROLES as unknown as string[]],
-      )
-    ).map((r) => r.rolname),
+    requiredRoleBaseline.filter((r) => r.exists).map((r) => r.rolname),
   );
 
   // 2. Fresh-DB-safe cleanup.
@@ -752,10 +750,8 @@ beforeAll(async () => {
   // 4. Grant only memberships CURRENT_USER doesn't already explicitly hold.
   //    Superuser's implicit ability is NOT recorded in pg_auth_members and
   //    is therefore never treated as a pre-existing membership.
-  const me = await currentUserName();
-  const preExistingMemberships = await existingExplicitMemberships(
-    me,
-    CANDIDATE_ROLES,
+  const preExistingMemberships = new Set(
+    explicitMembershipBaseline.map((r) => r.role),
   );
   for (const role of CANDIDATE_ROLES) {
     if (!preExistingMemberships.has(role)) {
