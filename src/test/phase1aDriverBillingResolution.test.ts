@@ -5,24 +5,69 @@ import {
   resolveDriverPlanKey,
   DriverBillingConflictError,
 } from "../../supabase/functions/_shared/driver-billing";
-import { performAccountDeletion } from "../../supabase/functions/_shared/account-deletion";
+import {
+  performAccountDeletion,
+  AGENCY_OWNER_BLOCK_MESSAGE,
+  GENERIC_DELETE_ERROR,
+} from "../../supabase/functions/_shared/account-deletion";
 
 type Row = Record<string, any>;
 
+// Phase 1N-F1-A — schema-aware column set for the relationship tables the
+// repaired orchestration touches. Any .eq/.in/update against a column
+// outside this set for one of these tables must produce a database-like
+// error at execution time, so a regression to `.eq('user_id', ...)` on a
+// table that lacks a real user_id column cannot silently pass tests. Other
+// tables retain the permissive shape used by pre-existing tests.
+const SCHEMA_AWARE_COLUMNS: Record<string, Set<string>> = {
+  driver_assistants: new Set(["id", "driver_user_id", "assistant_user_id", "status", "role"]),
+  agency_work_items: new Set(["id", "agency_id", "driver_user_id", "assigned_member_user_id", "created_by_user_id", "status"]),
+  agency_delegation_requests: new Set(["id", "agency_id", "driver_user_id", "member_user_id", "status"]),
+  agency_client_requests: new Set(["id", "agency_id", "driver_user_id", "assigned_member_user_id", "status"]),
+  agency_members: new Set(["id", "agency_id", "member_user_id", "role", "status", "revoked_at", "invite_email"]),
+  agency_profiles: new Set(["id", "agency_id", "owner_user_id", "name"]),
+  agency_entitlements: new Set(["id", "agency_id", "stripe_subscription_id", "status", "current_period_end", "updated_at"]),
+};
+
 function makeFakeDb(seed: Record<string, Row[]> = {}) {
   const tables: Record<string, Row[]> = seed;
+  const executedFilters: { table: string; op: string; col: string }[] = [];
+  const tableCalls: { table: string; mode: string }[] = [];
+  const errorInjections: { table: string; mode: "delete" | "update" | "select"; col?: string }[] = [];
+
   function ensure(name: string) { return tables[name] ?? (tables[name] = []); }
+
+  function assertColumnKnown(table: string, col: string) {
+    const allowed = SCHEMA_AWARE_COLUMNS[table];
+    if (allowed && !allowed.has(col)) {
+      const err: any = new Error(`column "${col}" does not exist on table "${table}"`);
+      err.code = "42703";
+      return err;
+    }
+    return null;
+  }
 
   function from(name: string) {
     const rows = ensure(name);
     let filters: ((r: Row) => boolean)[] = [];
+    let filterCols: string[] = [];
     let mode: "select" | "delete" | "update" = "select";
     let patch: Row | null = null;
     let single = false;
+    let columnError: any = null;
 
     async function exec(): Promise<{ data: any; error: any }> {
+      if (columnError) return { data: null, error: columnError };
+      tableCalls.push({ table: name, mode });
+      for (const c of filterCols) executedFilters.push({ table: name, op: mode, col: c });
+      const injected = errorInjections.find((i) =>
+        i.table === name && i.mode === mode && (!i.col || filterCols.includes(i.col))
+      );
+      if (injected) return { data: null, error: { message: `injected ${mode} error on ${name}`, code: "INJECT" } };
+
       if (mode === "delete") {
         const keep = rows.filter((r) => !filters.every((f) => f(r)));
+        const removed = rows.length - keep.length;
         rows.length = 0; rows.push(...keep);
         return { data: null, error: null };
       }
@@ -38,9 +83,27 @@ function makeFakeDb(seed: Record<string, Row[]> = {}) {
       select(_c?: string) { return builder; },
       delete() { mode = "delete"; return builder; },
       update(p: Row) { mode = "update"; patch = p; return builder; },
-      eq(col: string, val: any) { filters.push((r) => r[col] === val); return builder; },
-      in(col: string, vals: any[]) { filters.push((r) => vals.includes(r[col])); return builder; },
-      is(col: string, val: any) { filters.push((r) => (r[col] ?? null) === val); return builder; },
+      eq(col: string, val: any) {
+        filterCols.push(col);
+        const e = assertColumnKnown(name, col);
+        if (e && !columnError) columnError = e;
+        filters.push((r) => r[col] === val);
+        return builder;
+      },
+      in(col: string, vals: any[]) {
+        filterCols.push(col);
+        const e = assertColumnKnown(name, col);
+        if (e && !columnError) columnError = e;
+        filters.push((r) => vals.includes(r[col]));
+        return builder;
+      },
+      is(col: string, val: any) {
+        filterCols.push(col);
+        const e = assertColumnKnown(name, col);
+        if (e && !columnError) columnError = e;
+        filters.push((r) => (r[col] ?? null) === val);
+        return builder;
+      },
       async maybeSingle() { single = true; return exec(); },
       async upsert(row: Row, opts: { onConflict: string; ignoreDuplicates?: boolean }) {
         const key = opts.onConflict;
@@ -53,7 +116,16 @@ function makeFakeDb(seed: Record<string, Row[]> = {}) {
     };
     return builder;
   }
-  return { from, _tables: tables };
+
+  return {
+    from,
+    _tables: tables,
+    _executedFilters: executedFilters,
+    _tableCalls: tableCalls,
+    injectError(spec: { table: string; mode: "delete" | "update" | "select"; col?: string }) {
+      errorInjections.push(spec);
+    },
+  };
 }
 
 function makeFakeStripe(seed: { customers?: Record<string, any>; subscriptions?: Record<string, any> } = {}) {
@@ -62,10 +134,12 @@ function makeFakeStripe(seed: { customers?: Record<string, any>; subscriptions?:
   let n = 1000;
   const createCalls: any[] = [];
   const cancelCalls: string[] = [];
+  const retrieveCalls: string[] = [];
   return {
     _customers: customers,
     _createCalls: createCalls,
     _cancelCalls: cancelCalls,
+    _retrieveCalls: retrieveCalls,
     customers: {
       async create(params: any) {
         const id = `cus_fake_${n++}`;
@@ -75,11 +149,10 @@ function makeFakeStripe(seed: { customers?: Record<string, any>; subscriptions?:
       },
       async update(id: string, params: any) { customers[id] = { ...customers[id], ...params }; return customers[id]; },
       async del(id: string) { if (customers[id]) customers[id].deleted = true; return { id, deleted: true }; },
-      // Deliberately no `list` — any email-based lookup throws, which is
-      // real executable proof no driver billing path performs one.
     },
     subscriptions: {
       async retrieve(id: string) {
+        retrieveCalls.push(id);
         const sub = subscriptions[id];
         if (!sub) { const e: any = new Error("No such subscription"); e.code = "resource_missing"; throw e; }
         return sub;
@@ -97,21 +170,11 @@ function makeFakeStripe(seed: { customers?: Record<string, any>; subscriptions?:
 }
 
 const DRIVER_PRICE = { id: "price_monthly_test" };
-
-// Phase 1B-1: driver price configuration is now always passed in explicitly
-// by the caller (Part 2). These tests build the config themselves — they
-// never rely on an ambient Deno global or a test-setup shim.
 const TEST_CONFIG = { pro_monthly: "price_monthly_test", pro_yearly: "price_yearly_test" };
 const OTHER_CONFIG = { pro_monthly: "price_monthly_OTHER", pro_yearly: "price_yearly_OTHER" };
 
 describe("Phase 1B-1 — runtime neutrality", () => {
   it("driver-billing.ts and account-deletion.ts import cleanly with no ambient Deno global present", () => {
-    // If either shared module read `Deno.env` internally (the Phase 1A
-    // defect), this assertion on the ambient global would still pass or
-    // fail independently of the import — the real proof is that the two
-    // imports above at the top of this file already succeeded without a
-    // test-setup Deno shim. This assertion documents that no such shim was
-    // needed or installed.
     expect(typeof (globalThis as any).Deno).toBe("undefined");
   });
 
@@ -159,7 +222,6 @@ describe("resolveDriverStripeCustomerId — isolation across billing contexts", 
       profiles: [{ user_id: "user-3b" }],
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_3b: { id: "sub_3b", status: "active", customer: "cus_3b", items: { data: [{ price: DRIVER_PRICE }] } } } });
-    // DRIVER_PRICE.id ("price_monthly_test") is only valid under TEST_CONFIG.
     await expect(resolveDriverStripeCustomerId(db, stripe as any, "user-3b", OTHER_CONFIG)).rejects.toBeInstanceOf(DriverBillingConflictError);
     const db2 = makeFakeDb({
       subscriptions: [{ user_id: "user-3c", stripe_customer_id: null, stripe_subscription_id: "sub_3c" }],
@@ -212,37 +274,174 @@ describe("resolveOrCreateDriverStripeCustomerId", () => {
   });
 });
 
-describe("performAccountDeletion", () => {
+describe("performAccountDeletion — Phase 1N-F1-A repaired orchestration", () => {
   function baseDb(overrides: Record<string, Row[]> = {}) {
     return makeFakeDb({
-      subscriptions: [], recruiter_billing_profiles: [], agency_members: [], agency_entitlements: [],
+      subscriptions: [], recruiter_billing_profiles: [],
+      agency_profiles: [], agency_members: [], agency_entitlements: [],
+      agency_work_items: [], agency_client_requests: [], agency_delegation_requests: [],
+      driver_assistants: [],
       load_stops: [], expenses: [], fuel_logs: [], loads: [], broker_stats: [], lane_stats: [],
       operating_metrics: [], brokers: [], recurring_expense_templates: [], weekly_snapshots: [],
       feedback_responses: [], parse_usage: [], user_alerts: [], expense_automation_logs: [], ai_insights: [],
       cost_profile: [], parking_favorites: [], parking_reports: [], parking_verifications: [],
-      driver_point_events: [], driver_points: [], driver_assistants: [], agency_client_requests: [],
-      agency_delegation_requests: [], agency_work_items: [], recruiter_contact_requests: [],
+      driver_point_events: [], driver_points: [], driver_opportunity_profiles: [], saved_opportunities: [],
+      notifications: [], notification_preferences: [],
       user_settings: [], profiles: [],
+      // Retention/compliance tables — deliberately untouched.
+      agency_audit_log: [{ id: "aal-1", actor_user_id: "user-owner", action: "x" }],
+      assistant_audit_log: [{ id: "aat-1", actor_user_id: "user-owner", action: "x" }],
+      application_events: [{ id: "ae-1", actor_user_id: "user-owner" }],
+      contract_audit_log: [{ id: "cal-1", actor_user_id: "user-owner" }],
+      admin_audit_log: [{ id: "aal2-1", actor_user_id: "user-owner" }],
+      recruiter_contact_requests: [{ id: "rcr-1", application_id: "app-1" }],
       ...overrides,
     });
   }
 
-  it("cancels the driver's Stripe subscription before deleting local rows", async () => {
+  // 1. Agency owner blocked before any billing or data mutation.
+  it("hard-blocks (409) when the caller canonically owns an agency and touches no Stripe or table", async () => {
     const db = baseDb({
-      subscriptions: [{ user_id: "user-7", stripe_subscription_id: "sub_driver_7" }],
-      cost_profile: [{ user_id: "user-7", id: "cp-1" }],
+      agency_profiles: [{ id: "ap-1", agency_id: "agency-owner-1", owner_user_id: "user-owner" }],
+      subscriptions: [{ user_id: "user-owner", stripe_subscription_id: "sub_would_be_canceled" }],
+      cost_profile: [{ user_id: "user-owner", id: "cp-1" }],
+      loads: [{ user_id: "user-owner", id: "l-1" }],
     });
-    const stripe = makeFakeStripe({ subscriptions: { sub_driver_7: { id: "sub_driver_7", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-7", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
-    expect(stripe._cancelCalls).toContain("sub_driver_7");
-    expect(db._tables.cost_profile.length).toBe(0);
+    const stripe = makeFakeStripe({ subscriptions: { sub_would_be_canceled: { id: "sub_would_be_canceled", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-owner", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(false);
+    if (result.ok === false) {
+      expect(result.status).toBe(409);
+      expect(result.message).toBe(AGENCY_OWNER_BLOCK_MESSAGE);
+    }
+    expect(stripe._retrieveCalls.length).toBe(0);
+    expect(stripe._cancelCalls.length).toBe(0);
+    expect(db._tables.subscriptions.length).toBe(1);
+    expect(db._tables.cost_profile.length).toBe(1);
+    expect(db._tables.loads.length).toBe(1);
   });
 
-  it("cancels both driver and recruiter subscriptions for a user who is both", async () => {
+  // 2. Ownership is determined from agency_profiles, not agency_members.
+  it("blocks based on agency_profiles.owner_user_id even when no agency_members owner row exists", async () => {
+    const db = baseDb({
+      agency_profiles: [{ id: "ap-2", agency_id: "agency-2", owner_user_id: "user-owner-2" }],
+      agency_members: [], // no owner row at all
+    });
+    const stripe = makeFakeStripe();
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-owner-2", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(false);
+    if (result.ok === false) expect(result.status).toBe(409);
+    expect(stripe._retrieveCalls.length).toBe(0);
+  });
+
+  // 3. Non-owner member: agency billing/profile/entitlement untouched; member row revoked in place.
+  it("does not cancel agency billing or delete the agency for a non-owner member; membership row is revoked with member_user_id nulled", async () => {
+    const db = baseDb({
+      agency_profiles: [{ id: "ap-3", agency_id: "agency-3", owner_user_id: "someone-else" }],
+      agency_members: [
+        { id: "am-3", agency_id: "agency-3", member_user_id: "user-m", role: "agency_member", status: "active" },
+        { id: "am-x", agency_id: "agency-3", member_user_id: "other-user", role: "agency_member", status: "active" },
+      ],
+      agency_entitlements: [{ id: "ae-3", agency_id: "agency-3", stripe_subscription_id: "sub_agency_3", status: "active" }],
+    });
+    const stripe = makeFakeStripe({ subscriptions: { sub_agency_3: { id: "sub_agency_3", status: "active" } } });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-m", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(true);
+    expect(stripe._cancelCalls).not.toContain("sub_agency_3");
+    expect(db._tables.agency_profiles.length).toBe(1);
+    expect(db._tables.agency_entitlements[0].status).toBe("active");
+    expect(db._tables.agency_entitlements[0].stripe_subscription_id).toBe("sub_agency_3");
+    const own = db._tables.agency_members.find((r: any) => r.id === "am-3");
+    const other = db._tables.agency_members.find((r: any) => r.id === "am-x");
+    expect(own.status).toBe("revoked");
+    expect(own.revoked_at).toBeTruthy();
+    expect(own.member_user_id).toBeNull();
+    expect(other.status).toBe("active");
+    expect(other.member_user_id).toBe("other-user");
+  });
+
+  // 4. Assistant-only cleanup path.
+  it("removes assistant_user_id rows for an assistant-only account, leaves unrelated rows, and calls no Stripe cancellation when no billing exists", async () => {
+    const db = baseDb({
+      driver_assistants: [
+        { id: "da-1", driver_user_id: "some-driver", assistant_user_id: "user-a", status: "active" },
+        { id: "da-2", driver_user_id: "some-driver", assistant_user_id: "other-assistant", status: "active" },
+      ],
+    });
+    const stripe = makeFakeStripe();
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-a", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(true);
+    expect(stripe._cancelCalls.length).toBe(0);
+    expect(db._tables.driver_assistants.map((r: any) => r.id)).toEqual(["da-2"]);
+  });
+
+  // 5. Driver relationship cleanup by driver_user_id across the four tables.
+  it("removes rows keyed by driver_user_id from driver_assistants and all three agency relationship tables; leaves unrelated rows", async () => {
+    const db = baseDb({
+      driver_assistants: [
+        { id: "da-a", driver_user_id: "user-d", assistant_user_id: "asst-1" },
+        { id: "da-b", driver_user_id: "other-driver", assistant_user_id: "asst-2" },
+      ],
+      agency_work_items: [
+        { id: "wi-a", driver_user_id: "user-d", assigned_member_user_id: "member-1" },
+        { id: "wi-b", driver_user_id: "other-driver", assigned_member_user_id: "member-1" },
+      ],
+      agency_client_requests: [
+        { id: "cr-a", driver_user_id: "user-d", assigned_member_user_id: "member-1" },
+        { id: "cr-b", driver_user_id: "other-driver", assigned_member_user_id: "member-1" },
+      ],
+      agency_delegation_requests: [
+        { id: "dr-a", driver_user_id: "user-d", member_user_id: "member-1" },
+        { id: "dr-b", driver_user_id: "other-driver", member_user_id: "member-1" },
+      ],
+    });
+    const stripe = makeFakeStripe();
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-d", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(true);
+    expect(db._tables.driver_assistants.map((r: any) => r.id)).toEqual(["da-b"]);
+    expect(db._tables.agency_work_items.map((r: any) => r.id)).toEqual(["wi-b"]);
+    expect(db._tables.agency_client_requests.map((r: any) => r.id)).toEqual(["cr-b"]);
+    expect(db._tables.agency_delegation_requests.map((r: any) => r.id)).toEqual(["dr-b"]);
+  });
+
+  // 6. Departing agency-member assignment cleanup on shared rows.
+  it("nulls assigned_member_user_id on shared work items and client requests without deleting the row; leaves unrelated assignments intact", async () => {
+    const db = baseDb({
+      agency_profiles: [{ id: "ap-6", agency_id: "agency-6", owner_user_id: "someone-else" }],
+      agency_members: [{ id: "am-6", agency_id: "agency-6", member_user_id: "user-mem", role: "agency_member", status: "active" }],
+      agency_work_items: [
+        { id: "wi-1", driver_user_id: "some-driver", assigned_member_user_id: "user-mem" },
+        { id: "wi-2", driver_user_id: "some-driver", assigned_member_user_id: "other-member" },
+      ],
+      agency_client_requests: [
+        { id: "cr-1", driver_user_id: "some-driver", assigned_member_user_id: "user-mem" },
+        { id: "cr-2", driver_user_id: "some-driver", assigned_member_user_id: "other-member" },
+      ],
+      agency_delegation_requests: [
+        { id: "dr-1", driver_user_id: "some-driver", member_user_id: "user-mem" },
+      ],
+    });
+    const stripe = makeFakeStripe();
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-mem", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(true);
+    const wi1 = db._tables.agency_work_items.find((r: any) => r.id === "wi-1");
+    const wi2 = db._tables.agency_work_items.find((r: any) => r.id === "wi-2");
+    expect(wi1.assigned_member_user_id).toBeNull();
+    expect(wi2.assigned_member_user_id).toBe("other-member");
+    const cr1 = db._tables.agency_client_requests.find((r: any) => r.id === "cr-1");
+    const cr2 = db._tables.agency_client_requests.find((r: any) => r.id === "cr-2");
+    expect(cr1.assigned_member_user_id).toBeNull();
+    expect(cr2.assigned_member_user_id).toBe("other-member");
+    // delegation request keyed on member_user_id gets deleted.
+    expect(db._tables.agency_delegation_requests.length).toBe(0);
+  });
+
+  // 7. Dual driver + recruiter billing — both canceled before local cleanup.
+  it("cancels both driver and recruiter subscriptions before any local cleanup for a user who is both", async () => {
     const db = baseDb({
       subscriptions: [{ user_id: "user-8", stripe_subscription_id: "sub_driver_8" }],
       recruiter_billing_profiles: [{ user_id: "user-8", stripe_subscription_id: "sub_recruiter_8" }],
+      cost_profile: [{ user_id: "user-8", id: "cp-8" }],
     });
     const stripe = makeFakeStripe({
       subscriptions: {
@@ -253,36 +452,20 @@ describe("performAccountDeletion", () => {
     const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-8", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls.sort()).toEqual(["sub_driver_8", "sub_recruiter_8"].sort());
+    // Assert billing happened before any cost_profile delete.
+    const idxDriverCancel = db._tableCalls.findIndex((c: any) => c.table === "subscriptions" && c.mode === "delete");
+    const idxCostProfile = db._tableCalls.findIndex((c: any) => c.table === "cost_profile" && c.mode === "delete");
+    expect(idxDriverCancel).toBeGreaterThan(-1);
+    expect(idxCostProfile).toBeGreaterThan(-1);
+    expect(db._tables.cost_profile.length).toBe(0);
   });
 
-  it("cancels the owned agency's subscription for an agency owner", async () => {
-    const db = baseDb({
-      agency_members: [{ agency_id: "agency-9", member_user_id: "user-9", role: "agency_owner", status: "active" }],
-      agency_entitlements: [{ agency_id: "agency-9", stripe_subscription_id: "sub_agency_9" }],
-    });
-    const stripe = makeFakeStripe({ subscriptions: { sub_agency_9: { id: "sub_agency_9", status: "active", metadata: { billing_context: "agency" } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-9", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
-    expect(stripe._cancelCalls).toContain("sub_agency_9");
-    const ent = db._tables.agency_entitlements.find((r: any) => r.agency_id === "agency-9");
-    expect(ent.status).toBe("cancelled");
-  });
-
-  it("does NOT cancel the agency subscription for a non-owner member", async () => {
-    const db = baseDb({
-      agency_members: [{ agency_id: "agency-10", member_user_id: "user-10", role: "agency_member", status: "active" }],
-      agency_entitlements: [{ agency_id: "agency-10", stripe_subscription_id: "sub_agency_10" }],
-    });
-    const stripe = makeFakeStripe({ subscriptions: { sub_agency_10: { id: "sub_agency_10", status: "active" } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-10", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
-    expect(stripe._cancelCalls).not.toContain("sub_agency_10");
-  });
-
-  it("stops deletion and preserves all rows when Stripe cancellation fails", async () => {
+  // 8. Stripe failure preserves every local row, including a relationship row.
+  it("preserves every local row (including relationship rows) when Stripe cancellation fails", async () => {
     const db = baseDb({
       subscriptions: [{ user_id: "user-11", stripe_subscription_id: "sub_driver_11" }],
       cost_profile: [{ user_id: "user-11", id: "cp-11" }],
+      driver_assistants: [{ id: "da-11", driver_user_id: "user-11", assistant_user_id: "asst-11" }],
     });
     const stripe = makeFakeStripe({ subscriptions: { sub_driver_11: { id: "sub_driver_11", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
     stripe.subscriptions.cancel = async () => { throw new Error("Stripe API is down"); };
@@ -290,8 +473,48 @@ describe("performAccountDeletion", () => {
     expect(result.ok).toBe(false);
     expect(db._tables.subscriptions.length).toBe(1);
     expect(db._tables.cost_profile.length).toBe(1);
+    expect(db._tables.driver_assistants.length).toBe(1);
   });
 
+  // 9. Schema-aware regression: no relationship table receives a `user_id` filter.
+  it("completes without an unknown-column error and executes no user_id filter on the five relationship tables", async () => {
+    const db = baseDb({
+      subscriptions: [{ user_id: "user-r", stripe_subscription_id: null }],
+      driver_assistants: [{ id: "da-r", driver_user_id: "user-r", assistant_user_id: "asst" }],
+      agency_work_items: [{ id: "wi-r", driver_user_id: "user-r", assigned_member_user_id: "user-r" }],
+      agency_client_requests: [{ id: "cr-r", driver_user_id: "user-r", assigned_member_user_id: "user-r" }],
+      agency_delegation_requests: [{ id: "dr-r", driver_user_id: "user-r", member_user_id: "user-r" }],
+      agency_members: [{ id: "am-r", agency_id: "agency-r", member_user_id: "user-r", role: "agency_member", status: "active" }],
+      agency_profiles: [{ id: "ap-r", agency_id: "agency-r", owner_user_id: "not-user-r" }],
+    });
+    const stripe = makeFakeStripe();
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-r", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(true);
+    const relTables = ["driver_assistants", "agency_work_items", "agency_client_requests", "agency_delegation_requests", "agency_members"];
+    const offenders = db._executedFilters.filter((f: any) => relTables.includes(f.table) && f.col === "user_id");
+    expect(offenders).toEqual([]);
+  });
+
+  // 10. Cleanup error stops subsequent operations.
+  it("stops the deletion pipeline and does not execute later direct user_id cleanup when a relationship cleanup errors", async () => {
+    const db = baseDb({
+      driver_assistants: [{ id: "da-x", driver_user_id: "user-e", assistant_user_id: "asst" }],
+      cost_profile: [{ user_id: "user-e", id: "cp-e" }],
+      loads: [{ user_id: "user-e", id: "l-e" }],
+    });
+    db.injectError({ table: "driver_assistants", mode: "delete", col: "driver_user_id" });
+    const stripe = makeFakeStripe();
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-e", driverPriceConfig: TEST_CONFIG });
+    expect(result.ok).toBe(false);
+    if (result.ok === false) expect(result.message).toBe(GENERIC_DELETE_ERROR);
+    expect(db._tables.cost_profile.length).toBe(1);
+    expect(db._tables.loads.length).toBe(1);
+    // Confirm no delete against cost_profile was ever executed.
+    const costProfileDeletes = db._tableCalls.filter((c: any) => c.table === "cost_profile" && c.mode === "delete");
+    expect(costProfileDeletes.length).toBe(0);
+  });
+
+  // 11. Already-canceled Stripe subscription is idempotent success.
   it("treats an already-canceled Stripe subscription as idempotent success and proceeds", async () => {
     const db = baseDb({
       subscriptions: [{ user_id: "user-12", stripe_subscription_id: "sub_driver_12" }],
@@ -303,24 +526,37 @@ describe("performAccountDeletion", () => {
     expect(db._tables.subscriptions.length).toBe(0);
   });
 
-  it("removes rows from every Phase 1A local-data table for the deleted user", async () => {
+  // 12. Unrelated agency/shared/audit records survive.
+  it("leaves other agencies, their entitlements, and every audit table untouched for a non-owner deletion", async () => {
     const db = baseDb({
-      cost_profile: [{ user_id: "user-13", id: "1" }],
-      parking_favorites: [{ user_id: "user-13", id: "2" }],
-      parking_reports: [{ user_id: "user-13", id: "3" }],
-      parking_verifications: [{ user_id: "user-13", id: "4" }],
-      driver_points: [{ user_id: "user-13", id: "5" }],
-      driver_point_events: [{ user_id: "user-13", id: "6" }],
+      agency_profiles: [
+        { id: "ap-a", agency_id: "agency-a", owner_user_id: "someone-else" },
+        { id: "ap-b", agency_id: "agency-b", owner_user_id: "unrelated-owner" },
+      ],
+      agency_entitlements: [
+        { id: "ae-a", agency_id: "agency-a", stripe_subscription_id: "sub_a", status: "active" },
+        { id: "ae-b", agency_id: "agency-b", stripe_subscription_id: "sub_b", status: "active" },
+      ],
+      agency_members: [{ id: "am-a", agency_id: "agency-a", member_user_id: "user-nm", role: "agency_member", status: "active" }],
     });
     const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-13", driverPriceConfig: TEST_CONFIG });
+    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-nm", driverPriceConfig: TEST_CONFIG });
     expect(result.ok).toBe(true);
-    for (const t of ["cost_profile", "parking_favorites", "parking_reports", "parking_verifications", "driver_points", "driver_point_events"]) {
-      expect(db._tables[t].length).toBe(0);
-    }
+    expect(db._tables.agency_profiles.length).toBe(2);
+    expect(db._tables.agency_entitlements.length).toBe(2);
+    expect(db._tables.agency_entitlements.every((r: any) => r.status === "active")).toBe(true);
+    // No audit table was called at all.
+    const auditTables = ["agency_audit_log", "assistant_audit_log", "application_events", "contract_audit_log", "admin_audit_log"];
+    const auditCalls = db._tableCalls.filter((c: any) => auditTables.includes(c.table) && (c.mode === "delete" || c.mode === "update"));
+    expect(auditCalls).toEqual([]);
+    // recruiter_contact_requests also untouched by this pass.
+    const rcrMutations = db._tableCalls.filter((c: any) => c.table === "recruiter_contact_requests" && (c.mode === "delete" || c.mode === "update"));
+    expect(rcrMutations).toEqual([]);
+    expect(db._tables.recruiter_contact_requests.length).toBe(1);
   });
 
-  it("stops deletion when a subscription's context doesn't match its expected billing role", async () => {
+  // Retain original driver context-mismatch proof.
+  it("stops deletion when a driver subscription's billing_context does not match", async () => {
     const db = baseDb({
       subscriptions: [{ user_id: "user-14", stripe_subscription_id: "sub_mismatch_14" }],
       cost_profile: [{ user_id: "user-14", id: "1" }],
@@ -332,7 +568,8 @@ describe("performAccountDeletion", () => {
     expect(db._tables.cost_profile.length).toBe(1);
   });
 
-  it("rejects a driver subscription whose price is only valid under a different config than the one passed in (proves driverPriceConfig is threaded through deletion validation, not hardcoded)", async () => {
+  // Retain original driver-price config threading proof.
+  it("rejects a driver subscription whose price is only valid under a different config than the one passed in", async () => {
     const db = baseDb({
       subscriptions: [{ user_id: "user-15", stripe_subscription_id: "sub_driver_15" }],
       cost_profile: [{ user_id: "user-15", id: "1" }],
