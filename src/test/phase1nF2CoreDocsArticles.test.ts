@@ -371,13 +371,22 @@ describe('article factual content', () => {
 // ---------------------------------------------------------------------------
 function renderAt(path: string) {
   return render(
-    <HelmetProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/docs/:articleSlug" element={<DocsArticlePage />} />
-        </Routes>
-      </MemoryRouter>
-    </HelmetProvider>,
+    React.createElement(
+      HelmetProvider,
+      null,
+      React.createElement(
+        MemoryRouter,
+        { initialEntries: [path] },
+        React.createElement(
+          Routes,
+          null,
+          React.createElement(Route, {
+            path: '/docs/:articleSlug',
+            element: React.createElement(DocsArticlePage),
+          }),
+        ),
+      ),
+    ),
   );
 }
 
