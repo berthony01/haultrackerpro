@@ -11,8 +11,8 @@
  * recruiter_profile_can_manage_opportunities function.
  *
  * NEVER SKIPS. Fails hard if PHASE1N_LEGACY_RECRUITER_DATABASE_URL is
- * absent. No skip / only / todo markers, xit, xdescribe, PGlite, SQLite,
- * or in-memory substitute is permitted.
+ * absent. Test-runner exclusion markers are prohibited; the workflow
+ * scans this file for them and hard-fails.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
