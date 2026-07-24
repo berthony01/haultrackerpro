@@ -1277,9 +1277,9 @@ describe('Phase 1N-F1-B — advisory lock causally blocks concurrent RPC', () =>
   });
 });
 
-describe('Phase 1N-F1-B — candidate DDL idempotency', () => {
-  it('second exact candidate application preserves the full protected catalog snapshot', async () => {
-    await pool.query(CANDIDATE_SQL);
+describe('Phase 1N-F1-C — production migration DDL idempotency', () => {
+  it('second exact production migration application preserves the full protected catalog snapshot', async () => {
+    await pool.query(MIGRATION_SQL);
     const after = await snapshotAll();
     expect(after.tables).toEqual(SNAP_AFTER_FIRST.tables);
     expect(after.columns).toEqual(SNAP_AFTER_FIRST.columns);
@@ -1295,7 +1295,7 @@ describe('Phase 1N-F1-B — candidate DDL idempotency', () => {
   });
 });
 
-describe('Phase 1N-F1-B — non-interference fingerprints', () => {
+describe('Phase 1N-F1-C — non-interference fingerprints', () => {
   it('only added function identity is the RPC; every other function is byte-identical', () => {
     const before = SNAP_BEFORE.publicFunctions;
     const after = SNAP_AFTER_FIRST.publicFunctions;
@@ -1321,30 +1321,30 @@ describe('Phase 1N-F1-B — non-interference fingerprints', () => {
     expect(SNAP_AFTER_FIRST.tableGrants).toEqual(SNAP_BEFORE.tableGrants);
   });
 
-  it('extension set unchanged across candidate application', async () => {
+  it('extension set unchanged across production migration application', async () => {
     const now = await snapshotExtensions();
     expect(now).toEqual(extensionBaseline);
   });
 });
 
-describe('Phase 1N-F1-B — forbidden-target and required-target source scan', () => {
-  it('candidate does not mutate any D5 forbidden table or auth.users', () => {
+describe('Phase 1N-F1-C — forbidden-target and required-target source scan', () => {
+  it('production migration does not mutate any D5 forbidden table or auth.users', () => {
     for (const t of FORBIDDEN_TABLES) {
       const pattern = new RegExp(`(DELETE\\s+FROM|UPDATE)\\s+public\\.${t}\\b`, 'i');
-      expect(pattern.test(CANDIDATE_SQL)).toBe(false);
+      expect(pattern.test(MIGRATION_SQL)).toBe(false);
     }
-    expect(/DELETE\s+FROM\s+auth\.users/i.test(CANDIDATE_SQL)).toBe(false);
-    expect(/UPDATE\s+auth\.users/i.test(CANDIDATE_SQL)).toBe(false);
+    expect(/DELETE\s+FROM\s+auth\.users/i.test(MIGRATION_SQL)).toBe(false);
+    expect(/UPDATE\s+auth\.users/i.test(MIGRATION_SQL)).toBe(false);
   });
 
-  it('candidate contains explicit DELETE statements for all 29 direct tables', () => {
+  it('production migration contains explicit DELETE statements for all 29 direct tables', () => {
     for (const t of DIRECT_TABLES) {
       const pattern = new RegExp(`DELETE\\s+FROM\\s+public\\.${t}\\s+WHERE\\s+user_id\\s*=\\s*_uid`, 'i');
-      expect(pattern.test(CANDIDATE_SQL)).toBe(true);
+      expect(pattern.test(MIGRATION_SQL)).toBe(true);
     }
   });
 
-  it('candidate contains all required relationship / assignment / membership statements', () => {
+  it('production migration contains all required relationship / assignment / membership statements', () => {
     const required = [
       /DELETE\s+FROM\s+public\.driver_assistants\s+WHERE\s+driver_user_id\s*=\s*_uid/i,
       /DELETE\s+FROM\s+public\.driver_assistants\s+WHERE\s+assistant_user_id\s*=\s*_uid/i,
@@ -1356,11 +1356,11 @@ describe('Phase 1N-F1-B — forbidden-target and required-target source scan', (
       /UPDATE\s+public\.agency_client_requests[\s\S]*assigned_member_user_id\s*=\s*NULL[\s\S]*WHERE\s+assigned_member_user_id\s*=\s*_uid/i,
       /UPDATE\s+public\.agency_members[\s\S]*status\s*=\s*'revoked'[\s\S]*member_user_id\s*=\s*NULL[\s\S]*WHERE\s+member_user_id\s*=\s*_uid/i,
     ];
-    for (const r of required) expect(r.test(CANDIDATE_SQL)).toBe(true);
+    for (const r of required) expect(r.test(MIGRATION_SQL)).toBe(true);
   });
 
-  it('candidate never uses dynamic EXECUTE for cleanup statements', () => {
-    for (const line of CANDIDATE_SQL.split('\n')) {
+  it('production migration never uses dynamic EXECUTE for cleanup statements', () => {
+    for (const line of MIGRATION_SQL.split('\n')) {
       const stripped = line.replace(/--.*$/, '').trim();
       if (/^EXECUTE\b/i.test(stripped)) {
         throw new Error(`Dynamic EXECUTE forbidden: ${stripped}`);
@@ -1368,15 +1368,62 @@ describe('Phase 1N-F1-B — forbidden-target and required-target source scan', (
     }
   });
 
-  it('candidate has the exact function identity, search_path, and ACL clauses', () => {
-    expect(CANDIDATE_SQL).toMatch(/CREATE OR REPLACE FUNCTION\s+public\.finalize_my_account_data_deletion\s*\(\s*\)/);
-    expect(CANDIDATE_SQL).toMatch(/SET\s+search_path\s*=\s*pg_catalog\s*,\s*public\s*,\s*auth/);
-    expect(CANDIDATE_SQL).toMatch(/SECURITY DEFINER/);
-    expect(CANDIDATE_SQL).toMatch(/pg_advisory_xact_lock\s*\(\s*pg_catalog\.hashtextextended/);
-    expect(CANDIDATE_SQL).toMatch(/REVOKE ALL\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+FROM PUBLIC/i);
-    expect(CANDIDATE_SQL).toMatch(/REVOKE EXECUTE\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+FROM anon/i);
-    expect(CANDIDATE_SQL).toMatch(/REVOKE EXECUTE\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+FROM service_role/i);
-    expect(CANDIDATE_SQL).toMatch(/GRANT\s+EXECUTE\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+TO authenticated/i);
+  it('production migration has the exact function identity, search_path, and ACL clauses', () => {
+    expect(MIGRATION_SQL).toMatch(/CREATE OR REPLACE FUNCTION\s+public\.finalize_my_account_data_deletion\s*\(\s*\)/);
+    expect(MIGRATION_SQL).toMatch(/SET\s+search_path\s*=\s*pg_catalog\s*,\s*public\s*,\s*auth/);
+    expect(MIGRATION_SQL).toMatch(/SECURITY DEFINER/);
+    expect(MIGRATION_SQL).toMatch(/pg_advisory_xact_lock\s*\(\s*pg_catalog\.hashtextextended/);
+    expect(MIGRATION_SQL).toMatch(/REVOKE ALL\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+FROM PUBLIC/i);
+    expect(MIGRATION_SQL).toMatch(/REVOKE EXECUTE\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+FROM anon/i);
+    expect(MIGRATION_SQL).toMatch(/REVOKE EXECUTE\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+FROM service_role/i);
+    expect(MIGRATION_SQL).toMatch(/GRANT\s+EXECUTE\s+ON FUNCTION\s+public\.finalize_my_account_data_deletion\(\)\s+TO authenticated/i);
+  });
+});
+
+describe('Phase 1N-F1-C — promotion parity (candidate ⇄ production migration)', () => {
+  it('exactly one production migration file matches the required version stamp and filename', () => {
+    const same = readdirSync(MIGRATIONS_DIR).filter((n) => n.startsWith('20260724060000_'));
+    expect(same).toEqual([MIGRATION_FILENAME]);
+    expect(existsSync(MIGRATION_PATH)).toBe(true);
+    expect(existsSync(CANDIDATE_PATH)).toBe(true);
+    expect(MIGRATION_PATH).not.toBe(CANDIDATE_PATH);
+  });
+
+  it('production migration header does not contain "CANDIDATE ONLY" before the CREATE marker', () => {
+    const i = MIGRATION_SQL.indexOf(CREATE_MARKER);
+    expect(i).toBeGreaterThan(-1);
+    const header = MIGRATION_SQL.slice(0, i);
+    expect(/CANDIDATE\s+ONLY/i.test(header)).toBe(false);
+  });
+
+  it('production migration contains exactly one CREATE OR REPLACE FUNCTION identity for the RPC', () => {
+    const matches = MIGRATION_SQL.match(
+      /CREATE OR REPLACE FUNCTION\s+public\.finalize_my_account_data_deletion\s*\(\s*\)/g,
+    );
+    expect(matches?.length ?? 0).toBe(1);
+  });
+
+  it('production migration never invokes finalize_my_account_data_deletion() outside its definition', () => {
+    // Strip the function body (BEGIN..END; block bracketed by $fn$ ... $fn$).
+    const stripped = MIGRATION_SQL.replace(/\$fn\$[\s\S]*?\$fn\$/g, '');
+    expect(/SELECT[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
+    expect(/PERFORM[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
+    expect(/CALL[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
+  });
+
+  it('candidate and production migration executable bodies are byte-for-byte equal', () => {
+    const candBody = extractExecutableBody(CANDIDATE_SQL, 'CANDIDATE_SQL');
+    const migBody = extractExecutableBody(MIGRATION_SQL, 'MIGRATION_SQL');
+    expect(candBody).toBe(migBody);
+  });
+
+  it('executable-body SHA-256 equals the fixed accepted candidate SHA-256', () => {
+    const candBody = extractExecutableBody(CANDIDATE_SQL, 'CANDIDATE_SQL');
+    const migBody = extractExecutableBody(MIGRATION_SQL, 'MIGRATION_SQL');
+    const candSha = createHash('sha256').update(candBody, 'utf8').digest('hex');
+    const migSha = createHash('sha256').update(migBody, 'utf8').digest('hex');
+    expect(candSha).toBe(migSha);
+    expect(migSha).toBe(EXPECTED_EXECUTABLE_BODY_SHA256);
   });
 });
 
