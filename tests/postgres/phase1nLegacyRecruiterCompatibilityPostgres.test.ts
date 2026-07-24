@@ -631,6 +631,27 @@ async function snapshotAll() {
 const rolesCreated: string[] = [];
 const membershipsCreated: string[] = []; // role names granted to CURRENT_USER by this suite
 let extensionBaseline: string[] = [];
+type RequiredRoleBaselineRecord = {
+  rolname: string;
+  exists: boolean;
+  rolsuper: boolean | null;
+  rolinherit: boolean | null;
+  rolcreaterole: boolean | null;
+  rolcreatedb: boolean | null;
+  rolcanlogin: boolean | null;
+  rolreplication: boolean | null;
+  rolbypassrls: boolean | null;
+};
+type ExplicitMembershipRecord = {
+  role: string;
+  member: string;
+  grantor: string;
+  admin_option: boolean;
+  inherit_option: boolean;
+  set_option: boolean;
+};
+let requiredRoleBaseline: RequiredRoleBaselineRecord[] = [];
+let explicitMembershipBaseline: ExplicitMembershipRecord[] = [];
 
 const seeded: Record<string, string> = {};
 
@@ -643,18 +664,58 @@ async function currentUserName(): Promise<string> {
   return rows[0].u;
 }
 
+async function snapshotRequiredRoles(): Promise<RequiredRoleBaselineRecord[]> {
+  return q<RequiredRoleBaselineRecord>(
+    `WITH required AS (
+       SELECT rolname, ord
+       FROM unnest($1::text[]) WITH ORDINALITY AS t(rolname, ord)
+     )
+     SELECT required.rolname,
+            (r.oid IS NOT NULL) AS exists,
+            r.rolsuper,
+            r.rolinherit,
+            r.rolcreaterole,
+            r.rolcreatedb,
+            r.rolcanlogin,
+            r.rolreplication,
+            r.rolbypassrls
+       FROM required
+       LEFT JOIN pg_roles r ON r.rolname = required.rolname
+      ORDER BY required.ord`,
+    [CANDIDATE_ROLES as unknown as string[]],
+  );
+}
+
+async function snapshotExplicitRequiredMemberships(
+  member: string,
+  roles: readonly string[] = CANDIDATE_ROLES,
+): Promise<ExplicitMembershipRecord[]> {
+  return q<ExplicitMembershipRecord>(
+    `SELECT r.rolname AS role,
+            u.rolname AS member,
+            g.rolname AS grantor,
+            m.admin_option,
+            m.inherit_option,
+            m.set_option
+       FROM pg_auth_members m
+       JOIN pg_roles r ON r.oid = m.roleid
+       JOIN pg_roles u ON u.oid = m.member
+       JOIN pg_roles g ON g.oid = m.grantor
+      WHERE u.rolname = $1
+        AND r.rolname = ANY($2)
+      ORDER BY r.rolname, u.rolname, g.rolname,
+               m.admin_option, m.inherit_option, m.set_option`,
+    [member, roles as unknown as string[]],
+  );
+}
+
 async function existingExplicitMemberships(
   member: string,
   roles: readonly string[],
 ): Promise<Set<string>> {
-  const rows = await q<{ role: string }>(
-    `SELECT r.rolname AS role
-       FROM pg_auth_members m
-       JOIN pg_roles r ON r.oid = m.roleid
-       JOIN pg_roles u ON u.oid = m.member
-      WHERE u.rolname = $1
-        AND r.rolname = ANY($2)`,
-    [member, roles as unknown as string[]],
+  const rows = await snapshotExplicitRequiredMemberships(
+    member,
+    roles,
   );
   return new Set(rows.map((r) => r.role));
 }
