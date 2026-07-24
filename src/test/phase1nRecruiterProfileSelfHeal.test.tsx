@@ -219,7 +219,7 @@ describe('Phase 1N-E4-A — useRecruiterProfile self-heal', () => {
     // remain the canonical read path; the query function does not invoke
     // any mutation helper (upsertProfile / saveRecruiterProfile / etc.).
     const src = readFileSync(
-      new URL('../hooks/opportunities/useRecruiterProfile.ts', import.meta.url),
+      path.resolve(process.cwd(), 'src/hooks/opportunities/useRecruiterProfile.ts'),
       'utf8',
     );
     expect(src).toMatch(/queryKey:\s*\['recruiter_profile',\s*user\?\.id\]/);
