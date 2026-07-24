@@ -1,20 +1,23 @@
-// Phase 1N-F1-A — shared, runtime-neutral account-deletion orchestration.
-// Repairs Phase 1A/1B by (1) blocking personal-account deletion when the
-// caller canonically owns one or more agency_profiles (agency must be
-// transferred or closed via a dedicated flow, not silently destroyed here),
-// (2) replacing a broken generic `.eq('user_id', userId)` loop with
-// explicit role-aware relationship cleanup keyed on the real identity
-// columns (driver_user_id / assistant_user_id / member_user_id /
-// assigned_member_user_id), and (3) reserving direct user_id deletion for
-// tables that truly own a user_id column.
+// Phase 1N-F1-E — shared, runtime-neutral account-deletion orchestration.
 //
-// This module deliberately:
-//   - never calls Deno.serve
-//   - never imports a Deno-only URL dependency (https://..., npm:...)
-//   - never reads Deno.env
-// The Edge Function adapter (../delete-account/index.ts) is a thin runtime
-// wrapper that constructs Supabase/Stripe clients, authenticates the
-// caller, calls performAccountDeletion, then deletes the auth user last.
+// This module preserves the pre-cleanup ordering accepted in Phase 1N-F1-A-R1
+// (agency-owner hard block via agency_profiles.owner_user_id → driver billing
+// read → recruiter billing read → per-subscription Stripe retrieve + context
+// validation + non-terminal cancel) but replaces the previous sequential
+// TypeScript relationship/direct-table cleanup with EXACTLY ONE authenticated
+// call to the caller-bound SECURITY DEFINER RPC
+// public.finalize_my_account_data_deletion(). That RPC owns the atomic,
+// caller-`auth.uid()`-bound cleanup transaction; this file no longer contains
+// any table-cleanup pipeline.
+//
+// The edge adapter (../delete-account/index.ts) is a thin runtime wrapper
+// that constructs the Supabase admin/user clients and the Stripe client,
+// authenticates the caller, calls performAccountDeletion, then — only on
+// {ok:true} — deletes the auth user last via adminClient.auth.admin.
+//
+// Runtime neutrality: this module deliberately does not import Deno.serve,
+// any https://... or npm:... URL specifier, or Deno.env. It must remain
+// importable under Node/Vitest with zero Deno dependencies.
 import {
   dedupePendingCancellations,
   isTerminalStripeStatus,
@@ -40,71 +43,69 @@ export interface StripeSubscriptionActionsLike {
   };
 }
 
+/** Minimal structural shape of the authenticated RPC-capable client used to
+ *  invoke public.finalize_my_account_data_deletion() as the calling user
+ *  (never service_role, never admin). Must call the RPC with an empty args
+ *  object so the SECURITY DEFINER function derives identity from auth.uid()
+ *  exclusively. */
+export interface AuthenticatedCleanupClient {
+  rpc(
+    name: string,
+    args?: Record<string, never>,
+  ): Promise<{ data: any; error: any }>;
+}
+
 export interface DeletionDeps {
   adminClient: any;
   stripe: StripeSubscriptionActionsLike;
+  /** REQUIRED. Authenticated user client (Authorization: Bearer <user jwt>)
+   *  used solely to invoke finalize_my_account_data_deletion(). Never
+   *  fall back to adminClient — the RPC's ownership derives from
+   *  auth.uid() on the RPC connection. */
+  cleanupClient: AuthenticatedCleanupClient;
   userId: string;
   driverPriceConfig: DriverPriceConfig;
 }
 
-// Tables whose real identity column IS `user_id`. Relationship tables that
-// key on driver_user_id / assistant_user_id / member_user_id /
-// assigned_member_user_id are handled explicitly below and must NOT appear
-// here. FK-safe within this category: children before parents (profiles).
-const DIRECT_USER_ID_TABLES_IN_ORDER = [
-  "load_stops",
-  "expenses",
-  "fuel_logs",
-  "loads",
-  "broker_stats",
-  "lane_stats",
-  "operating_metrics",
-  "brokers",
-  "recurring_expense_templates",
-  "weekly_snapshots",
-  "feedback_responses",
-  "parse_usage",
-  "user_alerts",
-  "expense_automation_logs",
-  "ai_insights",
-  "cost_profile",
-  "parking_favorites",
-  "parking_reports",
-  "parking_verifications",
-  "driver_point_events",
-  "driver_points",
-  "driver_opportunity_profiles",
-  "saved_opportunities",
-  "notifications",
-  "notification_preferences",
-  "recruiter_billing_profiles",
-  "subscriptions",
-  "user_settings",
-  "profiles",
-];
+const CLEANUP_RPC_NAME = "finalize_my_account_data_deletion" as const;
 
 function logAndFail(userId: string, where: string, err: unknown): DeletionResult {
   console.error(`[account-deletion] user=${userId} ${where} failed:`, err);
   return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
 }
 
+function isNonNegativeInt(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0;
+}
+
 /**
  * Core, dependency-injected account-deletion logic. Runtime-neutral.
  *
- * Ordering:
+ * Ordering (unchanged externally):
  *   1. Canonical owned-agency check via agency_profiles.owner_user_id.
  *      If any owned agency exists → hard block (409). No Stripe call, no
- *      mutation. The caller remains fully recoverable.
+ *      RPC. The caller remains fully recoverable.
  *   2. Read driver + recruiter billing rows for the caller.
  *   3. Retrieve, context-validate, and cancel every non-terminal Stripe
  *      subscription. Any read/retrieve/context/non-idempotent cancel error
- *      aborts before any local mutation.
- *   4. Explicit role-aware relationship cleanup on real identity columns.
- *   5. Direct user_id cleanup on tables that truly own user_id.
- *   6. Return ok:true; the edge adapter deletes the auth user last.
+ *      aborts BEFORE the cleanup RPC is invoked.
+ *   4. Invoke public.finalize_my_account_data_deletion() EXACTLY ONCE via
+ *      the authenticated cleanupClient with empty args. That RPC owns the
+ *      atomic cleanup transaction, including its own owner-race guard.
+ *   5. Validate the RPC's single-row set-returning result. Any malformed
+ *      response is rejected as generic 500 and the auth user is NOT
+ *      deleted (auth deletion happens in the adapter, only on ok:true).
+ *
+ * Retry semantics:
+ *   - Stripe cancellation: already-terminal / resource_missing / prior
+ *     accepted terminal states are treated as idempotent success.
+ *   - Cleanup RPC: if it committed but its HTTP response was lost, a retry
+ *     is safe because finalize_my_account_data_deletion() is idempotent
+ *     and returns zero counters on the second call.
+ *   - Auth-user deletion is outside this module and always occurs last.
  */
 export async function performAccountDeletion(deps: DeletionDeps): Promise<DeletionResult> {
-  const { adminClient, stripe, userId, driverPriceConfig } = deps;
+  const { adminClient, stripe, cleanupClient, userId, driverPriceConfig } = deps;
 
   // 1. Canonical agency-owner hard block.
   const { data: ownedProfiles, error: ownedProfilesErr } = await adminClient
@@ -129,7 +130,8 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
   if (recruiterBilling?.stripe_subscription_id) pending.push({ context: "recruiter", subscriptionId: recruiterBilling.stripe_subscription_id });
   const deduped = dedupePendingCancellations(pending);
 
-  // 3. Retrieve + validate + cancel every pending subscription.
+  // 3. Retrieve + validate + cancel every pending subscription. Any failure
+  //    aborts BEFORE the cleanup RPC is invoked.
   for (const item of deduped) {
     let sub: any;
     try {
@@ -160,72 +162,52 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
     }
   }
 
-  // 4. Explicit role-aware relationship cleanup.
+  // 4. Atomic transactional cleanup — exactly one authenticated RPC.
+  //    No user_id / target / role arguments: the SECURITY DEFINER function
+  //    derives identity from auth.uid() on the caller's JWT.
+  const { data: rpcData, error: rpcError } = await cleanupClient.rpc(CLEANUP_RPC_NAME, {});
 
-  // driver_assistants: caller is either the driver or the assistant on this row.
-  {
-    const { error } = await adminClient.from("driver_assistants").delete().eq("driver_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup driver_assistants(driver_user_id)", error);
-  }
-  {
-    const { error } = await adminClient.from("driver_assistants").delete().eq("assistant_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup driver_assistants(assistant_user_id)", error);
-  }
-
-  // agency_work_items: delete rows belonging to the departing driver's
-  // managed relationship; separately null out the departing agency
-  // member's assignment on shared rows. Do not rewrite created_by_user_id.
-  {
-    const { error } = await adminClient.from("agency_work_items").delete().eq("driver_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup agency_work_items(driver_user_id)", error);
-  }
-  {
-    const { error } = await adminClient
-      .from("agency_work_items").update({ assigned_member_user_id: null })
-      .eq("assigned_member_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup agency_work_items(assigned_member_user_id)", error);
+  if (rpcError) {
+    const code = (rpcError as { code?: string })?.code;
+    const message = typeof (rpcError as { message?: unknown })?.message === "string"
+      ? (rpcError as { message: string }).message
+      : "";
+    if (code === "P0001" && message.includes(AGENCY_OWNER_BLOCK_MESSAGE)) {
+      // Owner-state race: caller became an agency owner between the
+      // adminClient owner precheck (step 1) and the RPC's own owner guard.
+      console.error(`[account-deletion] user=${userId} cleanup RPC reported owner-race P0001`);
+      return { ok: false, status: 409, message: AGENCY_OWNER_BLOCK_MESSAGE };
+    }
+    console.error(`[account-deletion] user=${userId} cleanup RPC ${CLEANUP_RPC_NAME} failed: code=${code ?? "none"}`);
+    return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
 
-  // agency_delegation_requests: caller as driver OR as agency member.
-  {
-    const { error } = await adminClient.from("agency_delegation_requests").delete().eq("driver_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup agency_delegation_requests(driver_user_id)", error);
+  // 5. Validate the single-row set-returning response. A malformed response
+  //    is NEVER treated as success — the adapter must not delete the auth
+  //    user unless every invariant below holds.
+  if (!Array.isArray(rpcData) || rpcData.length !== 1) {
+    console.error(`[account-deletion] user=${userId} cleanup RPC returned malformed shape (not a single-row array)`);
+    return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
-  {
-    const { error } = await adminClient.from("agency_delegation_requests").delete().eq("member_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup agency_delegation_requests(member_user_id)", error);
+  const row = rpcData[0] as Record<string, unknown> | null;
+  if (!row || typeof row !== "object") {
+    console.error(`[account-deletion] user=${userId} cleanup RPC returned null row`);
+    return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
-
-  // agency_client_requests: null the caller's assignment FIRST so the
-  // subsequent membership revoke doesn't leave dangling assignments; then
-  // delete rows keyed to the departing driver.
-  {
-    const { error } = await adminClient
-      .from("agency_client_requests").update({ assigned_member_user_id: null })
-      .eq("assigned_member_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup agency_client_requests(assigned_member_user_id)", error);
+  if (row.deleted_user_id !== userId) {
+    console.error(`[account-deletion] user=${userId} cleanup RPC deleted_user_id mismatch`);
+    return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
-  {
-    const { error } = await adminClient.from("agency_client_requests").delete().eq("driver_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup agency_client_requests(driver_user_id)", error);
-  }
-
-  // agency_members: caller is a non-owner (owners were hard-blocked). Do
-  // NOT cancel agency billing, delete the profile, or delete the row —
-  // preserve the invite/membership record as shared agency history and
-  // revoke it in place, detaching the personal identity.
-  {
-    const { error } = await adminClient
-      .from("agency_members")
-      .update({ status: "revoked", revoked_at: new Date().toISOString(), member_user_id: null })
-      .eq("member_user_id", userId);
-    if (error) return logAndFail(userId, "cleanup agency_members(member_user_id revoke)", error);
-  }
-
-  // 5. Direct user_id cleanup.
-  for (const table of DIRECT_USER_ID_TABLES_IN_ORDER) {
-    const { error } = await adminClient.from(table).delete().eq("user_id", userId);
-    if (error) return logAndFail(userId, `direct user_id cleanup table=${table}`, error);
+  for (const counter of [
+    "relationship_rows_deleted",
+    "shared_assignments_cleared",
+    "agency_memberships_revoked",
+    "direct_rows_deleted",
+  ] as const) {
+    if (!isNonNegativeInt(row[counter])) {
+      console.error(`[account-deletion] user=${userId} cleanup RPC counter ${counter} invalid`);
+      return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
+    }
   }
 
   return { ok: true };
