@@ -893,6 +893,43 @@ beforeAll(async () => {
   if (SNAP_BEFORE.policies.length === 0) {
     throw new Error('Pre-candidate policy snapshot is empty');
   }
+
+  // Hard-fail if the pre-candidate trigger snapshot does not contain
+  // exactly the two seeded noninternal triggers on recruiter_profiles.
+  const preTriggerNames = SNAP_BEFORE.triggers
+    .map((t: any) => t.tgname)
+    .sort();
+  const requiredTriggerNames = [
+    'trg_recruiter_profile_capability_sync',
+    'trg_recruiter_profile_guard',
+  ].sort();
+  if (
+    preTriggerNames.length !== requiredTriggerNames.length ||
+    !requiredTriggerNames.every((n, i) => preTriggerNames[i] === n)
+  ) {
+    throw new Error(
+      `Pre-candidate trigger snapshot mismatch: got ${JSON.stringify(
+        preTriggerNames,
+      )}, expected ${JSON.stringify(requiredTriggerNames)}`,
+    );
+  }
+
+  // Hard-fail if the pre-candidate constraint snapshot is empty or missing
+  // at least one constraint for any protected table.
+  if (SNAP_BEFORE.constraints.length === 0) {
+    throw new Error('Pre-candidate constraint snapshot is empty');
+  }
+  for (const t of PROTECTED_TABLE_NAMES) {
+    const qualified = `public.${t}`;
+    const anyForTable = SNAP_BEFORE.constraints.some(
+      (c: any) => c.tbl === qualified,
+    );
+    if (!anyForTable) {
+      throw new Error(
+        `Pre-candidate constraint snapshot missing constraint for table ${qualified}`,
+      );
+    }
+  }
   for (const t of PROTECTED_TABLE_NAMES) {
     const anyForTable = SNAP_BEFORE.policies.some(
       (p: any) => p.tablename === t,
