@@ -69,7 +69,7 @@ const ARTICLE_BILLING: DocsArticle = {
       heading: 'Separate billing contexts',
       paragraphs: [
         'Driver, recruiter, and agency subscriptions are separate billing contexts. Each is owned by the applicable account or workspace owner and is managed independently.',
-        'One login may hold more than one context — for example a driver plan and a recruiter plan on the same account. Each context has its own Stripe subscription and its own status.',
+        'One login may hold more than one context — for example a driver plan and a recruiter plan on the same account. Contexts are tracked separately and may map to distinct Stripe subscriptions, or, in legacy or normalized cases, to the same Stripe subscription ID. When you request permanent deletion the backend deduplicates repeated subscription IDs before it retrieves or cancels them so a shared ID is not cancelled twice.',
       ],
     },
     {
@@ -178,9 +178,9 @@ const ARTICLE_DELETION: DocsArticle = {
       callouts: [
         {
           tone: 'caution',
-          title: 'Export first — the process is intended to be irreversible',
+          title: 'Export first — treat successful deletion as irreversible',
           body:
-            'Once the deletion flow completes, HaulTrackerPro is not able to restore your personal records for you.',
+            'Treat a successful permanent deletion as irreversible. There is no self-service undo or restore flow in HaulTrackerPro. Export any records you still need before you confirm deletion. This callout does not promise that no backup ever exists or that no retained or third-party-held record can ever be recovered — see the retained records section below.',
         },
       ],
     },
@@ -191,7 +191,7 @@ const ARTICLE_DELETION: DocsArticle = {
         'The current, controlled order of operations is:',
       ],
       bullets: [
-        'Agency-owner block — if you still own an active agency workspace, the request is refused.',
+        'Agency-owner block — if any agency profile/workspace still records you as its owner, the request is refused. The backend does not inspect an active/inactive qualifier; ownership alone triggers the block.',
         'Stripe cancellation of every owned driver and recruiter subscription is attempted first.',
         'Then a single transactional database cleanup runs.',
         'Finally, the authentication user record is deleted last.',
@@ -466,7 +466,7 @@ const ARTICLE_OPPORTUNITY: DocsArticle = {
       heading: 'Platform boundaries',
       paragraphs: [
         'HaulTrackerPro may review, restrict, remove, preserve, or report content and accounts under applicable rules, but does not guarantee detection or prevention of every bad actor or dispute.',
-        'Users remain responsible for their own decisions and agreements. Nothing in this article disclaims HaulTrackerPro\u2019s own legal obligations under the applicable Terms of Service, Privacy Policy, or applicable law.',
+        "Users remain responsible for their own decisions and agreements. Nothing in this article disclaims HaulTrackerPro's own legal obligations under the applicable Terms of Service, Privacy Policy, or applicable law.",
       ],
     },
   ],
