@@ -97,33 +97,49 @@ jobs:
             ls supabase/migrations | grep '^20260724060000_' >&2 || true
             exit 1
           fi
-          python3 - "$CAND" "$MIG" <<'PY'
-          import hashlib, sys
-          MARK = "CREATE OR REPLACE FUNCTION public.finalize_my_account_data_deletion()"
-          def body(path):
-              t = open(path, 'r', encoding='utf-8').read()
-              i = t.find(MARK)
-              if i < 0:
-                  print(f"MISSING marker in {path}", file=sys.stderr)
-                  sys.exit(1)
-              return t[i:].rstrip(), t[:i]
-          cand_body, _ = body(sys.argv[1])
-          mig_body, mig_header = body(sys.argv[2])
-          if 'CANDIDATE ONLY' in mig_header.upper().replace('  ', ' '):
-              print("FORBIDDEN: production migration header contains 'CANDIDATE ONLY'", file=sys.stderr)
-              sys.exit(1)
-          cand_sha = hashlib.sha256(cand_body.encode('utf-8')).hexdigest()
-          mig_sha = hashlib.sha256(mig_body.encode('utf-8')).hexdigest()
-          print(f"candidate  executable-body SHA-256: {cand_sha}")
-          print(f"migration  executable-body SHA-256: {mig_sha}")
-          if cand_body != mig_body:
-              print("FAIL: candidate and production migration executable bodies differ", file=sys.stderr)
-              sys.exit(1)
-          if cand_sha != mig_sha:
-              print("FAIL: executable-body SHA-256 mismatch", file=sys.stderr)
-              sys.exit(1)
-          print("OK: executable bodies are byte-for-byte equal.")
-          PY
+          MARK='CREATE OR REPLACE FUNCTION public.finalize_my_account_data_deletion()'
+          extract_body() {
+            awk -v m="$MARK" '
+              !seen && index($0, m)==1 { seen=1 }
+              seen { print }
+            ' "$1"
+          }
+          extract_header() {
+            awk -v m="$MARK" '
+              index($0, m)==1 { exit }
+              { print }
+            ' "$1"
+          }
+          # Reject "CANDIDATE ONLY" text in the production migration header.
+          if extract_header "$MIG" | grep -Eiq 'CANDIDATE[[:space:]]+ONLY'; then
+            echo "FORBIDDEN: production migration header contains 'CANDIDATE ONLY'" >&2
+            exit 1
+          fi
+          # Byte-for-byte executable-body parity after consistent trailing-whitespace normalization.
+          CAND_BODY_FILE=$(mktemp)
+          MIG_BODY_FILE=$(mktemp)
+          extract_body "$CAND" | sed -e :a -e '/^$/{$d;N;ba' -e '}' > "$CAND_BODY_FILE"
+          extract_body "$MIG"  | sed -e :a -e '/^$/{$d;N;ba' -e '}' > "$MIG_BODY_FILE"
+          if [ ! -s "$CAND_BODY_FILE" ]; then
+            echo "MISSING marker in $CAND" >&2; exit 1
+          fi
+          if [ ! -s "$MIG_BODY_FILE" ]; then
+            echo "MISSING marker in $MIG" >&2; exit 1
+          fi
+          CAND_SHA=$(sha256sum "$CAND_BODY_FILE" | awk '{print $1}')
+          MIG_SHA=$(sha256sum "$MIG_BODY_FILE"  | awk '{print $1}')
+          echo "candidate executable-body SHA-256: $CAND_SHA"
+          echo "migration executable-body SHA-256: $MIG_SHA"
+          if ! cmp -s "$CAND_BODY_FILE" "$MIG_BODY_FILE"; then
+            echo "FAIL: candidate and production migration executable bodies differ" >&2
+            diff -u "$CAND_BODY_FILE" "$MIG_BODY_FILE" >&2 || true
+            exit 1
+          fi
+          if [ "$CAND_SHA" != "$MIG_SHA" ]; then
+            echo "FAIL: executable-body SHA-256 mismatch" >&2
+            exit 1
+          fi
+          echo "OK: executable bodies are byte-for-byte equal."
 
       - name: Wait for PostgreSQL 16 to accept connections
         run: |
