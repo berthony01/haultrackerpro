@@ -175,27 +175,30 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
     if (code === "P0001" && message.includes(AGENCY_OWNER_BLOCK_MESSAGE)) {
       // Owner-state race: caller became an agency owner between the
       // adminClient owner precheck (step 1) and the RPC's own owner guard.
-      console.error(`[account-deletion] user=${userId} cleanup RPC reported owner-race P0001`);
+      // Log stage only — no caller identity, no raw error payload.
+      console.error(`[account-deletion] cleanup RPC owner-race`);
       return { ok: false, status: 409, message: AGENCY_OWNER_BLOCK_MESSAGE };
     }
-    console.error(`[account-deletion] user=${userId} cleanup RPC ${CLEANUP_RPC_NAME} failed: code=${code ?? "none"}`);
+    // Log stage + bounded error code only — no userId, no message, no stack.
+    console.error(`[account-deletion] cleanup RPC failed: code=${code ?? "none"}`);
     return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
 
   // 5. Validate the single-row set-returning response. A malformed response
   //    is NEVER treated as success — the adapter must not delete the auth
-  //    user unless every invariant below holds.
+  //    user unless every invariant below holds. All rejection logs are
+  //    static stage descriptions with no caller identity and no payload.
   if (!Array.isArray(rpcData) || rpcData.length !== 1) {
-    console.error(`[account-deletion] user=${userId} cleanup RPC returned malformed shape (not a single-row array)`);
+    console.error(`[account-deletion] cleanup RPC malformed shape`);
     return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
   const row = rpcData[0] as Record<string, unknown> | null;
   if (!row || typeof row !== "object") {
-    console.error(`[account-deletion] user=${userId} cleanup RPC returned null row`);
+    console.error(`[account-deletion] cleanup RPC null row`);
     return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
   if (row.deleted_user_id !== userId) {
-    console.error(`[account-deletion] user=${userId} cleanup RPC deleted_user_id mismatch`);
+    console.error(`[account-deletion] cleanup RPC deleted_user_id mismatch`);
     return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
   }
   for (const counter of [
@@ -205,7 +208,7 @@ export async function performAccountDeletion(deps: DeletionDeps): Promise<Deleti
     "direct_rows_deleted",
   ] as const) {
     if (!isNonNegativeInt(row[counter])) {
-      console.error(`[account-deletion] user=${userId} cleanup RPC counter ${counter} invalid`);
+      console.error(`[account-deletion] cleanup RPC counter invalid`);
       return { ok: false, status: 500, message: GENERIC_DELETE_ERROR };
     }
   }
