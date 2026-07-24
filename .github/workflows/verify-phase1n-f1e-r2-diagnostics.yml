@@ -1,0 +1,83 @@
+name: Verification Only - Phase 1N-F1-E-R2 Diagnostics
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/verify-phase1n-f1e-r2-diagnostics.yml'
+  workflow_dispatch:
+
+jobs:
+  diagnostics:
+    name: Capture focused, typecheck, build, and full-suite logs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun 1.3.14
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare logs
+        run: mkdir -p artifacts
+
+      - name: Focused tests
+        id: focused
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run \
+            src/test/phase1aDriverBillingResolution.test.ts \
+            src/test/phase1aDriverBillingPure.test.ts \
+            src/test/securityViewsShape.test.ts \
+            src/test/phase1hA1FoundationRuntime.test.ts \
+            --reporter verbose 2>&1 | tee artifacts/focused.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx tsgo --noEmit 2>&1 | tee artifacts/typecheck.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bun run build 2>&1 | tee artifacts/build.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Default full Vitest suite
+        id: full
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run 2>&1 | tee artifacts/full.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1n-f1e-r2-diagnostic-logs
+          path: artifacts/*.log
+
+      - name: Enforce outcomes
+        run: |
+          set -eu
+          echo "focused=${{ steps.focused.outputs.exit }}"
+          echo "typecheck=${{ steps.typecheck.outputs.exit }}"
+          echo "build=${{ steps.build.outputs.exit }}"
+          echo "full=${{ steps.full.outputs.exit }}"
+          test "${{ steps.focused.outputs.exit }}" = "0"
+          test "${{ steps.typecheck.outputs.exit }}" = "0"
+          test "${{ steps.build.outputs.exit }}" = "0"
+          test "${{ steps.full.outputs.exit }}" = "0"
