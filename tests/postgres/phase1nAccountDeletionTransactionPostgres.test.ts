@@ -694,18 +694,35 @@ describe('Phase 1N-F1-B — function identity and return contract', () => {
 
 describe('Phase 1N-F1-B — ACL / authentication', () => {
   it('has_function_privilege confirms authenticated has EXECUTE; PUBLIC/anon/service_role do not', async () => {
-    const acl = await q<any>(
-      `SELECT
-         has_function_privilege('public'::regnamespace::text || '.${RPC}()', 'EXECUTE') AS current_user_execute,
-         has_function_privilege('authenticated', 'public.${RPC}()', 'EXECUTE') AS authenticated_execute,
-         has_function_privilege('anon',          'public.${RPC}()', 'EXECUTE') AS anon_execute,
-         has_function_privilege('service_role',  'public.${RPC}()', 'EXECUTE') AS service_role_execute`,
+    // Resolve exact zero-argument candidate function OID from pg_proc.
+    const oidRows = await q<{ oid: number }>(
+      `SELECT p.oid
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+          AND p.proname = $1
+          AND pg_get_function_identity_arguments(p.oid) = ''`,
+      [RPC],
     );
-    expect(acl[0].authenticated_execute).toBe(true);
-    expect(acl[0].anon_execute).toBe(false);
-    expect(acl[0].service_role_execute).toBe(false);
-    // PUBLIC is proxied via a fresh session in a role with no direct grants.
-    // The pg_proc ACL snapshot below covers PUBLIC explicitly.
+    expect(oidRows).toHaveLength(1);
+    const fnOid = oidRows[0].oid;
+
+    // True per-role has_function_privilege proofs. PUBLIC is grantee OID 0 in
+    // PostgreSQL's ACL representation.
+    const priv = await q<any>(
+      `SELECT
+         has_function_privilege(0::oid,         $1::oid, 'EXECUTE') AS public_execute,
+         has_function_privilege('anon',         $1::oid, 'EXECUTE') AS anon_execute,
+         has_function_privilege('authenticated',$1::oid, 'EXECUTE') AS authenticated_execute,
+         has_function_privilege('service_role', $1::oid, 'EXECUTE') AS service_role_execute`,
+      [fnOid],
+    );
+    expect(priv[0].public_execute).toBe(false);
+    expect(priv[0].anon_execute).toBe(false);
+    expect(priv[0].authenticated_execute).toBe(true);
+    expect(priv[0].service_role_execute).toBe(false);
+
+    // Independent second proof: the pg_proc ACL snapshot captured post-apply.
     const rec = SNAP_AFTER_FIRST.publicFunctions[RPC_IDENT];
     expect(rec).toBeDefined();
     const grantees = new Set(rec.acl.map((a: any) => a.grantee));
