@@ -121,3 +121,5 @@ jobs:
             echo "Phase 1N-E1 real-Postgres 16 gate FAILED." >&2
             exit 1
           fi
+
+# Verification-only PR trigger for the R5 PG16 rerun. Do not merge.
