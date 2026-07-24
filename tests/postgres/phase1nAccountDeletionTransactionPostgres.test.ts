@@ -1346,6 +1346,33 @@ describe('Phase 1N-F1-B — forbidden-target and required-target source scan', (
   });
 });
 
-// Placate the linter — afterEach is intentionally unused; leaving as future
-// hook if catalog-restoring cleanup becomes necessary.
-afterEach(async () => { /* no-op */ });
+describe('Phase 1N-F1-B — fixture enum catalog fidelity', () => {
+  const EXPECTED_ENUMS: ReadonlyArray<{ name: string; labels: readonly string[] }> = [
+    { name: 'agency_member_status',         labels: ['pending', 'active', 'revoked'] },
+    { name: 'agency_member_role',           labels: ['agency_owner', 'agency_admin', 'agency_member'] },
+    { name: 'assistant_status',             labels: ['pending', 'active', 'revoked', 'expired'] },
+    { name: 'agency_delegation_status',     labels: ['pending_driver_approval', 'approved', 'declined', 'revoked', 'expired'] },
+    { name: 'agency_client_request_status', labels: ['pending', 'approved', 'declined', 'cancelled', 'converted_to_client'] },
+  ];
+
+  for (const { name, labels } of EXPECTED_ENUMS) {
+    it(`enum public.${name} exists with exact ordered labels`, async () => {
+      const rows = await q<{ label: string; sortorder: number }>(
+        `SELECT e.enumlabel AS label, e.enumsortorder AS sortorder
+           FROM pg_type t
+           JOIN pg_namespace n ON n.oid = t.typnamespace
+           JOIN pg_enum e ON e.enumtypid = t.oid
+          WHERE n.nspname = 'public'
+            AND t.typname = $1
+            AND t.typtype = 'e'
+          ORDER BY e.enumsortorder ASC`,
+        [name],
+      );
+      expect(rows.map((r) => r.label)).toEqual(labels);
+      // Sort order is strictly ascending and unique.
+      const orders = rows.map((r) => Number(r.sortorder));
+      expect(orders).toEqual([...orders].sort((a, b) => a - b));
+      expect(new Set(orders).size).toBe(orders.length);
+    });
+  }
+});
