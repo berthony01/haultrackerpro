@@ -455,63 +455,70 @@ async function seedHistoricalProfile(
  */
 type PublicFunctionRecord = {
   ident: string;
+  identityArguments: string;
   def: string;
   prokind: string;
   provolatile: string;
   prosecdef: boolean;
   proconfig: string[] | null;
   owner: string;
-  acl: { grantee: string; privilege_type: string; is_grantable: string }[];
+  rawAcl: string[] | null;
+  acl: {
+    grantor: string;
+    grantee: string;
+    privilege_type: string;
+    is_grantable: boolean;
+  }[];
 };
 
 async function snapshotAllPublicFunctions(): Promise<Record<string, PublicFunctionRecord>> {
   const rows = await q<any>(
     `SELECT
-       'public.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident,
+       'public.'||p.proname||'('||oidvectortypes(p.proargtypes)||')' AS ident,
+       pg_get_function_identity_arguments(p.oid) AS identity_arguments,
        pg_get_functiondef(p.oid) AS def,
        p.prokind::text AS prokind,
        p.provolatile::text AS provolatile,
        p.prosecdef,
        p.proconfig,
-       pg_get_userbyid(p.proowner) AS owner
+       pg_get_userbyid(p.proowner) AS owner,
+       p.proacl::text[] AS raw_acl,
+       COALESCE(
+         (SELECT jsonb_agg(jsonb_build_object(
+            'grantor', CASE (acl).grantor WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantor) END,
+            'grantee', CASE (acl).grantee WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantee) END,
+            'privilege_type', (acl).privilege_type,
+            'is_grantable', (acl).is_grantable
+          ) ORDER BY
+            CASE (acl).grantor WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantor) END,
+            CASE (acl).grantee WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantee) END,
+            (acl).privilege_type,
+            (acl).is_grantable)
+            FROM aclexplode(COALESCE(p.proacl, acldefault('f'::"char", p.proowner))) acl),
+         '[]'::jsonb
+       ) AS acl
      FROM pg_proc p
      JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
      ORDER BY 1`,
   );
 
-  // ACL grouped by identity — routine_privileges reports by name only, which
-  // would collapse overloads together. Instead read pg_proc.proacl and expand.
-  const aclRows = await q<any>(
-    `SELECT
-        'public.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident,
-        COALESCE(
-          (SELECT jsonb_agg(jsonb_build_object(
-             'grantee', COALESCE(pg_get_userbyid((acl).grantee), 'PUBLIC'),
-             'privilege_type', (acl).privilege_type,
-             'is_grantable', (acl).is_grantable
-           ) ORDER BY (acl).grantee, (acl).privilege_type)
-             FROM aclexplode(p.proacl) acl),
-          '[]'::jsonb
-        ) AS acl
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-     WHERE n.nspname = 'public'`,
-  );
-  const aclByIdent = new Map<string, any[]>();
-  for (const r of aclRows) aclByIdent.set(r.ident, r.acl ?? []);
-
   const out: Record<string, PublicFunctionRecord> = {};
   for (const r of rows) {
+    if (out[r.ident]) {
+      throw new Error(`Duplicate public function identity key: ${r.ident}`);
+    }
     out[r.ident] = {
       ident: r.ident,
+      identityArguments: r.identity_arguments,
       def: r.def,
       prokind: r.prokind,
       provolatile: r.provolatile,
       prosecdef: r.prosecdef,
       proconfig: r.proconfig,
       owner: r.owner,
-      acl: aclByIdent.get(r.ident) ?? [],
+      rawAcl: r.raw_acl,
+      acl: r.acl ?? [],
     };
   }
   return out;
