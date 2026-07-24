@@ -84,6 +84,7 @@ const AssistantsAgencies = lazy(() => import("./pages/AssistantsAgencies"));
 const CapabilityLauncher = lazy(() => import("./pages/CapabilityLauncher"));
 const ProfessionalProfile = lazy(() => import("./pages/ProfessionalProfile"));
 const Docs = lazy(() => import("./pages/Docs"));
+const DocsArticle = lazy(() => import("./pages/DocsArticle"));
 const LegalCenter = lazy(() => import("./pages/LegalCenter"));
 
 // SEO content pages
@@ -219,6 +220,7 @@ const App = () => (
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/docs" element={<Docs />} />
+              <Route path="/docs/:articleSlug" element={<DocsArticle />} />
               <Route path="/legal" element={<LegalCenter />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/features" element={<Features />} />
