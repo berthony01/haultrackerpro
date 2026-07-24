@@ -194,14 +194,14 @@ const DOCS_ENTRIES: readonly DocsEntry[] = Object.freeze(
       },
       {
         id: 'billing-cancellation-refunds',
-        title: 'Cancellation & refunds reference',
+        title: 'Billing, cancellation & permanent deletion',
         description:
-          'Explains how cancellation works today and where refund rules will be documented. In preparation — canonical policy pending legal review.',
+          'How subscriptions, cancellation, and permanent account deletion actually work today across driver, recruiter, and agency contexts.',
         category: 'billing_subscriptions',
         audiences: ['all'],
-        route: null,
-        status: 'planned',
-        keywords: ['cancel', 'refund', 'billing', 'subscription'],
+        route: '/docs/billing-cancellation',
+        status: 'live',
+        keywords: ['cancel', 'refund', 'billing', 'subscription', 'stripe', 'portal'],
       },
 
       // Accounts, Roles & Data
@@ -228,6 +228,28 @@ const DOCS_ENTRIES: readonly DocsEntry[] = Object.freeze(
         keywords: ['privacy', 'data', 'legal'],
       },
       {
+        id: 'account-deletion-data-retention',
+        title: 'Permanent account deletion & retained records',
+        description:
+          'The actual order of operations for permanent deletion, agency-owner blocking, and what may be retained, detached, or anonymized.',
+        category: 'accounts_roles_data',
+        audiences: ['all'],
+        route: '/docs/account-deletion-data-retention',
+        status: 'live',
+        keywords: ['delete', 'deletion', 'retention', 'account', 'data', 'export'],
+      },
+      {
+        id: 'roles-access-relationships',
+        title: 'Account roles, delegated access & ending relationships',
+        description:
+          'How driver, recruiter, agency, and assistant roles are scoped today, and which self-service exit controls are not yet available.',
+        category: 'accounts_roles_data',
+        audiences: ['all'],
+        route: '/docs/roles-access-relationships',
+        status: 'live',
+        keywords: ['roles', 'assistant', 'agency', 'recruiter', 'leave', 'transfer', 'access'],
+      },
+      {
         id: 'universal-consent-controls',
         title: 'Consent history & preferences',
         description:
@@ -244,25 +266,25 @@ const DOCS_ENTRIES: readonly DocsEntry[] = Object.freeze(
         id: 'ai-ocr-calculations-limits',
         title: 'AI, OCR & calculation limitations',
         description:
-          'How to interpret AI, OCR and calculation output and where independent review is required. In preparation as a dedicated article.',
+          'How to interpret AI, OCR, contract analysis, and calculation output — and where independent review is required before you rely on any of it.',
         category: 'ai_ocr_calculations',
         audiences: ['all'],
-        route: null,
-        status: 'planned',
-        keywords: ['ai', 'ocr', 'calculations', 'limits', 'accuracy'],
+        route: '/docs/ai-ocr-calculation-limitations',
+        status: 'live',
+        keywords: ['ai', 'ocr', 'calculations', 'limits', 'accuracy', 'contract'],
       },
 
       // Opportunities, Contracts & Safety
       {
         id: 'opportunities-safety-guide',
-        title: 'Reviewing opportunities safely',
+        title: 'Opportunity & recruiting safety',
         description:
-          'What to verify before accepting an opportunity, and how to report a concern. In preparation as a dedicated article.',
+          'What drivers should independently verify before accepting an opportunity, and what recruiters and carriers are responsible for when posting.',
         category: 'opportunities_contracts_safety',
-        audiences: ['driver'],
-        route: null,
-        status: 'planned',
-        keywords: ['opportunities', 'safety', 'verification', 'report', 'concern'],
+        audiences: ['driver', 'recruiter'],
+        route: '/docs/opportunity-recruiting-safety',
+        status: 'live',
+        keywords: ['opportunities', 'safety', 'verification', 'report', 'recruiter', 'carrier'],
       },
     ] as DocsEntry[]
   ).map(freezeDocsEntry),
