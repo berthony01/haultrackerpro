@@ -191,7 +191,7 @@ const ARTICLE_DELETION: DocsArticle = {
         'The current, controlled order of operations is:',
       ],
       bullets: [
-        'Agency-owner block — if you still own an active agency workspace, the request is refused.',
+        'Agency-owner block — if any agency profile/workspace still records you as its owner, the request is refused. The backend does not inspect an active/inactive qualifier; ownership alone triggers the block.',
         'Stripe cancellation of every owned driver and recruiter subscription is attempted first.',
         'Then a single transactional database cleanup runs.',
         'Finally, the authentication user record is deleted last.',
