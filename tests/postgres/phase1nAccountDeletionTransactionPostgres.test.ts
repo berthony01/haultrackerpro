@@ -223,7 +223,7 @@ CREATE TABLE public.agency_delegation_requests (
   member_user_id uuid NOT NULL,
   created_by_user_id uuid NOT NULL,
   member_invite_email text NOT NULL,
-  status public.agency_delegation_request_status NOT NULL DEFAULT 'pending'
+  status public.agency_delegation_status NOT NULL DEFAULT 'pending_driver_approval'
 );
 
 CREATE TABLE public.agency_client_requests (
