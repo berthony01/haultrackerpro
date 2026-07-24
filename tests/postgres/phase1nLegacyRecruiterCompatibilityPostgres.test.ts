@@ -589,15 +589,19 @@ async function snapshotColumns() {
 
 async function snapshotConstraints() {
   return q(
-    `SELECT c.conrelid::regclass::text AS tbl,
-            c.conname, c.contype::text AS contype,
-            pg_get_constraintdef(c.oid) AS def
-       FROM pg_constraint c
-      WHERE c.conrelid::regclass::text = ANY($1)
-      ORDER BY tbl, conname`,
-    [PROTECTED_TABLES],
+    `SELECT ('public.' || c.relname) AS tbl,
+            con.conname, con.contype::text AS contype,
+            pg_get_constraintdef(con.oid) AS def
+       FROM pg_constraint con
+       JOIN pg_class c ON c.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relname = ANY($1)
+      ORDER BY tbl, con.conname`,
+    [PROTECTED_TABLE_NAMES],
   );
 }
+
 
 async function snapshotIndexes() {
   return q(
