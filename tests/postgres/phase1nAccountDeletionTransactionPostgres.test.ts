@@ -813,18 +813,21 @@ describe('Phase 1N-F1-B — canonical agency-owner hard block', () => {
              VALUES ($1,'recruiter','active')`, [owner]);
 
     // Deterministic snapshots per protected surface.
+    // user_capabilities uses a composite PK; every other seeded table has an id.
+    const orderFor = (t: string) =>
+      t === 'user_capabilities' ? 'user_id, capability' : 'id';
     const readAll = async () => {
       const rel: Record<string, any[]> = {};
       for (const t of RELATIONSHIP_TABLES) {
-        rel[t] = await q(`SELECT * FROM public.${t} ORDER BY id`);
+        rel[t] = await q(`SELECT * FROM public.${t} ORDER BY ${orderFor(t)}`);
       }
       const direct: Record<string, any[]> = {};
       for (const t of DIRECT_TABLES) {
-        direct[t] = await q(`SELECT * FROM public.${t} WHERE user_id=$1 ORDER BY id`, [owner]);
+        direct[t] = await q(`SELECT * FROM public.${t} WHERE user_id=$1 ORDER BY ${orderFor(t)}`, [owner]);
       }
       const forbidden: Record<string, any[]> = {};
       for (const t of FORBIDDEN_TABLES) {
-        forbidden[t] = await q(`SELECT * FROM public.${t} ORDER BY id`);
+        forbidden[t] = await q(`SELECT * FROM public.${t} ORDER BY ${orderFor(t)}`);
       }
       return {
         relationship: rel,
