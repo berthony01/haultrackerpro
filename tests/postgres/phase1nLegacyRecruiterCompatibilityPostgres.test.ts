@@ -526,17 +526,21 @@ async function snapshotAllPublicFunctions(): Promise<Record<string, PublicFuncti
 
 async function snapshotTriggerDefs() {
   return q<{ tgname: string; tbl: string; def: string; enabled: string }>(
-    `SELECT tgname,
-            tgrelid::regclass::text AS tbl,
-            pg_get_triggerdef(oid) AS def,
-            tgenabled::text AS enabled
-       FROM pg_trigger
-      WHERE NOT tgisinternal
-        AND tgrelid::regclass::text = ANY($1)
-      ORDER BY tbl, tgname`,
-    [PROTECTED_TABLES],
+    `SELECT t.tgname,
+            ('public.' || c.relname) AS tbl,
+            pg_get_triggerdef(t.oid) AS def,
+            t.tgenabled::text AS enabled
+       FROM pg_trigger t
+       JOIN pg_class c ON c.oid = t.tgrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE NOT t.tgisinternal
+        AND n.nspname = 'public'
+        AND c.relname = ANY($1)
+      ORDER BY tbl, t.tgname`,
+    [PROTECTED_TABLE_NAMES],
   );
 }
+
 
 async function snapshotPolicies() {
   return q(
@@ -585,15 +589,19 @@ async function snapshotColumns() {
 
 async function snapshotConstraints() {
   return q(
-    `SELECT c.conrelid::regclass::text AS tbl,
-            c.conname, c.contype::text AS contype,
-            pg_get_constraintdef(c.oid) AS def
-       FROM pg_constraint c
-      WHERE c.conrelid::regclass::text = ANY($1)
-      ORDER BY tbl, conname`,
-    [PROTECTED_TABLES],
+    `SELECT ('public.' || c.relname) AS tbl,
+            con.conname, con.contype::text AS contype,
+            pg_get_constraintdef(con.oid) AS def
+       FROM pg_constraint con
+       JOIN pg_class c ON c.oid = con.conrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relname = ANY($1)
+      ORDER BY tbl, con.conname`,
+    [PROTECTED_TABLE_NAMES],
   );
 }
+
 
 async function snapshotIndexes() {
   return q(
@@ -884,6 +892,43 @@ beforeAll(async () => {
   // protected table — an empty snapshot proves nothing.
   if (SNAP_BEFORE.policies.length === 0) {
     throw new Error('Pre-candidate policy snapshot is empty');
+  }
+
+  // Hard-fail if the pre-candidate trigger snapshot does not contain
+  // exactly the two seeded noninternal triggers on recruiter_profiles.
+  const preTriggerNames = SNAP_BEFORE.triggers
+    .map((t: any) => t.tgname)
+    .sort();
+  const requiredTriggerNames = [
+    'trg_recruiter_profile_capability_sync',
+    'trg_recruiter_profile_guard',
+  ].sort();
+  if (
+    preTriggerNames.length !== requiredTriggerNames.length ||
+    !requiredTriggerNames.every((n, i) => preTriggerNames[i] === n)
+  ) {
+    throw new Error(
+      `Pre-candidate trigger snapshot mismatch: got ${JSON.stringify(
+        preTriggerNames,
+      )}, expected ${JSON.stringify(requiredTriggerNames)}`,
+    );
+  }
+
+  // Hard-fail if the pre-candidate constraint snapshot is empty or missing
+  // at least one constraint for any protected table.
+  if (SNAP_BEFORE.constraints.length === 0) {
+    throw new Error('Pre-candidate constraint snapshot is empty');
+  }
+  for (const t of PROTECTED_TABLE_NAMES) {
+    const qualified = `public.${t}`;
+    const anyForTable = SNAP_BEFORE.constraints.some(
+      (c: any) => c.tbl === qualified,
+    );
+    if (!anyForTable) {
+      throw new Error(
+        `Pre-candidate constraint snapshot missing constraint for table ${qualified}`,
+      );
+    }
   }
   for (const t of PROTECTED_TABLE_NAMES) {
     const anyForTable = SNAP_BEFORE.policies.some(
@@ -1552,11 +1597,15 @@ describe('Phase 1N-E1-R3 — protected catalog surface non-interference', () => 
 
   it('no new triggers exist on protected tables (only the pre-existing fixture triggers)', async () => {
     const rows = await q<{ tgname: string }>(
-      `SELECT tgname FROM pg_trigger
-        WHERE NOT tgisinternal
-          AND tgrelid::regclass::text = ANY($1)
-        ORDER BY tgname`,
-      [PROTECTED_TABLES],
+      `SELECT t.tgname
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE NOT t.tgisinternal
+          AND n.nspname = 'public'
+          AND c.relname = ANY($1)
+        ORDER BY t.tgname`,
+      [PROTECTED_TABLE_NAMES],
     );
     expect(rows.map((r) => r.tgname).sort()).toEqual(
       [
@@ -1565,4 +1614,5 @@ describe('Phase 1N-E1-R3 — protected catalog surface non-interference', () => 
       ].sort(),
     );
   });
+
 });

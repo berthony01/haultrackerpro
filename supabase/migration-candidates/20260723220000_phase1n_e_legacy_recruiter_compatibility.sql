@@ -56,8 +56,12 @@
 --     legacy_terms_grandfathered_at, verification_status, verified_at,
 --     verified_by, admin_notes, or any billing/subscription data.
 --
--- Idempotency: ON CONFLICT (user_id) DO NOTHING preserves the existing
--- UNIQUE(user_id) contract so a rerun cannot duplicate or overwrite.
+-- Idempotency: the backfill's explicit ON CONFLICT (user_id) DO NOTHING and
+-- the RPC's bare ON CONFLICT DO NOTHING both rely on the existing
+-- UNIQUE(user_id) contract on public.recruiter_profiles so a rerun (or a
+-- concurrent first call) cannot duplicate or overwrite an existing row. The
+-- RPC uses the bare form to avoid an ambiguous reference between the target
+-- column and the PL/pgSQL RETURNS TABLE output variable of the same name.
 -- ---------------------------------------------------------------------------
 DO $phase1n_e_backfill$
 DECLARE
@@ -264,7 +268,7 @@ BEGIN
       _phone,
       ''
     )
-    ON CONFLICT (user_id) DO NOTHING
+    ON CONFLICT DO NOTHING
     RETURNING id INTO _inserted_id;
 
     IF _inserted_id IS NOT NULL THEN
