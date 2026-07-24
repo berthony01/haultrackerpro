@@ -170,9 +170,9 @@ describe('registries — static, no runtime dates', () => {
 // -----------------------------------------------------------------------------
 describe('docs registry — link honesty', () => {
   const appSource = readSource('src/App.tsx');
-  // Real routes that the docs registry is allowed to link to. Verified by
-  // grepping src/App.tsx above and enumerating those we intentionally link to.
-  const KNOWN_LIVE_ROUTES = [
+  // Static (non-article) destinations the docs registry is allowed to link to.
+  // Verified by grepping src/App.tsx and enumerating those we intentionally link to.
+  const KNOWN_STATIC_LIVE_ROUTES = [
     '/how-to-use-haultrackerpro',
     '/faq',
     '/pricing',
@@ -184,20 +184,36 @@ describe('docs registry — link honesty', () => {
     '/privacy',
   ];
 
-  it('every known-live route is actually mounted', () => {
-    for (const r of KNOWN_LIVE_ROUTES) {
+  it('every known static live route is actually mounted', () => {
+    for (const r of KNOWN_STATIC_LIVE_ROUTES) {
       expect(new RegExp(`path="${r}"`).test(appSource)).toBe(true);
     }
   });
 
-  it('live docs entries have a non-null route in the known-live set', () => {
+  it('App.tsx mounts exactly one /docs/:articleSlug dynamic route', () => {
+    const matches = appSource.match(/path="\/docs\/:articleSlug"/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('every live docs entry resolves to either a mounted static route or a canonical article', () => {
     for (const entry of getAllDocs()) {
-      if (entry.status === 'live') {
-        expect(typeof entry.route).toBe('string');
-        expect(entry.route).not.toBeNull();
-        expect(KNOWN_LIVE_ROUTES).toContain(entry.route as string);
-        expect(isDocsEntryLinkable(entry)).toBe(true);
+      if (entry.status !== 'live') continue;
+      expect(typeof entry.route).toBe('string');
+      expect(entry.route).not.toBeNull();
+      expect(isDocsEntryLinkable(entry)).toBe(true);
+      const route = entry.route as string;
+      if (KNOWN_STATIC_LIVE_ROUTES.includes(route)) {
+        expect(new RegExp(`path="${route}"`).test(appSource)).toBe(true);
+        continue;
       }
+      // Non-static live route MUST be a canonical /docs/<slug> article.
+      expect(route.startsWith('/docs/')).toBe(true);
+      const slug = route.slice('/docs/'.length);
+      expect(slug.length).toBeGreaterThan(0);
+      expect(slug.includes('/')).toBe(false);
+      const article = getArticleBySlug(slug);
+      expect(article).not.toBeNull();
+      expect(article).toBeDefined();
     }
   });
 
