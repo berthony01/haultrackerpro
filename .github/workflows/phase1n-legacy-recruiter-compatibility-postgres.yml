@@ -1,0 +1,123 @@
+name: Phase 1N-E1 Legacy Recruiter Compatibility PostgreSQL 16
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migration-candidates/20260723220000_phase1n_e_legacy_recruiter_compatibility.sql'
+      - 'tests/postgres/phase1nLegacyRecruiterCompatibilityPostgres.test.ts'
+      - 'vitest.phase1n-legacy-recruiter-compatibility-postgres.config.ts'
+      - '.github/workflows/phase1n-legacy-recruiter-compatibility-postgres.yml'
+  pull_request:
+    paths:
+      - 'supabase/migration-candidates/20260723220000_phase1n_e_legacy_recruiter_compatibility.sql'
+      - 'tests/postgres/phase1nLegacyRecruiterCompatibilityPostgres.test.ts'
+      - 'vitest.phase1n-legacy-recruiter-compatibility-postgres.config.ts'
+      - '.github/workflows/phase1n-legacy-recruiter-compatibility-postgres.yml'
+  workflow_dispatch:
+
+jobs:
+  phase1n-legacy-recruiter-compatibility-postgres:
+    name: PG16 legacy recruiter compatibility gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: phase1n_e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d phase1n_e"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      PHASE1N_LEGACY_RECRUITER_DATABASE_URL: postgres://postgres:postgres@localhost:5432/phase1n_e
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun 1.3.14
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Hard-fail if PHASE1N_LEGACY_RECRUITER_DATABASE_URL is absent
+        run: |
+          if [ -z "${PHASE1N_LEGACY_RECRUITER_DATABASE_URL:-}" ]; then
+            echo "PHASE1N_LEGACY_RECRUITER_DATABASE_URL is required for the Phase 1N-E1 gate." >&2
+            exit 1
+          fi
+          echo "PHASE1N_LEGACY_RECRUITER_DATABASE_URL is set."
+
+      - name: Forbidden marker scan (no .only / .skip / .todo)
+        run: |
+          set -eu
+          FILE="tests/postgres/phase1nLegacyRecruiterCompatibilityPostgres.test.ts"
+          FORBIDDEN='(it|test|describe)\.(skip|only)\b|\bit\.todo\b|\bxit\b|\bxdescribe\b'
+          if [ ! -f "$FILE" ]; then
+            echo "MISSING required file: $FILE" >&2
+            exit 1
+          fi
+          if grep -Enq "$FORBIDDEN" "$FILE"; then
+            echo "FORBIDDEN marker found in $FILE:" >&2
+            grep -En "$FORBIDDEN" "$FILE" >&2 || true
+            exit 1
+          fi
+
+      - name: Wait for PostgreSQL 16 to accept connections
+        run: |
+          set -eu
+          for i in $(seq 1 60); do
+            if pg_isready -h localhost -p 5432 -U postgres -d phase1n_e >/dev/null 2>&1; then
+              echo "Postgres is ready (attempt $i)."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Postgres did not become ready in time." >&2
+          exit 1
+        env:
+          PGPASSWORD: postgres
+
+      - name: Prepare artifacts directory
+        run: mkdir -p artifacts
+
+      - name: Real PostgreSQL 16 legacy recruiter compatibility gate
+        id: pg_gate
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run \
+            --config vitest.phase1n-legacy-recruiter-compatibility-postgres.config.ts \
+            --reporter verbose \
+            2>&1 | tee artifacts/phase1n-legacy-recruiter-compatibility-postgres.log
+          echo "gate_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload real-Postgres gate log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1n-legacy-recruiter-compatibility-postgres-log
+          path: artifacts/phase1n-legacy-recruiter-compatibility-postgres.log
+
+      - name: Enforce real-Postgres gate outcome
+        run: |
+          set -eu
+          EXIT="${{ steps.pg_gate.outputs.gate_exit }}"
+          echo "PostgreSQL gate exit code: ${EXIT}"
+          if [ "${EXIT}" != "0" ]; then
+            echo "Phase 1N-E1 real-Postgres 16 gate FAILED." >&2
+            exit 1
+          fi
