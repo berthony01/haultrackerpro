@@ -1003,7 +1003,17 @@ afterAll(async () => {
       }
     }
 
-    // 7. Extension set must equal the baseline captured before any fixture
+    // 7. Pre-existing required-role definitions and explicit memberships
+    //    must be restored exactly. This catches accidental removal, addition,
+    //    or option drift outside suite-created state.
+    const rolesNow = await snapshotRequiredRoles();
+    expect(rolesNow).toEqual(requiredRoleBaseline);
+
+    const me = await currentUserName();
+    const membershipsNow = await snapshotExplicitRequiredMemberships(me);
+    expect(membershipsNow).toEqual(explicitMembershipBaseline);
+
+    // 8. Extension set must equal the baseline captured before any fixture
     //    work — the suite must not add or remove extensions.
     const extensionsNow = await snapshotExtensions();
     if (
