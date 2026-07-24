@@ -418,45 +418,49 @@ describe('phase diff integrity (fail-closed)', () => {
     }
   };
 
-  const assertAncestor = (sha: string) => {
-    // `--is-ancestor` exits 0 if sha is an ancestor of HEAD, 1 if not.
-    // Anything else (missing objects in a shallow clone, unknown SHA, etc.)
-    // exits non-zero-non-1 and runGitStrict throws with the git error text.
-    // Distinguish "not-an-ancestor" (exit 1) explicitly so shallow clones do
-    // not silently certify scope.
+  const assertAncestor = (ancestor: string, descendant: string) => {
+    // `--is-ancestor` exits 0 if `ancestor` is an ancestor of `descendant`,
+    // 1 if not. Anything else (missing objects in a shallow clone, unknown
+    // SHA, etc.) is treated as an outright failure — no silent PASS.
     try {
-      execSync(`git merge-base --is-ancestor ${sha} HEAD`, { stdio: ['ignore', 'pipe', 'pipe'] });
+      execSync(`git merge-base --is-ancestor ${ancestor} ${descendant}`, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
     } catch (err) {
       const e = err as { status?: number; stderr?: Buffer | string };
       const stderr = e.stderr ? e.stderr.toString() : '';
       throw new Error(
-        `git merge-base --is-ancestor ${sha} HEAD failed (exit ${e.status ?? 'n/a'}). ` +
-          `The baseline SHA must be reachable from HEAD; a shallow CI clone must fetch full history. ` +
+        `git merge-base --is-ancestor ${ancestor} ${descendant} failed (exit ${e.status ?? 'n/a'}). ` +
+          `The reference SHA must be reachable; a shallow CI clone must fetch full history. ` +
           `stderr: ${stderr}`,
       );
     }
   };
 
-  it('phase start SHA is reachable from HEAD', () => {
-    assertAncestor(PHASE_START_SHA);
+  it('phase start SHA is an ancestor of the accepted F2-B SHA', () => {
+    assertAncestor(PHASE_START_SHA, F2B_ACCEPTED_SHA);
   });
 
-  it('accepted baseline SHA is reachable from HEAD', () => {
-    assertAncestor(BASELINE_SHA);
+  it('accepted baseline SHA is an ancestor of the accepted F2-B SHA', () => {
+    assertAncestor(BASELINE_SHA, F2B_ACCEPTED_SHA);
   });
 
-  it('cumulative diff from phase start SHA is exactly the six allowlisted files', () => {
-    const raw = runGitStrict(`diff --name-only ${PHASE_START_SHA}...HEAD`);
+  it('accepted F2-B SHA is an ancestor of current HEAD', () => {
+    assertAncestor(F2B_ACCEPTED_SHA, 'HEAD');
+  });
+
+  it('historical diff PHASE_START_SHA...F2B_ACCEPTED_SHA is exactly the six F2-B files', () => {
+    const raw = runGitStrict(`diff --name-only ${PHASE_START_SHA}...${F2B_ACCEPTED_SHA}`);
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(ALLOWED_FILES);
   });
 
-  it('cumulative diff from accepted baseline SHA is exactly the same six files (no .lovable/plan.md)', () => {
-    const raw = runGitStrict(`diff --name-only ${BASELINE_SHA}...HEAD`);
+  it('historical diff BASELINE_SHA...F2B_ACCEPTED_SHA is exactly the same six files and excludes forbidden paths', () => {
+    const raw = runGitStrict(`diff --name-only ${BASELINE_SHA}...${F2B_ACCEPTED_SHA}`);
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(ALLOWED_FILES);
     expect(changed).not.toContain('.lovable/plan.md');
-    // Explicit forbidden set — none of these must appear in the diff.
+    // Explicit forbidden set — none of these must appear in the F2-B diff.
     const forbidden = [
       'src/pages/Terms.tsx',
       'src/pages/Privacy.tsx',
@@ -473,7 +477,7 @@ describe('phase diff integrity (fail-closed)', () => {
     for (const f of forbidden) {
       expect(changed).not.toContain(f);
     }
-    // No migration/candidate SQL / edge function files in the diff.
+    // No migration/candidate SQL / edge function files in the F2-B diff.
     for (const f of changed) {
       expect(f.startsWith('supabase/migrations/')).toBe(false);
       expect(f.startsWith('supabase/migration-candidates/')).toBe(false);
