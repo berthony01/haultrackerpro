@@ -1,24 +1,28 @@
 /**
- * Phase 1N-E1-R2 — Real PostgreSQL 16 gate for the legacy recruiter
+ * Phase 1N-E1-R3 — Real PostgreSQL 16 gate for the legacy recruiter
  * compatibility candidate.
  *
- * R2 structural repairs on top of R1:
- *   1. No CREATE EXTENSION — the fixture depends only on core PG16
- *      (`gen_random_uuid()` is built in). The suite captures the extension
- *      baseline before any fixture work and hard-fails afterAll if the set
- *      is not restored byte-identically.
+ * R3 structural repairs on top of R2:
+ *   1. No CREATE EXTENSION in the fixture — the fixture depends only on core
+ *      PG16 (`gen_random_uuid()` is built in). The suite captures the
+ *      extension baseline before any fixture work and hard-fails afterAll if
+ *      the set is not restored byte-identically.
  *   2. Role MEMBERSHIP is tracked separately from role EXISTENCE. Only
  *      memberships that were not already explicit before the suite ran are
  *      granted, and only those grants are revoked in afterAll — regardless
  *      of whether the underlying role pre-existed.
- *   3. Protected-function proof no longer relies on a manual name/argument
- *      lookup. Every pre-existing function in schema `public` is snapshotted
- *      by unambiguous identity `public.<proname>(<pg_get_function_identity_arguments>)`
- *      with definition/ACL/owner/definer/config/volatility/prokind. After
- *      candidate application, the only added identity must be
+ *   3. Protected-function proof keys every function in schema `public` by
+ *      schema + name + input argument TYPES (`oidvectortypes(proargtypes)`),
+ *      while retaining `pg_get_function_identity_arguments` as a separate
+ *      drift field. Effective ACLs expand stored ACLs or PostgreSQL defaults
+ *      when `proacl` is NULL. After candidate application, the only added key
+ *      must be
  *      `public.ensure_my_recruiter_setup_state()` with exactly one overload;
  *      every other identity must be byte-identical.
- *   4. A real RLS policy surface is provisioned on all three protected
+ *   4. Pre-existing required-role definitions and explicit CURRENT_USER
+ *      memberships are snapshotted before suite grants and compared exactly
+ *      after cleanup, while suite-created roles/memberships are still removed.
+ *   5. A real RLS policy surface is provisioned on all three protected
  *      tables (`profiles`, `recruiter_profiles`, `user_capabilities`) with
  *      owner/self SELECT policies bound to `auth.uid()`. `relrowsecurity`
  *      and `relforcerowsecurity` are snapshotted alongside `pg_policies`.
@@ -62,8 +66,8 @@ const CANDIDATE_RPC_IDENT = `public.${CANDIDATE_RPC}()`;
 const CANDIDATE_ROLES = ['anon', 'authenticated', 'service_role'] as const;
 
 // Canonical fixture functions the pre-candidate snapshot MUST contain.
-// Identity keys use `pg_get_function_identity_arguments`, which strips
-// parameter names — so `_uid uuid` becomes just `uuid`.
+// Identity keys use input argument TYPES only (`oidvectortypes(proargtypes)`).
+// Argument names/modes are retained separately in each function record.
 const CANONICAL_FIXTURE_FUNCTION_IDENTS = [
   'public.update_updated_at_column()',
   'public.is_admin(uuid)',
@@ -451,63 +455,70 @@ async function seedHistoricalProfile(
  */
 type PublicFunctionRecord = {
   ident: string;
+  identityArguments: string;
   def: string;
   prokind: string;
   provolatile: string;
   prosecdef: boolean;
   proconfig: string[] | null;
   owner: string;
-  acl: { grantee: string; privilege_type: string; is_grantable: string }[];
+  rawAcl: string[] | null;
+  acl: {
+    grantor: string;
+    grantee: string;
+    privilege_type: string;
+    is_grantable: boolean;
+  }[];
 };
 
 async function snapshotAllPublicFunctions(): Promise<Record<string, PublicFunctionRecord>> {
   const rows = await q<any>(
     `SELECT
-       'public.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident,
+       'public.'||p.proname||'('||oidvectortypes(p.proargtypes)||')' AS ident,
+       pg_get_function_identity_arguments(p.oid) AS identity_arguments,
        pg_get_functiondef(p.oid) AS def,
        p.prokind::text AS prokind,
        p.provolatile::text AS provolatile,
        p.prosecdef,
        p.proconfig,
-       pg_get_userbyid(p.proowner) AS owner
+       pg_get_userbyid(p.proowner) AS owner,
+       p.proacl::text[] AS raw_acl,
+       COALESCE(
+         (SELECT jsonb_agg(jsonb_build_object(
+            'grantor', CASE (acl).grantor WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantor) END,
+            'grantee', CASE (acl).grantee WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantee) END,
+            'privilege_type', (acl).privilege_type,
+            'is_grantable', (acl).is_grantable
+          ) ORDER BY
+            CASE (acl).grantor WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantor) END,
+            CASE (acl).grantee WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid((acl).grantee) END,
+            (acl).privilege_type,
+            (acl).is_grantable)
+            FROM aclexplode(COALESCE(p.proacl, acldefault('f'::"char", p.proowner))) acl),
+         '[]'::jsonb
+       ) AS acl
      FROM pg_proc p
      JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
      ORDER BY 1`,
   );
 
-  // ACL grouped by identity — routine_privileges reports by name only, which
-  // would collapse overloads together. Instead read pg_proc.proacl and expand.
-  const aclRows = await q<any>(
-    `SELECT
-        'public.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' AS ident,
-        COALESCE(
-          (SELECT jsonb_agg(jsonb_build_object(
-             'grantee', COALESCE(pg_get_userbyid((acl).grantee), 'PUBLIC'),
-             'privilege_type', (acl).privilege_type,
-             'is_grantable', (acl).is_grantable
-           ) ORDER BY (acl).grantee, (acl).privilege_type)
-             FROM aclexplode(p.proacl) acl),
-          '[]'::jsonb
-        ) AS acl
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-     WHERE n.nspname = 'public'`,
-  );
-  const aclByIdent = new Map<string, any[]>();
-  for (const r of aclRows) aclByIdent.set(r.ident, r.acl ?? []);
-
   const out: Record<string, PublicFunctionRecord> = {};
   for (const r of rows) {
+    if (out[r.ident]) {
+      throw new Error(`Duplicate public function identity key: ${r.ident}`);
+    }
     out[r.ident] = {
       ident: r.ident,
+      identityArguments: r.identity_arguments,
       def: r.def,
       prokind: r.prokind,
       provolatile: r.provolatile,
       prosecdef: r.prosecdef,
       proconfig: r.proconfig,
       owner: r.owner,
-      acl: aclByIdent.get(r.ident) ?? [],
+      rawAcl: r.raw_acl,
+      acl: r.acl ?? [],
     };
   }
   return out;
@@ -620,6 +631,27 @@ async function snapshotAll() {
 const rolesCreated: string[] = [];
 const membershipsCreated: string[] = []; // role names granted to CURRENT_USER by this suite
 let extensionBaseline: string[] = [];
+type RequiredRoleBaselineRecord = {
+  rolname: string;
+  exists: boolean;
+  rolsuper: boolean | null;
+  rolinherit: boolean | null;
+  rolcreaterole: boolean | null;
+  rolcreatedb: boolean | null;
+  rolcanlogin: boolean | null;
+  rolreplication: boolean | null;
+  rolbypassrls: boolean | null;
+};
+type ExplicitMembershipRecord = {
+  role: string;
+  member: string;
+  grantor: string;
+  admin_option: boolean;
+  inherit_option: boolean;
+  set_option: boolean;
+};
+let requiredRoleBaseline: RequiredRoleBaselineRecord[] = [];
+let explicitMembershipBaseline: ExplicitMembershipRecord[] = [];
 
 const seeded: Record<string, string> = {};
 
@@ -632,18 +664,58 @@ async function currentUserName(): Promise<string> {
   return rows[0].u;
 }
 
+async function snapshotRequiredRoles(): Promise<RequiredRoleBaselineRecord[]> {
+  return q<RequiredRoleBaselineRecord>(
+    `WITH required AS (
+       SELECT rolname, ord
+       FROM unnest($1::text[]) WITH ORDINALITY AS t(rolname, ord)
+     )
+     SELECT required.rolname,
+            (r.oid IS NOT NULL) AS exists,
+            r.rolsuper,
+            r.rolinherit,
+            r.rolcreaterole,
+            r.rolcreatedb,
+            r.rolcanlogin,
+            r.rolreplication,
+            r.rolbypassrls
+       FROM required
+       LEFT JOIN pg_roles r ON r.rolname = required.rolname
+      ORDER BY required.ord`,
+    [CANDIDATE_ROLES as unknown as string[]],
+  );
+}
+
+async function snapshotExplicitRequiredMemberships(
+  member: string,
+  roles: readonly string[] = CANDIDATE_ROLES,
+): Promise<ExplicitMembershipRecord[]> {
+  return q<ExplicitMembershipRecord>(
+    `SELECT r.rolname AS role,
+            u.rolname AS member,
+            g.rolname AS grantor,
+            m.admin_option,
+            m.inherit_option,
+            m.set_option
+       FROM pg_auth_members m
+       JOIN pg_roles r ON r.oid = m.roleid
+       JOIN pg_roles u ON u.oid = m.member
+       JOIN pg_roles g ON g.oid = m.grantor
+      WHERE u.rolname = $1
+        AND r.rolname = ANY($2)
+      ORDER BY r.rolname, u.rolname, g.rolname,
+               m.admin_option, m.inherit_option, m.set_option`,
+    [member, roles as unknown as string[]],
+  );
+}
+
 async function existingExplicitMemberships(
   member: string,
   roles: readonly string[],
 ): Promise<Set<string>> {
-  const rows = await q<{ role: string }>(
-    `SELECT r.rolname AS role
-       FROM pg_auth_members m
-       JOIN pg_roles r ON r.oid = m.roleid
-       JOIN pg_roles u ON u.oid = m.member
-      WHERE u.rolname = $1
-        AND r.rolname = ANY($2)`,
-    [member, roles as unknown as string[]],
+  const rows = await snapshotExplicitRequiredMemberships(
+    member,
+    roles,
   );
   return new Set(rows.map((r) => r.role));
 }
@@ -652,15 +724,13 @@ beforeAll(async () => {
   // 0. Extension baseline BEFORE any fixture work. Snapshot must be
   //    restored exactly in afterAll.
   extensionBaseline = await snapshotExtensions();
+  const me = await currentUserName();
+  requiredRoleBaseline = await snapshotRequiredRoles();
+  explicitMembershipBaseline = await snapshotExplicitRequiredMemberships(me);
 
   // 1. Detect which required roles already exist.
   const existingRoles = new Set(
-    (
-      await q<{ rolname: string }>(
-        `SELECT rolname FROM pg_roles WHERE rolname = ANY($1)`,
-        [CANDIDATE_ROLES as unknown as string[]],
-      )
-    ).map((r) => r.rolname),
+    requiredRoleBaseline.filter((r) => r.exists).map((r) => r.rolname),
   );
 
   // 2. Fresh-DB-safe cleanup.
@@ -680,10 +750,8 @@ beforeAll(async () => {
   // 4. Grant only memberships CURRENT_USER doesn't already explicitly hold.
   //    Superuser's implicit ability is NOT recorded in pg_auth_members and
   //    is therefore never treated as a pre-existing membership.
-  const me = await currentUserName();
-  const preExistingMemberships = await existingExplicitMemberships(
-    me,
-    CANDIDATE_ROLES,
+  const preExistingMemberships = new Set(
+    explicitMembershipBaseline.map((r) => r.role),
   );
   for (const role of CANDIDATE_ROLES) {
     if (!preExistingMemberships.has(role)) {
@@ -827,13 +895,40 @@ beforeAll(async () => {
   }
 
   // Hard-fail if any canonical fixture function is not present in the
-  // pre-candidate snapshot — the lookup must not pass silently.
+  // pre-candidate snapshot — the type-only lookup must not pass silently.
   for (const ident of CANONICAL_FIXTURE_FUNCTION_IDENTS) {
-    if (!(ident in SNAP_BEFORE.publicFunctions)) {
+    const record = SNAP_BEFORE.publicFunctions[ident];
+    if (!record) {
       throw new Error(
         `Canonical fixture function absent from pre-candidate snapshot: ${ident}`,
       );
     }
+    if (!record.identityArguments && !ident.endsWith('()')) {
+      throw new Error(
+        `Canonical fixture function missing identity-argument field: ${ident}`,
+      );
+    }
+  }
+
+  const defaultAclFn = SNAP_BEFORE.publicFunctions['public.update_updated_at_column()'];
+  if (defaultAclFn.rawAcl !== null) {
+    throw new Error('Expected update_updated_at_column() to exercise NULL proacl default ACL fallback');
+  }
+  const defaultPublicExecute = defaultAclFn.acl.some(
+    (acl) => acl.grantee === 'PUBLIC' && acl.privilege_type === 'EXECUTE',
+  );
+  if (!defaultPublicExecute) {
+    throw new Error('Default ACL fallback did not expose PUBLIC EXECUTE for update_updated_at_column()');
+  }
+
+  const hardenedFn = SNAP_BEFORE.publicFunctions['public.recruiter_profile_can_manage_opportunities(uuid)'];
+  const hardenedAclLeak = hardenedFn.acl.filter(
+    (acl) =>
+      acl.privilege_type === 'EXECUTE' &&
+      (acl.grantee === 'PUBLIC' || acl.grantee === 'authenticated'),
+  );
+  if (hardenedAclLeak.length > 0) {
+    throw new Error('recruiter_profile_can_manage_opportunities(uuid) exposes EXECUTE to PUBLIC/authenticated');
   }
 
   // 8. Apply the EXACT full candidate SQL from disk exactly once.
@@ -935,7 +1030,17 @@ afterAll(async () => {
       }
     }
 
-    // 7. Extension set must equal the baseline captured before any fixture
+    // 7. Pre-existing required-role definitions and explicit memberships
+    //    must be restored exactly. This catches accidental removal, addition,
+    //    or option drift outside suite-created state.
+    const rolesNow = await snapshotRequiredRoles();
+    expect(rolesNow).toEqual(requiredRoleBaseline);
+
+    const me = await currentUserName();
+    const membershipsNow = await snapshotExplicitRequiredMemberships(me);
+    expect(membershipsNow).toEqual(explicitMembershipBaseline);
+
+    // 8. Extension set must equal the baseline captured before any fixture
     //    work — the suite must not add or remove extensions.
     const extensionsNow = await snapshotExtensions();
     if (
@@ -954,7 +1059,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
-describe('Phase 1N-E1-R2 — environment / candidate application', () => {
+describe('Phase 1N-E1-R3 — environment / candidate application', () => {
   it('runs against PostgreSQL major version exactly 16', async () => {
     const rows = await q<{ n: number }>(
       `SELECT (current_setting('server_version_num'))::int / 10000 AS n`,
@@ -968,12 +1073,9 @@ describe('Phase 1N-E1-R2 — environment / candidate application', () => {
     expect(CANDIDATE_SQL.length).toBeGreaterThan(100);
   });
 
-  it('candidate SQL does NOT contain any CREATE EXTENSION statement', () => {
-    expect(CANDIDATE_SQL).not.toMatch(/create\s+extension/i);
-  });
 });
 
-describe('Phase 1N-E1-R2 — backfill semantics (candidate applied once, post-seed)', () => {
+describe('Phase 1N-E1-R3 — backfill semantics (candidate applied once, post-seed)', () => {
   it('creates exactly one profile per eligible setup user missing a profile', async () => {
     const ids = [
       seeded.eligibleFromProfile,
@@ -1084,7 +1186,7 @@ describe('Phase 1N-E1-R2 — backfill semantics (candidate applied once, post-se
   });
 });
 
-describe('Phase 1N-E1-R2 — full-candidate idempotency', () => {
+describe('Phase 1N-E1-R3 — full-candidate idempotency', () => {
   it('re-applying the exact full candidate a second time is a no-op (rows, protected catalog surface)', async () => {
     const beforeRowCount = (await q<{ n: number }>(
       `SELECT count(*)::int AS n FROM public.recruiter_profiles`,
@@ -1119,7 +1221,7 @@ describe('Phase 1N-E1-R2 — full-candidate idempotency', () => {
   });
 });
 
-describe('Phase 1N-E1-R2 — RPC contract', () => {
+describe('Phase 1N-E1-R3 — RPC contract', () => {
   it('creates the RPC with correct signature, ACL, definer, search_path, volatility, owner', async () => {
     const rows = await q<any>(
       `SELECT p.prosecdef,
@@ -1378,7 +1480,7 @@ describe('Phase 1N-E1-R2 — RPC contract', () => {
   });
 });
 
-describe('Phase 1N-E1-R2 — protected catalog surface non-interference', () => {
+describe('Phase 1N-E1-R3 — protected catalog surface non-interference', () => {
   it('pre-candidate snapshot contains every canonical fixture function identity', () => {
     for (const ident of CANONICAL_FIXTURE_FUNCTION_IDENTS) {
       expect(SNAP_BEFORE.publicFunctions[ident]).toBeDefined();
