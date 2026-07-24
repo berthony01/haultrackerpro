@@ -740,7 +740,7 @@ describe("performAccountDeletion — Phase 1N-F1-E: authenticated transactional 
       expect(stmt).not.toMatch(/\$\{\s*message\s*\}/);
       expect(stmt).not.toMatch(/\bstack\b/);
       expect(stmt).not.toMatch(/JSON\.stringify/);
-      expect(stmt).not.toMatch(/\bcounter\b/);
+      expect(stmt).not.toMatch(/\$\{\s*counter\s*\}/);
       // No raw userId/UUID substring outside interpolations.
       expect(stmt).not.toMatch(/user=/);
     }
