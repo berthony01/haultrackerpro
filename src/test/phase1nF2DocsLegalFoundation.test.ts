@@ -26,12 +26,17 @@ import {
   searchDocs,
   DOCS_CATEGORY_LABELS,
 } from '@/lib/docs/docsRegistry';
+import { getArticleBySlug } from '@/lib/docs/docsArticles';
 
 const readSource = (relPath: string) =>
   readFileSync(resolve(process.cwd(), relPath), 'utf8');
 
 const BASELINE_SHA = '3926bec94121cfca616a56e006d2a952e654a338';
 const PHASE_START_SHA = '465a43a5060c17acdf060b152731dbccee3672ae';
+// The accepted F2-B end SHA. Historical F2-B scope proofs must end here,
+// NOT at current HEAD — later accepted phases (F2-C1, etc.) are permitted
+// to add files while the F2-B evidence remains immutable.
+const F2B_ACCEPTED_SHA = '08206a82d6705a772b9d1158ee531e7bc0232b01';
 
 const ALLOWED_FILES = [
   'src/lib/legal/policyRegistry.ts',
@@ -165,9 +170,9 @@ describe('registries — static, no runtime dates', () => {
 // -----------------------------------------------------------------------------
 describe('docs registry — link honesty', () => {
   const appSource = readSource('src/App.tsx');
-  // Real routes that the docs registry is allowed to link to. Verified by
-  // grepping src/App.tsx above and enumerating those we intentionally link to.
-  const KNOWN_LIVE_ROUTES = [
+  // Static (non-article) destinations the docs registry is allowed to link to.
+  // Verified by grepping src/App.tsx and enumerating those we intentionally link to.
+  const KNOWN_STATIC_LIVE_ROUTES = [
     '/how-to-use-haultrackerpro',
     '/faq',
     '/pricing',
@@ -179,20 +184,36 @@ describe('docs registry — link honesty', () => {
     '/privacy',
   ];
 
-  it('every known-live route is actually mounted', () => {
-    for (const r of KNOWN_LIVE_ROUTES) {
+  it('every known static live route is actually mounted', () => {
+    for (const r of KNOWN_STATIC_LIVE_ROUTES) {
       expect(new RegExp(`path="${r}"`).test(appSource)).toBe(true);
     }
   });
 
-  it('live docs entries have a non-null route in the known-live set', () => {
+  it('App.tsx mounts exactly one /docs/:articleSlug dynamic route', () => {
+    const matches = appSource.match(/path="\/docs\/:articleSlug"/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
+  it('every live docs entry resolves to either a mounted static route or a canonical article', () => {
     for (const entry of getAllDocs()) {
-      if (entry.status === 'live') {
-        expect(typeof entry.route).toBe('string');
-        expect(entry.route).not.toBeNull();
-        expect(KNOWN_LIVE_ROUTES).toContain(entry.route as string);
-        expect(isDocsEntryLinkable(entry)).toBe(true);
+      if (entry.status !== 'live') continue;
+      expect(typeof entry.route).toBe('string');
+      expect(entry.route).not.toBeNull();
+      expect(isDocsEntryLinkable(entry)).toBe(true);
+      const route = entry.route as string;
+      if (KNOWN_STATIC_LIVE_ROUTES.includes(route)) {
+        expect(new RegExp(`path="${route}"`).test(appSource)).toBe(true);
+        continue;
       }
+      // Non-static live route MUST be a canonical /docs/<slug> article.
+      expect(route.startsWith('/docs/')).toBe(true);
+      const slug = route.slice('/docs/'.length);
+      expect(slug.length).toBeGreaterThan(0);
+      expect(slug.includes('/')).toBe(false);
+      const article = getArticleBySlug(slug);
+      expect(article).not.toBeNull();
+      expect(article).toBeDefined();
     }
   });
 
@@ -397,45 +418,49 @@ describe('phase diff integrity (fail-closed)', () => {
     }
   };
 
-  const assertAncestor = (sha: string) => {
-    // `--is-ancestor` exits 0 if sha is an ancestor of HEAD, 1 if not.
-    // Anything else (missing objects in a shallow clone, unknown SHA, etc.)
-    // exits non-zero-non-1 and runGitStrict throws with the git error text.
-    // Distinguish "not-an-ancestor" (exit 1) explicitly so shallow clones do
-    // not silently certify scope.
+  const assertAncestor = (ancestor: string, descendant: string) => {
+    // `--is-ancestor` exits 0 if `ancestor` is an ancestor of `descendant`,
+    // 1 if not. Anything else (missing objects in a shallow clone, unknown
+    // SHA, etc.) is treated as an outright failure — no silent PASS.
     try {
-      execSync(`git merge-base --is-ancestor ${sha} HEAD`, { stdio: ['ignore', 'pipe', 'pipe'] });
+      execSync(`git merge-base --is-ancestor ${ancestor} ${descendant}`, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
     } catch (err) {
       const e = err as { status?: number; stderr?: Buffer | string };
       const stderr = e.stderr ? e.stderr.toString() : '';
       throw new Error(
-        `git merge-base --is-ancestor ${sha} HEAD failed (exit ${e.status ?? 'n/a'}). ` +
-          `The baseline SHA must be reachable from HEAD; a shallow CI clone must fetch full history. ` +
+        `git merge-base --is-ancestor ${ancestor} ${descendant} failed (exit ${e.status ?? 'n/a'}). ` +
+          `The reference SHA must be reachable; a shallow CI clone must fetch full history. ` +
           `stderr: ${stderr}`,
       );
     }
   };
 
-  it('phase start SHA is reachable from HEAD', () => {
-    assertAncestor(PHASE_START_SHA);
+  it('phase start SHA is an ancestor of the accepted F2-B SHA', () => {
+    assertAncestor(PHASE_START_SHA, F2B_ACCEPTED_SHA);
   });
 
-  it('accepted baseline SHA is reachable from HEAD', () => {
-    assertAncestor(BASELINE_SHA);
+  it('accepted baseline SHA is an ancestor of the accepted F2-B SHA', () => {
+    assertAncestor(BASELINE_SHA, F2B_ACCEPTED_SHA);
   });
 
-  it('cumulative diff from phase start SHA is exactly the six allowlisted files', () => {
-    const raw = runGitStrict(`diff --name-only ${PHASE_START_SHA}...HEAD`);
+  it('accepted F2-B SHA is an ancestor of current HEAD', () => {
+    assertAncestor(F2B_ACCEPTED_SHA, 'HEAD');
+  });
+
+  it('historical diff PHASE_START_SHA...F2B_ACCEPTED_SHA is exactly the six F2-B files', () => {
+    const raw = runGitStrict(`diff --name-only ${PHASE_START_SHA}...${F2B_ACCEPTED_SHA}`);
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(ALLOWED_FILES);
   });
 
-  it('cumulative diff from accepted baseline SHA is exactly the same six files (no .lovable/plan.md)', () => {
-    const raw = runGitStrict(`diff --name-only ${BASELINE_SHA}...HEAD`);
+  it('historical diff BASELINE_SHA...F2B_ACCEPTED_SHA is exactly the same six files and excludes forbidden paths', () => {
+    const raw = runGitStrict(`diff --name-only ${BASELINE_SHA}...${F2B_ACCEPTED_SHA}`);
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(ALLOWED_FILES);
     expect(changed).not.toContain('.lovable/plan.md');
-    // Explicit forbidden set — none of these must appear in the diff.
+    // Explicit forbidden set — none of these must appear in the F2-B diff.
     const forbidden = [
       'src/pages/Terms.tsx',
       'src/pages/Privacy.tsx',
@@ -452,7 +477,7 @@ describe('phase diff integrity (fail-closed)', () => {
     for (const f of forbidden) {
       expect(changed).not.toContain(f);
     }
-    // No migration/candidate SQL / edge function files in the diff.
+    // No migration/candidate SQL / edge function files in the F2-B diff.
     for (const f of changed) {
       expect(f.startsWith('supabase/migrations/')).toBe(false);
       expect(f.startsWith('supabase/migration-candidates/')).toBe(false);
