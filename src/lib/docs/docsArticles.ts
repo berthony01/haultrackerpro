@@ -69,7 +69,7 @@ const ARTICLE_BILLING: DocsArticle = {
       heading: 'Separate billing contexts',
       paragraphs: [
         'Driver, recruiter, and agency subscriptions are separate billing contexts. Each is owned by the applicable account or workspace owner and is managed independently.',
-        'One login may hold more than one context — for example a driver plan and a recruiter plan on the same account. Each context has its own Stripe subscription and its own status.',
+        'One login may hold more than one context — for example a driver plan and a recruiter plan on the same account. Contexts are tracked separately and may map to distinct Stripe subscriptions, or, in legacy or normalized cases, to the same Stripe subscription ID. When you request permanent deletion the backend deduplicates repeated subscription IDs before it retrieves or cancels them so a shared ID is not cancelled twice.',
       ],
     },
     {
