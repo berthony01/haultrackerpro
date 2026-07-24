@@ -1404,11 +1404,15 @@ describe('Phase 1N-F1-C — promotion parity (candidate ⇄ production migration
   });
 
   it('production migration never invokes finalize_my_account_data_deletion() outside its definition', () => {
-    // Strip the function body (BEGIN..END; block bracketed by $fn$ ... $fn$).
-    const stripped = MIGRATION_SQL.replace(/\$fn\$[\s\S]*?\$fn\$/g, '');
-    expect(/SELECT[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
-    expect(/PERFORM[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
-    expect(/CALL[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
+    // Strip the function body (dollar-quoted $fn$ ... $fn$) and SQL line
+    // comments so incidental prose (e.g. "NOT performed") cannot match the
+    // invocation regexes.
+    const stripped = MIGRATION_SQL
+      .replace(/\$fn\$[\s\S]*?\$fn\$/g, '')
+      .replace(/--[^\n]*/g, '');
+    expect(/\bSELECT\b[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
+    expect(/\bPERFORM\b[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
+    expect(/\bCALL\b[\s\S]*finalize_my_account_data_deletion\s*\(/i.test(stripped)).toBe(false);
   });
 
   it('candidate and production migration executable bodies are byte-for-byte equal', () => {
