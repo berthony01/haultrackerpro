@@ -26,12 +26,17 @@ import {
   searchDocs,
   DOCS_CATEGORY_LABELS,
 } from '@/lib/docs/docsRegistry';
+import { getArticleBySlug } from '@/lib/docs/docsArticles';
 
 const readSource = (relPath: string) =>
   readFileSync(resolve(process.cwd(), relPath), 'utf8');
 
 const BASELINE_SHA = '3926bec94121cfca616a56e006d2a952e654a338';
 const PHASE_START_SHA = '465a43a5060c17acdf060b152731dbccee3672ae';
+// The accepted F2-B end SHA. Historical F2-B scope proofs must end here,
+// NOT at current HEAD — later accepted phases (F2-C1, etc.) are permitted
+// to add files while the F2-B evidence remains immutable.
+const F2B_ACCEPTED_SHA = '08206a82d6705a772b9d1158ee531e7bc0232b01';
 
 const ALLOWED_FILES = [
   'src/lib/legal/policyRegistry.ts',
