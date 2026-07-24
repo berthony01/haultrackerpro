@@ -313,8 +313,8 @@ describe('article factual content', () => {
     const a = getArticleBySlug('roles-access-relationships')!;
     const t = fullText(a);
     const missing = [
-      /assistant .* leave .* not yet available/,
-      /agency-member .* leave .* not yet available/,
+      /assistant .*leave.* not yet available/,
+      /agency-member .*leave.* not yet available/,
       /agency ownership transfer and self-service agency closure are not yet available/,
       /recruiter-profile-only closure is not yet available/,
     ];
