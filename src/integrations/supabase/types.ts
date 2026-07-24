@@ -2853,6 +2853,57 @@ export type Database = {
         }
         Relationships: []
       }
+      professional_profiles: {
+        Row: {
+          availability: string
+          bio: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          display_name: string
+          professional_title: string | null
+          service_areas: string[]
+          services: string[]
+          share_contact_details: boolean
+          updated_at: string
+          user_id: string
+          visibility: string
+          years_experience: number | null
+        }
+        Insert: {
+          availability?: string
+          bio?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          display_name: string
+          professional_title?: string | null
+          service_areas?: string[]
+          services?: string[]
+          share_contact_details?: boolean
+          updated_at?: string
+          user_id: string
+          visibility?: string
+          years_experience?: number | null
+        }
+        Update: {
+          availability?: string
+          bio?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          display_name?: string
+          professional_title?: string | null
+          service_areas?: string[]
+          services?: string[]
+          share_contact_details?: boolean
+          updated_at?: string
+          user_id?: string
+          visibility?: string
+          years_experience?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -3827,6 +3878,23 @@ export type Database = {
       }
       _opportunity_jsonb_number: { Args: { j: Json }; Returns: number }
       _opportunity_numeric_is_finite: { Args: { v: number }; Returns: boolean }
+      _professional_profile_normalize_string_array: {
+        Args: {
+          _input: string[]
+          _label: string
+          _max_elems: number
+          _max_len: number
+        }
+        Returns: string[]
+      }
+      _professional_profile_relationship_authorized: {
+        Args: { _target: string; _viewer: string }
+        Returns: boolean
+      }
+      _professional_profile_string_array_is_canonical: {
+        Args: { _input: string[]; _max_elems: number; _max_len: number }
+        Returns: boolean
+      }
       _sync_recruiter_capability: {
         Args: { _user_id: string }
         Returns: undefined
@@ -4143,6 +4211,7 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      delete_my_professional_profile: { Args: never; Returns: boolean }
       delete_recruiter_opportunity: {
         Args: { p_opportunity_id: string }
         Returns: Json
@@ -4264,6 +4333,31 @@ export type Database = {
           scope: string
           starts_at: string
         }[]
+      }
+      get_my_professional_profile: {
+        Args: never
+        Returns: {
+          availability: string
+          bio: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          display_name: string
+          professional_title: string | null
+          service_areas: string[]
+          services: string[]
+          share_contact_details: boolean
+          updated_at: string
+          user_id: string
+          visibility: string
+          years_experience: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "professional_profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
       get_my_user_capabilities: {
@@ -4494,6 +4588,24 @@ export type Database = {
           status: Database["public"]["Enums"]["agency_work_item_status"]
           title: string
           type: Database["public"]["Enums"]["agency_work_item_type"]
+        }[]
+      }
+      list_authorized_professional_profiles: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          availability: string
+          bio: string
+          contact_email: string
+          contact_phone: string
+          display_name: string
+          professional_title: string
+          service_areas: string[]
+          services: string[]
+          share_contact_details: boolean
+          updated_at: string
+          user_id: string
+          visibility: string
+          years_experience: number
         }[]
       }
       list_driver_assistant_audit: {
@@ -5023,6 +5135,43 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "agency_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      upsert_my_professional_profile: {
+        Args: {
+          p_availability?: string
+          p_bio?: string
+          p_contact_email?: string
+          p_contact_phone?: string
+          p_display_name: string
+          p_professional_title?: string
+          p_service_areas?: string[]
+          p_services?: string[]
+          p_share_contact_details?: boolean
+          p_visibility?: string
+          p_years_experience?: number
+        }
+        Returns: {
+          availability: string
+          bio: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          display_name: string
+          professional_title: string | null
+          service_areas: string[]
+          services: string[]
+          share_contact_details: boolean
+          updated_at: string
+          user_id: string
+          visibility: string
+          years_experience: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "professional_profiles"
           isOneToOne: true
           isSetofReturn: false
         }
