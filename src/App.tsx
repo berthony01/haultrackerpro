@@ -84,6 +84,7 @@ const AssistantsAgencies = lazy(() => import("./pages/AssistantsAgencies"));
 const CapabilityLauncher = lazy(() => import("./pages/CapabilityLauncher"));
 const ProfessionalProfile = lazy(() => import("./pages/ProfessionalProfile"));
 const Docs = lazy(() => import("./pages/Docs"));
+const DocsArticle = lazy(() => import("./pages/DocsArticle"));
 const LegalCenter = lazy(() => import("./pages/LegalCenter"));
 
 // SEO content pages
