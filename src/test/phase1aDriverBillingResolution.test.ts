@@ -697,20 +697,107 @@ describe("performAccountDeletion — Phase 1N-F1-E: authenticated transactional 
   });
 
   // 14. Adapter wiring/source proof.
-  it("delete-account edge adapter passes cleanupClient: userClient (never adminClient) and calls performAccountDeletion before auth.admin.deleteUser exactly once", () => {
+  it("delete-account edge adapter passes cleanupClient: userClient (never adminClient), calls performAccountDeletion strictly before adminClient.auth.admin.deleteUser exactly once", () => {
     const src = readFileSync(resolve(__dirname, "../../supabase/functions/delete-account/index.ts"), "utf8");
     expect(src).toMatch(/cleanupClient:\s*userClient/);
     expect(src).not.toMatch(/cleanupClient:\s*adminClient/);
-    const performIdx = src.indexOf("performAccountDeletion");
-    const authDeleteIdx = src.indexOf("auth.admin.deleteUser");
-    expect(performIdx).toBeGreaterThan(-1);
-    expect(authDeleteIdx).toBeGreaterThan(-1);
-    expect(performIdx).toBeLessThan(authDeleteIdx);
+    // Actual call site — not the import occurrence.
+    const performCallMatch = src.match(/const\s+result\s*=\s*await\s+performAccountDeletion\(/);
+    expect(performCallMatch).not.toBeNull();
+    const performCallIdx = src.indexOf(performCallMatch![0]);
+    // Actual auth-delete call site.
+    const authDeleteCallMatch = src.match(/adminClient\.auth\.admin\.deleteUser\(/);
+    expect(authDeleteCallMatch).not.toBeNull();
+    const authDeleteCallIdx = src.indexOf(authDeleteCallMatch![0]);
+    expect(performCallIdx).toBeGreaterThan(-1);
+    expect(authDeleteCallIdx).toBeGreaterThan(-1);
+    expect(performCallIdx).toBeLessThan(authDeleteCallIdx);
     // No direct RPC call to finalize_my_account_data_deletion from the adapter.
     expect(src).not.toMatch(/finalize_my_account_data_deletion/);
-    // auth.admin.deleteUser CALL occurs exactly once (excludes console.error log-string references).
-    const deleteUserMatches = src.match(/auth\.admin\.deleteUser\(/g) ?? [];
-    expect(deleteUserMatches.length).toBe(1);
+    // adminClient.auth.admin.deleteUser CALL occurs exactly once.
+    const deleteUserCalls = src.match(/adminClient\.auth\.admin\.deleteUser\(/g) ?? [];
+    expect(deleteUserCalls.length).toBe(1);
+  });
+
+  // 16. Privacy-safe RPC-path logs — no userId, no raw payload/error message.
+  it("cleanup-RPC-path console.error logs do not interpolate userId, RPC data, or raw error message/stack", () => {
+    const src = readFileSync(resolve(__dirname, "../../supabase/functions/_shared/account-deletion.ts"), "utf8");
+    // Isolate the post-RPC block: from the CLEANUP_RPC_NAME call site through the end of validation.
+    const rpcCallIdx = src.indexOf("cleanupClient.rpc(");
+    expect(rpcCallIdx).toBeGreaterThan(-1);
+    const returnOkIdx = src.indexOf("return { ok: true }", rpcCallIdx);
+    expect(returnOkIdx).toBeGreaterThan(rpcCallIdx);
+    const rpcBlock = src.slice(rpcCallIdx, returnOkIdx);
+    // Every console.error in this block must be a static template with at most
+    // a bounded `code=${...}` interpolation — never userId, rpcData, rpcError, row, message, stack.
+    const logStatements = rpcBlock.match(/console\.error\([^)]*\)/g) ?? [];
+    expect(logStatements.length).toBeGreaterThan(0);
+    for (const stmt of logStatements) {
+      expect(stmt).not.toMatch(/\$\{\s*userId\s*\}/);
+      expect(stmt).not.toMatch(/\$\{\s*rpcData/);
+      expect(stmt).not.toMatch(/\$\{\s*rpcError/);
+      expect(stmt).not.toMatch(/\$\{\s*row\b/);
+      expect(stmt).not.toMatch(/\$\{\s*message\s*\}/);
+      expect(stmt).not.toMatch(/\bstack\b/);
+      expect(stmt).not.toMatch(/JSON\.stringify/);
+      expect(stmt).not.toMatch(/\bcounter\b/);
+      // No raw userId/UUID substring outside interpolations.
+      expect(stmt).not.toMatch(/user=/);
+    }
+  });
+
+  // 17. Deletion-specific driver-price config threading: mismatched config
+  //     must fail context validation before any Stripe cancel or cleanup RPC.
+  it("performAccountDeletion with a mismatched driverPriceConfig rejects the driver subscription (no cancel, no cleanup RPC) and returns generic failure", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({
+      subscriptions: [{ user_id: "user-cfg", stripe_subscription_id: "sub_cfg_driver" }],
+    }, opsLog);
+    const stripe = makeFakeStripe({
+      subscriptions: {
+        sub_cfg_driver: { id: "sub_cfg_driver", status: "active", customer: "cus_cfg", items: { data: [{ price: DRIVER_PRICE }] } },
+      },
+    }, opsLog);
+    const cleanup = makeFakeCleanupClient("user-cfg", opsLog);
+    const result = await performAccountDeletion(buildDeps({
+      adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-cfg",
+      driverPriceConfig: OTHER_CONFIG,
+    }));
+    expect(result.ok).toBe(false);
+    if (result.ok === false) expect(result.message).toBe(GENERIC_DELETE_ERROR);
+    expect(stripe._cancelCalls.length).toBe(0);
+    expect(cleanup._calls.length).toBe(0);
+  });
+
+  // 18. Shared-subscription deduplication: same subscription id in driver
+  //     and recruiter billing rows retrieves + cancels exactly once, RPC once.
+  it("dedupes when driver and recruiter billing rows share one Stripe subscription id: retrieve once, cancel once, cleanup RPC once", async () => {
+    const opsLog: OpEvent[] = [];
+    const sharedSubId = "sub_shared_dup";
+    const db = baseDb({
+      subscriptions: [{ user_id: "user-dup", stripe_subscription_id: sharedSubId }],
+      recruiter_billing_profiles: [{ user_id: "user-dup", stripe_subscription_id: sharedSubId }],
+    }, opsLog);
+    const stripe = makeFakeStripe({
+      subscriptions: {
+        [sharedSubId]: { id: sharedSubId, status: "active", customer: "cus_dup", items: { data: [{ price: DRIVER_PRICE }] } },
+      },
+    }, opsLog);
+    const cleanup = makeFakeCleanupClient("user-dup", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-dup" }));
+    expect(result.ok).toBe(true);
+    expect(stripe._retrieveCalls.filter((id) => id === sharedSubId).length).toBe(1);
+    expect(stripe._cancelCalls.filter((id) => id === sharedSubId).length).toBe(1);
+    expect(cleanup._calls.length).toBe(1);
+    // Ordering: exactly one retrieve, one cancel, then one RPC.
+    const retrieveIdxs = opsLog.map((e, i) => (e.kind === "stripe.retrieve" ? i : -1)).filter((i) => i >= 0);
+    const cancelIdxs = opsLog.map((e, i) => (e.kind === "stripe.cancel" ? i : -1)).filter((i) => i >= 0);
+    const rpcIdxs = opsLog.map((e, i) => (e.kind === "cleanup.rpc" ? i : -1)).filter((i) => i >= 0);
+    expect(retrieveIdxs.length).toBe(1);
+    expect(cancelIdxs.length).toBe(1);
+    expect(rpcIdxs.length).toBe(1);
+    expect(cancelIdxs[0]).toBeGreaterThan(retrieveIdxs[0]);
+    expect(rpcIdxs[0]).toBeGreaterThan(cancelIdxs[0]);
   });
 
   // 15. Shared module runtime neutrality — no Deno/URL/npm: imports.
