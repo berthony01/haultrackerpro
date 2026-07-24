@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   resolveDriverStripeCustomerId,
   resolveOrCreateDriverStripeCustomerId,
@@ -9,19 +11,18 @@ import {
   performAccountDeletion,
   AGENCY_OWNER_BLOCK_MESSAGE,
   GENERIC_DELETE_ERROR,
+  type DeletionDeps,
 } from "../../supabase/functions/_shared/account-deletion";
 
 type Row = Record<string, any>;
 
-// Phase 1N-F1-A-R1 — schema-aware column set matching the LIVE Postgres
-// schema for the tables the repaired orchestration touches. The canonical
-// identifier on public.agency_profiles is `id`; there is no `agency_id`
-// column on that table, so it MUST NOT appear here. Any .eq/.in/update or
-// .select projection against an unknown column on one of these tables must
-// produce a 42703-style database error, so a regression to
-// `.eq('user_id', ...)` on a relationship table, or a regression to
-// `.select('agency_id')` on agency_profiles, cannot silently pass tests.
-// Other tables retain the permissive shape used by pre-existing tests.
+// Phase 1N-F1-E — schema-aware column set. In F1-A/R1 this proved that
+// direct .delete()/.update() on relationship tables never referenced
+// user_id. In F1-E performAccountDeletion no longer performs ANY table
+// cleanup — cleanup runs inside a single authenticated RPC. The schema
+// map is retained so that (a) leftover legitimate reads against
+// agency_profiles remain fidelity-checked, and (b) any regression that
+// re-adds sequential TypeScript cleanup is caught by the fake immediately.
 const SCHEMA_AWARE_COLUMNS: Record<string, Set<string>> = {
   driver_assistants: new Set(["id", "driver_user_id", "assistant_user_id", "status", "role"]),
   agency_work_items: new Set(["id", "agency_id", "driver_user_id", "assigned_member_user_id", "created_by_user_id", "status"]),
@@ -37,7 +38,8 @@ type OpEvent =
   | { kind: "db.delete"; table: string; filters: string[] }
   | { kind: "db.update"; table: string; filters: string[] }
   | { kind: "stripe.retrieve"; id: string }
-  | { kind: "stripe.cancel"; id: string };
+  | { kind: "stripe.cancel"; id: string }
+  | { kind: "cleanup.rpc"; name: string; args: unknown };
 
 function parseCols(cols?: string): string[] | null {
   if (!cols || cols.trim() === "" || cols.trim() === "*") return null;
@@ -212,6 +214,51 @@ function makeFakeStripe(
   };
 }
 
+// Phase 1N-F1-E — fake authenticated cleanup client. Records every RPC
+// call on the SHARED ordered timeline used by Stripe/admin DB events, so
+// tests can prove the RPC occurs strictly after the last Stripe cancel.
+// Returns a valid single-row response for the requested user by default.
+// If invoked more than once in a single deletion attempt (which the
+// production code must not do), all calls are still recorded so tests
+// can assert count === 1.
+type CleanupRpcOutcome =
+  | { kind: "success"; data: any[] | null }
+  | { kind: "error"; error: any };
+
+function makeFakeCleanupClient(userId: string, opsLog: OpEvent[], outcome?: CleanupRpcOutcome) {
+  const calls: { name: string; args: unknown }[] = [];
+  const defaultOk = (u: string, counters?: Partial<Record<string, number>>) => ([{
+    deleted_user_id: u,
+    relationship_rows_deleted: counters?.relationship_rows_deleted ?? 0,
+    shared_assignments_cleared: counters?.shared_assignments_cleared ?? 0,
+    agency_memberships_revoked: counters?.agency_memberships_revoked ?? 0,
+    direct_rows_deleted: counters?.direct_rows_deleted ?? 0,
+  }]);
+  return {
+    _calls: calls,
+    async rpc(name: string, args?: Record<string, never>) {
+      const argsSnapshot = args === undefined ? undefined : { ...args };
+      calls.push({ name, args: argsSnapshot });
+      opsLog.push({ kind: "cleanup.rpc", name, args: argsSnapshot });
+      if (outcome?.kind === "error") return { data: null, error: outcome.error };
+      if (outcome?.kind === "success") return { data: outcome.data, error: null };
+      return { data: defaultOk(userId), error: null };
+    },
+  };
+}
+
+function buildDeps(overrides: Partial<DeletionDeps> & Pick<DeletionDeps, "adminClient" | "stripe" | "userId">): DeletionDeps {
+  const opsLog: OpEvent[] = (overrides.adminClient as any)?._opsLog ?? [];
+  const cleanupClient = overrides.cleanupClient ?? makeFakeCleanupClient(overrides.userId, opsLog);
+  return {
+    adminClient: overrides.adminClient,
+    stripe: overrides.stripe,
+    cleanupClient,
+    userId: overrides.userId,
+    driverPriceConfig: overrides.driverPriceConfig ?? TEST_CONFIG,
+  };
+}
+
 const DRIVER_PRICE = { id: "price_monthly_test" };
 const TEST_CONFIG = { pro_monthly: "price_monthly_test", pro_yearly: "price_yearly_test" };
 const OTHER_CONFIG = { pro_monthly: "price_monthly_OTHER", pro_yearly: "price_yearly_OTHER" };
@@ -317,45 +364,27 @@ describe("resolveOrCreateDriverStripeCustomerId", () => {
   });
 });
 
-describe("performAccountDeletion — Phase 1N-F1-A-R1 repaired orchestration", () => {
+describe("performAccountDeletion — Phase 1N-F1-E: authenticated transactional cleanup RPC", () => {
   function baseDb(overrides: Record<string, Row[]> = {}, opsLog: OpEvent[] = []) {
     return makeFakeDb({
-      subscriptions: [], recruiter_billing_profiles: [],
-      agency_profiles: [], agency_members: [], agency_entitlements: [],
-      agency_work_items: [], agency_client_requests: [], agency_delegation_requests: [],
-      driver_assistants: [],
-      load_stops: [], expenses: [], fuel_logs: [], loads: [], broker_stats: [], lane_stats: [],
-      operating_metrics: [], brokers: [], recurring_expense_templates: [], weekly_snapshots: [],
-      feedback_responses: [], parse_usage: [], user_alerts: [], expense_automation_logs: [], ai_insights: [],
-      cost_profile: [], parking_favorites: [], parking_reports: [], parking_verifications: [],
-      driver_point_events: [], driver_points: [], driver_opportunity_profiles: [], saved_opportunities: [],
-      notifications: [], notification_preferences: [],
-      user_settings: [], profiles: [],
-      // Retention/compliance tables — deliberately untouched.
-      agency_audit_log: [{ id: "aal-1", actor_user_id: "user-owner", action: "x" }],
-      assistant_audit_log: [{ id: "aat-1", actor_user_id: "user-owner", action: "x" }],
-      application_events: [{ id: "ae-1", actor_user_id: "user-owner" }],
-      contract_audit_log: [{ id: "cal-1", actor_user_id: "user-owner" }],
-      admin_audit_log: [{ id: "aal2-1", actor_user_id: "user-owner" }],
-      recruiter_contact_requests: [{ id: "rcr-1", application_id: "app-1" }],
+      subscriptions: [], recruiter_billing_profiles: [], agency_profiles: [],
       ...overrides,
     }, opsLog);
   }
 
-  // 1. Agency owner blocked before any billing or data mutation.
-  it("hard-blocks (409) when the caller canonically owns an agency and touches no Stripe or table", async () => {
+  // 1. Agency owner blocked before everything — zero Stripe, zero RPC.
+  it("hard-blocks (409) when the caller canonically owns an agency and touches no Stripe or cleanup RPC", async () => {
     const opsLog: OpEvent[] = [];
     const db = baseDb({
       agency_profiles: [{ id: "ap-1", owner_user_id: "user-owner", name: "Owner Agency" }],
       subscriptions: [{ user_id: "user-owner", stripe_subscription_id: "sub_would_be_canceled" }],
-      cost_profile: [{ user_id: "user-owner", id: "cp-1" }],
-      loads: [{ user_id: "user-owner", id: "l-1" }],
     }, opsLog);
     const stripe = makeFakeStripe(
       { subscriptions: { sub_would_be_canceled: { id: "sub_would_be_canceled", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } },
       opsLog,
     );
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-owner", driverPriceConfig: TEST_CONFIG });
+    const cleanup = makeFakeCleanupClient("user-owner", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-owner" }));
     expect(result.ok).toBe(false);
     if (result.ok === false) {
       expect(result.status).toBe(409);
@@ -363,168 +392,54 @@ describe("performAccountDeletion — Phase 1N-F1-A-R1 repaired orchestration", (
     }
     expect(stripe._retrieveCalls.length).toBe(0);
     expect(stripe._cancelCalls.length).toBe(0);
-    expect(db._tables.subscriptions.length).toBe(1);
-    expect(db._tables.cost_profile.length).toBe(1);
-    expect(db._tables.loads.length).toBe(1);
-    // No mutation events of any kind.
-    const mutations = opsLog.filter((e) => e.kind === "db.delete" || e.kind === "db.update" || e.kind === "stripe.cancel" || e.kind === "stripe.retrieve");
+    expect(cleanup._calls.length).toBe(0);
+    const mutations = opsLog.filter((e) => e.kind === "cleanup.rpc" || e.kind === "stripe.cancel" || e.kind === "stripe.retrieve" || e.kind === "db.delete" || e.kind === "db.update");
     expect(mutations).toEqual([]);
   });
 
-  // 1b. Explicit live-schema regression proof — owner check selects `id`, never `agency_id`.
-  it("owner check selects id from agency_profiles filtered by owner_user_id, and never selects agency_id", async () => {
+  // 2. Owner discovery is canonical via agency_profiles.owner_user_id.
+  it("blocks based on agency_profiles.owner_user_id even without any agency_members owner row", async () => {
+    const opsLog: OpEvent[] = [];
     const db = baseDb({
-      agency_profiles: [{ id: "ap-live", owner_user_id: "user-owner-live", name: "X" }],
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-owner-live", driverPriceConfig: TEST_CONFIG });
+      agency_profiles: [{ id: "ap-2", owner_user_id: "user-owner-2", name: "Y" }],
+    }, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const cleanup = makeFakeCleanupClient("user-owner-2", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-owner-2" }));
     expect(result.ok).toBe(false);
     if (result.ok === false) expect(result.status).toBe(409);
+    expect(stripe._retrieveCalls.length).toBe(0);
+    expect(cleanup._calls.length).toBe(0);
+    // Owner check selects `id` only, never `agency_id`.
     const ownerSelects = db._selectCalls.filter((c: any) => c.table === "agency_profiles");
     expect(ownerSelects.length).toBeGreaterThan(0);
     for (const c of ownerSelects) {
       expect(c.cols).toEqual(["id"]);
       expect(c.filters).toContain("owner_user_id");
-      expect(c.cols).not.toContain("agency_id");
     }
-    // No production select of agency_id from agency_profiles anywhere.
-    const bad = db._selectCalls.filter((c: any) => c.table === "agency_profiles" && (c.cols ?? []).includes("agency_id"));
-    expect(bad).toEqual([]);
   });
 
-  // 1c. Regression probe — selecting agency_id from agency_profiles fails with 42703.
-  it("harness rejects a select of agency_id from agency_profiles with Postgres error code 42703, proving the original defect can no longer pass", async () => {
-    const db = baseDb({ agency_profiles: [{ id: "ap-probe", owner_user_id: "someone" }] });
-    const { data, error } = await db.from("agency_profiles").select("agency_id").eq("owner_user_id", "someone");
-    expect(data).toBeNull();
-    expect(error).toBeTruthy();
-    expect(error.code).toBe("42703");
-    expect(String(error.message)).toMatch(/agency_id/);
-  });
-
-  // 2. Ownership is determined from agency_profiles, not agency_members.
-  it("blocks based on agency_profiles.owner_user_id even when no agency_members owner row exists", async () => {
-    const db = baseDb({
-      agency_profiles: [{ id: "ap-2", owner_user_id: "user-owner-2", name: "Y" }],
-      agency_members: [], // no owner row at all
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-owner-2", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(false);
-    if (result.ok === false) expect(result.status).toBe(409);
+  // 3. No billing — no Stripe calls, exactly one RPC with name+empty args.
+  it("with no billing contexts, calls no Stripe methods and invokes cleanup RPC exactly once with exact name and empty args", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({}, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const cleanup = makeFakeCleanupClient("user-nobill", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-nobill" }));
+    expect(result.ok).toBe(true);
     expect(stripe._retrieveCalls.length).toBe(0);
-  });
-
-  // 3. Non-owner member: agency billing/profile/entitlement untouched; member row revoked in place.
-  it("does not cancel agency billing or delete the agency for a non-owner member; membership row is revoked with member_user_id nulled", async () => {
-    const db = baseDb({
-      agency_profiles: [{ id: "ap-3", owner_user_id: "someone-else", name: "Z" }],
-      agency_members: [
-        { id: "am-3", agency_id: "agency-3", member_user_id: "user-m", role: "agency_member", status: "active" },
-        { id: "am-x", agency_id: "agency-3", member_user_id: "other-user", role: "agency_member", status: "active" },
-      ],
-      agency_entitlements: [{ id: "ae-3", agency_id: "agency-3", stripe_subscription_id: "sub_agency_3", status: "active" }],
-    });
-    const stripe = makeFakeStripe({ subscriptions: { sub_agency_3: { id: "sub_agency_3", status: "active" } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-m", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
-    expect(stripe._cancelCalls).not.toContain("sub_agency_3");
-    expect(db._tables.agency_profiles.length).toBe(1);
-    expect(db._tables.agency_entitlements[0].status).toBe("active");
-    expect(db._tables.agency_entitlements[0].stripe_subscription_id).toBe("sub_agency_3");
-    const own = db._tables.agency_members.find((r: any) => r.id === "am-3");
-    const other = db._tables.agency_members.find((r: any) => r.id === "am-x");
-    expect(own.status).toBe("revoked");
-    expect(own.revoked_at).toBeTruthy();
-    expect(own.member_user_id).toBeNull();
-    expect(other.status).toBe("active");
-    expect(other.member_user_id).toBe("other-user");
-  });
-
-  // 4. Assistant-only cleanup path.
-  it("removes assistant_user_id rows for an assistant-only account, leaves unrelated rows, and calls no Stripe cancellation when no billing exists", async () => {
-    const db = baseDb({
-      driver_assistants: [
-        { id: "da-1", driver_user_id: "some-driver", assistant_user_id: "user-a", status: "active" },
-        { id: "da-2", driver_user_id: "some-driver", assistant_user_id: "other-assistant", status: "active" },
-      ],
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-a", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
     expect(stripe._cancelCalls.length).toBe(0);
-    expect(db._tables.driver_assistants.map((r: any) => r.id)).toEqual(["da-2"]);
+    expect(cleanup._calls.length).toBe(1);
+    expect(cleanup._calls[0].name).toBe("finalize_my_account_data_deletion");
+    expect(cleanup._calls[0].args).toEqual({});
   });
 
-  // 5. Driver relationship cleanup by driver_user_id across the four tables.
-  it("removes rows keyed by driver_user_id from driver_assistants and all three agency relationship tables; leaves unrelated rows", async () => {
-    const db = baseDb({
-      driver_assistants: [
-        { id: "da-a", driver_user_id: "user-d", assistant_user_id: "asst-1" },
-        { id: "da-b", driver_user_id: "other-driver", assistant_user_id: "asst-2" },
-      ],
-      agency_work_items: [
-        { id: "wi-a", driver_user_id: "user-d", assigned_member_user_id: "member-1" },
-        { id: "wi-b", driver_user_id: "other-driver", assigned_member_user_id: "member-1" },
-      ],
-      agency_client_requests: [
-        { id: "cr-a", driver_user_id: "user-d", assigned_member_user_id: "member-1" },
-        { id: "cr-b", driver_user_id: "other-driver", assigned_member_user_id: "member-1" },
-      ],
-      agency_delegation_requests: [
-        { id: "dr-a", driver_user_id: "user-d", member_user_id: "member-1" },
-        { id: "dr-b", driver_user_id: "other-driver", member_user_id: "member-1" },
-      ],
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-d", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
-    expect(db._tables.driver_assistants.map((r: any) => r.id)).toEqual(["da-b"]);
-    expect(db._tables.agency_work_items.map((r: any) => r.id)).toEqual(["wi-b"]);
-    expect(db._tables.agency_client_requests.map((r: any) => r.id)).toEqual(["cr-b"]);
-    expect(db._tables.agency_delegation_requests.map((r: any) => r.id)).toEqual(["dr-b"]);
-  });
-
-  // 6. Departing agency-member assignment cleanup on shared rows.
-  it("nulls assigned_member_user_id on shared work items and client requests without deleting the row; leaves unrelated assignments intact", async () => {
-    const db = baseDb({
-      agency_profiles: [{ id: "ap-6", owner_user_id: "someone-else", name: "6" }],
-      agency_members: [{ id: "am-6", agency_id: "agency-6", member_user_id: "user-mem", role: "agency_member", status: "active" }],
-      agency_work_items: [
-        { id: "wi-1", driver_user_id: "some-driver", assigned_member_user_id: "user-mem" },
-        { id: "wi-2", driver_user_id: "some-driver", assigned_member_user_id: "other-member" },
-      ],
-      agency_client_requests: [
-        { id: "cr-1", driver_user_id: "some-driver", assigned_member_user_id: "user-mem" },
-        { id: "cr-2", driver_user_id: "some-driver", assigned_member_user_id: "other-member" },
-      ],
-      agency_delegation_requests: [
-        { id: "dr-1", driver_user_id: "some-driver", member_user_id: "user-mem" },
-      ],
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-mem", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
-    const wi1 = db._tables.agency_work_items.find((r: any) => r.id === "wi-1");
-    const wi2 = db._tables.agency_work_items.find((r: any) => r.id === "wi-2");
-    expect(wi1.assigned_member_user_id).toBeNull();
-    expect(wi2.assigned_member_user_id).toBe("other-member");
-    const cr1 = db._tables.agency_client_requests.find((r: any) => r.id === "cr-1");
-    const cr2 = db._tables.agency_client_requests.find((r: any) => r.id === "cr-2");
-    expect(cr1.assigned_member_user_id).toBeNull();
-    expect(cr2.assigned_member_user_id).toBe("other-member");
-    // delegation request keyed on member_user_id gets deleted.
-    expect(db._tables.agency_delegation_requests.length).toBe(0);
-  });
-
-  // 7. Dual driver + recruiter billing — unified timeline proves both Stripe cancels
-  //    complete before ANY DB update/delete, with no intervening mutation.
-  it("cancels both driver and recruiter subscriptions before any local mutation, proven on one shared ordered timeline", async () => {
+  // 4. Dual driver + recruiter — RPC strictly after last cancel.
+  it("cancels both driver and recruiter subscriptions and invokes cleanup RPC strictly after the last Stripe cancel, exactly once", async () => {
     const opsLog: OpEvent[] = [];
     const db = baseDb({
       subscriptions: [{ user_id: "user-8", stripe_subscription_id: "sub_driver_8" }],
       recruiter_billing_profiles: [{ user_id: "user-8", stripe_subscription_id: "sub_recruiter_8" }],
-      cost_profile: [{ user_id: "user-8", id: "cp-8" }],
     }, opsLog);
     const stripe = makeFakeStripe(
       {
@@ -535,188 +450,275 @@ describe("performAccountDeletion — Phase 1N-F1-A-R1 repaired orchestration", (
       },
       opsLog,
     );
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-8", driverPriceConfig: TEST_CONFIG });
+    const cleanup = makeFakeCleanupClient("user-8", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-8" }));
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls.sort()).toEqual(["sub_driver_8", "sub_recruiter_8"].sort());
+    expect(cleanup._calls.length).toBe(1);
 
-    // Unified ordering assertions on the single shared timeline.
-    const cancelIdxs = opsLog
-      .map((e, i) => (e.kind === "stripe.cancel" ? i : -1))
-      .filter((i) => i >= 0);
-    const firstMutationIdx = opsLog.findIndex((e) => e.kind === "db.delete" || e.kind === "db.update");
+    const cancelIdxs = opsLog.map((e, i) => (e.kind === "stripe.cancel" ? i : -1)).filter((i) => i >= 0);
+    const rpcIdxs = opsLog.map((e, i) => (e.kind === "cleanup.rpc" ? i : -1)).filter((i) => i >= 0);
     expect(cancelIdxs.length).toBe(2);
-    expect(firstMutationIdx).toBeGreaterThan(-1);
+    expect(rpcIdxs.length).toBe(1);
     const lastCancel = cancelIdxs[cancelIdxs.length - 1];
-    // (a) last stripe cancel happens BEFORE first DB mutation.
-    expect(lastCancel).toBeLessThan(firstMutationIdx);
-    // (b) no DB mutation event occurs at or before the last stripe cancel.
-    const mutationsBeforeAllCancels = opsLog
-      .slice(0, lastCancel + 1)
-      .filter((e) => e.kind === "db.delete" || e.kind === "db.update");
-    expect(mutationsBeforeAllCancels).toEqual([]);
-    expect(db._tables.cost_profile.length).toBe(0);
+    // (a) RPC event occurs AFTER last cancel
+    expect(rpcIdxs[0]).toBeGreaterThan(lastCancel);
+    // (b) no RPC event occurs before all cancellations finish
+    const rpcBeforeLastCancel = opsLog.slice(0, lastCancel + 1).filter((e) => e.kind === "cleanup.rpc");
+    expect(rpcBeforeLastCancel).toEqual([]);
   });
 
-  // 8. Stripe failure preserves every local row, including a relationship row.
-  it("preserves every local row (including relationship rows) when Stripe cancellation fails", async () => {
+  // 5. Stripe failure prevents RPC.
+  it("Stripe non-idempotent cancellation failure prevents the cleanup RPC from being invoked", async () => {
+    const opsLog: OpEvent[] = [];
     const db = baseDb({
       subscriptions: [{ user_id: "user-11", stripe_subscription_id: "sub_driver_11" }],
-      cost_profile: [{ user_id: "user-11", id: "cp-11" }],
-      driver_assistants: [{ id: "da-11", driver_user_id: "user-11", assistant_user_id: "asst-11" }],
-    });
-    const stripe = makeFakeStripe({ subscriptions: { sub_driver_11: { id: "sub_driver_11", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
+    }, opsLog);
+    const stripe = makeFakeStripe({ subscriptions: { sub_driver_11: { id: "sub_driver_11", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } }, opsLog);
     stripe.subscriptions.cancel = async () => { throw new Error("Stripe API is down"); };
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-11", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(false);
-    expect(db._tables.subscriptions.length).toBe(1);
-    expect(db._tables.cost_profile.length).toBe(1);
-    expect(db._tables.driver_assistants.length).toBe(1);
-  });
-
-  // 9. Schema-aware regression: no relationship table receives a `user_id` filter.
-  it("completes without an unknown-column error and executes no user_id filter on the five relationship tables", async () => {
-    const db = baseDb({
-      subscriptions: [{ user_id: "user-r", stripe_subscription_id: null }],
-      driver_assistants: [{ id: "da-r", driver_user_id: "user-r", assistant_user_id: "asst" }],
-      agency_work_items: [{ id: "wi-r", driver_user_id: "user-r", assigned_member_user_id: "user-r" }],
-      agency_client_requests: [{ id: "cr-r", driver_user_id: "user-r", assigned_member_user_id: "user-r" }],
-      agency_delegation_requests: [{ id: "dr-r", driver_user_id: "user-r", member_user_id: "user-r" }],
-      agency_members: [{ id: "am-r", agency_id: "agency-r", member_user_id: "user-r", role: "agency_member", status: "active" }],
-      agency_profiles: [{ id: "ap-r", owner_user_id: "not-user-r", name: "r" }],
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-r", driverPriceConfig: TEST_CONFIG });
-    expect(result.ok).toBe(true);
-    const relTables = ["driver_assistants", "agency_work_items", "agency_client_requests", "agency_delegation_requests", "agency_members"];
-    const offenders = db._executedFilters.filter((f: any) => relTables.includes(f.table) && f.col === "user_id");
-    expect(offenders).toEqual([]);
-  });
-
-  // 10. Cleanup error stops subsequent operations.
-  it("stops the deletion pipeline and does not execute later direct user_id cleanup when a relationship cleanup errors", async () => {
-    const db = baseDb({
-      driver_assistants: [{ id: "da-x", driver_user_id: "user-e", assistant_user_id: "asst" }],
-      cost_profile: [{ user_id: "user-e", id: "cp-e" }],
-      loads: [{ user_id: "user-e", id: "l-e" }],
-    });
-    db.injectError({ table: "driver_assistants", mode: "delete", col: "driver_user_id" });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-e", driverPriceConfig: TEST_CONFIG });
+    const cleanup = makeFakeCleanupClient("user-11", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-11" }));
     expect(result.ok).toBe(false);
     if (result.ok === false) expect(result.message).toBe(GENERIC_DELETE_ERROR);
-    expect(db._tables.cost_profile.length).toBe(1);
-    expect(db._tables.loads.length).toBe(1);
-    const costProfileDeletes = db._tableCalls.filter((c: any) => c.table === "cost_profile" && c.mode === "delete");
-    expect(costProfileDeletes.length).toBe(0);
+    expect(cleanup._calls.length).toBe(0);
   });
 
-  // 11. Already-canceled Stripe subscription is idempotent success.
-  it("treats an already-canceled Stripe subscription as idempotent success and proceeds", async () => {
+  // 5b. Stripe retrieve failure also prevents RPC.
+  it("Stripe retrieve failure prevents the cleanup RPC from being invoked", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({
+      subscriptions: [{ user_id: "user-11r", stripe_subscription_id: "sub_missing_r" }],
+    }, opsLog);
+    const stripe = makeFakeStripe({}, opsLog); // sub_missing_r intentionally not seeded
+    const cleanup = makeFakeCleanupClient("user-11r", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-11r" }));
+    expect(result.ok).toBe(false);
+    expect(cleanup._calls.length).toBe(0);
+  });
+
+  // 5c. Stripe context mismatch prevents RPC.
+  it("Stripe context mismatch prevents the cleanup RPC from being invoked", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({
+      subscriptions: [{ user_id: "user-11c", stripe_subscription_id: "sub_mismatch_c" }],
+    }, opsLog);
+    const stripe = makeFakeStripe({ subscriptions: { sub_mismatch_c: { id: "sub_mismatch_c", status: "active", metadata: { billing_context: "recruiter" } } } }, opsLog);
+    const cleanup = makeFakeCleanupClient("user-11c", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-11c" }));
+    expect(result.ok).toBe(false);
+    expect(stripe._cancelCalls).not.toContain("sub_mismatch_c");
+    expect(cleanup._calls.length).toBe(0);
+  });
+
+  // 6. Terminal / already-canceled — no re-cancel, RPC still runs.
+  it("treats an already-canceled Stripe subscription as idempotent success and still invokes cleanup RPC exactly once", async () => {
+    const opsLog: OpEvent[] = [];
     const db = baseDb({
       subscriptions: [{ user_id: "user-12", stripe_subscription_id: "sub_driver_12" }],
-    });
-    const stripe = makeFakeStripe({ subscriptions: { sub_driver_12: { id: "sub_driver_12", status: "canceled", items: { data: [{ price: DRIVER_PRICE }] } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-12", driverPriceConfig: TEST_CONFIG });
+    }, opsLog);
+    const stripe = makeFakeStripe({ subscriptions: { sub_driver_12: { id: "sub_driver_12", status: "canceled", items: { data: [{ price: DRIVER_PRICE }] } } } }, opsLog);
+    const cleanup = makeFakeCleanupClient("user-12", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-12" }));
     expect(result.ok).toBe(true);
     expect(stripe._cancelCalls).not.toContain("sub_driver_12");
-    expect(db._tables.subscriptions.length).toBe(0);
+    expect(cleanup._calls.length).toBe(1);
   });
 
-  // 12. Unrelated agency/shared/audit records survive.
-  it("leaves other agencies, their entitlements, and every audit table untouched for a non-owner deletion", async () => {
+  // 7. Resource-missing cancellation retry proceeds to RPC.
+  it("treats a resource_missing cancel error as idempotent and proceeds to the cleanup RPC exactly once", async () => {
+    const opsLog: OpEvent[] = [];
     const db = baseDb({
-      agency_profiles: [
-        { id: "ap-a", owner_user_id: "someone-else", name: "a" },
-        { id: "ap-b", owner_user_id: "unrelated-owner", name: "b" },
-      ],
-      agency_entitlements: [
-        { id: "ae-a", agency_id: "agency-a", stripe_subscription_id: "sub_a", status: "active" },
-        { id: "ae-b", agency_id: "agency-b", stripe_subscription_id: "sub_b", status: "active" },
-      ],
-      agency_members: [{ id: "am-a", agency_id: "agency-a", member_user_id: "user-nm", role: "agency_member", status: "active" }],
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-nm", driverPriceConfig: TEST_CONFIG });
+      subscriptions: [{ user_id: "user-rm", stripe_subscription_id: "sub_rm" }],
+    }, opsLog);
+    const stripe = makeFakeStripe({ subscriptions: { sub_rm: { id: "sub_rm", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } }, opsLog);
+    stripe.subscriptions.cancel = async () => { const e: any = new Error("No such subscription: sub_rm"); e.code = "resource_missing"; throw e; };
+    const cleanup = makeFakeCleanupClient("user-rm", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-rm" }));
     expect(result.ok).toBe(true);
-    expect(db._tables.agency_profiles.length).toBe(2);
-    expect(db._tables.agency_entitlements.length).toBe(2);
-    expect(db._tables.agency_entitlements.every((r: any) => r.status === "active")).toBe(true);
-    const auditTables = ["agency_audit_log", "assistant_audit_log", "application_events", "contract_audit_log", "admin_audit_log"];
-    const auditCalls = db._tableCalls.filter((c: any) => auditTables.includes(c.table) && (c.mode === "delete" || c.mode === "update"));
-    expect(auditCalls).toEqual([]);
-    const rcrMutations = db._tableCalls.filter((c: any) => c.table === "recruiter_contact_requests" && (c.mode === "delete" || c.mode === "update"));
-    expect(rcrMutations).toEqual([]);
-    expect(db._tables.recruiter_contact_requests.length).toBe(1);
+    expect(cleanup._calls.length).toBe(1);
   });
 
-  // 13. Direct user_id cleanup — caller rows removed across original + representative tables; unrelated rows survive.
-  it("deletes the caller's direct-owned rows across original + representative operational/account tables and leaves other users' rows intact", async () => {
-    const db = baseDb({
-      // Original direct list
-      cost_profile: [
-        { user_id: "user-dc", id: "cp-1" },
-        { user_id: "other", id: "cp-2" },
-      ],
-      parking_favorites: [
-        { user_id: "user-dc", id: "pf-1" },
-        { user_id: "other", id: "pf-2" },
-      ],
-      parking_reports: [{ user_id: "user-dc", id: "pr-1" }, { user_id: "other", id: "pr-2" }],
-      parking_verifications: [{ user_id: "user-dc", id: "pv-1" }, { user_id: "other", id: "pv-2" }],
-      driver_points: [{ user_id: "user-dc", id: "dp-1" }, { user_id: "other", id: "dp-2" }],
-      driver_point_events: [{ user_id: "user-dc", id: "dpe-1" }, { user_id: "other", id: "dpe-2" }],
-      // Representative operational/account tables from the new direct list
-      loads: [{ user_id: "user-dc", id: "l-1" }, { user_id: "other", id: "l-2" }],
-      expenses: [{ user_id: "user-dc", id: "e-1" }, { user_id: "other", id: "e-2" }],
-      subscriptions: [{ user_id: "user-dc", stripe_subscription_id: null, id: "s-1" }],
-      recruiter_billing_profiles: [{ user_id: "user-dc", stripe_subscription_id: null, id: "rb-1" }],
-      user_settings: [{ user_id: "user-dc", id: "us-1" }, { user_id: "other", id: "us-2" }],
-      profiles: [{ user_id: "user-dc", id: "prof-1" }, { user_id: "other", id: "prof-2" }],
-    });
-    const stripe = makeFakeStripe();
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-dc", driverPriceConfig: TEST_CONFIG });
+  // 8. RPC caller identity safety — exact name, exact empty args, no identity args.
+  it("invokes the cleanup RPC with exact name and empty args, never passing user_id / id / target / role", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({}, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const cleanup = makeFakeCleanupClient("user-safety", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-safety" }));
     expect(result.ok).toBe(true);
-
-    // Caller rows fully removed.
-    for (const t of [
-      "cost_profile", "parking_favorites", "parking_reports", "parking_verifications",
-      "driver_points", "driver_point_events", "loads", "expenses",
-      "subscriptions", "recruiter_billing_profiles", "user_settings", "profiles",
-    ]) {
-      const owned = db._tables[t].filter((r: any) => r.user_id === "user-dc");
-      expect(owned.length).toBe(0);
-    }
-    // Unrelated rows intact.
-    for (const t of ["cost_profile", "parking_favorites", "parking_reports", "parking_verifications",
-      "driver_points", "driver_point_events", "loads", "expenses", "user_settings", "profiles"]) {
-      const others = db._tables[t].filter((r: any) => r.user_id === "other");
-      expect(others.length).toBe(1);
+    expect(cleanup._calls.length).toBe(1);
+    expect(cleanup._calls[0].name).toBe("finalize_my_account_data_deletion");
+    const args = cleanup._calls[0].args as Record<string, unknown>;
+    expect(args).toEqual({});
+    for (const forbidden of ["user_id", "id", "target", "target_user_id", "role", "context", "p_user_id"]) {
+      expect(Object.prototype.hasOwnProperty.call(args, forbidden)).toBe(false);
     }
   });
 
-  // Retain original driver context-mismatch proof.
-  it("stops deletion when a driver subscription's billing_context does not match", async () => {
-    const db = baseDb({
-      subscriptions: [{ user_id: "user-14", stripe_subscription_id: "sub_mismatch_14" }],
-      cost_profile: [{ user_id: "user-14", id: "1" }],
-    });
-    const stripe = makeFakeStripe({ subscriptions: { sub_mismatch_14: { id: "sub_mismatch_14", status: "active", metadata: { billing_context: "recruiter" } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-14", driverPriceConfig: TEST_CONFIG });
+  // 9. RPC generic failure — 500, no retry.
+  it("returns generic 500 on an RPC generic failure and never re-invokes the RPC", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({}, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const rpcError = { code: "XX000", message: "internal database error" };
+    const cleanup = makeFakeCleanupClient("user-rpcerr", opsLog, { kind: "error", error: rpcError });
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-rpcerr" }));
     expect(result.ok).toBe(false);
-    expect(stripe._cancelCalls).not.toContain("sub_mismatch_14");
-    expect(db._tables.cost_profile.length).toBe(1);
+    if (result.ok === false) {
+      expect(result.status).toBe(500);
+      expect(result.message).toBe(GENERIC_DELETE_ERROR);
+    }
+    expect(cleanup._calls.length).toBe(1);
   });
 
-  // Retain original driver-price config threading proof.
-  it("rejects a driver subscription whose price is only valid under a different config than the one passed in", async () => {
-    const db = baseDb({
-      subscriptions: [{ user_id: "user-15", stripe_subscription_id: "sub_driver_15" }],
-      cost_profile: [{ user_id: "user-15", id: "1" }],
-    });
-    const stripe = makeFakeStripe({ subscriptions: { sub_driver_15: { id: "sub_driver_15", status: "active", items: { data: [{ price: DRIVER_PRICE }] } } } });
-    const result = await performAccountDeletion({ adminClient: db, stripe: stripe as any, userId: "user-15", driverPriceConfig: OTHER_CONFIG });
+  // 10. RPC owner-race — P0001 + exact owner block message → 409 owner message.
+  it("maps a P0001 owner-race RPC error carrying the exact owner block message to 409 with AGENCY_OWNER_BLOCK_MESSAGE, invoked exactly once", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({}, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const rpcError = { code: "P0001", message: `raise: ${AGENCY_OWNER_BLOCK_MESSAGE}` };
+    const cleanup = makeFakeCleanupClient("user-race", opsLog, { kind: "error", error: rpcError });
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-race" }));
     expect(result.ok).toBe(false);
-    expect(stripe._cancelCalls).not.toContain("sub_driver_15");
-    expect(db._tables.cost_profile.length).toBe(1);
+    if (result.ok === false) {
+      expect(result.status).toBe(409);
+      expect(result.message).toBe(AGENCY_OWNER_BLOCK_MESSAGE);
+    }
+    expect(cleanup._calls.length).toBe(1);
+  });
+
+  // 10b. P0001 without owner message stays generic 500.
+  it("does not map an unrelated P0001 error to the agency-owner block message", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({}, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const cleanup = makeFakeCleanupClient("user-p0001", opsLog, { kind: "error", error: { code: "P0001", message: "some other assertion failed" } });
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-p0001" }));
+    expect(result.ok).toBe(false);
+    if (result.ok === false) {
+      expect(result.status).toBe(500);
+      expect(result.message).toBe(GENERIC_DELETE_ERROR);
+    }
+  });
+
+  // 11. Malformed success rejection — parametric.
+  const malformedCases: { label: string; data: any }[] = [
+    { label: "null data", data: null },
+    { label: "non-array data", data: { deleted_user_id: "user-m" } },
+    { label: "empty array", data: [] },
+    { label: "multiple rows", data: [
+      { deleted_user_id: "user-m", relationship_rows_deleted: 0, shared_assignments_cleared: 0, agency_memberships_revoked: 0, direct_rows_deleted: 0 },
+      { deleted_user_id: "user-m", relationship_rows_deleted: 0, shared_assignments_cleared: 0, agency_memberships_revoked: 0, direct_rows_deleted: 0 },
+    ] },
+    { label: "wrong deleted_user_id", data: [
+      { deleted_user_id: "other-user", relationship_rows_deleted: 0, shared_assignments_cleared: 0, agency_memberships_revoked: 0, direct_rows_deleted: 0 },
+    ] },
+    { label: "missing counter", data: [
+      { deleted_user_id: "user-m", relationship_rows_deleted: 0, shared_assignments_cleared: 0, agency_memberships_revoked: 0 /* direct_rows_deleted missing */ },
+    ] },
+    { label: "non-integer counter", data: [
+      { deleted_user_id: "user-m", relationship_rows_deleted: 1.5, shared_assignments_cleared: 0, agency_memberships_revoked: 0, direct_rows_deleted: 0 },
+    ] },
+    { label: "negative counter", data: [
+      { deleted_user_id: "user-m", relationship_rows_deleted: 0, shared_assignments_cleared: -1, agency_memberships_revoked: 0, direct_rows_deleted: 0 },
+    ] },
+    { label: "non-numeric counter", data: [
+      { deleted_user_id: "user-m", relationship_rows_deleted: "0", shared_assignments_cleared: 0, agency_memberships_revoked: 0, direct_rows_deleted: 0 },
+    ] },
+    { label: "null row inside array", data: [null] },
+  ];
+  for (const { label, data } of malformedCases) {
+    it(`returns generic 500 for malformed success shape: ${label}`, async () => {
+      const opsLog: OpEvent[] = [];
+      const db = baseDb({}, opsLog);
+      const stripe = makeFakeStripe({}, opsLog);
+      const cleanup = makeFakeCleanupClient("user-m", opsLog, { kind: "success", data });
+      const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-m" }));
+      expect(result.ok).toBe(false);
+      if (result.ok === false) {
+        expect(result.status).toBe(500);
+        expect(result.message).toBe(GENERIC_DELETE_ERROR);
+      }
+      // RPC still called exactly once — never retried.
+      expect(cleanup._calls.length).toBe(1);
+    });
+  }
+
+  // 12. Valid nonzero response returns ok true.
+  it("accepts a valid single-row response with nonzero counters and returns ok:true without rewriting the profile shape", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({}, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const data = [{
+      deleted_user_id: "user-nz",
+      relationship_rows_deleted: 7,
+      shared_assignments_cleared: 3,
+      agency_memberships_revoked: 1,
+      direct_rows_deleted: 42,
+    }];
+    const cleanup = makeFakeCleanupClient("user-nz", opsLog, { kind: "success", data });
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-nz" }));
+    expect(result.ok).toBe(true);
+    // External result shape unchanged — just { ok:true }.
+    expect(result).toEqual({ ok: true });
+    expect(cleanup._calls.length).toBe(1);
+  });
+
+  // 13. No sequential cleanup regression — source proof + runtime proof.
+  it("shared account-deletion.ts contains no direct .delete()/.update() cleanup pipeline and no DIRECT_USER_ID_TABLES_IN_ORDER", () => {
+    const src = readFileSync(resolve(__dirname, "../../supabase/functions/_shared/account-deletion.ts"), "utf8");
+    expect(src).not.toMatch(/DIRECT_USER_ID_TABLES_IN_ORDER/);
+    // No `.from("<table>").delete()` or `.from("<table>").update(` cleanup pipeline anywhere.
+    expect(src).not.toMatch(/\.from\([^)]+\)\s*\.\s*delete\(/);
+    expect(src).not.toMatch(/\.from\([^)]+\)\s*\.\s*update\(/);
+    // Exactly one cleanup RPC call.
+    const matches = src.match(/finalize_my_account_data_deletion/g) ?? [];
+    // The identifier may appear in a constant declaration and in a comment; the
+    // rpc(...) call must reference the constant CLEANUP_RPC_NAME exactly once.
+    const rpcCallCount = (src.match(/cleanupClient\.rpc\(\s*CLEANUP_RPC_NAME\s*,\s*\{\s*\}\s*\)/g) ?? []).length;
+    expect(rpcCallCount).toBe(1);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("during a successful deletion, adminClient DB operations are reads only and cleanup occurs via exactly one RPC event", async () => {
+    const opsLog: OpEvent[] = [];
+    const db = baseDb({
+      subscriptions: [{ user_id: "user-runtime", stripe_subscription_id: null }],
+      recruiter_billing_profiles: [{ user_id: "user-runtime", stripe_subscription_id: null }],
+    }, opsLog);
+    const stripe = makeFakeStripe({}, opsLog);
+    const cleanup = makeFakeCleanupClient("user-runtime", opsLog);
+    const result = await performAccountDeletion(buildDeps({ adminClient: db, stripe: stripe as any, cleanupClient: cleanup, userId: "user-runtime" }));
+    expect(result.ok).toBe(true);
+    const dbMutations = opsLog.filter((e) => e.kind === "db.delete" || e.kind === "db.update");
+    expect(dbMutations).toEqual([]);
+    const rpcEvents = opsLog.filter((e) => e.kind === "cleanup.rpc");
+    expect(rpcEvents.length).toBe(1);
+  });
+
+  // 14. Adapter wiring/source proof.
+  it("delete-account edge adapter passes cleanupClient: userClient (never adminClient) and calls performAccountDeletion before auth.admin.deleteUser exactly once", () => {
+    const src = readFileSync(resolve(__dirname, "../../supabase/functions/delete-account/index.ts"), "utf8");
+    expect(src).toMatch(/cleanupClient:\s*userClient/);
+    expect(src).not.toMatch(/cleanupClient:\s*adminClient/);
+    const performIdx = src.indexOf("performAccountDeletion");
+    const authDeleteIdx = src.indexOf("auth.admin.deleteUser");
+    expect(performIdx).toBeGreaterThan(-1);
+    expect(authDeleteIdx).toBeGreaterThan(-1);
+    expect(performIdx).toBeLessThan(authDeleteIdx);
+    // No direct RPC call to finalize_my_account_data_deletion from the adapter.
+    expect(src).not.toMatch(/finalize_my_account_data_deletion/);
+    // auth.admin.deleteUser CALL occurs exactly once (excludes console.error log-string references).
+    const deleteUserMatches = src.match(/auth\.admin\.deleteUser\(/g) ?? [];
+    expect(deleteUserMatches.length).toBe(1);
+  });
+
+  // 15. Shared module runtime neutrality — no Deno/URL/npm: imports.
+  it("shared account-deletion.ts remains runtime-neutral (no Deno.env, no https://, no npm: imports)", () => {
+    const src = readFileSync(resolve(__dirname, "../../supabase/functions/_shared/account-deletion.ts"), "utf8");
+    expect(src).not.toMatch(/Deno\.env\.get\(/);
+    expect(src).not.toMatch(/Deno\.serve\(/);
+    expect(src).not.toMatch(/from\s+["']https:\/\//);
+    expect(src).not.toMatch(/from\s+["']npm:/);
   });
 });

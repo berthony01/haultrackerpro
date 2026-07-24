@@ -56,7 +56,17 @@ serve(async (req) => {
       pro_yearly: Deno.env.get("STRIPE_PRO_YEARLY_PRICE_ID"),
     };
 
-    const deps: DeletionDeps = { adminClient, stripe, userId: user.id, driverPriceConfig };
+    // Phase 1N-F1-E: cleanupClient MUST be the authenticated user client so
+    // the shared orchestration's transactional cleanup RPC resolves
+    // auth.uid() to the caller. Never pass adminClient here — service_role
+    // would bypass the RPC's own caller-bound guard.
+    const deps: DeletionDeps = {
+      adminClient,
+      stripe,
+      cleanupClient: userClient,
+      userId: user.id,
+      driverPriceConfig,
+    };
     const result = await performAccountDeletion(deps);
     if (result.ok === false) {
       return clientError(result.status, result.message);
