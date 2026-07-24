@@ -526,17 +526,21 @@ async function snapshotAllPublicFunctions(): Promise<Record<string, PublicFuncti
 
 async function snapshotTriggerDefs() {
   return q<{ tgname: string; tbl: string; def: string; enabled: string }>(
-    `SELECT tgname,
-            tgrelid::regclass::text AS tbl,
-            pg_get_triggerdef(oid) AS def,
-            tgenabled::text AS enabled
-       FROM pg_trigger
-      WHERE NOT tgisinternal
-        AND tgrelid::regclass::text = ANY($1)
-      ORDER BY tbl, tgname`,
-    [PROTECTED_TABLES],
+    `SELECT t.tgname,
+            ('public.' || c.relname) AS tbl,
+            pg_get_triggerdef(t.oid) AS def,
+            t.tgenabled::text AS enabled
+       FROM pg_trigger t
+       JOIN pg_class c ON c.oid = t.tgrelid
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE NOT t.tgisinternal
+        AND n.nspname = 'public'
+        AND c.relname = ANY($1)
+      ORDER BY tbl, t.tgname`,
+    [PROTECTED_TABLE_NAMES],
   );
 }
+
 
 async function snapshotPolicies() {
   return q(
