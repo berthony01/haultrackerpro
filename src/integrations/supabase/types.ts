@@ -4252,6 +4252,17 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      ensure_my_recruiter_setup_state: {
+        Args: never
+        Returns: {
+          capability_status: string
+          eligibility_state: string
+          missing_requirements: string[]
+          profile_created: boolean
+          profile_id: string
+          user_id: string
+        }[]
+      }
       expire_stale_contact_requests: { Args: never; Returns: number }
       fail_stripe_webhook_event: {
         Args: {
