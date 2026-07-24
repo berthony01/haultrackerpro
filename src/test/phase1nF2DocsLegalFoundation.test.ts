@@ -377,41 +377,61 @@ describe('page sources — accessibility & honesty', () => {
 // (11) Source integrity — this phase's diff touches only the six allowlisted
 //      files and does not touch Terms, Privacy, FAQ, Auth, sitemap, robots,
 //      package files, migrations, or generated types.
+//
+//      FAIL-CLOSED: any git failure or missing history must fail the test with
+//      full command/error context. There is no "files exist" fallback: a
+//      shallow CI clone that cannot reach the baseline SHAs must fetch the
+//      history or be marked failed — the scope proof must never silently PASS.
 // -----------------------------------------------------------------------------
-describe('phase diff integrity', () => {
-  const runGit = (args: string): string => {
+describe('phase diff integrity (fail-closed)', () => {
+  const runGitStrict = (args: string): string => {
     try {
-      return execSync(`git ${args}`, { encoding: 'utf8' }).trim();
-    } catch {
-      return '';
+      return execSync(`git ${args}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+    } catch (err) {
+      const e = err as { status?: number; stderr?: Buffer | string; stdout?: Buffer | string; message?: string };
+      const stderr = e.stderr ? e.stderr.toString() : '';
+      const stdout = e.stdout ? e.stdout.toString() : '';
+      throw new Error(
+        `git ${args} failed (exit ${e.status ?? 'n/a'}): ${e.message ?? ''}\nstderr: ${stderr}\nstdout: ${stdout}`,
+      );
     }
   };
 
-  it('cumulative diff from phase start SHA is exactly the six allowlisted files', () => {
-    const merge = runGit(`merge-base ${PHASE_START_SHA} HEAD`);
-    // If baseline is not reachable (shallow clone / detached CI), skip silently
-    // by marking the test as a soft check.
-    if (!merge) {
-      // Fallback: just verify allowlisted files exist.
-      for (const f of ALLOWED_FILES) {
-        expect(existsSync(resolve(process.cwd(), f))).toBe(true);
-      }
-      return;
+  const assertAncestor = (sha: string) => {
+    // `--is-ancestor` exits 0 if sha is an ancestor of HEAD, 1 if not.
+    // Anything else (missing objects in a shallow clone, unknown SHA, etc.)
+    // exits non-zero-non-1 and runGitStrict throws with the git error text.
+    // Distinguish "not-an-ancestor" (exit 1) explicitly so shallow clones do
+    // not silently certify scope.
+    try {
+      execSync(`git merge-base --is-ancestor ${sha} HEAD`, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (err) {
+      const e = err as { status?: number; stderr?: Buffer | string };
+      const stderr = e.stderr ? e.stderr.toString() : '';
+      throw new Error(
+        `git merge-base --is-ancestor ${sha} HEAD failed (exit ${e.status ?? 'n/a'}). ` +
+          `The baseline SHA must be reachable from HEAD; a shallow CI clone must fetch full history. ` +
+          `stderr: ${stderr}`,
+      );
     }
-    const raw = runGit(`diff --name-only ${PHASE_START_SHA}...HEAD`);
+  };
+
+  it('phase start SHA is reachable from HEAD', () => {
+    assertAncestor(PHASE_START_SHA);
+  });
+
+  it('accepted baseline SHA is reachable from HEAD', () => {
+    assertAncestor(BASELINE_SHA);
+  });
+
+  it('cumulative diff from phase start SHA is exactly the six allowlisted files', () => {
+    const raw = runGitStrict(`diff --name-only ${PHASE_START_SHA}...HEAD`);
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(ALLOWED_FILES);
   });
 
   it('cumulative diff from accepted baseline SHA is exactly the same six files (no .lovable/plan.md)', () => {
-    const merge = runGit(`merge-base ${BASELINE_SHA} HEAD`);
-    if (!merge) {
-      for (const f of ALLOWED_FILES) {
-        expect(existsSync(resolve(process.cwd(), f))).toBe(true);
-      }
-      return;
-    }
-    const raw = runGit(`diff --name-only ${BASELINE_SHA}...HEAD`);
+    const raw = runGitStrict(`diff --name-only ${BASELINE_SHA}...HEAD`);
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(ALLOWED_FILES);
     expect(changed).not.toContain('.lovable/plan.md');
@@ -432,11 +452,201 @@ describe('phase diff integrity', () => {
     for (const f of forbidden) {
       expect(changed).not.toContain(f);
     }
-    // No migration/candidate SQL files in the diff.
+    // No migration/candidate SQL / edge function files in the diff.
     for (const f of changed) {
       expect(f.startsWith('supabase/migrations/')).toBe(false);
       expect(f.startsWith('supabase/migration-candidates/')).toBe(false);
       expect(f.startsWith('supabase/functions/')).toBe(false);
     }
+  });
+
+  it('allowlisted files all exist on disk', () => {
+    for (const f of ALLOWED_FILES) {
+      expect(existsSync(resolve(process.cwd(), f))).toBe(true);
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// (12) Deep runtime immutability — R1 hardening. Prove that every exposed
+//      layer of the policy and docs registries is Object.frozen at runtime.
+//      TypeScript `readonly` alone does not stop a JavaScript caller from
+//      mutating shape at runtime; these tests exercise the JS behavior.
+// -----------------------------------------------------------------------------
+describe('policy registry — deep runtime immutability', () => {
+  it('outer canonical array is frozen', () => {
+    expect(Object.isFrozen(getAllPolicies())).toBe(true);
+  });
+
+  it('every policy entry object is frozen', () => {
+    for (const entry of getAllPolicies()) {
+      expect(Object.isFrozen(entry)).toBe(true);
+    }
+  });
+
+  it('every policy `audiences` array is frozen', () => {
+    for (const entry of getAllPolicies()) {
+      expect(Object.isFrozen(entry.audiences)).toBe(true);
+    }
+  });
+
+  it('getLivePolicies() and getPlannedPolicies() return frozen arrays of frozen entries', () => {
+    const live = getLivePolicies();
+    const planned = getPlannedPolicies();
+    expect(Object.isFrozen(live)).toBe(true);
+    expect(Object.isFrozen(planned)).toBe(true);
+    for (const e of live) expect(Object.isFrozen(e)).toBe(true);
+    for (const e of planned) expect(Object.isFrozen(e)).toBe(true);
+  });
+
+  it('findPolicyBySlug returns a frozen canonical entry', () => {
+    const terms = findPolicyBySlug('terms')!;
+    expect(Object.isFrozen(terms)).toBe(true);
+    expect(Object.isFrozen(terms.audiences)).toBe(true);
+  });
+
+  it('mutating status / route / version on a policy entry throws and leaves canonical values unchanged', () => {
+    const planned = getPlannedPolicies();
+    const acceptableUse = planned.find((p) => p.slug === 'acceptable-use')!;
+    const originalStatus = acceptableUse.status;
+    const originalRoute = acceptableUse.route;
+    const originalVersion = acceptableUse.version;
+    expect(() => {
+      (acceptableUse as unknown as { status: string }).status = 'live';
+    }).toThrow();
+    expect(() => {
+      (acceptableUse as unknown as { route: string }).route = '/hijacked';
+    }).toThrow();
+    expect(() => {
+      (acceptableUse as unknown as { version: string }).version = '9.9.9';
+    }).toThrow();
+    const reread = findPolicyBySlug('acceptable-use')!;
+    expect(reread.status).toBe(originalStatus);
+    expect(reread.route).toBe(originalRoute);
+    expect(reread.version).toBe(originalVersion);
+  });
+
+  it('mutating nested policy `audiences` array throws and leaves it unchanged', () => {
+    const entry = findPolicyBySlug('recruiting-rules')!;
+    const originalLen = entry.audiences.length;
+    expect(() => {
+      (entry.audiences as PolicyAudienceMutable).push('driver');
+    }).toThrow();
+    expect(findPolicyBySlug('recruiting-rules')!.audiences.length).toBe(originalLen);
+  });
+
+  it('mutating helper-returned arrays (push / pop) throws', () => {
+    const live = getLivePolicies();
+    expect(() => (live as unknown as PolicyEntryMutable[]).push({} as unknown as PolicyEntryMutable)).toThrow();
+    const planned = getPlannedPolicies();
+    expect(() => (planned as unknown as PolicyEntryMutable[]).pop()).toThrow();
+  });
+
+  it('account-deletion policy description does not commit to a "tax" retention reason', () => {
+    const entry = findPolicyBySlug('account-deletion-retention')!;
+    // Neutral wording — must not name "tax" as an authoritative retention
+    // reason before legal review. Other authoritative reasons (billing,
+    // audit, compliance, fraud prevention, disputes, security, lawful /
+    // operational reasons) are acceptable.
+    expect(/\btax\b/i.test(entry.description)).toBe(false);
+  });
+});
+
+// Local mutable-shape helpers used only inside immutability tests.
+type PolicyAudienceMutable = string[];
+type PolicyEntryMutable = { status: string; route: string | null };
+
+describe('docs registry — deep runtime immutability', () => {
+  it('outer canonical array is frozen', () => {
+    expect(Object.isFrozen(getAllDocs())).toBe(true);
+  });
+
+  it('every docs entry object is frozen', () => {
+    for (const entry of getAllDocs()) {
+      expect(Object.isFrozen(entry)).toBe(true);
+    }
+  });
+
+  it('every docs `audiences` and `keywords` array is frozen', () => {
+    for (const entry of getAllDocs()) {
+      expect(Object.isFrozen(entry.audiences)).toBe(true);
+      expect(Object.isFrozen(entry.keywords)).toBe(true);
+    }
+  });
+
+  it('category-label map is frozen', () => {
+    expect(Object.isFrozen(DOCS_CATEGORY_LABELS)).toBe(true);
+  });
+
+  it('getDocsByCategory returns a frozen object whose category arrays are frozen and contain frozen entries', () => {
+    const grouped = getDocsByCategory();
+    expect(Object.isFrozen(grouped)).toBe(true);
+    for (const key of Object.keys(grouped) as Array<keyof typeof grouped>) {
+      const arr = grouped[key];
+      expect(Object.isFrozen(arr)).toBe(true);
+      for (const e of arr) expect(Object.isFrozen(e)).toBe(true);
+    }
+  });
+
+  it('searchDocs ALWAYS returns a newly created frozen array — including empty and whitespace queries', () => {
+    const canonical = getAllDocs();
+
+    const emptyResult = searchDocs('');
+    expect(Object.isFrozen(emptyResult)).toBe(true);
+    // Same contents (canonical order) but NOT the same array identity.
+    expect(emptyResult).not.toBe(canonical);
+    expect(emptyResult.map((e) => e.id)).toEqual(canonical.map((e) => e.id));
+
+    const wsResult = searchDocs('   ');
+    expect(Object.isFrozen(wsResult)).toBe(true);
+    expect(wsResult).not.toBe(canonical);
+    expect(wsResult).not.toBe(emptyResult);
+
+    const hits = searchDocs('driver');
+    expect(Object.isFrozen(hits)).toBe(true);
+    expect(hits).not.toBe(canonical);
+  });
+
+  it('mutating status / route / title on a docs entry throws and leaves canonical values unchanged', () => {
+    const planned = getAllDocs().find((d) => d.status === 'planned' && d.route === null)!;
+    const originalStatus = planned.status;
+    const originalRoute = planned.route;
+    const originalTitle = planned.title;
+    expect(() => {
+      (planned as unknown as { status: string }).status = 'live';
+    }).toThrow();
+    expect(() => {
+      (planned as unknown as { route: string }).route = '/hijacked';
+    }).toThrow();
+    expect(() => {
+      (planned as unknown as { title: string }).title = 'Hijacked';
+    }).toThrow();
+    const reread = getAllDocs().find((d) => d.id === planned.id)!;
+    expect(reread.status).toBe(originalStatus);
+    expect(reread.route).toBe(originalRoute);
+    expect(reread.title).toBe(originalTitle);
+  });
+
+  it('mutating nested docs `audiences` and `keywords` arrays throws and leaves them unchanged', () => {
+    const entry = getAllDocs().find((d) => d.id === 'driver-how-to-use')!;
+    const audLen = entry.audiences.length;
+    const kwLen = entry.keywords.length;
+    expect(() => (entry.audiences as unknown as string[]).push('agency')).toThrow();
+    expect(() => (entry.keywords as unknown as string[]).push('injected')).toThrow();
+    const reread = getAllDocs().find((d) => d.id === 'driver-how-to-use')!;
+    expect(reread.audiences.length).toBe(audLen);
+    expect(reread.keywords.length).toBe(kwLen);
+  });
+
+  it('mutating helper-returned arrays (push / pop) throws', () => {
+    const all = getAllDocs();
+    expect(() => (all as unknown as unknown[]).push({} as unknown)).toThrow();
+
+    const grouped = getDocsByCategory();
+    const firstKey = Object.keys(grouped)[0] as keyof typeof grouped;
+    expect(() => (grouped[firstKey] as unknown as unknown[]).push({} as unknown)).toThrow();
+
+    const search = searchDocs('');
+    expect(() => (search as unknown as unknown[]).pop()).toThrow();
   });
 });
