@@ -466,7 +466,7 @@ const ARTICLE_OPPORTUNITY: DocsArticle = {
       heading: 'Platform boundaries',
       paragraphs: [
         'HaulTrackerPro may review, restrict, remove, preserve, or report content and accounts under applicable rules, but does not guarantee detection or prevention of every bad actor or dispute.',
-        'Users remain responsible for their own decisions and agreements. Nothing in this article disclaims HaulTrackerPro\u2019s own legal obligations under the applicable Terms of Service, Privacy Policy, or applicable law.',
+        "Users remain responsible for their own decisions and agreements. Nothing in this article disclaims HaulTrackerPro's own legal obligations under the applicable Terms of Service, Privacy Policy, or applicable law.",
       ],
     },
   ],
