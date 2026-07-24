@@ -460,7 +460,10 @@ describe('DocsArticle page', () => {
         name: /billing, renewals, cancellation, and permanent deletion/i,
       }),
     ).toBeTruthy();
-    expect(screen.getByText(/product documentation/i)).toBeTruthy();
+    // Page intentionally references "Product documentation" more than once
+    // (label chip + disclaimer). Assert at least two, not a single match.
+    const productDocMatches = screen.getAllByText(/product documentation/i);
+    expect(productDocMatches.length).toBeGreaterThanOrEqual(2);
     // Reviewed-for-product-accuracy fixed literal appears.
     expect(screen.getByText(/2026-07-24/)).toBeTruthy();
     // No raw HTML in source.
