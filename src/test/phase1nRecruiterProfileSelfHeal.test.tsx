@@ -154,13 +154,15 @@ describe('Phase 1N-E4-A — useRecruiterProfile self-heal', () => {
   it('5. first safe-read error propagates; self-heal never called', async () => {
     const err = new Error('first-read-boom');
     queueSafe({ data: null, error: err });
-    const { Wrapper } = makeWrapper();
+    const { Wrapper, client } = makeWrapper();
     const { result } = renderHook(() => useRecruiterProfile(), { wrapper: Wrapper });
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() =>
+      expect(client.getQueryState(['recruiter_profile', 'user-1'])?.status).toBe('error'),
+    );
     expect(rpcCalls.map((c) => c.fn)).toEqual(['get_my_recruiter_profile_safe']);
-    // React Query surfaces error via profileQuery internals; the exposed
-    // profile stays null. Assert the exact error was not swallowed by
-    // inspecting that no self-heal or second read occurred.
+    // Exact-identity cache error proof: the same Error object thrown by the
+    // first safe-read reaches React Query's cache unmodified.
+    expect(client.getQueryState(['recruiter_profile', 'user-1'])?.error).toBe(err);
     expect(result.current.profile).toBeNull();
   });
 
@@ -168,13 +170,16 @@ describe('Phase 1N-E4-A — useRecruiterProfile self-heal', () => {
     const err = new Error('heal-boom');
     queueSafe({ data: [], error: null });
     queueHeal({ data: null, error: err });
-    const { Wrapper } = makeWrapper();
+    const { Wrapper, client } = makeWrapper();
     const { result } = renderHook(() => useRecruiterProfile(), { wrapper: Wrapper });
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() =>
+      expect(client.getQueryState(['recruiter_profile', 'user-1'])?.status).toBe('error'),
+    );
     expect(rpcCalls.map((c) => c.fn)).toEqual([
       'get_my_recruiter_profile_safe',
       'ensure_my_recruiter_setup_state',
     ]);
+    expect(client.getQueryState(['recruiter_profile', 'user-1'])?.error).toBe(err);
     expect(result.current.profile).toBeNull();
   });
 
@@ -183,14 +188,17 @@ describe('Phase 1N-E4-A — useRecruiterProfile self-heal', () => {
     queueSafe({ data: [], error: null });
     queueHeal({ data: null, error: null });
     queueSafe({ data: null, error: err });
-    const { Wrapper } = makeWrapper();
+    const { Wrapper, client } = makeWrapper();
     const { result } = renderHook(() => useRecruiterProfile(), { wrapper: Wrapper });
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() =>
+      expect(client.getQueryState(['recruiter_profile', 'user-1'])?.status).toBe('error'),
+    );
     expect(rpcCalls.map((c) => c.fn)).toEqual([
       'get_my_recruiter_profile_safe',
       'ensure_my_recruiter_setup_state',
       'get_my_recruiter_profile_safe',
     ]);
+    expect(client.getQueryState(['recruiter_profile', 'user-1'])?.error).toBe(err);
     expect(result.current.profile).toBeNull();
   });
 
