@@ -658,17 +658,17 @@ describe('Phase 1N-F1-B — environment and candidate location', () => {
     expect(rows[0].n).toBe(16);
   });
 
-  it('candidate lives in migration-candidates and no same-version production migration exists', () => {
+  it('candidate and production migration coexist at the exact required paths', () => {
     expect(CANDIDATE_PATH).toContain('/migration-candidates/');
     expect(CANDIDATE_PATH).not.toMatch(/\/supabase\/migrations\//);
     expect(CANDIDATE_SQL.length).toBeGreaterThan(100);
-    // Filesystem existence check.
     expect(existsSync(MIGRATIONS_DIR)).toBe(true);
+    // Exactly one production migration begins with the required version stamp.
     const same = readdirSync(MIGRATIONS_DIR).filter((n) => n.startsWith('20260724060000_'));
-    expect(same).toEqual([]);
-    // Path negative for safety.
-    expect(existsSync(path.join(MIGRATIONS_DIR,
-      '20260724060000_phase1n_f1b_transactional_account_cleanup.sql'))).toBe(false);
+    expect(same).toEqual([MIGRATION_FILENAME]);
+    expect(existsSync(MIGRATION_PATH)).toBe(true);
+    expect(MIGRATION_PATH).not.toBe(CANDIDATE_PATH);
+    expect(MIGRATION_SQL.length).toBeGreaterThan(100);
   });
 });
 
