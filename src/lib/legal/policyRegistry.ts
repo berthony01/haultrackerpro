@@ -40,7 +40,8 @@ export interface PolicyEntry {
   readonly version: string | null;
   /**
    * Fixed canonical effective date (ISO date, e.g. `2026-08-01`). Null until
-   * F2-D publication. Do NOT default to `new Date()` or build time.
+   * F2-D publication. Must never be defaulted from the runtime clock or
+   * build time.
    */
   readonly effectiveDate: string | null;
   /**

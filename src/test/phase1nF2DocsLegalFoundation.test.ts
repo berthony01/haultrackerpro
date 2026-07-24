@@ -349,7 +349,7 @@ describe('page sources — accessibility & honesty', () => {
 
   it('LegalCenter clearly states it is informational and not legal advice', () => {
     expect(legalSrc).toMatch(/informational/i);
-    expect(legalSrc).toMatch(/does not replace professional legal advice/i);
+    expect(legalSrc).toMatch(/does\s+not\s+replace\s+professional\s+legal\s+advice/i);
   });
 
   it('LegalCenter does not link directly to any planned policy route', () => {
