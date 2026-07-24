@@ -603,17 +603,17 @@ beforeAll(async () => {
 
   preCandidateOwner = await currentUserName();
 
-  // Pre-candidate snapshot (must NOT contain the RPC yet).
+  // Pre-migration snapshot (must NOT contain the RPC yet).
   SNAP_BEFORE = await snapshotAll();
   if (SNAP_BEFORE.publicFunctions[RPC_IDENT]) {
-    throw new Error('RPC unexpectedly present before candidate application');
+    throw new Error('RPC unexpectedly present before migration application');
   }
   if (SNAP_BEFORE.policies.length === 0) {
-    throw new Error('Pre-candidate policy snapshot is empty');
+    throw new Error('Pre-migration policy snapshot is empty');
   }
 
-  // Apply candidate exactly once.
-  await pool.query(CANDIDATE_SQL);
+  // Apply the promoted production migration exactly once.
+  await pool.query(MIGRATION_SQL);
   SNAP_AFTER_FIRST = await snapshotAll();
 });
 
