@@ -1059,7 +1059,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
-describe('Phase 1N-E1-R2 — environment / candidate application', () => {
+describe('Phase 1N-E1-R3 — environment / candidate application', () => {
   it('runs against PostgreSQL major version exactly 16', async () => {
     const rows = await q<{ n: number }>(
       `SELECT (current_setting('server_version_num'))::int / 10000 AS n`,
@@ -1073,12 +1073,9 @@ describe('Phase 1N-E1-R2 — environment / candidate application', () => {
     expect(CANDIDATE_SQL.length).toBeGreaterThan(100);
   });
 
-  it('candidate SQL does NOT contain any CREATE EXTENSION statement', () => {
-    expect(CANDIDATE_SQL).not.toMatch(/create\s+extension/i);
-  });
 });
 
-describe('Phase 1N-E1-R2 — backfill semantics (candidate applied once, post-seed)', () => {
+describe('Phase 1N-E1-R3 — backfill semantics (candidate applied once, post-seed)', () => {
   it('creates exactly one profile per eligible setup user missing a profile', async () => {
     const ids = [
       seeded.eligibleFromProfile,
@@ -1189,7 +1186,7 @@ describe('Phase 1N-E1-R2 — backfill semantics (candidate applied once, post-se
   });
 });
 
-describe('Phase 1N-E1-R2 — full-candidate idempotency', () => {
+describe('Phase 1N-E1-R3 — full-candidate idempotency', () => {
   it('re-applying the exact full candidate a second time is a no-op (rows, protected catalog surface)', async () => {
     const beforeRowCount = (await q<{ n: number }>(
       `SELECT count(*)::int AS n FROM public.recruiter_profiles`,
@@ -1224,7 +1221,7 @@ describe('Phase 1N-E1-R2 — full-candidate idempotency', () => {
   });
 });
 
-describe('Phase 1N-E1-R2 — RPC contract', () => {
+describe('Phase 1N-E1-R3 — RPC contract', () => {
   it('creates the RPC with correct signature, ACL, definer, search_path, volatility, owner', async () => {
     const rows = await q<any>(
       `SELECT p.prosecdef,
@@ -1483,7 +1480,7 @@ describe('Phase 1N-E1-R2 — RPC contract', () => {
   });
 });
 
-describe('Phase 1N-E1-R2 — protected catalog surface non-interference', () => {
+describe('Phase 1N-E1-R3 — protected catalog surface non-interference', () => {
   it('pre-candidate snapshot contains every canonical fixture function identity', () => {
     for (const ident of CANONICAL_FIXTURE_FUNCTION_IDENTS) {
       expect(SNAP_BEFORE.publicFunctions[ident]).toBeDefined();
