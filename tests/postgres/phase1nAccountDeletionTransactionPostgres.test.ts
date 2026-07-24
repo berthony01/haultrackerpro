@@ -1101,7 +1101,7 @@ describe('Phase 1N-F1-B — full transactional rollback', () => {
         message: expect.stringContaining('rollback-guard-trigger'),
       });
 
-      expect((await q<{ n: number }>(`SELECT count(*)::int AS n FROM public.driver_assistants WHERE assistant_user_id=$1`, [caller]))[0].n).toBe(1);
+      expect((await q<{ n: number }>(`SELECT count(*)::int AS n FROM public.driver_assistants WHERE driver_user_id=$1`, [caller]))[0].n).toBe(1);
       const wi = await q<any>(`SELECT assigned_member_user_id FROM public.agency_work_items WHERE assigned_member_user_id=$1`, [caller]);
       expect(wi).toHaveLength(1);
       const mem = await q<any>(`SELECT status::text AS status, member_user_id FROM public.agency_members WHERE agency_id=$1`, [agencyId]);
