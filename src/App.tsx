@@ -83,6 +83,8 @@ const AgencySlugRedirect = lazy(() => import("./pages/AgencySlugRedirect"));
 const AssistantsAgencies = lazy(() => import("./pages/AssistantsAgencies"));
 const CapabilityLauncher = lazy(() => import("./pages/CapabilityLauncher"));
 const ProfessionalProfile = lazy(() => import("./pages/ProfessionalProfile"));
+const Docs = lazy(() => import("./pages/Docs"));
+const LegalCenter = lazy(() => import("./pages/LegalCenter"));
 
 // SEO content pages
 const TruckDriverTaxDeductions = lazy(() => import("./pages/TruckDriverTaxDeductions"));
@@ -216,6 +218,8 @@ const App = () => (
               <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/docs" element={<Docs />} />
+              <Route path="/legal" element={<LegalCenter />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/features" element={<Features />} />
               <Route path="/pricing" element={<Pricing />} />
