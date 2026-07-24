@@ -143,7 +143,6 @@ jobs:
           print("OK: promotion parity PASS — executable bodies byte-identical and match accepted fixed SHA-256.")
           PY
 
-
       - name: Wait for PostgreSQL 16 to accept connections
         run: |
           set -eu
@@ -189,3 +188,5 @@ jobs:
             echo "Phase 1N-F1-C real-Postgres 16 gate FAILED." >&2
             exit 1
           fi
+
+# Verification-only PR trigger. This branch must not be merged.
