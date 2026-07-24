@@ -126,10 +126,10 @@ GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated, service_role;
 
 -- Real enums (D fidelity).
 CREATE TYPE public.agency_member_status AS ENUM ('pending','active','revoked');
-CREATE TYPE public.agency_member_role AS ENUM ('owner','admin','member');
-CREATE TYPE public.driver_assistant_status AS ENUM ('pending','active','revoked','expired');
-CREATE TYPE public.agency_delegation_request_status AS ENUM ('pending','accepted','declined','revoked','expired');
-CREATE TYPE public.agency_client_request_status AS ENUM ('pending','accepted','declined','revoked','completed');
+CREATE TYPE public.agency_member_role AS ENUM ('agency_owner','agency_admin','agency_member');
+CREATE TYPE public.assistant_status AS ENUM ('pending','active','revoked','expired');
+CREATE TYPE public.agency_delegation_status AS ENUM ('pending_driver_approval','approved','declined','revoked','expired');
+CREATE TYPE public.agency_client_request_status AS ENUM ('pending','approved','declined','cancelled','converted_to_client');
 
 -- Forbidden (D5) tables.
 CREATE TABLE public.agency_profiles (
