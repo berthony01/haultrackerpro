@@ -1,24 +1,28 @@
 /**
- * Phase 1N-E1-R2 — Real PostgreSQL 16 gate for the legacy recruiter
+ * Phase 1N-E1-R3 — Real PostgreSQL 16 gate for the legacy recruiter
  * compatibility candidate.
  *
- * R2 structural repairs on top of R1:
- *   1. No CREATE EXTENSION — the fixture depends only on core PG16
- *      (`gen_random_uuid()` is built in). The suite captures the extension
- *      baseline before any fixture work and hard-fails afterAll if the set
- *      is not restored byte-identically.
+ * R3 structural repairs on top of R2:
+ *   1. No CREATE EXTENSION in the fixture — the fixture depends only on core
+ *      PG16 (`gen_random_uuid()` is built in). The suite captures the
+ *      extension baseline before any fixture work and hard-fails afterAll if
+ *      the set is not restored byte-identically.
  *   2. Role MEMBERSHIP is tracked separately from role EXISTENCE. Only
  *      memberships that were not already explicit before the suite ran are
  *      granted, and only those grants are revoked in afterAll — regardless
  *      of whether the underlying role pre-existed.
- *   3. Protected-function proof no longer relies on a manual name/argument
- *      lookup. Every pre-existing function in schema `public` is snapshotted
- *      by unambiguous identity `public.<proname>(<pg_get_function_identity_arguments>)`
- *      with definition/ACL/owner/definer/config/volatility/prokind. After
- *      candidate application, the only added identity must be
+ *   3. Protected-function proof keys every function in schema `public` by
+ *      schema + name + input argument TYPES (`oidvectortypes(proargtypes)`),
+ *      while retaining `pg_get_function_identity_arguments` as a separate
+ *      drift field. Effective ACLs expand stored ACLs or PostgreSQL defaults
+ *      when `proacl` is NULL. After candidate application, the only added key
+ *      must be
  *      `public.ensure_my_recruiter_setup_state()` with exactly one overload;
  *      every other identity must be byte-identical.
- *   4. A real RLS policy surface is provisioned on all three protected
+ *   4. Pre-existing required-role definitions and explicit CURRENT_USER
+ *      memberships are snapshotted before suite grants and compared exactly
+ *      after cleanup, while suite-created roles/memberships are still removed.
+ *   5. A real RLS policy surface is provisioned on all three protected
  *      tables (`profiles`, `recruiter_profiles`, `user_capabilities`) with
  *      owner/self SELECT policies bound to `auth.uid()`. `relrowsecurity`
  *      and `relforcerowsecurity` are snapshotted alongside `pg_policies`.
@@ -62,8 +66,8 @@ const CANDIDATE_RPC_IDENT = `public.${CANDIDATE_RPC}()`;
 const CANDIDATE_ROLES = ['anon', 'authenticated', 'service_role'] as const;
 
 // Canonical fixture functions the pre-candidate snapshot MUST contain.
-// Identity keys use `pg_get_function_identity_arguments`, which strips
-// parameter names — so `_uid uuid` becomes just `uuid`.
+// Identity keys use input argument TYPES only (`oidvectortypes(proargtypes)`).
+// Argument names/modes are retained separately in each function record.
 const CANONICAL_FIXTURE_FUNCTION_IDENTS = [
   'public.update_updated_at_column()',
   'public.is_admin(uuid)',
