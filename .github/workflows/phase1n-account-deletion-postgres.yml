@@ -1,16 +1,18 @@
-name: Phase 1N-F1-B Transactional Account Cleanup PostgreSQL 16
+name: Phase 1N-F1-C Account Cleanup Migration Promotion PostgreSQL 16 Gate
 
 on:
   push:
     branches:
       - main
     paths:
+      - 'supabase/migrations/20260724060000_phase1n_f1b_transactional_account_cleanup.sql'
       - 'supabase/migration-candidates/20260724060000_phase1n_f1b_transactional_account_cleanup.sql'
       - 'tests/postgres/phase1nAccountDeletionTransactionPostgres.test.ts'
       - 'vitest.phase1n-account-deletion-postgres.config.ts'
       - '.github/workflows/phase1n-account-deletion-postgres.yml'
   pull_request:
     paths:
+      - 'supabase/migrations/20260724060000_phase1n_f1b_transactional_account_cleanup.sql'
       - 'supabase/migration-candidates/20260724060000_phase1n_f1b_transactional_account_cleanup.sql'
       - 'tests/postgres/phase1nAccountDeletionTransactionPostgres.test.ts'
       - 'vitest.phase1n-account-deletion-postgres.config.ts'
@@ -19,7 +21,7 @@ on:
 
 jobs:
   phase1n-account-deletion-postgres:
-    name: PG16 transactional account-cleanup gate
+    name: PG16 promoted account-cleanup migration gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -56,7 +58,7 @@ jobs:
       - name: Hard-fail if PHASE1N_ACCOUNT_DELETION_DATABASE_URL is absent
         run: |
           if [ -z "${PHASE1N_ACCOUNT_DELETION_DATABASE_URL:-}" ]; then
-            echo "PHASE1N_ACCOUNT_DELETION_DATABASE_URL is required for the Phase 1N-F1-B gate." >&2
+            echo "PHASE1N_ACCOUNT_DELETION_DATABASE_URL is required for the Phase 1N-F1-C gate." >&2
             exit 1
           fi
           echo "PHASE1N_ACCOUNT_DELETION_DATABASE_URL is set."
@@ -76,19 +78,68 @@ jobs:
             exit 1
           fi
 
-      - name: Candidate-only location scan (no same-version production migration)
+      - name: Promotion parity scan (candidate ⇄ production migration)
         run: |
           set -eu
           CAND="supabase/migration-candidates/20260724060000_phase1n_f1b_transactional_account_cleanup.sql"
+          MIG="supabase/migrations/20260724060000_phase1n_f1b_transactional_account_cleanup.sql"
           if [ ! -f "$CAND" ]; then
             echo "MISSING candidate: $CAND" >&2
             exit 1
           fi
-          if ls supabase/migrations 2>/dev/null | grep -q '^20260724060000_'; then
-            echo "FORBIDDEN: production migration exists with the same version stamp as the candidate." >&2
+          if [ ! -f "$MIG" ]; then
+            echo "MISSING production migration: $MIG" >&2
+            exit 1
+          fi
+          COUNT=$(ls supabase/migrations 2>/dev/null | grep -c '^20260724060000_' || true)
+          if [ "$COUNT" != "1" ]; then
+            echo "Expected exactly one production migration beginning 20260724060000_, found $COUNT:" >&2
             ls supabase/migrations | grep '^20260724060000_' >&2 || true
             exit 1
           fi
+          MARK='CREATE OR REPLACE FUNCTION public.finalize_my_account_data_deletion()'
+          extract_body() {
+            awk -v m="$MARK" '
+              !seen && index($0, m)==1 { seen=1 }
+              seen { print }
+            ' "$1"
+          }
+          extract_header() {
+            awk -v m="$MARK" '
+              index($0, m)==1 { exit }
+              { print }
+            ' "$1"
+          }
+          # Reject "CANDIDATE ONLY" text in the production migration header.
+          if extract_header "$MIG" | grep -Eiq 'CANDIDATE[[:space:]]+ONLY'; then
+            echo "FORBIDDEN: production migration header contains 'CANDIDATE ONLY'" >&2
+            exit 1
+          fi
+          # Byte-for-byte executable-body parity after consistent trailing-whitespace normalization.
+          CAND_BODY_FILE=$(mktemp)
+          MIG_BODY_FILE=$(mktemp)
+          extract_body "$CAND" | sed -e :a -e '/^$/{$d;N;ba' -e '}' > "$CAND_BODY_FILE"
+          extract_body "$MIG"  | sed -e :a -e '/^$/{$d;N;ba' -e '}' > "$MIG_BODY_FILE"
+          if [ ! -s "$CAND_BODY_FILE" ]; then
+            echo "MISSING marker in $CAND" >&2; exit 1
+          fi
+          if [ ! -s "$MIG_BODY_FILE" ]; then
+            echo "MISSING marker in $MIG" >&2; exit 1
+          fi
+          CAND_SHA=$(sha256sum "$CAND_BODY_FILE" | awk '{print $1}')
+          MIG_SHA=$(sha256sum "$MIG_BODY_FILE"  | awk '{print $1}')
+          echo "candidate executable-body SHA-256: $CAND_SHA"
+          echo "migration executable-body SHA-256: $MIG_SHA"
+          if ! cmp -s "$CAND_BODY_FILE" "$MIG_BODY_FILE"; then
+            echo "FAIL: candidate and production migration executable bodies differ" >&2
+            diff -u "$CAND_BODY_FILE" "$MIG_BODY_FILE" >&2 || true
+            exit 1
+          fi
+          if [ "$CAND_SHA" != "$MIG_SHA" ]; then
+            echo "FAIL: executable-body SHA-256 mismatch" >&2
+            exit 1
+          fi
+          echo "OK: executable bodies are byte-for-byte equal."
 
       - name: Wait for PostgreSQL 16 to accept connections
         run: |
@@ -108,7 +159,7 @@ jobs:
       - name: Prepare artifacts directory
         run: mkdir -p artifacts
 
-      - name: Real PostgreSQL 16 transactional account-cleanup gate
+      - name: Real PostgreSQL 16 promoted-migration account-cleanup gate
         id: pg_gate
         continue-on-error: true
         run: |
@@ -132,6 +183,6 @@ jobs:
           EXIT="${{ steps.pg_gate.outputs.gate_exit }}"
           echo "PostgreSQL gate exit code: ${EXIT}"
           if [ "${EXIT}" != "0" ]; then
-            echo "Phase 1N-F1-B real-Postgres 16 gate FAILED." >&2
+            echo "Phase 1N-F1-C real-Postgres 16 gate FAILED." >&2
             exit 1
           fi
