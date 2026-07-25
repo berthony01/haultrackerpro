@@ -250,7 +250,7 @@ export function OpportunityCard({
 
       {/* Row 2 — dominant pay headline + coverage */}
       {(pay || coverage) && (
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
           {pay && (
             <div className="min-w-0" aria-label={`${pay.source} ${pay.amount} per week`}>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
@@ -258,8 +258,8 @@ export function OpportunityCard({
               </p>
               <p className="text-2xl sm:text-3xl font-black text-primary leading-none whitespace-nowrap">
                 {pay.amount}
-                <span className="text-base font-bold text-muted-foreground ml-1">{pay.suffix}</span>
               </p>
+              <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">per week</p>
             </div>
           )}
           {coverage && (
