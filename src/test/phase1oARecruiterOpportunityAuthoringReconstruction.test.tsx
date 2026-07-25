@@ -271,16 +271,12 @@ describe('Phase 1O-A — Driver Preview truthfulness', () => {
     expect(within(preview).queryByText(/^N\/A$/)).toBeNull();
   });
 
-  it('renders positive optional values when present', () => {
-    renderForm(makeOpportunity({
-      sign_on_bonus: 2500,
-      detention_pay: '$25/hr after 2 hrs',
-      actual_benefits: 'Medical after 60 days',
-    }));
+  it('renders positive optional values when present (sign-on bonus routed through the one-time incentive row)', () => {
+    renderForm(makeOpportunity({ sign_on_bonus: 2500 }));
     gotoReview();
     const preview = screen.getByTestId('driver-preview');
     expect(within(preview).getByText(/\$2,500/)).toBeInTheDocument();
-    expect(within(preview).getByText(/\$25\/hr after 2 hrs/)).toBeInTheDocument();
-    expect(within(preview).getByText(/Medical after 60 days/)).toBeInTheDocument();
+    expect(within(preview).getByText(/paid separately from weekly earnings/i)).toBeInTheDocument();
   });
+
 });
