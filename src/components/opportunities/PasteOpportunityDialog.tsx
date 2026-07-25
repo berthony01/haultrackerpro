@@ -45,6 +45,28 @@ export interface ExtractedOpportunity {
   requirements?: string;
 }
 
+/**
+ * Centralized opportunity extraction — the single Supabase invocation used by
+ * both the paste dialog and the inline `Extract details` action on the
+ * recruiter authoring form. All callers must funnel through this function so
+ * the AI-extraction contract stays in one place.
+ */
+export async function extractOpportunityFromText(text: string): Promise<ExtractedOpportunity> {
+  const trimmed = text.trim();
+  if (trimmed.length < 30) {
+    throw new Error('Paste at least a short opportunity description first.');
+  }
+  const { data, error } = await supabase.functions.invoke('ai-insight', {
+    body: { type: 'parse_opportunity', context: { text: trimmed } },
+  });
+  if (error) throw new Error(error.message || 'Extraction failed');
+  const parsed = (data as { parsed?: ExtractedOpportunity })?.parsed;
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('AI returned no structured data. Try cleaner text.');
+  }
+  return parsed;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,21 +87,9 @@ export function PasteOpportunityDialog({ open, onOpenChange, onExtracted }: Prop
   };
 
   const handleExtract = async () => {
-    const trimmed = text.trim();
-    if (trimmed.length < 30) {
-      toast.error('Paste at least a short opportunity description first.');
-      return;
-    }
     setBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-insight', {
-        body: { type: 'parse_opportunity', context: { text: trimmed } },
-      });
-      if (error) throw new Error(error.message || 'Extraction failed');
-      const parsed = (data as { parsed?: ExtractedOpportunity })?.parsed;
-      if (!parsed || typeof parsed !== 'object') {
-        throw new Error('AI returned no structured data. Try cleaner text.');
-      }
+      const parsed = await extractOpportunityFromText(text);
       onExtracted(parsed);
       toast.success('Fields extracted. Review and adjust before submitting.');
       setText('');

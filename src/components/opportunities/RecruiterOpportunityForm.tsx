@@ -1,10 +1,10 @@
-// Phase 1L-DE1 — Canonical recruiter opportunity authoring form.
+// Phase 1O-A — Free-text-first, four-stage recruiter opportunity authoring.
 //
-// Six-section responsive authoring page bound to the canonical authoring
-// state, using the Phase 1L-C canonical calculator and the shared
-// publication-readiness validator. Legacy multi-page wizard, giant
-// generic "Optional details" accordion, and misleading Profit Intelligence
-// copy have been removed.
+// Reconstructs the recruiter authoring experience into four progressively
+// disclosed stages (Write & Extract, Essentials, Optional Details, Review &
+// Publish). Persistence semantics, canonical calculations, mutations, and
+// publication-readiness rules are unchanged — only the authoring UX and the
+// Review composition are new.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -17,7 +17,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  ArrowLeft, Save, Send, Sparkles, Plus, Trash2, AlertTriangle,
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  ArrowLeft, ArrowRight, Save, Send, Sparkles, Plus, Trash2, AlertTriangle,
+  CheckCircle2, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -43,7 +47,11 @@ import {
   type RecurringFrequency,
   type YesNoUnknown,
 } from '@/lib/opportunities/opportunityCanonical';
-import { PasteOpportunityDialog, type ExtractedOpportunity } from './PasteOpportunityDialog';
+import {
+  PasteOpportunityDialog,
+  extractOpportunityFromText,
+  type ExtractedOpportunity,
+} from './PasteOpportunityDialog';
 
 interface Props {
   initial?: Opportunity | null;
@@ -77,6 +85,61 @@ const FREQ_OPTIONS: Array<{ value: RecurringFrequency; label: string }> = [
   { value: 'annual', label: 'Annual' },
 ];
 const FUEL_PAID_BY = ['Company', 'Driver', 'Split', 'Not Disclosed'];
+
+/**
+ * Fixed set of 48 contiguous US state codes. Excludes AK, HI, DC, and all
+ * territories per the Phase 1O-A Hiring Coverage contract.
+ */
+export const LOWER_48_STATE_CODES: readonly string[] = [
+  'AL','AR','AZ','CA','CO','CT','DE','FL','GA','IA',
+  'ID','IL','IN','KS','KY','LA','MA','MD','ME','MI',
+  'MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM',
+  'NV','NY','OH','OK','OR','PA','RI','SC','SD','TN',
+  'TX','UT','VA','VT','WA','WI','WV','WY',
+] as const;
+
+const LOWER_48_SET = new Set(LOWER_48_STATE_CODES);
+
+export type HiringCoverageMode = 'nationwide' | 'selected' | 'local';
+
+export function inferHiringCoverageMode(state: CanonicalOpportunityAuthoringState): HiringCoverageMode {
+  const hs = state.hiring_states;
+  if (
+    hs.length === LOWER_48_STATE_CODES.length &&
+    hs.every((c) => LOWER_48_SET.has(c))
+  ) {
+    return 'nationwide';
+  }
+  if (hs.length >= 1) return 'selected';
+  return 'local';
+}
+
+function applyCoverageMode(
+  s: CanonicalOpportunityAuthoringState,
+  mode: HiringCoverageMode,
+): CanonicalOpportunityAuthoringState {
+  if (mode === 'nationwide') {
+    return { ...s, hiring_states: [...LOWER_48_STATE_CODES], hiring_city: '', hiring_state: '' };
+  }
+  if (mode === 'selected') {
+    const prior = inferHiringCoverageMode(s);
+    return {
+      ...s,
+      hiring_city: '',
+      hiring_state: '',
+      hiring_states: prior === 'nationwide' ? [] : s.hiring_states,
+    };
+  }
+  return { ...s, hiring_states: [] };
+}
+
+type StageKey = 'write' | 'essentials' | 'optional' | 'review';
+const STAGES: Array<{ key: StageKey; label: string }> = [
+  { key: 'write', label: 'Write & Extract' },
+  { key: 'essentials', label: 'Essentials' },
+  { key: 'optional', label: 'Optional Details' },
+  { key: 'review', label: 'Review & Publish' },
+];
 
 type State = CanonicalOpportunityAuthoringState;
 
@@ -154,9 +217,6 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
     next.hiring_states = [...data.hiring_states];
   }
 
-  // Legacy driver_type → canonical employment/team via shared projection.
-  // Employment and team configuration are projected independently and never
-  // overwrite a resolved recruiter selection.
   if (data.driver_type) {
     const proj = projectLegacyDriverType(data.driver_type);
     if (next.employment_model === 'unknown' && proj.employment_model !== 'unknown') {
@@ -215,7 +275,10 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const [state, setState] = useState<State>(() =>
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
   );
+  const [stage, setStage] = useState<StageKey>(initial ? 'essentials' : 'write');
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [rawText, setRawText] = useState('');
+  const [extracting, setExtracting] = useState(false);
   const hydratedRef = useRef(!!initial);
 
   useEffect(() => {
@@ -234,6 +297,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
   const readiness = useMemo(() => validateOpportunityReadiness(state), [state]);
   const pending = createOpportunity.isPending || updateOpportunity.isPending;
+  const coverageMode = inferHiringCoverageMode(state);
 
   const save = (mode: 'draft' | 'publish') => {
     if (mode === 'draft' && !readiness.canSaveDraft) {
@@ -263,10 +327,32 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
     setState((cur) => mergePasteIntoState(cur, data));
   };
 
+  const runInlineExtract = async () => {
+    setExtracting(true);
+    try {
+      const parsed = await extractOpportunityFromText(rawText);
+      handleExtracted(parsed);
+      toast.success('Fields extracted. Review and adjust before submitting.');
+      setStage('essentials');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Extraction failed');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const em = state.employment_model;
   const isCompany = em === 'company_driver';
   const isCostBearing = em === 'contractor_1099' || em === 'owner_operator' || em === 'lease_purchase';
   const leaseRelevant = em === 'lease_purchase';
+
+  const stageIndex = STAGES.findIndex((s) => s.key === stage);
+  const goNext = () => {
+    if (stageIndex < STAGES.length - 1) setStage(STAGES[stageIndex + 1].key);
+  };
+  const goPrev = () => {
+    if (stageIndex > 0) setStage(STAGES[stageIndex - 1].key);
+  };
 
   return (
     <div className="animate-fade-in pb-16 space-y-5" data-testid="recruiter-opportunity-form">
@@ -306,360 +392,781 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
         onExtracted={handleExtracted}
       />
 
-      {/* Section 1 — Opportunity Basics */}
-      <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="section-basics">
-        <SectionHeader n={1} title="Opportunity Basics" subtitle="Title, company, and how this role is classified." />
-        <Field label="Opportunity Title" required>
-          <Input value={state.title} onChange={(e) => set('title', e.target.value.slice(0, 100))}
-            placeholder="Regional Dry Van Driver" aria-label="Opportunity Title" />
-        </Field>
-        <Field label="Company Name" required>
-          <Input value={state.company_name} onChange={(e) => set('company_name', e.target.value)}
-            placeholder="ABC Logistics LLC" aria-label="Company Name" />
-        </Field>
+      {/* Stage navigation */}
+      <StageTabs current={stage} onSelect={setStage} />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Employment Arrangement" required>
-            <ChipRow<CanonicalEmploymentModel>
-              value={state.employment_model === 'unknown' ? null : state.employment_model}
-              options={EMPLOYMENT_OPTIONS}
-              onChange={(v) => setState((s) => applyEmploymentChange(s, v))}
-              testId="employment-arrangement"
-            />
-          </Field>
-          <Field label="Driving Configuration" required>
-            <ChipRow<CanonicalTeamConfiguration>
-              value={state.team_configuration === 'unspecified' ? null : state.team_configuration}
-              options={TEAM_OPTIONS}
-              onChange={(v) => set('team_configuration', v)}
-              testId="driving-configuration"
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Route Type" required>
-            <SelectField
-              ariaLabel="Route Type"
-              value={state.route_type}
-              options={ROUTE_TYPE_VALUES as readonly string[]}
-              onChange={(v) => set('route_type', v)}
-            />
-          </Field>
-          <Field label="Trailer Type" required>
-            <SelectField
-              ariaLabel="Trailer Type"
-              value={state.trailer_type}
-              options={TRAILER_TYPE_VALUES as readonly string[]}
-              onChange={(v) => set('trailer_type', v)}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-4">
-          <Field label="Hiring City">
-            <Input value={state.hiring_city} onChange={(e) => set('hiring_city', e.target.value)}
-              placeholder="Dallas" aria-label="Hiring City" />
-          </Field>
-          <Field label="Hiring State">
-            <Input value={state.hiring_state} onChange={(e) => set('hiring_state', e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="TX" aria-label="Hiring State" />
-          </Field>
-        </div>
-        <Field label="Additional Hiring States" helper="Comma-separated (TX, OK, AR)">
-          <Input
-            value={state.hiring_states.join(', ')}
-            onChange={(e) => set('hiring_states',
-              e.target.value.split(',').map((v) => v.trim().toUpperCase()).filter(Boolean))}
-            aria-label="Additional Hiring States"
+      {/* Stage panels — only the active stage is mounted; state is preserved in useState above. */}
+      {stage === 'write' && (
+        <Card className="p-5 sm:p-6 border-border/60 space-y-4" data-testid="stage-write">
+          <StageHeader
+            step={1}
+            title="Write & Extract"
+            subtitle="Paste a job posting or type it freely. Our extractor pre-fills the form so you only review."
           />
-        </Field>
-      </Card>
-
-      {/* Section 2 — Compensation */}
-      <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="section-compensation">
-        <SectionHeader n={2} title="Compensation" subtitle="Pick a pay model — only relevant fields appear." />
-        <Field label="Pay Model" required>
-          <ChipRow<CanonicalPayModel>
-            value={state.pay_model === 'unknown' ? null : state.pay_model}
-            options={PAY_OPTIONS}
-            onChange={(v) => setState((s) => applyPayModelChange(s, v))}
-            testId="pay-model"
-          />
-        </Field>
-
-        {state.pay_model === 'cpm' && (
-          <NumField label="CPM Rate ($/mi)" value={state.cpm} onChange={(v) => set('cpm', v)} />
-        )}
-        {state.pay_model === 'percentage' && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <NumField label="Percentage (%)" value={state.percentage_rate} onChange={(v) => set('percentage_rate', v)} />
-            <Field label="Percentage Basis Label" required>
-              <Input value={state.percentage_basis_label} onChange={(e) => set('percentage_basis_label', e.target.value)}
-                placeholder="Gross line-haul revenue" aria-label="Percentage Basis Label" />
-            </Field>
-            <NumField label="Weekly Revenue Basis ($)" value={state.percentage_weekly_revenue_basis}
-              onChange={(v) => set('percentage_weekly_revenue_basis', v)} />
+          <Field label="Write or paste the opportunity" helper="30+ characters unlocks Extract details.">
+            <Textarea
+              rows={12}
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
+              placeholder={'Example:\n\nABC Logistics is hiring company drivers for regional dry van runs out of Dallas, TX. Pay is $0.65/mile, average 2,800 miles per week. Home weekends. No-touch freight. Sign-on bonus $2,000.'}
+              aria-label="Write or paste the opportunity"
+              className="font-mono text-xs"
+            />
+          </Field>
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-[11px] text-muted-foreground">
+              We send only what you paste to the extractor. Nothing is saved until you publish.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={runInlineExtract}
+                disabled={extracting || rawText.trim().length < 30}
+              >
+                {extracting
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Extracting…</>
+                  : <><Sparkles className="h-4 w-4" /> Extract details</>}
+              </Button>
+              <Button type="button" onClick={goNext}>
+                Continue <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        )}
-        {state.pay_model === 'flat_weekly' && (
-          <NumField label="Flat Weekly Pay ($)" value={state.flat_weekly_pay} onChange={(v) => set('flat_weekly_pay', v)} />
-        )}
-        {state.pay_model === 'salary' && (
+        </Card>
+      )}
+
+      {stage === 'essentials' && (
+        <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="stage-essentials">
+          <StageHeader
+            step={2}
+            title="Essentials"
+            subtitle="Confirm the fields drivers must see. Optional details come next."
+          />
+
+          <Field label="Opportunity Title" required>
+            <Input value={state.title} onChange={(e) => set('title', e.target.value.slice(0, 100))}
+              placeholder="Regional Dry Van Driver" aria-label="Opportunity Title" />
+          </Field>
+          <Field label="Company Name" required>
+            <Input value={state.company_name} onChange={(e) => set('company_name', e.target.value)}
+              placeholder="ABC Logistics LLC" aria-label="Company Name" />
+          </Field>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <NumField label="Salary Amount ($)" value={state.salary_amount} onChange={(v) => set('salary_amount', v)} />
-            <Field label="Salary Pay Period" required>
-              <FreqSelect value={state.salary_frequency} onChange={(v) => set('salary_frequency', v)} ariaLabel="Salary Pay Period" />
+            <Field label="Employment Arrangement" required>
+              <ChipRow<CanonicalEmploymentModel>
+                value={state.employment_model === 'unknown' ? null : state.employment_model}
+                options={EMPLOYMENT_OPTIONS}
+                onChange={(v) => setState((s) => applyEmploymentChange(s, v))}
+                testId="employment-arrangement"
+              />
+            </Field>
+            <Field label="Driving Configuration" required>
+              <ChipRow<CanonicalTeamConfiguration>
+                value={state.team_configuration === 'unspecified' ? null : state.team_configuration}
+                options={TEAM_OPTIONS}
+                onChange={(v) => set('team_configuration', v)}
+                testId="driving-configuration"
+              />
             </Field>
           </div>
-        )}
-        {state.pay_model === 'mixed' && (
-          <MixedComponentsEditor
-            components={state.mixed_pay_components}
-            onChange={(comps) => set('mixed_pay_components', comps)}
-          />
-        )}
-        {state.pay_model === 'other' && (
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Pay Method Label" required>
-              <Input value={state.other_pay_method_label} onChange={(e) => set('other_pay_method_label', e.target.value)}
-                placeholder="Guarantee + activity bonuses" aria-label="Pay Method Label" />
+            <Field label="Route Type" required>
+              <SelectField
+                ariaLabel="Route Type"
+                value={state.route_type}
+                options={ROUTE_TYPE_VALUES as readonly string[]}
+                onChange={(v) => set('route_type', v)}
+              />
             </Field>
-            <NumField label="Supported Weekly Gross ($)" value={state.other_weekly_gross}
-              onChange={(v) => set('other_weekly_gross', v)} />
+            <Field label="Trailer Type" required>
+              <SelectField
+                ariaLabel="Trailer Type"
+                value={state.trailer_type}
+                options={TRAILER_TYPE_VALUES as readonly string[]}
+                onChange={(v) => set('trailer_type', v)}
+              />
+            </Field>
           </div>
-        )}
 
-        <NumField label="Recruiter-provided Weekly Gross ($)" value={state.recruiter_provided_weekly_gross}
-          onChange={(v) => set('recruiter_provided_weekly_gross', v)} />
+          <HiringCoverageEditor
+            state={state}
+            mode={coverageMode}
+            onModeChange={(m) => setState((s) => applyCoverageMode(s, m))}
+            onCityChange={(v) => set('hiring_city', v)}
+            onStateChange={(v) => set('hiring_state', v.toUpperCase().slice(0, 2))}
+            onStatesChange={(list) => set('hiring_states', list)}
+          />
 
-        <div className="pt-3 border-t border-border/40">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-            One-Time Incentives
-          </p>
-          <NumField label="Sign-On Bonus ($)" value={state.sign_on_bonus} onChange={(v) => set('sign_on_bonus', v)} />
-          <p className="text-[11px] text-muted-foreground mt-1">
-            Displayed separately from weekly earnings. Never included in gross, net, or RPM.
-          </p>
-        </div>
-      </Card>
-
-      {/* Section 3 — Schedule, Routes & Operations */}
-      <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="section-operations">
-        <SectionHeader n={3} title="Schedule, Routes & Operations" subtitle="Miles, deadhead, and operating terms." />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <NumField label="Total Weekly Miles" value={state.estimated_weekly_miles}
-            onChange={(v) => set('estimated_weekly_miles', v)} />
-          <NumField label="Loaded Miles" value={state.estimated_loaded_miles}
-            onChange={(v) => set('estimated_loaded_miles', v)} />
-          <NumField label="Deadhead Miles" value={state.estimated_deadhead_miles}
-            onChange={(v) => set('estimated_deadhead_miles', v)} />
-        </div>
-        <Field label="Deadhead Paid?">
-          <YesNoSelect ariaLabel="Deadhead Paid?" value={state.deadhead_paid}
-            onChange={(v) => set('deadhead_paid', v)} />
-        </Field>
-        <Field label="Home Time" required>
-          <Input value={state.home_time} onChange={(e) => set('home_time', e.target.value)}
-            placeholder="Home weekly, every 2 weeks…" aria-label="Home Time" />
-        </Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Detention Pay">
-            <Input value={state.detention_pay} onChange={(e) => set('detention_pay', e.target.value)}
-              placeholder="$25/hr after 2 hrs" aria-label="Detention Pay" />
+          <Field label="Home Time" required>
+            <Input value={state.home_time} onChange={(e) => set('home_time', e.target.value)}
+              placeholder="Home weekly, every 2 weeks…" aria-label="Home Time" />
           </Field>
-          <Field label="Layover Pay">
-            <Input value={state.layover_pay} onChange={(e) => set('layover_pay', e.target.value)}
-              placeholder="$150/day" aria-label="Layover Pay" />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="Forced Dispatch?">
-            <YesNoSelect ariaLabel="Forced Dispatch?" value={state.forced_dispatch}
-              onChange={(v) => set('forced_dispatch', v)} />
-          </Field>
-          <Field label="Pets Allowed?">
-            <YesNoSelect ariaLabel="Pets Allowed?" value={state.pets_allowed}
-              onChange={(v) => set('pets_allowed', v)} />
-          </Field>
-          <Field label="Riders Allowed?">
-            <YesNoSelect ariaLabel="Riders Allowed?" value={state.riders_allowed}
-              onChange={(v) => set('riders_allowed', v)} />
-          </Field>
-        </div>
-        <Field label="Equipment Year / Truck Info">
-          <Input value={state.equipment_year} onChange={(e) => set('equipment_year', e.target.value)}
-            placeholder="2020–2024 Freightliner Cascadia" aria-label="Equipment Year / Truck Info" />
-        </Field>
-      </Card>
 
-      {/* Section 4 — Equipment, Costs & Benefits */}
-      <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="section-costs">
-        <SectionHeader n={4} title="Equipment, Costs & Benefits"
-          subtitle={isCompany
-            ? 'Ownership operating-cost fields are not applicable to company-driver listings.'
-            : 'Enter recurring costs the driver bears. Use “Not disclosed” to leave blank.'} />
+          <div className="pt-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+              Main Pay Model
+            </p>
+            <Field label="Pay Model" required>
+              <ChipRow<CanonicalPayModel>
+                value={state.pay_model === 'unknown' ? null : state.pay_model}
+                options={PAY_OPTIONS}
+                onChange={(v) => setState((s) => applyPayModelChange(s, v))}
+                testId="pay-model"
+              />
+            </Field>
 
-        {!isCompany && (
-          <Field label="Fuel Paid By">
-            <Select value={state.fuel_paid_by || 'unset'}
-              onValueChange={(v) => set('fuel_paid_by', v === 'unset' ? '' : v)}>
-              <SelectTrigger aria-label="Fuel Paid By"><SelectValue placeholder="Not disclosed" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unset">Not disclosed</SelectItem>
-                {FUEL_PAID_BY.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </Field>
-        )}
-
-        {isCompany && (
-          <p className="text-xs text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
-            Ownership operating-cost fields are not applicable to company-driver listings. Estimated
-            take-home is unavailable under the current canonical model.
-          </p>
-        )}
-
-        {isCostBearing && (
-          <div className="space-y-4" data-testid="cost-fields">
-            <CostRow label="Insurance" amount={state.insurance_amount} frequency={state.insurance_frequency}
-              onAmount={(v) => set('insurance_amount', v)} onFrequency={(v) => set('insurance_frequency', v)} />
-            <CostRow label="Maintenance" amount={state.maintenance_amount} frequency={state.maintenance_frequency}
-              onAmount={(v) => set('maintenance_amount', v)} onFrequency={(v) => set('maintenance_frequency', v)} />
-            <CostRow label="Other recurring cost" amount={state.other_cost_amount} frequency={state.other_cost_frequency}
-              onAmount={(v) => set('other_cost_amount', v)} onFrequency={(v) => set('other_cost_frequency', v)} />
-            {leaseRelevant && (
-              <CostRow label="Lease payment" amount={state.lease_amount} frequency={state.lease_frequency}
-                onAmount={(v) => set('lease_amount', v)} onFrequency={(v) => set('lease_frequency', v)} />
+            {state.pay_model === 'cpm' && (
+              <div className="mt-4">
+                <NumField label="CPM Rate ($/mi)" value={state.cpm} onChange={(v) => set('cpm', v)} />
+              </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label="Escrow Required?">
-                <Select
-                  value={state.escrow_required_state}
-                  onValueChange={(v) => set('escrow_required_state',
-                    (v === 'unspecified' ? 'unspecified' : v) as EscrowRequiredState | 'unspecified')}
-                >
-                  <SelectTrigger aria-label="Escrow Required?"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unspecified">Not disclosed</SelectItem>
-                    <SelectItem value="required">Required</SelectItem>
-                    <SelectItem value="not_required">Not required</SelectItem>
-                    <SelectItem value="not_disclosed">Explicitly not disclosed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              {state.escrow_required_state === 'required' && (
-                <>
-                  <NumField label="Escrow Amount ($)" value={state.escrow_amount}
-                    onChange={(v) => set('escrow_amount', v)} />
-                  <Field label="Escrow Frequency">
-                    <FreqSelect ariaLabel="Escrow Frequency" value={state.escrow_frequency}
-                      onChange={(v) => set('escrow_frequency', v)} />
-                  </Field>
-                </>
-              )}
-            </div>
+            {state.pay_model === 'percentage' && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <NumField label="Percentage (%)" value={state.percentage_rate} onChange={(v) => set('percentage_rate', v)} />
+                <Field label="Percentage Basis Label" required>
+                  <Input value={state.percentage_basis_label} onChange={(e) => set('percentage_basis_label', e.target.value)}
+                    placeholder="Gross line-haul revenue" aria-label="Percentage Basis Label" />
+                </Field>
+                <NumField label="Weekly Revenue Basis ($)" value={state.percentage_weekly_revenue_basis}
+                  onChange={(v) => set('percentage_weekly_revenue_basis', v)} />
+              </div>
+            )}
+            {state.pay_model === 'flat_weekly' && (
+              <div className="mt-4">
+                <NumField label="Flat Weekly Pay ($)" value={state.flat_weekly_pay} onChange={(v) => set('flat_weekly_pay', v)} />
+              </div>
+            )}
+            {state.pay_model === 'salary' && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <NumField label="Salary Amount ($)" value={state.salary_amount} onChange={(v) => set('salary_amount', v)} />
+                <Field label="Salary Pay Period" required>
+                  <FreqSelect value={state.salary_frequency} onChange={(v) => set('salary_frequency', v)} ariaLabel="Salary Pay Period" />
+                </Field>
+              </div>
+            )}
+            {state.pay_model === 'mixed' && (
+              <div className="mt-4">
+                <MixedComponentsEditor
+                  components={state.mixed_pay_components}
+                  onChange={(comps) => set('mixed_pay_components', comps)}
+                />
+              </div>
+            )}
+            {state.pay_model === 'other' && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Pay Method Label" required>
+                  <Input value={state.other_pay_method_label} onChange={(e) => set('other_pay_method_label', e.target.value)}
+                    placeholder="Guarantee + activity bonuses" aria-label="Pay Method Label" />
+                </Field>
+                <NumField label="Supported Weekly Gross ($)" value={state.other_weekly_gross}
+                  onChange={(v) => set('other_weekly_gross', v)} />
+              </div>
+            )}
           </div>
-        )}
 
-        <Field label="Actual Benefits (health, retirement, PTO)">
-          <Textarea rows={3} value={state.actual_benefits}
-            onChange={(e) => set('actual_benefits', e.target.value)}
-            placeholder="Medical after 60 days, 401k with match, 2 weeks PTO"
-            aria-label="Actual Benefits" />
-        </Field>
-      </Card>
+          <StageNav onPrev={goPrev} onNext={goNext} isFirst={false} isLast={false} />
+        </Card>
+      )}
 
-      {/* Section 5 — Qualifications & Description */}
-      <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="section-content">
-        <SectionHeader n={5} title="Qualifications & Description" subtitle="How this role reads to drivers." />
-        <Field label="Description" required>
-          <Textarea rows={4} value={state.description}
-            onChange={(e) => set('description', e.target.value.slice(0, 800))}
-            placeholder="Briefly describe the role, lanes, and expectations."
-            aria-label="Description" />
-        </Field>
-        <Field label="Typical Lanes" helper='One per line — "Dallas, TX → Houston, TX"'>
-          <Textarea rows={3} value={state.typical_lanes}
-            onChange={(e) => set('typical_lanes', e.target.value)}
-            placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
-            aria-label="Typical Lanes" />
-        </Field>
-        <Field label="Requirements" helper="Experience, CDL class, endorsements, MVR/drug test.">
-          <Textarea rows={4} value={state.requirements}
-            onChange={(e) => set('requirements', e.target.value)}
-            placeholder={'• 1 year OTR experience\n• Class A CDL\n• Clean MVR last 3 years'}
-            aria-label="Requirements" />
-        </Field>
-      </Card>
-
-      {/* Section 6 — Review & Publish */}
-      <Card className="p-5 sm:p-6 border-border/60 space-y-5" data-testid="section-review">
-        <SectionHeader n={6} title="Review & Publish" subtitle="Canonical summary before you publish." />
-        <ReviewSummary state={state} readiness={readiness} />
-
-        <label className="flex items-start gap-3 cursor-pointer">
-          <Checkbox
-            checked={state.transparency_confirmed}
-            onCheckedChange={(v) => set('transparency_confirmed', !!v)}
-            className="mt-0.5"
-            aria-label="Transparency confirmation"
+      {stage === 'optional' && (
+        <Card className="p-5 sm:p-6 border-border/60 space-y-4" data-testid="stage-optional">
+          <StageHeader
+            step={3}
+            title="Optional Details"
+            subtitle="Everything else drivers may care about. Skip any group that does not apply."
           />
-          <span className="text-sm text-foreground leading-snug">
-            I confirm this opportunity is accurate: pay, miles, costs, and estimated earnings are labeled
-            with their source.
-          </span>
-        </label>
+          <Accordion type="multiple" className="w-full">
+            {/* Mileage & Runs */}
+            <AccordionItem value="mileage" data-testid="group-mileage">
+              <AccordionTrigger>Mileage & Runs</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <NumField label="Total Weekly Miles" value={state.estimated_weekly_miles}
+                      onChange={(v) => set('estimated_weekly_miles', v)} />
+                    <NumField label="Loaded Miles" value={state.estimated_loaded_miles}
+                      onChange={(v) => set('estimated_loaded_miles', v)} />
+                    <NumField label="Deadhead Miles" value={state.estimated_deadhead_miles}
+                      onChange={(v) => set('estimated_deadhead_miles', v)} />
+                  </div>
+                  <Field label="Deadhead Paid?">
+                    <YesNoSelect ariaLabel="Deadhead Paid?" value={state.deadhead_paid}
+                      onChange={(v) => set('deadhead_paid', v)} />
+                  </Field>
+                  <NumField label="Recruiter-provided Weekly Gross ($)" value={state.recruiter_provided_weekly_gross}
+                    onChange={(v) => set('recruiter_provided_weekly_gross', v)} />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-        {readiness.blockingReasons.length > 0 && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3" data-testid="publish-blockers">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <h4 className="text-xs font-bold text-foreground">Fix before publishing</h4>
-            </div>
-            <ul className="space-y-1 text-xs text-muted-foreground list-disc pl-5">
-              {readiness.blockingReasons.map((r) => <li key={r}>{r}</li>)}
-            </ul>
-          </div>
-        )}
-        {readiness.warnings.length > 0 && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3" data-testid="publish-warnings">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-amber-400" />
-              <h4 className="text-xs font-bold text-foreground">Heads up</h4>
-            </div>
-            <ul className="space-y-1 text-xs text-muted-foreground list-disc pl-5">
-              {readiness.warnings.map((w) => <li key={w}>{w}</li>)}
-            </ul>
-          </div>
-        )}
+            {/* Bonuses & Accessorial Pay */}
+            <AccordionItem value="bonuses" data-testid="group-bonuses">
+              <AccordionTrigger>Bonuses & Accessorial Pay</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Detention Pay">
+                      <Input value={state.detention_pay} onChange={(e) => set('detention_pay', e.target.value)}
+                        placeholder="$25/hr after 2 hrs" aria-label="Detention Pay" />
+                    </Field>
+                    <Field label="Layover Pay">
+                      <Input value={state.layover_pay} onChange={(e) => set('layover_pay', e.target.value)}
+                        placeholder="$150/day" aria-label="Layover Pay" />
+                    </Field>
+                  </div>
+                  <NumField label="Sign-On Bonus ($)" value={state.sign_on_bonus} onChange={(v) => set('sign_on_bonus', v)} />
+                  <p className="text-[11px] text-muted-foreground">
+                    One-time incentives are displayed separately from weekly earnings. Never included in gross, net, or RPM.
+                  </p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3" data-testid="form-actions">
-          <Button variant="outline" onClick={() => save('draft')}
-            disabled={pending || !readiness.canSaveDraft}>
-            <Save className="h-4 w-4" /> Save Draft
-          </Button>
-          <Button onClick={() => save('publish')}
-            disabled={pending || !readiness.canPublish}>
-            <Send className="h-4 w-4" /> Publish Opportunity
-          </Button>
+            {/* Costs & Operating Terms */}
+            <AccordionItem value="costs" data-testid="group-costs">
+              <AccordionTrigger>Costs & Operating Terms</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  {isCompany && (
+                    <p className="text-xs text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
+                      Ownership operating-cost fields are not applicable to company-driver listings. Estimated
+                      take-home is unavailable under the current canonical model.
+                    </p>
+                  )}
+                  {!isCompany && (
+                    <Field label="Fuel Paid By">
+                      <Select value={state.fuel_paid_by || 'unset'}
+                        onValueChange={(v) => set('fuel_paid_by', v === 'unset' ? '' : v)}>
+                        <SelectTrigger aria-label="Fuel Paid By"><SelectValue placeholder="Not disclosed" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unset">Not disclosed</SelectItem>
+                          {FUEL_PAID_BY.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+
+                  {isCostBearing && (
+                    <div className="space-y-4" data-testid="cost-fields">
+                      <CostRow label="Insurance" amount={state.insurance_amount} frequency={state.insurance_frequency}
+                        onAmount={(v) => set('insurance_amount', v)} onFrequency={(v) => set('insurance_frequency', v)} />
+                      <CostRow label="Maintenance" amount={state.maintenance_amount} frequency={state.maintenance_frequency}
+                        onAmount={(v) => set('maintenance_amount', v)} onFrequency={(v) => set('maintenance_frequency', v)} />
+                      <CostRow label="Other recurring cost" amount={state.other_cost_amount} frequency={state.other_cost_frequency}
+                        onAmount={(v) => set('other_cost_amount', v)} onFrequency={(v) => set('other_cost_frequency', v)} />
+                      {leaseRelevant && (
+                        <CostRow label="Lease payment" amount={state.lease_amount} frequency={state.lease_frequency}
+                          onAmount={(v) => set('lease_amount', v)} onFrequency={(v) => set('lease_frequency', v)} />
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <Field label="Escrow Required?">
+                          <Select
+                            value={state.escrow_required_state}
+                            onValueChange={(v) => set('escrow_required_state',
+                              (v === 'unspecified' ? 'unspecified' : v) as EscrowRequiredState | 'unspecified')}
+                          >
+                            <SelectTrigger aria-label="Escrow Required?"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unspecified">Not disclosed</SelectItem>
+                              <SelectItem value="required">Required</SelectItem>
+                              <SelectItem value="not_required">Not required</SelectItem>
+                              <SelectItem value="not_disclosed">Explicitly not disclosed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        {state.escrow_required_state === 'required' && (
+                          <>
+                            <NumField label="Escrow Amount ($)" value={state.escrow_amount}
+                              onChange={(v) => set('escrow_amount', v)} />
+                            <Field label="Escrow Frequency">
+                              <FreqSelect ariaLabel="Escrow Frequency" value={state.escrow_frequency}
+                                onChange={(v) => set('escrow_frequency', v)} />
+                            </Field>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Field label="Forced Dispatch?">
+                      <YesNoSelect ariaLabel="Forced Dispatch?" value={state.forced_dispatch}
+                        onChange={(v) => set('forced_dispatch', v)} />
+                    </Field>
+                    <Field label="Pets Allowed?">
+                      <YesNoSelect ariaLabel="Pets Allowed?" value={state.pets_allowed}
+                        onChange={(v) => set('pets_allowed', v)} />
+                    </Field>
+                    <Field label="Riders Allowed?">
+                      <YesNoSelect ariaLabel="Riders Allowed?" value={state.riders_allowed}
+                        onChange={(v) => set('riders_allowed', v)} />
+                    </Field>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Benefits & Equipment */}
+            <AccordionItem value="benefits" data-testid="group-benefits">
+              <AccordionTrigger>Benefits & Equipment</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  <Field label="Equipment Year / Truck Info">
+                    <Input value={state.equipment_year} onChange={(e) => set('equipment_year', e.target.value)}
+                      placeholder="2020–2024 Freightliner Cascadia" aria-label="Equipment Year / Truck Info" />
+                  </Field>
+                  <Field label="Actual Benefits (health, retirement, PTO)">
+                    <Textarea rows={3} value={state.actual_benefits}
+                      onChange={(e) => set('actual_benefits', e.target.value)}
+                      placeholder="Medical after 60 days, 401k with match, 2 weeks PTO"
+                      aria-label="Actual Benefits" />
+                  </Field>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Driver Requirements & Description */}
+            <AccordionItem value="requirements" data-testid="group-requirements">
+              <AccordionTrigger>Driver Requirements & Description</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  <Field label="Description" required>
+                    <Textarea rows={4} value={state.description}
+                      onChange={(e) => set('description', e.target.value.slice(0, 800))}
+                      placeholder="Briefly describe the role, lanes, and expectations."
+                      aria-label="Description" />
+                  </Field>
+                  <Field label="Typical Lanes" helper='One per line — "Dallas, TX → Houston, TX"'>
+                    <Textarea rows={3} value={state.typical_lanes}
+                      onChange={(e) => set('typical_lanes', e.target.value)}
+                      placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
+                      aria-label="Typical Lanes" />
+                  </Field>
+                  <Field label="Requirements" helper="Experience, CDL class, endorsements, MVR/drug test.">
+                    <Textarea rows={4} value={state.requirements}
+                      onChange={(e) => set('requirements', e.target.value)}
+                      placeholder={'• 1 year OTR experience\n• Class A CDL\n• Clean MVR last 3 years'}
+                      aria-label="Requirements" />
+                  </Field>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          <StageNav onPrev={goPrev} onNext={goNext} isFirst={false} isLast={false} />
+        </Card>
+      )}
+
+      {stage === 'review' && (
+        <div className="space-y-5" data-testid="stage-review">
+          <StageHeader
+            step={4}
+            title="Review & Publish"
+            subtitle="Confirm the checklist and preview drivers will see. Publish when you're ready."
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <PublicationChecklist readiness={readiness} />
+            <DriverPreview state={state} readiness={readiness} coverageMode={coverageMode} />
+          </div>
+
+          <Card className="p-5 sm:p-6 border-border/60 space-y-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <Checkbox
+                checked={state.transparency_confirmed}
+                onCheckedChange={(v) => set('transparency_confirmed', !!v)}
+                className="mt-0.5"
+                aria-label="Transparency confirmation"
+              />
+              <span className="text-sm text-foreground leading-snug">
+                I confirm this opportunity is accurate: pay, miles, costs, and estimated earnings are labeled
+                with their source.
+              </span>
+            </label>
+
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3" data-testid="form-actions">
+              <Button variant="outline" onClick={goPrev} type="button">
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Button>
+              <Button variant="outline" onClick={() => save('draft')}
+                disabled={pending || !readiness.canSaveDraft}>
+                <Save className="h-4 w-4" /> Save Draft
+              </Button>
+              <Button onClick={() => save('publish')}
+                disabled={pending || !readiness.canPublish}>
+                <Send className="h-4 w-4" /> Publish Opportunity
+              </Button>
+            </div>
+          </Card>
         </div>
-      </Card>
+      )}
     </div>
   );
 }
 
-/* ---------------- primitives ---------------- */
+/* ---------------- stage primitives ---------------- */
 
-function SectionHeader({ n, title, subtitle }: { n: number; title: string; subtitle: string }) {
+function StageTabs({ current, onSelect }: { current: StageKey; onSelect: (k: StageKey) => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Opportunity authoring stages"
+      className="flex flex-wrap gap-2"
+      data-testid="stage-tabs"
+    >
+      {STAGES.map((s, i) => {
+        const active = s.key === current;
+        return (
+          <button
+            key={s.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-current={active ? 'step' : undefined}
+            onClick={() => onSelect(s.key)}
+            data-testid={`stage-tab-${s.key}`}
+            className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+              active
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
+            }`}
+          >
+            <span className="tabular-nums text-[10px] opacity-70 mr-1.5">{i + 1}</span>
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StageHeader({ step, title, subtitle }: { step: number; title: string; subtitle: string }) {
   return (
     <div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-primary">Section {n}</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-primary">Step {step} of {STAGES.length}</p>
       <h2 className="text-lg font-black text-foreground mt-1">{title}</h2>
       <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
     </div>
   );
 }
+
+function StageNav({
+  onPrev, onNext, isFirst, isLast,
+}: { onPrev: () => void; onNext: () => void; isFirst: boolean; isLast: boolean }) {
+  return (
+    <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 pt-2">
+      <Button type="button" variant="outline" onClick={onPrev} disabled={isFirst}>
+        <ArrowLeft className="h-4 w-4" /> Back
+      </Button>
+      <Button type="button" onClick={onNext} disabled={isLast}>
+        Continue <ArrowRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+/* ---------------- hiring coverage ---------------- */
+
+function HiringCoverageEditor({
+  state, mode, onModeChange, onCityChange, onStateChange, onStatesChange,
+}: {
+  state: State;
+  mode: HiringCoverageMode;
+  onModeChange: (m: HiringCoverageMode) => void;
+  onCityChange: (v: string) => void;
+  onStateChange: (v: string) => void;
+  onStatesChange: (list: string[]) => void;
+}) {
+  const modeOptions: Array<{ value: HiringCoverageMode; label: string }> = [
+    { value: 'nationwide', label: 'Nationwide — Lower 48' },
+    { value: 'selected', label: 'Selected States' },
+    { value: 'local', label: 'Local / Metro Area' },
+  ];
+
+  const toggleState = (code: string) => {
+    const has = state.hiring_states.includes(code);
+    const next = has
+      ? state.hiring_states.filter((c) => c !== code)
+      : [...state.hiring_states, code].sort();
+    onStatesChange(next);
+  };
+
+  return (
+    <div className="space-y-3" data-testid="hiring-coverage">
+      <Field label="Hiring Coverage" required>
+        <div className="flex flex-wrap gap-2" data-testid="hiring-coverage-modes" role="radiogroup" aria-label="Hiring Coverage">
+          {modeOptions.map((o) => {
+            const active = o.value === mode;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                aria-pressed={active}
+                onClick={() => onModeChange(o.value)}
+                data-testid={`coverage-mode-${o.value}`}
+                className={`px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                  active
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
+                }`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      {mode === 'nationwide' && (
+        <p className="text-xs text-muted-foreground rounded-md bg-muted/30 px-3 py-2" data-testid="coverage-nationwide-hint">
+          Drivers in all 48 contiguous states will see this opportunity.
+        </p>
+      )}
+
+      {mode === 'selected' && (
+        <div className="space-y-2" data-testid="coverage-selected">
+          <p className="text-[11px] text-muted-foreground">
+            Choose one or more contiguous states. AK, HI, and DC are not eligible.
+          </p>
+          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
+            {LOWER_48_STATE_CODES.map((code) => {
+              const on = state.hiring_states.includes(code);
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => toggleState(code)}
+                  aria-pressed={on}
+                  aria-label={`Hiring state ${code}`}
+                  data-testid={`coverage-state-${code}`}
+                  className={`px-2 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${
+                    on
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
+                  }`}
+                >
+                  {code}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {state.hiring_states.length} state{state.hiring_states.length === 1 ? '' : 's'} selected.
+          </p>
+        </div>
+      )}
+
+      {mode === 'local' && (
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-4" data-testid="coverage-local">
+          <Field label="Hiring City" required>
+            <Input value={state.hiring_city} onChange={(e) => onCityChange(e.target.value)}
+              placeholder="Dallas" aria-label="Hiring City" />
+          </Field>
+          <Field label="Hiring State" required>
+            <Input value={state.hiring_state} onChange={(e) => onStateChange(e.target.value)}
+              placeholder="TX" aria-label="Hiring State" />
+          </Field>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- review composition ---------------- */
+
+function PublicationChecklist({
+  readiness,
+}: { readiness: ReturnType<typeof validateOpportunityReadiness> }) {
+  const blockers = readiness.blockingReasons;
+  const warnings = readiness.warnings;
+  const ok = blockers.length === 0;
+
+  return (
+    <Card className="p-5 sm:p-6 border-border/60 space-y-4" data-testid="publication-checklist">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-primary">Publication Checklist</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Blockers stop publishing. Warnings publish as-is but reduce transparency.
+        </p>
+      </div>
+
+      {ok && (
+        <div
+          className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3"
+          data-testid="publish-ok"
+        >
+          <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-bold text-foreground">Ready to publish</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">No blockers detected.</p>
+          </div>
+        </div>
+      )}
+
+      {blockers.length > 0 && (
+        <div
+          className="rounded-lg border border-destructive/30 bg-destructive/5 p-3"
+          data-testid="publish-blockers"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <h4 className="text-xs font-bold text-foreground">
+              {blockers.length} blocker{blockers.length === 1 ? '' : 's'}
+            </h4>
+          </div>
+          <ul className="space-y-1 text-xs text-muted-foreground list-disc pl-5">
+            {blockers.map((r) => <li key={r}>{r}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div
+          className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"
+          data-testid="publish-warnings"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <h4 className="text-xs font-bold text-foreground">
+              {warnings.length} warning{warnings.length === 1 ? '' : 's'}
+            </h4>
+          </div>
+          <ul className="space-y-1 text-xs text-muted-foreground list-disc pl-5">
+            {warnings.map((w) => <li key={w}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function DriverPreview({
+  state, readiness, coverageMode,
+}: {
+  state: State;
+  readiness: ReturnType<typeof validateOpportunityReadiness>;
+  coverageMode: HiringCoverageMode;
+}) {
+  const fe = readiness.financialEstimate;
+  const rows: Array<{ label: string; value: string }> = [];
+
+  const payLabel = state.pay_model === 'unknown'
+    ? null
+    : PAY_OPTIONS.find((o) => o.value === state.pay_model)?.label ?? null;
+  const grossLabel = fe.grossSource === 'derived'
+    ? 'Derived'
+    : fe.grossSource === 'recruiter_provided'
+      ? 'Recruiter-provided'
+      : null;
+
+  const payDetails: string[] = [];
+  if (payLabel) payDetails.push(payLabel);
+  if (fe.recurringWeeklyGross != null && grossLabel) {
+    payDetails.push(`$${Math.round(fe.recurringWeeklyGross).toLocaleString()}/wk (${grossLabel})`);
+  }
+  if (fe.effectiveRpm != null) payDetails.push(`$${fe.effectiveRpm.toFixed(2)} RPM`);
+  if (payDetails.length > 0) rows.push({ label: 'Main pay offer', value: payDetails.join(' · ') });
+
+  const coverageValue = coverageMode === 'nationwide'
+    ? 'Nationwide — Lower 48'
+    : coverageMode === 'selected'
+      ? state.hiring_states.length > 0
+        ? `Selected states: ${state.hiring_states.join(', ')}`
+        : ''
+      : state.hiring_city && state.hiring_state
+        ? `${state.hiring_city}, ${state.hiring_state}`
+        : '';
+  if (coverageValue) rows.push({ label: 'Hiring coverage', value: coverageValue });
+
+  const emLabel = state.employment_model === 'unknown'
+    ? null
+    : EMPLOYMENT_OPTIONS.find((o) => o.value === state.employment_model)?.label ?? null;
+  if (emLabel) rows.push({ label: 'Employment arrangement', value: emLabel });
+
+  const teamLabel = state.team_configuration === 'unspecified'
+    ? null
+    : TEAM_OPTIONS.find((o) => o.value === state.team_configuration)?.label ?? null;
+  if (teamLabel) rows.push({ label: 'Driving configuration', value: teamLabel });
+
+  if (state.route_type) rows.push({ label: 'Route type', value: state.route_type });
+  if (state.trailer_type) rows.push({ label: 'Trailer type', value: state.trailer_type });
+  if (state.home_time.trim()) rows.push({ label: 'Home time', value: state.home_time.trim() });
+
+  // Optional recurring net — only when actually available and applicable.
+  if (fe.netStatus === 'available' && fe.estimatedWeeklyNet != null) {
+    rows.push({
+      label: 'Estimated weekly net',
+      value: `$${Math.round(fe.estimatedWeeklyNet).toLocaleString()} · Before taxes`,
+    });
+  }
+
+  // One-time incentives — only when > 0, always labeled separately from recurring pay.
+  if (fe.oneTimeIncentiveTotal > 0) {
+    rows.push({
+      label: 'One-time incentives',
+      value: `$${Math.round(fe.oneTimeIncentiveTotal).toLocaleString()} (paid separately from weekly earnings)`,
+    });
+  }
+
+  const title = state.title.trim();
+  const company = state.company_name.trim();
+  const description = state.description.trim();
+
+  return (
+    <Card className="p-5 sm:p-6 border-border/60 space-y-4" data-testid="driver-preview">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-primary">Driver Preview</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Only populated details appear. Skipped fields are hidden — no empty rows.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {title ? (
+          <h3 className="text-xl font-black text-foreground leading-tight">{title}</h3>
+        ) : (
+          <p className="text-xs italic text-muted-foreground">Add a title on Essentials.</p>
+        )}
+        {company && (
+          <p className="text-sm font-semibold text-muted-foreground">{company}</p>
+        )}
+      </div>
+
+      {rows.length > 0 && (
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="driver-preview-rows">
+          {rows.map((r) => (
+            <div
+              key={r.label}
+              className="rounded-lg border border-border/60 bg-card/40 px-3 py-2"
+              data-testid={`preview-row-${r.label.toLowerCase().replace(/[^a-z]+/g, '-')}`}
+            >
+              <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                {r.label}
+              </dt>
+              <dd className="text-sm font-black text-foreground mt-0.5">{r.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {description && (
+        <div className="pt-2 border-t border-border/40">
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-1">
+            About this role
+          </p>
+          <p className="text-sm text-foreground whitespace-pre-line">{description}</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ---------------- primitives ---------------- */
 
 function Field({
   label, required, helper, children,
@@ -810,45 +1317,6 @@ function MixedComponentsEditor({ components, onChange }: {
       <Button type="button" variant="outline" size="sm" onClick={add}>
         <Plus className="h-4 w-4" /> Add pay component
       </Button>
-    </div>
-  );
-}
-
-function ReviewSummary({ state, readiness }: {
-  state: CanonicalOpportunityAuthoringState; readiness: ReturnType<typeof validateOpportunityReadiness>;
-}) {
-  const fe = readiness.financialEstimate;
-  const grossLabel = fe.grossSource === 'derived' ? 'Derived' : fe.grossSource === 'recruiter_provided' ? 'Recruiter-provided' : '—';
-  const fmt = (n: number | null) => n == null ? '—' : `$${Math.round(n).toLocaleString()}`;
-  const rpm = fe.effectiveRpm == null ? '—' : `$${fe.effectiveRpm.toFixed(2)}`;
-  const isCompany = state.employment_model === 'company_driver';
-  const netLine = isCompany
-    ? 'Not available for company drivers'
-    : fe.netStatus === 'available'
-      ? `${fmt(fe.estimatedWeeklyNet)} · Before taxes`
-      : 'Unavailable';
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="review-summary">
-      <SumCard label="Employment"
-        value={state.employment_model === 'unknown' ? '—' : EMPLOYMENT_OPTIONS.find((o) => o.value === state.employment_model)?.label ?? '—'} />
-      <SumCard label="Driving configuration"
-        value={state.team_configuration === 'unspecified' ? '—' : TEAM_OPTIONS.find((o) => o.value === state.team_configuration)?.label ?? '—'} />
-      <SumCard label="Pay model" value={state.pay_model === 'unknown' ? '—' : state.pay_model} />
-      <SumCard label="Financial status" value={fe.status} />
-      <SumCard label={`Recurring weekly gross (${grossLabel})`} value={fmt(fe.recurringWeeklyGross)} />
-      <SumCard label="Estimated weekly net" value={netLine} testId="review-net" />
-      <SumCard label="Effective RPM" value={fe.effectiveRpm == null ? '—' : rpm} />
-      <SumCard label="One-time incentives total" value={fmt(fe.oneTimeIncentiveTotal ?? null)} testId="review-onetime" />
-    </div>
-  );
-}
-
-function SumCard({ label, value, testId }: { label: string; value: string; testId?: string }) {
-  return (
-    <div className="rounded-lg border border-border/60 bg-card/40 px-3 py-2" data-testid={testId}>
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{label}</p>
-      <p className="text-sm font-black text-foreground mt-0.5">{value}</p>
     </div>
   );
 }
