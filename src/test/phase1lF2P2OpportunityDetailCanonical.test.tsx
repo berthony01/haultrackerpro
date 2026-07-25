@@ -627,7 +627,7 @@ describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
  * Disclosure distinction (not_disclosed vs not_applicable)
  * ========================================================================= */
 describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
-  it('flat-weekly company_driver with no mileage: mileage KVs Not applicable and header/home-time Not disclosed', () => {
+  it('flat-weekly company_driver with no mileage or route/trailer/home_time: all filler rows are omitted (Phase 1O-B)', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
@@ -643,17 +643,17 @@ describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
         deadhead_paid: null,
       }),
     );
-    const headerHeading = screen.getByRole('heading', { level: 1, name: 'OTR Reefer Solo' });
-    const headerCard = headerHeading.closest('.p-6');
-    if (!headerCard) throw new Error('header card not found');
-    expect(within(headerCard as HTMLElement).getAllByText('Not disclosed')).toHaveLength(3);
-    expect(within(kvRow('Home time')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(kvRow('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(kvRow('Loaded miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(kvRow('Deadhead miles')).getByText('Not applicable')).toBeInTheDocument();
+    // No "Not disclosed" / "Not applicable" filler anywhere.
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
+    expect(screen.queryByText(/Not applicable/i)).toBeNull();
+    // Mileage / route / trailer / home-time rows are absent entirely.
+    expect(screen.queryByText('Weekly miles')).toBeNull();
+    expect(screen.queryByText('Loaded miles')).toBeNull();
+    expect(screen.queryByText('Deadhead miles')).toBeNull();
+    expect(screen.queryByText('Home time')).toBeNull();
   });
 
-  it('content sections keep all four headings and each independently owns Not disclosed fallback for empty content', () => {
+  it('content sections omit their headings entirely when they have no populated content (Phase 1O-B)', () => {
     renderDetail(
       fullBase({
         actual_benefits: null,
@@ -662,10 +662,11 @@ describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
         description: null,
       }),
     );
-    expect(within(sectionCard('Benefits')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(sectionCard('Typical Lanes')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(sectionCard('Requirements')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(sectionCard('About this Opportunity')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Benefits' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Typical Lanes' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Requirements' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'About this Opportunity' })).toBeNull();
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
   });
 });
 
