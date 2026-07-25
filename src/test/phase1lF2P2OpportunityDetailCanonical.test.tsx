@@ -449,16 +449,16 @@ describe('Phase 1L-F2B-P2-R1 · One-time incentive isolation', () => {
       deadhead_paid: null,
     });
 
-  it('null sign-on bonus: recurring gross unchanged, Sign-on bonus row Not disclosed', () => {
+  it('null sign-on bonus: recurring gross unchanged, sign-on bonus row absent (omission rules)', () => {
     renderDetail(base(null));
     expect(within(kvRow('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
-    expect(within(kvRow('Sign-on bonus')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(screen.queryByText(/Sign-on bonus/i)).toBeNull();
   });
 
-  it('$10,000 sign-on bonus: recurring gross still $1,600 and Sign-on bonus row shows $10,000', () => {
+  it('$10,000 sign-on bonus: recurring gross still $1,600 and Sign-on bonus callout shows $10,000', () => {
     renderDetail(base(10000));
     expect(within(kvRow('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
-    expect(within(kvRow('Sign-on bonus')).getByText('$10,000')).toBeInTheDocument();
+    expect(screen.getByText('Sign-on bonus: $10,000')).toBeInTheDocument();
   });
 });
 
