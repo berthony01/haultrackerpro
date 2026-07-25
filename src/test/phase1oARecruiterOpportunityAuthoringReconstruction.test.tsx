@@ -332,8 +332,15 @@ describe('Phase 1O-A-R2 — locked publication checklist + preview + cost-note c
 
 });
 
-describe('Phase 1O-A-R2 — scope, start-gate, and theme lock proofs (fail-closed)', () => {
+describe('Phase 1O-A-R2 — historical scope, start-gate, and theme lock proofs (fail-closed)', () => {
+  // The Phase 1O-A implementation base — the commit immediately before any
+  // Phase 1O-A work began.
   const ORIGINAL_BASE_SHA = 'c4248feb39c4e2ebd575d48dae41a395bc8107a1';
+  // The accepted Phase 1O-A terminal SHA (final R2 commit). All Phase 1O-A
+  // authorized diffs must sit inside base..terminal — later authorized
+  // phases (1O-B and beyond) live outside this window and must NOT be
+  // treated as Phase 1O-A scope violations.
+  const ACCEPTED_TERMINAL_SHA = '8938b17a9258de877e8a86f8cb431ef0fbc2797d';
   const AUTHORIZED_FILES = new Set([
     'src/components/opportunities/RecruiterOpportunityForm.tsx',
     'src/components/opportunities/PasteOpportunityDialog.tsx',
@@ -342,33 +349,56 @@ describe('Phase 1O-A-R2 — scope, start-gate, and theme lock proofs (fail-close
     'src/test/recruiterOpportunityFormConsolidation.test.tsx',
   ]);
 
-  it('the pinned original base SHA is reachable from HEAD (ancestry proof)', () => {
-    let ok = false;
+  function isAncestor(a: string, b: string): boolean {
     try {
-      execFileSync('git', ['merge-base', '--is-ancestor', ORIGINAL_BASE_SHA, 'HEAD'], { stdio: 'ignore' });
-      ok = true;
+      execFileSync('git', ['merge-base', '--is-ancestor', a, b], { stdio: 'ignore' });
+      return true;
     } catch {
-      ok = false;
+      return false;
     }
-    expect(ok).toBe(true);
+  }
+
+  it('the pinned original base SHA is ancestor of the accepted Phase 1O-A terminal SHA', () => {
+    expect(isAncestor(ORIGINAL_BASE_SHA, ACCEPTED_TERMINAL_SHA)).toBe(true);
   });
 
-  it('the cumulative diff from the original base touches ONLY the five authorized files', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${ORIGINAL_BASE_SHA}..HEAD`], { encoding: 'utf8' }).trim();
-    const changed = out.split('\n').map((s) => s.trim()).filter(Boolean);
-    expect(changed.length).toBeGreaterThan(0);
+  it('the accepted Phase 1O-A terminal SHA is ancestor of the current HEAD', () => {
+    expect(isAncestor(ACCEPTED_TERMINAL_SHA, 'HEAD')).toBe(true);
+  });
+
+  it('the historical Phase 1O-A diff (base..accepted-terminal) equals exactly the five authorized files, no missing and no extras', () => {
+    const out = execFileSync(
+      'git',
+      ['diff', '--name-only', `${ORIGINAL_BASE_SHA}..${ACCEPTED_TERMINAL_SHA}`],
+      { encoding: 'utf8' },
+    ).trim();
+    const changed = new Set(
+      out.split('\n').map((s) => s.trim()).filter(Boolean),
+    );
+    // No missing.
+    for (const authorized of AUTHORIZED_FILES) {
+      expect(
+        changed.has(authorized),
+        `missing from historical Phase 1O-A diff: ${authorized}`,
+      ).toBe(true);
+    }
+    // No extras.
     for (const path of changed) {
       expect(
         AUTHORIZED_FILES.has(path),
-        `unauthorized file in cumulative Phase 1O-A diff: ${path}`,
+        `unauthorized file in historical Phase 1O-A diff: ${path}`,
       ).toBe(true);
     }
+    // And the exact size matches.
+    expect(changed.size).toBe(AUTHORIZED_FILES.size);
   });
 
-  it('RecruiterOpportunityForm.tsx contains no raw amber utility classes (theme-token lock)', () => {
-    const src = execFileSync('git', [
-      'show', 'HEAD:src/components/opportunities/RecruiterOpportunityForm.tsx',
-    ], { encoding: 'utf8' });
+  it('RecruiterOpportunityForm.tsx at the accepted Phase 1O-A terminal SHA contains no raw amber utility classes (theme-token lock)', () => {
+    const src = execFileSync(
+      'git',
+      ['show', `${ACCEPTED_TERMINAL_SHA}:src/components/opportunities/RecruiterOpportunityForm.tsx`],
+      { encoding: 'utf8' },
+    );
     expect(src).not.toMatch(/\bamber-\d{3}\b/);
     expect(src).toMatch(/border-warning\/30/);
     expect(src).toMatch(/bg-warning\/5/);
