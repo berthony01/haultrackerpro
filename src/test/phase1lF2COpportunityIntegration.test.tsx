@@ -558,7 +558,7 @@ describe('Phase 1L-F2C · Company driver ownership-cost gating', () => {
 // 6. UNKNOWN-EMPLOYMENT SAFETY ACROSS BOTH SURFACES
 // =========================================================================
 describe('Phase 1L-F2C · Unknown employment gating', () => {
-  it('6. unknown employment renders "Employment not disclosed" and suppresses ownership net/cost metrics on card and detail; exact note', async () => {
+  it('6. unknown employment omits any "Employment not disclosed" filler on card and detail, suppresses ownership net/cost metrics, and still surfaces the exact financial-disclosure safety note produced by OpportunityProfitBreakdown', async () => {
     proStore.set(true);
     opportunitiesStore.set([
       contractorFullBase({
@@ -571,16 +571,23 @@ describe('Phase 1L-F2C · Unknown employment gating', () => {
     renderPage();
 
     const card = cardFor('Unknown Job');
-    expect(within(card).getByText('Employment not disclosed')).toBeInTheDocument();
+    // Phase 1O-B omission rules: never render filler like
+    // "Employment not disclosed", "Not disclosed", or "Not applicable".
+    expect(within(card).queryByText('Employment not disclosed')).toBeNull();
+    expect(within(card).queryByText(/Not disclosed/i)).toBeNull();
+    expect(within(card).queryByText(/Not applicable/i)).toBeNull();
+    // Ownership-cost metrics must still be suppressed.
     expect(within(card).queryByText('Est. net')).toBeNull();
     expect(within(card).queryByText('Gross per total mile')).toBeNull();
 
     await openDetailByTitle('Unknown Job');
     const header = detailHeaderCard('Unknown Job');
-    expect(within(header).getByText('Employment not disclosed')).toBeInTheDocument();
+    expect(within(header).queryByText('Employment not disclosed')).toBeNull();
     for (const label of ['Known weekly costs', 'Estimated weekly net', 'Net per total mile']) {
       expect(screen.queryByText(label)).toBeNull();
     }
+    // The financial-disclosure safety note is still produced by
+    // OpportunityProfitBreakdown for unknown-employment listings.
     expect(
       screen.getByText(
         'Employment arrangement must be disclosed before ownership-cost net can be estimated.',
@@ -593,7 +600,7 @@ describe('Phase 1L-F2C · Unknown employment gating', () => {
 // 7. DISCLOSURE-STATE CONSISTENCY
 // =========================================================================
 describe('Phase 1L-F2C · Disclosure-state consistency', () => {
-  it('7. flat_weekly company_driver with no route/trailer/home_time/mileage: route/trailer/home render Not disclosed on card and detail, mileage renders Not applicable on card and each detail mileage KV', async () => {
+  it('7. flat_weekly company_driver with no route/trailer/home_time/mileage: card and detail keep Company Driver + Solo, omit route/trailer/home/mileage rows entirely, and never render Not disclosed / Not applicable filler', async () => {
     const row = source({
       id: 'opp-disc',
       canonical_version: 1,
@@ -625,25 +632,34 @@ describe('Phase 1L-F2C · Disclosure-state consistency', () => {
     renderPage();
 
     const card = cardFor('Sparse Details');
-    const cardBadgeRow = within(card).getByText('Company Driver').parentElement as HTMLElement;
-    const cardBadges = Array.from(cardBadgeRow.children)
-      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'DIV')
-      .map((el) => (el.textContent ?? '').trim());
-    expect(cardBadges).toEqual(['Company Driver', 'Solo', 'Not disclosed', 'Not disclosed', 'Not disclosed']);
-    expect(within(cardRowFor(card, 'Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(cardRowFor(card, 'Deadhead')).getByText('Not applicable')).toBeInTheDocument();
+    // Preserved facts.
+    expect(within(card).getByText('Company Driver')).toBeInTheDocument();
+    expect(within(card).getByText('Solo')).toBeInTheDocument();
+    // Route / Trailer / Home time facts are omitted entirely — no filler
+    // "Not disclosed" chip / stat renders in their place.
+    expect(within(card).queryByText('Route')).toBeNull();
+    expect(within(card).queryByText('Trailer')).toBeNull();
+    expect(within(card).queryByText('Home time')).toBeNull();
+    // Weekly miles / Deadhead stat rows are omitted (no filler).
+    expect(within(card).queryByText('Weekly miles')).toBeNull();
+    expect(within(card).queryByText('Deadhead')).toBeNull();
+    // Prohibited filler must not appear anywhere on the card.
+    expect(within(card).queryByText(/Not disclosed/i)).toBeNull();
+    expect(within(card).queryByText(/Not applicable/i)).toBeNull();
 
     await openDetailByTitle('Sparse Details');
     const header = detailHeaderCard('Sparse Details');
-    const detailBadgeRow = within(header).getByText('Company Driver').parentElement as HTMLElement;
-    const detailBadges = Array.from(detailBadgeRow.children)
-      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'DIV')
-      .map((el) => (el.textContent ?? '').trim());
-    expect(detailBadges).toEqual(['Company Driver', 'Solo', 'Not disclosed', 'Not disclosed', 'Not disclosed']);
-    expect(within(detailKV('Home time')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(detailKV('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(detailKV('Loaded miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(detailKV('Deadhead miles')).getByText('Not applicable')).toBeInTheDocument();
+    expect(within(header).getByText('Company Driver')).toBeInTheDocument();
+    expect(within(header).getByText('Solo')).toBeInTheDocument();
+    // Sections whose only content is disclosure-absent must not surface
+    // filler; Home time KV is omitted rather than showing "Not disclosed".
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
+    expect(screen.queryByText(/Not applicable/i)).toBeNull();
+    // No mileage KVs for a listing with no disclosed miles.
+    expect(screen.queryByText('Weekly miles')).toBeNull();
+    expect(screen.queryByText('Loaded miles')).toBeNull();
+    expect(screen.queryByText('Loaded weekly miles')).toBeNull();
+    expect(screen.queryByText('Deadhead miles')).toBeNull();
   });
 });
 
@@ -651,7 +667,7 @@ describe('Phase 1L-F2C · Disclosure-state consistency', () => {
 // 8. ZERO AND FALSE PRESERVATION
 // =========================================================================
 describe('Phase 1L-F2C · Zero and false preservation', () => {
-  it('8. CPM row with explicit zero miles, deadhead_paid=false, and false lifestyle booleans preserves "0 mi", "Unpaid", and "No" on card and detail', async () => {
+  it('8. CPM row with explicit zero miles, deadhead_paid=false, and false lifestyle booleans preserves "0 mi", "Unpaid", and "No" on card and detail (uses Phase 1O-B "Loaded weekly miles" label where the CPM loaded value now appears)', async () => {
     const row = contractorFullBase({
       id: 'opp-zero',
       title: 'Zero Row',
@@ -675,8 +691,10 @@ describe('Phase 1L-F2C · Zero and false preservation', () => {
     expect(within(cardRowFor(card, 'Weekly miles')).queryByText('Not disclosed')).toBeNull();
 
     await openDetailByTitle('Zero Row');
+    // CPM listings now surface loaded miles under the pay section using
+    // the Phase 1O-B label "Loaded weekly miles".
+    expect(within(detailKV('Loaded weekly miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(detailKV('Weekly miles')).getByText('0 mi')).toBeInTheDocument();
-    expect(within(detailKV('Loaded miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(detailKV('Deadhead miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(detailKV('Deadhead paid?')).getByText('Unpaid')).toBeInTheDocument();
     expect(within(detailKV('Forced dispatch')).getByText('No')).toBeInTheDocument();
@@ -689,7 +707,7 @@ describe('Phase 1L-F2C · Zero and false preservation', () => {
 // 9. ONE-TIME INCENTIVE ISOLATION
 // =========================================================================
 describe('Phase 1L-F2C · One-time incentive isolation', () => {
-  it('9. company_driver flat_weekly $1,600 recurring with $10,000 sign-on: card and detail show recurring $1,600; $10,000 only inside Sign-on bonus row', async () => {
+  it('9. company_driver flat_weekly $1,600 recurring with $10,000 sign-on: card and detail show recurring $1,600; card still never shows $10,000; detail exposes $10,000 only inside the separate "Sign-on bonus: $10,000" callout, not a legacy KV row', async () => {
     const row = source({
       id: 'opp-bonus',
       canonical_version: 1,
@@ -724,7 +742,10 @@ describe('Phase 1L-F2C · One-time incentive isolation', () => {
 
     await openDetailByTitle('Bonus Row');
     expect(within(detailKV('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
-    expect(within(detailKV('Sign-on bonus')).getByText('$10,000')).toBeInTheDocument();
+    // Phase 1O-B: sign-on bonus is now a separate callout, not a KV row.
+    // The row-form KV lookup must find nothing.
+    expect(() => detailKV('Sign-on bonus')).toThrow();
+    expect(screen.getByText('Sign-on bonus: $10,000')).toBeInTheDocument();
   });
 });
 

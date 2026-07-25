@@ -246,3 +246,80 @@ describe('Phase 1O-B · Theme lock', () => {
     expect(src).not.toMatch(/#[0-9A-Fa-f]{6}\b/);
   });
 });
+
+// -------------------------------------------------------------------------
+// Phase 1O-B fail-closed phase-boundary proof.
+// -------------------------------------------------------------------------
+describe('Phase 1O-B — historical phase-boundary proof (fail-closed)', () => {
+  const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+  // Implementation base (pre-1O-B) and accepted terminal SHA.
+  const START_SHA = '8938b17a9258de877e8a86f8cb431ef0fbc2797d';
+  const TERMINAL_SHA = '4168035214872cded25d3767dd7ee06b7bd44ccb';
+  // Exactly the six production+test files actually changed in the
+  // implementation window. OpportunitiesPage.tsx and its P3 test were
+  // authorized but correctly left unchanged (P3 already passed).
+  const EXPECTED_IMPL_FILES = new Set<string>([
+    'src/components/opportunities/OpportunityCard.tsx',
+    'src/components/opportunities/OpportunityDetail.tsx',
+    'src/components/opportunities/RecommendedOpportunityCard.tsx',
+    'src/test/phase1lF2P1OpportunityCardCanonical.test.tsx',
+    'src/test/phase1lF2P2OpportunityDetailCanonical.test.tsx',
+    'src/test/phase1oBDriverOutputReconstruction.test.tsx',
+  ]);
+  // Original Phase 1O-B allowlist (eight files) — no production file
+  // outside this set may appear in start..terminal.
+  const ORIGINAL_ALLOWLIST = new Set<string>([
+    'src/components/opportunities/OpportunityCard.tsx',
+    'src/components/opportunities/OpportunityDetail.tsx',
+    'src/components/opportunities/OpportunitiesPage.tsx',
+    'src/components/opportunities/RecommendedOpportunityCard.tsx',
+    'src/test/phase1lF2P1OpportunityCardCanonical.test.tsx',
+    'src/test/phase1lF2P2OpportunityDetailCanonical.test.tsx',
+    'src/test/phase1lF2P3OpportunitiesPageCanonical.test.tsx',
+    'src/test/phase1oBDriverOutputReconstruction.test.tsx',
+  ]);
+
+  function isAncestor(a: string, b: string): boolean {
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', a, b], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  it('start SHA is ancestor of terminal SHA', () => {
+    expect(isAncestor(START_SHA, TERMINAL_SHA)).toBe(true);
+  });
+
+  it('terminal SHA is ancestor of current HEAD', () => {
+    expect(isAncestor(TERMINAL_SHA, 'HEAD')).toBe(true);
+  });
+
+  it('git diff --name-only start..terminal equals exactly the six implementation files', () => {
+    const out = execFileSync(
+      'git',
+      ['diff', '--name-only', `${START_SHA}..${TERMINAL_SHA}`],
+      { encoding: 'utf8' },
+    ).trim();
+    const changed = new Set(
+      out.split('\n').map((s) => s.trim()).filter(Boolean),
+    );
+    for (const f of EXPECTED_IMPL_FILES) {
+      expect(changed.has(f), `missing from Phase 1O-B diff: ${f}`).toBe(true);
+    }
+    for (const f of changed) {
+      expect(
+        EXPECTED_IMPL_FILES.has(f),
+        `unexpected file in Phase 1O-B diff: ${f}`,
+      ).toBe(true);
+    }
+    expect(changed.size).toBe(EXPECTED_IMPL_FILES.size);
+  });
+
+  it('every file in the Phase 1O-B diff sits inside the original eight-file allowlist', () => {
+    for (const f of EXPECTED_IMPL_FILES) {
+      expect(ORIGINAL_ALLOWLIST.has(f), `outside original allowlist: ${f}`).toBe(true);
+    }
+  });
+});
