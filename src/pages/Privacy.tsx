@@ -1,8 +1,9 @@
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
 import { findPolicyBySlug, POLICY_METADATA_PENDING_LABEL } from '@/lib/legal/policyRegistry';
+
 
 export default function Privacy() {
   const navigate = useNavigate();
