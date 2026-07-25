@@ -36,6 +36,9 @@ import {
   getRecruiterTrustView,
   type RecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
+import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
+import { RecruiterReadinessDialog } from '../RecruiterReadinessDialog';
+
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
 // helper — this file MUST NOT reimplement completeness. `active_billing`
