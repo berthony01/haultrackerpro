@@ -1,12 +1,9 @@
-// Phase 1N-B — Dashboard "Recommended Opportunity" card.
+// Phase 1N-B / Phase 1O-B — Dashboard "Recommended Opportunity" card.
 //
-// One compact, trust-safe recommendation surfaced on the driver dashboard.
-// Fails closed on loading/errors, degrades to a "Complete Your Opportunity
-// Preferences" prompt when the profile is missing/incomplete, and never
-// shows a recommendation the driver hasn't already earned by disclosing
-// preferences. Uses only the existing `useOpportunities()` (safe RPC that
-// returns approved/non-suspended recruiter listings) and
-// `useDriverOpportunityProfile()` hooks — no new queries.
+// Same information hierarchy as the reconstructed OpportunityCard:
+// title → company → pay → hiring coverage → compact facts row → secondary
+// trust indicators → match badge visually secondary → single primary action.
+// Unprovided facts are hidden entirely (never rendered as filler).
 
 import { useCallback, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -21,12 +18,15 @@ import {
   DollarSign,
   Gauge,
   Truck,
+  Home,
+  Briefcase,
+  Users,
   Sparkles,
-  Info,
 } from 'lucide-react';
 import { useOpportunities } from '@/hooks/opportunities/useOpportunities';
 import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
+import { displayHiringCoverage } from './OpportunityCard';
 import type { OpportunitySourceRow } from '@/lib/opportunities/opportunityCanonicalView';
 import {
   RECOMMENDED_OPPORTUNITY_DISMISSED_KEY,
@@ -44,6 +44,19 @@ const RECRUITER_TRUST_LABEL =
 
 const ADVISORY_COPY =
   'Based on your saved preferences and disclosed listing details. Verify pay, requirements, availability, and terms directly with the recruiter.';
+
+const EMPLOYMENT_LABEL: Record<string, string> = {
+  company_driver: 'Company Driver',
+  contractor_1099: '1099 Contractor',
+  owner_operator: 'Owner-Operator',
+  lease_purchase: 'Lease-Purchase',
+};
+
+const TEAM_LABEL: Record<string, string> = {
+  solo: 'Solo',
+  team: 'Team',
+  solo_or_team: 'Team optional',
+};
 
 function readInitialDismissed(): Set<string> {
   try {
@@ -139,13 +152,10 @@ export function RecommendedOpportunityCard({ onNavigate }: Props) {
     });
   }, [chosen]);
 
-  // Fail closed on loading/error — do not show a misleading recommendation.
   if (oppsLoading || profileLoading || oppsError || profileError) {
     return null;
   }
 
-  // Missing or incomplete profile → single "Complete Your Opportunity
-  // Preferences" prompt. No recommendation, no priority label.
   if (!profile || profile.profile_completed !== true) {
     return (
       <Card
@@ -173,23 +183,13 @@ export function RecommendedOpportunityCard({ onNavigate }: Props) {
     );
   }
 
-  // Completed profile but no eligible excellent/strong safe candidate → nothing.
   if (!chosen) return null;
 
   const c = chosen.canonical;
   const fe = c.derived.financialEstimate;
-  const routeType =
-    c.classification.routeType.state === 'provided'
-      ? c.classification.routeType.value
-      : 'Not disclosed';
-  const trailerType =
-    c.classification.trailerType.state === 'provided'
-      ? c.classification.trailerType.value
-      : 'Not disclosed';
   const companyName =
-    c.identity.companyName.state === 'provided'
-      ? c.identity.companyName.value
-      : 'Company not disclosed';
+    c.identity.companyName.state === 'provided' ? c.identity.companyName.value : null;
+  const coverage = displayHiringCoverage(c);
   const showGross =
     typeof fe.recurringWeeklyGross === 'number' &&
     Number.isFinite(fe.recurringWeeklyGross);
@@ -197,7 +197,22 @@ export function RecommendedOpportunityCard({ onNavigate }: Props) {
     fe.grossSource === 'recruiter_provided'
       ? 'Recruiter weekly gross'
       : 'Derived weekly gross';
-  const transparency = c.derived.transparencyScore.score;
+
+  const employmentLabel = EMPLOYMENT_LABEL[c.classification.employmentModel] ?? null;
+  const teamLabel = TEAM_LABEL[c.classification.teamConfiguration] ?? null;
+  const routeLabel =
+    c.classification.routeType.state === 'provided' ? c.classification.routeType.value : null;
+  const trailerLabel =
+    c.classification.trailerType.state === 'provided' ? c.classification.trailerType.value : null;
+  const homeTimeLabel =
+    c.operatingTerms.homeTime.state === 'provided' ? c.operatingTerms.homeTime.value : null;
+
+  const facts: { icon: typeof MapPin; label: string; value: string }[] = [];
+  if (employmentLabel) facts.push({ icon: Briefcase, label: 'Employment', value: employmentLabel });
+  if (teamLabel) facts.push({ icon: Users, label: 'Config', value: teamLabel });
+  if (routeLabel) facts.push({ icon: MapPin, label: 'Route', value: routeLabel });
+  if (trailerLabel) facts.push({ icon: Truck, label: 'Trailer', value: trailerLabel });
+  if (homeTimeLabel) facts.push({ icon: Home, label: 'Home time', value: homeTimeLabel });
 
   return (
     <Card
@@ -207,7 +222,7 @@ export function RecommendedOpportunityCard({ onNavigate }: Props) {
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           <div className="rounded-xl bg-primary/15 p-2 shrink-0">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Sparkles className="h-4 w-4 text-primary" aria-hidden />
           </div>
           <h3 className="text-base font-bold text-foreground truncate">
             Recommended Opportunity
@@ -224,19 +239,58 @@ export function RecommendedOpportunityCard({ onNavigate }: Props) {
       </div>
 
       <div className="space-y-3">
+        {/* Title / company */}
         <div>
           <p className="text-sm font-bold text-foreground truncate">
             {c.identity.title}
           </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {companyName}
-          </p>
+          {companyName && (
+            <p className="text-xs text-muted-foreground truncate">{companyName}</p>
+          )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {/* Dominant pay + coverage */}
+        {(showGross || coverage) && (
+          <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
+            {showGross && (
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  {grossLabel}
+                </p>
+                <p className="text-xl font-black text-primary leading-none whitespace-nowrap">
+                  {fmtMoney(fe.recurringWeeklyGross as number)}
+                  <span className="text-xs font-bold text-muted-foreground ml-1">/wk</span>
+                </p>
+              </div>
+            )}
+            {coverage && (
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  Hiring
+                </p>
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  <span className="truncate">{coverage}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Compact facts */}
+        {facts.length > 0 && (
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+            {facts.map((f) => (
+              <MiniStat key={f.label} icon={f.icon} label={f.label} value={f.value} />
+            ))}
+          </div>
+        )}
+
+        {/* Secondary trust indicators */}
+        <div className="flex flex-wrap gap-1.5">
           <Badge
             variant="outline"
-            className="border-success/40 text-success gap-1"
+            className="border-success/40 text-success gap-1 text-[10px]"
             title={RECRUITER_TRUST_LABEL}
             aria-label={RECRUITER_TRUST_LABEL}
           >
@@ -249,7 +303,7 @@ export function RecommendedOpportunityCard({ onNavigate }: Props) {
           {c.trust.featured && (
             <Badge
               variant="secondary"
-              className="bg-primary/15 text-primary border-primary/20"
+              className="bg-primary/10 text-primary border-primary/20 text-[10px]"
               title="Priority placement — recruiter-paid placement, separate from the recommendation match."
               aria-label="Priority placement — recruiter-paid placement, separate from the recommendation match."
             >
@@ -257,38 +311,6 @@ export function RecommendedOpportunityCard({ onNavigate }: Props) {
             </Badge>
           )}
         </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <MiniStat
-            icon={MapPin}
-            label="Hiring"
-            value={c.hiringArea.displayLabel}
-          />
-          <MiniStat icon={Truck} label="Route" value={routeType} />
-          <MiniStat icon={Gauge} label="Trailer" value={trailerType} />
-          {showGross ? (
-            <MiniStat
-              icon={DollarSign}
-              label={grossLabel}
-              value={fmtMoney(fe.recurringWeeklyGross as number)}
-            />
-          ) : (
-            <MiniStat
-              icon={Info}
-              label="Listing transparency"
-              value={`${transparency}/100`}
-            />
-          )}
-        </div>
-
-        {showGross && (
-          <p className="text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">
-              Listing transparency:
-            </span>{' '}
-            {transparency}/100
-          </p>
-        )}
 
         <p className="text-xs text-muted-foreground leading-relaxed">
           {ADVISORY_COPY}
@@ -330,3 +352,6 @@ function MiniStat({
     </div>
   );
 }
+
+// Kept for backward compatibility with any legacy imports.
+export { DollarSign, Gauge };
