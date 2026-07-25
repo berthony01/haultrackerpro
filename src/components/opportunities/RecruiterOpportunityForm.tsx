@@ -440,6 +440,15 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
         onExtracted={handleExtracted}
       />
 
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={setReadinessOpen}
+        profile={profile}
+        onOpenOnboarding={onBack}
+        actionLabel="Publish"
+      />
+
+
       {/* Stage navigation */}
       <StageTabs current={stage} onSelect={setStage} />
 
