@@ -18,7 +18,39 @@ export type RecruiterProfileUpsert = Omit<
   | 'posting_terms_accepted_at'
   | 'posting_terms_version'
   | 'legacy_terms_grandfathered_at'
->;
+> & {
+  // Phase 1P-A1: company_type is a new nullable column. The generated
+  // types.ts is regenerated only after the migration is applied; until
+  // then callers pass it through this augmented shape.
+  company_type?:
+    | 'carrier'
+    | 'third_party_recruiter'
+    | 'staffing_agency'
+    | 'independent_recruiter'
+    | null;
+};
+
+const PERSISTENCE_MISMATCH_MESSAGE =
+  'Your recruiter profile could not be updated. Reload the page and try again. If the problem continues, contact support.';
+
+/**
+ * Phase 1P-A1 — normalized read-back fields the persistence verification
+ * checks against the just-submitted values. Any drift (zero rows, multiple
+ * rows, mismatched values) aborts BEFORE accept_recruiter_posting_terms.
+ */
+const VERIFIED_FIELDS = [
+  'recruiter_name',
+  'company_name',
+  'recruiter_email',
+  'company_type',
+  'dot_number',
+  'mc_number',
+] as const;
+
+function normalize(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim();
+}
+
 
 export function useRecruiterProfile() {
   const { user } = useAuth();
