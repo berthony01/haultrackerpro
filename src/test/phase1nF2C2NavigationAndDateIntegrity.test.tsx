@@ -193,9 +193,10 @@ describe('phase1nF2C2 — no out-of-scope substitutes', () => {
     expect(selfSrc).not.toMatch(/DeleteAccountModal/);
     expect(selfSrc).not.toMatch(/robots|sitemap|llms/i);
   });
-  it('does not carry brittle current-HEAD git diff assertions', () => {
-    expect(selfSrc).not.toMatch(/git\s+diff/);
-    expect(selfSrc).not.toMatch(/execSync/);
-    expect(selfSrc).not.toMatch(/rev-parse/);
+  it('does not carry brittle current-HEAD git-based assertions', () => {
+    expect(selfSrc).not.toMatch(/from ['"]node:child_process['"]/);
+    expect(selfSrc).not.toMatch(/require\(['"]child_process['"]\)/);
+    expect(selfSrc).not.toMatch(/HEAD/);
   });
+
 });
