@@ -173,6 +173,12 @@ AS $function$
   );
 $function$;
 
+REVOKE ALL     ON FUNCTION public.current_user_can_manage_recruiter_opportunities(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.current_user_can_manage_recruiter_opportunities(uuid) FROM anon;
+GRANT  EXECUTE ON FUNCTION public.current_user_can_manage_recruiter_opportunities(uuid) TO authenticated, service_role;
+
+
+
 -- ---------------------------------------------------------------------------
 -- 6. accept_recruiter_posting_terms(text) — preserves every existing
 --    security/locking/consent-pair/concurrency/version/suspension/ownership
