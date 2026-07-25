@@ -492,30 +492,8 @@ export function OpportunityDetail({
             </div>
           )}
 
-          {/* Dominant primary action */}
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
-            <Button
-              size="lg"
-              onClick={() => setShowApply(true)}
-              disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
-              className="flex-1 sm:flex-none sm:min-w-[200px]"
-            >
-              <Send className="h-4 w-4" />
-              {formalState.kind === 'active'
-                ? 'Application Submitted'
-                : formalState.kind === 'completed'
-                  ? 'Hired'
-                  : formalState.kind === 'reapplyable'
-                    ? 'Apply Again'
-                    : 'Apply Now'}
-            </Button>
-            <Button variant="outline" size="lg" onClick={handleToggleSave}>
-              {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-              {isSaved ? 'Saved' : 'Save'}
-            </Button>
-          </div>
-        </div>
-      </Card>
+          {/* Primary actions live in the sticky action bar below to keep them
+              always reachable without duplicating buttons on the page. */}
 
       {/* Match Insights (secondary rationale — kept for driver context) */}
       {match ? (
