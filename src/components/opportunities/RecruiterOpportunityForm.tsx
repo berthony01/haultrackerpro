@@ -271,7 +271,9 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
 
 export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
-  const { profile } = useRecruiterProfile();
+  const { profile, refetchProfile } = useRecruiterProfile();
+  const [readinessOpen, setReadinessOpen] = useState(false);
+
   const [state, setState] = useState<State>(() =>
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
   );
