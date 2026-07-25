@@ -424,7 +424,7 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     chooseChip('employment-arrangement', '1099 Contractor');
     gotoOptional();
     expandGroup("group-costs");
-    expect(screen.queryByLabelText("Escrow Amount ($)')).toBeNull();
+    expect(screen.queryByLabelText("Escrow Amount ($)")).toBeNull();
 
     fireEvent.click(screen.getByLabelText('Escrow Required?'));
     fireEvent.click(screen.getByRole('option', { name: 'Required' }));
@@ -485,7 +485,7 @@ describe('Phase 1O-A — pay-model conditional inputs', () => {
     expect(screen.getByLabelText('CPM Rate ($/mi)')).toBeInTheDocument();
     gotoOptional();
     expandGroup("group-mileage");
-    expect(screen.getByLabelText("Total Weekly Miles')).toBeInTheDocument();
+    expect(screen.getByLabelText("Total Weekly Miles")).toBeInTheDocument();
     expect(screen.getByLabelText('Loaded Miles')).toBeInTheDocument();
     expect(screen.getByLabelText('Deadhead Miles')).toBeInTheDocument();
     expect(screen.getByLabelText('Deadhead Paid?')).toBeInTheDocument();
