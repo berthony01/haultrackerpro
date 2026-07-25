@@ -606,12 +606,15 @@ describe('phase diff integrity (fail-closed)', () => {
     const section = src.slice(start);
     // Every `git diff --name-only ...` in the historical-scope section
     // must terminate at F2C1_ACCEPTED_SHA; none may terminate at HEAD.
-    const diffCalls = section.match(/diff --name-only [^`'"\n]+/g) ?? [];
+    // Match only real git-diff invocations built from template constants:
+    // `diff --name-only ${A}...${B}`. This intentionally excludes any
+    // regex/documentation prose in this same file.
+    const diffCalls = section.match(/diff --name-only \$\{[A-Z0-9_]+\}\.\.\.\$\{[A-Z0-9_]+\}/g) ?? [];
     expect(diffCalls.length).toBeGreaterThanOrEqual(2);
     for (const call of diffCalls) {
-      expect(call).toContain('F2C1_ACCEPTED_SHA');
-      expect(call).not.toMatch(/\.\.\.HEAD\b/);
-      expect(call).not.toMatch(/\}\s*HEAD/);
+      // Endpoint must be F2C1_ACCEPTED_SHA (right-hand side of the range).
+      expect(call.endsWith('${F2C1_ACCEPTED_SHA}')).toBe(true);
+      expect(call).not.toContain('HEAD');
     }
     // The only HEAD-based git call permitted in this section is the
     // ancestor proof that F2C1_ACCEPTED_SHA is reachable from HEAD.
