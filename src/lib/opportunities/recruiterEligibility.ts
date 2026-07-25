@@ -106,7 +106,7 @@ export function describeRecruiterEligibility(
       canPost: false,
       isVerified: false,
       title: 'Finish your recruiter profile',
-      body: 'Add your recruiter name, company name, a valid recruiter email, company type, and accept the posting terms. Carrier accounts also need a DOT or MC number. Posting unlocks the moment those are saved.',
+      body: 'Add your recruiter name, company name, a valid recruiter email, choose your company type, and accept the posting terms. A DOT or MC number is required only for Carrier / Motor Carrier accounts. Posting unlocks the moment those are saved.',
       cta: 'Complete Profile',
     };
   }
