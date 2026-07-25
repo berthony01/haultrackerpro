@@ -217,6 +217,11 @@ function gotoStage(label: 'Write & Extract' | 'Essentials' | 'Optional Details' 
 function gotoReview() { gotoStage('Review & Publish'); }
 function gotoOptional() { gotoStage('Optional Details'); }
 function gotoEssentials() { gotoStage('Essentials'); }
+function expandGroup(testId: string) {
+  const trigger = within(screen.getByTestId(testId)).getByRole('button');
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+}
+
 
 function clickPublish() {
   gotoReview();
