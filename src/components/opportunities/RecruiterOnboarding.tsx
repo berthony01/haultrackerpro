@@ -263,6 +263,25 @@ export function RecruiterOnboarding({ onBack }: Props) {
             <Field label="Company Name *">
               <Input value={form.company_name} onChange={(e) => set('company_name', e.target.value)} />
             </Field>
+            <Field label="Company Type *">
+              <Select
+                value={form.company_type || undefined}
+                onValueChange={(v) => set('company_type', v as CompanyType)}
+              >
+                <SelectTrigger data-testid="recruiter-company-type">
+                  <SelectValue placeholder="Choose company type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(COMPANY_TYPE_LABELS) as Array<[CompanyType, string]>).map(
+                    ([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </Field>
             <Field label="Company Website">
               <Input placeholder="https://" value={form.company_website} onChange={(e) => set('company_website', e.target.value)} />
             </Field>
@@ -282,16 +301,23 @@ export function RecruiterOnboarding({ onBack }: Props) {
 
           {/* C. Verification Information */}
           <Section icon={ShieldCheck} title="Verification Information">
-            <Field label="DOT Number">
+            <Field label={form.company_type === 'carrier' ? 'DOT Number *' : 'DOT Number'}>
               <Input value={form.dot_number} onChange={(e) => set('dot_number', e.target.value)} />
             </Field>
-            <Field label="MC Number">
+            <Field label={form.company_type === 'carrier' ? 'MC Number *' : 'MC Number'}>
               <Input value={form.mc_number} onChange={(e) => set('mc_number', e.target.value)} />
             </Field>
-            <p className="text-xs text-muted-foreground sm:col-span-2">
-              Provide at least one DOT or MC number. It is required to complete your recruiter profile and is also used for Verified Recruiter badge review. Standard posting unlocks when the required profile and posting terms are complete; badge approval is separate.
+            <p
+              className="text-xs text-muted-foreground sm:col-span-2"
+              data-testid="verification-info-copy"
+            >
+              {form.company_type === 'carrier'
+                ? 'Carriers must provide at least one DOT or MC number to complete their recruiter profile. It is also used for Verified Recruiter badge review. Standard posting unlocks when the required profile fields and posting terms are complete; badge approval is separate.'
+                : 'DOT or MC numbers are optional for third-party recruiters, staffing agencies, and independent recruiters. Provide them if you have them — they help with Verified Recruiter badge review. Standard posting unlocks when the required profile fields and posting terms are complete.'}
             </p>
           </Section>
+
+
 
           {/* D. Hiring Information */}
           <Section icon={Truck} title="Hiring Information">
