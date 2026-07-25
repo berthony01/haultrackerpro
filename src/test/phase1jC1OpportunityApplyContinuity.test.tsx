@@ -102,13 +102,35 @@ vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), message: vi.fn() }),
 }));
 
-// OpportunityCard: list presentation only.
+// OpportunityCard: list presentation only. We also re-export a
+// deterministic `displayHiringCoverage` helper because OpportunityDetail
+// imports it from this module; a mock that omitted the helper would
+// leave it undefined and break every apply-continuity scenario that
+// renders the real OpportunityDetail.
 vi.mock('@/components/opportunities/OpportunityCard', () => ({
   OpportunityCard: ({ opportunity, onView }: any) => (
     <button data-testid={`card-${opportunity.id}`} onClick={onView}>
       Open {opportunity.title}
     </button>
   ),
+  displayHiringCoverage: (canonical: any): string | null => {
+    const area = canonical?.hiringArea;
+    if (!area) return null;
+    const city = area.city;
+    const state = area.state;
+    if (city?.state === 'provided' && state?.state === 'provided') {
+      return `${city.value}, ${state.value}`;
+    }
+    const states = area.states;
+    if (states?.state === 'provided' && Array.isArray(states.value)) {
+      const arr: string[] = states.value;
+      if (arr.length === 48) return 'Nationwide — Lower 48';
+      if (arr.length === 0) return null;
+      if (arr.length <= 6) return arr.join(', ');
+      return `${arr.length} states`;
+    }
+    return null;
+  },
 }));
 // ReferDriverDialog isolation (mirrors A2 detail test).
 vi.mock('@/components/opportunities/ReferDriverDialog', () => ({
