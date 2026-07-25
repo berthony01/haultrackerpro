@@ -556,13 +556,13 @@ const faqs: Faq[] = [
         </p>
         <p>
           Export anything you need first — successful deletion has no self-service undo. See{' '}
-          <a href="/docs/account-deletion-data-retention" className="text-primary hover:underline font-medium">
+          <Link to="/docs/account-deletion-data-retention" className="text-primary hover:underline font-medium">
             Account deletion &amp; data retention
-          </a>{' '}
+          </Link>{' '}
           and{' '}
-          <a href="/docs/billing-cancellation" className="text-primary hover:underline font-medium">
+          <Link to="/docs/billing-cancellation" className="text-primary hover:underline font-medium">
             Cancellation vs. permanent deletion
-          </a>{' '}
+          </Link>{' '}
           for the complete details.
         </p>
       </div>
