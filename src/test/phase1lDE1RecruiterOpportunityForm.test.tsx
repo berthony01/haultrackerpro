@@ -414,7 +414,7 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     chooseChip('employment-arrangement', 'Lease Purchase');
     gotoOptional();
     expandGroup("group-costs");
-    expect(screen.getByLabelText('Lease payment amount ($)'')).toBeInTheDocument();
+    expect(screen.getByLabelText('Lease payment amount ($)')).toBeInTheDocument();
     expect(screen.getByLabelText('Lease payment frequency')).toBeInTheDocument();
   });
 
