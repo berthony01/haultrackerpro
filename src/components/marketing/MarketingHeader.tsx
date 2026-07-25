@@ -21,7 +21,10 @@ const NAV_LINKS: { label: string; href: string }[] = [
   { label: 'Pricing', href: '/pricing' },
   { label: 'For Recruiters', href: '/recruiters' },
   { label: 'Assistants & Agencies', href: '/assistants-agencies' },
+  { label: 'Help', href: '/docs' },
+  { label: 'Legal', href: '/legal' },
 ];
+
 
 export interface MarketingHeaderProps {
   /** Optional override for the primary CTA on the right. */

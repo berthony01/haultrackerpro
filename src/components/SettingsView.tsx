@@ -686,9 +686,13 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/how-to-use-haultrackerpro')}>
             <BookOpen className="h-4 w-4 text-primary" /> User Guide
           </Button>
+          <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/docs')}>
+            <LifeBuoy className="h-4 w-4 text-primary" /> Help Center
+          </Button>
           <Button variant="outline" className="w-full h-11 rounded-xl font-bold gap-2 justify-start" onClick={() => navigate('/updates')}>
             <Sparkles className="h-4 w-4 text-primary" /> What's New
           </Button>
+
           <AdminDashboardLink />
           <div className="flex items-center gap-2 pt-1">
             <Mail className="h-3.5 w-3.5 text-muted-foreground/50" />
@@ -707,6 +711,11 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> Privacy Policy</span>
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50" />
           </Button>
+          <Button variant="ghost" className="w-full h-10 rounded-xl font-semibold gap-2 justify-between text-sm" onClick={() => navigate('/legal')}>
+            <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Legal Center</span>
+            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50" />
+          </Button>
+
           <p className="text-[10px] text-muted-foreground/50 pt-1">
             HaulTrackerPro provides tracking tools only. Always verify financial and tax information with qualified professionals.
           </p>
