@@ -323,11 +323,13 @@ describe('Phase 1O-A-R2 — locked publication checklist + preview + cost-note c
   it('company-driver operating-cost note uses the locked W-2 sentence', () => {
     renderForm(makeOpportunity({ employment_model: 'company_driver' }));
     fireEvent.click(stageTab('Optional Details'));
-    fireEvent.click(screen.getByTestId('group-costs'));
+    const trigger = within(screen.getByTestId('group-costs')).getByRole('button');
+    if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
     expect(screen.getByText(
       'Operating-cost fields do not apply to W-2 company-driver opportunities.',
     )).toBeInTheDocument();
   });
+
 });
 
 describe('Phase 1O-A-R2 — scope, start-gate, and theme lock proofs (fail-closed)', () => {
