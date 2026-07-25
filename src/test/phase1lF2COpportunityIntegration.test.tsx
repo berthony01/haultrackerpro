@@ -748,7 +748,6 @@ describe('Phase 1L-F2C · One-time incentive isolation', () => {
     expect(screen.getByText('Sign-on bonus: $10,000')).toBeInTheDocument();
   });
 });
-});
 
 // =========================================================================
 // 10. TRUST SEPARATION — FEATURED ONLY
