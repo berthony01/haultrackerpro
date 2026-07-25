@@ -593,7 +593,7 @@ describe('Phase 1L-F2B-P2-R1 · Cost-bearing financial estimate', () => {
  * Zero / false preservation
  * ========================================================================= */
 describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
-  it('zero mileage disclosures render "0 mi" in each mileage KV', () => {
+  it('zero mileage disclosures render "0 mi" in the mileage KVs that remain visible for CPM', () => {
     renderDetail(
       fullBase({
         estimated_weekly_miles: 0,
@@ -601,9 +601,11 @@ describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
         estimated_deadhead_miles: 0,
       }),
     );
+    // Under CPM, Loaded miles is exposed inside the Pay section as
+    // "Loaded weekly miles"; other mileage KVs live in the coverage section.
     expect(within(kvRow('Weekly miles')).getByText('0 mi')).toBeInTheDocument();
-    expect(within(kvRow('Loaded miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(kvRow('Deadhead miles')).getByText('0 mi')).toBeInTheDocument();
+    expect(within(kvRow('Loaded weekly miles')).getByText('0 mi')).toBeInTheDocument();
   });
 
   it('deadhead_paid=false with positive deadhead miles renders "Unpaid" in its own KV', () => {
