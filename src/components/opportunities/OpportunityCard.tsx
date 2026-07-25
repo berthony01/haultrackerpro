@@ -1,3 +1,22 @@
+// Phase 1O-B — Driver Opportunity Card reconstruction.
+//
+// Information hierarchy (top → bottom):
+//   1. Title
+//   2. Company name
+//   3. Main compensation headline (dominant fact after title/company)
+//   4. Hiring coverage (prominent)
+//   5. Compact facts row: employment / team / route / trailer / home time
+//   6. Secondary trust indicators: Verified Recruiter, Priority placement,
+//      Transparency, Match — all visually secondary to the job itself.
+//   7. Single dominant primary action (View Details)
+//
+// Omission rules: unprovided disclosures (unknown, unspecified, not_disclosed,
+// not_applicable, empty strings) render as absent — NOT as "Not disclosed",
+// "Not applicable", "—", "Unavailable", empty labels, or blank metric boxes.
+// The one exception is the Est. net / Gross per total mile stat pair for Pro
+// cost-bearing users, which continues to render the canonical financial
+// estimate exactly as calculated (a negative value is a truthful signal,
+// not filler).
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +32,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
+  Home,
+  Briefcase,
+  Users,
 } from 'lucide-react';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
@@ -26,6 +48,7 @@ import {
   type CanonicalEmploymentModel,
 } from '@/lib/opportunities/opportunityCanonicalView';
 import type { CanonicalTeamConfiguration } from '@/lib/opportunities/opportunityCanonical';
+import { LOWER_48_STATE_CODES } from './RecruiterOpportunityForm';
 import type { DriverOpportunityProfile } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 
@@ -63,58 +86,72 @@ const EMPLOYMENT_LABEL: Record<CanonicalEmploymentModel, string> = {
   contractor_1099: '1099 Contractor',
   owner_operator: 'Owner-Operator',
   lease_purchase: 'Lease-Purchase',
-  unknown: 'Employment not disclosed',
+  unknown: '',
 };
 
 const TEAM_LABEL: Record<CanonicalTeamConfiguration, string> = {
   solo: 'Solo',
   team: 'Team',
   solo_or_team: 'Team optional',
-  unspecified: 'Team setup not disclosed',
+  unspecified: '',
 };
+
+const LOWER_48_SET = new Set(LOWER_48_STATE_CODES);
 
 function isCostBearing(em: CanonicalEmploymentModel): boolean {
   return em === 'contractor_1099' || em === 'owner_operator' || em === 'lease_purchase';
 }
 
-function discString(d: Disclosure<string>): string {
-  if (d.state === 'provided') return d.value;
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
+function providedStr(d: Disclosure<string>): string | null {
+  return d.state === 'provided' ? d.value : null;
 }
 
-function companyDisplay(d: Disclosure<string>): string {
-  if (d.state === 'provided') return d.value;
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Company not disclosed';
+/**
+ * Truthful, concise coverage label:
+ *   - City + State  → "Dallas, TX"
+ *   - Exactly 48 contiguous state codes → "Nationwide — Lower 48"
+ *   - ≤ 6 selected states → joined codes
+ *   - 7+ selected states → "{N} states"
+ *   - Otherwise → null (row is hidden)
+ */
+export function displayHiringCoverage(canonical: CanonicalOpportunity): string | null {
+  const cityD = canonical.hiringArea.city;
+  const stateD = canonical.hiringArea.state;
+  const statesD = canonical.hiringArea.states;
+  const city = cityD.state === 'provided' ? cityD.value : null;
+  const state = stateD.state === 'provided' ? stateD.value : null;
+  if (city && state) return `${city}, ${state}`;
+  if (statesD.state === 'provided' && statesD.value.length > 0) {
+    const arr = statesD.value;
+    if (arr.length === 48 && arr.every((x) => LOWER_48_SET.has(x))) {
+      return 'Nationwide — Lower 48';
+    }
+    if (arr.length <= 6) return arr.join(', ');
+    return `${arr.length} states`;
+  }
+  return null;
 }
 
-function discMilesDisplay(d: Disclosure<number>): string {
-  if (d.state === 'provided') return fmtMilesN(d.value);
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
-}
-
-function deadheadSuffix(d: Disclosure<boolean>): string {
-  if (d.state === 'provided') return d.value ? ' · paid' : ' · unpaid';
-  if (d.state === 'not_applicable') return '';
-  return ' · pay not disclosed';
-}
-
-function grossLabelFor(source: 'derived' | 'recruiter_provided' | null): string {
-  if (source === 'derived') return 'Derived weekly gross';
-  if (source === 'recruiter_provided') return 'Recruiter weekly gross';
-  return 'Weekly gross';
-}
-
-function grossValueFor(canonical: CanonicalOpportunity): string {
+/**
+ * Dominant pay headline. Returns null when no recurring gross is available,
+ * so the card can degrade gracefully rather than showing filler.
+ */
+function payHeadline(canonical: CanonicalOpportunity): {
+  amount: string;
+  suffix: string;
+  source: string;
+} | null {
   const fe = canonical.derived.financialEstimate;
   if (typeof fe.recurringWeeklyGross === 'number' && Number.isFinite(fe.recurringWeeklyGross)) {
-    return fmtMoney(fe.recurringWeeklyGross);
+    const source =
+      fe.grossSource === 'derived'
+        ? 'Derived weekly gross'
+        : fe.grossSource === 'recruiter_provided'
+          ? 'Recruiter weekly gross'
+          : 'Weekly gross';
+    return { amount: fmtMoney(fe.recurringWeeklyGross), suffix: '/wk', source };
   }
-  if (fe.status === 'not_applicable') return 'Not applicable';
-  if (fe.status === 'incomplete' || fe.status === 'conflict') return 'Incomplete';
-  return 'Not disclosed';
+  return null;
 }
 
 export function OpportunityCard({
@@ -145,58 +182,59 @@ export function OpportunityCard({
   const featured = canonical.trust.featured;
   const isVerifiedRecruiter = canonical.trust.recruiterVerification === 'approved';
 
-  const grossLabel = grossLabelFor(canonical.derived.financialEstimate.grossSource);
-  const grossValue = grossValueFor(canonical);
+  const companyName = providedStr(canonical.identity.companyName);
+  const coverage = displayHiringCoverage(canonical);
+  const pay = payHeadline(canonical);
 
-  const totalMiles = canonical.compensation.mileage.totalWeeklyMiles;
-  const deadheadMiles = canonical.compensation.mileage.deadheadWeeklyMiles;
-  const deadheadPaid = canonical.compensation.mileage.deadheadPaid;
+  const employmentLabel = EMPLOYMENT_LABEL[employment];
+  const teamLabel = TEAM_LABEL[team];
+  const routeLabel = providedStr(canonical.classification.routeType);
+  const trailerLabel = providedStr(canonical.classification.trailerType);
+  const homeTimeLabel = providedStr(canonical.operatingTerms.homeTime);
 
-  const deadheadValue = `${discMilesDisplay(deadheadMiles)}${deadheadSuffix(deadheadPaid)}`;
+  const facts: { icon: typeof MapPin; label: string; text: string }[] = [];
+  if (employmentLabel) facts.push({ icon: Briefcase, label: 'Employment', text: employmentLabel });
+  if (teamLabel) facts.push({ icon: Users, label: 'Config', text: teamLabel });
+  if (routeLabel) facts.push({ icon: MapPin, label: 'Route', text: routeLabel });
+  if (trailerLabel) facts.push({ icon: Truck, label: 'Trailer', text: trailerLabel });
+  if (homeTimeLabel) facts.push({ icon: Home, label: 'Home time', text: homeTimeLabel });
+
+  const mileage = canonical.compensation.mileage;
+  const totalMiles = mileage.totalWeeklyMiles;
+  const deadheadMiles = mileage.deadheadWeeklyMiles;
+  const deadheadPaid = mileage.deadheadPaid;
+
+  const fe = canonical.derived.financialEstimate;
+  const canShowNet = costBearing && typeof fe.estimatedWeeklyNet === 'number';
+  const showCostBearingPro = isPro && costBearing;
+
+  const deadheadValue =
+    deadheadMiles.state === 'provided'
+      ? deadheadPaid.state === 'provided'
+        ? `${fmtMilesN(deadheadMiles.value)} · ${deadheadPaid.value ? 'paid' : 'unpaid'}`
+        : fmtMilesN(deadheadMiles.value)
+      : null;
   const deadheadWarn =
     deadheadMiles.state === 'provided' &&
     deadheadMiles.value > 0 &&
     deadheadPaid.state === 'provided' &&
     deadheadPaid.value === false;
 
-  const fe = canonical.derived.financialEstimate;
-  const canShowNet = costBearing && typeof fe.estimatedWeeklyNet === 'number';
-  const showCostBearingPro = isPro && costBearing;
+  const weeklyMilesValue = totalMiles.state === 'provided' ? fmtMilesN(totalMiles.value) : null;
 
   return (
-    <Card className="p-5 border-border/60 hover:border-primary/40 transition-colors flex flex-col gap-4">
+    <Card className="p-5 border-border/60 hover:border-primary/40 transition-colors flex flex-col gap-4 w-full">
+      {/* Row 1 — title + save */}
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 className="text-base font-bold text-foreground truncate">{canonical.identity.title}</h3>
-            {featured && (
-              <Badge
-                variant="secondary"
-                className="bg-primary/15 text-primary border-primary/20"
-                title="Priority placement — Growth or Fleet plan"
-                aria-label="Priority placement — Growth or Fleet plan"
-              >
-                Priority placement
-              </Badge>
-            )}
-            {isVerifiedRecruiter && (
-              <Badge variant="outline" className="border-success/40 text-success gap-1">
-                <ShieldCheck className="h-3 w-3" /> Verified Recruiter
-              </Badge>
-            )}
-            <Badge
-              variant="outline"
-              className={`gap-1 ${BAND_CLASS[t.band]}`}
-              title={transparencyDescriptor}
-              aria-label={transparencyDescriptor}
-            >
-              <Info className="h-3 w-3" aria-hidden /> {transparencyText}
-            </Badge>
-            {match && <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />}
-          </div>
-          <p className="text-sm text-muted-foreground font-semibold truncate">
-            {companyDisplay(canonical.identity.companyName)}
-          </p>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-foreground leading-tight break-words">
+            {canonical.identity.title}
+          </h3>
+          {companyName && (
+            <p className="text-sm text-muted-foreground font-semibold truncate mt-0.5">
+              {companyName}
+            </p>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -210,51 +248,119 @@ export function OpportunityCard({
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="outline">{EMPLOYMENT_LABEL[employment]}</Badge>
-        <Badge variant="outline">{TEAM_LABEL[team]}</Badge>
-        <Badge variant="outline">{discString(canonical.classification.routeType)}</Badge>
-        <Badge variant="outline">{discString(canonical.classification.trailerType)}</Badge>
-        <Badge variant="outline">{discString(canonical.operatingTerms.homeTime)}</Badge>
-      </div>
+      {/* Row 2 — dominant pay headline + coverage */}
+      {(pay || coverage) && (
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
+          {pay && (
+            <div className="min-w-0" aria-label={`${pay.source} ${pay.amount} per week`}>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                {pay.source}
+              </p>
+              <p className="text-2xl sm:text-3xl font-black text-primary leading-none whitespace-nowrap">
+                {pay.amount}
+                <span className="text-base font-bold text-muted-foreground ml-1">{pay.suffix}</span>
+              </p>
+            </div>
+          )}
+          {coverage && (
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Hiring
+              </p>
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                <span className="truncate">{coverage}</span>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <Stat icon={MapPin} label="Hiring" value={canonical.hiringArea.displayLabel} />
-        <Stat icon={DollarSign} label={grossLabel} value={grossValue} />
-        {showCostBearingPro ? (
-          <>
-            {canShowNet ? (
-              <EstimatedNetStat value={fe.estimatedWeeklyNet as number} />
-            ) : (
-              <Stat icon={Gauge} label="Weekly miles" value={discMilesDisplay(totalMiles)} />
-            )}
+      {/* Row 3 — compact facts row (employment / config / route / trailer / home time) */}
+      {facts.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-2 text-sm">
+          {facts.map((f) => (
+            <Stat key={f.label} icon={f.icon} label={f.label} value={f.text} />
+          ))}
+        </div>
+      )}
+
+      {/* Row 4 — Pro cost-bearing financial stats (kept for parity with canonical estimates). */}
+      {showCostBearingPro && (canShowNet || weeklyMilesValue || deadheadValue) && (
+        <div className="grid grid-cols-2 gap-3 text-sm border-t border-border/40 pt-3">
+          {canShowNet ? (
+            <EstimatedNetStat value={fe.estimatedWeeklyNet as number} />
+          ) : weeklyMilesValue ? (
+            <Stat icon={Gauge} label="Weekly miles" value={weeklyMilesValue} />
+          ) : null}
+          {typeof fe.effectiveRpm === 'number' ? (
             <Stat icon={Gauge} label="Gross per total mile" value={fmtRpm(fe.effectiveRpm)} />
-          </>
-        ) : (
-          <>
-            <Stat icon={Gauge} label="Weekly miles" value={discMilesDisplay(totalMiles)} />
+          ) : deadheadValue ? (
             <Stat icon={Truck} label="Deadhead" value={deadheadValue} warn={deadheadWarn} />
-          </>
+          ) : null}
+        </div>
+      )}
+
+      {/* Row 4b — Non-Pro or non cost-bearing: show weekly miles / deadhead only when provided. */}
+      {!showCostBearingPro && (weeklyMilesValue || deadheadValue) && (
+        <div className="grid grid-cols-2 gap-3 text-sm border-t border-border/40 pt-3">
+          {weeklyMilesValue && <Stat icon={Gauge} label="Weekly miles" value={weeklyMilesValue} />}
+          {deadheadValue && (
+            <Stat icon={Truck} label="Deadhead" value={deadheadValue} warn={deadheadWarn} />
+          )}
+        </div>
+      )}
+
+      {/* Row 5 — secondary indicators (visually secondary to the job) */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {isVerifiedRecruiter && (
+          <Badge
+            variant="outline"
+            className="border-success/40 text-success gap-1 text-[10px] font-semibold"
+          >
+            <ShieldCheck className="h-3 w-3" aria-hidden /> Verified Recruiter
+          </Badge>
         )}
+        <Badge
+          variant="outline"
+          className={`gap-1 text-[10px] font-semibold ${BAND_CLASS[t.band]}`}
+          title={transparencyDescriptor}
+          aria-label={transparencyDescriptor}
+        >
+          <Info className="h-3 w-3" aria-hidden /> {transparencyText}
+        </Badge>
+        {featured && (
+          <Badge
+            variant="secondary"
+            className="bg-primary/10 text-primary border-primary/20 text-[10px] font-semibold"
+            title="Priority placement — Growth or Fleet plan"
+            aria-label="Priority placement — Growth or Fleet plan"
+          >
+            Priority placement
+          </Badge>
+        )}
+        {match && <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} />}
       </div>
 
+      {/* Row 6 — match rationale, secondary */}
       {match && (match.reasons.length > 0 || match.hasSevereWarning) && (
         <div className="space-y-1.5 rounded-lg bg-muted/30 border border-border/40 p-3">
           {match.reasons.slice(0, 2).map((r) => (
             <div key={r} className="flex items-start gap-2 text-xs text-foreground">
-              <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" aria-hidden />
               <span>{r}</span>
             </div>
           ))}
           {match.hasSevereWarning && match.warnings[0] && (
             <div className="flex items-start gap-2 text-xs text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden />
               <span>{match.warnings[0]}</span>
             </div>
           )}
         </div>
       )}
 
+      {/* Row 7 — single dominant primary action */}
       <Button onClick={onView} className="w-full">View Details</Button>
     </Card>
   );
@@ -273,7 +379,10 @@ function Stat({
 }) {
   return (
     <div className="flex items-start gap-2 min-w-0">
-      <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${warn ? 'text-destructive' : 'text-primary'}`} />
+      <Icon
+        className={`h-4 w-4 mt-0.5 shrink-0 ${warn ? 'text-destructive' : 'text-primary'}`}
+        aria-hidden
+      />
       <div className="min-w-0">
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
         <p className="text-sm font-semibold text-foreground truncate">{value}</p>
@@ -284,13 +393,8 @@ function Stat({
 
 /**
  * Est. net can go negative when the driver's personal weekly cost profile
- * exceeds the listing's estimated gross. That's a personalized calculation
- * — not a broken listing — so we surface it with a warning tone, a
- * clarifying caption, and a tooltip explaining the source, rather than
- * hiding it or styling it as a plain metric.
- *
- * Only rendered for cost-bearing employment models. Company drivers and
- * unknown employment never see this stat.
+ * exceeds the listing's estimated gross. Surfaced with a warning tone and
+ * explanatory caption rather than hidden.
  */
 function EstimatedNetStat({ value }: { value: number }) {
   const isNegative = Number(value) < 0;
