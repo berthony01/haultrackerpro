@@ -29,18 +29,16 @@ export function describeRecruiterBlock(
   if (e.canPost) {
     return { reason: 'ok', title: e.title, body: e.body };
   }
-  // Phase 1P-A1: append the first readiness message when incomplete so
-  // callers surface the truthful blocker (e.g. company_type).
-  const readiness = resolveRecruiterReadiness(profile);
-  const body =
-    e.state === 'incomplete_profile' && readiness.messages.length > 0
-      ? `${readiness.messages[0]} ${e.body}`
-      : e.body;
+  // Phase 1P-A1: readiness is authoritative for the actionable dialog; the
+  // block-level body is preserved for legacy gate cards. Callers that need
+  // the exact missing tokens should call `resolveRecruiterReadiness`.
+  void resolveRecruiterReadiness;
   return {
     reason: e.state as RecruiterBlockReason,
     title: e.title,
-    body,
+    body: e.body,
     cta: e.cta,
   };
 }
+
 
