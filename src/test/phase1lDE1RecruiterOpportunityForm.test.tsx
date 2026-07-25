@@ -378,7 +378,8 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     gotoEssentials();
     chooseChip('employment-arrangement', 'W-2 Company Driver');
     gotoOptional();
-    expect(screen.queryByTestId('cost-fields')).toBeNull();
+    expandGroup("group-costs");
+    expect(screen.queryByTestId("cost-fields")).toBeNull();
     expect(screen.getByText(
       /Ownership operating-cost fields are not applicable to company-driver listings\. Estimated\s+take-home is unavailable under the current canonical model\./i,
     )).toBeInTheDocument();
@@ -390,7 +391,8 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     gotoEssentials();
     chooseChip('employment-arrangement', '1099 Contractor');
     gotoOptional();
-    expect(screen.getByTestId('cost-fields')).toBeInTheDocument();
+    expandGroup("group-costs");
+    expect(screen.getByTestId("cost-fields")).toBeInTheDocument();
     expect(screen.getByLabelText('Fuel Paid By')).toBeInTheDocument();
     expect(screen.queryByLabelText('Lease payment amount ($)')).toBeNull();
   });
@@ -400,7 +402,8 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     gotoEssentials();
     chooseChip('employment-arrangement', 'Owner-Operator');
     gotoOptional();
-    expect(screen.getByTestId('cost-fields')).toBeInTheDocument();
+    expandGroup("group-costs");
+    expect(screen.getByTestId("cost-fields")).toBeInTheDocument();
     expect(screen.getByLabelText('Fuel Paid By')).toBeInTheDocument();
     expect(screen.queryByLabelText('Lease payment amount ($)')).toBeNull();
   });
@@ -410,7 +413,8 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     gotoEssentials();
     chooseChip('employment-arrangement', 'Lease Purchase');
     gotoOptional();
-    expect(screen.getByLabelText('Lease payment amount ($)')).toBeInTheDocument();
+    expandGroup("group-costs");
+    expect(screen.getByLabelText("Lease payment amount ($)')).toBeInTheDocument();
     expect(screen.getByLabelText('Lease payment frequency')).toBeInTheDocument();
   });
 
@@ -419,7 +423,8 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     gotoEssentials();
     chooseChip('employment-arrangement', '1099 Contractor');
     gotoOptional();
-    expect(screen.queryByLabelText('Escrow Amount ($)')).toBeNull();
+    expandGroup("group-costs");
+    expect(screen.queryByLabelText("Escrow Amount ($)')).toBeNull();
 
     fireEvent.click(screen.getByLabelText('Escrow Required?'));
     fireEvent.click(screen.getByRole('option', { name: 'Required' }));
@@ -479,7 +484,8 @@ describe('Phase 1O-A — pay-model conditional inputs', () => {
     choosePay('CPM');
     expect(screen.getByLabelText('CPM Rate ($/mi)')).toBeInTheDocument();
     gotoOptional();
-    expect(screen.getByLabelText('Total Weekly Miles')).toBeInTheDocument();
+    expandGroup("group-mileage");
+    expect(screen.getByLabelText("Total Weekly Miles')).toBeInTheDocument();
     expect(screen.getByLabelText('Loaded Miles')).toBeInTheDocument();
     expect(screen.getByLabelText('Deadhead Miles')).toBeInTheDocument();
     expect(screen.getByLabelText('Deadhead Paid?')).toBeInTheDocument();
@@ -756,7 +762,8 @@ describe('Phase 1O-A — draft / publish routing', () => {
       benefits: 'Legacy freeform requirements text',
     }));
     gotoOptional();
-    expect(screen.getByLabelText('Requirements')).toHaveValue('Legacy freeform requirements text');
+    expandGroup("group-requirements");
+    expect(screen.getByLabelText("Requirements")).toHaveValue('Legacy freeform requirements text');
     expect(screen.getByLabelText('Typical Lanes')).toHaveValue('');
     clickSaveDraft();
     const { data } = updateArgs();
