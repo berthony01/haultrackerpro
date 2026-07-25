@@ -403,7 +403,7 @@ describe('Phase 1L-F2B-P2-R1 · Pay-model states', () => {
     expect(within(kvRow('Derived weekly gross')).getByText('$1,500')).toBeInTheDocument();
   });
 
-  it('Unknown pay_model with recruiter-provided gross renders "Not disclosed" pay model and Recruiter weekly gross and no formula rows', () => {
+  it('Unknown pay_model with recruiter-provided gross omits Pay model filler and shows Recruiter weekly gross (omission rules)', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
@@ -416,7 +416,8 @@ describe('Phase 1L-F2B-P2-R1 · Pay-model states', () => {
         deadhead_paid: null,
       }),
     );
-    expect(within(kvRow('Pay model')).getByText('Not disclosed')).toBeInTheDocument();
+    // Pay model row is absent under omission rules (no "Not disclosed" filler).
+    expect(screen.queryByText('Pay model')).toBeNull();
     expect(within(kvRow('Recruiter weekly gross')).getByText('$1,500')).toBeInTheDocument();
     for (const label of [
       'Flat weekly pay',
@@ -448,16 +449,16 @@ describe('Phase 1L-F2B-P2-R1 · One-time incentive isolation', () => {
       deadhead_paid: null,
     });
 
-  it('null sign-on bonus: recurring gross unchanged, Sign-on bonus row Not disclosed', () => {
+  it('null sign-on bonus: recurring gross unchanged, sign-on bonus row absent (omission rules)', () => {
     renderDetail(base(null));
     expect(within(kvRow('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
-    expect(within(kvRow('Sign-on bonus')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(screen.queryByText(/Sign-on bonus/i)).toBeNull();
   });
 
-  it('$10,000 sign-on bonus: recurring gross still $1,600 and Sign-on bonus row shows $10,000', () => {
+  it('$10,000 sign-on bonus: recurring gross still $1,600 and Sign-on bonus callout shows $10,000', () => {
     renderDetail(base(10000));
     expect(within(kvRow('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
-    expect(within(kvRow('Sign-on bonus')).getByText('$10,000')).toBeInTheDocument();
+    expect(screen.getByText('Sign-on bonus: $10,000')).toBeInTheDocument();
   });
 });
 
@@ -592,7 +593,7 @@ describe('Phase 1L-F2B-P2-R1 · Cost-bearing financial estimate', () => {
  * Zero / false preservation
  * ========================================================================= */
 describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
-  it('zero mileage disclosures render "0 mi" in each mileage KV', () => {
+  it('zero mileage disclosures render "0 mi" in the mileage KVs that remain visible for CPM', () => {
     renderDetail(
       fullBase({
         estimated_weekly_miles: 0,
@@ -600,9 +601,11 @@ describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
         estimated_deadhead_miles: 0,
       }),
     );
+    // Under CPM, Loaded miles is exposed inside the Pay section as
+    // "Loaded weekly miles"; other mileage KVs live in the coverage section.
     expect(within(kvRow('Weekly miles')).getByText('0 mi')).toBeInTheDocument();
-    expect(within(kvRow('Loaded miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(kvRow('Deadhead miles')).getByText('0 mi')).toBeInTheDocument();
+    expect(within(kvRow('Loaded weekly miles')).getByText('0 mi')).toBeInTheDocument();
   });
 
   it('deadhead_paid=false with positive deadhead miles renders "Unpaid" in its own KV', () => {
@@ -624,7 +627,7 @@ describe('Phase 1L-F2B-P2-R1 · Zero and false preservation', () => {
  * Disclosure distinction (not_disclosed vs not_applicable)
  * ========================================================================= */
 describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
-  it('flat-weekly company_driver with no mileage: mileage KVs Not applicable and header/home-time Not disclosed', () => {
+  it('flat-weekly company_driver with no mileage or route/trailer/home_time: all filler rows are omitted (Phase 1O-B)', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
@@ -640,17 +643,17 @@ describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
         deadhead_paid: null,
       }),
     );
-    const headerHeading = screen.getByRole('heading', { level: 1, name: 'OTR Reefer Solo' });
-    const headerCard = headerHeading.closest('.p-6');
-    if (!headerCard) throw new Error('header card not found');
-    expect(within(headerCard as HTMLElement).getAllByText('Not disclosed')).toHaveLength(3);
-    expect(within(kvRow('Home time')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(kvRow('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(kvRow('Loaded miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(kvRow('Deadhead miles')).getByText('Not applicable')).toBeInTheDocument();
+    // No "Not disclosed" / "Not applicable" filler anywhere.
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
+    expect(screen.queryByText(/Not applicable/i)).toBeNull();
+    // Mileage / route / trailer / home-time rows are absent entirely.
+    expect(screen.queryByText('Weekly miles')).toBeNull();
+    expect(screen.queryByText('Loaded miles')).toBeNull();
+    expect(screen.queryByText('Deadhead miles')).toBeNull();
+    expect(screen.queryByText('Home time')).toBeNull();
   });
 
-  it('content sections keep all four headings and each independently owns Not disclosed fallback for empty content', () => {
+  it('content sections omit their headings entirely when they have no populated content (Phase 1O-B)', () => {
     renderDetail(
       fullBase({
         actual_benefits: null,
@@ -659,10 +662,11 @@ describe('Phase 1L-F2B-P2-R1 · Disclosure distinction', () => {
         description: null,
       }),
     );
-    expect(within(sectionCard('Benefits')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(sectionCard('Typical Lanes')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(sectionCard('Requirements')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(sectionCard('About this Opportunity')).getByText('Not disclosed')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Benefits' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Typical Lanes' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Requirements' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'About this Opportunity' })).toBeNull();
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
   });
 });
 

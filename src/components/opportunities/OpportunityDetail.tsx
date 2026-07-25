@@ -1,13 +1,19 @@
-// Phase 1L-F2B-P2 — canonical driver-facing detail adoption.
+// Phase 1O-B — Driver Opportunity Detail reconstruction.
 //
-// This component is now a strict consumer of the Phase 1L-F1 canonical view
-// model. It calls `normalizeOpportunity(source)` exactly once per render and
-// renders identity, classification, hiring area, compensation, mileage,
-// operating terms, and content directly from canonical disclosures. Every
-// displayed disclosure honors the three-state model (provided / not_disclosed
-// / not_applicable) so zero, false, and "unspecified" are never collapsed to
-// a legacy dash. The Phase 1L-F1 Listing Transparency Score replaces the
-// legacy Profit Clarity Score inside `OpportunityProfitBreakdown`.
+// Top summary: title, company, verified indicator, dominant pay headline,
+// hiring coverage, route, trailer, driving configuration, home time, and a
+// single dominant `Apply Now` action. Save and Refer a Driver remain secondary.
+//
+// Section order (each section hides entirely when it has no populated data):
+//   1. Opportunity Overview       (description)
+//   2. Pay & Compensation         (pay model, gross, mileage, accessorial, one-time incentives)
+//   3. Hiring Coverage & Route    (coverage, route, trailer, typical lanes)
+//   4. Home Time & Lifestyle      (home time, dispatch, pets, riders, equipment year)
+//   5. Benefits & Equipment       (actual benefits)
+//   6. Requirements               (requirements)
+//   7. Costs & Operating Terms    (cost-bearing employment only)
+//   8. Transparency & Financial Disclosure (secondary — Listing transparency + calc breakdown)
+//   9. Sticky action bar          (Apply Now dominant, Save + Refer + Request Info secondary)
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +37,9 @@ import {
   Gift,
   ClipboardList,
   FileText,
+  Briefcase,
+  Users,
+  Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
@@ -43,6 +52,7 @@ import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch'
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ReferDriverDialog } from './ReferDriverDialog';
 import { ApplyNowDialog } from './ApplyNowDialog';
+import { displayHiringCoverage } from './OpportunityCard';
 import {
   classifyFormalApply,
   classifyRequestInfo,
@@ -55,6 +65,7 @@ import {
   type CanonicalPayModel,
   type CanonicalEmploymentModel,
   type CanonicalRecurringAmount,
+  type CanonicalOpportunity,
 } from '@/lib/opportunities/opportunityCanonicalView';
 import type { CanonicalTeamConfiguration } from '@/lib/opportunities/opportunityCanonical';
 
@@ -76,7 +87,7 @@ const PAY_MODEL_LABEL: Record<CanonicalPayModel, string> = {
   salary: 'Salary',
   mixed: 'Mixed',
   other: 'Other',
-  unknown: 'Not disclosed',
+  unknown: '',
 };
 
 const EMPLOYMENT_LABEL: Record<CanonicalEmploymentModel, string> = {
@@ -84,78 +95,56 @@ const EMPLOYMENT_LABEL: Record<CanonicalEmploymentModel, string> = {
   contractor_1099: '1099 Contractor',
   owner_operator: 'Owner-Operator',
   lease_purchase: 'Lease-Purchase',
-  unknown: 'Employment not disclosed',
+  unknown: '',
 };
 
 const TEAM_LABEL: Record<CanonicalTeamConfiguration, string> = {
   solo: 'Solo',
   team: 'Team',
   solo_or_team: 'Team optional',
-  unspecified: 'Team setup not disclosed',
+  unspecified: '',
 };
 
-const fmtMilesDisc = (d: Disclosure<number>): string => {
-  if (d.state === 'provided') return `${Math.round(d.value).toLocaleString()} mi`;
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
+/* ------------------------------ formatters ------------------------------ */
+
+const fmtMilesN = (n: number): string => `${Math.round(n).toLocaleString()} mi`;
+const fmtMoney = (n: number): string => `$${Math.round(n).toLocaleString()}`;
+
+/** Returns the formatted value only when a Disclosure is `provided`, else null. */
+const strOrNull = (d: Disclosure<string>): string | null =>
+  d.state === 'provided' ? d.value : null;
+const milesOrNull = (d: Disclosure<number>): string | null =>
+  d.state === 'provided' ? fmtMilesN(d.value) : null;
+const moneyOrNull = (d: Disclosure<number>): string | null =>
+  d.state === 'provided' ? fmtMoney(d.value) : null;
+const boolYNOrNull = (d: Disclosure<boolean>): string | null =>
+  d.state === 'provided' ? (d.value ? 'Yes' : 'No') : null;
+const recurringOrNull = (d: Disclosure<CanonicalRecurringAmount>): string | null => {
+  if (d.state !== 'provided') return null;
+  const { amount, frequency } = d.value;
+  if (!Number.isFinite(amount)) return null;
+  const money = fmtMoney(amount);
+  return frequency == null ? money : `${money} ${frequency}`;
 };
 
-const fmtStrDisc = (d: Disclosure<string>): string => {
-  if (d.state === 'provided') return d.value;
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
-};
-
-const fmtDeadheadPaid = (d: Disclosure<boolean>): string => {
-  if (d.state === 'provided') return d.value ? 'Paid' : 'Unpaid';
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
-};
-
-const fmtBoolYN = (d: Disclosure<boolean>): string => {
-  if (d.state === 'provided') return d.value ? 'Yes' : 'No';
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
-};
-
-const fmtRecurring = (d: Disclosure<CanonicalRecurringAmount>): string => {
-  if (d.state === 'provided') {
-    const { amount, frequency } = d.value;
-    if (!Number.isFinite(amount)) return 'Not disclosed';
-    const money = `$${Math.round(amount).toLocaleString()}`;
-    if (frequency == null) return money;
-    return `${money} ${frequency}`;
-  }
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
-};
-
-const fmtMoneyDisc = (d: Disclosure<number>): string => {
-  if (d.state === 'provided') return `$${Math.round(d.value).toLocaleString()}`;
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Not disclosed';
-};
-
-function grossLabel(source: 'derived' | 'recruiter_provided' | null): string {
+function grossLabelFor(source: 'derived' | 'recruiter_provided' | null): string {
   if (source === 'derived') return 'Derived weekly gross';
   if (source === 'recruiter_provided') return 'Recruiter weekly gross';
   return 'Weekly gross';
 }
 
-function grossValue(fe: { status: string; recurringWeeklyGross: number | null }): string {
+function grossValueOrNull(fe: {
+  status: string;
+  recurringWeeklyGross: number | null;
+}): string | null {
   if (typeof fe.recurringWeeklyGross === 'number' && Number.isFinite(fe.recurringWeeklyGross)) {
-    return `$${Math.round(fe.recurringWeeklyGross).toLocaleString()}`;
+    return fmtMoney(fe.recurringWeeklyGross);
   }
-  if (fe.status === 'not_applicable') return 'Not applicable';
-  if (fe.status === 'incomplete' || fe.status === 'conflict') return 'Incomplete';
-  return 'Not disclosed';
+  if (fe.status === 'conflict') return 'Conflict';
+  return null;
 }
 
-function companyDisplay(d: Disclosure<string>): string {
-  if (d.state === 'provided') return d.value;
-  if (d.state === 'not_applicable') return 'Not applicable';
-  return 'Company not disclosed';
-}
+/* ============================== component =============================== */
 
 export function OpportunityDetail({
   opportunity: o,
@@ -249,7 +238,10 @@ export function OpportunityDetail({
   };
 
   const displayTitle = canonical.identity.title;
-  const displayCompany = companyDisplay(canonical.identity.companyName);
+  const companyName =
+    canonical.identity.companyName.state === 'provided'
+      ? canonical.identity.companyName.value
+      : null;
   const featured = canonical.trust.featured;
   const isVerified = canonical.trust.recruiterVerification === 'approved';
   const employment = canonical.classification.employmentModel;
@@ -257,59 +249,262 @@ export function OpportunityDetail({
   const pm = canonical.compensation.payModel;
   const rp = canonical.compensation.recurringPay;
   const mileage = canonical.compensation.mileage;
+  const fe = canonical.derived.financialEstimate;
+  const costBearing =
+    employment === 'contractor_1099' ||
+    employment === 'owner_operator' ||
+    employment === 'lease_purchase';
 
+  const dialogCompanyName = companyName ?? o.company_name;
+
+  const coverage = displayHiringCoverage(canonical);
+  const employmentLabel = EMPLOYMENT_LABEL[employment];
+  const teamLabel = TEAM_LABEL[team];
+  const routeLabel = strOrNull(canonical.classification.routeType);
+  const trailerLabel = strOrNull(canonical.classification.trailerType);
+  const homeTimeLabel = strOrNull(canonical.operatingTerms.homeTime);
+  const payModelLabel = PAY_MODEL_LABEL[pm];
+  const grossValue = grossValueOrNull(fe);
+  const grossLabel = grossLabelFor(fe.grossSource);
+
+  /* -------------------- section content (or null) -------------------- */
+
+  const overviewContent = strOrNull(canonical.content.description);
+
+  const payKVs: [string, string][] = [];
+  if (payModelLabel) payKVs.push(['Pay model', payModelLabel]);
+  if (grossValue) payKVs.push([grossLabel, grossValue]);
+  if (pm === 'cpm') {
+    if (rp.cpm.state === 'provided')
+      payKVs.push(['CPM', `$${Number(rp.cpm.value).toFixed(2)}/mi`]);
+    const loaded = milesOrNull(mileage.loadedWeeklyMiles);
+    if (loaded) payKVs.push(['Loaded weekly miles', loaded]);
+  }
+  if (pm === 'percentage' && rp.percentage.state === 'provided') {
+    const v = rp.percentage.value;
+    if (Number.isFinite(v.rate)) payKVs.push(['Percentage rate', `${v.rate}%`]);
+    if (v.weeklyRevenueBasis != null)
+      payKVs.push(['Weekly revenue basis', `$${Math.round(v.weeklyRevenueBasis).toLocaleString()}`]);
+    if (v.basisLabel) payKVs.push(['Percentage basis', v.basisLabel]);
+  }
+  if (pm === 'flat_weekly') {
+    const flat = moneyOrNull(rp.flatWeekly);
+    if (flat) payKVs.push(['Flat weekly pay', flat]);
+  }
+  if (pm === 'salary' && rp.salary.state === 'provided') {
+    payKVs.push(['Salary amount', fmtMoney(rp.salary.value.amount)]);
+    if (rp.salary.value.frequency)
+      payKVs.push(['Salary frequency', rp.salary.value.frequency]);
+  }
+  if (pm === 'other') {
+    const label = strOrNull(rp.otherMethod.label);
+    if (label) payKVs.push(['Other pay method', label]);
+    const money = moneyOrNull(rp.otherMethod.weeklyGross);
+    if (money) payKVs.push(['Other weekly gross', money]);
+  }
+  const detention = strOrNull(canonical.compensation.accessorialPay.detention);
+  const layover = strOrNull(canonical.compensation.accessorialPay.layover);
+  if (detention) payKVs.push(['Detention pay', detention]);
+  if (layover) payKVs.push(['Layover pay', layover]);
+
+  const mixedComponents =
+    pm === 'mixed'
+      ? rp.mixedComponents.filter((c) => c.amount.state === 'provided')
+      : [];
+
+  // Sign-on bonus renders only when > 0 (contract: positive incentives only,
+  // separately labeled from recurring pay).
+  const signOn = canonical.compensation.oneTimeIncentives.signOnBonus;
+  const signOnAmount =
+    signOn.state === 'provided' && signOn.value > 0 ? signOn.value : null;
+
+  const mileageKVs: [string, string, boolean?][] = [];
+  const totalMiles = milesOrNull(mileage.totalWeeklyMiles);
+  if (totalMiles) mileageKVs.push(['Weekly miles', totalMiles]);
+  const loadedMiles = milesOrNull(mileage.loadedWeeklyMiles);
+  if (loadedMiles && pm !== 'cpm') mileageKVs.push(['Loaded miles', loadedMiles]);
+  const deadheadMi = milesOrNull(mileage.deadheadWeeklyMiles);
   const deadheadWarn =
     mileage.deadheadWeeklyMiles.state === 'provided' &&
     mileage.deadheadWeeklyMiles.value > 0 &&
     mileage.deadheadPaid.state === 'provided' &&
     mileage.deadheadPaid.value === false;
+  if (deadheadMi) mileageKVs.push(['Deadhead miles', deadheadMi, deadheadWarn]);
+  if (mileage.deadheadPaid.state === 'provided') {
+    mileageKVs.push([
+      'Deadhead paid?',
+      mileage.deadheadPaid.value ? 'Paid' : 'Unpaid',
+      mileage.deadheadPaid.value === false,
+    ]);
+  }
 
-  const dialogCompanyName =
-    canonical.identity.companyName.state === 'provided'
-      ? canonical.identity.companyName.value
-      : o.company_name;
+  const hasPaySection =
+    payKVs.length > 0 || mixedComponents.length > 0 || signOnAmount != null;
+
+  const coverageKVs: [string, string][] = [];
+  if (coverage) coverageKVs.push(['Hiring coverage', coverage]);
+  if (routeLabel) coverageKVs.push(['Route type', routeLabel]);
+  if (trailerLabel) coverageKVs.push(['Trailer', trailerLabel]);
+  const typicalLanes = strOrNull(canonical.content.typicalLanes);
+  const hasCoverageSection =
+    coverageKVs.length > 0 || typicalLanes != null || mileageKVs.length > 0;
+
+  const lifestyleKVs: [string, string][] = [];
+  if (homeTimeLabel) lifestyleKVs.push(['Home time', homeTimeLabel]);
+  const forcedDispatch = boolYNOrNull(canonical.operatingTerms.forcedDispatch);
+  if (forcedDispatch) lifestyleKVs.push(['Forced dispatch', forcedDispatch]);
+  const pets = boolYNOrNull(canonical.operatingTerms.petsAllowed);
+  if (pets) lifestyleKVs.push(['Pets allowed', pets]);
+  const riders = boolYNOrNull(canonical.operatingTerms.ridersAllowed);
+  if (riders) lifestyleKVs.push(['Riders allowed', riders]);
+  const equipmentYear = strOrNull(canonical.operatingTerms.equipmentYear);
+  if (equipmentYear) lifestyleKVs.push(['Equipment year', equipmentYear]);
+
+  const benefits = strOrNull(canonical.content.actualBenefits);
+  const requirements = strOrNull(canonical.content.requirements);
+
+  const costsKVs: [string, string][] = [];
+  if (costBearing) {
+    const fuel = strOrNull(canonical.costs.fuelPaidBy);
+    if (fuel) costsKVs.push(['Fuel paid by', fuel]);
+    const ins = recurringOrNull(canonical.costs.insurance);
+    if (ins) costsKVs.push(['Insurance', ins]);
+    const maint = recurringOrNull(canonical.costs.maintenance);
+    if (maint) costsKVs.push(['Maintenance', maint]);
+    const otherC = recurringOrNull(canonical.costs.otherRecurringCost);
+    if (otherC) costsKVs.push(['Other recurring cost', otherC]);
+    if (employment === 'lease_purchase') {
+      const lease = recurringOrNull(canonical.costs.lease);
+      if (lease) costsKVs.push(['Lease payment', lease]);
+    }
+    if (
+      canonical.costs.escrowRequired.state === 'provided' &&
+      canonical.costs.escrowRequired.value === true
+    ) {
+      costsKVs.push(['Escrow required', 'Yes']);
+      const esc = recurringOrNull(canonical.costs.escrowAmount);
+      if (esc) costsKVs.push(['Escrow amount', esc]);
+    }
+  }
+  const hasCostsSection = costBearing && costsKVs.length > 0;
+
+  /* --------------------------------- render --------------------------------- */
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <Button variant="ghost" onClick={onBack} className="text-muted-foreground hover:text-foreground -ml-2">
+      <Button
+        variant="ghost"
+        onClick={onBack}
+        className="text-muted-foreground hover:text-foreground -ml-2"
+      >
         <ArrowLeft className="h-4 w-4" /> Back to Opportunities
       </Button>
 
-      {/* Header */}
+      {/* ============= Top Summary ============= */}
       <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <h1 className="text-2xl font-black text-foreground">{displayTitle}</h1>
-          {featured && (
-            <Badge className="bg-primary/15 text-primary border-primary/20" variant="secondary">
-              Priority placement
-            </Badge>
+        <div className="flex flex-col gap-4">
+          {/* Title / company / verified */}
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-2xl font-black text-foreground leading-tight break-words">
+                {displayTitle}
+              </h1>
+              {isVerified && (
+                <Badge
+                  variant="outline"
+                  className="border-success/40 text-success gap-1 text-xs"
+                >
+                  <ShieldCheck className="h-3 w-3" aria-hidden /> Verified Recruiter
+                </Badge>
+              )}
+              {featured && (
+                <Badge
+                  className="bg-primary/15 text-primary border-primary/20 text-xs"
+                  variant="secondary"
+                >
+                  Priority placement
+                </Badge>
+              )}
+            </div>
+            {companyName && (
+              <p className="text-base font-semibold text-muted-foreground">{companyName}</p>
+            )}
+          </div>
+
+          {/* Dominant pay + coverage */}
+          {(grossValue || coverage) && (
+            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+              {grossValue && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Weekly pay
+                  </p>
+                  <p className="text-3xl sm:text-4xl font-black text-primary leading-none whitespace-nowrap">
+                    {grossValue}
+                  </p>
+                  <p className="text-[10px] font-semibold text-muted-foreground mt-1">
+                    per week
+                  </p>
+                </div>
+              )}
+              {coverage && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Hiring
+                  </p>
+                  <p className="text-base font-semibold text-foreground flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                    <span>{coverage}</span>
+                  </p>
+                </div>
+              )}
+            </div>
           )}
-          {isVerified && (
-            <Badge variant="outline" className="border-success/40 text-success gap-1">
-              <ShieldCheck className="h-3 w-3" /> Verified Recruiter
-            </Badge>
+
+          {/* Compact facts row — hide unpopulated facts */}
+          {(employmentLabel || teamLabel || routeLabel || trailerLabel || homeTimeLabel) && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              {employmentLabel && (
+                <Badge variant="outline" className="gap-1">
+                  <Briefcase className="h-3 w-3" aria-hidden /> {employmentLabel}
+                </Badge>
+              )}
+              {teamLabel && (
+                <Badge variant="outline" className="gap-1">
+                  <Users className="h-3 w-3" aria-hidden /> {teamLabel}
+                </Badge>
+              )}
+              {routeLabel && (
+                <Badge variant="outline" className="gap-1">
+                  <MapPin className="h-3 w-3" aria-hidden /> {routeLabel}
+                </Badge>
+              )}
+              {trailerLabel && (
+                <Badge variant="outline" className="gap-1">
+                  <Truck className="h-3 w-3" aria-hidden /> {trailerLabel}
+                </Badge>
+              )}
+              {homeTimeLabel && (
+                <Badge variant="outline" className="gap-1">
+                  <Home className="h-3 w-3" aria-hidden /> {homeTimeLabel}
+                </Badge>
+              )}
+            </div>
           )}
-        </div>
-        <p className="text-base font-semibold text-muted-foreground mb-3">{displayCompany}</p>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5" /> {canonical.hiringArea.displayLabel}
-          </span>
-          <Badge variant="outline">{EMPLOYMENT_LABEL[employment]}</Badge>
-          <Badge variant="outline">{TEAM_LABEL[team]}</Badge>
-          <Badge variant="outline">{fmtStrDisc(canonical.classification.routeType)}</Badge>
-          <Badge variant="outline">{fmtStrDisc(canonical.classification.trailerType)}</Badge>
-          <Badge variant="outline">{fmtStrDisc(canonical.operatingTerms.homeTime)}</Badge>
+
+          {/* Primary actions live in the sticky action bar below to keep them
+              always reachable without duplicating buttons on the page. */}
         </div>
       </Card>
 
-      {/* Match Insights */}
+
+      {/* Match Insights (secondary rationale — kept for driver context) */}
       {match ? (
         <Card className="p-5 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2">
               <div className="rounded-lg bg-primary/15 p-1.5">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden />
               </div>
               <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Your Match</h3>
             </div>
@@ -323,7 +518,7 @@ export function OpportunityDetail({
               <ul className="space-y-1.5">
                 {match.reasons.map((r) => (
                   <li key={r} className="flex items-start gap-2 text-sm text-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden />
                     <span>{r}</span>
                   </li>
                 ))}
@@ -338,23 +533,18 @@ export function OpportunityDetail({
               <ul className="space-y-1.5">
                 {match.warnings.map((w) => (
                   <li key={w} className="flex items-start gap-2 text-sm text-foreground">
-                    <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden />
                     <span>{w}</span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
-          {match.reasons.length === 0 && match.warnings.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              We couldn't pull strong signals from this opportunity. Review the pay and disclosure details below.
-            </p>
-          )}
         </Card>
       ) : (
         <Card className="p-5 border-border/60 bg-muted/20">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+            <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" aria-hidden />
             <div>
               <h3 className="text-sm font-bold text-foreground mb-1">Improve Your Match Insights</h3>
               <p className="text-sm text-muted-foreground">
@@ -365,196 +555,175 @@ export function OpportunityDetail({
         </Card>
       )}
 
-      {/* Canonical Pay Breakdown */}
-      <Section icon={DollarSign} title="Pay Breakdown">
-        <Grid>
-          <KV label="Pay model" value={PAY_MODEL_LABEL[pm]} />
-          <KV
-            label={grossLabel(canonical.derived.financialEstimate.grossSource)}
-            value={grossValue(canonical.derived.financialEstimate)}
-            highlight
-          />
-          {pm === 'cpm' && (
-            <>
-              <KV
-                label="CPM"
-                value={
-                  rp.cpm.state === 'provided'
-                    ? `$${Number(rp.cpm.value).toFixed(2)}/mi`
-                    : rp.cpm.state === 'not_applicable'
-                    ? 'Not applicable'
-                    : 'Not disclosed'
-                }
-              />
-              <KV label="Loaded weekly miles" value={fmtMilesDisc(mileage.loadedWeeklyMiles)} />
-            </>
+      {/* 1. Opportunity Overview */}
+      {overviewContent && (
+        <Section icon={FileText} title="Opportunity Overview">
+          <p className="text-sm text-foreground whitespace-pre-line">{overviewContent}</p>
+        </Section>
+      )}
+
+      {/* 2. Pay & Compensation */}
+      {hasPaySection && (
+        <Section icon={DollarSign} title="Pay & Compensation">
+          {payKVs.length > 0 && (
+            <Grid>
+              {payKVs.map(([label, value]) => (
+                <KV
+                  key={label}
+                  label={label}
+                  value={value}
+                  highlight={label === grossLabel}
+                />
+              ))}
+            </Grid>
           )}
-          {pm === 'percentage' && (
-            <>
-              <KV
-                label="Percentage rate"
-                value={
-                  rp.percentage.state === 'provided'
-                    ? `${rp.percentage.value.rate}%`
-                    : rp.percentage.state === 'not_applicable'
-                    ? 'Not applicable'
-                    : 'Not disclosed'
-                }
-              />
-              <KV
-                label="Weekly revenue basis"
-                value={
-                  rp.percentage.state === 'provided' &&
-                  rp.percentage.value.weeklyRevenueBasis != null
-                    ? `$${Math.round(rp.percentage.value.weeklyRevenueBasis).toLocaleString()}`
-                    : 'Not disclosed'
-                }
-              />
-              <KV
-                label="Percentage basis"
-                value={
-                  rp.percentage.state === 'provided' && rp.percentage.value.basisLabel
-                    ? rp.percentage.value.basisLabel
-                    : 'Not disclosed'
-                }
-              />
-            </>
-          )}
-          {pm === 'flat_weekly' && (
-            <KV label="Flat weekly pay" value={fmtMoneyDisc(rp.flatWeekly)} />
-          )}
-          {pm === 'salary' && (
-            <>
-              <KV
-                label="Salary amount"
-                value={
-                  rp.salary.state === 'provided'
-                    ? `$${Math.round(rp.salary.value.amount).toLocaleString()}`
-                    : rp.salary.state === 'not_applicable'
-                    ? 'Not applicable'
-                    : 'Not disclosed'
-                }
-              />
-              <KV
-                label="Salary frequency"
-                value={
-                  rp.salary.state === 'provided' && rp.salary.value.frequency
-                    ? rp.salary.value.frequency
-                    : 'Not disclosed'
-                }
-              />
-            </>
-          )}
-          {pm === 'mixed' && (
-            <div className="col-span-2 sm:col-span-3 rounded-lg bg-muted/30 p-3">
+          {mixedComponents.length > 0 && (
+            <div className="mt-3 rounded-lg bg-muted/30 p-3">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
                 Mixed pay components
               </p>
-              {rp.mixedComponents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Not disclosed</p>
-              ) : (
-                <ul className="space-y-1">
-                  {rp.mixedComponents.map((c, i) => (
-                    <li key={i} className="text-sm text-foreground flex justify-between gap-2">
-                      <span>{c.label || 'Component'}</span>
-                      <span className="font-semibold">{fmtRecurring(c.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ul className="space-y-1">
+                {mixedComponents.map((c, i) => (
+                  <li key={i} className="text-sm text-foreground flex justify-between gap-2">
+                    <span>{c.label || 'Component'}</span>
+                    <span className="font-semibold">
+                      {c.amount.state === 'provided'
+                        ? `${fmtMoney(c.amount.value.amount)}${
+                            c.amount.value.frequency ? ` ${c.amount.value.frequency}` : ''
+                          }`
+                        : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
-          {pm === 'other' && (
-            <>
-              <KV label="Other pay method" value={fmtStrDisc(rp.otherMethod.label)} />
-              <KV label="Other weekly gross" value={fmtMoneyDisc(rp.otherMethod.weeklyGross)} />
-            </>
+          {signOnAmount != null && (
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-3">
+              <Gift className="h-4 w-4 text-primary shrink-0" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">
+                  One-time incentive · separate from weekly pay
+                </p>
+                <p className="text-sm font-bold text-foreground">
+                  Sign-on bonus: {fmtMoney(signOnAmount)}
+                </p>
+              </div>
+            </div>
           )}
-          <KV label="Detention pay" value={fmtStrDisc(canonical.compensation.accessorialPay.detention)} />
-          <KV label="Layover pay" value={fmtStrDisc(canonical.compensation.accessorialPay.layover)} />
-        </Grid>
-      </Section>
+        </Section>
+      )}
 
-      {/* One-Time Incentives */}
-      <Section icon={Gift} title="One-Time Incentives">
-        <Grid>
-          <KV
-            label="Sign-on bonus"
-            value={fmtMoneyDisc(canonical.compensation.oneTimeIncentives.signOnBonus)}
-          />
-        </Grid>
-      </Section>
+      {/* 3. Hiring Coverage & Route */}
+      {hasCoverageSection && (
+        <Section icon={MapPin} title="Hiring Coverage & Route">
+          {coverageKVs.length > 0 && (
+            <Grid>
+              {coverageKVs.map(([label, value]) => (
+                <KV key={label} label={label} value={value} />
+              ))}
+            </Grid>
+          )}
+          {mileageKVs.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                Mileage & deadhead
+              </p>
+              <Grid>
+                {mileageKVs.map(([label, value, warn]) => (
+                  <KV key={label} label={label} value={value} warn={warn} />
+                ))}
+              </Grid>
+            </div>
+          )}
+          {typicalLanes && (
+            <div className="mt-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                Typical Lanes
+              </p>
+              <p className="text-sm text-foreground whitespace-pre-line">{typicalLanes}</p>
+            </div>
+          )}
+        </Section>
+      )}
 
-      {/* Mileage & Deadhead */}
-      <Section icon={Gauge} title="Mileage & Deadhead">
-        <Grid>
-          <KV label="Weekly miles" value={fmtMilesDisc(mileage.totalWeeklyMiles)} />
-          <KV label="Loaded miles" value={fmtMilesDisc(mileage.loadedWeeklyMiles)} />
-          <KV
-            label="Deadhead miles"
-            value={fmtMilesDisc(mileage.deadheadWeeklyMiles)}
-            warn={deadheadWarn}
-          />
-          <KV
-            label="Deadhead paid?"
-            value={fmtDeadheadPaid(mileage.deadheadPaid)}
-            warn={
-              mileage.deadheadPaid.state === 'provided' &&
-              mileage.deadheadPaid.value === false
-            }
-          />
-        </Grid>
-      </Section>
+      {/* 4. Home Time & Lifestyle */}
+      {lifestyleKVs.length > 0 && (
+        <Section icon={Home} title="Home Time & Lifestyle">
+          <Grid>
+            {lifestyleKVs.map(([label, value]) => (
+              <KV key={label} label={label} value={value} />
+            ))}
+          </Grid>
+        </Section>
+      )}
 
-      {/* Listing Transparency + Financial Disclosure */}
+      {/* 5. Benefits & Equipment */}
+      {benefits && (
+        <Section icon={ShieldCheck} title="Benefits & Equipment">
+          <p className="text-sm text-foreground whitespace-pre-line">{benefits}</p>
+        </Section>
+      )}
+
+      {/* 6. Requirements */}
+      {requirements && (
+        <Section icon={ClipboardList} title="Requirements">
+          <p className="text-sm text-foreground whitespace-pre-line">{requirements}</p>
+        </Section>
+      )}
+
+      {/* 7. Costs & Operating Terms (cost-bearing employment only) */}
+      {hasCostsSection && (
+        <Section icon={Wallet} title="Costs & Operating Terms">
+          <Grid>
+            {costsKVs.map(([label, value]) => (
+              <KV key={label} label={label} value={value} />
+            ))}
+          </Grid>
+        </Section>
+      )}
+
+      {/* 8. Transparency & Financial Disclosure (secondary) */}
       <OpportunityProfitBreakdown canonical={canonical} isPro={isPro} onUpgrade={onUpgrade} />
-
-      {/* Home Time & Lifestyle */}
-      <Section icon={Home} title="Home Time & Lifestyle">
-        <Grid>
-          <KV label="Home time" value={fmtStrDisc(canonical.operatingTerms.homeTime)} />
-          <KV label="Forced dispatch" value={fmtBoolYN(canonical.operatingTerms.forcedDispatch)} />
-          <KV label="Pets allowed" value={fmtBoolYN(canonical.operatingTerms.petsAllowed)} />
-          <KV label="Riders allowed" value={fmtBoolYN(canonical.operatingTerms.ridersAllowed)} />
-          <KV label="Equipment year" value={fmtStrDisc(canonical.operatingTerms.equipmentYear)} />
-        </Grid>
-      </Section>
-
-      {/* Benefits / Lanes / Requirements / Description — always visible with disclosure fallbacks */}
-      <Section icon={ShieldCheck} title="Benefits">
-        <p className="text-sm text-muted-foreground whitespace-pre-line">
-          {fmtStrDisc(canonical.content.actualBenefits)}
-        </p>
-      </Section>
-      <Section icon={Truck} title="Typical Lanes">
-        <p className="text-sm text-muted-foreground whitespace-pre-line">
-          {fmtStrDisc(canonical.content.typicalLanes)}
-        </p>
-      </Section>
-      <Section icon={ClipboardList} title="Requirements">
-        <p className="text-sm text-muted-foreground whitespace-pre-line">
-          {fmtStrDisc(canonical.content.requirements)}
-        </p>
-      </Section>
-      <Section icon={FileText} title="About this Opportunity">
-        <p className="text-sm text-muted-foreground whitespace-pre-line">
-          {fmtStrDisc(canonical.content.description)}
-        </p>
-      </Section>
 
       <div aria-hidden className="h-32 lg:h-28" />
 
+      {/* Sticky action bar — Apply Now dominant, everything else secondary */}
       <div className="fixed left-0 right-0 lg:left-[calc(15rem+1.5rem)] lg:right-6 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30 space-y-2">
         {profileIncomplete && formalState.kind === 'none' && (
           <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
-            <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+            <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" aria-hidden />
             <span>Complete your Opportunity Preferences to apply and improve your match score.</span>
           </div>
         )}
         <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
+          <Button
+            onClick={() => setShowApply(true)}
+            disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
+            className="flex-1 sm:flex-[2]"
+            size="lg"
+          >
+            <Send className="h-4 w-4" />
+            {formalState.kind === 'active'
+              ? 'Application Submitted'
+              : formalState.kind === 'completed'
+                ? 'Hired'
+                : formalState.kind === 'reapplyable'
+                  ? 'Apply Again'
+                  : 'Apply Now'}
+          </Button>
           <Button variant="outline" onClick={handleToggleSave} className="flex-1">
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {isSaved ? 'Saved' : 'Save'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleRequestInfo}
+            disabled={requestInfoState.exists || submitting}
+            className="flex-1"
+          >
+            <Send className="h-4 w-4" />
+            {requestInfoState.exists ? 'Info Requested' : submitting ? 'Sending…' : 'Request Info'}
           </Button>
           {isPro ? (
             <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
@@ -576,29 +745,6 @@ export function OpportunityDetail({
               <Lock className="h-4 w-4" /> Refer a Driver — Pro
             </Button>
           )}
-          <Button
-            variant="outline"
-            onClick={handleRequestInfo}
-            disabled={requestInfoState.exists || submitting}
-            className="flex-1"
-          >
-            <Send className="h-4 w-4" />
-            {requestInfoState.exists ? 'Info Requested' : submitting ? 'Sending…' : 'Request Info'}
-          </Button>
-          <Button
-            onClick={() => setShowApply(true)}
-            disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
-            className="flex-1"
-          >
-            <Send className="h-4 w-4" />
-            {formalState.kind === 'active'
-              ? 'Application Submitted'
-              : formalState.kind === 'completed'
-              ? 'Hired'
-              : formalState.kind === 'reapplyable'
-              ? 'Apply Again'
-              : 'Apply Now'}
-          </Button>
         </div>
       </div>
 
@@ -639,7 +785,7 @@ function Section({
     <Card className="p-5 border-border/60">
       <div className="flex items-center gap-2 mb-4">
         <div className="rounded-lg bg-primary/10 p-1.5">
-          <Icon className="h-4 w-4 text-primary" />
+          <Icon className="h-4 w-4 text-primary" aria-hidden />
         </div>
         <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">{title}</h3>
       </div>

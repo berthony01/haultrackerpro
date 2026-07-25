@@ -322,7 +322,7 @@ describe('Phase 1L-F2B-P1 · Canonical classification and disclosure labels', ()
     expect(screen.getByText('Acme Freight')).toBeInTheDocument();
   });
 
-  it('distinguishes Not disclosed (route/trailer/home) from Not applicable (mileage) for flat_weekly company driver', () => {
+  it('flat_weekly company driver omits unpopulated route/trailer/home rows and hides mileage rows entirely (Phase 1O-B omission rules)', () => {
     const opp = source({
       canonical_version: 1,
       employment_model: 'company_driver',
@@ -333,19 +333,21 @@ describe('Phase 1L-F2B-P1 · Canonical classification and disclosure labels', ()
     });
     renderCard({ opportunity: opp });
     expect(screen.getByText('Company Driver')).toBeInTheDocument();
-    expect(screen.getByText('Team setup not disclosed')).toBeInTheDocument();
-    expect(screen.getByText('Company not disclosed')).toBeInTheDocument();
-    // Route / trailer / home_time badges — always relevant → Not disclosed.
-    expect(screen.getAllByText('Not disclosed').length).toBeGreaterThanOrEqual(3);
-    // Weekly miles / Deadhead — irrelevant under flat_weekly → Not applicable.
-    expect(within(rowFor('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(rowFor('Deadhead')).getByText('Not applicable')).toBeInTheDocument();
+    // Omission rules: no "Not disclosed" / "Not applicable" / "—" filler anywhere.
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
+    expect(screen.queryByText(/Not applicable/i)).toBeNull();
+    expect(screen.queryByText('Team setup not disclosed')).toBeNull();
+    expect(screen.queryByText('Company not disclosed')).toBeNull();
+    // Mileage rows are absent (not "Not applicable") under flat_weekly.
+    expect(screen.queryByText('Weekly miles')).toBeNull();
+    expect(screen.queryByText('Deadhead')).toBeNull();
   });
 
-  it('renders "Employment not disclosed" for unknown employment', () => {
+  it('unknown employment omits the employment fact rather than rendering "Employment not disclosed" filler', () => {
     const opp = source({ canonical_version: 1, employment_model: null, driver_type: null });
     renderCard({ opportunity: opp });
-    expect(screen.getByText('Employment not disclosed')).toBeInTheDocument();
+    expect(screen.queryByText('Employment not disclosed')).toBeNull();
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
   });
 });
 
