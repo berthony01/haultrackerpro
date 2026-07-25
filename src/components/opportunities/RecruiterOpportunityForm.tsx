@@ -1017,7 +1017,7 @@ function PublicationChecklist({
       <div>
         <p className="text-[10px] font-black uppercase tracking-widest text-primary">Publication Checklist</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Blockers stop publishing. Warnings publish as-is but reduce transparency.
+          Complete the required details before publishing. Warnings do not block publication.
         </p>
       </div>
 
@@ -1029,7 +1029,7 @@ function PublicationChecklist({
           <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-foreground">Ready to publish</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">No blockers detected.</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">No required details are missing.</p>
           </div>
         </div>
       )}
@@ -1053,11 +1053,11 @@ function PublicationChecklist({
 
       {warnings.length > 0 && (
         <div
-          className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"
+          className="rounded-lg border border-warning/30 bg-warning/5 p-3"
           data-testid="publish-warnings"
         >
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <AlertTriangle className="h-4 w-4 text-warning" />
             <h4 className="text-xs font-bold text-foreground">
               {warnings.length} warning{warnings.length === 1 ? '' : 's'}
             </h4>
@@ -1070,6 +1070,7 @@ function PublicationChecklist({
     </Card>
   );
 }
+
 
 function DriverPreview({
   state, readiness, coverageMode,
