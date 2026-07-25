@@ -253,10 +253,22 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
               <Trash2 className="h-4 w-4" /> Delete account
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Deleting your account permanently removes your recruiter profile, opportunities, and applications you received.
-            Stripe billing records are retained as required by law.
-          </p>
+          <div className="space-y-2 pt-1 text-[11px] text-muted-foreground leading-relaxed">
+            <p>
+              <span className="font-semibold text-foreground">Delete Account</span> removes your entire personal login — not only the recruiter profile. It may cancel both the driver and recruiter subscriptions owned by the same login.
+            </p>
+            <p>
+              Personal recruiter, profile, and listing data may be removed through account cleanup. Shared applications, events, contracts, signatures, audit, billing/payment, fraud, dispute, legal/compliance, backup, or third-party records may be retained, detached, anonymized, or remain where operationally or lawfully necessary.
+            </p>
+            <p>
+              If you own an agency, personal deletion is blocked until ownership is transferred or the agency is closed through support.
+            </p>
+            <p>
+              <Link to="/docs/account-deletion-data-retention" className="text-primary hover:underline font-medium">
+                Review deletion and retention details
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
 
