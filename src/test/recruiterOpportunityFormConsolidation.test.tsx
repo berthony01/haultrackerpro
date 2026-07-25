@@ -236,12 +236,16 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(screen.getByTestId('recruiter-opportunity-form')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Edit Opportunity' })).toBeInTheDocument();
+    // Editing an opportunity opens on the Essentials stage — Title/Company/Home
+    // Time all live there and hydrate from the seeded row.
     expect(screen.getByLabelText('Opportunity Title')).toHaveValue('Regional Dry Van');
     expect(screen.getByLabelText('Company Name')).toHaveValue('Acme Trucking');
     expect(screen.getByLabelText('Home Time')).toHaveValue('Home weekly');
-    // Stored transparency=true must hydrate as checked.
+    // Transparency confirmation lives on the Review stage — navigate to verify hydration.
+    fireEvent.click(screen.getByRole('tab', { name: /Review & Publish/ }));
     expect(screen.getByLabelText('Transparency confirmation')).toBeChecked();
   });
+
 
   it('completed, pending-verification profile may post (per shared eligibility helper)', () => {
     profileState = makeProfile({ verification_status: 'pending' });
@@ -285,7 +289,11 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
   it('create flow reaches createOpportunity.mutate with status=draft and canonical_version=1', () => {
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId('empty-state-cta'));
+    // New opportunities open on the Write & Extract stage; navigate to
+    // Essentials for the Title input, then to Review for Save Draft.
+    fireEvent.click(screen.getByRole('tab', { name: /Essentials/ }));
     fireEvent.change(screen.getByLabelText('Opportunity Title'), { target: { value: 'New Draft' } });
+    fireEvent.click(screen.getByRole('tab', { name: /Review & Publish/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
     expect(h.createMutate).toHaveBeenCalledTimes(1);
     const call = h.createMutate.mock.calls[0];
@@ -302,6 +310,8 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     opportunitiesState = [makeOpportunity({ id: 'opp-abc' })];
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    // Editing opens on Essentials; Save Draft lives on Review.
+    fireEvent.click(screen.getByRole('tab', { name: /Review & Publish/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
     expect(h.updateMutate).toHaveBeenCalledTimes(1);
     const call = h.updateMutate.mock.calls[0];
@@ -311,6 +321,7 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     expect(args.data.status).toBe('draft');
     expect(h.createMutate).not.toHaveBeenCalled();
   });
+
 
   it('does not reintroduce Quick Post, wizard, or legacy confirmations in source', () => {
     const root = path.resolve(__dirname, '..');
