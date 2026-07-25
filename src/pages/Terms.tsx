@@ -186,7 +186,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">30. Contact Information</h3>
-          <p className="text-muted-foreground">For questions about these Terms of Service, please contact us at support@haultrackerpro.com.</p>
+          <p className="text-muted-foreground">For questions about these Terms of Service, sign in to your HaulTrackerPro account, open Settings, and select Send Feedback.</p>
         </section>
 
 
