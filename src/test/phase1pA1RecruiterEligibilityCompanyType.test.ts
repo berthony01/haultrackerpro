@@ -618,10 +618,15 @@ describe('Phase 1P-A1.2 scope + hygiene', () => {
       /\b(?:it|test|describe)\.(?:only|skip|todo)\b|\bxit\b|\bxdescribe\b/;
     for (const rel of testFiles) {
       const body = readFileSync(resolve(process.cwd(), rel), 'utf8');
-      // Strip this file's own regex string so we do not self-match.
-      const scan = rel.endsWith('phase1pA1RecruiterEligibilityCompanyType.test.ts')
-        ? body.replace(/const forbidden[\s\S]+?;/, '')
-        : body;
+      // Strip string/regex literals + line comments so the hygiene rule
+      // never self-matches on documentation of the forbidden markers.
+      const scan = body
+        .replace(/\/\/[^\n]*/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/'(?:\\.|[^'\\])*'/g, "''")
+        .replace(/"(?:\\.|[^"\\])*"/g, '""')
+        .replace(/`(?:\\.|[^`\\])*`/g, '``')
+        .replace(/\/(?:\\.|\[[^\]]*\]|[^/\\\n])+\/[gimsuy]*/g, '/_/');
       expect(forbidden.test(scan), `disabled test marker found in ${rel}`).toBe(
         false,
       );
