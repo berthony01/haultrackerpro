@@ -65,6 +65,7 @@ CREATE TABLE public.recruiter_profiles (
   posting_terms_accepted_at   timestamptz,
   posting_terms_version       text,
   legacy_terms_grandfathered_at timestamptz,
+  company_type                text,
   created_at                  timestamptz NOT NULL DEFAULT now(),
   updated_at                  timestamptz NOT NULL DEFAULT now()
 );
