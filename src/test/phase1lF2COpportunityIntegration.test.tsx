@@ -707,7 +707,7 @@ describe('Phase 1L-F2C · Zero and false preservation', () => {
 // 9. ONE-TIME INCENTIVE ISOLATION
 // =========================================================================
 describe('Phase 1L-F2C · One-time incentive isolation', () => {
-  it('9. company_driver flat_weekly $1,600 recurring with $10,000 sign-on: card and detail show recurring $1,600; $10,000 only inside Sign-on bonus row', async () => {
+  it('9. company_driver flat_weekly $1,600 recurring with $10,000 sign-on: card and detail show recurring $1,600; card still never shows $10,000; detail exposes $10,000 only inside the separate "Sign-on bonus: $10,000" callout, not a legacy KV row', async () => {
     const row = source({
       id: 'opp-bonus',
       canonical_version: 1,
@@ -742,8 +742,12 @@ describe('Phase 1L-F2C · One-time incentive isolation', () => {
 
     await openDetailByTitle('Bonus Row');
     expect(within(detailKV('Derived weekly gross')).getByText('$1,600')).toBeInTheDocument();
-    expect(within(detailKV('Sign-on bonus')).getByText('$10,000')).toBeInTheDocument();
+    // Phase 1O-B: sign-on bonus is now a separate callout, not a KV row.
+    // The row-form KV lookup must find nothing.
+    expect(() => detailKV('Sign-on bonus')).toThrow();
+    expect(screen.getByText('Sign-on bonus: $10,000')).toBeInTheDocument();
   });
+});
 });
 
 // =========================================================================
