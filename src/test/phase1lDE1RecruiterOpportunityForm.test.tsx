@@ -1,7 +1,13 @@
-// Phase 1L-DE1R2R2 — Rendered behavior of the canonical recruiter authoring
-// form. Uses exhaustive typed factories (no factory-level casts), exact copy
-// matching where the packet mandates it, and a real user-driven interaction
-// with the two-component mixed editor.
+// Phase 1O-A migration — Rendered behavior of the four-stage canonical
+// recruiter authoring form. Preserves all prior coverage semantics
+// (employment-driven cost visibility, pay-model conditional fields, escrow,
+// mixed components, readiness guards, transparency confirmation, create/
+// update routing, paste merge safety, field preservation), retargeted at
+// the new Write & Extract / Essentials / Optional Details / Review & Publish
+// architecture. Six-card assumptions and fixed-grid `ReviewSummary` /
+// company-driver filler assertions were superseded by the Phase 1O-A
+// product contract and have been replaced with equivalent or stronger
+// assertions on the reconstructed experience.
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -35,6 +41,7 @@ vi.mock('@/hooks/opportunities/useRecruiterOpportunities', () => ({
   useRecruiterOpportunities: vi.fn(),
 }));
 vi.mock('@/components/opportunities/PasteOpportunityDialog', () => ({
+  extractOpportunityFromText: vi.fn(),
   PasteOpportunityDialog: ({
     open, onExtracted,
   }: { open: boolean; onExtracted: (data: ExtractedOpportunity) => void }) =>
@@ -56,7 +63,6 @@ type OppsHook = ReturnType<typeof useRecruiterOpportunities>;
 
 /* ---------------- exhaustive typed factories ---------------- */
 
-/** Fully-typed baseline row. No factory-level casts. */
 function makeRecruiterProfile(
   overrides: Partial<RecruiterProfile> = {},
 ): RecruiterProfile {
@@ -160,10 +166,6 @@ function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
   };
 }
 
-/** Boundary cast for hook returns: providing every UseMutationResult field
- *  is impractical, so consumed properties are asserted at this boundary and
- *  the assertion is quarantined to one factory per hook. The compat cast is
- *  routed through an `unknown` typed local so no double-cast is written. */
 function makeProfileHook(
   profile: RecruiterProfile = makeRecruiterProfile(),
 ): ProfileHook {
@@ -207,10 +209,21 @@ function renderForm(initial: Opportunity | null = null) {
   );
 }
 
+/* ---------------- stage navigation helpers ---------------- */
+
+function gotoStage(label: 'Write & Extract' | 'Essentials' | 'Optional Details' | 'Review & Publish') {
+  fireEvent.click(screen.getByRole('tab', { name: new RegExp(label) }));
+}
+function gotoReview() { gotoStage('Review & Publish'); }
+function gotoOptional() { gotoStage('Optional Details'); }
+function gotoEssentials() { gotoStage('Essentials'); }
+
 function clickPublish() {
+  gotoReview();
   fireEvent.click(screen.getByRole('button', { name: 'Publish Opportunity' }));
 }
 function clickSaveDraft() {
+  gotoReview();
   fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 }
 function chooseChip(testId: string, label: string) {
@@ -243,15 +256,26 @@ afterEach(() => cleanup());
 
 /* ---------------- structure ---------------- */
 
-describe('Phase 1L-DE1R2R1 — form structure', () => {
-  it('renders all six canonical sections and a single action area', () => {
+describe('Phase 1O-A — form structure', () => {
+  it('renders the four exact stage tabs with functional current-step semantics', () => {
     renderForm();
-    for (const id of [
-      'section-basics', 'section-compensation', 'section-operations',
-      'section-costs', 'section-content', 'section-review',
-    ]) {
-      expect(screen.getByTestId(id)).toBeInTheDocument();
-    }
+    const tablist = screen.getByRole('tablist', { name: /authoring stages/i });
+    const tabs = within(tablist).getAllByRole('tab').map((t) => t.textContent?.replace(/^\d+/, '').trim() ?? '');
+    expect(tabs).toEqual(['Write & Extract', 'Essentials', 'Optional Details', 'Review & Publish']);
+    // Default active stage for a new opportunity is Write & Extract.
+    const write = within(tablist).getByRole('tab', { name: /Write & Extract/ });
+    expect(write).toHaveAttribute('aria-current', 'step');
+    expect(write).toHaveAttribute('aria-selected', 'true');
+    // Navigation is functional: select Essentials and expect the Essentials panel + aria-current shift.
+    gotoEssentials();
+    const essentials = within(tablist).getByRole('tab', { name: /Essentials/ });
+    expect(essentials).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByTestId('stage-essentials')).toBeInTheDocument();
+  });
+
+  it('renders a single publish action area on the Review stage', () => {
+    renderForm();
+    gotoReview();
     expect(screen.getAllByTestId('form-actions')).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Save Draft' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Publish Opportunity' })).toHaveLength(1);
@@ -264,8 +288,9 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
     )).toBeInTheDocument();
   });
 
-  it('shows exactly one transparency confirmation with the exact attestation copy', () => {
+  it('shows exactly one transparency confirmation with the exact attestation copy on Review', () => {
     renderForm();
+    gotoReview();
     expect(screen.getAllByRole('checkbox')).toHaveLength(1);
     expect(screen.getByLabelText('Transparency confirmation')).toBeInTheDocument();
     expect(screen.getByText(
@@ -276,6 +301,7 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
 
   it('renders the exact ordered employment choices with nothing extra', () => {
     renderForm();
+    gotoEssentials();
     const em = screen.getByTestId('employment-arrangement');
     const labels = within(em)
       .getAllByRole('button')
@@ -285,6 +311,7 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
 
   it('renders the exact ordered driving-configuration choices with nothing extra', () => {
     renderForm();
+    gotoEssentials();
     const team = screen.getByTestId('driving-configuration');
     const labels = within(team)
       .getAllByRole('button')
@@ -294,6 +321,7 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
 
   it('route select exposes exactly the canonical route vocabulary in order', () => {
     renderForm();
+    gotoEssentials();
     fireEvent.click(screen.getByLabelText('Route Type'));
     const options = within(screen.getByRole('listbox'))
       .getAllByRole('option')
@@ -304,6 +332,7 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
 
   it('trailer select exposes exactly the canonical trailer vocabulary in order; Step Deck / Power Only / Hopper are absent', () => {
     renderForm();
+    gotoEssentials();
     fireEvent.click(screen.getByLabelText('Trailer Type'));
     const options = within(screen.getByRole('listbox'))
       .getAllByRole('option')
@@ -326,20 +355,24 @@ describe('Phase 1L-DE1R2R1 — form structure', () => {
   it('prefills company from a late-arriving recruiter profile without overwriting typed input', () => {
     installMocks(makeRecruiterProfile({ company_name: '' }));
     const { rerender } = renderForm();
+    gotoEssentials();
     expect(screen.getByLabelText('Company Name')).toHaveValue('');
     fireEvent.change(screen.getByLabelText('Company Name'), { target: { value: 'Typed Company' } });
     installMocks(makeRecruiterProfile({ company_name: 'Late Profile Company' }));
     rerender(<RecruiterOpportunityForm initial={null} onBack={vi.fn()} onSaved={vi.fn()} />);
+    gotoEssentials();
     expect(screen.getByLabelText('Company Name')).toHaveValue('Typed Company');
   });
 });
 
 /* ---------------- employment-driven cost visibility ---------------- */
 
-describe('Phase 1L-DE1R2R1 — employment-driven cost visibility', () => {
+describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', () => {
   it('company-driver hides cost fields, hides fuel, and shows the not-applicable / take-home copy', () => {
     renderForm();
+    gotoEssentials();
     chooseChip('employment-arrangement', 'W-2 Company Driver');
+    gotoOptional();
     expect(screen.queryByTestId('cost-fields')).toBeNull();
     expect(screen.getByText(
       /Ownership operating-cost fields are not applicable to company-driver listings\. Estimated\s+take-home is unavailable under the current canonical model\./i,
@@ -349,7 +382,9 @@ describe('Phase 1L-DE1R2R1 — employment-driven cost visibility', () => {
 
   it('contractor exposes cost fields, fuel, and no lease payment', () => {
     renderForm();
+    gotoEssentials();
     chooseChip('employment-arrangement', '1099 Contractor');
+    gotoOptional();
     expect(screen.getByTestId('cost-fields')).toBeInTheDocument();
     expect(screen.getByLabelText('Fuel Paid By')).toBeInTheDocument();
     expect(screen.queryByLabelText('Lease payment amount ($)')).toBeNull();
@@ -357,7 +392,9 @@ describe('Phase 1L-DE1R2R1 — employment-driven cost visibility', () => {
 
   it('owner-operator exposes cost fields, fuel, and no lease payment', () => {
     renderForm();
+    gotoEssentials();
     chooseChip('employment-arrangement', 'Owner-Operator');
+    gotoOptional();
     expect(screen.getByTestId('cost-fields')).toBeInTheDocument();
     expect(screen.getByLabelText('Fuel Paid By')).toBeInTheDocument();
     expect(screen.queryByLabelText('Lease payment amount ($)')).toBeNull();
@@ -365,14 +402,18 @@ describe('Phase 1L-DE1R2R1 — employment-driven cost visibility', () => {
 
   it('lease-purchase exposes the lease payment cost row', () => {
     renderForm();
+    gotoEssentials();
     chooseChip('employment-arrangement', 'Lease Purchase');
+    gotoOptional();
     expect(screen.getByLabelText('Lease payment amount ($)')).toBeInTheDocument();
     expect(screen.getByLabelText('Lease payment frequency')).toBeInTheDocument();
   });
 
   it('escrow amount/frequency appear only for Required, and disappear on Not required / Not disclosed', () => {
     renderForm();
+    gotoEssentials();
     chooseChip('employment-arrangement', '1099 Contractor');
+    gotoOptional();
     expect(screen.queryByLabelText('Escrow Amount ($)')).toBeNull();
 
     fireEvent.click(screen.getByLabelText('Escrow Required?'));
@@ -394,7 +435,7 @@ describe('Phase 1L-DE1R2R1 — employment-driven cost visibility', () => {
 
 /* ---------------- pay-model conditional inputs ---------------- */
 
-describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
+describe('Phase 1O-A — pay-model conditional inputs', () => {
   const CPM_LABELS = ['CPM Rate ($/mi)'];
   const PCT_LABELS = ['Percentage (%)', 'Percentage Basis Label', 'Weekly Revenue Basis ($)'];
   const FLAT_LABELS = ['Flat Weekly Pay ($)'];
@@ -413,6 +454,7 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
     ['Other', 'other'],
   ])('%s reveals its required inputs and hides every other pay-model input', (chip, key) => {
     renderForm();
+    gotoEssentials();
     choosePay(chip);
     for (const label of ALL_SCALAR[key]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
@@ -426,10 +468,12 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
     expect(screen.queryByTestId('mixed-components-editor')).toBeNull();
   });
 
-  it('CPM keeps miles + deadhead operational inputs visible alongside the CPM rate', () => {
+  it('CPM keeps miles + deadhead operational inputs visible on Optional Details alongside the CPM rate', () => {
     renderForm();
+    gotoEssentials();
     choosePay('CPM');
     expect(screen.getByLabelText('CPM Rate ($/mi)')).toBeInTheDocument();
+    gotoOptional();
     expect(screen.getByLabelText('Total Weekly Miles')).toBeInTheDocument();
     expect(screen.getByLabelText('Loaded Miles')).toBeInTheDocument();
     expect(screen.getByLabelText('Deadhead Miles')).toBeInTheDocument();
@@ -438,6 +482,7 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
 
   it('Mixed reveals the mixed components editor and hides every scalar pay-model input', () => {
     renderForm();
+    gotoEssentials();
     choosePay('Mixed');
     expect(screen.getByTestId('mixed-components-editor')).toBeInTheDocument();
     for (const labels of Object.values(ALL_SCALAR)) {
@@ -448,17 +493,13 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
   });
 
   it('Mixed editor supports two user-authored components and produces a publishable payload', () => {
-    // Start from an otherwise-publishable opportunity with pay_model=mixed
-    // and zero components, then drive the editor by real user events:
-    // click "Add pay component" twice, fill both components, publish.
     renderForm(makeOpportunity({
       id: 'existing-mixed',
       pay_model: 'mixed',
       cpm: null,
       mixed_pay_components: [] as Json,
     }));
-
-    // Editor is present but empty.
+    // Initial opportunity opens on Essentials.
     expect(screen.getByTestId('mixed-components-editor')).toBeInTheDocument();
     expect(screen.queryByTestId('mixed-component-0')).toBeNull();
 
@@ -469,7 +510,6 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
     expect(screen.getByTestId('mixed-component-0')).toBeInTheDocument();
     expect(screen.getByTestId('mixed-component-1')).toBeInTheDocument();
 
-    // Component 1: CPM base @ 0.5 weekly.
     fireEvent.change(screen.getByLabelText('Mixed component 1 label'), {
       target: { value: 'CPM base' },
     });
@@ -480,7 +520,6 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
     fireEvent.click(screen.getByLabelText('Mixed component 1 frequency'));
     fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'Weekly' }));
 
-    // Component 2: Weekly guarantee @ 250 weekly.
     fireEvent.change(screen.getByLabelText('Mixed component 2 label'), {
       target: { value: 'Weekly guarantee' },
     });
@@ -504,25 +543,55 @@ describe('Phase 1L-DE1R2R1 — pay-model conditional inputs', () => {
   });
 });
 
-/* ---------------- review summary ---------------- */
+/* ---------------- review composition ---------------- */
 
-describe('Phase 1L-DE1R2R1 — review summary', () => {
-  it('renders $0 for an explicit zero sign-on bonus', () => {
-    renderForm(makeOpportunity({ sign_on_bonus: 0 }));
-    expect(screen.getByTestId('review-onetime')).toHaveTextContent('$0');
+describe('Phase 1O-A — review composition (checklist + driver preview)', () => {
+  it('renders separate Publication Checklist and Driver Preview surfaces', () => {
+    renderForm(makeOpportunity());
+    gotoReview();
+    expect(screen.getByTestId('publication-checklist')).toBeInTheDocument();
+    expect(screen.getByTestId('driver-preview')).toBeInTheDocument();
   });
 
-  it('marks the estimated weekly net as unavailable for company drivers', () => {
+  it('driver preview omits the estimated weekly net entirely for company drivers (no Unavailable / Not available filler)', () => {
     renderForm(makeOpportunity({ employment_model: 'company_driver' }));
-    expect(screen.getByTestId('review-net')).toHaveTextContent('Not available for company drivers');
+    gotoReview();
+    const preview = screen.getByTestId('driver-preview');
+    expect(within(preview).queryByText(/Not available for company drivers/i)).toBeNull();
+    expect(within(preview).queryByText(/Unavailable/i)).toBeNull();
+    expect(within(preview).queryByText(/^—$/)).toBeNull();
+    expect(preview.textContent ?? '').not.toMatch(/Estimated weekly net/i);
+  });
+
+  it('driver preview omits one-time incentives when zero and shows them separately when positive', () => {
+    const { unmount } = renderForm(makeOpportunity({ sign_on_bonus: 0 }));
+    gotoReview();
+    let preview = screen.getByTestId('driver-preview');
+    expect(preview.textContent ?? '').not.toMatch(/One-time incentives/i);
+    unmount();
+
+    renderForm(makeOpportunity({ sign_on_bonus: 2500 }));
+    gotoReview();
+    preview = screen.getByTestId('driver-preview');
+    expect(within(preview).getByText(/One-time incentives/i)).toBeInTheDocument();
+    expect(within(preview).getByText(/\$2,500/)).toBeInTheDocument();
+    expect(within(preview).getByText(/paid separately from weekly earnings/i)).toBeInTheDocument();
+  });
+
+  it('publication checklist success banner appears when there are zero blockers', () => {
+    renderForm(makeOpportunity());
+    gotoReview();
+    expect(screen.getByTestId('publish-ok')).toBeInTheDocument();
+    expect(screen.queryByTestId('publish-blockers')).toBeNull();
   });
 });
 
 /* ---------------- paste-to-autofill safety ---------------- */
 
-describe('Phase 1L-DE1R2R1 — paste-to-autofill safety', () => {
+describe('Phase 1O-A — paste-to-autofill safety', () => {
   it('never overwrites resolved title, company, employment, team, or pay model', () => {
     renderForm();
+    gotoEssentials();
     fireEvent.change(screen.getByLabelText('Opportunity Title'), { target: { value: 'Typed Title' } });
     fireEvent.change(screen.getByLabelText('Company Name'), { target: { value: 'Typed Company' } });
     chooseChip('employment-arrangement', 'Owner-Operator');
@@ -548,6 +617,7 @@ describe('Phase 1L-DE1R2R1 — paste-to-autofill safety', () => {
 
   it('paste can project team when team is still unspecified even if employment already resolved', () => {
     renderForm();
+    gotoEssentials();
     chooseChip('employment-arrangement', 'Owner-Operator');
     h.pastePayload = { driver_type: 'team' } as ExtractedOpportunity;
     fireEvent.click(screen.getByRole('button', { name: 'Paste to auto-fill' }));
@@ -558,6 +628,7 @@ describe('Phase 1L-DE1R2R1 — paste-to-autofill safety', () => {
 
   it('paste can fill unresolved employment independently of team', () => {
     renderForm();
+    gotoEssentials();
     chooseChip('driving-configuration', 'Solo');
     h.pastePayload = { driver_type: 'owner_operator' } as ExtractedOpportunity;
     fireEvent.click(screen.getByRole('button', { name: 'Paste to auto-fill' }));
@@ -587,9 +658,10 @@ describe('Phase 1L-DE1R2R1 — paste-to-autofill safety', () => {
 
 /* ---------------- draft / publish routing ---------------- */
 
-describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
+describe('Phase 1O-A — draft / publish routing', () => {
   it('minimal draft routes through createOpportunity with status=draft and canonical_version=1', () => {
     renderForm();
+    gotoEssentials();
     fireEvent.change(screen.getByLabelText('Opportunity Title'), { target: { value: 'Minimal Draft' } });
     clickSaveDraft();
     expect(h.createMutate).toHaveBeenCalledTimes(1);
@@ -600,7 +672,6 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
   });
 
   it('valid publish emits a fully populated create call with status=active', () => {
-    // Force create-mode with a populated fixture by clearing the id.
     const seed = makeOpportunity();
     const seedWithoutId: Opportunity = { ...seed, id: '' };
     renderForm(seedWithoutId);
@@ -630,6 +701,7 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
       driver_type: null,
       team_configuration: null,
     }));
+    gotoReview();
     expect(screen.getByRole('button', { name: 'Publish Opportunity' })).toBeDisabled();
     expect(screen.getByTestId('publish-blockers')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Publish Opportunity' }));
@@ -639,18 +711,20 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
 
   it('stored transparency_confirmed=true hydrates the checkbox as checked and persists true with no user toggle', () => {
     renderForm(makeOpportunity({ transparency_confirmed: true }));
+    gotoReview();
     expect(screen.getByLabelText('Transparency confirmation')).toBeChecked();
-    clickSaveDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
     expect(updateArgs().data.transparency_confirmed).toBe(true);
   });
 
   it('stored transparency_confirmed=false hydrates unchecked and publish remains blocked until checked', () => {
     renderForm(makeOpportunity({ transparency_confirmed: false }));
+    gotoReview();
     expect(screen.getByLabelText('Transparency confirmation')).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Publish Opportunity' })).toBeDisabled();
     fireEvent.click(screen.getByLabelText('Transparency confirmation'));
     expect(screen.getByLabelText('Transparency confirmation')).toBeChecked();
-    clickPublish();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish Opportunity' }));
     expect(h.updateMutate).toHaveBeenCalledTimes(1);
     expect(updateArgs().data.transparency_confirmed).toBe(true);
   });
@@ -676,6 +750,7 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
       typical_lanes: null, requirements: null,
       benefits: 'Legacy freeform requirements text',
     }));
+    gotoOptional();
     expect(screen.getByLabelText('Requirements')).toHaveValue('Legacy freeform requirements text');
     expect(screen.getByLabelText('Typical Lanes')).toHaveValue('');
     clickSaveDraft();
@@ -688,15 +763,13 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
     renderForm(makeOpportunity({
       transparency_confirmed: false, home_time: null,
     }));
+    gotoReview();
     const blockers = screen.getByTestId('publish-blockers');
     expect(blockers).toHaveTextContent('Confirm the opportunity is accurate before publishing.');
     expect(blockers).toHaveTextContent('Home time is required.');
   });
 
   it('renders the escrow-not-disclosed warning in publish-warnings without blocking publish', () => {
-    // Contractor opportunity, otherwise publishable, with escrow left as
-    // the canonical "explicitly not disclosed" state. Warning must render;
-    // publish button must remain enabled.
     renderForm(makeOpportunity({
       employment_model: 'contractor_1099',
       driver_type: '1099',
@@ -705,6 +778,7 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
       escrow_amount: null,
       escrow_amount_frequency: null,
     }));
+    gotoReview();
     const warnings = screen.getByTestId('publish-warnings');
     expect(warnings).toHaveTextContent('Escrow requirement not disclosed — weekly net will be incomplete.');
     expect(screen.queryByTestId('publish-blockers')).toBeNull();
@@ -714,13 +788,13 @@ describe('Phase 1L-DE1R2R1 — draft / publish routing', () => {
 
 /* ---------------- source integrity ---------------- */
 
-describe('Phase 1L-DE1R2R1 — source integrity', () => {
+describe('Phase 1O-A — source integrity', () => {
   it('does not reintroduce wizard scaffolding, generic optional accordion, Quick Post, duplicate confirmations, or legacy review-flow copy', () => {
     const root = path.resolve(__dirname, '..');
     const form = fs.readFileSync(path.join(root, 'components/opportunities/RecruiterOpportunityForm.tsx'), 'utf8');
     expect(fs.existsSync(path.join(root, 'components/opportunities/RecruiterQuickPostForm.tsx'))).toBe(false);
     for (const forbidden of [
-      'Step 1 of', 'Switch to detailed editor',
+      'Switch to detailed editor',
       'confirm_drivers_see_intel', 'confirm_misleading_removed',
       'RecruiterQuickPostForm', 'optional-details-section',
       'Resubmit for Review', 'reviewed before going live',
