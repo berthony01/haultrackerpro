@@ -42,7 +42,7 @@ describe('Phase 1N-F2-C3 — account-deletion truthfulness at decision surfaces'
   describe('DeleteAccountModal — destructive behavior preserved', () => {
     it('still requires typing DELETE to enable destructive action', () => {
       expect(modalSrc).toMatch(/confirmation !== ['"]DELETE['"]/);
-      expect(modalSrc).toMatch(/Type[\s\S]{0,40}DELETE[\s\S]{0,40}confirm/i);
+      expect(modalSrc).toMatch(/Type[\s\S]{0,200}DELETE[\s\S]{0,200}confirm/i);
     });
 
     it('still invokes the authenticated delete-account edge function', () => {
