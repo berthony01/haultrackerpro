@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import SEOHead from '@/components/SEOHead';
 import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
@@ -539,7 +539,35 @@ const faqs: Faq[] = [
     ),
   },
   { id: 'edit-loads', question: 'Can I edit past loads?', answer: 'Yes! Go to My Loads, tap on any load to see its details, then use the edit button to modify any field. You can update pay received, miles, locations, and all other details at any time.' },
-  { id: 'delete-account', question: 'How do I delete my account?', answer: 'Go to Settings → scroll to the Account section → tap "Delete Account." You\'ll need to type DELETE to confirm. This permanently removes everything tied to your account: loads and stops, expenses, fuel logs, brokers, recurring expense templates, weekly snapshots, AI insights, smart alerts, feedback, parse history, your settings and subscription record, and your sign-in account itself. This action cannot be undone.' },
+  {
+    id: 'delete-account',
+    question: 'How do I delete my account?',
+    keywords: 'delete account remove close cancel deletion retention agency owner subscription',
+    answer: (
+      <div className="space-y-2 text-sm leading-relaxed">
+        <p>
+          Go to <span className="font-semibold">Settings → Account → Delete Account</span> and type <span className="font-mono">DELETE</span> to confirm. Permanent deletion affects the full personal login and every capability it owns (driver, recruiter, assistant), not only the role you are viewing.
+        </p>
+        <p>
+          Any driver and recruiter subscriptions owned by that login are cancelled as part of the permanent-deletion flow before database cleanup — this is different from a normal cancel-at-period-end from the billing portal. Personal operational data (loads, expenses, fuel logs, settings, and similar direct account records) is targeted for transactional cleanup.
+        </p>
+        <p>
+          Some shared, audit, billing/payment, application, signature, security, fraud-prevention, dispute, legal, compliance, backup, or third-party-held records may remain, be detached from your identity, or be anonymized where operationally or lawfully necessary. If you own an agency, personal deletion is blocked until agency ownership is transferred or the agency is closed through support.
+        </p>
+        <p>
+          Export anything you need first — successful deletion has no self-service undo. See{' '}
+          <Link to="/docs/account-deletion-data-retention" className="text-primary hover:underline font-medium">
+            Account deletion &amp; data retention
+          </Link>{' '}
+          and{' '}
+          <Link to="/docs/billing-cancellation" className="text-primary hover:underline font-medium">
+            Cancellation vs. permanent deletion
+          </Link>{' '}
+          for the complete details.
+        </p>
+      </div>
+    ),
+  },
   { id: 'weekly-closeout', question: 'What is the Weekly Closeout?', answer: 'The Weekly Closeout lets you finalize your week\'s data. It creates a snapshot of your earnings, miles, and deadhead percentage so you can track performance week over week.' },
   { id: 'multi-stop', question: 'How does multi-stop tracking work?', answer: 'Toggle "Multi-stop load?" to add route stops between pickup and final delivery. Each stop can have a type (Pickup, Stop, Drop), an optional stop date, and optional detention minutes. The top-level Pickup and Drop-off fields stay canonical — your manual Drop-off Date stays in control unless you enter a date on the final Drop stop, which then drives dashboard/reports/exports.' },
   { id: 'rate-con-scanner', question: 'How does the Rate Con Screenshot Scanner work?', answer: 'Open the load form and tap "Scan Rate Con Screenshot" (Pro feature). Upload or snap a photo of your rate confirmation. The app uses OCR to extract text from the image, then parses pickup, dropoff, miles, rate, and revenue from the text. You always review the extracted fields before saving — accuracy depends on image quality and format.' },
