@@ -177,27 +177,55 @@ export function useRecruiterProfile() {
     const queryId = profileQuery.data?.id ?? null;
     const existingId = boundId ?? queryId;
 
+    // Build the expected normalized read-back from the outgoing payload.
+    // Fields absent from the payload aren't verified (they retain their
+    // current stored value).
+    const expected: Record<string, string> = {};
+    for (const key of VERIFIED_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(safe, key)) {
+        expected[key] = normalize((safe as Record<string, unknown>)[key]);
+      }
+    }
+    const verifyRow = (row: Record<string, unknown> | null): void => {
+      if (!row) {
+        throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
+      }
+      for (const [key, want] of Object.entries(expected)) {
+        const got = normalize(row[key]);
+        if (got !== want) {
+          throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
+        }
+      }
+    };
+
     if (existingId) {
-      const { error } = await supabase
+      // Phase 1P-A1: use .select() so PostgREST returns the affected rows
+      // and we can prove exactly one caller-owned row changed. Zero or
+      // multiple rows throws the controlled mismatch message BEFORE any
+      // downstream RPC (accept_recruiter_posting_terms) is called.
+      const { data: updatedRows, error } = await supabase
         .from('recruiter_profiles')
         .update(safe as never)
         .eq('id', existingId)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('*');
       if (error) throw error;
+      const rows = (updatedRows ?? []) as Array<Record<string, unknown>>;
+      if (rows.length !== 1) {
+        throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
+      }
+      verifyRow(rows[0]);
       return;
     }
     const { data: inserted, error } = await supabase
       .from('recruiter_profiles')
       .insert({ ...(safe as RecruiterProfileUpsert), user_id: user.id } as never)
-      .select('id')
+      .select('*')
       .single();
     if (error) throw error;
-    let insertedId = (inserted as { id?: string } | null)?.id ?? null;
+    const insertedRow = inserted as Record<string, unknown> | null;
+    let insertedId = (insertedRow?.id as string | undefined) ?? null;
 
-    // Phase 1F-A.2.1A-R4: never proceed to terms acceptance without a
-    // confirmed profile id. If the INSERT response is missing an id,
-    // attempt a safe caller-owned recovery via the same RPC the query
-    // path uses. Any arbitrary or unowned id is refused.
     if (!insertedId) {
       const { data: recRows, error: recErr } = await (supabase as unknown as {
         rpc: (
@@ -206,18 +234,22 @@ export function useRecruiterProfile() {
         ) => Promise<{ data: Array<Record<string, unknown>> | null; error: Error | null }>;
       }).rpc('get_my_recruiter_profile_safe', {});
       if (!recErr) {
-        const rows = (recRows ?? []) as Array<{ id?: string }>;
-        const candidate = rows[0]?.id ?? null;
-        if (candidate) insertedId = candidate;
+        const rows = (recRows ?? []) as Array<Record<string, unknown>>;
+        const candidate = (rows[0]?.id as string | undefined) ?? null;
+        if (candidate) {
+          insertedId = candidate;
+          verifyRow(rows[0]);
+        }
       }
+    } else {
+      verifyRow(insertedRow);
     }
     if (!insertedId) {
-      throw new Error(
-        'Recruiter profile was saved but its ID could not be confirmed. Please retry.',
-      );
+      throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
     }
     knownProfileRef.current = { userId: user.id, profileId: insertedId };
   }
+
 
   // Ordinary-save API preserved for callers that only need to persist
   // profile fields (no consent stamping). Implemented via the shared branch
