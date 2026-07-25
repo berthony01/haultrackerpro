@@ -205,14 +205,17 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     vi.clearAllMocks();
   });
 
-  it('null profile → top Post disabled; setup/onboarding entry visible; no Verified badge', () => {
+  it('null profile → top Post opens readiness dialog (data-can-post=false); setup/onboarding entry visible; no Verified badge', () => {
     installHooks({ profile: null });
     renderPage();
-    expect(topPostButton()).toBeDisabled();
+    // Phase 1P-A1: the top Post button is intentionally always enabled
+    // and opens the RecruiterReadinessDialog when the profile is not
+    // ready. Canonical gate signal now lives on data-can-post.
+    expect(topPostButton()).not.toBeDisabled();
+    expect(trustStatus().getAttribute('data-can-post')).toBe('false');
     // Real onboarding entry card (production) surfaces the CTA.
     expect(screen.getByTestId('finish-recruiter-setup-cta')).toBeInTheDocument();
     expect(screen.queryByTestId('recruiter-verified-badge')).toBeNull();
-    expect(trustStatus().getAttribute('data-can-post')).toBe('false');
   });
 
   it.each([
@@ -220,11 +223,13 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     ['rejected' as const, /Verification Not Approved/i],
     ['approved' as const, /Verified/i],
   ])(
-    'incomplete + %s → real top Post disabled, setup-required state visible, NO Verified Recruiter badge',
+    'incomplete + %s → data-can-post=false (readiness gates via dialog), setup-required state visible, NO Verified Recruiter badge',
     (v, verifRegex) => {
       installHooks({ profile: incomplete({ verification_status: v }) });
       renderPage();
-      expect(topPostButton()).toBeDisabled();
+      // Phase 1P-A1: gate signal is data-can-post, not button disabled.
+      expect(topPostButton()).not.toBeDisabled();
+      expect(trustStatus().getAttribute('data-can-post')).toBe('false');
       // Real StateCard for incomplete surfaces the required-fields copy.
       expect(screen.getAllByText(/Finish your recruiter profile/i)[0]).toBeInTheDocument();
       // Trust badge exposes canonical state to the DOM.
@@ -240,6 +245,7 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     installHooks({ profile: makeProfile({ verification_status: 'pending' }) });
     renderPage();
     expect(topPostButton()).not.toBeDisabled();
+    expect(trustStatus().getAttribute('data-can-post')).toBe('true');
     expect(
       within(trustStatus()).getByTestId('recruiter-verification-label'),
     ).toHaveTextContent(/Pending Verification/i);
@@ -255,6 +261,7 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     installHooks({ profile: makeProfile({ verification_status: 'rejected' }) });
     renderPage();
     expect(topPostButton()).not.toBeDisabled();
+    expect(trustStatus().getAttribute('data-can-post')).toBe('true');
     expect(
       within(trustStatus()).getByTestId('recruiter-verification-label'),
     ).toHaveTextContent(/Verification Not Approved/i);
@@ -265,6 +272,7 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     installHooks({ profile: makeProfile({ verification_status: 'approved' }) });
     renderPage();
     expect(topPostButton()).not.toBeDisabled();
+    expect(trustStatus().getAttribute('data-can-post')).toBe('true');
     // The duplicate `recruiter-verified-badge` affirmation was removed;
     // the verification label alone conveys the Verified Recruiter status.
     expect(screen.queryByTestId('recruiter-verified-badge')).toBeNull();
@@ -273,21 +281,28 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
     expect(trustStatus().getAttribute('data-verified')).toBe('true');
   });
 
-  it('status=suspended → top Post disabled, suspended state visible, tool cards hidden', () => {
+  it('status=suspended → data-can-post=false, suspended state visible, tool cards hidden', () => {
     installHooks({ profile: makeProfile({ status: 'suspended' }) });
     renderPage();
-    expect(topPostButton()).toBeDisabled();
+    // Phase 1P-A1: suspended still routes through the readiness dialog,
+    // but the button itself is not disabled — canonical gate is
+    // data-can-post + data-state on the trust status badge.
+    expect(topPostButton()).not.toBeDisabled();
+    expect(trustStatus().getAttribute('data-can-post')).toBe('false');
+    expect(trustStatus().getAttribute('data-state')).toBe('suspended');
     expect(screen.getAllByText(/Recruiter Access Suspended/i)[0]).toBeInTheDocument();
     // Production hides the ToolsGrid outside of active_* states.
     expect(screen.queryByText('Your Recruiting Tools')).toBeNull();
   });
 
-  it('verification_status=suspended → top Post disabled, suspended state visible', () => {
+  it('verification_status=suspended → data-can-post=false, suspended state visible', () => {
     installHooks({
       profile: makeProfile({ verification_status: 'suspended' as never }),
     });
     renderPage();
-    expect(topPostButton()).toBeDisabled();
+    expect(topPostButton()).not.toBeDisabled();
+    expect(trustStatus().getAttribute('data-can-post')).toBe('false');
+    expect(trustStatus().getAttribute('data-state')).toBe('suspended');
     expect(screen.getAllByText(/Recruiter Access Suspended/i)[0]).toBeInTheDocument();
     expect(screen.queryByText('Your Recruiting Tools')).toBeNull();
   });
