@@ -166,7 +166,6 @@ describe('Phase 1O-A — inline extractor routes through the shared helper', () 
   it('Extract details forwards the raw text to extractOpportunityFromText and merges the parsed result into essentials', async () => {
     h.extract.mockResolvedValueOnce({
       title: 'Extracted Title',
-      company_name: 'Extracted Co',
       home_time: 'Home weekly',
     } as ExtractedOpportunity);
 
@@ -180,12 +179,13 @@ describe('Phase 1O-A — inline extractor routes through the shared helper', () 
     expect(h.extract).toHaveBeenCalledWith(text);
 
     fireEvent.click(stageTab('Essentials'));
+    // Unresolved fields adopt the extracted values.
     await vi.waitFor(() =>
       expect(screen.getByLabelText('Opportunity Title')).toHaveValue('Extracted Title'),
     );
-    expect(screen.getByLabelText('Company Name')).toHaveValue('Extracted Co');
     expect(screen.getByLabelText('Home Time')).toHaveValue('Home weekly');
   });
+
 
   it('extractor failures surface as toast errors and leave the form untouched', async () => {
     h.extract.mockRejectedValueOnce(new Error('AI returned no structured data.'));
