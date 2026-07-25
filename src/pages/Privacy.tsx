@@ -28,7 +28,7 @@ export default function Privacy() {
         <h2 className="text-2xl font-black font-heading">HaulTrackerPro Privacy Policy</h2>
 
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-foreground/90">
-          <span className="font-semibold text-primary">Updated:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data.
+          <span className="font-semibold text-primary">Coverage note:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data.
         </div>
 
         <section className="space-y-2">
@@ -75,7 +75,8 @@ export default function Privacy() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">6. Data Retention</h3>
-          <p className="text-muted-foreground">We retain your data for as long as your account is active. When you delete your account, all associated data is permanently removed from our systems, subject to limited retention required for legal, tax, or fraud-prevention purposes (e.g., Stripe billing records).</p>
+          <p className="text-muted-foreground">We retain your data for as long as your account is active. When you permanently delete your account, direct personal operational records are targeted for transactional cleanup. Some shared, audit, billing or payment, application, contract or signature, security, fraud-prevention, dispute, legal or compliance, backup, or third-party-held records may be retained, detached, anonymized, or remain where operationally or lawfully necessary.</p>
+          <p className="text-muted-foreground"><Link to="/docs/account-deletion-data-retention" className="font-semibold text-primary underline">Review account deletion and data retention details.</Link></p>
         </section>
 
         <section className="space-y-2">
