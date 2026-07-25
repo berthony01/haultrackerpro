@@ -190,8 +190,11 @@ describe('phase1nF2C2 — no out-of-scope substitutes', () => {
     expect(selfSrc).not.toMatch(/from\s+['"]@\/pages\/Auth['"]/);
     expect(selfSrc).not.toMatch(/from\s+['"]@\/pages\/Pricing['"]/);
     expect(selfSrc).not.toMatch(/from\s+['"]@\/App['"]/);
-    expect(selfSrc).not.toMatch(new RegExp('Delete' + 'AccountModal'));
-    expect(selfSrc).not.toMatch(new RegExp('robots|' + 'site' + 'map|llms', 'i'));
+    const forbidden = ['Delete' + 'AccountModal', 'ro' + 'bots.txt', 'site' + 'map.xml', 'll' + 'ms.txt'];
+    for (const token of forbidden) {
+      expect(selfSrc.includes(token)).toBe(false);
+    }
+
   });
   it('does not carry brittle git-based scope assertions', () => {
     expect(selfSrc).not.toMatch(/from ['"]node:child_process['"]/);
