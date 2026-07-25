@@ -282,3 +282,94 @@ describe('Phase 1O-A — Driver Preview truthfulness', () => {
   });
 
 });
+
+describe('Phase 1O-A-R2 — interactive Selected States entry from empty state', () => {
+  it('clicking Selected States from an empty/local start opens the 48-chip grid without pre-seeding hiring_states', () => {
+    renderForm();
+    fireEvent.click(stageTab('Essentials'));
+    fireEvent.click(screen.getByTestId('coverage-mode-selected'));
+    const grid = screen.getByTestId('coverage-selected');
+    const codes = within(grid).getAllByRole('button').map((b) => b.textContent?.trim() ?? '');
+    expect(codes).toHaveLength(48);
+    const pressed = within(grid).getAllByRole('button')
+      .filter((b) => b.getAttribute('aria-pressed') === 'true');
+    expect(pressed).toEqual([]);
+  });
+});
+
+describe('Phase 1O-A-R2 — locked publication checklist + preview + cost-note copy', () => {
+  function gotoReview() { fireEvent.click(stageTab('Review & Publish')); }
+
+  it('Publication Checklist uses the locked helper sentence and success detail', () => {
+    renderForm(makeOpportunity());
+    gotoReview();
+    const checklist = screen.getByTestId('publication-checklist');
+    expect(within(checklist).getByText(
+      'Complete the required details before publishing. Warnings do not block publication.',
+    )).toBeInTheDocument();
+    expect(within(checklist).getByText('No required details are missing.')).toBeInTheDocument();
+  });
+
+  it('Driver Preview uses the locked helper sentence and omits the empty-title placeholder', () => {
+    renderForm();
+    fireEvent.click(stageTab('Review & Publish'));
+    const preview = screen.getByTestId('driver-preview');
+    expect(within(preview).getByText(
+      'This is how the populated opportunity details will appear to drivers.',
+    )).toBeInTheDocument();
+    expect(preview.textContent ?? '').not.toMatch(/Add a title on Essentials/i);
+  });
+
+  it('company-driver operating-cost note uses the locked W-2 sentence', () => {
+    renderForm(makeOpportunity({ employment_model: 'company_driver' }));
+    fireEvent.click(stageTab('Optional Details'));
+    fireEvent.click(screen.getByTestId('group-costs'));
+    expect(screen.getByText(
+      'Operating-cost fields do not apply to W-2 company-driver opportunities.',
+    )).toBeInTheDocument();
+  });
+});
+
+describe('Phase 1O-A-R2 — scope, start-gate, and theme lock proofs (fail-closed)', () => {
+  const ORIGINAL_BASE_SHA = 'c4248feb39c4e2ebd575d48dae41a395bc8107a1';
+  const AUTHORIZED_FILES = new Set([
+    'src/components/opportunities/RecruiterOpportunityForm.tsx',
+    'src/components/opportunities/PasteOpportunityDialog.tsx',
+    'src/test/phase1oARecruiterOpportunityAuthoringReconstruction.test.tsx',
+    'src/test/phase1lDE1RecruiterOpportunityForm.test.tsx',
+    'src/test/recruiterOpportunityFormConsolidation.test.tsx',
+  ]);
+
+  it('the pinned original base SHA is reachable from HEAD (ancestry proof)', () => {
+    let ok = false;
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', ORIGINAL_BASE_SHA, 'HEAD'], { stdio: 'ignore' });
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    expect(ok).toBe(true);
+  });
+
+  it('the cumulative diff from the original base touches ONLY the five authorized files', () => {
+    const out = execFileSync('git', ['diff', '--name-only', `${ORIGINAL_BASE_SHA}..HEAD`], { encoding: 'utf8' }).trim();
+    const changed = out.split('\n').map((s) => s.trim()).filter(Boolean);
+    expect(changed.length).toBeGreaterThan(0);
+    for (const path of changed) {
+      expect(
+        AUTHORIZED_FILES.has(path),
+        `unauthorized file in cumulative Phase 1O-A diff: ${path}`,
+      ).toBe(true);
+    }
+  });
+
+  it('RecruiterOpportunityForm.tsx contains no raw amber utility classes (theme-token lock)', () => {
+    const src = execFileSync('git', [
+      'show', 'HEAD:src/components/opportunities/RecruiterOpportunityForm.tsx',
+    ], { encoding: 'utf8' });
+    expect(src).not.toMatch(/\bamber-\d{3}\b/);
+    expect(src).toMatch(/border-warning\/30/);
+    expect(src).toMatch(/bg-warning\/5/);
+    expect(src).toMatch(/text-warning\b/);
+  });
+});
