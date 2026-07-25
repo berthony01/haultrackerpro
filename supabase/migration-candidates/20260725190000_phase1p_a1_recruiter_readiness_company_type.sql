@@ -299,7 +299,7 @@ GRANT  EXECUTE ON FUNCTION public.accept_recruiter_posting_terms(text)
 
 -- ---------------------------------------------------------------------------
 -- 7. ensure_my_recruiter_setup_state — include company_type and conditional
---    dot_or_mc_number tokens. Never infers or writes company_type. All
+--    dot_or_mc tokens. Never infers or writes company_type. All
 --    other behavior byte-preserved from Phase 1N-E where practical.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.ensure_my_recruiter_setup_state()
@@ -490,7 +490,7 @@ GRANT  EXECUTE ON FUNCTION public.ensure_my_recruiter_setup_state()
   TO authenticated, service_role;
 
 COMMENT ON FUNCTION public.ensure_my_recruiter_setup_state() IS
-  'Phase 1P-A1 update: adds company_type and conditional dot_or_mc_number '
+  'Phase 1P-A1 update: adds company_type and conditional dot_or_mc '
   'tokens to missing_requirements. Never infers or writes company_type. '
   'All other behavior byte-preserved from Phase 1N-E1.';
 
