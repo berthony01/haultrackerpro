@@ -121,7 +121,10 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
 
   // Phase 1F-A.2.2: `canPost` is the canonical eligibility signal derived
   // from describeRecruiterEligibility(). Billing NEVER gates standard posting.
-  const postDisabled = !canPost;
+  // Phase 1P-A1: the top-level Post button opens the readiness dialog
+  // instead of relying on `postDisabled`; sub-components still consume
+  // `canPost` to gate their inline actions.
+
 
   // Phase 1P-A1: readiness dialog gates every "Post an Opportunity" click
   // instead of silently disabling the button. The dialog surfaces the exact
