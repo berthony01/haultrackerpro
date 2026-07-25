@@ -498,12 +498,18 @@ describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)
     expectNoForbidden(container);
   });
 
-  it('incomplete profile → mentions DOT or MC and posting terms; top Post disabled', () => {
+  it('incomplete profile → mentions DOT or MC and posting terms; data-can-post=false', () => {
     installHooks({ profile: incomplete({ verification_status: 'pending' }) });
     const { container } = renderPage();
     expect(container.textContent).toMatch(/DOT or MC/);
     expect(container.textContent).toMatch(/posting terms/i);
-    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).toBeDisabled();
+    // Phase 1P-A1: readiness dialog gates; button is not disabled.
+    expect(
+      screen.getByRole('button', { name: /Post an Opportunity/i }),
+    ).not.toBeDisabled();
+    expect(
+      screen.getByTestId('recruiter-trust-status').getAttribute('data-can-post'),
+    ).toBe('false');
     expectNoForbidden(container);
   });
 
