@@ -403,7 +403,7 @@ describe('Phase 1L-F2B-P2-R1 · Pay-model states', () => {
     expect(within(kvRow('Derived weekly gross')).getByText('$1,500')).toBeInTheDocument();
   });
 
-  it('Unknown pay_model with recruiter-provided gross renders "Not disclosed" pay model and Recruiter weekly gross and no formula rows', () => {
+  it('Unknown pay_model with recruiter-provided gross omits Pay model filler and shows Recruiter weekly gross (omission rules)', () => {
     renderDetail(
       fullBase({
         employment_model: 'company_driver',
@@ -416,7 +416,8 @@ describe('Phase 1L-F2B-P2-R1 · Pay-model states', () => {
         deadhead_paid: null,
       }),
     );
-    expect(within(kvRow('Pay model')).getByText('Not disclosed')).toBeInTheDocument();
+    // Pay model row is absent under omission rules (no "Not disclosed" filler).
+    expect(screen.queryByText('Pay model')).toBeNull();
     expect(within(kvRow('Recruiter weekly gross')).getByText('$1,500')).toBeInTheDocument();
     for (const label of [
       'Flat weekly pay',
