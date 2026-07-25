@@ -102,11 +102,20 @@ export function RecruiterOnboarding({ onBack }: Props) {
 
   useEffect(() => {
     if (profile) {
+      const anyP = profile as unknown as Record<string, unknown>;
+      const legacyType = anyP.company_type;
       setForm({
         recruiter_name: profile.recruiter_name ?? '',
         recruiter_email: profile.recruiter_email ?? '',
         recruiter_phone: profile.recruiter_phone ?? '',
         company_name: profile.company_name ?? '',
+        company_type:
+          legacyType === 'carrier' ||
+          legacyType === 'third_party_recruiter' ||
+          legacyType === 'staffing_agency' ||
+          legacyType === 'independent_recruiter'
+            ? (legacyType as CompanyType)
+            : '',
         company_website: profile.company_website ?? '',
         company_phone: profile.company_phone ?? '',
         company_address: profile.company_address ?? '',
@@ -118,15 +127,13 @@ export function RecruiterOnboarding({ onBack }: Props) {
         equipment_types: (profile.equipment_types ?? []).join(', '),
         driver_types_hired: (profile.driver_types_hired ?? []).join(', '),
       });
-      // Only auto-check the agreement boxes if the recruiter has previously
-      // accepted (or been grandfathered). New/legacy-unconsented rows must
-      // explicitly re-confirm before we stamp posting_terms_accepted_at.
       const alreadyAccepted = hasAcceptedPostingTerms(profile);
       setAgree1(alreadyAccepted);
       setAgree2(alreadyAccepted);
       setAgree3(alreadyAccepted);
     }
   }, [profile]);
+
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
