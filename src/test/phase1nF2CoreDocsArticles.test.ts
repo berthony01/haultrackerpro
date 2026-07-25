@@ -606,9 +606,9 @@ describe('phase diff integrity (fail-closed)', () => {
     const section = src.slice(start);
     // Every `git diff --name-only ...` in the historical-scope section
     // must terminate at F2C1_ACCEPTED_SHA; none may terminate at HEAD.
-    // Match only real runGitStrict template-literal invocations of the
-    // form: runGitStrict(`diff --name-only ${A}...${B}`). This excludes
-    // this meta-check block's own descriptive regex source.
+    // Match only real historical-scope helper invocations. This excludes
+    // this meta-check block's own descriptive prose by requiring the
+    // exact SHA-constant identifiers used above.
     const diffCalls =
       section.match(
         /runGitStrict\(\s*`diff --name-only \$\{[A-Z0-9_]+\}\.\.\.\$\{[A-Z0-9_]+\}`/g,
