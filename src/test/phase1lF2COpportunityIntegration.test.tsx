@@ -558,7 +558,7 @@ describe('Phase 1L-F2C · Company driver ownership-cost gating', () => {
 // 6. UNKNOWN-EMPLOYMENT SAFETY ACROSS BOTH SURFACES
 // =========================================================================
 describe('Phase 1L-F2C · Unknown employment gating', () => {
-  it('6. unknown employment renders "Employment not disclosed" and suppresses ownership net/cost metrics on card and detail; exact note', async () => {
+  it('6. unknown employment omits any "Employment not disclosed" filler on card and detail, suppresses ownership net/cost metrics, and still surfaces the exact financial-disclosure safety note produced by OpportunityProfitBreakdown', async () => {
     proStore.set(true);
     opportunitiesStore.set([
       contractorFullBase({
@@ -571,16 +571,23 @@ describe('Phase 1L-F2C · Unknown employment gating', () => {
     renderPage();
 
     const card = cardFor('Unknown Job');
-    expect(within(card).getByText('Employment not disclosed')).toBeInTheDocument();
+    // Phase 1O-B omission rules: never render filler like
+    // "Employment not disclosed", "Not disclosed", or "Not applicable".
+    expect(within(card).queryByText('Employment not disclosed')).toBeNull();
+    expect(within(card).queryByText(/Not disclosed/i)).toBeNull();
+    expect(within(card).queryByText(/Not applicable/i)).toBeNull();
+    // Ownership-cost metrics must still be suppressed.
     expect(within(card).queryByText('Est. net')).toBeNull();
     expect(within(card).queryByText('Gross per total mile')).toBeNull();
 
     await openDetailByTitle('Unknown Job');
     const header = detailHeaderCard('Unknown Job');
-    expect(within(header).getByText('Employment not disclosed')).toBeInTheDocument();
+    expect(within(header).queryByText('Employment not disclosed')).toBeNull();
     for (const label of ['Known weekly costs', 'Estimated weekly net', 'Net per total mile']) {
       expect(screen.queryByText(label)).toBeNull();
     }
+    // The financial-disclosure safety note is still produced by
+    // OpportunityProfitBreakdown for unknown-employment listings.
     expect(
       screen.getByText(
         'Employment arrangement must be disclosed before ownership-cost net can be estimated.',
