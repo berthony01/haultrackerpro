@@ -31,9 +31,19 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 vi.mock('@/hooks/opportunities/useOpportunityApplications', () => ({
   useOpportunityApplications: () => ({
+    driverApplications: [],
     applications: [],
     isLoading: false,
+    createApplication: { mutateAsync: vi.fn(), isPending: false },
     submit: { mutateAsync: vi.fn(), isPending: false },
+  }),
+}));
+vi.mock('@/hooks/opportunities/useSavedOpportunities', () => ({
+  useSavedOpportunities: () => ({
+    saved: [],
+    isLoading: false,
+    save: { mutateAsync: vi.fn(), isPending: false },
+    unsave: { mutateAsync: vi.fn(), isPending: false },
   }),
 }));
 vi.mock('@/hooks/opportunities/useRecruiterContactRequests', () => ({
