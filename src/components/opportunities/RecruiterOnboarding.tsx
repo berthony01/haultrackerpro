@@ -7,6 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   ArrowLeft,
   Building2,
   ShieldCheck,
@@ -26,6 +33,7 @@ import {
   hasAcceptedPostingTerms,
   getRecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
+import { COMPANY_TYPE_LABELS, type CompanyType } from '@/lib/opportunities/resolveRecruiterReadiness';
 
 interface Props {
   onBack: () => void;
@@ -37,6 +45,7 @@ type FormState = {
   recruiter_email: string;
   recruiter_phone: string;
   company_name: string;
+  company_type: CompanyType | '';
   company_website: string;
   company_phone: string;
   company_address: string;
@@ -54,6 +63,7 @@ const EMPTY: FormState = {
   recruiter_email: '',
   recruiter_phone: '',
   company_name: '',
+  company_type: '',
   company_website: '',
   company_phone: '',
   company_address: '',
@@ -65,6 +75,7 @@ const EMPTY: FormState = {
   equipment_types: '',
   driver_types_hired: '',
 };
+
 
 const splitList = (s: string): string[] =>
   s.split(',').map((p) => p.trim()).filter(Boolean);
