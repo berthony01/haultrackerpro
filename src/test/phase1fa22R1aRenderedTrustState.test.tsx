@@ -91,6 +91,8 @@ function makeProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfil
     company_address: null,
     company_city: null,
     company_state: null,
+    // Phase 1P-A1: company_type is required for a complete profile.
+    company_type: 'carrier',
     dot_number: '1234567',
     mc_number: null,
     hiring_states: [],
@@ -554,11 +556,18 @@ describe('Phase 1J-C2 — RecruiterOnboarding rendered copy (production-mounted)
     vi.mocked(useUserRole).mockReturnValue({ intentRecruiter: true } as never);
   });
 
-  it('form contains the corrected DOT/MC clarification sentence', () => {
+  it('form contains the conditional DOT/MC clarification sentence (carrier-only requirement)', () => {
     installHooks({ profile: null });
     const { container } = renderOnboarding();
+    // Phase 1P-A1: DOT / MC is required only for Carrier / Motor Carrier.
+    // The form now discloses this conditional rule explicitly for the
+    // three non-carrier company types.
     expect(container.textContent).toMatch(
-      /Provide at least one DOT or MC number\. It is required to complete your recruiter profile and is also used for Verified Recruiter badge review\. Standard posting unlocks when the required profile and posting terms are complete; badge approval is separate\./,
+      /DOT or MC numbers are optional for third-party recruiters, staffing agencies, and independent recruiters\. Provide them if you have them — they help with Verified Recruiter badge review\. Standard posting unlocks when the required profile fields and posting terms are complete\./,
+    );
+    // The old universal-requirement wording must no longer appear.
+    expect(container.textContent).not.toMatch(
+      /Provide at least one DOT or MC number\. It is required to complete your recruiter profile/,
     );
     expectNoForbidden(container);
   });
