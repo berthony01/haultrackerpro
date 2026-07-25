@@ -338,8 +338,16 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   };
 
   const handleExtracted = (data: ExtractedOpportunity) => {
-    setState((cur) => mergePasteIntoState(cur, data));
+    setState((cur) => {
+      const merged = mergePasteIntoState(cur, data);
+      // If the extractor resolved coverage information, reflect it in the
+      // user-visible mode; otherwise leave the current selection alone.
+      const inferred = inferHiringCoverageMode(merged);
+      if (inferred !== inferHiringCoverageMode(cur)) setCoverageMode(inferred);
+      return merged;
+    });
   };
+
 
   const runInlineExtract = async () => {
     setExtracting(true);
