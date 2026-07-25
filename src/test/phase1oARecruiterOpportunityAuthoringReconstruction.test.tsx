@@ -8,10 +8,12 @@
 // Driver Preview that omits empty values instead of showing "Unavailable"
 // or "Not disclosed" filler.
 
+import { execFileSync } from 'node:child_process';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtractedOpportunity } from '@/components/opportunities/PasteOpportunityDialog';
+
 import type { Json, Tables } from '@/integrations/supabase/types';
 import type {
   OpportunityInsert,
