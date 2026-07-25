@@ -276,6 +276,18 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
   );
   const [stage, setStage] = useState<StageKey>(initial ? 'essentials' : 'write');
+  // Coverage mode is user-driven, not purely derived — clicking "Selected States"
+  // from an empty state must open the state grid without pre-seeding hiring_states.
+  // We initialise from the (possibly hydrated) canonical state and thereafter
+  // update on explicit user selection or on paste-merge results that resolve it.
+  const initialMode = useMemo(
+    () => inferHiringCoverageMode(
+      initial ? normalizeOpportunityForAuthoring(initial) : EMPTY_AUTHORING_STATE,
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [coverageMode, setCoverageMode] = useState<HiringCoverageMode>(initialMode);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [rawText, setRawText] = useState('');
   const [extracting, setExtracting] = useState(false);
@@ -283,7 +295,9 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
   useEffect(() => {
     if (initial && !hydratedRef.current) {
-      setState(normalizeOpportunityForAuthoring(initial));
+      const norm = normalizeOpportunityForAuthoring(initial);
+      setState(norm);
+      setCoverageMode(inferHiringCoverageMode(norm));
       hydratedRef.current = true;
       return;
     }
@@ -297,7 +311,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
   const readiness = useMemo(() => validateOpportunityReadiness(state), [state]);
   const pending = createOpportunity.isPending || updateOpportunity.isPending;
-  const coverageMode = inferHiringCoverageMode(state);
+
 
   const save = (mode: 'draft' | 'publish') => {
     if (mode === 'draft' && !readiness.canSaveDraft) {
@@ -324,8 +338,16 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   };
 
   const handleExtracted = (data: ExtractedOpportunity) => {
-    setState((cur) => mergePasteIntoState(cur, data));
+    setState((cur) => {
+      const merged = mergePasteIntoState(cur, data);
+      // If the extractor resolved coverage information, reflect it in the
+      // user-visible mode; otherwise leave the current selection alone.
+      const inferred = inferHiringCoverageMode(merged);
+      if (inferred !== inferHiringCoverageMode(cur)) setCoverageMode(inferred);
+      return merged;
+    });
   };
+
 
   const runInlineExtract = async () => {
     setExtracting(true);
@@ -494,11 +516,15 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
           <HiringCoverageEditor
             state={state}
             mode={coverageMode}
-            onModeChange={(m) => setState((s) => applyCoverageMode(s, m))}
+            onModeChange={(m) => {
+              setCoverageMode(m);
+              setState((s) => applyCoverageMode(s, m));
+            }}
             onCityChange={(v) => set('hiring_city', v)}
             onStateChange={(v) => set('hiring_state', v.toUpperCase().slice(0, 2))}
             onStatesChange={(list) => set('hiring_states', list)}
           />
+
 
           <Field label="Home Time" required>
             <Input value={state.home_time} onChange={(e) => set('home_time', e.target.value)}
@@ -632,10 +658,10 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 <div className="space-y-4 pt-2">
                   {isCompany && (
                     <p className="text-xs text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
-                      Ownership operating-cost fields are not applicable to company-driver listings. Estimated
-                      take-home is unavailable under the current canonical model.
+                      Operating-cost fields do not apply to W-2 company-driver opportunities.
                     </p>
                   )}
+
                   {!isCompany && (
                     <Field label="Fuel Paid By">
                       <Select value={state.fuel_paid_by || 'unset'}
@@ -991,7 +1017,7 @@ function PublicationChecklist({
       <div>
         <p className="text-[10px] font-black uppercase tracking-widest text-primary">Publication Checklist</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Blockers stop publishing. Warnings publish as-is but reduce transparency.
+          Complete the required details before publishing. Warnings do not block publication.
         </p>
       </div>
 
@@ -1003,7 +1029,7 @@ function PublicationChecklist({
           <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-bold text-foreground">Ready to publish</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">No blockers detected.</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">No required details are missing.</p>
           </div>
         </div>
       )}
@@ -1027,11 +1053,11 @@ function PublicationChecklist({
 
       {warnings.length > 0 && (
         <div
-          className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"
+          className="rounded-lg border border-warning/30 bg-warning/5 p-3"
           data-testid="publish-warnings"
         >
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <AlertTriangle className="h-4 w-4 text-warning" />
             <h4 className="text-xs font-bold text-foreground">
               {warnings.length} warning{warnings.length === 1 ? '' : 's'}
             </h4>
@@ -1044,6 +1070,7 @@ function PublicationChecklist({
     </Card>
   );
 }
+
 
 function DriverPreview({
   state, readiness, coverageMode,
@@ -1122,20 +1149,21 @@ function DriverPreview({
       <div>
         <p className="text-[10px] font-black uppercase tracking-widest text-primary">Driver Preview</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Only populated details appear. Skipped fields are hidden — no empty rows.
+          This is how the populated opportunity details will appear to drivers.
         </p>
       </div>
 
-      <div className="space-y-2">
-        {title ? (
-          <h3 className="text-xl font-black text-foreground leading-tight">{title}</h3>
-        ) : (
-          <p className="text-xs italic text-muted-foreground">Add a title on Essentials.</p>
-        )}
-        {company && (
-          <p className="text-sm font-semibold text-muted-foreground">{company}</p>
-        )}
-      </div>
+      {(title || company) && (
+        <div className="space-y-2">
+          {title && (
+            <h3 className="text-xl font-black text-foreground leading-tight">{title}</h3>
+          )}
+          {company && (
+            <p className="text-sm font-semibold text-muted-foreground">{company}</p>
+          )}
+        </div>
+      )}
+
 
       {rows.length > 0 && (
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="driver-preview-rows">

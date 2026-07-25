@@ -373,18 +373,20 @@ describe('Phase 1O-A — form structure', () => {
 /* ---------------- employment-driven cost visibility ---------------- */
 
 describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', () => {
-  it('company-driver hides cost fields, hides fuel, and shows the not-applicable / take-home copy', () => {
+  it('company-driver hides cost fields, hides fuel, and shows the locked not-applicable notice', () => {
     renderForm();
     gotoEssentials();
     chooseChip('employment-arrangement', 'W-2 Company Driver');
     gotoOptional();
     expandGroup("group-costs");
     expect(screen.queryByTestId("cost-fields")).toBeNull();
+    // Phase 1O-A locked sentence — no take-home reference in the optional-details notice.
     expect(screen.getByText(
-      /Ownership operating-cost fields are not applicable to company-driver listings\. Estimated\s+take-home is unavailable under the current canonical model\./i,
+      'Operating-cost fields do not apply to W-2 company-driver opportunities.',
     )).toBeInTheDocument();
     expect(screen.queryByLabelText('Fuel Paid By')).toBeNull();
   });
+
 
   it('contractor exposes cost fields, fuel, and no lease payment', () => {
     renderForm();
