@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Building2, Phone, ShieldCheck, CreditCard, ExternalLink,
   HelpCircle, BookOpen, Sparkles, ListChecks, LogOut, Trash2, Mail,
