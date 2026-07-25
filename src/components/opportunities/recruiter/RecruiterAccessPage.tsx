@@ -169,14 +169,23 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
           <Button
             size="sm"
             onClick={handlePost}
-            disabled={postDisabled}
-            title={postDisabled ? 'Finish your recruiter profile to post opportunities.' : undefined}
+            data-testid="post-opportunity-button"
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <PlusCircle className="h-4 w-4" /> Post an Opportunity
           </Button>
         </div>
       </div>
+
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={setReadinessOpen}
+        profile={profile}
+        onOpenOnboarding={onOpenOnboarding}
+        onContinue={onManage}
+        actionLabel="Post an Opportunity"
+      />
+
 
       {/* Page header */}
       <div>
