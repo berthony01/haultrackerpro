@@ -545,10 +545,16 @@ describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)
     expectNoForbidden(container);
   });
 
-  it('suspended → Post disabled', () => {
+  it('suspended → data-can-post=false (readiness dialog gates)', () => {
     installHooks({ profile: makeProfile({ status: 'suspended' }) });
     const { container } = renderPage();
-    expect(screen.getByRole('button', { name: /Post an Opportunity/i })).toBeDisabled();
+    // Phase 1P-A1: button not disabled; canonical gate is data-can-post.
+    expect(
+      screen.getByRole('button', { name: /Post an Opportunity/i }),
+    ).not.toBeDisabled();
+    expect(
+      screen.getByTestId('recruiter-trust-status').getAttribute('data-can-post'),
+    ).toBe('false');
     expectNoForbidden(container);
   });
 
