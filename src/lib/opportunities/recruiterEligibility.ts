@@ -1,4 +1,9 @@
 import type { Tables } from '@/integrations/supabase/types';
+import {
+  resolveRecruiterReadiness,
+  isValidRecruiterEmail as sharedIsValidRecruiterEmail,
+  hasAcceptedPostingTermsProfile,
+} from './resolveRecruiterReadiness';
 
 // Kept for existing imports of `RecruiterProfile` from this module.
 export type RecruiterProfile = Tables<'recruiter_profiles'>;
@@ -24,59 +29,37 @@ export interface RecruiterEligibility {
 /** Current posting-terms version stamped by the onboarding form. */
 export const POSTING_TERMS_VERSION = '2026-07-17.v1';
 
-function isNonEmpty(v: unknown): boolean {
-  return typeof v === 'string' && v.trim().length > 0;
-}
-
 /**
  * Client-side email validation aligned with the server pattern.
  * Rejects empty/whitespace, missing @, missing domain suffix.
+ *
+ * Phase 1P-A1.2: delegates to the shared pure helper in
+ * `resolveRecruiterReadiness` — no local regex reimplementation.
  */
 export function isValidRecruiterEmail(v: unknown): boolean {
-  if (typeof v !== 'string') return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-}
-
-/** True iff the profile has stamped or been grandfathered into posting terms. */
-export function hasAcceptedPostingTerms(profile: RecruiterProfile | null): boolean {
-  if (!profile) return false;
-  const anyProfile = profile as unknown as Record<string, unknown>;
-  return (
-    typeof anyProfile.posting_terms_accepted_at === 'string' ||
-    typeof anyProfile.legacy_terms_grandfathered_at === 'string'
-  );
+  return sharedIsValidRecruiterEmail(v);
 }
 
 /**
- * Canonical client-side profile completeness. Mirrors the server rule in
- * public.recruiter_profile_can_manage_opportunities.
+ * True iff the profile has stamped or been grandfathered into posting terms.
  *
- * Phase 1P-A1: adds company_type gate and conditional DOT/MC — DOT/MC is
- * required only for `carrier`; NULL company_type is always incomplete.
+ * Phase 1P-A1.2: delegates to the shared pure helper in
+ * `resolveRecruiterReadiness` — no local field-check reimplementation.
+ */
+export function hasAcceptedPostingTerms(profile: RecruiterProfile | null): boolean {
+  return hasAcceptedPostingTermsProfile(profile);
+}
+
+/**
+ * Canonical client-side profile completeness.
+ *
+ * Phase 1P-A1.2: this is a thin delegator over the single canonical
+ * `resolveRecruiterReadiness` selector. It MUST NOT reimplement company
+ * type, DOT/MC, email, suspension, or terms logic — every completeness
+ * change lives in the selector.
  */
 export function isProfileCompleteForPosting(profile: RecruiterProfile | null): boolean {
-  if (!profile) return false;
-  const anyP = profile as unknown as Record<string, unknown>;
-  const companyType = anyP.company_type;
-  const isCarrier = companyType === 'carrier';
-  const isValidCompanyType =
-    companyType === 'carrier' ||
-    companyType === 'third_party_recruiter' ||
-    companyType === 'staffing_agency' ||
-    companyType === 'independent_recruiter';
-
-  const dotOrMcOk = isCarrier
-    ? isNonEmpty(profile.dot_number) || isNonEmpty(profile.mc_number)
-    : true;
-
-  return (
-    isNonEmpty(profile.recruiter_name) &&
-    isNonEmpty(profile.company_name) &&
-    isValidRecruiterEmail(profile.recruiter_email) &&
-    isValidCompanyType &&
-    dotOrMcOk &&
-    hasAcceptedPostingTerms(profile)
-  );
+  return resolveRecruiterReadiness(profile).ready;
 }
 
 
