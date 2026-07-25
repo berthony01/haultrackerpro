@@ -261,9 +261,15 @@ async function clickSaveIncomplete() {
 
 // ==========================================================================
 describe('Phase 1J-C1 — Opportunity Apply continuity (integration)', () => {
-  it('1. Apply Now on A → Preferences preserves A (Back returns to A detail)', async () => {
+  it('1. Apply Now on A → Preferences preserves A (Back returns to A detail); detail exposes exactly one dominant Apply Now action', async () => {
     renderPage();
     await openDetail('opp-A');
+    // Phase 1O-B contract: the detail surface exposes exactly one
+    // dominant Apply Now action (the sticky action bar) — no duplicate
+    // top-of-summary button. Any Referral secondary button that carries
+    // the word "Apply" (e.g. "Applied?") is excluded via an exact match.
+    const applyButtons = screen.getAllByRole('button', { name: /^Apply Now$/i });
+    expect(applyButtons).toHaveLength(1);
     await openApplyDialog();
     await enterPrefsFromApply();
     // Dialog/detail hidden while editing preferences.
