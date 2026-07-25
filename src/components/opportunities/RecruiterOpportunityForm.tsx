@@ -276,6 +276,18 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
   );
   const [stage, setStage] = useState<StageKey>(initial ? 'essentials' : 'write');
+  // Coverage mode is user-driven, not purely derived — clicking "Selected States"
+  // from an empty state must open the state grid without pre-seeding hiring_states.
+  // We initialise from the (possibly hydrated) canonical state and thereafter
+  // update on explicit user selection or on paste-merge results that resolve it.
+  const initialMode = useMemo(
+    () => inferHiringCoverageMode(
+      initial ? normalizeOpportunityForAuthoring(initial) : EMPTY_AUTHORING_STATE,
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [coverageMode, setCoverageMode] = useState<HiringCoverageMode>(initialMode);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [rawText, setRawText] = useState('');
   const [extracting, setExtracting] = useState(false);
@@ -283,7 +295,9 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
   useEffect(() => {
     if (initial && !hydratedRef.current) {
-      setState(normalizeOpportunityForAuthoring(initial));
+      const norm = normalizeOpportunityForAuthoring(initial);
+      setState(norm);
+      setCoverageMode(inferHiringCoverageMode(norm));
       hydratedRef.current = true;
       return;
     }
@@ -297,7 +311,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
   const readiness = useMemo(() => validateOpportunityReadiness(state), [state]);
   const pending = createOpportunity.isPending || updateOpportunity.isPending;
-  const coverageMode = inferHiringCoverageMode(state);
+
 
   const save = (mode: 'draft' | 'publish') => {
     if (mode === 'draft' && !readiness.canSaveDraft) {
