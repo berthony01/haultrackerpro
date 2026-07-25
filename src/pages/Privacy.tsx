@@ -83,7 +83,7 @@ export default function Privacy() {
           <h3 className="text-base font-bold">7. User Rights</h3>
           <ul className="list-disc list-inside text-muted-foreground space-y-1">
             <li>Right to access and export all your data at any time</li>
-            <li>Right to delete your account and all associated data</li>
+            <li>Right to request permanent deletion of your account, subject to the retention behavior described in Section 6</li>
             <li>Right to correct inaccurate information</li>
             <li>Right to withdraw an opportunity request at any time (note: contact information already shared with the recruiter cannot be retroactively recalled)</li>
           </ul>
