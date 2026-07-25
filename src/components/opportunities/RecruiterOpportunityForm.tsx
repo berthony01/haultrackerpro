@@ -1149,20 +1149,21 @@ function DriverPreview({
       <div>
         <p className="text-[10px] font-black uppercase tracking-widest text-primary">Driver Preview</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Only populated details appear. Skipped fields are hidden — no empty rows.
+          This is how the populated opportunity details will appear to drivers.
         </p>
       </div>
 
-      <div className="space-y-2">
-        {title ? (
-          <h3 className="text-xl font-black text-foreground leading-tight">{title}</h3>
-        ) : (
-          <p className="text-xs italic text-muted-foreground">Add a title on Essentials.</p>
-        )}
-        {company && (
-          <p className="text-sm font-semibold text-muted-foreground">{company}</p>
-        )}
-      </div>
+      {(title || company) && (
+        <div className="space-y-2">
+          {title && (
+            <h3 className="text-xl font-black text-foreground leading-tight">{title}</h3>
+          )}
+          {company && (
+            <p className="text-sm font-semibold text-muted-foreground">{company}</p>
+          )}
+        </div>
+      )}
+
 
       {rows.length > 0 && (
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="driver-preview-rows">
