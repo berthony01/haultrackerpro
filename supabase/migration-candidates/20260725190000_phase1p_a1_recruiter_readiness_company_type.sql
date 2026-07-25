@@ -127,6 +127,11 @@ AS $function$
   );
 $function$;
 
+REVOKE ALL     ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM authenticated;
+GRANT  EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;
+
 -- ---------------------------------------------------------------------------
 -- 5. current_user_can_manage_recruiter_opportunities — same rule + ownership.
 -- ---------------------------------------------------------------------------
