@@ -127,6 +127,11 @@ AS $function$
   );
 $function$;
 
+REVOKE ALL     ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) FROM authenticated;
+GRANT  EXECUTE ON FUNCTION public.recruiter_profile_can_manage_opportunities(uuid) TO service_role;
+
 -- ---------------------------------------------------------------------------
 -- 5. current_user_can_manage_recruiter_opportunities — same rule + ownership.
 -- ---------------------------------------------------------------------------
@@ -167,6 +172,12 @@ AS $function$
       )
   );
 $function$;
+
+REVOKE ALL     ON FUNCTION public.current_user_can_manage_recruiter_opportunities(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.current_user_can_manage_recruiter_opportunities(uuid) FROM anon;
+GRANT  EXECUTE ON FUNCTION public.current_user_can_manage_recruiter_opportunities(uuid) TO authenticated, service_role;
+
+
 
 -- ---------------------------------------------------------------------------
 -- 6. accept_recruiter_posting_terms(text) — preserves every existing
@@ -288,7 +299,7 @@ GRANT  EXECUTE ON FUNCTION public.accept_recruiter_posting_terms(text)
 
 -- ---------------------------------------------------------------------------
 -- 7. ensure_my_recruiter_setup_state — include company_type and conditional
---    dot_or_mc_number tokens. Never infers or writes company_type. All
+--    dot_or_mc tokens. Never infers or writes company_type. All
 --    other behavior byte-preserved from Phase 1N-E where practical.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.ensure_my_recruiter_setup_state()
@@ -479,7 +490,7 @@ GRANT  EXECUTE ON FUNCTION public.ensure_my_recruiter_setup_state()
   TO authenticated, service_role;
 
 COMMENT ON FUNCTION public.ensure_my_recruiter_setup_state() IS
-  'Phase 1P-A1 update: adds company_type and conditional dot_or_mc_number '
+  'Phase 1P-A1 update: adds company_type and conditional dot_or_mc '
   'tokens to missing_requirements. Never infers or writes company_type. '
   'All other behavior byte-preserved from Phase 1N-E1.';
 

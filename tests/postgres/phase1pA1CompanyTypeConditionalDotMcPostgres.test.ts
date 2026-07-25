@@ -832,5 +832,47 @@ describe('Phase 1P-A1.1-R1 — company_type + conditional DOT/MC candidate', () 
       expect(grantees.has('anon')).toBe(false);
       expect(grantees.has('PUBLIC')).toBe(false);
     }
+
+    // profile-scoped eligibility helper: service_role only.
+    {
+      const grantees = byName['recruiter_profile_can_manage_opportunities'].grantees;
+      expect(grantees.has('service_role')).toBe(true);
+      expect(grantees.has('authenticated')).toBe(false);
+      expect(grantees.has('anon')).toBe(false);
+      expect(grantees.has('PUBLIC')).toBe(false);
+    }
+
+    // current-user eligibility helper: authenticated + service_role only.
+    {
+      const grantees = byName['current_user_can_manage_recruiter_opportunities'].grantees;
+      expect(grantees.has('authenticated')).toBe(true);
+      expect(grantees.has('service_role')).toBe(true);
+      expect(grantees.has('anon')).toBe(false);
+      expect(grantees.has('PUBLIC')).toBe(false);
+    }
+
+    // Both eligibility helpers must retain exactly one uuid argument.
+    const sigRows = await ctx.pool.query(
+      `SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname='public'
+          AND p.proname IN (
+            'recruiter_profile_can_manage_opportunities',
+            'current_user_can_manage_recruiter_opportunities'
+          )`,
+    );
+    const sigByName: Record<string, string> = {};
+    for (const r of sigRows.rows) {
+      sigByName[r.proname as string] = (r.args as string).trim();
+    }
+    for (const name of [
+      'recruiter_profile_can_manage_opportunities',
+      'current_user_can_manage_recruiter_opportunities',
+    ]) {
+      // Signature is `_recruiter_id uuid` — one uuid parameter.
+      expect(sigByName[name]).toMatch(/^_recruiter_id\s+uuid$/);
+    }
   });
 });
+
