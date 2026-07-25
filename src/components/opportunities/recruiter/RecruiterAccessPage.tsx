@@ -123,17 +123,24 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   // from describeRecruiterEligibility(). Billing NEVER gates standard posting.
   const postDisabled = !canPost;
 
+  // Phase 1P-A1: readiness dialog gates every "Post an Opportunity" click
+  // instead of silently disabling the button. The dialog surfaces the exact
+  // missing tokens and routes recruiters into onboarding.
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const readiness = resolveRecruiterReadiness(profile);
+
   const handlePost = () => {
-    if (state === 'none' || state === 'incomplete') {
-      // Don't silently open the recruiter-profile form from a "Post" button —
-      // it looks like the post-opportunity form. Scroll to the explicit
-      // "Add Recruiter Workspace" card instead.
-      onboardingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (state === 'suspended') {
+      setReadinessOpen(true);
       return;
     }
-    if (state === 'suspended') return;
+    if (!readiness.ready) {
+      setReadinessOpen(true);
+      return;
+    }
     onManage();
   };
+
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
