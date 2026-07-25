@@ -481,7 +481,7 @@ export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterP
     view.state === 'suspended'
       ? 'Please contact support regarding your recruiter account. Standard posting is disabled until this is resolved.'
       : view.state === 'missing_profile' || view.state === 'incomplete_profile'
-      ? 'Standard posting is not enabled yet. Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Verification review runs separately.'
+      ? 'Standard posting is not enabled yet. Add your recruiter name, company name, a valid recruiter email, your company type, and accept the posting terms. Carrier accounts also need a DOT or MC number. Verification review runs separately.'
       : view.state === 'verified'
       ? 'Standard posting is enabled and drivers see a Verified Recruiter badge on your opportunities.'
       : profile?.verification_status === 'rejected'
