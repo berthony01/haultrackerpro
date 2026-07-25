@@ -52,6 +52,9 @@ import {
   extractOpportunityFromText,
   type ExtractedOpportunity,
 } from './PasteOpportunityDialog';
+import { RecruiterReadinessDialog } from './RecruiterReadinessDialog';
+import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
+
 
 interface Props {
   initial?: Opportunity | null;
