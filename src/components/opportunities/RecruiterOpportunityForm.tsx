@@ -52,6 +52,9 @@ import {
   extractOpportunityFromText,
   type ExtractedOpportunity,
 } from './PasteOpportunityDialog';
+import { RecruiterReadinessDialog } from './RecruiterReadinessDialog';
+import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
+
 
 interface Props {
   initial?: Opportunity | null;
@@ -271,7 +274,9 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
 
 export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
-  const { profile } = useRecruiterProfile();
+  const { profile, refetchProfile } = useRecruiterProfile();
+  const [readinessOpen, setReadinessOpen] = useState(false);
+
   const [state, setState] = useState<State>(() =>
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
   );
@@ -313,7 +318,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const pending = createOpportunity.isPending || updateOpportunity.isPending;
 
 
-  const save = (mode: 'draft' | 'publish') => {
+  const save = async (mode: 'draft' | 'publish') => {
     if (mode === 'draft' && !readiness.canSaveDraft) {
       const msg = readiness.blockingReasons[0] ?? 'Fix the highlighted issues before saving.';
       toast.error(msg);
@@ -324,18 +329,39 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       toast.error(msg);
       return;
     }
+    // Phase 1P-A1 — publish defense-in-depth: refetch the recruiter
+    // profile immediately before the mutation and abort into the
+    // readiness dialog if the caller no longer satisfies posting
+    // requirements (e.g. suspended between page load and click, or
+    // legacy consent revoked out-of-band).
+    if (mode === 'publish') {
+      const fresh = await refetchProfile();
+      const rr = resolveRecruiterReadiness(fresh);
+      if (!rr.ready) {
+        setReadinessOpen(true);
+        return;
+      }
+    }
     const payload = buildOpportunityPersistencePayload(state, mode);
     const onSuccess = () => {
       toast.success(mode === 'publish' ? 'Opportunity published — live to drivers now' : 'Draft saved');
       onSaved();
     };
-    const onError = (e: Error) => toast.error(e.message);
+    const onError = (e: Error) => {
+      const cause = (e as Error & { cause?: unknown }).cause;
+      const detail =
+        cause && typeof cause === 'object' && cause !== null && 'message' in cause
+          ? String((cause as { message?: unknown }).message ?? '')
+          : '';
+      toast.error(detail ? `${e.message} — ${detail}` : e.message);
+    };
     if (initial?.id) {
       updateOpportunity.mutate({ id: initial.id, data: payload }, { onSuccess, onError });
     } else {
       createOpportunity.mutate(payload, { onSuccess, onError });
     }
   };
+
 
   const handleExtracted = (data: ExtractedOpportunity) => {
     setState((cur) => {
@@ -413,6 +439,15 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
         onOpenChange={setPasteOpen}
         onExtracted={handleExtracted}
       />
+
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={setReadinessOpen}
+        profile={profile}
+        onOpenOnboarding={onBack}
+        actionLabel="Publish"
+      />
+
 
       {/* Stage navigation */}
       <StageTabs current={stage} onSelect={setStage} />

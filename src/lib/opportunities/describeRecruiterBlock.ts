@@ -1,5 +1,7 @@
 import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { describeRecruiterEligibility } from './recruiterEligibility';
+import { resolveRecruiterReadiness } from './resolveRecruiterReadiness';
+
 
 export type RecruiterBlockReason =
   | 'missing_profile'
@@ -27,6 +29,10 @@ export function describeRecruiterBlock(
   if (e.canPost) {
     return { reason: 'ok', title: e.title, body: e.body };
   }
+  // Phase 1P-A1: readiness is authoritative for the actionable dialog; the
+  // block-level body is preserved for legacy gate cards. Callers that need
+  // the exact missing tokens should call `resolveRecruiterReadiness`.
+  void resolveRecruiterReadiness;
   return {
     reason: e.state as RecruiterBlockReason,
     title: e.title,
@@ -34,3 +40,5 @@ export function describeRecruiterBlock(
     cta: e.cta,
   };
 }
+
+

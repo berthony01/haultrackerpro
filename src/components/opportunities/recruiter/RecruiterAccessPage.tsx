@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,9 @@ import {
   getRecruiterTrustView,
   type RecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
+import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
+import { RecruiterReadinessDialog } from '../RecruiterReadinessDialog';
+
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
 // helper — this file MUST NOT reimplement completeness. `active_billing`
@@ -118,19 +121,29 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
 
   // Phase 1F-A.2.2: `canPost` is the canonical eligibility signal derived
   // from describeRecruiterEligibility(). Billing NEVER gates standard posting.
-  const postDisabled = !canPost;
+  // Phase 1P-A1: the top-level Post button opens the readiness dialog
+  // instead of relying on `postDisabled`; sub-components still consume
+  // `canPost` to gate their inline actions.
+
+
+  // Phase 1P-A1: readiness dialog gates every "Post an Opportunity" click
+  // instead of silently disabling the button. The dialog surfaces the exact
+  // missing tokens and routes recruiters into onboarding.
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const readiness = resolveRecruiterReadiness(profile);
 
   const handlePost = () => {
-    if (state === 'none' || state === 'incomplete') {
-      // Don't silently open the recruiter-profile form from a "Post" button —
-      // it looks like the post-opportunity form. Scroll to the explicit
-      // "Add Recruiter Workspace" card instead.
-      onboardingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (state === 'suspended') {
+      setReadinessOpen(true);
       return;
     }
-    if (state === 'suspended') return;
+    if (!readiness.ready) {
+      setReadinessOpen(true);
+      return;
+    }
     onManage();
   };
+
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -159,14 +172,23 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
           <Button
             size="sm"
             onClick={handlePost}
-            disabled={postDisabled}
-            title={postDisabled ? 'Finish your recruiter profile to post opportunities.' : undefined}
+            data-testid="post-opportunity-button"
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <PlusCircle className="h-4 w-4" /> Post an Opportunity
           </Button>
         </div>
       </div>
+
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={setReadinessOpen}
+        profile={profile}
+        onOpenOnboarding={onOpenOnboarding}
+        onContinue={onManage}
+        actionLabel="Post an Opportunity"
+      />
+
 
       {/* Page header */}
       <div>

@@ -7,6 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   ArrowLeft,
   Building2,
   ShieldCheck,
@@ -26,6 +33,7 @@ import {
   hasAcceptedPostingTerms,
   getRecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
+import { COMPANY_TYPE_LABELS, type CompanyType } from '@/lib/opportunities/resolveRecruiterReadiness';
 
 interface Props {
   onBack: () => void;
@@ -37,6 +45,7 @@ type FormState = {
   recruiter_email: string;
   recruiter_phone: string;
   company_name: string;
+  company_type: CompanyType | '';
   company_website: string;
   company_phone: string;
   company_address: string;
@@ -54,6 +63,7 @@ const EMPTY: FormState = {
   recruiter_email: '',
   recruiter_phone: '',
   company_name: '',
+  company_type: '',
   company_website: '',
   company_phone: '',
   company_address: '',
@@ -65,6 +75,7 @@ const EMPTY: FormState = {
   equipment_types: '',
   driver_types_hired: '',
 };
+
 
 const splitList = (s: string): string[] =>
   s.split(',').map((p) => p.trim()).filter(Boolean);
@@ -91,11 +102,20 @@ export function RecruiterOnboarding({ onBack }: Props) {
 
   useEffect(() => {
     if (profile) {
+      const anyP = profile as unknown as Record<string, unknown>;
+      const legacyType = anyP.company_type;
       setForm({
         recruiter_name: profile.recruiter_name ?? '',
         recruiter_email: profile.recruiter_email ?? '',
         recruiter_phone: profile.recruiter_phone ?? '',
         company_name: profile.company_name ?? '',
+        company_type:
+          legacyType === 'carrier' ||
+          legacyType === 'third_party_recruiter' ||
+          legacyType === 'staffing_agency' ||
+          legacyType === 'independent_recruiter'
+            ? (legacyType as CompanyType)
+            : '',
         company_website: profile.company_website ?? '',
         company_phone: profile.company_phone ?? '',
         company_address: profile.company_address ?? '',
@@ -107,15 +127,13 @@ export function RecruiterOnboarding({ onBack }: Props) {
         equipment_types: (profile.equipment_types ?? []).join(', '),
         driver_types_hired: (profile.driver_types_hired ?? []).join(', '),
       });
-      // Only auto-check the agreement boxes if the recruiter has previously
-      // accepted (or been grandfathered). New/legacy-unconsented rows must
-      // explicitly re-confirm before we stamp posting_terms_accepted_at.
       const alreadyAccepted = hasAcceptedPostingTerms(profile);
       setAgree1(alreadyAccepted);
       setAgree2(alreadyAccepted);
       setAgree3(alreadyAccepted);
     }
   }, [profile]);
+
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -130,8 +148,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
     if (!form.company_name.trim()) return 'Company name is required.';
     if (!form.recruiter_email.trim()) return 'Recruiter email is required.';
     if (!isEmail(form.recruiter_email)) return 'Please enter a valid recruiter email.';
-    if (!form.dot_number.trim() && !form.mc_number.trim())
-      return 'Please provide at least a DOT or MC number.';
+    if (!form.company_type) return 'Please choose a company type.';
+    if (form.company_type === 'carrier' && !form.dot_number.trim() && !form.mc_number.trim())
+      return 'Carriers must provide at least a DOT or MC number.';
     if (form.company_website && !isUrlish(form.company_website))
       return 'Please enter a valid company website.';
     if (!allAgreed) return 'Please confirm all agreements before submitting.';
@@ -148,14 +167,12 @@ export function RecruiterOnboarding({ onBack }: Props) {
       toast.error(err);
       return;
     }
-    // Phase 1F-A.2.1A: the browser never stamps consent. We send only
-    // ordinary profile fields, then call the SECURITY DEFINER RPC via the
-    // combined mutation to stamp posting_terms_* server-side.
     const payload: RecruiterProfileUpsert = {
       recruiter_name: form.recruiter_name.trim(),
       recruiter_email: form.recruiter_email.trim() || null,
       recruiter_phone: form.recruiter_phone.trim() || null,
       company_name: form.company_name.trim(),
+      company_type: form.company_type || null,
       company_website: form.company_website.trim() || null,
       company_phone: form.company_phone.trim() || null,
       company_address: form.company_address.trim() || null,
@@ -180,9 +197,20 @@ export function RecruiterOnboarding({ onBack }: Props) {
           toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
         }
       },
-      onError: (e: Error) => toast.error(e.message),
+      // Phase 1P-A1: surface Error.cause so recruiters see the true
+      // reason (RPC DETAIL, RLS mismatch, persistence verification) rather
+      // than the generic combined-mutation label.
+      onError: (e: Error) => {
+        const cause = (e as Error & { cause?: unknown }).cause;
+        const detail =
+          cause && typeof cause === 'object' && cause !== null && 'message' in cause
+            ? String((cause as { message?: unknown }).message ?? '')
+            : '';
+        toast.error(detail ? `${e.message} — ${detail}` : e.message);
+      },
     });
   };
+
 
   return (
     <div className="space-y-6 animate-fade-in pb-32">
@@ -235,6 +263,25 @@ export function RecruiterOnboarding({ onBack }: Props) {
             <Field label="Company Name *">
               <Input value={form.company_name} onChange={(e) => set('company_name', e.target.value)} />
             </Field>
+            <Field label="Company Type *">
+              <Select
+                value={form.company_type || undefined}
+                onValueChange={(v) => set('company_type', v as CompanyType)}
+              >
+                <SelectTrigger data-testid="recruiter-company-type">
+                  <SelectValue placeholder="Choose company type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(COMPANY_TYPE_LABELS) as Array<[CompanyType, string]>).map(
+                    ([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </Field>
             <Field label="Company Website">
               <Input placeholder="https://" value={form.company_website} onChange={(e) => set('company_website', e.target.value)} />
             </Field>
@@ -254,16 +301,23 @@ export function RecruiterOnboarding({ onBack }: Props) {
 
           {/* C. Verification Information */}
           <Section icon={ShieldCheck} title="Verification Information">
-            <Field label="DOT Number">
+            <Field label={form.company_type === 'carrier' ? 'DOT Number *' : 'DOT Number'}>
               <Input value={form.dot_number} onChange={(e) => set('dot_number', e.target.value)} />
             </Field>
-            <Field label="MC Number">
+            <Field label={form.company_type === 'carrier' ? 'MC Number *' : 'MC Number'}>
               <Input value={form.mc_number} onChange={(e) => set('mc_number', e.target.value)} />
             </Field>
-            <p className="text-xs text-muted-foreground sm:col-span-2">
-              Provide at least one DOT or MC number. It is required to complete your recruiter profile and is also used for Verified Recruiter badge review. Standard posting unlocks when the required profile and posting terms are complete; badge approval is separate.
+            <p
+              className="text-xs text-muted-foreground sm:col-span-2"
+              data-testid="verification-info-copy"
+            >
+              {form.company_type === 'carrier'
+                ? 'Carriers must provide at least one DOT or MC number to complete their recruiter profile. It is also used for Verified Recruiter badge review. Standard posting unlocks when the required profile fields and posting terms are complete; badge approval is separate.'
+                : 'DOT or MC numbers are optional for third-party recruiters, staffing agencies, and independent recruiters. Provide them if you have them — they help with Verified Recruiter badge review. Standard posting unlocks when the required profile fields and posting terms are complete.'}
             </p>
           </Section>
+
+
 
           {/* D. Hiring Information */}
           <Section icon={Truck} title="Hiring Information">
@@ -427,7 +481,7 @@ export function RecruiterOnboardingStatusCard({ profile }: { profile: RecruiterP
     view.state === 'suspended'
       ? 'Please contact support regarding your recruiter account. Standard posting is disabled until this is resolved.'
       : view.state === 'missing_profile' || view.state === 'incomplete_profile'
-      ? 'Standard posting is not enabled yet. Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Verification review runs separately.'
+      ? 'Standard posting is not enabled yet. Add your recruiter name, company name, a valid recruiter email, your company type, and accept the posting terms. Carrier accounts also need a DOT or MC number. Verification review runs separately.'
       : view.state === 'verified'
       ? 'Standard posting is enabled and drivers see a Verified Recruiter badge on your opportunities.'
       : profile?.verification_status === 'rejected'
