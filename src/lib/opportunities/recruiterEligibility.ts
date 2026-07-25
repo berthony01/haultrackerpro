@@ -50,17 +50,35 @@ export function hasAcceptedPostingTerms(profile: RecruiterProfile | null): boole
 /**
  * Canonical client-side profile completeness. Mirrors the server rule in
  * public.recruiter_profile_can_manage_opportunities.
+ *
+ * Phase 1P-A1: adds company_type gate and conditional DOT/MC — DOT/MC is
+ * required only for `carrier`; NULL company_type is always incomplete.
  */
 export function isProfileCompleteForPosting(profile: RecruiterProfile | null): boolean {
   if (!profile) return false;
+  const anyP = profile as unknown as Record<string, unknown>;
+  const companyType = anyP.company_type;
+  const isCarrier = companyType === 'carrier';
+  const isValidCompanyType =
+    companyType === 'carrier' ||
+    companyType === 'third_party_recruiter' ||
+    companyType === 'staffing_agency' ||
+    companyType === 'independent_recruiter';
+
+  const dotOrMcOk = isCarrier
+    ? isNonEmpty(profile.dot_number) || isNonEmpty(profile.mc_number)
+    : true;
+
   return (
     isNonEmpty(profile.recruiter_name) &&
     isNonEmpty(profile.company_name) &&
     isValidRecruiterEmail(profile.recruiter_email) &&
-    (isNonEmpty(profile.dot_number) || isNonEmpty(profile.mc_number)) &&
+    isValidCompanyType &&
+    dotOrMcOk &&
     hasAcceptedPostingTerms(profile)
   );
 }
+
 
 /**
  * Phase 1F-A.1: canonical recruiter posting rule.
@@ -105,10 +123,11 @@ export function describeRecruiterEligibility(
       canPost: false,
       isVerified: false,
       title: 'Finish your recruiter profile',
-      body: 'Add your recruiter name, company name, a valid recruiter email, a DOT or MC number, and accept the posting terms. Posting unlocks the moment those are saved.',
+      body: 'Add your recruiter name, company name, a valid recruiter email, company type, and accept the posting terms. Carrier accounts also need a DOT or MC number. Posting unlocks the moment those are saved.',
       cta: 'Complete Profile',
     };
   }
+
 
   if (profile.verification_status === 'approved') {
     return {
