@@ -31,6 +31,11 @@ import DocsArticlePage from '@/pages/DocsArticle';
 
 const PHASE_START_SHA = '08206a82d6705a772b9d1158ee531e7bc0232b01';
 const BASELINE_SHA = '3926bec94121cfca616a56e006d2a952e654a338';
+// Immutable accepted endpoint for the F2-C1 historical phase scope. Any
+// later authorized edits (F2-C1-R2, R3, ...) occur only inside already-
+// authorized test files and must NOT rewrite the historical phase
+// boundary. Endpoint pinning — never compare historical scope to HEAD.
+const F2C1_ACCEPTED_SHA = '821d7e016479f12b323e6af2e70b131538c5746c';
 
 const REQUIRED_SLUGS = [
   'billing-cancellation',
@@ -524,37 +529,47 @@ describe('phase diff integrity (fail-closed)', () => {
     }
   };
 
-  const assertAncestor = (sha: string) => {
+  // Fail-closed ancestor proof: throws diagnostic on failure, never
+  // silently converts a failure into PASS.
+  const assertIsAncestor = (ancestor: string, descendant: string) => {
     try {
-      execSync(`git merge-base --is-ancestor ${sha} HEAD`, {
+      execSync(`git merge-base --is-ancestor ${ancestor} ${descendant}`, {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (err) {
       const e = err as { status?: number; stderr?: Buffer | string };
       throw new Error(
-        `git merge-base --is-ancestor ${sha} HEAD failed (exit ${e.status ?? 'n/a'}); ${
-          e.stderr ? e.stderr.toString() : ''
-        }`,
+        `git merge-base --is-ancestor ${ancestor} ${descendant} failed (exit ${
+          e.status ?? 'n/a'
+        }); ${e.stderr ? e.stderr.toString() : ''}`,
       );
     }
   };
 
-  it('phase start SHA is reachable from HEAD', () => {
-    assertAncestor(PHASE_START_SHA);
+  it('BASELINE_SHA is an ancestor of PHASE_START_SHA', () => {
+    assertIsAncestor(BASELINE_SHA, PHASE_START_SHA);
   });
 
-  it('baseline SHA is reachable from HEAD', () => {
-    assertAncestor(BASELINE_SHA);
+  it('PHASE_START_SHA is an ancestor of F2C1_ACCEPTED_SHA', () => {
+    assertIsAncestor(PHASE_START_SHA, F2C1_ACCEPTED_SHA);
   });
 
-  it('phase diff from PHASE_START_SHA is exactly the five allowlisted files', () => {
-    const raw = runGitStrict(`diff --name-only ${PHASE_START_SHA}...HEAD`);
+  it('F2C1_ACCEPTED_SHA remains reachable from current HEAD', () => {
+    assertIsAncestor(F2C1_ACCEPTED_SHA, 'HEAD');
+  });
+
+  it('historical phase diff PHASE_START_SHA..F2C1_ACCEPTED_SHA is exactly the five allowlisted files', () => {
+    const raw = runGitStrict(
+      `diff --name-only ${PHASE_START_SHA}...${F2C1_ACCEPTED_SHA}`,
+    );
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(PHASE_ALLOWED_FILES);
   });
 
-  it('cumulative diff from BASELINE_SHA equals the accepted F2-B + F2-C1 file set (no .lovable/plan.md, no supabase/*)', () => {
-    const raw = runGitStrict(`diff --name-only ${BASELINE_SHA}...HEAD`);
+  it('historical cumulative diff BASELINE_SHA..F2C1_ACCEPTED_SHA equals the accepted F2-B + F2-C1 file set (no .lovable/plan.md, no supabase/*)', () => {
+    const raw = runGitStrict(
+      `diff --name-only ${BASELINE_SHA}...${F2C1_ACCEPTED_SHA}`,
+    );
     const changed = raw ? raw.split('\n').map((s) => s.trim()).filter(Boolean).sort() : [];
     expect(changed).toEqual(CUMULATIVE_ALLOWED_FILES);
     expect(changed).not.toContain('.lovable/plan.md');
@@ -577,5 +592,40 @@ describe('phase diff integrity (fail-closed)', () => {
       'src/integrations/supabase/types.ts',
     ];
     for (const f of forbidden) expect(changed).not.toContain(f);
+  });
+
+  // Future-phase safety: the historical scope commands in THIS section
+  // must end at F2C1_ACCEPTED_SHA, not at HEAD. The only HEAD-based git
+  // use permitted here is proving the accepted endpoint remains
+  // reachable from HEAD.
+  it('historical scope commands are endpoint-pinned to F2C1_ACCEPTED_SHA (not HEAD)', () => {
+    const src = readFileSync('src/test/phase1nF2CoreDocsArticles.test.ts', 'utf8');
+    // Isolate this describe block to avoid matching unrelated commentary.
+    const start = src.indexOf('phase diff integrity (fail-closed)');
+    expect(start).toBeGreaterThan(-1);
+    const section = src.slice(start);
+    // Every `git diff --name-only ...` in the historical-scope section
+    // must terminate at F2C1_ACCEPTED_SHA; none may terminate at HEAD.
+    // Match only real historical-scope helper invocations. This excludes
+    // this meta-check block's own descriptive prose by requiring the
+    // exact SHA-constant identifiers used above.
+    const diffCalls =
+      section.match(
+        /runGitStrict\(\s*`diff --name-only \$\{[A-Z0-9_]+\}\.\.\.\$\{[A-Z0-9_]+\}`/g,
+      ) ?? [];
+    expect(diffCalls.length).toBeGreaterThanOrEqual(2);
+    for (const call of diffCalls) {
+      // Right-hand endpoint must be F2C1_ACCEPTED_SHA.
+      expect(call).toMatch(/\.\.\.\$\{F2C1_ACCEPTED_SHA\}`$/);
+      expect(call).not.toContain('HEAD');
+    }
+    // The only HEAD-based git call permitted in this section is the
+    // ancestor proof that F2C1_ACCEPTED_SHA is reachable from HEAD.
+    expect(section).toContain(
+      "assertIsAncestor(F2C1_ACCEPTED_SHA, 'HEAD')",
+    );
+    // Fail-closed contract: no silent-fallback patterns.
+    expect(section).not.toMatch(/\|\|\s*true/);
+    expect(section).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/);
   });
 });
