@@ -437,11 +437,13 @@ export function OpportunityDetail({
               {grossValue && (
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                    {grossLabel}
+                    Weekly pay
                   </p>
                   <p className="text-3xl sm:text-4xl font-black text-primary leading-none whitespace-nowrap">
                     {grossValue}
-                    <span className="text-lg font-bold text-muted-foreground ml-1">/wk</span>
+                  </p>
+                  <p className="text-[10px] font-semibold text-muted-foreground mt-1">
+                    per week
                   </p>
                 </div>
               )}
