@@ -917,10 +917,13 @@ export default function Landing() {
                 links: [
                   { label: 'About', href: '/about' },
                   { label: 'Resources', href: '/resources' },
+                  { label: 'Help Center', href: '/docs' },
+                  { label: 'Legal Center', href: '/legal' },
                   { label: 'Terms', href: '/terms' },
                   { label: 'Privacy', href: '/privacy' },
                 ],
               },
+
             ].map((col) => (
               <div key={col.title}>
                 <p

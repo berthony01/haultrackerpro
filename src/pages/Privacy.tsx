@@ -2,10 +2,14 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead';
+import { findPolicyBySlug, POLICY_METADATA_PENDING_LABEL } from '@/lib/legal/policyRegistry';
 
 export default function Privacy() {
   const navigate = useNavigate();
-  const lastUpdated = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const policy = findPolicyBySlug('privacy');
+  const hasFixedMetadata = !!(policy && policy.version && policy.effectiveDate);
+
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -200,8 +204,12 @@ export default function Privacy() {
 
 
         <p className="text-xs text-muted-foreground/60 pt-4 border-t border-border">
-          Last Updated: {lastUpdated}
+          Policy metadata:{' '}
+          {hasFixedMetadata
+            ? `Version ${policy!.version} — Effective ${policy!.effectiveDate}`
+            : POLICY_METADATA_PENDING_LABEL}
         </p>
+
       </main>
     </div>
   );

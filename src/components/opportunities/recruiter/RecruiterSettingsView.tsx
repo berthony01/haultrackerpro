@@ -212,7 +212,9 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
             <ResourceLink icon={BookOpen} label="Recruiter User Guide" onClick={() => navigate('/recruiter/guide')} />
             <ResourceLink icon={HelpCircle} label="Recruiter FAQ" onClick={() => navigate('/recruiter/faq')} />
             <ResourceLink icon={Sparkles} label="What's New for Recruiters" onClick={() => navigate('/recruiter/updates')} />
+            <ResourceLink icon={HelpCircle} label="Help Center" onClick={() => navigate('/docs')} />
           </div>
+
         </CardContent>
       </Card>
 
@@ -239,6 +241,10 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
             <Button variant="outline" className="justify-start h-11 rounded-xl gap-2" onClick={() => navigate('/privacy')}>
               <Shield className="h-4 w-4" /> Privacy Policy
             </Button>
+            <Button variant="outline" className="justify-start h-11 rounded-xl gap-2" onClick={() => navigate('/legal')}>
+              <FileText className="h-4 w-4" /> Legal Center
+            </Button>
+
             <Button
               variant="outline"
               className="justify-start h-11 rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
