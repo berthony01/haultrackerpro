@@ -148,8 +148,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
     if (!form.company_name.trim()) return 'Company name is required.';
     if (!form.recruiter_email.trim()) return 'Recruiter email is required.';
     if (!isEmail(form.recruiter_email)) return 'Please enter a valid recruiter email.';
-    if (!form.dot_number.trim() && !form.mc_number.trim())
-      return 'Please provide at least a DOT or MC number.';
+    if (!form.company_type) return 'Please choose a company type.';
+    if (form.company_type === 'carrier' && !form.dot_number.trim() && !form.mc_number.trim())
+      return 'Carriers must provide at least a DOT or MC number.';
     if (form.company_website && !isUrlish(form.company_website))
       return 'Please enter a valid company website.';
     if (!allAgreed) return 'Please confirm all agreements before submitting.';
@@ -166,14 +167,12 @@ export function RecruiterOnboarding({ onBack }: Props) {
       toast.error(err);
       return;
     }
-    // Phase 1F-A.2.1A: the browser never stamps consent. We send only
-    // ordinary profile fields, then call the SECURITY DEFINER RPC via the
-    // combined mutation to stamp posting_terms_* server-side.
     const payload: RecruiterProfileUpsert = {
       recruiter_name: form.recruiter_name.trim(),
       recruiter_email: form.recruiter_email.trim() || null,
       recruiter_phone: form.recruiter_phone.trim() || null,
       company_name: form.company_name.trim(),
+      company_type: form.company_type || null,
       company_website: form.company_website.trim() || null,
       company_phone: form.company_phone.trim() || null,
       company_address: form.company_address.trim() || null,
@@ -198,9 +197,20 @@ export function RecruiterOnboarding({ onBack }: Props) {
           toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
         }
       },
-      onError: (e: Error) => toast.error(e.message),
+      // Phase 1P-A1: surface Error.cause so recruiters see the true
+      // reason (RPC DETAIL, RLS mismatch, persistence verification) rather
+      // than the generic combined-mutation label.
+      onError: (e: Error) => {
+        const cause = (e as Error & { cause?: unknown }).cause;
+        const detail =
+          cause && typeof cause === 'object' && cause !== null && 'message' in cause
+            ? String((cause as { message?: unknown }).message ?? '')
+            : '';
+        toast.error(detail ? `${e.message} — ${detail}` : e.message);
+      },
     });
   };
+
 
   return (
     <div className="space-y-6 animate-fade-in pb-32">
