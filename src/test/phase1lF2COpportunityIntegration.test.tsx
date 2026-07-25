@@ -667,7 +667,7 @@ describe('Phase 1L-F2C · Disclosure-state consistency', () => {
 // 8. ZERO AND FALSE PRESERVATION
 // =========================================================================
 describe('Phase 1L-F2C · Zero and false preservation', () => {
-  it('8. CPM row with explicit zero miles, deadhead_paid=false, and false lifestyle booleans preserves "0 mi", "Unpaid", and "No" on card and detail', async () => {
+  it('8. CPM row with explicit zero miles, deadhead_paid=false, and false lifestyle booleans preserves "0 mi", "Unpaid", and "No" on card and detail (uses Phase 1O-B "Loaded weekly miles" label where the CPM loaded value now appears)', async () => {
     const row = contractorFullBase({
       id: 'opp-zero',
       title: 'Zero Row',
@@ -691,8 +691,10 @@ describe('Phase 1L-F2C · Zero and false preservation', () => {
     expect(within(cardRowFor(card, 'Weekly miles')).queryByText('Not disclosed')).toBeNull();
 
     await openDetailByTitle('Zero Row');
+    // CPM listings now surface loaded miles under the pay section using
+    // the Phase 1O-B label "Loaded weekly miles".
+    expect(within(detailKV('Loaded weekly miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(detailKV('Weekly miles')).getByText('0 mi')).toBeInTheDocument();
-    expect(within(detailKV('Loaded miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(detailKV('Deadhead miles')).getByText('0 mi')).toBeInTheDocument();
     expect(within(detailKV('Deadhead paid?')).getByText('Unpaid')).toBeInTheDocument();
     expect(within(detailKV('Forced dispatch')).getByText('No')).toBeInTheDocument();
