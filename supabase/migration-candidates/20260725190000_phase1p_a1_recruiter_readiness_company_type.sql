@@ -26,10 +26,12 @@
 --      machine-readable missing-requirement tokens via the RAISE DETAIL
 --      channel using safe non-PII vocabulary.
 --   7. Replace public.ensure_my_recruiter_setup_state() only as needed so
---      missing_requirements includes 'company_type' and includes
---      'dot_or_mc_number' only when stored company_type is 'carrier'. Never
---      infers or writes company_type. All other behavior byte-preserved
---      from the promoted Phase 1N-E migration where practical.
+--      missing_requirements uses the locked client vocabulary
+--      (recruiter_name, company_name, recruiter_email_missing OR
+--      recruiter_email_invalid, company_type, dot_or_mc only when
+--      company_type='carrier', posting_terms). Never infers or writes
+--      company_type. All other behavior byte-preserved from the promoted
+--      Phase 1N-E migration where practical.
 --
 -- Explicit non-scope:
 --   * No opportunity-row changes.
