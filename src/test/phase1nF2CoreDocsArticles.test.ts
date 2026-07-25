@@ -599,7 +599,7 @@ describe('phase diff integrity (fail-closed)', () => {
   // use permitted here is proving the accepted endpoint remains
   // reachable from HEAD.
   it('historical scope commands are endpoint-pinned to F2C1_ACCEPTED_SHA (not HEAD)', () => {
-    const src = readFileSync(__filename, 'utf8');
+    const src = readFileSync('src/test/phase1nF2CoreDocsArticles.test.ts', 'utf8');
     // Isolate this describe block to avoid matching unrelated commentary.
     const start = src.indexOf('phase diff integrity (fail-closed)');
     expect(start).toBeGreaterThan(-1);
