@@ -24,6 +24,8 @@ function makeProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfil
     recruiter_name: 'Alice',
     company_name: 'Acme',
     recruiter_email: 'alice@acme.example',
+    // Phase 1P-A1: company_type is a required completeness field.
+    company_type: 'carrier',
     dot_number: '1234567',
     mc_number: null,
     hiring_states: [],
@@ -206,6 +208,8 @@ describe('getRecruiterTrustView — visible trust invariants', () => {
     id: 'rp-1', user_id: 'u-1',
     recruiter_name: 'Alice', company_name: 'Acme',
     recruiter_email: 'alice@acme.example',
+    // Phase 1P-A1: company_type participates in completeness.
+    company_type: 'carrier',
     dot_number: '1234567', mc_number: null,
     hiring_states: [], equipment_types: [], driver_types_hired: [],
     status: 'active', verification_status: 'pending',

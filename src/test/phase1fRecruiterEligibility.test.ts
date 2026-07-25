@@ -20,6 +20,10 @@ function baseProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfil
     recruiter_name: 'Alice Recruiter',
     company_name: 'Acme Freight',
     recruiter_email: 'alice@acme.example',
+    // Phase 1P-A1: company_type is now part of the canonical
+    // completeness rule. The base fixture is a Carrier so DOT-only
+    // profiles keep satisfying the authority requirement.
+    company_type: 'carrier',
     dot_number: '1234567',
     mc_number: null,
     hiring_states: [],
