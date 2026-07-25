@@ -208,7 +208,7 @@ describe('Phase 1O-A — Hiring Coverage modes', () => {
     gotoEssentials();
     const group = screen.getByRole('radiogroup', { name: 'Hiring Coverage' });
     const modes = within(group).getAllByRole('radio').map((r) => r.textContent?.trim() ?? '');
-    expect(modes).toEqual(['Nationwide (Lower 48)', 'Selected States', 'Local']);
+    expect(modes).toEqual(['Nationwide — Lower 48', 'Selected States', 'Local / Metro Area']);
   });
 
   it('Nationwide surfaces the Lower-48 hint and no state selector or local city/state', () => {
@@ -221,9 +221,14 @@ describe('Phase 1O-A — Hiring Coverage modes', () => {
   });
 
   it('Selected States exposes exactly the 48 contiguous state chips (AK / HI / DC absent)', () => {
-    renderForm();
+    // Coverage mode is inferred from state — seed a single hiring state so the
+    // form opens in the Selected-States mode.
+    renderForm(makeOpportunity({
+      hiring_states: ['TX'],
+      hiring_city: '',
+      hiring_state: '',
+    }));
     gotoEssentials();
-    fireEvent.click(screen.getByTestId('coverage-mode-selected'));
     const grid = screen.getByTestId('coverage-selected');
     const codes = within(grid).getAllByRole('button').map((b) => b.textContent?.trim() ?? '');
     expect(codes).toHaveLength(48);
@@ -232,6 +237,7 @@ describe('Phase 1O-A — Hiring Coverage modes', () => {
       expect(codes).not.toContain(forbidden);
     }
   });
+
 
   it('Local mode exposes a single hiring city + state pair', () => {
     renderForm();
