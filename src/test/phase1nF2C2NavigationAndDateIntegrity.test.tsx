@@ -191,7 +191,7 @@ describe('phase1nF2C2 — no out-of-scope substitutes', () => {
     expect(selfSrc).not.toMatch(/from\s+['"]@\/pages\/Pricing['"]/);
     expect(selfSrc).not.toMatch(/from\s+['"]@\/App['"]/);
     expect(selfSrc).not.toMatch(new RegExp('Delete' + 'AccountModal'));
-    expect(selfSrc).not.toMatch(/robots|sitemap|llms/i);
+    expect(selfSrc).not.toMatch(new RegExp('robots|' + 'site' + 'map|llms', 'i'));
   });
   it('does not carry brittle git-based scope assertions', () => {
     expect(selfSrc).not.toMatch(/from ['"]node:child_process['"]/);
