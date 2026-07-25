@@ -380,5 +380,12 @@ export function useRecruiterProfile() {
     approveRecruiter,
     rejectRecruiter,
     suspendRecruiter,
+    // Phase 1P-A1: expose the profile query's refetch so publish-time
+    // callers can force a fresh read before evaluating readiness.
+    refetchProfile: async () => {
+      const r = await profileQuery.refetch();
+      return (r.data ?? null) as RecruiterProfile | null;
+    },
   };
+
 }
