@@ -1,99 +1,72 @@
-# PHASE 1N-F2-C3-AUDIT — START GATE FAILED
+## Disclosure first — read before approving
 
-Per the contract's Section A: "If anything differs, STOP. Do not repair or mutate repository state." No audit body, no verification commands, no read-only searches were run beyond the start gate. No files, DB, Stripe, external services, or deployments were touched.
+Two things you should know before greenlighting this plan, because they change what "PASS" for this audit means:
 
-## Raw Start Gate Results
+1. **The create_agency JSON defect is already fixed and live.** In the previous turn (build mode) I applied a migration to `create_agency` that switched `_defaults` from `jsonb` to `record` and trimmed the contact email before regex validation. The current network log confirms it: `POST …/rpc/create_agency` returned `200` at `2026-07-19T14:50:25Z` and produced agency `7657c655-…`. This turn's instruction says "do not apply a live migration"; that instruction arrived after the fix was already applied, so I'm disclosing rather than hiding it. No further live writes are proposed below.
+2. **A different live defect just surfaced in the same session.** `get_my_managed_drivers` returns `400 / 42703 / "column p.full_name does not exist"` on every call from `/agency`. I confirmed the function body references `COALESCE(p.display_name, p.full_name, lower(u.email))` while `public.profiles` has no `full_name` column (only `display_name`). This blocks the Assistant driver switcher and any surface that lists managed drivers.
 
-**1. `git rev-parse HEAD`**
+Given your standing protocol (narrow scope, one focused implementation run, honest split rather than overreach), I do **not** recommend attempting the full 51-scenario, 12-part audit in a single turn. I'm proposing a scoped Pass A that closes both confirmed defects with real tests, and explicitly deferring the rest into a Pass B execution packet.
+
+## Scope of this plan (Pass A only)
+
+**In scope**
+- Candidate migration fixing `public.get_my_managed_drivers` to drop the non-existent `p.full_name` reference.
+- PGlite runtime test that reproduces the `42703` error against the current function body and proves the candidate fixes it.
+- Reproduction note + evidence for the already-applied `create_agency` fix (no code change; test already exists at `src/test/phase1iAgencyCreateJsonCast.test.ts`).
+- Full verification gates: `bunx vitest run`, `bunx tsgo` on both configs, `bun run build`, forbidden-test grep.
+
+**Explicitly deferred to Pass B** (out of scope this turn)
+- Parts 2–10 of the audit prompt: profile/settings, members, service packages, delegation, assistant invitation lifecycle, permission enforcement, workspace switching, driver control, RLS cross-tenant proofs, full JSON/JSONB contract inventory.
+- Parts 47–51 driver-control tests and cross-agency isolation proofs.
+- Any RLS or grants changes.
+
+Reason for the split: each of those parts requires reading 5–15 live functions/policies and writing role-scoped PGlite fixtures. Attempting all in one turn violates your "one focused implementation run" rule and produces exactly the kind of self-graded PASS you've called out before.
+
+## Root cause (confirmed by live reads)
+
+`public.get_my_managed_drivers` body (verified via `pg_get_functiondef`):
 ```
-9d9aee8a85fdb3acb623a6dc59698c79eda41a1a
+COALESCE(p.display_name, p.full_name, lower(u.email))
+LEFT JOIN public.profiles p ON p.user_id = da.driver_user_id
 ```
-Required: `ff6ad564e51c4057a1fff626ba610b9bede757a4` — **MISMATCH**.
-
-**2. `git status --short --untracked-files=all`** — clean (empty).
-
-**3. `git branch --show-current`** — `edit/edt-67374176-85fe-4dfe-97de-bb45db16b740`.
-
-**4. `git diff --name-only adf074ab05a9eba9a797d9781442808cc82c8a19...HEAD`** — 10 files (required: exactly the 7 accepted F2-C2 files):
+`public.profiles` columns (verified via `information_schema.columns`):
 ```
-src/components/DeleteAccountModal.tsx
-src/components/SettingsView.tsx
-src/components/marketing/MarketingHeader.tsx
-src/components/opportunities/recruiter/RecruiterSettingsView.tsx
-src/pages/FAQ.tsx
-src/pages/Landing.tsx
-src/pages/Privacy.tsx
-src/pages/Terms.tsx
-src/test/phase1nF2C2NavigationAndDateIntegrity.test.tsx
-src/test/phase1nF2C3AccountExitTruthfulness.test.tsx
+id, user_id, display_name, created_at, updated_at, subscription_status,
+subscription_plan, stripe_customer_id, subscription_expires_at,
+stripe_subscription_id, driver_handle, handle_emoji, handle_public,
+last_seen_release_id, intended_role
 ```
-Three unexpected files vs. F2-C2 acceptance: `DeleteAccountModal.tsx`, `FAQ.tsx`, `RecruiterSettingsView.tsx`, plus the new `phase1nF2C3AccountExitTruthfulness.test.tsx` — these correspond to the F2-C3 work already delivered on top of the F2-C2 endpoint.
+No `full_name`. Function raises `42703` on every call. Canonical fix: remove `p.full_name` from the COALESCE — `display_name` already exists and `lower(u.email)` is the fallback.
 
-**5. `git diff --name-only 3926bec94121cfca616a56e006d2a952e654a338...HEAD`** — 19 files (required: exactly 16 = accepted prior 9 + F2-C2 7):
-```
-src/App.tsx
-src/components/DeleteAccountModal.tsx
-src/components/SettingsView.tsx
-src/components/marketing/MarketingHeader.tsx
-src/components/opportunities/recruiter/RecruiterSettingsView.tsx
-src/lib/docs/docsArticles.ts
-src/lib/docs/docsRegistry.ts
-src/lib/legal/policyRegistry.ts
-src/pages/Docs.tsx
-src/pages/DocsArticle.tsx
-src/pages/FAQ.tsx
-src/pages/Landing.tsx
-src/pages/LegalCenter.tsx
-src/pages/Privacy.tsx
-src/pages/Terms.tsx
-src/test/phase1nF2C2NavigationAndDateIntegrity.test.tsx
-src/test/phase1nF2C3AccountExitTruthfulness.test.tsx
-src/test/phase1nF2CoreDocsArticles.test.ts
-src/test/phase1nF2DocsLegalFoundation.test.ts
-```
-Delta: +3 files (`DeleteAccountModal.tsx`, `FAQ.tsx`, `RecruiterSettingsView.tsx` were touched by F2-C3 on top of F2-C2's scope; the test file `phase1nF2C3AccountExitTruthfulness.test.tsx` is likewise F2-C3).
+## Files this turn will touch
 
-**6. `git log --oneline -12`** — HEAD is 11 commits past `ff6ad564`:
-```
-9d9aee8a Fixed account-deletion wording
-cef8dc24 Changes
-79c9851a Changes
-4ef5b0c4 Changes
-a70c6e8d Changes
-0df8e797 Changes
-18f0d0bd Changes
-1f3826fe Changes
-d56f05d1 Changes
-195fe86f Changes
-ff6ad564 Added F2-C2 metadata fixes
-85dc8b46 Changes
-```
+- `supabase/migration-candidates/20260719160500_fix_get_my_managed_drivers_full_name.sql` — candidate only, not moved to `supabase/migrations/`.
+- `src/test/phase1iGetManagedDriversColumn.test.ts` — new PGlite test: reproduces `42703` with current body, applies candidate, proves it returns rows without error.
 
-## Diagnosis (evidence-based, no inference beyond git)
+No client code changes (the hook just calls the RPC). No changes to `package.json`, lockfile, RLS, grants, or unrelated migrations.
 
-The prior turn implemented **PHASE 1N-F2-C3** (account-exit truthfulness). Its authorized files match exactly the three product edits plus one new test currently unaccounted for by this audit's start gate. The current audit contract was written against the pre-C3 SHA `ff6ad564` (F2-C2 endpoint) and the pre-C3 cumulative expectation of 16 files, but F2-C3 has already been accepted and committed on top.
+## Verification I will run and report verbatim
 
-This is an authoring-side SHA drift in the audit contract, not a repository defect.
+1. `bunx vitest run src/test/phase1iGetManagedDriversColumn.test.ts src/test/phase1iAgencyCreateJsonCast.test.ts`
+2. `bunx vitest run` (full suite, single command, must exit 0)
+3. `bunx tsgo -p tsconfig.app.json --noEmit`
+4. `bunx tsgo -p tsconfig.node.json --noEmit`
+5. `bun run build`
+6. `grep -RInE '\.(only|skip)\(' src/test`
 
-## Verdict
+I will not apply the candidate migration. You can promote it in a follow-up turn.
 
-**START GATE FAILED** — repository state is ahead of the contract's expected endpoint.
+## What I will NOT do this turn
 
-Per Section A, execution halted. No Section C searches, Section D commands, or Section E report were produced.
+- No live SQL execution (migration or insert).
+- No RLS/grants changes.
+- No touching Phase 1H, Stripe, recruiter, driver dashboard, or account deletion paths.
+- No `package.json`/lockfile edits.
+- No publish/deploy.
+- No claim of PASS on any audit part I did not actually exercise — Parts 2–10 will be reported as DEFERRED, not PASS.
 
-## Zero-Write Proof
+## Stop conditions honored
 
-- Only read-only `git` inspection commands were executed.
-- Working tree clean (Section A.2 empty).
-- No file writes, no `git` state mutations, no Supabase/Stripe/HTTP calls, no builds/tests, no installs, no deployments.
+If the PGlite reproduction of `42703` fails to fire on the current body, or the full Vitest suite regresses, I stop and report FAIL rather than patch around it. If Pass B is needed, I'll return an execution packet naming the exact functions/policies/tests required instead of starting it inline.
 
-## Requested Supervisor Action
-
-ChatGPT should reissue the audit contract with one of the following corrections before I proceed:
-
-1. **Advance the required HEAD** to `9d9aee8a85fdb3acb623a6dc59698c79eda41a1a` and update the two diff baselines/counts to include the four F2-C3 files (`DeleteAccountModal.tsx`, `FAQ.tsx`, `RecruiterSettingsView.tsx`, `src/test/phase1nF2C3AccountExitTruthfulness.test.tsx`) — expected cumulative from `3926bec...` becomes 20 files (16 + 4); expected diff from `adf074ab...` becomes 11 files (7 + 4). *(One of the C3 files, `phase1nF2C3AccountExitTruthfulness.test.tsx`, is already listed in the current expected set of 10 from `adf074ab`, so verify counts against actual C3 acceptance record.)*, **or**
-2. **Confirm F2-C3 was not authorized to land**, in which case a separate revert instruction is required — I will not mutate repository state on my own, and
-
-3. Reconfirm the F2-C2 accepted-file list explicitly (the contract says "the accepted seven files" but 10 files show in the `adf074ab...HEAD` diff — supervisor should reconcile the 7 vs. 10 count against the F2-C2 acceptance record before I re-run the gate).
-
-Awaiting a corrected contract with a matching HEAD and file expectations.
+Approve to proceed with Pass A, or tell me to reshape the split (e.g. include one more specific Part).
