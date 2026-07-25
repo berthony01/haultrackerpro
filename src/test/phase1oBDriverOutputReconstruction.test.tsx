@@ -57,6 +57,7 @@ vi.mock('@/hooks/opportunities/useApplicationEvents', () => ({
 vi.mock('@/hooks/opportunities/useDriverReferrals', () => ({
   useDriverReferrals: () => ({
     referrals: [],
+    create: { mutateAsync: vi.fn(), isPending: false },
     createReferral: { mutateAsync: vi.fn(), isPending: false },
   }),
 }));
