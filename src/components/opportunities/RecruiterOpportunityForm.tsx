@@ -658,10 +658,10 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 <div className="space-y-4 pt-2">
                   {isCompany && (
                     <p className="text-xs text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
-                      Ownership operating-cost fields are not applicable to company-driver listings. Estimated
-                      take-home is unavailable under the current canonical model.
+                      Operating-cost fields do not apply to W-2 company-driver opportunities.
                     </p>
                   )}
+
                   {!isCompany && (
                     <Field label="Fuel Paid By">
                       <Select value={state.fuel_paid_by || 'unset'}
