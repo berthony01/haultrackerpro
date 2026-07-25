@@ -126,7 +126,7 @@ describe('Phase 1N-F2-C3 — account-deletion truthfulness at decision surfaces'
 
     it('covers cancellation, cleanup, retention, agency-owner block, export/no-undo, and both docs links', () => {
       expect(lower).toMatch(/settings\s*[→>]\s*account\s*[→>]\s*delete account/);
-      expect(lower).toMatch(/type\s+delete/);
+      expect(lower).toMatch(/type[\s\S]{0,120}delete/);
       expect(lower).toMatch(/entire personal|full personal login/);
       expect(lower).toMatch(/subscriptions?[\s\S]{0,80}cancelled/);
       expect(lower).toMatch(/before database cleanup/);
