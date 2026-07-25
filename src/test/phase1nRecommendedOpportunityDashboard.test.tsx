@@ -535,7 +535,7 @@ describe('Phase 1N-B card behavior', () => {
   it('completed profile with eligible candidate renders full recommendation surface', () => {
     profileStore.set(completedProfile);
     opportunitiesStore.set([eligibleRow()]);
-    renderCard();
+    const { container } = renderCard();
     expect(screen.getByText('Recommended Opportunity')).toBeTruthy();
     expect(screen.getByText('OTR Reefer Solo')).toBeTruthy();
     expect(screen.getByText('Acme Freight')).toBeTruthy();
@@ -546,8 +546,20 @@ describe('Phase 1N-B card behavior', () => {
     expect(screen.getByText('Reefer')).toBeTruthy();
     // Truthful gross source label (derived from cpm × loaded miles).
     expect(screen.getByText('Derived weekly gross')).toBeTruthy();
-    // Listing transparency (not profitability).
-    expect(screen.getByText(/Listing transparency/i)).toBeTruthy();
+    // Primary actions remain reachable.
+    expect(screen.getByRole('button', { name: /View Opportunity/i })).toBeTruthy();
+    // Phase 1O-B omission contract: matching/transparency data may be
+    // omitted from this compact surface, and no filler chips may render.
+    const text = container.textContent ?? '';
+    expect(text).not.toMatch(/Not disclosed/i);
+    expect(text).not.toMatch(/Not applicable/i);
+    expect(text).not.toMatch(/Unavailable/i);
+    // No standalone em-dash cells (em-dashes embedded in prose like
+    // "Nationwide — Lower 48" are permitted; a bare "—" chip is not).
+    const bareEmDash = Array.from(container.querySelectorAll('*')).some(
+      (el) => (el.textContent ?? '').trim() === '—',
+    );
+    expect(bareEmDash).toBe(false);
   });
 
   it('featured candidate renders "Priority placement" and never "Featured Load"', () => {
