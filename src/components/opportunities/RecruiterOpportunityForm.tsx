@@ -516,11 +516,15 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
           <HiringCoverageEditor
             state={state}
             mode={coverageMode}
-            onModeChange={(m) => setState((s) => applyCoverageMode(s, m))}
+            onModeChange={(m) => {
+              setCoverageMode(m);
+              setState((s) => applyCoverageMode(s, m));
+            }}
             onCityChange={(v) => set('hiring_city', v)}
             onStateChange={(v) => set('hiring_state', v.toUpperCase().slice(0, 2))}
             onStatesChange={(list) => set('hiring_states', list)}
           />
+
 
           <Field label="Home Time" required>
             <Input value={state.home_time} onChange={(e) => set('home_time', e.target.value)}
