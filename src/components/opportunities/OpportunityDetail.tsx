@@ -494,6 +494,9 @@ export function OpportunityDetail({
 
           {/* Primary actions live in the sticky action bar below to keep them
               always reachable without duplicating buttons on the page. */}
+        </div>
+      </Card>
+
 
       {/* Match Insights (secondary rationale — kept for driver context) */}
       {match ? (
