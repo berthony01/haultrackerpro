@@ -768,13 +768,11 @@ describe('Phase 1P-A1.1-R1 — company_type + conditional DOT/MC candidate', () 
               p.prosecdef,
               pg_get_function_identity_arguments(p.oid) AS args,
               (SELECT array_agg(cfg) FROM unnest(coalesce(p.proconfig,'{}')) cfg) AS cfg,
-              (SELECT array_agg(gt.grantee)
-                 FROM information_schema.routine_privileges gt
-                WHERE gt.specific_name LIKE p.proname || '\\_%'
-                  AND gt.routine_schema='public'
-                  AND gt.privilege_type='EXECUTE'
-                  AND gt.grantee IN ('anon','authenticated','service_role','PUBLIC')
-              ) AS grantees
+              (SELECT array_agg(DISTINCT g.grantee)
+                 FROM aclexplode(coalesce(p.proacl,
+                        acldefault('f', p.proowner))) g
+                WHERE g.privilege_type='EXECUTE'
+              )::text[] AS grantee_oids
          FROM pg_proc p
          JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname='public'
@@ -785,7 +783,32 @@ describe('Phase 1P-A1.1-R1 — company_type + conditional DOT/MC candidate', () 
             'current_user_can_manage_recruiter_opportunities'
           )`,
     );
-    const byName = Object.fromEntries(rows.map((r) => [r.proname, r]));
+    // Resolve grantee OIDs → role names; 0 means PUBLIC.
+    const roleMap = new Map<string, string>();
+    const rr = await ctx.pool.query(
+      `SELECT oid::text AS oid, rolname FROM pg_roles`,
+    );
+    for (const r of rr.rows) roleMap.set(r.oid as string, r.rolname as string);
+    roleMap.set('0', 'PUBLIC');
+
+    const byName: Record<string, {
+      prosecdef: boolean;
+      cfg: string[];
+      grantees: Set<string>;
+    }> = {};
+    for (const rec of rows) {
+      const oids = (rec.grantee_oids as string[] | null) ?? [];
+      const grantees = new Set<string>();
+      for (const o of oids) {
+        const name = roleMap.get(String(o));
+        if (name) grantees.add(name);
+      }
+      byName[rec.proname as string] = {
+        prosecdef: rec.prosecdef as boolean,
+        cfg: (rec.cfg as string[] | null) ?? [],
+        grantees,
+      };
+    }
     for (const name of [
       'accept_recruiter_posting_terms',
       'ensure_my_recruiter_setup_state',
@@ -795,8 +818,7 @@ describe('Phase 1P-A1.1-R1 — company_type + conditional DOT/MC candidate', () 
       const rec = byName[name];
       expect(rec).toBeDefined();
       expect(rec.prosecdef).toBe(true);
-      const cfg = (rec.cfg as string[] | null) ?? [];
-      expect(cfg).toContain('search_path=public');
+      expect(rec.cfg).toContain('search_path=public');
     }
 
     // accept + ensure: authenticated + service_role EXECUTE, no anon/PUBLIC
@@ -804,7 +826,7 @@ describe('Phase 1P-A1.1-R1 — company_type + conditional DOT/MC candidate', () 
       'accept_recruiter_posting_terms',
       'ensure_my_recruiter_setup_state',
     ]) {
-      const grantees = new Set<string>((byName[name].grantees as string[] | null) ?? []);
+      const grantees = byName[name].grantees;
       expect(grantees.has('authenticated')).toBe(true);
       expect(grantees.has('service_role')).toBe(true);
       expect(grantees.has('anon')).toBe(false);
