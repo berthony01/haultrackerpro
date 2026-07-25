@@ -157,8 +157,8 @@ function renderDetail(opp: OpportunitySourceRow) {
         opportunity={opp as never}
         onBack={vi.fn()}
         isPro={false}
-        isSaved={false}
-        onToggleSave={vi.fn()}
+        onUpgrade={vi.fn()}
+        onOpenPreferencesForApply={vi.fn()}
       />
     </QueryClientProvider>,
   );
