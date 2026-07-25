@@ -53,14 +53,18 @@ vi.mock('@/hooks/opportunities/useDriverReferrals', () => ({
 vi.mock('@/hooks/opportunities/useDriverOpportunityProfile', () => ({
   useDriverOpportunityProfile: () => ({ profile: null }),
 }));
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }),
-    }),
-    functions: { invoke: async () => ({ data: null }) },
-  },
-}));
+vi.mock('@/integrations/supabase/client', () => {
+  const rpc = Object.assign(vi.fn(async () => ({ data: null, error: null })), {});
+  return {
+    supabase: {
+      from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }),
+      }),
+      rpc,
+      functions: { invoke: async () => ({ data: null }) },
+    },
+  };
+});
 
 function makeRow(overrides: Partial<Row> = {}): Row {
   return {
