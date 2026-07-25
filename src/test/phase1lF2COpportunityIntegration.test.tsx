@@ -600,7 +600,7 @@ describe('Phase 1L-F2C · Unknown employment gating', () => {
 // 7. DISCLOSURE-STATE CONSISTENCY
 // =========================================================================
 describe('Phase 1L-F2C · Disclosure-state consistency', () => {
-  it('7. flat_weekly company_driver with no route/trailer/home_time/mileage: route/trailer/home render Not disclosed on card and detail, mileage renders Not applicable on card and each detail mileage KV', async () => {
+  it('7. flat_weekly company_driver with no route/trailer/home_time/mileage: card and detail keep Company Driver + Solo, omit route/trailer/home/mileage rows entirely, and never render Not disclosed / Not applicable filler', async () => {
     const row = source({
       id: 'opp-disc',
       canonical_version: 1,
@@ -632,25 +632,34 @@ describe('Phase 1L-F2C · Disclosure-state consistency', () => {
     renderPage();
 
     const card = cardFor('Sparse Details');
-    const cardBadgeRow = within(card).getByText('Company Driver').parentElement as HTMLElement;
-    const cardBadges = Array.from(cardBadgeRow.children)
-      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'DIV')
-      .map((el) => (el.textContent ?? '').trim());
-    expect(cardBadges).toEqual(['Company Driver', 'Solo', 'Not disclosed', 'Not disclosed', 'Not disclosed']);
-    expect(within(cardRowFor(card, 'Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(cardRowFor(card, 'Deadhead')).getByText('Not applicable')).toBeInTheDocument();
+    // Preserved facts.
+    expect(within(card).getByText('Company Driver')).toBeInTheDocument();
+    expect(within(card).getByText('Solo')).toBeInTheDocument();
+    // Route / Trailer / Home time facts are omitted entirely — no filler
+    // "Not disclosed" chip / stat renders in their place.
+    expect(within(card).queryByText('Route')).toBeNull();
+    expect(within(card).queryByText('Trailer')).toBeNull();
+    expect(within(card).queryByText('Home time')).toBeNull();
+    // Weekly miles / Deadhead stat rows are omitted (no filler).
+    expect(within(card).queryByText('Weekly miles')).toBeNull();
+    expect(within(card).queryByText('Deadhead')).toBeNull();
+    // Prohibited filler must not appear anywhere on the card.
+    expect(within(card).queryByText(/Not disclosed/i)).toBeNull();
+    expect(within(card).queryByText(/Not applicable/i)).toBeNull();
 
     await openDetailByTitle('Sparse Details');
     const header = detailHeaderCard('Sparse Details');
-    const detailBadgeRow = within(header).getByText('Company Driver').parentElement as HTMLElement;
-    const detailBadges = Array.from(detailBadgeRow.children)
-      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'DIV')
-      .map((el) => (el.textContent ?? '').trim());
-    expect(detailBadges).toEqual(['Company Driver', 'Solo', 'Not disclosed', 'Not disclosed', 'Not disclosed']);
-    expect(within(detailKV('Home time')).getByText('Not disclosed')).toBeInTheDocument();
-    expect(within(detailKV('Weekly miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(detailKV('Loaded miles')).getByText('Not applicable')).toBeInTheDocument();
-    expect(within(detailKV('Deadhead miles')).getByText('Not applicable')).toBeInTheDocument();
+    expect(within(header).getByText('Company Driver')).toBeInTheDocument();
+    expect(within(header).getByText('Solo')).toBeInTheDocument();
+    // Sections whose only content is disclosure-absent must not surface
+    // filler; Home time KV is omitted rather than showing "Not disclosed".
+    expect(screen.queryByText(/Not disclosed/i)).toBeNull();
+    expect(screen.queryByText(/Not applicable/i)).toBeNull();
+    // No mileage KVs for a listing with no disclosed miles.
+    expect(screen.queryByText('Weekly miles')).toBeNull();
+    expect(screen.queryByText('Loaded miles')).toBeNull();
+    expect(screen.queryByText('Loaded weekly miles')).toBeNull();
+    expect(screen.queryByText('Deadhead miles')).toBeNull();
   });
 });
 
