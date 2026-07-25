@@ -432,10 +432,11 @@ BEGIN
   IF COALESCE(btrim(_rp.company_name), '') = '' THEN
     _missing := array_append(_missing, 'company_name');
   END IF;
-  IF COALESCE(btrim(_rp.recruiter_email), '') = ''
-     OR btrim(COALESCE(_rp.recruiter_email, '')) !~
+  IF COALESCE(btrim(_rp.recruiter_email), '') = '' THEN
+    _missing := array_append(_missing, 'recruiter_email_missing');
+  ELSIF btrim(_rp.recruiter_email) !~
         '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
-    _missing := array_append(_missing, 'recruiter_email');
+    _missing := array_append(_missing, 'recruiter_email_invalid');
   END IF;
   IF _rp.company_type IS NULL
      OR _rp.company_type NOT IN (
@@ -447,11 +448,11 @@ BEGIN
   THEN
     _missing := array_append(_missing, 'company_type');
   END IF;
-  -- dot_or_mc_number is only a missing requirement for carrier accounts.
+  -- dot_or_mc is only a missing requirement for carrier accounts.
   IF _rp.company_type = 'carrier'
      AND COALESCE(btrim(_rp.dot_number), '') = ''
      AND COALESCE(btrim(_rp.mc_number), '') = '' THEN
-    _missing := array_append(_missing, 'dot_or_mc_number');
+    _missing := array_append(_missing, 'dot_or_mc');
   END IF;
   IF _rp.posting_terms_accepted_at IS NULL
      AND _rp.legacy_terms_grandfathered_at IS NULL THEN
