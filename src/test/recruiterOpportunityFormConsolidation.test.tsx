@@ -185,6 +185,9 @@ function installHookMocks() {
       isProfileComplete: isProfileCompleteForPosting(profileState),
       canPost,
       refetch: vi.fn(),
+      refetchProfile: vi.fn(async () => profileState),
+      upsertProfile: { mutateAsync: vi.fn(), isPending: false },
+      saveRecruiterProfile: { mutateAsync: vi.fn(), isPending: false },
     };
     return impl as ProfileHook;
   });

@@ -179,6 +179,9 @@ function makeProfileHook(
     isVerified: profile.verification_status === 'approved' && profile.status === 'active',
     isProfileComplete: true,
     refetch: vi.fn(),
+    refetchProfile: vi.fn(async () => profile),
+    upsertProfile: { mutateAsync: vi.fn(), isPending: false },
+    saveRecruiterProfile: { mutateAsync: vi.fn(), isPending: false },
   };
   return impl as ProfileHook;
 }
