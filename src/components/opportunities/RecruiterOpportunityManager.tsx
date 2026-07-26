@@ -34,6 +34,8 @@ import { toast } from 'sonner';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useUserRole } from '@/hooks/useUserRole';
 import { describeRecruiterBlock } from '@/lib/opportunities/describeRecruiterBlock';
+import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
+import { RecruiterReadinessDialog } from './RecruiterReadinessDialog';
 import {
   useRecruiterOpportunities,
   type Opportunity,
