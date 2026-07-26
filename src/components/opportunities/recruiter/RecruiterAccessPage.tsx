@@ -400,7 +400,7 @@ function StateCard({
 
   const cfg =
     state === 'incomplete'
-      ? { Icon: AlertTriangle, title: 'Finish your recruiter profile', body: 'Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Standard posting unlocks as soon as your profile is complete.', tone: 'bg-amber-500/10 border-amber-500/30 text-amber-400', cta: { label: 'Complete Profile', onClick: onOpenOnboarding } }
+      ? { Icon: AlertTriangle, title: 'Finish your recruiter profile', body: 'Add your recruiter name, company name, a valid recruiter email, and your company type. A DOT or MC number is required for Carrier / Motor Carrier accounts. Then accept the posting terms — standard posting unlocks as soon as your profile is complete.', tone: 'bg-amber-500/10 border-amber-500/30 text-amber-400', cta: { label: 'Complete Profile', onClick: onOpenOnboarding } }
       : state === 'suspended'
       ? { Icon: Ban, title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: null }
       : state === 'active_no_billing'
