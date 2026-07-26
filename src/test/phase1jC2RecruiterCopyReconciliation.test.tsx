@@ -102,6 +102,7 @@ function baseProfile(overrides: Partial<RecruiterProfile> = {}): RecruiterProfil
     user_id: 'u-1',
     recruiter_name: 'Alice',
     company_name: 'Acme',
+    company_type: 'third_party_recruiter',
     recruiter_email: 'alice@acme.example',
     dot_number: '1234567',
     mc_number: null,
