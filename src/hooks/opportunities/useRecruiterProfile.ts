@@ -31,7 +31,35 @@ export type RecruiterProfileUpsert = Omit<
 };
 
 const PERSISTENCE_MISMATCH_MESSAGE =
-  'Your recruiter profile could not be updated. Reload the page and try again. If the problem continues, contact support.';
+  'Your recruiter profile changes were not saved. Please review your account setup and try again.';
+
+/**
+ * Phase 1P-A4 — safe error formatter used by recruiter surfaces so we
+ * surface the true underlying reason (PostgREST message or an Error.cause
+ * chain) instead of leaking raw objects, SQL, tokens, credentials, or
+ * internal stack data.
+ *
+ * Preference order:
+ *   1. `err.cause.message`  (Error chain / RPC controlled cause)
+ *   2. `err.message`        (top-level Error wrapper)
+ *   3. String fallback
+ *
+ * Never JSON-serializes objects or exposes protected properties.
+ */
+export function formatRecruiterProfileError(err: unknown): string {
+  if (err && typeof err === 'object' && err instanceof Error) {
+    const cause = (err as Error & { cause?: unknown }).cause;
+    if (cause && typeof cause === 'object') {
+      const m = (cause as { message?: unknown }).message;
+      if (typeof m === 'string' && m.trim()) return m.trim();
+    }
+    if (typeof err.message === 'string' && err.message.trim()) {
+      return err.message.trim();
+    }
+  }
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  return 'Something went wrong. Please try again.';
+}
 
 /**
  * Phase 1P-A1 — normalized read-back fields the persistence verification
