@@ -276,6 +276,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile, refetchProfile } = useRecruiterProfile();
   const [readinessOpen, setReadinessOpen] = useState(false);
+  const pendingPublishRef = useRef(false);
 
   const [state, setState] = useState<State>(() =>
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
