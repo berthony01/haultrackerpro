@@ -462,7 +462,7 @@ describe('Phase 1F-A.2.1A-R1 client cutover', () => {
     }
     expect(caught).toBeInstanceOf(Error);
     expect((caught as Error).message).toMatch(
-      /Recruiter profile was saved but its ID could not be confirmed\. Please retry\./,
+      /Your recruiter profile changes were not saved\. Please review your account setup and try again\./,
     );
     // INSERT and recovery ran; terms RPC never invoked.
     expect(insertCalls.length).toBe(1);
