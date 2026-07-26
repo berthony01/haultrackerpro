@@ -444,11 +444,20 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
       <RecruiterReadinessDialog
         open={readinessOpen}
-        onOpenChange={setReadinessOpen}
+        onOpenChange={(v) => {
+          setReadinessOpen(v);
+          if (!v) pendingPublishRef.current = false;
+        }}
         profile={profile}
-        onOpenOnboarding={onBack}
+        onReady={() => {
+          if (pendingPublishRef.current) {
+            pendingPublishRef.current = false;
+            void save('publish');
+          }
+        }}
         actionLabel="Publish"
       />
+
 
 
       {/* Stage navigation */}
