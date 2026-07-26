@@ -339,6 +339,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       const fresh = await refetchProfile();
       const rr = resolveRecruiterReadiness(fresh);
       if (!rr.ready) {
+        pendingPublishRef.current = true;
         setReadinessOpen(true);
         return;
       }
