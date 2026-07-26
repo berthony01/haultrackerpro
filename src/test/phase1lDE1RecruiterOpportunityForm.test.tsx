@@ -57,7 +57,7 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
 type Opportunity = Tables<'opportunities'>;
-type RecruiterProfile = Tables<'recruiter_profiles'>;
+type RecruiterProfile = Tables<'recruiter_profiles'> & { company_type: string | null };
 type ProfileHook = ReturnType<typeof useRecruiterProfile>;
 type OppsHook = ReturnType<typeof useRecruiterOpportunities>;
 
