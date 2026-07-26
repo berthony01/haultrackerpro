@@ -39,7 +39,14 @@ describe('describeRecruiterBlock', () => {
     const r = describeRecruiterBlock(null);
     expect(r.reason).toBe('missing_profile');
     expect(r.title).toMatch(/recruiter workspace/i);
-    expect(r.body).toMatch(/recruiter profile/i);
+    // Body is derived from the canonical readiness selector and enumerates
+    // the required fields. Assert on that canonical guidance rather than
+    // the legacy "recruiter profile" prose.
+    expect(r.body).toMatch(/recruiter name/i);
+    expect(r.body).toMatch(/company name/i);
+    expect(r.body).toMatch(/recruiter email/i);
+    expect(r.body).toMatch(/company type/i);
+    expect(r.body).toMatch(/posting terms/i);
     expect(r.body).not.toMatch(/apply|application|before approval/i);
     expect(r.cta).toMatch(/Add Recruiter Workspace/i);
   });
@@ -47,8 +54,15 @@ describe('describeRecruiterBlock', () => {
   it('returns missing_profile with "finish setup" copy when intent is recruiter', () => {
     const r = describeRecruiterBlock(null, { intentRecruiter: true });
     expect(r.reason).toBe('missing_profile');
+    // Under the canonical readiness contract the intent distinction is
+    // exposed via title + cta; the body enumerates the same required
+    // fields regardless of intent.
     expect(r.title).toMatch(/Finish/i);
-    expect(r.body).toMatch(/signed up as a recruiter/i);
+    expect(r.body).toMatch(/recruiter name/i);
+    expect(r.body).toMatch(/company name/i);
+    expect(r.body).toMatch(/recruiter email/i);
+    expect(r.body).toMatch(/company type/i);
+    expect(r.body).toMatch(/posting terms/i);
     expect(r.cta).toMatch(/Finish Recruiter Setup/i);
   });
 

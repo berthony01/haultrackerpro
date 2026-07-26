@@ -3,7 +3,7 @@
 // eligibility surface from the shared canonical helpers so this file never
 // reimplements the "can post" rule.
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -220,18 +220,20 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
-  it('opens the canonical form from the top CTA', () => {
+  it('opens the canonical form from the top CTA', async () => {
     opportunitiesState = [makeOpportunity()];
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId('post-opportunity-cta'));
-    expect(screen.getByTestId('recruiter-opportunity-form')).toBeInTheDocument();
+    // openCreate awaits refetchProfile before switching views; wait for
+    // the canonical form to mount.
+    await waitFor(() => expect(screen.getByTestId('recruiter-opportunity-form')).toBeInTheDocument());
     expect(screen.getByRole('heading', { name: 'Post Opportunity' })).toBeInTheDocument();
   });
 
-  it('opens the canonical form from the empty-state CTA', () => {
+  it('opens the canonical form from the empty-state CTA', async () => {
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId('empty-state-cta'));
-    expect(screen.getByTestId('recruiter-opportunity-form')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('recruiter-opportunity-form')).toBeInTheDocument());
   });
 
   it('edit routes into the same canonical form and hydrates canonical values', () => {
@@ -290,9 +292,11 @@ describe('Phase 1L-DE1R2R1 — manager ↔ canonical form', () => {
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 
-  it('create flow reaches createOpportunity.mutate with status=draft and canonical_version=1', () => {
+  it('create flow reaches createOpportunity.mutate with status=draft and canonical_version=1', async () => {
     render(<RecruiterOpportunityManager onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId('empty-state-cta'));
+    // openCreate awaits refetchProfile; wait for the canonical form.
+    await waitFor(() => expect(screen.getByTestId('recruiter-opportunity-form')).toBeInTheDocument());
     // New opportunities open on the Write & Extract stage; navigate to
     // Essentials for the Title input, then to Review for Save Draft.
     fireEvent.click(screen.getByRole('tab', { name: /Essentials/ }));

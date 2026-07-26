@@ -9,7 +9,7 @@
 // product contract and have been replaced with equivalent or stronger
 // assertions on the reconstructed experience.
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -509,7 +509,7 @@ describe('Phase 1O-A — pay-model conditional inputs', () => {
     }
   });
 
-  it('Mixed editor supports two user-authored components and produces a publishable payload', () => {
+  it('Mixed editor supports two user-authored components and produces a publishable payload', async () => {
     renderForm(makeOpportunity({
       id: 'existing-mixed',
       pay_model: 'mixed',
@@ -549,7 +549,9 @@ describe('Phase 1O-A — pay-model conditional inputs', () => {
 
     clickPublish();
 
-    expect(h.updateMutate).toHaveBeenCalledTimes(1);
+    // Publish awaits refetchProfile before invoking the mutation; wait for
+    // it to land, then assert it fired exactly once with the expected data.
+    await waitFor(() => expect(h.updateMutate).toHaveBeenCalledTimes(1));
     const { data } = updateArgs();
     expect(data.pay_model).toBe('mixed');
     expect(data.status).toBe('active');
@@ -688,12 +690,13 @@ describe('Phase 1O-A — draft / publish routing', () => {
     });
   });
 
-  it('valid publish emits a fully populated create call with status=active', () => {
+  it('valid publish emits a fully populated create call with status=active', async () => {
     const seed = makeOpportunity();
     const seedWithoutId: Opportunity = { ...seed, id: '' };
     renderForm(seedWithoutId);
     clickPublish();
-    expect(h.createMutate).toHaveBeenCalledTimes(1);
+    // Publish awaits refetchProfile before invoking the mutation.
+    await waitFor(() => expect(h.createMutate).toHaveBeenCalledTimes(1));
     expect(payloadOf(h.createMutate)).toMatchObject({
       title: 'Regional Dry Van', company_name: 'Acme Trucking',
       employment_model: 'company_driver', team_configuration: 'solo',
@@ -703,10 +706,11 @@ describe('Phase 1O-A — draft / publish routing', () => {
     });
   });
 
-  it('edit publish routes through updateOpportunity with the exact ID', () => {
+  it('edit publish routes through updateOpportunity with the exact ID', async () => {
     renderForm(makeOpportunity({ id: 'existing-42' }));
     clickPublish();
-    expect(h.updateMutate).toHaveBeenCalledTimes(1);
+    // Publish awaits refetchProfile before invoking the mutation.
+    await waitFor(() => expect(h.updateMutate).toHaveBeenCalledTimes(1));
     const { id, data } = updateArgs();
     expect(id).toBe('existing-42');
     expect(data.status).toBe('active');
@@ -734,7 +738,7 @@ describe('Phase 1O-A — draft / publish routing', () => {
     expect(updateArgs().data.transparency_confirmed).toBe(true);
   });
 
-  it('stored transparency_confirmed=false hydrates unchecked and publish remains blocked until checked', () => {
+  it('stored transparency_confirmed=false hydrates unchecked and publish remains blocked until checked', async () => {
     renderForm(makeOpportunity({ transparency_confirmed: false }));
     gotoReview();
     expect(screen.getByLabelText('Transparency confirmation')).not.toBeChecked();
@@ -742,7 +746,8 @@ describe('Phase 1O-A — draft / publish routing', () => {
     fireEvent.click(screen.getByLabelText('Transparency confirmation'));
     expect(screen.getByLabelText('Transparency confirmation')).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Publish Opportunity' }));
-    expect(h.updateMutate).toHaveBeenCalledTimes(1);
+    // Publish awaits refetchProfile before invoking the mutation.
+    await waitFor(() => expect(h.updateMutate).toHaveBeenCalledTimes(1));
     expect(updateArgs().data.transparency_confirmed).toBe(true);
   });
 
