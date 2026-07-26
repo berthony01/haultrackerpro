@@ -100,6 +100,7 @@ const COMPLETE_PROFILE = {
   verification_status: 'approved',
   recruiter_name: 'Real Recruiter',
   company_name: 'Real Freight LLC',
+  company_type: 'carrier',
   recruiter_email: 'recruiter@example.com',
   dot_number: '123456',
   mc_number: null,
