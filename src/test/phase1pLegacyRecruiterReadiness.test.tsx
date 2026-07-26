@@ -68,7 +68,6 @@ const CANONICAL_LABELS = [
   DIALOG_MISSING_LABELS.company_name,
   DIALOG_MISSING_LABELS.recruiter_email_missing,
   DIALOG_MISSING_LABELS.company_type,
-  DIALOG_MISSING_LABELS.dot_or_mc,
   DIALOG_MISSING_LABELS.posting_terms,
 ];
 
