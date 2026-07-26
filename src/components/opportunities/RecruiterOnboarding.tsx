@@ -27,13 +27,22 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useRecruiterProfile, type RecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
+import {
+  useRecruiterProfile,
+  formatRecruiterProfileError,
+  type RecruiterProfile,
+  type RecruiterProfileUpsert,
+} from '@/hooks/opportunities/useRecruiterProfile';
 import {
   POSTING_TERMS_VERSION,
   hasAcceptedPostingTerms,
   getRecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
-import { COMPANY_TYPE_LABELS, type CompanyType } from '@/lib/opportunities/resolveRecruiterReadiness';
+import {
+  COMPANY_TYPE_LABELS,
+  RECRUITER_AGREEMENT_STATEMENTS,
+  type CompanyType,
+} from '@/lib/opportunities/resolveRecruiterReadiness';
 
 interface Props {
   onBack: () => void;
