@@ -202,6 +202,19 @@ describe('Phase 1P-A4 — post/publish gate resume', () => {
     expect(setStatusMutate.mock.calls[0][0]).toEqual({ id: 'opp-1', status: 'active' });
   });
 
+  it('Repair 1 regression guard: dialog closing BEFORE onReady must NOT run the continuation (proves manager clears pendingAction on close)', async () => {
+    const user = userEvent.setup();
+    renderManager();
+    await user.click(screen.getByTestId('post-opportunity-cta'));
+    expect(screen.getByTestId('mock-readiness-dialog')).toBeInTheDocument();
+    readiness.ready = true;
+    // Buggy pre-1P-A5 order: onOpenChange(false) fires first, which clears
+    // pendingAction; then onReady runs but has nothing to resume.
+    await user.click(screen.getByTestId('mock-readiness-ready-buggy-order'));
+    expect(screen.queryByTestId('mock-opp-form')).not.toBeInTheDocument();
+    expect(setStatusMutate).not.toHaveBeenCalled();
+  });
+
   it('Cancel from the readiness dialog clears the pending action and performs nothing', async () => {
     const user = userEvent.setup();
     renderManager();
