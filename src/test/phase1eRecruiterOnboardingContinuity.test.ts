@@ -15,6 +15,7 @@ const baseProfile: RecruiterProfile = {
   user_id: '00000000-0000-0000-0000-0000000000aa',
   recruiter_name: 'Alice Recruiter',
   company_name: 'Acme Freight',
+  company_type: 'third_party_recruiter',
   recruiter_email: 'alice@acme.example',
   dot_number: '1234567',
   mc_number: null,

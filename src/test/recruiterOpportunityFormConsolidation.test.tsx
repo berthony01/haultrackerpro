@@ -63,6 +63,7 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     company_address: null,
     company_city: null,
     company_name: 'Acme Trucking',
+    company_type: 'carrier',
     company_phone: null,
     company_state: null,
     company_website: null,

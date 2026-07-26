@@ -186,8 +186,10 @@ export function RecruiterReadinessDialog({
   useEffect(() => {
     if (open && readiness.ready && !suspended && !readyFiredRef.current) {
       readyFiredRef.current = true;
-      onOpenChange(false);
+      // Repair 1 (Phase 1P-A5): invoke onReady BEFORE closing so parent
+      // close-handlers do not clear the pending action first.
       onReady?.();
+      onOpenChange(false);
     }
   }, [open, readiness.ready, suspended, onOpenChange, onReady]);
 
@@ -266,8 +268,9 @@ export function RecruiterReadinessDialog({
       if (rr.ready) {
         if (!readyFiredRef.current) {
           readyFiredRef.current = true;
-          onOpenChange(false);
+          // Repair 1 (Phase 1P-A5): resume BEFORE closing.
           onReady?.();
+          onOpenChange(false);
         }
         return;
       }
