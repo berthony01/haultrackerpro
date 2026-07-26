@@ -26,7 +26,7 @@ const URL_STR: string = DATABASE_URL;
 
 const CANDIDATE_PATH = fileURLToPath(
   new URL(
-    '../../supabase/migration-candidates/20260725190000_phase1p_a1_recruiter_readiness_company_type.sql',
+    '../../supabase/migrations/20260726013000_phase1p_recruiter_company_type_readiness.sql',
     import.meta.url,
   ),
 );

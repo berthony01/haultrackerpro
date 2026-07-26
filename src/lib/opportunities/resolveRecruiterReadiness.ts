@@ -66,6 +66,34 @@ export const READINESS_MESSAGES: Record<ReadinessToken, string> = {
   posting_terms: 'Review and accept the current posting terms.',
 };
 
+/**
+ * Phase 1P-A4 — user-facing checklist labels shown inside the inline
+ * `RecruiterReadinessDialog`. Locked verbatim by contract. The parallel
+ * `READINESS_MESSAGES` map is preserved unchanged for other consumers
+ * (describeRecruiterBlock, onboarding validation, etc.).
+ */
+export const DIALOG_MISSING_LABELS: Record<ReadinessToken, string> = {
+  suspended: 'Recruiter access is suspended. Contact support for assistance.',
+  recruiter_name: 'Add your recruiter name',
+  company_name: 'Add your company name',
+  recruiter_email_missing: 'Add a valid recruiter email',
+  recruiter_email_invalid: 'Add a valid recruiter email',
+  company_type: 'Select your company type',
+  dot_or_mc: 'Add a DOT or MC number for a carrier account',
+  posting_terms: 'Review and accept the posting terms',
+};
+
+/**
+ * Phase 1P-A4 — the three posting-terms agreement statements that the
+ * inline readiness dialog and the standalone `RecruiterOnboarding` form
+ * MUST render verbatim. Frozen so a caller cannot mutate them.
+ */
+export const RECRUITER_AGREEMENT_STATEMENTS: readonly string[] = Object.freeze([
+  'I confirm that my company information is accurate.',
+  'I understand misleading opportunities may be removed.',
+  'I understand HaulTrackerPro may suspend misleading recruiter accounts.',
+]);
+
 export interface RecruiterReadiness {
   /** True iff standard posting is fully enabled right now. */
   ready: boolean;

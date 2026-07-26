@@ -276,6 +276,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile, refetchProfile } = useRecruiterProfile();
   const [readinessOpen, setReadinessOpen] = useState(false);
+  const pendingPublishRef = useRef(false);
 
   const [state, setState] = useState<State>(() =>
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
@@ -338,6 +339,7 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       const fresh = await refetchProfile();
       const rr = resolveRecruiterReadiness(fresh);
       if (!rr.ready) {
+        pendingPublishRef.current = true;
         setReadinessOpen(true);
         return;
       }
@@ -442,11 +444,20 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
 
       <RecruiterReadinessDialog
         open={readinessOpen}
-        onOpenChange={setReadinessOpen}
+        onOpenChange={(v) => {
+          setReadinessOpen(v);
+          if (!v) pendingPublishRef.current = false;
+        }}
         profile={profile}
-        onOpenOnboarding={onBack}
+        onReady={() => {
+          if (pendingPublishRef.current) {
+            pendingPublishRef.current = false;
+            void save('publish');
+          }
+        }}
         actionLabel="Publish"
       />
+
 
 
       {/* Stage navigation */}

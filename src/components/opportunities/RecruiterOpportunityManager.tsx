@@ -21,7 +21,6 @@ import {
   PauseCircle,
   PlayCircle,
   XCircle,
-  AlertTriangle,
   Ban,
   ShieldCheck,
   Inbox,
@@ -34,6 +33,8 @@ import { toast } from 'sonner';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useUserRole } from '@/hooks/useUserRole';
 import { describeRecruiterBlock } from '@/lib/opportunities/describeRecruiterBlock';
+import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
+import { RecruiterReadinessDialog } from './RecruiterReadinessDialog';
 import {
   useRecruiterOpportunities,
   type Opportunity,
@@ -50,7 +51,7 @@ interface Props {
 type View = 'list' | 'form' | 'referrals';
 
 export function RecruiterOpportunityManager({ onBack }: Props) {
-  const { profile, isLoading: profileLoading } = useRecruiterProfile();
+  const { profile, isLoading: profileLoading, refetchProfile } = useRecruiterProfile();
   const { intentRecruiter } = useUserRole();
   const { opportunities, isLoading, setStatus, deleteOpportunity, refetch } =
     useRecruiterOpportunities();
@@ -59,6 +60,11 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const [view, setView] = useState<View>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Opportunity | null>(null);
+  // Phase 1P-A4: exactly-one pending action queued behind readiness.
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    { kind: 'create' } | { kind: 'activate'; id: string } | null
+  >(null);
 
   if (profileLoading) {
     return (
@@ -69,15 +75,12 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   }
 
+  // Suspended remains fully blocked. Incomplete profiles no longer dead-end;
+  // they see the manager and are prompted via the inline readiness dialog
+  // only when they attempt to create or activate an opportunity.
   const block = describeRecruiterBlock(profile, { intentRecruiter });
-  if (block.reason !== 'ok') {
-    const Icon =
-      block.reason === 'suspended'
-        ? Ban
-        : block.reason === 'incomplete_profile'
-        ? AlertTriangle
-        : ShieldCheck;
-    return <Gate onBack={onBack} title={block.title} body={block.body} Icon={Icon} />;
+  if (block.reason === 'suspended') {
+    return <Gate onBack={onBack} title={block.title} body={block.body} Icon={Ban} />;
   }
 
   if (view === 'form') {
@@ -109,8 +112,24 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     );
   };
 
-  const openCreate = () => { setEditing(null); setView('form'); };
+  const executeCreate = () => { setEditing(null); setView('form'); };
+  const executeActivate = (id: string) => handleStatus(id, 'active');
+
+  const gateOrRun = async (action: { kind: 'create' } | { kind: 'activate'; id: string }) => {
+    const fresh = await refetchProfile();
+    const rr = resolveRecruiterReadiness(fresh);
+    if (rr.ready) {
+      if (action.kind === 'create') executeCreate();
+      else executeActivate(action.id);
+      return;
+    }
+    setPendingAction(action);
+    setReadinessOpen(true);
+  };
+
+  const openCreate = () => { void gateOrRun({ kind: 'create' }); };
   const openEdit = (o: Opportunity) => { setEditing(o); setView('form'); };
+  const requestActivate = (o: Opportunity) => { void gateOrRun({ kind: 'activate', id: o.id }); };
   const canActivate = true;
   const deletionPending = deleteOpportunity?.isPending ?? false;
   const busy = setStatus.isPending || deletionPending;
@@ -196,7 +215,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               o={o}
               onEdit={() => openEdit(o)}
               onPause={() => handleStatus(o.id, 'paused')}
-              onActivate={() => handleStatus(o.id, 'active')}
+              onActivate={() => requestActivate(o)}
               onClose={() => handleStatus(o.id, 'closed')}
               onDelete={() => setPendingDelete(o)}
               busy={busy}
@@ -205,6 +224,23 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
           ))}
         </div>
       )}
+
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={(v) => {
+          setReadinessOpen(v);
+          if (!v) setPendingAction(null);
+        }}
+        profile={profile}
+        onReady={() => {
+          const pending = pendingAction;
+          setPendingAction(null);
+          if (!pending) return;
+          if (pending.kind === 'create') executeCreate();
+          else executeActivate(pending.id);
+        }}
+        actionLabel="Post Opportunity"
+      />
 
       <AlertDialog
         open={pendingDelete !== null}

@@ -27,13 +27,22 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useRecruiterProfile, type RecruiterProfile, type RecruiterProfileUpsert } from '@/hooks/opportunities/useRecruiterProfile';
+import {
+  useRecruiterProfile,
+  formatRecruiterProfileError,
+  type RecruiterProfile,
+  type RecruiterProfileUpsert,
+} from '@/hooks/opportunities/useRecruiterProfile';
 import {
   POSTING_TERMS_VERSION,
   hasAcceptedPostingTerms,
   getRecruiterTrustView,
 } from '@/lib/opportunities/recruiterEligibility';
-import { COMPANY_TYPE_LABELS, type CompanyType } from '@/lib/opportunities/resolveRecruiterReadiness';
+import {
+  COMPANY_TYPE_LABELS,
+  RECRUITER_AGREEMENT_STATEMENTS,
+  type CompanyType,
+} from '@/lib/opportunities/resolveRecruiterReadiness';
 
 interface Props {
   onBack: () => void;
@@ -200,16 +209,15 @@ export function RecruiterOnboarding({ onBack }: Props) {
       // Phase 1P-A1: surface Error.cause so recruiters see the true
       // reason (RPC DETAIL, RLS mismatch, persistence verification) rather
       // than the generic combined-mutation label.
+      // Phase 1P-A4: unified safe formatter — surfaces the true
+      // underlying reason (RPC DETAIL, RLS mismatch, persistence
+      // verification) without leaking raw objects, SQL, or credentials.
       onError: (e: Error) => {
-        const cause = (e as Error & { cause?: unknown }).cause;
-        const detail =
-          cause && typeof cause === 'object' && cause !== null && 'message' in cause
-            ? String((cause as { message?: unknown }).message ?? '')
-            : '';
-        toast.error(detail ? `${e.message} — ${detail}` : e.message);
+        toast.error(formatRecruiterProfileError(e));
       },
     });
   };
+
 
 
   return (
@@ -350,9 +358,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
           {/* E. Agreements */}
           <Card className="p-5 border-border/60 space-y-3">
             <h3 className="text-sm font-bold text-foreground">Agreements</h3>
-            <Agreement checked={agree1} onChange={setAgree1} text="I confirm that my company information is accurate." />
-            <Agreement checked={agree2} onChange={setAgree2} text="I understand misleading opportunities may be removed." />
-            <Agreement checked={agree3} onChange={setAgree3} text="I understand HaulTrackerPro may suspend misleading recruiter accounts." />
+            <Agreement checked={agree1} onChange={setAgree1} text={RECRUITER_AGREEMENT_STATEMENTS[0]} />
+            <Agreement checked={agree2} onChange={setAgree2} text={RECRUITER_AGREEMENT_STATEMENTS[1]} />
+            <Agreement checked={agree3} onChange={setAgree3} text={RECRUITER_AGREEMENT_STATEMENTS[2]} />
           </Card>
 
           {/* Sticky save */}
