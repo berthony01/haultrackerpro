@@ -50,7 +50,7 @@ import { RecruiterOpportunityManager } from '@/components/opportunities/Recruite
 import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
-type Profile = Tables<'recruiter_profiles'>;
+type Profile = Tables<'recruiter_profiles'> & { company_type: string | null };
 type Opportunity = Tables<'opportunities'>;
 type ProfileHook = ReturnType<typeof useRecruiterProfile>;
 type OppsHook = ReturnType<typeof useRecruiterOpportunities>;
@@ -185,6 +185,9 @@ function installHookMocks() {
       isProfileComplete: isProfileCompleteForPosting(profileState),
       canPost,
       refetch: vi.fn(),
+      refetchProfile: vi.fn(async () => profileState),
+      upsertProfile: { mutateAsync: vi.fn(), isPending: false },
+      saveRecruiterProfile: { mutateAsync: vi.fn(), isPending: false },
     };
     return impl as ProfileHook;
   });

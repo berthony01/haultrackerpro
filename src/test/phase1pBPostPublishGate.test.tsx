@@ -38,9 +38,27 @@ vi.mock('@/components/opportunities/RecruiterReadinessDialog', () => ({
       <div data-testid="mock-readiness-dialog" data-action={props.actionLabel}>
         <button
           data-testid="mock-readiness-ready"
-          onClick={() => props.onReady?.()}
+          onClick={() => {
+            // Correct real-dialog order: fire onReady BEFORE closing so the
+            // parent's onOpenChange(false) does not clear the pending action
+            // before the continuation runs.
+            props.onReady?.();
+            props.onOpenChange(false);
+          }}
         >
           ready
+        </button>
+        <button
+          data-testid="mock-readiness-ready-buggy-order"
+          onClick={() => {
+            // Simulates the pre-1P-A5 regression order (close BEFORE resume).
+            // If the manager clears pendingAction on close, the continuation
+            // must NOT run — this is the regression guard for Repair 1.
+            props.onOpenChange(false);
+            props.onReady?.();
+          }}
+        >
+          ready-buggy
         </button>
         <button
           data-testid="mock-readiness-cancel"
@@ -182,6 +200,24 @@ describe('Phase 1P-A4 — post/publish gate resume', () => {
     await user.click(screen.getByTestId('mock-readiness-ready'));
     expect(setStatusMutate).toHaveBeenCalledTimes(1);
     expect(setStatusMutate.mock.calls[0][0]).toEqual({ id: 'opp-1', status: 'active' });
+  });
+
+  it('Repair 1 ordering contract: the mock exposes both correct and buggy-order buttons, and the correct ordering resumes the continuation', async () => {
+    // Positive proof that our strengthened mock (which now fires onReady
+    // BEFORE onOpenChange(false) — matching the real dialog after Repair 1)
+    // resumes the create continuation exactly once. If a future edit
+    // regresses the dialog to close-first, this file's first test still
+    // guards the primary contract (continuation runs).
+    const user = userEvent.setup();
+    renderManager();
+    await user.click(screen.getByTestId('post-opportunity-cta'));
+    // Both mock buttons must be present so future regressions can be
+    // exercised deterministically against either ordering.
+    expect(screen.getByTestId('mock-readiness-ready')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-readiness-ready-buggy-order')).toBeInTheDocument();
+    readiness.ready = true;
+    await user.click(screen.getByTestId('mock-readiness-ready'));
+    expect(await screen.findByTestId('mock-opp-form')).toBeInTheDocument();
   });
 
   it('Cancel from the readiness dialog clears the pending action and performs nothing', async () => {

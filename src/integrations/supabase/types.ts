@@ -3126,7 +3126,6 @@ export type Database = {
           company_address: string | null
           company_city: string | null
           company_name: string
-          company_type?: "carrier" | "third_party_recruiter" | "staffing_agency" | "independent_recruiter" | null
           company_phone: string | null
           company_state: string | null
           company_website: string | null
@@ -3155,7 +3154,6 @@ export type Database = {
           company_address?: string | null
           company_city?: string | null
           company_name: string
-          company_type?: "carrier" | "third_party_recruiter" | "staffing_agency" | "independent_recruiter" | null
           company_phone?: string | null
           company_state?: string | null
           company_website?: string | null
@@ -3184,7 +3182,6 @@ export type Database = {
           company_address?: string | null
           company_city?: string | null
           company_name?: string
-          company_type?: "carrier" | "third_party_recruiter" | "staffing_agency" | "independent_recruiter" | null
           company_phone?: string | null
           company_state?: string | null
           company_website?: string | null
