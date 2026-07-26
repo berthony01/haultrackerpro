@@ -184,10 +184,10 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
         open={readinessOpen}
         onOpenChange={setReadinessOpen}
         profile={profile}
-        onOpenOnboarding={onOpenOnboarding}
-        onContinue={onManage}
+        onReady={onManage}
         actionLabel="Post an Opportunity"
       />
+
 
 
       {/* Page header */}
