@@ -50,7 +50,7 @@ import { RecruiterOpportunityManager } from '@/components/opportunities/Recruite
 import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
-type Profile = Tables<'recruiter_profiles'>;
+type Profile = Tables<'recruiter_profiles'> & { company_type: string | null };
 type Opportunity = Tables<'opportunities'>;
 type ProfileHook = ReturnType<typeof useRecruiterProfile>;
 type OppsHook = ReturnType<typeof useRecruiterOpportunities>;
