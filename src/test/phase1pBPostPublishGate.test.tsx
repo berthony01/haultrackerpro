@@ -38,9 +38,27 @@ vi.mock('@/components/opportunities/RecruiterReadinessDialog', () => ({
       <div data-testid="mock-readiness-dialog" data-action={props.actionLabel}>
         <button
           data-testid="mock-readiness-ready"
-          onClick={() => props.onReady?.()}
+          onClick={() => {
+            // Correct real-dialog order: fire onReady BEFORE closing so the
+            // parent's onOpenChange(false) does not clear the pending action
+            // before the continuation runs.
+            props.onReady?.();
+            props.onOpenChange(false);
+          }}
         >
           ready
+        </button>
+        <button
+          data-testid="mock-readiness-ready-buggy-order"
+          onClick={() => {
+            // Simulates the pre-1P-A5 regression order (close BEFORE resume).
+            // If the manager clears pendingAction on close, the continuation
+            // must NOT run — this is the regression guard for Repair 1.
+            props.onOpenChange(false);
+            props.onReady?.();
+          }}
+        >
+          ready-buggy
         </button>
         <button
           data-testid="mock-readiness-cancel"
