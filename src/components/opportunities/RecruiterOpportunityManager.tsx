@@ -21,7 +21,6 @@ import {
   PauseCircle,
   PlayCircle,
   XCircle,
-  AlertTriangle,
   Ban,
   ShieldCheck,
   Inbox,
