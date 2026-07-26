@@ -147,6 +147,13 @@ describe('Phase 1P-A4 — Legacy recruiter inline readiness dialog', () => {
     mocks.refetchProfile.mockResolvedValue(mocks.profile);
     mocks.upsertProfileFn.mockResolvedValue(undefined);
     mocks.saveRecruiterProfileFn.mockResolvedValue(undefined);
+    // jsdom lacks pointer-capture APIs that Radix Select touches.
+    if (!(Element.prototype as unknown as { hasPointerCapture?: unknown }).hasPointerCapture) {
+      (Element.prototype as unknown as Record<string, unknown>).hasPointerCapture = () => false;
+      (Element.prototype as unknown as Record<string, unknown>).releasePointerCapture = () => {};
+      (Element.prototype as unknown as Record<string, unknown>).setPointerCapture = () => {};
+      (Element.prototype as unknown as Record<string, unknown>).scrollIntoView = () => {};
+    }
   });
 
   it('renders locked title and canonical ordered missing labels for a fully-empty legacy profile', () => {
