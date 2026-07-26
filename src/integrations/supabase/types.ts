@@ -3128,6 +3128,7 @@ export type Database = {
           company_name: string
           company_phone: string | null
           company_state: string | null
+          company_type: string | null
           company_website: string | null
           created_at: string
           dot_number: string | null
@@ -3156,6 +3157,7 @@ export type Database = {
           company_name: string
           company_phone?: string | null
           company_state?: string | null
+          company_type?: string | null
           company_website?: string | null
           created_at?: string
           dot_number?: string | null
@@ -3184,6 +3186,7 @@ export type Database = {
           company_name?: string
           company_phone?: string | null
           company_state?: string | null
+          company_type?: string | null
           company_website?: string | null
           created_at?: string
           dot_number?: string | null
