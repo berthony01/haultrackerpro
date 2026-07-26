@@ -430,7 +430,7 @@ describe('Phase 1F-A.2.1A-R1 client cutover', () => {
     authState.userId = 'client-user-1';
     currentProfile = null;
     insertReturnsEmpty = true;
-    safeProfileRpcRows = [{ id: 'recovered-rp-9' }];
+    safeProfileRpcRows = [{ id: 'recovered-rp-9', ...baseData } as { id: string }];
     const hook = useRecruiterProfile();
     await hook.saveRecruiterProfile.mutateAsync({ ...baseData } as never);
 
