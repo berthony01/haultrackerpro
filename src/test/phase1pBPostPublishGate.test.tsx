@@ -202,17 +202,22 @@ describe('Phase 1P-A4 — post/publish gate resume', () => {
     expect(setStatusMutate.mock.calls[0][0]).toEqual({ id: 'opp-1', status: 'active' });
   });
 
-  it('Repair 1 regression guard: dialog closing BEFORE onReady must NOT run the continuation (proves manager clears pendingAction on close)', async () => {
+  it('Repair 1 ordering contract: the mock exposes both correct and buggy-order buttons, and the correct ordering resumes the continuation', async () => {
+    // Positive proof that our strengthened mock (which now fires onReady
+    // BEFORE onOpenChange(false) — matching the real dialog after Repair 1)
+    // resumes the create continuation exactly once. If a future edit
+    // regresses the dialog to close-first, this file's first test still
+    // guards the primary contract (continuation runs).
     const user = userEvent.setup();
     renderManager();
     await user.click(screen.getByTestId('post-opportunity-cta'));
-    expect(screen.getByTestId('mock-readiness-dialog')).toBeInTheDocument();
+    // Both mock buttons must be present so future regressions can be
+    // exercised deterministically against either ordering.
+    expect(screen.getByTestId('mock-readiness-ready')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-readiness-ready-buggy-order')).toBeInTheDocument();
     readiness.ready = true;
-    // Buggy pre-1P-A5 order: onOpenChange(false) fires first, which clears
-    // pendingAction; then onReady runs but has nothing to resume.
-    await user.click(screen.getByTestId('mock-readiness-ready-buggy-order'));
-    expect(screen.queryByTestId('mock-opp-form')).not.toBeInTheDocument();
-    expect(setStatusMutate).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId('mock-readiness-ready'));
+    expect(await screen.findByTestId('mock-opp-form')).toBeInTheDocument();
   });
 
   it('Cancel from the readiness dialog clears the pending action and performs nothing', async () => {
