@@ -55,16 +55,26 @@ vi.mock('@/integrations/supabase/client', () => {
   const from = (table: string) => ({
     update: (payload: Record<string, unknown>) => {
       const filters: Array<[string, unknown]> = [];
+      const runUpdate = () => {
+        updateCalls.push({ table, payload, filters });
+        const err = updateNextError;
+        updateNextError = null;
+        // Phase 1P-A1: .update().eq().eq().select('*') returns the affected
+        // rows so the hook can verify persistence. Echo the payload as the
+        // single affected row unless an error is queued.
+        const data = err ? null : [{ ...payload }];
+        return Promise.resolve({ data, error: err });
+      };
       const chain = {
         eq(col: string, v: unknown) {
           filters.push([col, v]);
           return chain;
         },
+        select(_cols: string) {
+          return runUpdate();
+        },
         then(res: (r: { error: Error | null }) => unknown) {
-          updateCalls.push({ table, payload, filters });
-          const err = updateNextError;
-          updateNextError = null;
-          return Promise.resolve({ error: err }).then(res);
+          return runUpdate().then(res);
         },
       };
       return chain;
@@ -76,8 +86,8 @@ vi.mock('@/integrations/supabase/client', () => {
       const nextId = `inserted-rp-${++insertedIdCounter}`;
       const returnEmpty = insertReturnsEmpty;
       insertReturnsEmpty = false;
-      const data = err ? null : (returnEmpty ? {} : { id: nextId });
-      const bare = Promise.resolve({ data, error: err });
+      const row = err ? null : (returnEmpty ? {} : { id: nextId, ...payload });
+      const bare = Promise.resolve({ data: row, error: err });
       return {
         select: (_cols: string) => ({
           single: () => bare,
