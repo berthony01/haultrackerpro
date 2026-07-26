@@ -216,7 +216,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               o={o}
               onEdit={() => openEdit(o)}
               onPause={() => handleStatus(o.id, 'paused')}
-              onActivate={() => handleStatus(o.id, 'active')}
+              onActivate={() => requestActivate(o)}
               onClose={() => handleStatus(o.id, 'closed')}
               onDelete={() => setPendingDelete(o)}
               busy={busy}
@@ -225,6 +225,23 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
           ))}
         </div>
       )}
+
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={(v) => {
+          setReadinessOpen(v);
+          if (!v) setPendingAction(null);
+        }}
+        profile={profile}
+        onReady={() => {
+          const pending = pendingAction;
+          setPendingAction(null);
+          if (!pending) return;
+          if (pending.kind === 'create') executeCreate();
+          else executeActivate(pending.id);
+        }}
+        actionLabel="Post Opportunity"
+      />
 
       <AlertDialog
         open={pendingDelete !== null}
