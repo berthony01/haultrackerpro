@@ -121,7 +121,7 @@ function withCompanyType(
   p: RecruiterProfile,
   t: 'carrier' | 'third_party_recruiter' | 'staffing_agency' | 'independent_recruiter' | null,
 ): RecruiterProfile {
-  return { ...(p as unknown as Record<string, unknown>), company_type: t } as RecruiterProfile;
+  return { ...(p as unknown as Record<string, unknown>), company_type: t } as unknown as RecruiterProfile;
 }
 
 function renderDialog(props: Partial<React.ComponentProps<typeof RecruiterReadinessDialog>> = {}) {
