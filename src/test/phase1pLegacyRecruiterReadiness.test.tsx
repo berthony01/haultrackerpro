@@ -30,9 +30,9 @@ type UpsertPayload = Record<string, unknown>;
 
 const mocks = {
   profile: null as RecruiterProfile | null,
-  refetchProfile: vi.fn<[], Promise<RecruiterProfile | null>>(),
-  upsertProfileFn: vi.fn<[UpsertPayload], Promise<unknown>>(),
-  saveRecruiterProfileFn: vi.fn<[UpsertPayload], Promise<unknown>>(),
+  refetchProfile: vi.fn(),
+  upsertProfileFn: vi.fn(),
+  saveRecruiterProfileFn: vi.fn(),
 };
 
 vi.mock('@/hooks/opportunities/useRecruiterProfile', async () => {
