@@ -358,9 +358,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
           {/* E. Agreements */}
           <Card className="p-5 border-border/60 space-y-3">
             <h3 className="text-sm font-bold text-foreground">Agreements</h3>
-            <Agreement checked={agree1} onChange={setAgree1} text="I confirm that my company information is accurate." />
-            <Agreement checked={agree2} onChange={setAgree2} text="I understand misleading opportunities may be removed." />
-            <Agreement checked={agree3} onChange={setAgree3} text="I understand HaulTrackerPro may suspend misleading recruiter accounts." />
+            <Agreement checked={agree1} onChange={setAgree1} text={RECRUITER_AGREEMENT_STATEMENTS[0]} />
+            <Agreement checked={agree2} onChange={setAgree2} text={RECRUITER_AGREEMENT_STATEMENTS[1]} />
+            <Agreement checked={agree3} onChange={setAgree3} text={RECRUITER_AGREEMENT_STATEMENTS[2]} />
           </Card>
 
           {/* Sticky save */}
