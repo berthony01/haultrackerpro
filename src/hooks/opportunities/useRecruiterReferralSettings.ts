@@ -104,35 +104,39 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
   );
 
 
-  const upsert = useMutation({
-    mutationFn: async (input: ReferralSettingsInput) => {
-      if (!recruiterId) throw new Error('Missing recruiter profile');
+  const upsert = useMutation(
+    {
+      mutationFn: async (input: ReferralSettingsInput) => {
+        if (!recruiterId) throw new Error('Missing recruiter profile');
 
-      validateDetails(input);
+        validateDetails(input);
 
-      const payload: TablesInsert<'recruiter_referral_settings'> = {
-        recruiter_id: recruiterId,
-        referral_bonus_enabled: input.referral_bonus_enabled,
-        bonus_amount: input.referral_bonus_enabled ? input.bonus_amount : null,
-        payment_trigger: input.referral_bonus_enabled ? input.payment_trigger : null,
-        waiting_period_days: input.referral_bonus_enabled ? input.waiting_period_days : null,
-        bonus_terms: input.referral_bonus_enabled
-          ? (input.bonus_terms?.trim() || null)
-          : null,
-      };
+        const payload: TablesInsert<'recruiter_referral_settings'> = {
+          recruiter_id: recruiterId,
+          referral_bonus_enabled: input.referral_bonus_enabled,
+          bonus_amount: input.referral_bonus_enabled ? input.bonus_amount : null,
+          payment_trigger: input.referral_bonus_enabled ? input.payment_trigger : null,
+          waiting_period_days: input.referral_bonus_enabled ? input.waiting_period_days : null,
+          bonus_terms: input.referral_bonus_enabled
+            ? (input.bonus_terms?.trim() || null)
+            : null,
+        };
 
-      const { data, error } = await supabase
-        .from('recruiter_referral_settings')
-        .upsert(payload, { onConflict: 'recruiter_id' })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+        const { data, error } = await supabase
+          .from('recruiter_referral_settings')
+          .upsert(payload, { onConflict: 'recruiter_id' })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      },
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['recruiter_referral_settings', recruiterId] });
+      },
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recruiter_referral_settings', recruiterId] });
-    },
-  });
+    qc,
+  );
+
 
   // Phase 1Q-A — narrowly scoped onboarding mutation. Persists a
   // recruiter's referral-bonus decision as part of the onboarding save,
