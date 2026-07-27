@@ -65,18 +65,24 @@ function validateDetails(details: ReferralSettingsInput) {
   }
 }
 
+let __fallbackQueryClient: QueryClient | null = null;
+function getFallbackQueryClient(): QueryClient {
+  if (!__fallbackQueryClient) {
+    __fallbackQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+  }
+  return __fallbackQueryClient;
+}
+
 export function useRecruiterReferralSettings(recruiterId?: string | null) {
-  // Phase 1Q-A — resilient to a missing QueryClientProvider so that
-  // production consumers (which are always wrapped) keep working while
-  // legacy component-level render tests that do NOT wrap the tree in a
-  // QueryClientProvider don't blow up when this hook is added to a
-  // shared component. A fallback client is used only when no ambient
-  // provider exists; behavior is identical inside the real app.
+  // Phase 1Q-A — resilient to a missing QueryClientProvider so this hook
+  // can be composed into components rendered by legacy render tests that
+  // don't wrap the tree in a provider. Production consumers always mount
+  // under a real provider; behavior there is unchanged.
   const ambient = useContext(QueryClientContext);
   const qc = ambient ?? getFallbackQueryClient();
-  // Keep the classic call path healthy when a provider IS present.
-  // (useQueryClient is safe here because ambient is truthy.)
-  if (ambient) useQueryClient();
+
 
 
   const query = useQuery({
