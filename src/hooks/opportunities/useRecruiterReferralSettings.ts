@@ -142,52 +142,56 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
   // recruiter's referral-bonus decision as part of the onboarding save,
   // using an EXPLICIT recruiterId (post-refetch profile id) so we never
   // rely on hook-scoped recruiterId drift. Never bypasses RLS.
-  const saveDecision = useMutation({
-    mutationFn: async (args: {
-      recruiterId: string;
-      decision: ReferralDecision;
-      details: ReferralSettingsInput;
-    }) => {
-      const rid = args.recruiterId;
-      if (!rid || typeof rid !== 'string' || !rid.trim()) {
-        throw new Error('Missing recruiter profile');
-      }
+  const saveDecision = useMutation(
+    {
+      mutationFn: async (args: {
+        recruiterId: string;
+        decision: ReferralDecision;
+        details: ReferralSettingsInput;
+      }) => {
+        const rid = args.recruiterId;
+        if (!rid || typeof rid !== 'string' || !rid.trim()) {
+          throw new Error('Missing recruiter profile');
+        }
 
-      if (args.decision === 'later') {
-        const { error } = await supabase
+        if (args.decision === 'later') {
+          const { error } = await supabase
+            .from('recruiter_referral_settings')
+            .delete()
+            .eq('recruiter_id', rid);
+          if (error) throw error;
+          return { decision: 'later' as const };
+        }
+
+        if (args.decision === 'yes') {
+          validateDetails(args.details);
+        }
+
+        const enabled = args.decision === 'yes';
+        const payload: TablesInsert<'recruiter_referral_settings'> = {
+          recruiter_id: rid,
+          referral_bonus_enabled: enabled,
+          bonus_amount: enabled ? args.details.bonus_amount : null,
+          payment_trigger: enabled ? args.details.payment_trigger : null,
+          waiting_period_days: enabled ? args.details.waiting_period_days : null,
+          bonus_terms: enabled ? (args.details.bonus_terms?.trim() || null) : null,
+        };
+
+        const { data, error } = await supabase
           .from('recruiter_referral_settings')
-          .delete()
-          .eq('recruiter_id', rid);
+          .upsert(payload, { onConflict: 'recruiter_id' })
+          .select()
+          .single();
         if (error) throw error;
-        return { decision: 'later' as const };
-      }
-
-      if (args.decision === 'yes') {
-        validateDetails(args.details);
-      }
-
-      const enabled = args.decision === 'yes';
-      const payload: TablesInsert<'recruiter_referral_settings'> = {
-        recruiter_id: rid,
-        referral_bonus_enabled: enabled,
-        bonus_amount: enabled ? args.details.bonus_amount : null,
-        payment_trigger: enabled ? args.details.payment_trigger : null,
-        waiting_period_days: enabled ? args.details.waiting_period_days : null,
-        bonus_terms: enabled ? (args.details.bonus_terms?.trim() || null) : null,
-      };
-
-      const { data, error } = await supabase
-        .from('recruiter_referral_settings')
-        .upsert(payload, { onConflict: 'recruiter_id' })
-        .select()
-        .single();
-      if (error) throw error;
-      return { decision: args.decision, row: data };
+        return { decision: args.decision, row: data };
+      },
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['recruiter_referral_settings', recruiterId] });
+      },
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recruiter_referral_settings', recruiterId] });
-    },
-  });
+    qc,
+  );
+
 
   return {
     settings: query.data ?? null,
