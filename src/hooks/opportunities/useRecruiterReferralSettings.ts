@@ -47,13 +47,13 @@ const VALID_TRIGGERS: PaymentTrigger[] = [
 
 function validateDetails(details: ReferralSettingsInput) {
   if (details.bonus_amount != null) {
-    if (Number.isNaN(details.bonus_amount) || details.bonus_amount < 0) {
-      throw new Error('Bonus amount cannot be negative');
+    if (!Number.isFinite(details.bonus_amount) || details.bonus_amount < 0) {
+      throw new Error('Bonus amount must be a non-negative number');
     }
   }
   if (details.waiting_period_days != null) {
     if (
-      Number.isNaN(details.waiting_period_days) ||
+      !Number.isFinite(details.waiting_period_days) ||
       details.waiting_period_days < 0 ||
       !Number.isInteger(details.waiting_period_days)
     ) {
@@ -64,6 +64,8 @@ function validateDetails(details: ReferralSettingsInput) {
     throw new Error('Invalid payment trigger');
   }
 }
+
+const VALID_DECISIONS: ReferralDecision[] = ['yes', 'no', 'later'];
 
 let __fallbackQueryClient: QueryClient | null = null;
 function getFallbackQueryClient(): QueryClient {
@@ -149,9 +151,12 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
         decision: ReferralDecision;
         details: ReferralSettingsInput;
       }) => {
-        const rid = args.recruiterId;
-        if (!rid || typeof rid !== 'string' || !rid.trim()) {
+        const rid = typeof args.recruiterId === 'string' ? args.recruiterId.trim() : '';
+        if (!rid) {
           throw new Error('Missing recruiter profile');
+        }
+        if (!VALID_DECISIONS.includes(args.decision)) {
+          throw new Error('Invalid referral decision');
         }
 
         if (args.decision === 'later') {
@@ -160,7 +165,7 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
             .delete()
             .eq('recruiter_id', rid);
           if (error) throw error;
-          return { decision: 'later' as const };
+          return { decision: 'later' as const, recruiterId: rid };
         }
 
         if (args.decision === 'yes') {
@@ -183,10 +188,16 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
           .select()
           .single();
         if (error) throw error;
-        return { decision: args.decision, row: data };
+        return { decision: args.decision, row: data, recruiterId: rid };
       },
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ['recruiter_referral_settings', recruiterId] });
+      onSuccess: (_data, variables) => {
+        const rid =
+          typeof variables?.recruiterId === 'string'
+            ? variables.recruiterId.trim()
+            : '';
+        if (rid) {
+          qc.invalidateQueries({ queryKey: ['recruiter_referral_settings', rid] });
+        }
       },
     },
     qc,
