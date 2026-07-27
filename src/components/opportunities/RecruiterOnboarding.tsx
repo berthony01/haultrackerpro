@@ -449,6 +449,140 @@ export function RecruiterOnboarding({ onBack }: Props) {
             </Field>
           </Section>
 
+          {/* D2. Driver Referral Bonus — Phase 1Q-A */}
+          <Section icon={Gift} title="Driver Referral Bonus">
+            <div className="sm:col-span-2 space-y-4">
+              <div>
+                <Label className="text-sm font-semibold text-foreground">
+                  Are you willing to pay a driver for referring another driver who gets hired?
+                </Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This preference does not affect recruiter approval, standard posting
+                  eligibility, or Verified Recruiter status. You can update it later in
+                  Driver Referrals.
+                </p>
+              </div>
+
+              <RadioGroup
+                value={referralDecision}
+                onValueChange={(v) => setReferralDecision(v as ReferralDecision)}
+                aria-label="Driver referral bonus decision"
+                data-testid="referral-decision-group"
+              >
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <RadioGroupItem
+                    value="yes"
+                    id="referral-yes"
+                    data-testid="referral-decision-yes"
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm text-foreground">
+                    Yes, I offer an external referral bonus
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <RadioGroupItem
+                    value="no"
+                    id="referral-no"
+                    data-testid="referral-decision-no"
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm text-foreground">No, not currently</span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <RadioGroupItem
+                    value="later"
+                    id="referral-later"
+                    data-testid="referral-decision-later"
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm text-foreground">I'll decide later</span>
+                </label>
+              </RadioGroup>
+
+              {referralDecision === 'yes' && (
+                <div
+                  className="space-y-4 rounded-lg border border-border/60 p-4"
+                  data-testid="referral-details-panel"
+                >
+                  <div>
+                    <Label htmlFor="ref-bonus-amount" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                      Bonus amount
+                    </Label>
+                    <Input
+                      id="ref-bonus-amount"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Example: 500"
+                      value={refAmount}
+                      onChange={(e) => setRefAmount(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ref-trigger" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                      Payment trigger
+                    </Label>
+                    <Select
+                      value={refTrigger || undefined}
+                      onValueChange={(v) => setRefTrigger(v as PaymentTrigger)}
+                    >
+                      <SelectTrigger id="ref-trigger" className="mt-1" data-testid="ref-trigger">
+                        <SelectValue placeholder="Select trigger…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(PAYMENT_TRIGGER_LABELS) as PaymentTrigger[]).map((k) => (
+                          <SelectItem key={k} value={k}>
+                            {PAYMENT_TRIGGER_LABELS[k]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="ref-waiting-days" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                      Waiting period (days)
+                    </Label>
+                    <Input
+                      id="ref-waiting-days"
+                      type="number"
+                      min={0}
+                      step="1"
+                      inputMode="numeric"
+                      placeholder="Example: 30"
+                      value={refWaitingDays}
+                      onChange={(e) => setRefWaitingDays(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ref-terms" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                      Referral bonus terms
+                    </Label>
+                    <Textarea
+                      id="ref-terms"
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="$500 paid externally after the referred driver completes 30 days and remains in good standing."
+                      value={refTerms}
+                      onChange={(e) => setRefTerms(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground">
+                <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                <span data-testid="referral-disclaimer">
+                  {DEFAULT_EXTERNAL_PAYMENT_DISCLAIMER}
+                </span>
+              </div>
+            </div>
+          </Section>
+
           {/* E. Agreements */}
           <Card className="p-5 border-border/60 space-y-3">
             <h3 className="text-sm font-bold text-foreground">Agreements</h3>
@@ -470,7 +604,13 @@ export function RecruiterOnboarding({ onBack }: Props) {
                   <Button variant="outline" onClick={onBack}>Cancel</Button>
                   <Button
                     onClick={handleSave}
-                    disabled={saveRecruiterProfile.isPending || isSuspended}
+                    data-testid="recruiter-onboarding-submit"
+                    disabled={
+                      saveRecruiterProfile.isPending ||
+                      referralSettings.saveDecision.isPending ||
+                      (!!profile && referralSettings.isLoading) ||
+                      isSuspended
+                    }
                   >
                     <Save className="h-4 w-4" />
                     {isSuspended
@@ -485,6 +625,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
               </Card>
             </div>
           </div>
+
         </>
       )}
     </div>
