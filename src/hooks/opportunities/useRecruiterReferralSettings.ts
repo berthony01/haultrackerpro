@@ -28,6 +28,35 @@ export interface ReferralSettingsInput {
   bonus_terms: string | null;
 }
 
+export type ReferralDecision = 'yes' | 'no' | 'later';
+
+const VALID_TRIGGERS: PaymentTrigger[] = [
+  'on_hire',
+  'after_waiting_period',
+  'recruiter_defined',
+  'other',
+];
+
+function validateDetails(details: ReferralSettingsInput) {
+  if (details.bonus_amount != null) {
+    if (Number.isNaN(details.bonus_amount) || details.bonus_amount < 0) {
+      throw new Error('Bonus amount cannot be negative');
+    }
+  }
+  if (details.waiting_period_days != null) {
+    if (
+      Number.isNaN(details.waiting_period_days) ||
+      details.waiting_period_days < 0 ||
+      !Number.isInteger(details.waiting_period_days)
+    ) {
+      throw new Error('Waiting period must be a non-negative whole number');
+    }
+  }
+  if (details.payment_trigger && !VALID_TRIGGERS.includes(details.payment_trigger)) {
+    throw new Error('Invalid payment trigger');
+  }
+}
+
 export function useRecruiterReferralSettings(recruiterId?: string | null) {
   const qc = useQueryClient();
 
@@ -50,22 +79,7 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
     mutationFn: async (input: ReferralSettingsInput) => {
       if (!recruiterId) throw new Error('Missing recruiter profile');
 
-      // Validation
-      if (input.bonus_amount != null && input.bonus_amount < 0) {
-        throw new Error('Bonus amount cannot be negative');
-      }
-      if (input.waiting_period_days != null && input.waiting_period_days < 0) {
-        throw new Error('Waiting period cannot be negative');
-      }
-      const validTriggers: PaymentTrigger[] = [
-        'on_hire',
-        'after_waiting_period',
-        'recruiter_defined',
-        'other',
-      ];
-      if (input.payment_trigger && !validTriggers.includes(input.payment_trigger)) {
-        throw new Error('Invalid payment trigger');
-      }
+      validateDetails(input);
 
       const payload: TablesInsert<'recruiter_referral_settings'> = {
         recruiter_id: recruiterId,
@@ -91,6 +105,57 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
     },
   });
 
+  // Phase 1Q-A — narrowly scoped onboarding mutation. Persists a
+  // recruiter's referral-bonus decision as part of the onboarding save,
+  // using an EXPLICIT recruiterId (post-refetch profile id) so we never
+  // rely on hook-scoped recruiterId drift. Never bypasses RLS.
+  const saveDecision = useMutation({
+    mutationFn: async (args: {
+      recruiterId: string;
+      decision: ReferralDecision;
+      details: ReferralSettingsInput;
+    }) => {
+      const rid = args.recruiterId;
+      if (!rid || typeof rid !== 'string' || !rid.trim()) {
+        throw new Error('Missing recruiter profile');
+      }
+
+      if (args.decision === 'later') {
+        const { error } = await supabase
+          .from('recruiter_referral_settings')
+          .delete()
+          .eq('recruiter_id', rid);
+        if (error) throw error;
+        return { decision: 'later' as const };
+      }
+
+      if (args.decision === 'yes') {
+        validateDetails(args.details);
+      }
+
+      const enabled = args.decision === 'yes';
+      const payload: TablesInsert<'recruiter_referral_settings'> = {
+        recruiter_id: rid,
+        referral_bonus_enabled: enabled,
+        bonus_amount: enabled ? args.details.bonus_amount : null,
+        payment_trigger: enabled ? args.details.payment_trigger : null,
+        waiting_period_days: enabled ? args.details.waiting_period_days : null,
+        bonus_terms: enabled ? (args.details.bonus_terms?.trim() || null) : null,
+      };
+
+      const { data, error } = await supabase
+        .from('recruiter_referral_settings')
+        .upsert(payload, { onConflict: 'recruiter_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return { decision: args.decision, row: data };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recruiter_referral_settings', recruiterId] });
+    },
+  });
+
   return {
     settings: query.data ?? null,
     isLoading: query.isLoading,
@@ -98,5 +163,6 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
     error: query.error,
     refetch: query.refetch,
     upsert,
+    saveDecision,
   };
 }
