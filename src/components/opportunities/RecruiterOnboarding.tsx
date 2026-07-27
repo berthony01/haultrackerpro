@@ -112,12 +112,51 @@ const isUrlish = (v: string) => {
 };
 
 export function RecruiterOnboarding({ onBack }: Props) {
-  const { profile, isLoading, isSuspended, saveRecruiterProfile } = useRecruiterProfile();
+  const {
+    profile,
+    isLoading,
+    isSuspended,
+    saveRecruiterProfile,
+    refetchProfile,
+  } = useRecruiterProfile();
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [agree1, setAgree1] = useState(false);
   const [agree2, setAgree2] = useState(false);
   const [agree3, setAgree3] = useState(false);
+
+  // Phase 1Q-A — driver referral bonus decision.
+  const [referralDecision, setReferralDecision] = useState<ReferralDecision>('later');
+  const [refAmount, setRefAmount] = useState('');
+  const [refTrigger, setRefTrigger] = useState<PaymentTrigger | ''>('');
+  const [refWaitingDays, setRefWaitingDays] = useState('');
+  const [refTerms, setRefTerms] = useState('');
+
+  const referralSettings = useRecruiterReferralSettings(profile?.id ?? null);
+  const referralHydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    if (referralSettings.isLoading) return;
+    if (referralHydratedRef.current) return;
+    referralHydratedRef.current = true;
+    const s = referralSettings.settings;
+    if (!s) {
+      setReferralDecision('later');
+      return;
+    }
+    if (s.referral_bonus_enabled) {
+      setReferralDecision('yes');
+      setRefAmount(s.bonus_amount != null ? String(s.bonus_amount) : '');
+      setRefTrigger(((s.payment_trigger as PaymentTrigger) ?? '') || '');
+      setRefWaitingDays(
+        s.waiting_period_days != null ? String(s.waiting_period_days) : '',
+      );
+      setRefTerms(s.bonus_terms ?? '');
+    } else {
+      setReferralDecision('no');
+    }
+  }, [profile, referralSettings.isLoading, referralSettings.settings]);
 
   useEffect(() => {
     if (profile) {
@@ -152,6 +191,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
       setAgree3(alreadyAccepted);
     }
   }, [profile]);
+
 
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
