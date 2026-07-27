@@ -255,7 +255,51 @@ export function RecruiterOnboarding({ onBack }: Props) {
         } else {
           toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
         }
+
+        // Phase 1Q-A — persist the referral-bonus decision AFTER a
+        // successful profile save + posting-terms stamp. Force a fresh
+        // profile read so we use the authoritative recruiter id (never a
+        // stale local one) as the referral row owner.
+        let freshProfileId: string | null = profile?.id ?? null;
+        try {
+          const fresh = await refetchProfile();
+          if (fresh?.id) freshProfileId = fresh.id;
+        } catch {
+          // fall through — will fail below if we truly have no id
+        }
+        if (!freshProfileId) {
+          toast.error(
+            'Recruiter profile saved, but your referral preference could not be saved. Please retry or update it later in Driver Referrals.',
+          );
+          return;
+        }
+        try {
+          await referralSettings.saveDecision.mutateAsync({
+            recruiterId: freshProfileId,
+            decision: referralDecision,
+            details: {
+              referral_bonus_enabled: referralDecision === 'yes',
+              bonus_amount:
+                referralDecision === 'yes' && refAmount.trim() !== ''
+                  ? Number(refAmount)
+                  : null,
+              payment_trigger:
+                referralDecision === 'yes' && refTrigger ? refTrigger : null,
+              waiting_period_days:
+                referralDecision === 'yes' && refWaitingDays.trim() !== ''
+                  ? Number(refWaitingDays)
+                  : null,
+              bonus_terms:
+                referralDecision === 'yes' ? (refTerms.trim() || null) : null,
+            },
+          });
+        } catch {
+          toast.error(
+            'Recruiter profile saved, but your referral preference could not be saved. Please retry or update it later in Driver Referrals.',
+          );
+        }
       },
+
       // Phase 1P-A1: surface Error.cause so recruiters see the true
       // reason (RPC DETAIL, RLS mismatch, persistence verification) rather
       // than the generic combined-mutation label.
