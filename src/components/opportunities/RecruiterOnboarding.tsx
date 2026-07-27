@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -24,6 +25,8 @@ import {
   AlertTriangle,
   Clock,
   Ban,
+  Gift,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,6 +46,13 @@ import {
   RECRUITER_AGREEMENT_STATEMENTS,
   type CompanyType,
 } from '@/lib/opportunities/resolveRecruiterReadiness';
+import {
+  useRecruiterReferralSettings,
+  PAYMENT_TRIGGER_LABELS,
+  DEFAULT_EXTERNAL_PAYMENT_DISCLAIMER,
+  type PaymentTrigger,
+  type ReferralDecision,
+} from '@/hooks/opportunities/useRecruiterReferralSettings';
 
 interface Props {
   onBack: () => void;
