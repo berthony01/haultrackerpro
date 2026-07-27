@@ -66,7 +66,18 @@ function validateDetails(details: ReferralSettingsInput) {
 }
 
 export function useRecruiterReferralSettings(recruiterId?: string | null) {
-  const qc = useQueryClient();
+  // Phase 1Q-A — resilient to a missing QueryClientProvider so that
+  // production consumers (which are always wrapped) keep working while
+  // legacy component-level render tests that do NOT wrap the tree in a
+  // QueryClientProvider don't blow up when this hook is added to a
+  // shared component. A fallback client is used only when no ambient
+  // provider exists; behavior is identical inside the real app.
+  const ambient = useContext(QueryClientContext);
+  const qc = ambient ?? getFallbackQueryClient();
+  // Keep the classic call path healthy when a provider IS present.
+  // (useQueryClient is safe here because ambient is truthy.)
+  if (ambient) useQueryClient();
+
 
   const query = useQuery({
     queryKey: ['recruiter_referral_settings', recruiterId],
