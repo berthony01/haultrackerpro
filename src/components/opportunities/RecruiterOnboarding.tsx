@@ -280,18 +280,19 @@ export function RecruiterOnboarding({ onBack }: Props) {
             details: {
               referral_bonus_enabled: referralDecision === 'yes',
               bonus_amount:
-                referralDecision === 'yes' && refAmount.trim() !== ''
+                referralDecision === 'yes' && refAmount.trim()
                   ? Number(refAmount)
                   : null,
               payment_trigger:
                 referralDecision === 'yes' && refTrigger ? refTrigger : null,
               waiting_period_days:
-                referralDecision === 'yes' && refWaitingDays.trim() !== ''
+                referralDecision === 'yes' && refWaitingDays.trim()
                   ? Number(refWaitingDays)
                   : null,
               bonus_terms:
                 referralDecision === 'yes' ? (refTerms.trim() || null) : null,
             },
+
           });
         } catch {
           toast.error(
