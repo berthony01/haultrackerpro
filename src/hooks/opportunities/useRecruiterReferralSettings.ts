@@ -85,20 +85,24 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
 
 
 
-  const query = useQuery({
-    queryKey: ['recruiter_referral_settings', recruiterId],
-    enabled: !!recruiterId,
-    queryFn: async (): Promise<RecruiterReferralSettings | null> => {
-      if (!recruiterId) return null;
-      const { data, error } = await supabase
-        .from('recruiter_referral_settings')
-        .select('*')
-        .eq('recruiter_id', recruiterId)
-        .maybeSingle();
-      if (error) throw error;
-      return data ?? null;
+  const query = useQuery(
+    {
+      queryKey: ['recruiter_referral_settings', recruiterId],
+      enabled: !!recruiterId,
+      queryFn: async (): Promise<RecruiterReferralSettings | null> => {
+        if (!recruiterId) return null;
+        const { data, error } = await supabase
+          .from('recruiter_referral_settings')
+          .select('*')
+          .eq('recruiter_id', recruiterId)
+          .maybeSingle();
+        if (error) throw error;
+        return data ?? null;
+      },
     },
-  });
+    qc,
+  );
+
 
   const upsert = useMutation({
     mutationFn: async (input: ReferralSettingsInput) => {
