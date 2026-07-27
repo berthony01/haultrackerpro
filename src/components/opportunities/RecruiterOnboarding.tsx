@@ -128,7 +128,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
   // Phase 1Q-A — driver referral bonus decision.
   const [referralDecision, setReferralDecision] = useState<ReferralDecision>('later');
   const [refAmount, setRefAmount] = useState('');
-  const [refTrigger, setRefTrigger] = useState<PaymentTrigger | ''>('');
+  // Phase 1Q-A-R1 — local sentinel `none` means "no payment_trigger
+  // chosen"; it is never sent to the database.
+  const [refTrigger, setRefTrigger] = useState<PaymentTrigger | 'none'>('none');
   const [refWaitingDays, setRefWaitingDays] = useState('');
   const [refTerms, setRefTerms] = useState('');
 
@@ -148,7 +150,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
     if (s.referral_bonus_enabled) {
       setReferralDecision('yes');
       setRefAmount(s.bonus_amount != null ? String(s.bonus_amount) : '');
-      setRefTrigger(((s.payment_trigger as PaymentTrigger) ?? '') || '');
+      setRefTrigger(
+        s.payment_trigger ? (s.payment_trigger as PaymentTrigger) : 'none',
+      );
       setRefWaitingDays(
         s.waiting_period_days != null ? String(s.waiting_period_days) : '',
       );
@@ -256,21 +260,23 @@ export function RecruiterOnboarding({ onBack }: Props) {
           toast.success(isEditMode ? 'Recruiter profile updated' : 'Recruiter profile submitted');
         }
 
-        // Phase 1Q-A — persist the referral-bonus decision AFTER a
+        // Phase 1Q-A-R1 — persist the referral-bonus decision AFTER a
         // successful profile save + posting-terms stamp. Force a fresh
-        // profile read so we use the authoritative recruiter id (never a
-        // stale local one) as the referral row owner.
-        let freshProfileId: string | null = profile?.id ?? null;
+        // refetch and REQUIRE a valid, non-empty id from that refetch.
+        // Never fall back to the pre-save `profile?.id`.
+        const partialSaveWarning =
+          'Recruiter profile saved, but your referral preference could not be saved. Please retry or update it later in Driver Referrals.';
+        let freshProfileId: string | null = null;
         try {
           const fresh = await refetchProfile();
-          if (fresh?.id) freshProfileId = fresh.id;
+          const candidate =
+            typeof fresh?.id === 'string' ? fresh.id.trim() : '';
+          if (candidate) freshProfileId = candidate;
         } catch {
-          // fall through — will fail below if we truly have no id
+          freshProfileId = null;
         }
         if (!freshProfileId) {
-          toast.error(
-            'Recruiter profile saved, but your referral preference could not be saved. Please retry or update it later in Driver Referrals.',
-          );
+          toast.error(partialSaveWarning);
           return;
         }
         try {
@@ -284,7 +290,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
                   ? Number(refAmount)
                   : null,
               payment_trigger:
-                referralDecision === 'yes' && refTrigger ? refTrigger : null,
+                referralDecision === 'yes' && refTrigger && refTrigger !== 'none'
+                  ? (refTrigger as PaymentTrigger)
+                  : null,
               waiting_period_days:
                 referralDecision === 'yes' && refWaitingDays.trim()
                   ? Number(refWaitingDays)
@@ -292,12 +300,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
               bonus_terms:
                 referralDecision === 'yes' ? (refTerms.trim() || null) : null,
             },
-
           });
         } catch {
-          toast.error(
-            'Recruiter profile saved, but your referral preference could not be saved. Please retry or update it later in Driver Referrals.',
-          );
+          toast.error(partialSaveWarning);
         }
       },
 
@@ -527,13 +532,16 @@ export function RecruiterOnboarding({ onBack }: Props) {
                       Payment trigger
                     </Label>
                     <Select
-                      value={refTrigger || undefined}
-                      onValueChange={(v) => setRefTrigger(v as PaymentTrigger)}
+                      value={refTrigger}
+                      onValueChange={(v) => setRefTrigger(v as PaymentTrigger | 'none')}
                     >
                       <SelectTrigger id="ref-trigger" className="mt-1" data-testid="ref-trigger">
                         <SelectValue placeholder="Select trigger…" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none" data-testid="ref-trigger-none">
+                          Not specified
+                        </SelectItem>
                         {(Object.keys(PAYMENT_TRIGGER_LABELS) as PaymentTrigger[]).map((k) => (
                           <SelectItem key={k} value={k}>
                             {PAYMENT_TRIGGER_LABELS[k]}
