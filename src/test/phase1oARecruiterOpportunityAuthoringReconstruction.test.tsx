@@ -53,6 +53,7 @@ function makeRecruiterProfile(overrides: Partial<RecruiterProfile> = {}): Recrui
   return {
     admin_notes: null, company_address: null, company_city: null,
     company_name: 'Acme Trucking', company_phone: null, company_state: null,
+    company_type: 'carrier',
     company_website: null, created_at: '2026-07-01T00:00:00Z', dot_number: '123456',
     driver_types_hired: [], equipment_types: [], hiring_states: [], id: 'r-1',
     legacy_terms_grandfathered_at: null, mc_number: null,
