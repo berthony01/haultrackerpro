@@ -47,18 +47,24 @@ function isSafeStripeCheckoutUrl(raw: unknown): boolean {
   return m[1].toLowerCase() === "checkout.stripe.com";
 }
 
-/** Deterministic mapping from a claim block reason to the public response. */
+/**
+ * Deterministic mapping from a claim block reason to the public response.
+ *
+ * Phase 1R-D2-B3-R1: every block reason is a conflict with existing billing
+ * state, not an authorization failure, so all of them are HTTP 409. Only the
+ * distinct `not_owner` claim outcome (handled by the caller) remains 403.
+ */
 function recruiterBlockedResult(reason: string): RecruiterCheckoutResult {
   switch (reason) {
     case "agency_entitlement_exists":
       return {
-        status: 403,
+        status: 409,
         code: "agency_entitlement_exists",
         message: "This account already has agency billing.",
       };
     case "agency_billing_requires_management":
       return {
-        status: 403,
+        status: 409,
         code: "agency_billing_requires_management",
         message: "Manage billing from your agency workspace.",
       };
