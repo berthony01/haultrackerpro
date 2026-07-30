@@ -22,6 +22,10 @@ export type RecruiterCheckoutCode =
   | 'session_invalid'
   | 'transient_error'
   | 'support_required'
+  // Phase 1R-D1 — cross-context business billing guard codes.
+  | 'agency_entitlement_exists'
+  | 'agency_billing_requires_management'
+  | 'opposing_entitlement_unknown'
   | 'internal_error';
 
 export interface ParsedCheckoutError {
@@ -60,6 +64,13 @@ export const RECRUITER_CHECKOUT_MESSAGES: Record<
   invalid_plan: 'That plan is not available. Please choose a valid plan.',
   invalid_price: 'Pricing is temporarily unavailable. Please try again later.',
   invalid_origin: 'Checkout could not be started from this location.',
+  // Phase 1R-D1 — cross-context business billing guard.
+  agency_entitlement_exists:
+    'Your agency plan already includes recruiter premium. Manage billing from the agency workspace.',
+  agency_billing_requires_management:
+    'Your agency subscription needs billing attention. Manage it from the agency workspace before starting recruiter billing.',
+  opposing_entitlement_unknown:
+    'We could not safely confirm your existing business billing. Please contact support.',
   internal_error: 'Billing is temporarily unavailable. Please try again later.',
   unknown_error: 'Something went wrong. Please try again.',
 };
@@ -73,6 +84,7 @@ export const RECRUITER_SUPPORT_CODES: ReadonlySet<
   'customer_not_found',
   'customer_ambiguous',
   'support_required',
+  'opposing_entitlement_unknown',
 ]);
 
 /** Codes that indicate the server made progress on billing state and the

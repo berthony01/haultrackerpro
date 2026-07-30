@@ -30,6 +30,11 @@ import {
   type StripeSessionLike,
   type StripeSubscriptionLike,
 } from "../../supabase/functions/_shared/recruiter-checkout";
+import { evaluateRecruiterCheckoutCrossContext } from "../../supabase/functions/_shared/business-checkout-guard";
+import {
+  RECRUITER_CHECKOUT_MESSAGES,
+  RECRUITER_SUPPORT_CODES,
+} from "@/lib/opportunities/recruiterCheckoutMessages";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -838,6 +843,86 @@ describe("Phase 1G-R1A2 — recruiter checkout orchestrator", () => {
       expect(edgeSrc).toContain('typeof s?.status === "string" ? s.status : ""');
       // id must not default to a truthy value that would slip past validation.
       expect(edgeSrc).toContain('typeof s?.id === "string" ? s.id : ""');
+    });
+  });
+
+  describe("Phase 1R-D1 — cross-context business guard precheck (source contract)", () => {
+    const edgeSrc = readFileSync(
+      resolve(__dirname, "../../supabase/functions/create-recruiter-checkout/index.ts"),
+      "utf8",
+    );
+
+    it("28. imports the pure cross-context guard module", () => {
+      expect(edgeSrc).toMatch(
+        /from\s+"\.\.\/_shared\/business-checkout-guard\.ts"/,
+      );
+      expect(edgeSrc).toContain("evaluateRecruiterCheckoutCrossContext");
+    });
+
+    it("29. evaluates the guard BEFORE runRecruiterCheckout, Stripe, and any intent RPC", () => {
+      const guardIdx = edgeSrc.indexOf("evaluateRecruiterCheckoutCrossContext(");
+      const orchestratorIdx = edgeSrc.indexOf("await runRecruiterCheckout(");
+      const stripeIdx = edgeSrc.indexOf("new Stripe(stripeKey");
+      const depsIdx = edgeSrc.indexOf("buildDeps(stripe");
+      expect(guardIdx).toBeGreaterThan(-1);
+      expect(orchestratorIdx).toBeGreaterThan(-1);
+      expect(stripeIdx).toBeGreaterThan(-1);
+      expect(depsIdx).toBeGreaterThan(-1);
+      expect(guardIdx).toBeLessThan(stripeIdx);
+      expect(guardIdx).toBeLessThan(depsIdx);
+      expect(guardIdx).toBeLessThan(orchestratorIdx);
+    });
+
+    it("30. reads owner memberships and entitlements with the exact scoped columns", () => {
+      expect(edgeSrc).toContain('from("agency_members")');
+      expect(edgeSrc).toContain('.eq("role", "agency_owner")');
+      expect(edgeSrc).toContain('.eq("status", "active")');
+      expect(edgeSrc).toContain('from("agency_entitlements")');
+      expect(edgeSrc).toContain('.select("agency_id, plan_key, status, source")');
+    });
+
+    it("31. returns 503 transient_error on either cross-context read failure", () => {
+      const guardStart = edgeSrc.indexOf('from("agency_members")');
+      const guardEnd = edgeSrc.indexOf("new Stripe(stripeKey");
+      const block = edgeSrc.slice(guardStart, guardEnd);
+      const transientHits = block.match(/code:\s*"transient_error"/g) ?? [];
+      expect(transientHits.length).toBeGreaterThanOrEqual(2);
+      expect(block).toContain("status: 503");
+    });
+
+    it("32. surfaces only the three stable cross-context codes", () => {
+      expect(edgeSrc).toContain('"agency_entitlement_exists"');
+      expect(edgeSrc).toContain('"agency_billing_requires_management"');
+      expect(edgeSrc).toContain('"opposing_entitlement_unknown"');
+    });
+
+    it("33. the guard blocks without any dependency work (direct pure behaviour)", () => {
+      const blockedDecision = evaluateRecruiterCheckoutCrossContext({
+        hasRow: true,
+        planKey: "agency_team",
+        status: "active",
+        source: "stripe",
+        hasActiveOwnerMembership: true,
+      });
+      expect(blockedDecision.allowed).toBe(false);
+      // The pure guard performs no I/O at all — it has no injected deps.
+      expect(evaluateRecruiterCheckoutCrossContext.length).toBe(1);
+    });
+
+    it("34. blocked codes are part of the recruiter public code union + client messages", () => {
+      const shared = readFileSync(
+        resolve(__dirname, "../../supabase/functions/_shared/recruiter-checkout.ts"),
+        "utf8",
+      );
+      for (const code of [
+        "agency_entitlement_exists",
+        "agency_billing_requires_management",
+        "opposing_entitlement_unknown",
+      ]) {
+        expect(shared).toContain(`| "${code}"`);
+        expect(code in RECRUITER_CHECKOUT_MESSAGES).toBe(true);
+      }
+      expect(RECRUITER_SUPPORT_CODES.has("opposing_entitlement_unknown")).toBe(true);
     });
   });
 });

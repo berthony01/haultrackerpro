@@ -16,6 +16,12 @@ import { useAgencyMembers, useMyAgency } from '@/hooks/useAgency';
 import { useAgencyClients, useAgencyPackages } from '@/hooks/useAgencyWorkflow';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AGENCY_CHECKOUT_MESSAGES,
+  agencyCheckoutMessageForCode,
+  isSafeAgencyStripeCheckoutUrl,
+  parseAgencyCheckoutError,
+} from '@/lib/agencyCheckoutMessages';
 
 interface Props {
   agencyId: string;
@@ -90,22 +96,35 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
   const badge = statusBadge[entitlement.status];
 
   const startCheckout = async (planKey: AssistantAgencyPlanKey) => {
+    if (busy) return;
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-agency-checkout', {
         body: { agencyId, planKey },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (data?.url) {
+      if (error) {
+        const parsed = await parseAgencyCheckoutError(error);
+        toast({
+          title: 'Could not start agency billing',
+          description: parsed.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (isSafeAgencyStripeCheckoutUrl(data?.url)) {
         window.location.href = data.url;
         return;
       }
-      throw new Error('No checkout URL returned');
-    } catch (e: any) {
+      const fallback = agencyCheckoutMessageForCode(data?.code);
       toast({
         title: 'Could not start agency billing',
-        description: e?.message ?? 'Please try again.',
+        description: fallback.message,
+        variant: 'destructive',
+      });
+    } catch {
+      toast({
+        title: 'Could not start agency billing',
+        description: AGENCY_CHECKOUT_MESSAGES.unknown_error,
         variant: 'destructive',
       });
     } finally {
