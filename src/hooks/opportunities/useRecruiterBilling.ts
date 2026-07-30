@@ -387,7 +387,14 @@ export function useRecruiterBilling() {
     ],
   );
 
-  const canStartCheckout = canStartCheckoutFn(uiState);
+  // Phase 1R-C fail-closed client guard: recruiter checkout requires the
+  // existing recruiter UI-state permission AND a fully resolved business
+  // entitlement that is not already included through an agency.
+  const canStartCheckout =
+    canStartCheckoutFn(uiState) &&
+    effectiveBusinessEntitlement.state === 'resolved' &&
+    effectiveBusinessEntitlement.entitlementSource !== 'agency_included';
+
   const showManageBilling = shouldShowManageBillingFn(
     uiState,
     !!billing?.stripe_subscription_id,
