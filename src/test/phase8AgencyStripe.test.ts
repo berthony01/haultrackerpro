@@ -52,28 +52,59 @@ describe('Phase 8B / 1R-D2-B3 — create-agency-checkout', () => {
     expect(src).toMatch(/Client-supplied price IDs are not allowed/);
   });
 
-  // --- Phase 1R-D1 orchestrator + guard contracts -------------------------
+  // --- Phase 1R-D2-B3 atomic coordinator contracts ------------------------
 
   it('delegates to the pure agency checkout orchestrator', () => {
     expect(src).toMatch(/from\s+"\.\.\/_shared\/agency-checkout\.ts"/);
     expect(src).toContain('runAgencyCheckout(');
   });
 
-  it('imports and evaluates the pure cross-context business guard', () => {
-    expect(src).toMatch(/from\s+"\.\.\/_shared\/business-checkout-guard\.ts"/);
-    expect(src).toContain('evaluateAgencyCheckoutCrossContext(');
+  it('imports the atomic business checkout coordinator and removes the retired edge guard', () => {
+    expect(src).toMatch(/from\s+"\.\.\/_shared\/business-checkout-claim\.ts"/);
+    for (const symbol of [
+      'createBusinessCheckoutClaimStore',
+      'beginBusinessCheckout',
+      'completeBusinessCheckout',
+      'releaseBusinessCheckout',
+    ]) {
+      expect(src).toContain(symbol);
+    }
+    expect(src).not.toContain('business-checkout-guard.ts');
+    expect(src).not.toContain('evaluateAgencyCheckoutCrossContext');
+    // The PostgreSQL claim state machine is the sole cross-context authority;
+    // the agency edge no longer reads recruiter billing state directly.
+    expect(src).not.toContain('from("recruiter_profiles")');
+    expect(src).not.toContain('from("recruiter_billing_profiles")');
   });
 
-  it('runs the recruiter billing precheck BEFORE Stripe construction and the orchestrator', () => {
-    const guardIdx = src.indexOf('evaluateAgencyCheckoutCrossContext(');
-    const recruiterReadIdx = src.indexOf('from("recruiter_billing_profiles")');
-    const stripeIdx = src.indexOf('new Stripe(stripeKey');
-    const orchestratorIdx = src.indexOf('await runAgencyCheckout(');
-    expect(recruiterReadIdx).toBeGreaterThan(-1);
-    expect(guardIdx).toBeGreaterThan(recruiterReadIdx);
-    expect(stripeIdx).toBeGreaterThan(-1);
-    expect(guardIdx).toBeLessThan(stripeIdx);
-    expect(guardIdx).toBeLessThan(orchestratorIdx);
+  it('acquires the atomic claim after owner validation and before Stripe or orchestrator work', () => {
+    const beginIdx = src.indexOf('await beginBusinessCheckout(');
+    expect(beginIdx).toBeGreaterThan(-1);
+    for (const before of [
+      'if (!isAgencyPlanKey(planKey))',
+      'from("agency_profiles")',
+      'from("agency_members")',
+      'ownerRow.role !== "agency_owner"',
+      'if (!isAllowedAgencyOrigin(reqOrigin))',
+    ]) {
+      const idx = src.indexOf(before);
+      expect(idx).toBeGreaterThan(-1);
+      expect(idx).toBeLessThan(beginIdx);
+    }
+    for (const after of [
+      'new Stripe(stripeKey',
+      'buildAgencyDeps(stripe',
+      'await runAgencyCheckout(',
+    ]) {
+      const idx = src.indexOf(after);
+      expect(idx).toBeGreaterThan(-1);
+      expect(idx).toBeGreaterThan(beginIdx);
+    }
+    const claimInput = src.slice(beginIdx, beginIdx + 400);
+    expect(claimInput).toContain('userId: user.id');
+    expect(claimInput).toContain('context: "agency"');
+    expect(claimInput).toContain('subjectId: agencyId');
+    expect(claimInput).toContain('planKey');
   });
 
   it('returns the stable cross-context codes', () => {
