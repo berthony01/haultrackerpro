@@ -128,7 +128,9 @@ export function RecruiterBillingPanel() {
     if (actionInFlightRef.current) return;
     if (isPending) return;
     if (!canStartCheckout) return;
+    if (entitlementBlocksCheckout) return;
     actionInFlightRef.current = true;
+
     setFallback(null);
     // Synchronous popup MUST come before any awaited work so browsers
     // treat it as user-gesture initiated. Same deterministic name across
