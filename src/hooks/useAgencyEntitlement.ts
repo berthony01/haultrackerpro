@@ -82,8 +82,11 @@ export function useAgencyEntitlement(
     entitlement,
     hasRow: !!row,
     isLoading: q.isLoading,
+    isError: q.isError,
+    error: (q.error as Error | null) ?? null,
     refetch: () => q.refetch(),
   };
 }
+
 
 export { ASSISTANT_AGENCY_PLANS, effectiveLimits };
