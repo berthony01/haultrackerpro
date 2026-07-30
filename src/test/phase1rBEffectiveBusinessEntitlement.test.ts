@@ -528,14 +528,12 @@ describe('Phase 1R-B — purity, immutability, determinism', () => {
 
   it('29. module source contains no runtime/environment dependencies', () => {
     const source = readFileSync(MODULE_PATH, 'utf8');
-    const forbidden = [
-      'from \'react\'',
-      'from "react"',
-      '@tanstack',
-      '@/integrations/supabase/client',
-      'createClient',
-      'stripe',
-      'Stripe',
+    // Strip comments so documentation prose cannot trip the guard.
+    const code = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/.*$/gm, '');
+
+    const forbiddenRuntime = [
       'window.',
       'document.',
       'localStorage',
@@ -546,20 +544,43 @@ describe('Phase 1R-B — purity, immutability, determinism', () => {
       'Math.random',
       'Deno.env',
       'process.env',
+      'require(',
+      'createClient',
+      'useState',
+      'useMemo',
+      'useQuery',
     ];
-    for (const token of forbidden) {
-      expect(
-        source.includes(token),
-        `module must not reference ${token}`,
-      ).toBe(false);
+    for (const token of forbiddenRuntime) {
+      expect(code.includes(token), `module must not reference ${token}`).toBe(
+        false,
+      );
     }
-    // Only type-only imports are permitted.
-    const importLines = source
+
+    // Only type-only imports are permitted, and only from approved modules.
+    const importLines = code
       .split('\n')
       .filter((line) => /^\s*import\s/.test(line));
     expect(importLines.length).toBeGreaterThan(0);
+    const allowedSpecifiers = [
+      '@/lib/recruiterCapabilities',
+      '@/lib/agencyPlans',
+    ];
     for (const line of importLines) {
       expect(line.trimStart().startsWith('import type ')).toBe(true);
+      const specifier = line.match(/from\s+'([^']+)'/)?.[1];
+      expect(allowedSpecifiers).toContain(specifier);
+    }
+
+    const forbiddenSpecifiers = [
+      'react',
+      '@tanstack/react-query',
+      '@/integrations/supabase/client',
+      '@supabase/supabase-js',
+      'stripe',
+    ];
+    for (const specifier of forbiddenSpecifiers) {
+      expect(code.includes(`from '${specifier}'`)).toBe(false);
+      expect(code.includes(`from "${specifier}"`)).toBe(false);
     }
   });
 });
