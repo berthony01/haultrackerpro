@@ -164,7 +164,7 @@ function renderContracts() {
 }
 
 beforeEach(() => {
-  profileMocks.profile = { id: 'rec-1', company_name: 'Real Freight LLC' };
+  profileMocks.profile = { ...RECRUITER_PROFILE_FIXTURE };
   appsMocks.lastRecruiterId = undefined;
   setBilling({ tier: 'free_verified' });
 });
