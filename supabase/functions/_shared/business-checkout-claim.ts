@@ -314,7 +314,7 @@ export async function beginBusinessCheckout(
       if (row.claim_state === "ready") {
         const sessionId = row.stripe_checkout_session_id;
         if (!sessionId) return TRANSIENT;
-        const expiry = epochSecondsFromIso(row.checkout_expires_at);
+        const expiry = exactEpochSecondsFromIso(row.checkout_expires_at);
         if (expiry === null) return TRANSIENT;
         if (!(expiry > nowSeconds)) return TRANSIENT;
         return {
