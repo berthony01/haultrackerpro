@@ -485,7 +485,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_now  timestamptz := clock_timestamp();
+  v_lock_namespace constant bigint := 7218926914894380123;
+  v_now  timestamptz;
   v_row  public.business_checkout_claims%ROWTYPE;
   v_next text;
 BEGIN
@@ -499,7 +500,7 @@ BEGIN
     outcome := 'invalid_input'; reason := 'missing_claim_token'; RETURN NEXT; RETURN;
   END IF;
   IF _terminal IS NULL THEN
-    outcome := 'invalid_input'; reason := 'terminal_flag_missing'; RETURN NEXT; RETURN;
+    outcome := 'invalid_input'; reason := 'terminal_flag_invalid'; RETURN NEXT; RETURN;
   END IF;
   IF _error_code IS NULL
      OR _error_code !~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'
@@ -508,7 +509,7 @@ BEGIN
   END IF;
 
   PERFORM pg_advisory_xact_lock(
-    hashtextextended(_user_id::text, 7218926914894380123)
+    hashtextextended(_user_id::text, v_lock_namespace)
   );
 
   -- Fresh wall-clock time after the lock wait.
