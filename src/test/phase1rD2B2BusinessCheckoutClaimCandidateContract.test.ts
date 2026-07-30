@@ -337,9 +337,8 @@ describe("Phase 1R-D2-B2-A — coordination and D1 policy vocabulary", () => {
 
   it("reproduces the exact D1 recruiter vocabulary and block reasons", () => {
     expect(candidateSql).toContain("'canceled','incomplete_expired','inactive'");
-    // trial-allowlist: Stripe subscription status vocabulary literal
     expect(candidateSql).toContain(
-      "'active','trialing','past_due','unpaid','incomplete','paused'",
+      "'active','trialing','past_due','unpaid','incomplete','paused'", // trial-allowlist: Stripe status vocabulary literal
     );
     expect(candidateSql).toContain("'starter','growth','fleet'");
     expect(candidateSql).toContain("'recruiter_subscription_exists'");
