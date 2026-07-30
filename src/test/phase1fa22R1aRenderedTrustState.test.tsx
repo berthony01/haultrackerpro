@@ -160,7 +160,20 @@ function installHooks({
     plan: 'none',
     status: isBillingActive ? 'active' : 'inactive',
     isLoading: false,
+    // Phase 1R-C additive effective-entitlement contract. A recruiter with
+    // no agency resolves to their own subscription (or free standard).
+    businessEntitlementState: 'resolved',
+    effectiveRecruiterTier: isBillingActive ? 'starter' : 'free_verified',
+    effectiveRecruiterPlan: isBillingActive ? 'starter' : 'none',
+    effectiveAgencyPlan: null,
+    entitlementSource: isBillingActive
+      ? 'recruiter_subscription'
+      : 'free_standard',
+    billingManagementContext: isBillingActive ? 'recruiter' : 'none',
+    hasEffectivePremiumRecruiterAccess: isBillingActive,
+    isBusinessEntitlementLoading: false,
   } as unknown as BillingHook);
+
 
   vi.mocked(useRecruiterOpportunities).mockReturnValue({
     opportunities: [],
