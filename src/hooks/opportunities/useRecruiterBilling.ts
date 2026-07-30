@@ -528,7 +528,26 @@ export function useRecruiterBilling() {
     activeCount,
     isBillingActive,
     canSubmitMore: legacyCanSubmitMore_DO_NOT_USE_FOR_STANDARD_POSTING,
-    isLoading: billingQuery.isLoading || activeCountQuery.isLoading,
+    isLoading:
+      profileLoading ||
+      billingQuery.isLoading ||
+      activeCountQuery.isLoading ||
+      myAgency.isLoading ||
+      (hasRealAgency && agencyEnt.isLoading),
+
+    // Phase 1R-C: effective business entitlement (additive, never overwrites
+    // the raw recruiter billing fields above)
+    effectiveBusinessEntitlement,
+    businessEntitlementState: effectiveBusinessEntitlement.state,
+    businessEntitlementConflictReason: effectiveBusinessEntitlement.conflictReason,
+    effectiveRecruiterTier,
+    effectiveRecruiterPlan,
+    effectiveAgencyPlan: effectiveBusinessEntitlement.effectiveAgencyPlan,
+    entitlementSource: effectiveBusinessEntitlement.entitlementSource,
+    billingManagementContext: effectiveBusinessEntitlement.billingManagementContext,
+    hasEffectivePremiumRecruiterAccess,
+    isBusinessEntitlementLoading,
+
 
     // Discriminated UI state (single source of truth for the panel)
     uiState,
