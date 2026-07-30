@@ -49,10 +49,17 @@ const CANDIDATE_PATH = fileURLToPath(
 );
 const CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, "utf8");
 
-// Minimal isolated bootstrap: only the roles and the ownership/billing columns
-// the candidate RPCs actually read. The isolated recruiter billing table
-// intentionally accepts the FULL Phase 1R-D1 status vocabulary so the durable
-// policy branches can be exercised; production tables are untouched.
+// Isolated bootstrap mirroring the repository PRODUCTION constraints that are
+// relevant to this proof:
+//   * recruiter_profiles.user_id UNIQUE
+//       (20260513003741_07f20f7a-242b-44d6-bd4b-4d91849cc847.sql)
+//   * recruiter_billing_profiles.recruiter_id UNIQUE, and NO user_id uniqueness
+//       (20260523023143_9b418a9e-92de-4f62-adc5-ca3f5169669e.sql)
+//   * agency_entitlements.agency_id UNIQUE
+//       (20260630001239_aacd1acb-dd6f-4fc5-9645-7f430b807820.sql)
+// Only the ownership/billing columns the candidate RPCs actually read are
+// created. Status/plan/source columns stay text so the isolated fixtures can
+// exercise malformed fail-closed branches; production tables are untouched.
 const BOOTSTRAP_SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -73,15 +80,18 @@ DROP TABLE IF EXISTS public.agency_members CASCADE;
 DROP TABLE IF EXISTS public.agency_profiles CASCADE;
 DROP TABLE IF EXISTS public.recruiter_profiles CASCADE;
 
+-- production-fidelity: recruiter_profiles.user_id UNIQUE
 CREATE TABLE public.recruiter_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL UNIQUE,
+  user_id uuid NOT NULL,
   status text NOT NULL DEFAULT 'active',
   verification_status text NOT NULL DEFAULT 'approved',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT recruiter_profiles_user_unique UNIQUE (user_id)
 );
 
+-- production-fidelity: recruiter_billing_profiles.recruiter_id UNIQUE only
 CREATE TABLE public.recruiter_billing_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recruiter_id uuid NOT NULL REFERENCES public.recruiter_profiles(id) ON DELETE CASCADE,
@@ -113,6 +123,7 @@ CREATE TABLE public.agency_members (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- production-fidelity: agency_entitlements.agency_id UNIQUE
 CREATE TABLE public.agency_entitlements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   agency_id uuid NOT NULL REFERENCES public.agency_profiles(id) ON DELETE CASCADE,
@@ -120,7 +131,8 @@ CREATE TABLE public.agency_entitlements (
   status text NOT NULL DEFAULT 'active',
   source text NOT NULL DEFAULT 'stripe',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT agency_entitlements_agency_id_key UNIQUE (agency_id)
 );
 
 GRANT ALL ON public.recruiter_profiles, public.recruiter_billing_profiles,
