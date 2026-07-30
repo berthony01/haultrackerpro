@@ -545,10 +545,11 @@ describe("Phase 1R-D2-B2-A-R2 — Repair D/E: proof fidelity and hygiene", () =>
     for (const forbidden of [
       "setTimeout",
       "setInterval",
-      "Date.now()",
+      "sleep(",
       "startedAt",
-      "lock-wait",
+      "elapsed",
       "lockwait",
+      "lock wait proof",
     ]) {
       expect(pgTestSource).not.toContain(forbidden);
     }
