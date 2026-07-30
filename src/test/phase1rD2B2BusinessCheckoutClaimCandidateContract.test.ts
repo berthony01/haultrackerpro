@@ -6,9 +6,13 @@ import { describe, expect, it } from "vitest";
  * Phase 1R-D2-B2-A — static contract proof for the atomic business checkout
  * claim CANDIDATE. Node file reads only: no database, no network.
  *
- * This phase deliberately does NOT create an active migration. The candidate
- * lives under supabase/migration-candidates/ and B2-B promotion is separate.
+ * This file still proves the accepted B2-A candidate exactly as tested. Phase
+ * 1R-D2-B2-B separately created an active migration whose executable body was
+ * promoted from this candidate; that promotion has its own dedicated contract
+ * test, which owns the body-equality proof. The candidate itself was neither
+ * moved nor applied: it remains candidate-only at its original path.
  */
+
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
@@ -74,9 +78,22 @@ describe("Phase 1R-D2-B2-A — candidate location and header", () => {
     expect(existsSync(path.join(REPO_ROOT, CANDIDATE_REL))).toBe(true);
   });
 
-  it("does not create an active B2 migration in this phase", () => {
-    expect(existsSync(path.join(REPO_ROOT, PROMOTED_ACTIVE_REL))).toBe(false);
+  it("remains candidate-only at its original migration-candidates path", () => {
+    expect(CANDIDATE_REL).toBe(
+      path.join(
+        "supabase",
+        "migration-candidates",
+        "20260730070000_phase1r_d2_b2_business_checkout_claims.sql",
+      ),
+    );
+    expect(existsSync(path.join(REPO_ROOT, CANDIDATE_REL))).toBe(true);
+    expect(candidateHeader).toContain("CANDIDATE ONLY");
   });
+
+  it("has an active B2 migration created by the separate B2-B promotion", () => {
+    expect(existsSync(path.join(REPO_ROOT, PROMOTED_ACTIVE_REL))).toBe(true);
+  });
+
 
   it("identifies Phase 1R-D2-B2-A as candidate only", () => {
     expect(candidateHeader).toContain("Phase 1R-D2-B2-A");
