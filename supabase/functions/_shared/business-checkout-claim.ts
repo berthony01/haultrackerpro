@@ -129,7 +129,7 @@ function singleRow(data: unknown): Record<string, unknown> | null {
 }
 
 function normalizeClaimRow(data: unknown): BusinessCheckoutClaimRow {
-  const row = firstRow(data);
+  const row = singleRow(data);
   return {
     outcome: str(row?.outcome) ?? "unknown",
     reason: str(row?.reason),
