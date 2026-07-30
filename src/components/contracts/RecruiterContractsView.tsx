@@ -67,8 +67,12 @@ function readinessFromStatus(status: string | null, hasVersion: boolean) {
 export function RecruiterContractsView({ onOpenApplications }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
   const billing = useRecruiterBilling();
-  const planAllowsContracts =
-    (billing.plan === 'growth' || billing.plan === 'fleet') && billing.isBillingActive;
+  // Phase 1R-C: effective capability, not a raw recruiter plan comparison.
+  const planAllowsContracts = billing.canUseContractWorkflowTools === true;
+  const entitlementState = billing.businessEntitlementState ?? 'resolved';
+  const entitlementUnavailable =
+    entitlementState === 'error' || entitlementState === 'conflict';
+
   const { recruiterApplications, isLoadingRecruiter, isErrorRecruiter, refetchRecruiter } =
     useOpportunityApplications({ recruiterId: planAllowsContracts ? profile?.id : undefined });
   const [filter, setFilter] = useState<RecruiterContractsFilter>('awaiting_upload');
