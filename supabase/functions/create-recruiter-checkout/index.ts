@@ -176,6 +176,58 @@ serve(async (req) => {
       });
     }
 
+    // Phase 1R-D1 — cross-context business billing precheck. Runs BEFORE any
+    // Stripe construction, recruiter-intent RPC, or orchestrator call so a
+    // blocked user never produces a Stripe customer or Checkout Session.
+    const { data: ownerRows, error: ownerErr } = await supabaseService
+      .from("agency_members")
+      .select("agency_id")
+      .eq("member_user_id", user.id)
+      .eq("role", "agency_owner")
+      .eq("status", "active");
+    if (ownerErr) {
+      return jsonResponse({
+        status: 503,
+        code: "transient_error",
+        message: "Temporary billing error. Please try again.",
+      });
+    }
+    const ownedAgencyIds: string[] = (ownerRows ?? [])
+      .map((row: { agency_id?: string | null }) => row?.agency_id ?? null)
+      .filter((v: string | null): v is string => typeof v === "string" && v !== "");
+
+    if (ownedAgencyIds.length > 0) {
+      const { data: entRows, error: entErr } = await supabaseService
+        .from("agency_entitlements")
+        .select("agency_id, plan_key, status, source")
+        .in("agency_id", ownedAgencyIds);
+      if (entErr) {
+        return jsonResponse({
+          status: 503,
+          code: "transient_error",
+          message: "Temporary billing error. Please try again.",
+        });
+      }
+
+      for (const row of entRows ?? []) {
+        const decision = evaluateRecruiterCheckoutCrossContext({
+          hasRow: true,
+          planKey: row?.plan_key ?? null,
+          status: row?.status ?? null,
+          source: row?.source ?? null,
+          hasActiveOwnerMembership: true,
+        });
+        if (!decision.allowed) {
+          log("cross_context_block", { code: decision.code });
+          return jsonResponse({
+            status: decision.status,
+            code: decision.code,
+            message: decision.message,
+          });
+        }
+      }
+    }
+
     // Build adapters.
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const deps = buildDeps(stripe, supabaseService);
