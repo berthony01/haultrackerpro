@@ -392,7 +392,7 @@ describe('Phase 1R-C-R1 — recruiter report header and cache identity', () => {
 // Phase 1R-C-R1 — authoritative SQL and production source contract guards
 // ---------------------------------------------------------------------------
 
-const REPO_ROOT = path.resolve(__dirname, '../..');
+const REPO_ROOT = process.cwd();
 
 function readRepoFile(relative: string): string {
   return fs.readFileSync(path.join(REPO_ROOT, relative), 'utf8');
