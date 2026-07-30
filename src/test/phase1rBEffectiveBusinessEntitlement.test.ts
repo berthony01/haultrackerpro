@@ -121,10 +121,10 @@ describe('Phase 1R-B — explicit recruiter paid entitlement', () => {
   });
 
   it.each(['starter', 'growth', 'fleet'] as const)(
-    '4. trialing recruiter %s maps exactly',
+    '4. trialing recruiter %s maps exactly',  // trial-allowlist: Stripe subscription status literal, not user-facing copy
     (plan) => {
       const result = resolveEffectiveBusinessEntitlement(
-        makeInput({ recruiterBilling: { hasRow: true, plan, status: 'trialing' } }),
+        makeInput({ recruiterBilling: { hasRow: true, plan, status: 'trialing' } }),  // trial-allowlist: Stripe subscription status literal, not user-facing copy
       );
       expect(result.effectiveRecruiterTier).toBe(plan);
       expect(result.entitlementSource).toBe('recruiter_subscription');
@@ -181,9 +181,9 @@ describe('Phase 1R-B — agency-included recruiter entitlement', () => {
     ['agency_starter', 'starter'],
     ['agency_team', 'growth'],
     ['agency_growth', 'fleet'],
-  ] as const)('8. trialing owner on %s includes %s', (planKey, tier) => {
+  ] as const)('8. trialing owner on %s includes %s', (planKey, tier) => {  // trial-allowlist: Stripe subscription status literal, not user-facing copy
     const result = resolveEffectiveBusinessEntitlement(
-      makeInput(agencyOwner(planKey, 'trialing')),
+      makeInput(agencyOwner(planKey, 'trialing')),  // trial-allowlist: Stripe subscription status literal, not user-facing copy
     );
     expect(result.effectiveRecruiterTier).toBe(tier);
     expect(result.effectiveAgencyPlan).toBe(planKey);
@@ -453,7 +453,7 @@ describe('Phase 1R-B — free standard, none, and source semantics', () => {
     expect(result.canPostStandardOpportunities).toBe(false);
   });
 
-  it.each(['active', 'trialing'])(
+  it.each(['active', 'trialing'])(  // trial-allowlist: Stripe subscription status literal, not user-facing copy
     '25. %s Stripe agency entitlement without a recruiter profile selects agency billing context only',
     (status) => {
       const result = resolveEffectiveBusinessEntitlement(
@@ -517,7 +517,7 @@ describe('Phase 1R-B — purity, immutability, determinism', () => {
 
   it('28. is deterministic across repeated calls', () => {
     const input = makeInput({
-      ...agencyOwner('agency_growth', 'trialing', 'stripe'),
+      ...agencyOwner('agency_growth', 'trialing', 'stripe'),  // trial-allowlist: Stripe subscription status literal, not user-facing copy
       recruiterProfile: { exists: true, readyToPost: false, suspended: false },
     });
     const first = resolveEffectiveBusinessEntitlement(input);

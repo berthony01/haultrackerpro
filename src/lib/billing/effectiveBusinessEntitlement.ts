@@ -18,12 +18,12 @@
  *  4. Agency-included recruiter premium is OWNER-ONLY and requires an active
  *     membership.
  *  5. Agency inclusion also requires an explicit row, a valid paid agency plan,
- *     agency status active/trialing, and an existing recruiter profile.
+ *     agency status active/trialing, and an existing recruiter profile.  (trial-allowlist: Stripe status literal)
  *  6. manual_beta preserves the agency plan but never includes recruiter premium.
  *  7. past_due grants no premium, but may still resolve a billing-management
  *     context.
  *  8. Recruiter paid premium requires explicit row + valid paid plan +
- *     active/trialing status.
+ *     active/trialing status.  (trial-allowlist: Stripe status literal)
  *  9. Anything unknown/missing/malformed grants no premium.
  * 10. Dual paid business entitlement is an explicit fail-closed conflict.
  * 11. Suspension never erases a resolved tier — it only blocks standard posting.
@@ -205,7 +205,7 @@ export function resolveEffectiveBusinessEntitlement(
   const agencyStatusPastDue = isExactly(agencyEntitlement.status, 'past_due');
   const agencySourceStripe = isExactly(agencyEntitlement.source, 'stripe');
 
-  // Semantics C — effective agency plan (active/trialing/manual_beta only).
+  // Semantics C — effective agency plan (active/trialing/manual_beta only).  // trial-allowlist: Stripe subscription status literal, not user-facing copy
   const effectiveAgencyPlan: PaidAgencyPlanKey | null =
     agencyRowValid && (agencyStatusPremium || agencyStatusManualBeta)
       ? (agencyPlanKey as PaidAgencyPlanKey)
