@@ -327,9 +327,8 @@ describe("Phase 1R-D2-B2-A — coordination and D1 policy vocabulary", () => {
       "'agency_starter','agency_team','agency_growth'",
     );
     expect(candidateSql).toContain("'stripe','manual','admin_seed'");
-    // trial-allowlist: Stripe subscription status vocabulary literal
     expect(candidateSql).toContain(
-      "'manual_beta','trialing','active','past_due','cancelled'",
+      "'manual_beta','trialing','active','past_due','cancelled'", // trial-allowlist: Stripe status vocabulary literal
     );
     expect(candidateSql).toContain("'agency_entitlement_exists'");
     expect(candidateSql).toContain("'agency_billing_requires_management'");
