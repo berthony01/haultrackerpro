@@ -27,6 +27,9 @@ import {
 } from 'lucide-react';
 import { useRecruiterProfile, type RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunities/useRecruiterBilling';
+import { ASSISTANT_AGENCY_PLANS } from '@/lib/agencyPlans';
+import type { PaidAgencyPlanKey } from '@/lib/billing/effectiveBusinessEntitlement';
+
 import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -53,15 +56,16 @@ type RecruiterState =
 
 function resolveState(
   profile: RecruiterProfile | null,
-  isBillingActive: boolean,
+  hasPremiumAccess: boolean,
   intentRecruiter: boolean,
 ): { state: RecruiterState; canPost: boolean } {
   const e = describeRecruiterEligibility(profile, { intentRecruiter });
   if (e.state === 'missing_profile') return { state: 'none', canPost: false };
   if (e.state === 'suspended') return { state: 'suspended', canPost: false };
   if (e.state === 'incomplete_profile') return { state: 'incomplete', canPost: false };
-  return { state: isBillingActive ? 'active_billing' : 'active_no_billing', canPost: e.canPost };
+  return { state: hasPremiumAccess ? 'active_billing' : 'active_no_billing', canPost: e.canPost };
 }
+
 
 interface Props {
   onBack: () => void;
@@ -72,7 +76,21 @@ interface Props {
 
 export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onApplications }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
-  const { isBillingActive, plan, status, isLoading: billingLoading } = useRecruiterBilling();
+  const billing = useRecruiterBilling();
+  const { isBillingActive, plan, status, isLoading: billingLoading } = billing;
+  // Phase 1R-C: premium presentation follows the EFFECTIVE entitlement,
+  // which may be an explicit recruiter subscription or agency-included
+  // access. Read defensively so narrow legacy mocks keep working.
+  const hasPremiumAccess =
+    billing.hasEffectivePremiumRecruiterAccess ?? isBillingActive;
+  const entitlementSource =
+    billing.entitlementSource ??
+    (isBillingActive ? 'recruiter_subscription' : 'free_standard');
+  const isAgencyIncluded = entitlementSource === 'agency_included';
+  const effectiveRecruiterPlan = billing.effectiveRecruiterPlan ?? plan;
+  const effectiveAgencyPlan = billing.effectiveAgencyPlan ?? null;
+  const canUsePriorityPlacement = billing.canUsePriorityPlacement ?? false;
+
   const { opportunities, isLoading: oppsLoading } = useRecruiterOpportunities();
   const { recruiterApplications, isLoadingRecruiter } = useOpportunityApplications({ recruiterId: profile?.id ?? undefined });
   const { intentRecruiter } = useUserRole();
@@ -81,7 +99,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const howRef = useRef<HTMLDivElement | null>(null);
   const onboardingRef = useRef<HTMLDivElement | null>(null);
 
-  const { state, canPost } = resolveState(profile, isBillingActive, !!intentRecruiter);
+  const { state, canPost } = resolveState(profile, hasPremiumAccess, !!intentRecruiter);
   const apps = recruiterApplications;
 
   const snapshot = useMemo(() => {
@@ -336,9 +354,14 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               loading={billingLoading}
               plan={plan}
               status={status}
-              isBillingActive={isBillingActive}
+              hasPremiumAccess={hasPremiumAccess}
+              isAgencyIncluded={isAgencyIncluded}
+              effectiveRecruiterPlan={effectiveRecruiterPlan}
+              effectiveAgencyPlan={effectiveAgencyPlan}
+              canUsePriorityPlacement={canUsePriorityPlacement}
               onManagePlan={() => scrollTo(billingRef)}
             />
+
           </div>
         </div>
       )}
@@ -730,17 +753,25 @@ function BillingSummary({
   loading,
   plan,
   status,
-  isBillingActive,
+  hasPremiumAccess,
+  isAgencyIncluded,
+  effectiveRecruiterPlan,
+  effectiveAgencyPlan,
+  canUsePriorityPlacement,
   onManagePlan,
 }: {
   loading: boolean;
   plan: keyof typeof RECRUITER_PLAN_LABELS;
   status: string;
-  isBillingActive: boolean;
+  hasPremiumAccess: boolean;
+  isAgencyIncluded: boolean;
+  effectiveRecruiterPlan: keyof typeof RECRUITER_PLAN_LABELS;
+  effectiveAgencyPlan: PaidAgencyPlanKey | null;
+  canUsePriorityPlacement: boolean;
   onManagePlan: () => void;
 }) {
   if (loading) return <Skeleton className="h-40 w-full" />;
-  if (!isBillingActive) {
+  if (!hasPremiumAccess) {
     return (
       <Card className="p-5 border-primary/30 bg-primary/5">
         <div className="flex items-start gap-3">
@@ -756,8 +787,34 @@ function BillingSummary({
       </Card>
     );
   }
-  const priorityPlacement =
-    plan === 'growth' || plan === 'fleet' ? 'Included' : 'Upgrade to Growth';
+  const priorityPlacement = canUsePriorityPlacement ? 'Included' : 'Upgrade to Growth';
+
+  // Phase 1R-C: agency-included premium recruiter access — no recruiter
+  // upgrade or Manage Plan action is offered here.
+  if (isAgencyIncluded) {
+    const agencyLabel = effectiveAgencyPlan
+      ? ASSISTANT_AGENCY_PLANS[effectiveAgencyPlan].label
+      : 'Agency plan';
+    return (
+      <Card className="p-5 border-border/60" data-testid="recruiter-billing-summary-agency-included">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-foreground">Billing</h3>
+          <Badge variant="default">Included with agency</Badge>
+        </div>
+        <div className="space-y-2 text-sm">
+          <Row label="Recruiter plan" value={RECRUITER_PLAN_LABELS[effectiveRecruiterPlan]} />
+          <Row label="Agency plan" value={agencyLabel} />
+          <Row label="Standard posting" value="Unlimited on your recruiter account" />
+          <Row
+            label="Premium tools"
+            value="Included through your agency entitlement"
+          />
+          <Row label="Priority placement" value={priorityPlacement} />
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="p-5 border-border/60">
       <div className="flex items-center justify-between mb-3">
@@ -777,6 +834,7 @@ function BillingSummary({
     </Card>
   );
 }
+
 
 function Row({ label, value }: { label: string; value: string }) {
   return (

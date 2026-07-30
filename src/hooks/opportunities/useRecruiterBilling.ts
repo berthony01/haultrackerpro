@@ -5,10 +5,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRecruiterProfile } from './useRecruiterProfile';
 import type { Tables } from '@/integrations/supabase/types';
 import {
-  getRecruiterPlanCapabilities,
+  getRecruiterCapabilitiesForTier,
   isRecruiterPaidPlanActive,
   resolveRecruiterCapabilityTier,
 } from '@/lib/recruiterCapabilities';
+import { useMyAgency } from '@/hooks/useAgency';
+import { useAgencyEntitlement } from '@/hooks/useAgencyEntitlement';
+import {
+  resolveEffectiveBusinessEntitlement,
+  type EffectiveBusinessEntitlement,
+} from '@/lib/billing/effectiveBusinessEntitlement';
+
 import {
   isSafeStripeCheckoutUrl,
   isSafeStripeBillingPortalUrl,
@@ -70,9 +77,10 @@ export function useRecruiterBilling() {
   const {
     profile,
     isLoading: profileLoading,
-    isApproved,
     isSuspended,
+    isProfileComplete,
   } = useRecruiterProfile();
+
   const recruiterId = profile?.id ?? null;
   const qc = useQueryClient();
 
@@ -186,18 +194,106 @@ export function useRecruiterBilling() {
   const legacyCanSubmitMore_DO_NOT_USE_FOR_STANDARD_POSTING =
     isBillingActive && activeCount < limit;
 
-  const capabilities = getRecruiterPlanCapabilities({
-    plan,
-    status,
-    isApprovedRecruiter: isApproved,
-    isSuspended,
+  // ---- Phase 1R-C: effective business entitlement ------------------------
+  //
+  // RAW recruiter billing (above) stays the ONLY source for recruiter Stripe
+  // checkout / portal / subscription fields. The EFFECTIVE entitlement below
+  // may additionally come from an included agency entitlement and is the
+  // source for premium feature capability gates.
+  const myAgency = useMyAgency();
+  const agencyId = myAgency.data?.id ?? null;
+  const agencyEnt = useAgencyEntitlement(agencyId);
+  const hasRealAgency = !!agencyId;
+
+  const recruiterSourceState: 'ready' | 'loading' | 'error' = billingQuery.isError
+    ? 'error'
+    : profileLoading || billingQuery.isLoading
+      ? 'loading'
+      : 'ready';
+
+  const agencySourceState: 'ready' | 'loading' | 'error' =
+    myAgency.isError || (hasRealAgency && agencyEnt.isError)
+      ? 'error'
+      : myAgency.isLoading || (hasRealAgency && agencyEnt.isLoading)
+        ? 'loading'
+        : 'ready';
+
+  // `get_my_agency` joins agency_members with `am.status = 'active'`, so a
+  // returned row proves the caller is an ACTIVE member of that agency.
+  const agencyMembershipStatus = myAgency.data ? 'active' : null;
+  const agencyMembershipRole = myAgency.data?.my_role ?? null;
+
+  const agencyEntitlementRow = agencyEnt.entitlement;
+  const agencyHasRow = agencyEnt.hasRow;
+
+  const effectiveBusinessEntitlement: EffectiveBusinessEntitlement = useMemo(
+    () =>
+      resolveEffectiveBusinessEntitlement({
+        sourceState: {
+          recruiterBilling: recruiterSourceState,
+          agencyEntitlement: agencySourceState,
+        },
+        recruiterBilling: {
+          hasRow: !!billing,
+          plan: billing?.plan ?? null,
+          status: billing?.status ?? null,
+        },
+        agencyEntitlement: {
+          hasRow: agencyHasRow,
+          planKey: agencyHasRow ? agencyEntitlementRow.planKey : null,
+          status: agencyHasRow ? agencyEntitlementRow.status : null,
+          source: agencyHasRow ? agencyEntitlementRow.source : null,
+        },
+        agencyMembership: {
+          role: agencyMembershipRole,
+          status: agencyMembershipStatus,
+        },
+        recruiterProfile: {
+          exists: !!profile,
+          readyToPost: isProfileComplete,
+          suspended: isSuspended,
+        },
+      }),
+    [
+      recruiterSourceState,
+      agencySourceState,
+      billing,
+      agencyHasRow,
+      agencyEntitlementRow.planKey,
+      agencyEntitlementRow.status,
+      agencyEntitlementRow.source,
+      agencyMembershipRole,
+      agencyMembershipStatus,
+      profile,
+      isProfileComplete,
+      isSuspended,
+    ],
+  );
+
+  const effectiveRecruiterTier = effectiveBusinessEntitlement.effectiveRecruiterTier;
+  const effectiveRecruiterPlan: RecruiterPlan =
+    effectiveRecruiterTier === 'free_verified' ? 'none' : effectiveRecruiterTier;
+  const hasEffectivePremiumRecruiterAccess =
+    effectiveBusinessEntitlement.state === 'resolved' &&
+    effectiveRecruiterTier !== 'free_verified';
+  const isBusinessEntitlementLoading =
+    effectiveBusinessEntitlement.state === 'loading';
+
+  const capabilities = getRecruiterCapabilitiesForTier({
+    tier: effectiveRecruiterTier,
+    canPostStandardOpportunities:
+      effectiveBusinessEntitlement.canPostStandardOpportunities,
   });
 
   const refetchBilling = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['recruiter_billing'] });
     qc.invalidateQueries({ queryKey: ['recruiter_active_opportunity_count'] });
     qc.invalidateQueries({ queryKey: ['recruiter_profile'] });
+    // Phase 1R-C: effective entitlement also depends on agency state.
+    qc.invalidateQueries({ queryKey: ['my-agency'] });
+    qc.invalidateQueries({ queryKey: ['agency-entitlement'] });
   }, [qc]);
+
 
   // ---- Server-progress + error state (drives the UI state machine) ------
 
@@ -291,7 +387,14 @@ export function useRecruiterBilling() {
     ],
   );
 
-  const canStartCheckout = canStartCheckoutFn(uiState);
+  // Phase 1R-C fail-closed client guard: recruiter checkout requires the
+  // existing recruiter UI-state permission AND a fully resolved business
+  // entitlement that is not already included through an agency.
+  const canStartCheckout =
+    canStartCheckoutFn(uiState) &&
+    effectiveBusinessEntitlement.state === 'resolved' &&
+    effectiveBusinessEntitlement.entitlementSource !== 'agency_included';
+
   const showManageBilling = shouldShowManageBillingFn(
     uiState,
     !!billing?.stripe_subscription_id,
@@ -425,7 +528,26 @@ export function useRecruiterBilling() {
     activeCount,
     isBillingActive,
     canSubmitMore: legacyCanSubmitMore_DO_NOT_USE_FOR_STANDARD_POSTING,
-    isLoading: billingQuery.isLoading || activeCountQuery.isLoading,
+    isLoading:
+      profileLoading ||
+      billingQuery.isLoading ||
+      activeCountQuery.isLoading ||
+      myAgency.isLoading ||
+      (hasRealAgency && agencyEnt.isLoading),
+
+    // Phase 1R-C: effective business entitlement (additive, never overwrites
+    // the raw recruiter billing fields above)
+    effectiveBusinessEntitlement,
+    businessEntitlementState: effectiveBusinessEntitlement.state,
+    businessEntitlementConflictReason: effectiveBusinessEntitlement.conflictReason,
+    effectiveRecruiterTier,
+    effectiveRecruiterPlan,
+    effectiveAgencyPlan: effectiveBusinessEntitlement.effectiveAgencyPlan,
+    entitlementSource: effectiveBusinessEntitlement.entitlementSource,
+    billingManagementContext: effectiveBusinessEntitlement.billingManagementContext,
+    hasEffectivePremiumRecruiterAccess,
+    isBusinessEntitlementLoading,
+
 
     // Discriminated UI state (single source of truth for the panel)
     uiState,
@@ -441,7 +563,7 @@ export function useRecruiterBilling() {
     prepareTab,
     refresh,
 
-    // Capability layer (unchanged)
+    // Capability layer (now resolved from the EFFECTIVE recruiter tier)
     capabilities,
     capabilityTier: capabilities.tier,
     isPaidRecruiterPlanActive: isRecruiterPaidPlanActive(plan, status),

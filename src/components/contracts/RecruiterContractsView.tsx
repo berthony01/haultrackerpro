@@ -67,8 +67,12 @@ function readinessFromStatus(status: string | null, hasVersion: boolean) {
 export function RecruiterContractsView({ onOpenApplications }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
   const billing = useRecruiterBilling();
-  const planAllowsContracts =
-    (billing.plan === 'growth' || billing.plan === 'fleet') && billing.isBillingActive;
+  // Phase 1R-C: effective capability, not a raw recruiter plan comparison.
+  const planAllowsContracts = billing.canUseContractWorkflowTools === true;
+  const entitlementState = billing.businessEntitlementState ?? 'resolved';
+  const entitlementUnavailable =
+    entitlementState === 'error' || entitlementState === 'conflict';
+
   const { recruiterApplications, isLoadingRecruiter, isErrorRecruiter, refetchRecruiter } =
     useOpportunityApplications({ recruiterId: planAllowsContracts ? profile?.id : undefined });
   const [filter, setFilter] = useState<RecruiterContractsFilter>('awaiting_upload');
@@ -106,7 +110,34 @@ export function RecruiterContractsView({ onOpenApplications }: Props) {
     );
   }
 
+  if (!billing.isLoading && !planAllowsContracts && entitlementUnavailable) {
+    return (
+      <Card
+        className="p-6 border-border/60 bg-card"
+        data-testid="recruiter-contracts-entitlement-unavailable"
+        role="alert"
+      >
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-muted p-3 shrink-0">
+            <Lock className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-foreground mb-1">
+              Contract Protection unavailable
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {entitlementState === 'conflict'
+                ? 'We found overlapping business subscriptions on this account. Contract Protection is paused until this is resolved. Please contact support.'
+                : "We couldn't confirm your plan access right now. Contract Protection is unavailable until this check succeeds. Please refresh and try again."}
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   if (!billing.isLoading && !planAllowsContracts) {
+
     return (
       <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/10 animate-fade-in">
         <div className="flex items-start gap-4">

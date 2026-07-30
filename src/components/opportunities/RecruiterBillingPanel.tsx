@@ -94,6 +94,19 @@ export function RecruiterBillingPanel() {
   const headline = hook.headline ?? null;
   const checkServerStatus = hook.checkServerStatus ?? (() => {});
 
+  // Phase 1R-C: additive effective-entitlement fields, read defensively so
+  // narrow legacy mocks that omit them never throw.
+  const entitlementSource = hook.entitlementSource ?? 'free_standard';
+  const businessEntitlementState = hook.businessEntitlementState ?? 'resolved';
+  const billingManagementContext = hook.billingManagementContext ?? 'none';
+  const effectiveRecruiterPlan = hook.effectiveRecruiterPlan ?? 'none';
+  const isAgencyIncluded = entitlementSource === 'agency_included';
+  const isEntitlementConflict = businessEntitlementState === 'conflict';
+  const isEntitlementError = businessEntitlementState === 'error';
+  const entitlementBlocksCheckout =
+    isAgencyIncluded || isEntitlementConflict || isEntitlementError;
+
+
   const [pendingPlan, setPendingPlan] = useState<PaidPlan | null>(null);
   // Phase 1G-R1A7-R1: real-Chromium rapid-double-click testing proved that
   // React Query's `isPending` flag is NOT synchronously available between
@@ -115,7 +128,9 @@ export function RecruiterBillingPanel() {
     if (actionInFlightRef.current) return;
     if (isPending) return;
     if (!canStartCheckout) return;
+    if (entitlementBlocksCheckout) return;
     actionInFlightRef.current = true;
+
     setFallback(null);
     // Synchronous popup MUST come before any awaited work so browsers
     // treat it as user-gesture initiated. Same deterministic name across
@@ -304,6 +319,68 @@ export function RecruiterBillingPanel() {
         </p>
       </Card>
 
+      {isAgencyIncluded && (
+        <Card
+          className="p-4 border-primary/40 bg-primary/5 space-y-2"
+          data-testid="recruiter-agency-included-access"
+        >
+          <div className="flex items-center gap-2">
+            <BadgeCheck className="h-4 w-4 text-primary" aria-hidden="true" />
+            <h3 className="text-sm font-bold text-foreground">
+              Premium Recruiter Access Included
+            </h3>
+            <Badge variant="default" className="capitalize">
+              {RECRUITER_PLAN_LABELS[effectiveRecruiterPlan]}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Premium recruiter tools are included through your agency
+            entitlement. No separate recruiter subscription is required.
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {billingManagementContext === 'agency'
+              ? 'Agency billing is managed from Agency Operations.'
+              : 'No recruiter billing action is required.'}
+          </p>
+        </Card>
+      )}
+
+      {isEntitlementConflict && (
+        <Card
+          className="p-4 border-destructive/50 bg-destructive/5 space-y-1"
+          role="alert"
+          data-testid="recruiter-business-entitlement-conflict"
+        >
+          <h3 className="text-sm font-bold text-foreground">
+            Overlapping Business Subscriptions
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            We found both a recruiter subscription and an agency entitlement on
+            this account. Premium recruiter tools are paused and no new
+            recruiter subscription can be started until this is resolved.
+            Please contact support.
+          </p>
+        </Card>
+      )}
+
+      {isEntitlementError && (
+        <Card
+          className="p-4 border-destructive/50 bg-destructive/5 space-y-1"
+          role="alert"
+          data-testid="recruiter-business-entitlement-error"
+        >
+          <h3 className="text-sm font-bold text-foreground">
+            Plan Access Could Not Be Verified
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            We couldn't confirm your business plan access right now. Premium
+            recruiter tools and new subscriptions are unavailable until this
+            check succeeds. Please refresh and try again.
+          </p>
+        </Card>
+      )}
+
+
       <Card className="p-4 border-border/60">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-bold text-foreground">Standard Recruiter Access</h3>
@@ -319,66 +396,74 @@ export function RecruiterBillingPanel() {
         </ul>
       </Card>
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-          <h3 className="text-sm font-bold text-foreground">
-            Upgrade for premium recruiting tools
-          </h3>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Premium visibility, reports, contract tools, analytics, and
-          recruiting workflow features.
-        </p>
-      </div>
+      {!isAgencyIncluded && (
+        <>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+              <h3 className="text-sm font-bold text-foreground">
+                Upgrade for premium recruiting tools
+              </h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Premium visibility, reports, contract tools, analytics, and
+              recruiting workflow features.
+            </p>
+          </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {PLANS.map((p) => {
-          const isCurrent = isBillingActive && plan === p.key;
-          const disabled =
-            isPending || isCurrent || !canStartCheckout;
-          return (
-            <Card
-              key={p.key}
-              className={`p-4 border-border/60 ${isCurrent ? 'ring-2 ring-primary' : ''}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold text-foreground">
-                  {RECRUITER_PLAN_LABELS[p.key]}
-                </h3>
-                {isCurrent && <Badge variant="default">Current</Badge>}
-              </div>
-              <p className="text-xs text-muted-foreground mb-1">{p.price}</p>
-              <p className="text-[11px] text-muted-foreground mb-3">{p.tagline}</p>
-              <ul className="space-y-1 mb-3">
-                {p.perks.map((perk, i) => (
-                  <PerkItem key={i} perk={perk} />
-                ))}
-              </ul>
-              <Button
-                size="sm"
-                className="w-full"
-                variant={isCurrent ? 'outline' : 'default'}
-                disabled={disabled}
-                aria-busy={pendingPlan === p.key || undefined}
-                data-testid={`recruiter-plan-button-${p.key}`}
-                onClick={() => handleUpgrade(p.key)}
-              >
-                {pendingPlan === p.key ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    <span>Preparing…</span>
-                  </>
-                ) : isCurrent ? (
-                  'Active'
-                ) : (
-                  `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
-                )}
-              </Button>
-            </Card>
-          );
-        })}
-      </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {PLANS.map((p) => {
+              const isCurrent = isBillingActive && plan === p.key;
+              const disabled =
+                isPending ||
+                isCurrent ||
+                !canStartCheckout ||
+                entitlementBlocksCheckout;
+              return (
+                <Card
+                  key={p.key}
+                  className={`p-4 border-border/60 ${isCurrent ? 'ring-2 ring-primary' : ''}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-sm font-bold text-foreground">
+                      {RECRUITER_PLAN_LABELS[p.key]}
+                    </h3>
+                    {isCurrent && <Badge variant="default">Current</Badge>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1">{p.price}</p>
+                  <p className="text-[11px] text-muted-foreground mb-3">{p.tagline}</p>
+                  <ul className="space-y-1 mb-3">
+                    {p.perks.map((perk, i) => (
+                      <PerkItem key={i} perk={perk} />
+                    ))}
+                  </ul>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant={isCurrent ? 'outline' : 'default'}
+                    disabled={disabled}
+                    aria-busy={pendingPlan === p.key || undefined}
+                    data-testid={`recruiter-plan-button-${p.key}`}
+                    onClick={() => handleUpgrade(p.key)}
+                  >
+                    {pendingPlan === p.key ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        <span>Preparing…</span>
+                      </>
+                    ) : isCurrent ? (
+                      'Active'
+                    ) : (
+                      `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
+                    )}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+
 
       {showManageBilling && (
         <Button

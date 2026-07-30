@@ -28,6 +28,16 @@ const profileMocks = vi.hoisted(() => ({
   isSuspended: false,
   isLoading: false,
 }));
+// Phase 1R-C: agency sources feeding the effective business entitlement.
+const agencyMocks = vi.hoisted(() => ({
+  agency: null as Record<string, unknown> | null,
+  agencyLoading: false,
+  agencyError: false,
+  entitlement: null as Record<string, unknown> | null,
+  hasRow: false,
+  entLoading: false,
+  entError: false,
+}));
 const supabaseMocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   fromMaybeSingle: vi.fn(async () => ({ data: null, error: null })),
@@ -48,14 +58,55 @@ vi.mock('@/hooks/useAuth', () => ({
 vi.mock('@/hooks/useAdmin', () => ({
   useAdmin: () => ({ isAdmin: adminMocks.isAdmin }),
 }));
-vi.mock('@/hooks/opportunities/useRecruiterProfile', () => ({
-  useRecruiterProfile: () => ({
-    profile: profileMocks.profile,
-    isApproved: profileMocks.isApproved,
-    isSuspended: profileMocks.isSuspended,
-    isLoading: profileMocks.isLoading,
+vi.mock('@/hooks/opportunities/useRecruiterProfile', async () => {
+  const { isProfileCompleteForPosting } = await vi.importActual<
+    typeof import('@/lib/opportunities/recruiterEligibility')
+  >('@/lib/opportunities/recruiterEligibility');
+  return {
+    useRecruiterProfile: () => {
+      const complete = isProfileCompleteForPosting(
+        profileMocks.profile as never,
+      );
+      return {
+        profile: profileMocks.profile,
+        isApproved: profileMocks.isApproved,
+        isSuspended: profileMocks.isSuspended,
+        isLoading: profileMocks.isLoading,
+        isProfileComplete: complete,
+        canPost:
+          !!profileMocks.profile && !profileMocks.isSuspended && complete,
+      };
+    },
+  };
+});
+
+// Phase 1R-C: narrow default agency mocks. With no agency present the
+// effective entitlement resolves exactly as recruiter-only, so every
+// pre-existing test in this file keeps its original behavior.
+vi.mock('@/hooks/useAgency', () => ({
+  useMyAgency: () => ({
+    data: agencyMocks.agency,
+    isLoading: agencyMocks.agencyLoading,
+    isError: agencyMocks.agencyError,
   }),
 }));
+vi.mock('@/hooks/useAgencyEntitlement', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/agencyPlans')>(
+    '@/lib/agencyPlans',
+  );
+  return {
+    useAgencyEntitlement: (agencyId: string | null | undefined) => ({
+      entitlement:
+        agencyMocks.entitlement ?? actual.defaultBetaEntitlement(agencyId ?? ''),
+      hasRow: agencyMocks.hasRow,
+      isLoading: agencyMocks.entLoading,
+      isError: agencyMocks.entError,
+      error: null,
+      refetch: () => {},
+    }),
+  };
+});
+
 
 vi.mock('@/integrations/supabase/client', () => {
   const billingChain = {
@@ -159,6 +210,14 @@ beforeEach(() => {
   profileMocks.isApproved = true;
   profileMocks.isSuspended = false;
   profileMocks.isLoading = false;
+  agencyMocks.agency = null;
+  agencyMocks.agencyLoading = false;
+  agencyMocks.agencyError = false;
+  agencyMocks.entitlement = null;
+  agencyMocks.hasRow = false;
+  agencyMocks.entLoading = false;
+  agencyMocks.entError = false;
+
   supabaseMocks.invoke.mockReset();
   supabaseMocks.fromMaybeSingle.mockReset();
   supabaseMocks.fromMaybeSingle.mockResolvedValue({ data: null, error: null });
@@ -918,5 +977,126 @@ describe('safe messaging', () => {
     );
     const text = screen.getByTestId('recruiter-billing-status').textContent ?? '';
     expect(text).not.toMatch(/cus_leaky_777|DatabaseException/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1R-C — effective business entitlement rendering in the production panel
+// ---------------------------------------------------------------------------
+
+function withAgency(
+  planKey: string,
+  status: string,
+  source: string,
+  role = 'agency_owner',
+) {
+  agencyMocks.agency = { id: 'agency-1', my_role: role };
+  agencyMocks.hasRow = true;
+  agencyMocks.entitlement = {
+    agencyId: 'agency-1',
+    planKey,
+    status,
+    source,
+    activeClientLimit: null,
+    memberLimit: null,
+    servicePackageLimit: null,
+    currentPeriodEnd: null,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+  };
+}
+
+describe('Phase 1R-C — agency-included recruiter premium access', () => {
+  it('stripe agency_team owner: renders included access, hides recruiter upgrade actions', async () => {
+    withAgency('agency_team', 'active', 'stripe');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-agency-included-access'),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByTestId('recruiter-agency-included-access').textContent,
+    ).toMatch(/Growth/);
+    expect(screen.queryByTestId('recruiter-plan-button-starter')).toBeNull();
+    expect(screen.queryByTestId('recruiter-plan-button-growth')).toBeNull();
+    expect(screen.queryByTestId('recruiter-plan-button-fleet')).toBeNull();
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it('admin_seed agency_growth owner: included at Fleet with no recruiter billing action', async () => {
+    withAgency('agency_growth', 'active', 'admin_seed');
+    renderPanel();
+    const card = await screen.findByTestId('recruiter-agency-included-access');
+    expect(card.textContent).toMatch(/Fleet/);
+    expect(card.textContent).toMatch(/No recruiter billing action is required/i);
+    expect(screen.queryByTestId('recruiter-plan-button-growth')).toBeNull();
+  });
+
+  it('manual_beta agency: no inclusion — recruiter upgrade actions remain available', async () => {
+    withAgency('agency_starter', 'manual_beta', 'manual');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('recruiter-agency-included-access')).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).not.toBeDisabled(),
+    );
+  });
+
+  it('non-owner member of a paid stripe agency: no inclusion granted', async () => {
+    withAgency('agency_team', 'active', 'stripe', 'agency_member');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('recruiter-agency-included-access')).toBeNull();
+  });
+
+  it('agency sources still loading: checkout is blocked fail-closed', async () => {
+    agencyMocks.agency = { id: 'agency-1', my_role: 'agency_owner' };
+    agencyMocks.agencyLoading = true;
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).toBeDisabled(),
+    );
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it('agency source error: renders error card and blocks checkout', async () => {
+    agencyMocks.agency = { id: 'agency-1', my_role: 'agency_owner' };
+    agencyMocks.hasRow = true;
+    agencyMocks.entError = true;
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-business-entitlement-error'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('recruiter-plan-button-starter')).toBeDisabled();
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it('recruiter subscription + agency inclusion: conflict card, premium paused, checkout blocked', async () => {
+    withBilling({ plan: 'starter', status: 'active', current_period_end: null });
+    withAgency('agency_team', 'active', 'stripe');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-business-entitlement-conflict'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('recruiter-agency-included-access')).toBeNull();
+    expect(screen.getByTestId('recruiter-plan-button-growth')).toBeDisabled();
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
   });
 });

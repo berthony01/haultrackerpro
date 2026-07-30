@@ -194,19 +194,51 @@ const TIER_BUILDERS: Record<
   fleet,
 };
 
+export interface RecruiterCapabilitiesForTierInput {
+  /** Already-resolved capability tier. Unknown values fail closed. */
+  tier: RecruiterCapabilityTier | string | null | undefined;
+  /** Posting permission decided by the caller — preserved exactly. */
+  canPostStandardOpportunities: boolean;
+}
+
+/**
+ * Phase 1R-C — build a capability object from an ALREADY-RESOLVED tier.
+ *
+ * This is the single builder used by both the raw plan/status path
+ * (`getRecruiterPlanCapabilities`) and the effective business entitlement
+ * path (agency-included recruiter premium). Unknown, malformed, null, or
+ * undefined tiers fail closed to `free_verified`. The supplied posting
+ * boolean is preserved exactly and never re-derived here.
+ */
+export function getRecruiterCapabilitiesForTier(
+  input: RecruiterCapabilitiesForTierInput,
+): RecruiterCapabilities {
+  const raw = input.tier;
+  const key: RecruiterCapabilityTier =
+    typeof raw === 'string' &&
+    Object.prototype.hasOwnProperty.call(TIER_BUILDERS, raw)
+      ? (raw as RecruiterCapabilityTier)
+      : 'free_verified';
+  const base = TIER_BUILDERS[key]();
+  return {
+    ...base,
+    canPostStandardOpportunities: input.canPostStandardOpportunities,
+  };
+}
+
 /** Main entry point. Resolves the full capability object for a recruiter. */
 export function getRecruiterPlanCapabilities(
   input: ResolveCapabilitiesInput,
 ): RecruiterCapabilities {
   const { plan, status, isApprovedRecruiter = true, isSuspended = false } = input;
   const tier = resolveRecruiterCapabilityTier(plan, status);
-  const base = TIER_BUILDERS[tier]();
   const canPost = isApprovedRecruiter === true && isSuspended !== true;
-  return {
-    ...base,
+  return getRecruiterCapabilitiesForTier({
+    tier,
     canPostStandardOpportunities: canPost,
-  };
+  });
 }
+
 
 /** Typed capability accessor — useful for call sites that want a single key. */
 export function hasRecruiterCapability<
