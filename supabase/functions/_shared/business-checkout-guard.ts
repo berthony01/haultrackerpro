@@ -216,10 +216,17 @@ export function evaluateRecruiterCheckoutCrossContext(
   }
 
   // A failing agency subscription must be resolved in the agency workspace
-  // rather than routed around by opening recruiter billing.
+  // rather than routed around by opening recruiter billing. Only a
+  // Stripe-sourced row can represent a real subscription that a user can
+  // manage in Stripe billing; a manual/admin_seed row in past_due is
+  // malformed and fails closed.
   if (status === "past_due") {
-    return block("agency_billing_requires_management");
+    if (facts.source === "stripe") {
+      return block("agency_billing_requires_management");
+    }
+    return block("opposing_entitlement_unknown");
   }
+
 
   // manual_beta and cancelled confer no live agency premium.
   return ALLOW;

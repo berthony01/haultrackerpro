@@ -496,6 +496,96 @@ describe("Phase 1R-D1 — agency checkout orchestrator", () => {
     });
   });
 
+  describe("R1 — historical completed-session freshness", () => {
+    it("R1-1. returns processing for a completed exact session with future expiry", async () => {
+      seedCanonical();
+      stripe.sessions.push(
+        makeSession({ status: "complete", url: null, expires_at: NOW + 300 }),
+      );
+      const r = await run();
+      expect(r.code).toBe("checkout_processing");
+      expect(stripe.createSessionCalls.length).toBe(0);
+    });
+
+    it("R1-2. ignores a historical completed session and starts a fresh checkout", async () => {
+      seedCanonical();
+      stripe.sessions.push(
+        makeSession({
+          id: "cs_history",
+          status: "complete",
+          url: null,
+          expires_at: NOW - 1,
+        }),
+      );
+      const r = await run();
+      expect(r.code).toBe("checkout_ready");
+      expect(stripe.createSessionCalls.length).toBe(1);
+    });
+
+    for (const [label, expires] of [
+      ["zero", 0],
+      ["negative", -5],
+    ] as const) {
+      it(`R1-3${label}. fails closed on a completed session with ${label} expiry`, async () => {
+        seedCanonical();
+        stripe.sessions.push(
+          makeSession({ status: "complete", url: null, expires_at: expires }),
+        );
+        const r = await run();
+        expect(r.code).toBe("session_invalid");
+        expect(stripe.createSessionCalls.length).toBe(0);
+      });
+    }
+
+    it("R1-3c. fails closed on a completed session with malformed expiry", async () => {
+      seedCanonical();
+      stripe.sessions.push(
+        makeSession({
+          status: "complete",
+          url: null,
+          expires_at: "soon" as unknown as number,
+        }),
+      );
+      const r = await run();
+      expect(r.code).toBe("session_invalid");
+      expect(stripe.createSessionCalls.length).toBe(0);
+    });
+
+    it("R1-4. fails closed on a completed session belonging to another customer", async () => {
+      seedCanonical();
+      // The real gateway lists by customer; simulate Stripe returning a
+      // foreign-customer row so the orchestrator's own identity check is proven.
+      const foreign = makeSession({
+        status: "complete",
+        url: null,
+        customer: "cus_someone_else",
+      });
+      stripe.listAllSessions = async () => [foreign];
+      const r = await run();
+      expect(r.code).toBe("session_invalid");
+      expect(stripe.createSessionCalls.length).toBe(0);
+    });
+
+
+    it("R1-5. prefers a valid open session over a historical completed session", async () => {
+      seedCanonical();
+      stripe.sessions.push(
+        makeSession({
+          id: "cs_history",
+          status: "complete",
+          url: null,
+          expires_at: NOW - 1,
+        }),
+      );
+      stripe.sessions.push(makeSession({ id: "cs_open" }));
+      const r = await run();
+      expect(r.code).toBe("checkout_ready");
+      expect(r.url).toBe("https://checkout.stripe.com/c/pay/cs_existing");
+      expect(stripe.createSessionCalls.length).toBe(0);
+    });
+  });
+
+
   describe("returned-session validation", () => {
     const cases: Array<[string, Partial<AgencySessionLike>]> = [
       ["empty id", { id: "" }],
@@ -628,6 +718,23 @@ describe("Phase 1R-D1 — agency checkout orchestrator", () => {
       expect(r.code).toBe("checkout_ready");
     });
   });
+
+  describe("R1 — plan-independent customer metadata contract", () => {
+    it("R1-6. customer metadata omits plan_key so the customer is reusable across plans", () => {
+      expect(Object.keys(canonicalMeta()).sort()).toEqual([
+        "agency_id",
+        "billing_context",
+        "billing_type",
+        "owner_user_id",
+      ]);
+      expect(canonicalMeta()).not.toHaveProperty("plan_key");
+    });
+
+    it("R1-7. session metadata is the customer metadata plus plan_key", () => {
+      expect(sessionMeta()).toEqual({ ...canonicalMeta(), plan_key: PLAN });
+    });
+  });
+
 
   describe("safe public surface", () => {
     it("31. no result message leaks IDs, URLs, emails, or vendor names", async () => {
