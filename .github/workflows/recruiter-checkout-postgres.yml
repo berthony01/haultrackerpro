@@ -54,8 +54,12 @@ on:
 
       - 'tests/postgres/businessCheckoutClaimsConcurrency.test.ts'
       - 'vitest.business-checkout-postgres.config.ts'
+      - 'supabase/functions/_shared/business-checkout-claim.ts'
+      - 'src/test/phase1rD2B3BusinessCheckoutIntegration.test.ts'
       - 'supabase/functions/_shared/recruiter-checkout.ts'
+      - 'supabase/functions/_shared/agency-checkout.ts'
       - 'supabase/functions/create-recruiter-checkout/index.ts'
+      - 'supabase/functions/create-agency-checkout/index.ts'
       - 'src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts'
       - 'src/components/opportunities/RecruiterBillingPanel.tsx'
       - 'src/test/phase1gR1A4BuildShaAndCopy.test.ts'
