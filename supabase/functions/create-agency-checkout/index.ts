@@ -16,7 +16,10 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
-import { evaluateAgencyCheckoutCrossContext } from "../_shared/business-checkout-guard.ts";
+import {
+  evaluateAgencyCheckoutCrossContext,
+  isCrossContextBlock,
+} from "../_shared/business-checkout-guard.ts";
 import {
   isAgencyPlanKey,
   isAllowedAgencyOrigin,
@@ -240,14 +243,15 @@ serve(async (req) => {
         plan: recruiterBilling?.plan ?? null,
         status: recruiterBilling?.status ?? null,
       });
-      if (!decision.allowed) {
-        log("cross_context_block", { code: decision.code });
+      if (isCrossContextBlock(decision)) {
+        const code =
+          decision.code === "recruiter_subscription_exists"
+            ? ("recruiter_subscription_exists" as const)
+            : ("opposing_entitlement_unknown" as const);
+        log("cross_context_block", { code });
         return jsonResponse({
           status: decision.status,
-          code:
-            decision.code === "recruiter_subscription_exists"
-              ? "recruiter_subscription_exists"
-              : "opposing_entitlement_unknown",
+          code,
           message: decision.message,
         });
       }

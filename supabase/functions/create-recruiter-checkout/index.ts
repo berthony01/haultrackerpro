@@ -10,7 +10,10 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
-import { evaluateRecruiterCheckoutCrossContext } from "../_shared/business-checkout-guard.ts";
+import {
+  evaluateRecruiterCheckoutCrossContext,
+  isCrossContextBlock,
+} from "../_shared/business-checkout-guard.ts";
 import {
   isAllowedRecruiterOrigin,
   isRecruiterPlan,
@@ -218,11 +221,16 @@ serve(async (req) => {
           source: row?.source ?? null,
           hasActiveOwnerMembership: true,
         });
-        if (!decision.allowed) {
-          log("cross_context_block", { code: decision.code });
+        if (isCrossContextBlock(decision)) {
+          const code =
+            decision.code === "agency_entitlement_exists" ||
+            decision.code === "agency_billing_requires_management"
+              ? decision.code
+              : "opposing_entitlement_unknown";
+          log("cross_context_block", { code });
           return jsonResponse({
             status: decision.status,
-            code: decision.code,
+            code,
             message: decision.message,
           });
         }
