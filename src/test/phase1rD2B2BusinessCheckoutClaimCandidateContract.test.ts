@@ -36,6 +36,22 @@ const PROMOTED_ACTIVE_REL = path.join(
   "20260730070000_phase1r_d2_b2_business_checkout_claims.sql",
 );
 
+const PG_TEST_REL = path.join(
+  "tests",
+  "postgres",
+  "businessCheckoutClaimsConcurrency.test.ts",
+);
+
+const PG_CONFIG_REL = "vitest.business-checkout-postgres.config.ts";
+
+const SELF_REL = path.join(
+  "src",
+  "test",
+  "phase1rD2B2BusinessCheckoutClaimCandidateContract.test.ts",
+);
+
+
+
 function readRepoFile(rel: string): string {
   return readFileSync(path.join(REPO_ROOT, rel), "utf8");
 }
