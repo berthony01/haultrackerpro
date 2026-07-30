@@ -134,6 +134,10 @@ vi.mock('@/integrations/supabase/client', () => {
 });
 
 import { RecruiterBillingPanel } from '@/components/opportunities/RecruiterBillingPanel';
+// Phase 1R-C-R1: the REAL hook is exercised directly (only its dependency /
+// network boundary is mocked above).
+import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
+
 import {
   isSafeStripeCheckoutUrl,
   isSafeStripeBillingPortalUrl,
