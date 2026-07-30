@@ -210,7 +210,12 @@ export function resolveEffectiveBusinessEntitlement(
   const agencyPlanKey = isPaidAgencyPlanKey(agencyEntitlement.planKey)
     ? agencyEntitlement.planKey
     : null;
-  const agencyRowValid = agencyEntitlement.hasRow === true && agencyPlanKey !== null;
+  // Repair A — an unrecognized/malformed source invalidates the entire row.
+  const agencySourceRecognized =
+    typeof agencyEntitlement.source === 'string' &&
+    RECOGNIZED_AGENCY_SOURCES.includes(agencyEntitlement.source);
+  const agencyRowValid =
+    agencyEntitlement.hasRow === true && agencyPlanKey !== null && agencySourceRecognized;
   const agencyStatusPremium = isPremiumStatus(agencyEntitlement.status);
   const agencyStatusManualBeta = isExactly(agencyEntitlement.status, 'manual_beta');
   const agencyStatusPastDue = isExactly(agencyEntitlement.status, 'past_due');
