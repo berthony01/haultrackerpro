@@ -1042,9 +1042,11 @@ describe('Phase 1R-C — agency-included recruiter premium access', () => {
       ).toBeInTheDocument(),
     );
     expect(screen.queryByTestId('recruiter-agency-included-access')).toBeNull();
-    expect(
-      screen.getByTestId('recruiter-plan-button-starter'),
-    ).not.toBeDisabled();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).not.toBeDisabled(),
+    );
   });
 
   it('non-owner member of a paid stripe agency: no inclusion granted', async () => {
