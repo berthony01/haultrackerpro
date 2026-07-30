@@ -53,15 +53,16 @@ type RecruiterState =
 
 function resolveState(
   profile: RecruiterProfile | null,
-  isBillingActive: boolean,
+  hasPremiumAccess: boolean,
   intentRecruiter: boolean,
 ): { state: RecruiterState; canPost: boolean } {
   const e = describeRecruiterEligibility(profile, { intentRecruiter });
   if (e.state === 'missing_profile') return { state: 'none', canPost: false };
   if (e.state === 'suspended') return { state: 'suspended', canPost: false };
   if (e.state === 'incomplete_profile') return { state: 'incomplete', canPost: false };
-  return { state: isBillingActive ? 'active_billing' : 'active_no_billing', canPost: e.canPost };
+  return { state: hasPremiumAccess ? 'active_billing' : 'active_no_billing', canPost: e.canPost };
 }
+
 
 interface Props {
   onBack: () => void;
