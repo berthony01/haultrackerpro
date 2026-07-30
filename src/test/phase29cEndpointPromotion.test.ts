@@ -19,12 +19,19 @@ import { applySourceDropoffDate } from '@/lib/sourceDate';
  * Save uses: explicit final Drop stop_date > manual dropoff_date > load_date.
  */
 
+/**
+ * Phase 29C tests verify endpoint promotion, not wall-clock expiration, so they
+ * inject a stable clock inside the sanity window for the May 29–30, 2026
+ * fixtures. Production date logic is unchanged.
+ */
+const PHASE_29C_NOW = new Date(2026, 5, 1, 12, 0, 0);
+
 function applyToForm(prev: { pickup_location: string; dropoff_location: string; dropoff_date: string }, data: any) {
   const norm = normalizeParsedStops(data);
   return {
     pickup_location: norm.pickup_location ?? data.pickup_location ?? prev.pickup_location,
     dropoff_location: norm.dropoff_location ?? data.dropoff_location ?? prev.dropoff_location,
-    dropoff_date: applySourceDropoffDate(prev.dropoff_date, norm.dropoff_date ?? data.dropoff_date),
+    dropoff_date: applySourceDropoffDate(prev.dropoff_date, norm.dropoff_date ?? data.dropoff_date, PHASE_29C_NOW),
     interiorStops: norm.interiorStops,
     multiStop: norm.multiStop,
   };
