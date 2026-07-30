@@ -1424,3 +1424,297 @@ describe("Phase 1R-D2-B2-A — structured input validation", () => {
     expect((await claimRow(seed.userId))!.state).toBe("processing");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. Phase 1R-D2-B2-A-R1 repairs
+// ---------------------------------------------------------------------------
+
+const LOCK_NAMESPACE = "7218926914894380123";
+
+describe("Phase 1R-D2-B2-A-R1 — Repair A: namespaced lock and post-lock clock", () => {
+  it("uses the 64-bit namespaced advisory key in all three RPCs", async () => {
+    const { rows } = await pool.query(
+      `SELECT p.proname, p.prosrc
+         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname='public'
+          AND p.proname IN ('claim_business_checkout',
+                            'complete_business_checkout_claim',
+                            'release_business_checkout_claim')
+        ORDER BY p.proname`,
+    );
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      const src = row.prosrc as string;
+      expect(src).toContain(
+        `hashtextextended(_user_id::text, ${LOCK_NAMESPACE})`,
+      );
+      expect(src).not.toContain("hashtext('bcc:'");
+      expect(src).toContain("v_now := clock_timestamp();");
+    }
+  });
+
+  it("derives the lease from wall-clock time read AFTER the lock wait", async () => {
+    const seed = await seedRecruiter();
+    const holder = await pool.connect();
+    const waiter = await pool.connect();
+    try {
+      await holder.query("BEGIN");
+      await holder.query(
+        `SELECT pg_advisory_xact_lock(hashtextextended($1::text, ${LOCK_NAMESPACE}))`,
+        [seed.userId],
+      );
+
+      const startedAt = Date.now();
+      const pending = claim(waiter, {
+        userId: seed.userId,
+        context: "recruiter",
+        subjectId: seed.recruiterId,
+        planKey: "growth",
+        requestKey: "req-lockwait",
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await holder.query("COMMIT");
+
+      const acquired = await pending;
+      expect(acquired.outcome).toBe("acquired");
+      const leaseMs = (acquired.lease_expires_at as Date).getTime();
+      // A transaction-fixed now() would place the lease ~300s after startedAt.
+      // A post-lock clock_timestamp() must place it beyond the lock wait.
+      expect(leaseMs - startedAt).toBeGreaterThan(300_000 + 1_000);
+    } finally {
+      holder.release();
+      waiter.release();
+    }
+  });
+});
+
+describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", () => {
+  it("rejects a NULL plan key as invalid input rather than falling through", async () => {
+    const seed = await seedRecruiter();
+    const { rows } = await pool.query(
+      `SELECT * FROM public.claim_business_checkout($1::uuid,$2::text,$3::uuid,$4::text,$5::text)`,
+      [seed.userId, "recruiter", seed.recruiterId, null, "req-null-plan"],
+    );
+    expect(rows[0]).toMatchObject({
+      outcome: "invalid_input",
+      reason: "plan_not_supported",
+    });
+    expect(await claimRowCount(seed.userId)).toBe(0);
+  });
+
+  it("rejects a NULL terminal flag before any state transition", async () => {
+    const seed = await seedRecruiter();
+    const acquired = await claim(pool, {
+      userId: seed.userId,
+      context: "recruiter",
+      subjectId: seed.recruiterId,
+      planKey: "growth",
+      requestKey: "req-null-terminal",
+    });
+    const { rows } = await pool.query(
+      `SELECT * FROM public.release_business_checkout_claim($1::uuid,$2::text,$3::uuid,$4::text,$5::boolean)`,
+      [seed.userId, "recruiter", acquired.claim_token, "stripe_timeout", null],
+    );
+    expect(rows[0]).toMatchObject({
+      outcome: "invalid_input",
+      reason: "terminal_flag_missing",
+    });
+    expect((await claimRow(seed.userId))!.state).toBe("processing");
+  });
+
+  it("enforces strict snake_case error codes", async () => {
+    const rejected = ["_leading", "trailing_", "double__underscore", "9start", "Upper_case"];
+    for (const errorCode of rejected) {
+      const seed = await seedRecruiter();
+      const acquired = await claim(pool, {
+        userId: seed.userId,
+        context: "recruiter",
+        subjectId: seed.recruiterId,
+        planKey: "growth",
+        requestKey: "req-code",
+      });
+      expect(
+        await release(pool, {
+          userId: seed.userId,
+          context: "recruiter",
+          token: acquired.claim_token,
+          errorCode,
+        }),
+      ).toMatchObject({ outcome: "invalid_input", reason: "error_code_malformed" });
+      expect((await claimRow(seed.userId))!.state).toBe("processing");
+    }
+
+    const accepted = await seedRecruiter();
+    const acquired = await claim(pool, {
+      userId: accepted.userId,
+      context: "recruiter",
+      subjectId: accepted.recruiterId,
+      planKey: "growth",
+      requestKey: "req-code-ok",
+    });
+    expect(
+      await release(pool, {
+        userId: accepted.userId,
+        context: "recruiter",
+        token: acquired.claim_token,
+        errorCode: "stripe_api_error9",
+      }),
+    ).toMatchObject({ outcome: "released" });
+    expect((await claimRow(accepted.userId))!.last_error_code).toBe(
+      "stripe_api_error9",
+    );
+  });
+
+  it("rejects a strict-shape violation at the table constraint level", async () => {
+    const seed = await seedRecruiter();
+    await expectSqlState(
+      pool.query(
+        `INSERT INTO public.business_checkout_claims
+           (user_id, context, subject_id, plan_key, request_key, state, last_error_code)
+         VALUES ($1,'recruiter',$2,'growth','req','failed','__bad__')`,
+        [seed.userId, seed.recruiterId],
+      ),
+      "23514",
+    );
+  });
+});
+
+describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => {
+  it("blocks when ANY agency entitlement row is live, regardless of row order", async () => {
+    const seed = await seedBoth();
+    await setAgencyEntitlement(seed.agencyId, "agency_starter", "cancelled", "stripe");
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "active", "stripe");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "recruiter",
+        subjectId: seed.recruiterId,
+        planKey: "growth",
+        requestKey: "req-setwise-agency",
+      }),
+    ).toMatchObject({ outcome: "blocked", reason: "agency_entitlement_exists" });
+    expect(await claimRowCount(seed.userId)).toBe(0);
+  });
+
+  it("prefers unknown over every other agency precedence tier", async () => {
+    const seed = await seedBoth();
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "active", "stripe");
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "past_due", "stripe");
+    await setAgencyEntitlement(seed.agencyId, "not_a_plan", "active", "stripe");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "recruiter",
+        subjectId: seed.recruiterId,
+        planKey: "growth",
+        requestKey: "req-setwise-unknown",
+      }),
+    ).toMatchObject({ outcome: "blocked", reason: "opposing_entitlement_unknown" });
+  });
+
+  it("prefers stripe past_due management over a non-stripe past_due row", async () => {
+    const seed = await seedBoth();
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "cancelled", "manual");
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "past_due", "stripe");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "recruiter",
+        subjectId: seed.recruiterId,
+        planKey: "growth",
+        requestKey: "req-setwise-pastdue",
+      }),
+    ).toMatchObject({
+      outcome: "blocked",
+      reason: "agency_billing_requires_management",
+    });
+  });
+
+  it("fails closed on a non-stripe past_due row evaluated setwise", async () => {
+    const seed = await seedBoth();
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "cancelled", "stripe");
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "past_due", "manual");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "recruiter",
+        subjectId: seed.recruiterId,
+        planKey: "growth",
+        requestKey: "req-setwise-manual",
+      }),
+    ).toMatchObject({ outcome: "blocked", reason: "opposing_entitlement_unknown" });
+  });
+
+  it("allows when every agency entitlement row is inert", async () => {
+    const seed = await seedBoth();
+    await setAgencyEntitlement(seed.agencyId, "agency_team", "cancelled", "stripe");
+    await setAgencyEntitlement(seed.agencyId, "agency_starter", "manual_beta", "manual");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "recruiter",
+        subjectId: seed.recruiterId,
+        planKey: "growth",
+        requestKey: "req-setwise-inert",
+      }),
+    ).toMatchObject({ outcome: "acquired" });
+  });
+
+  it("blocks when ANY recruiter billing row for the user is live", async () => {
+    const seed = await seedBoth();
+    const other = await seedRecruiter();
+    await setRecruiterBilling(seed.recruiterId, seed.userId, "none", "inactive");
+    await setRecruiterBilling(other.recruiterId, seed.userId, "fleet", "active");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "agency",
+        subjectId: seed.agencyId,
+        planKey: "agency_team",
+        requestKey: "req-setwise-recruiter",
+      }),
+    ).toMatchObject({ outcome: "blocked", reason: "recruiter_subscription_exists" });
+    expect(await claimRowCount(seed.userId)).toBe(0);
+  });
+
+  it("fails closed when ANY recruiter billing row is unrecognised", async () => {
+    const seed = await seedBoth();
+    const other = await seedRecruiter();
+    await setRecruiterBilling(seed.recruiterId, seed.userId, "fleet", "active");
+    await setRecruiterBilling(other.recruiterId, seed.userId, "fleet", "weird_status");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "agency",
+        subjectId: seed.agencyId,
+        planKey: "agency_team",
+        requestKey: "req-setwise-recruiter-unknown",
+      }),
+    ).toMatchObject({ outcome: "blocked", reason: "opposing_entitlement_unknown" });
+  });
+
+  it("allows when every recruiter billing row is terminal", async () => {
+    const seed = await seedBoth();
+    const other = await seedRecruiter();
+    await setRecruiterBilling(seed.recruiterId, seed.userId, "growth", "canceled");
+    await setRecruiterBilling(other.recruiterId, seed.userId, "none", "inactive");
+
+    expect(
+      await claim(pool, {
+        userId: seed.userId,
+        context: "agency",
+        subjectId: seed.agencyId,
+        planKey: "agency_team",
+        requestKey: "req-setwise-recruiter-terminal",
+      }),
+    ).toMatchObject({ outcome: "acquired" });
+  });
+});
