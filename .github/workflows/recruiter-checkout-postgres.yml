@@ -86,6 +86,7 @@ jobs:
 
     env:
       RECRUITER_CHECKOUT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recruiter_checkout
+      BUSINESS_CHECKOUT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recruiter_checkout
       VITE_SUPABASE_URL: https://phase1g-r1a4-test.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: phase1g-r1a4-isolated-test-key
 
