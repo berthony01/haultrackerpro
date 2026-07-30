@@ -18,7 +18,7 @@ import { ALL_AGENCY_PLAN_KEYS, ASSISTANT_AGENCY_PLANS } from '@/lib/agencyPlans'
 
 const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8');
 
-describe('Phase 8B / 1R-D1 — create-agency-checkout', () => {
+describe('Phase 8B / 1R-D2-B3 — create-agency-checkout', () => {
   const src = read('supabase/functions/create-agency-checkout/index.ts');
 
   it('maps every approved agency plan to a STRIPE_AGENCY_*_PRICE_ID env var', () => {
