@@ -18,7 +18,7 @@ import { ALL_AGENCY_PLAN_KEYS, ASSISTANT_AGENCY_PLANS } from '@/lib/agencyPlans'
 
 const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8');
 
-describe('Phase 8B — create-agency-checkout', () => {
+describe('Phase 8B / 1R-D1 — create-agency-checkout', () => {
   const src = read('supabase/functions/create-agency-checkout/index.ts');
 
   it('maps every approved agency plan to a STRIPE_AGENCY_*_PRICE_ID env var', () => {
@@ -34,14 +34,17 @@ describe('Phase 8B — create-agency-checkout', () => {
   it('requires Authorization header and validates the JWT in-code', () => {
     expect(src).toMatch(/Authorization/);
     expect(src).toMatch(/supabaseAnon\.auth\.getUser/);
+    expect(src).toMatch(/startsWith\("Bearer "\)/);
   });
 
-  it('requires the caller to be the agency owner', () => {
+  it('requires the caller to be an active agency owner', () => {
     expect(src).toMatch(/role !== "agency_owner"/);
+    expect(src).toMatch(/status !== "active"/);
     expect(src).toMatch(/Only the agency owner can manage billing/);
   });
 
   it('rejects unknown plan keys', () => {
+    expect(src).toMatch(/isAgencyPlanKey/);
     expect(src).toMatch(/Invalid plan key/);
   });
 
@@ -49,28 +52,107 @@ describe('Phase 8B — create-agency-checkout', () => {
     expect(src).toMatch(/Client-supplied price IDs are not allowed/);
   });
 
-  it('blocks restart while an active/trialing/past_due Stripe sub already exists', () => {  // trial-allowlist: Stripe subscription status
-    expect(src).toMatch(/"active",\s*"trialing",\s*"past_due"/);  // trial-allowlist: Stripe subscription status
-    expect(src).toMatch(/already has an active billing subscription/);
+  // --- Phase 1R-D1 orchestrator + guard contracts -------------------------
+
+  it('delegates to the pure agency checkout orchestrator', () => {
+    expect(src).toMatch(/from\s+"\.\.\/_shared\/agency-checkout\.ts"/);
+    expect(src).toContain('runAgencyCheckout(');
+  });
+
+  it('imports and evaluates the pure cross-context business guard', () => {
+    expect(src).toMatch(/from\s+"\.\.\/_shared\/business-checkout-guard\.ts"/);
+    expect(src).toContain('evaluateAgencyCheckoutCrossContext(');
+  });
+
+  it('runs the recruiter billing precheck BEFORE Stripe construction and the orchestrator', () => {
+    const guardIdx = src.indexOf('evaluateAgencyCheckoutCrossContext(');
+    const recruiterReadIdx = src.indexOf('from("recruiter_billing_profiles")');
+    const stripeIdx = src.indexOf('new Stripe(stripeKey');
+    const orchestratorIdx = src.indexOf('await runAgencyCheckout(');
+    expect(recruiterReadIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeGreaterThan(recruiterReadIdx);
+    expect(stripeIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeLessThan(stripeIdx);
+    expect(guardIdx).toBeLessThan(orchestratorIdx);
+  });
+
+  it('returns the stable cross-context codes', () => {
+    expect(src).toContain('"recruiter_subscription_exists"');
+    expect(src).toContain('"opposing_entitlement_unknown"');
+  });
+
+  it('rejects non-allowlisted origins strictly with no production fallback', () => {
+    expect(src).toContain('isAllowedAgencyOrigin');
+    expect(src).toMatch(/code:\s*"invalid_origin"/);
+    // The old permissive fallback must be gone.
+    expect(src).not.toMatch(/\?\s*reqOrigin\s*:\s*"https:\/\/haultrackerpro\.com"/);
+    expect(src).not.toMatch(/ALLOWED_ORIGINS\.has\(reqOrigin\)\s*\?/);
+  });
+
+  it('passes idempotency keys and explicit expiry through the Stripe adapter', () => {
+    expect(src).toMatch(/stripe\.customers\.create\(\s*\{[\s\S]*?\},\s*\{\s*idempotencyKey\s*\}/);
+    expect(src).toMatch(/expires_at:\s*expiresAt/);
+    expect(src).toMatch(/stripe\.checkout\.sessions\.create\([\s\S]*?\{\s*idempotencyKey\s*\}/);
+  });
+
+  it('paginates subscriptions and Checkout Sessions exhaustively', () => {
+    expect(src).toMatch(/stripe\.subscriptions\.list\(/);
+    expect(src).toMatch(/stripe\.checkout\.sessions\.list\(/);
+    const hasMore = src.match(/if\s*\(!page\.has_more\)\s*break;/g) ?? [];
+    expect(hasMore.length).toBeGreaterThanOrEqual(2);
+    const startingAfter = src.match(/starting_after:\s*startingAfter/g) ?? [];
+    expect(startingAfter.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('never queries Stripe customers by email', () => {
+    expect(src).not.toMatch(/customers\.list\(/);
+    expect(src).not.toMatch(/email:\s*user\.email/);
+    expect(src).toMatch(/metadata\['agency_id'\]/);
+    expect(src).toMatch(/metadata\['owner_user_id'\]/);
+  });
+
+  it('contains no raw exception logging or raw error responses', () => {
+    expect(src).not.toMatch(/\be\.message\b/);
+    expect(src).not.toMatch(/\bString\(\s*e\s*\)/);
+    expect(src).not.toMatch(/\.stack\b/);
+    expect(src).not.toMatch(/log\("ERROR"/);
+    expect(src).not.toMatch(/json\(\{\s*error:/);
+    expect(src).toContain('log("request_failed"');
+  });
+
+  it('persists only stripe_customer_id + updated_at to agency_entitlements', () => {
+    const saveIdx = src.indexOf('async saveCustomerId');
+    expect(saveIdx).toBeGreaterThan(-1);
+    const body = src.slice(saveIdx, saveIdx + 900);
+    expect(body).toContain('stripe_customer_id: customerId');
+    expect(body).toContain('updated_at:');
+    expect(body).not.toMatch(/plan_key:/);
+    expect(body).not.toMatch(/status:/);
+    expect(body).not.toMatch(/stripe_subscription_id:/);
   });
 
   it('isolates the agency customer ID on agency_entitlements only', () => {
     expect(src).toMatch(/agency_entitlements/);
-    // Must NOT reuse driver subscriptions or recruiter billing tables for
-    // customer storage.
+    // Must NOT reuse driver subscriptions for customer storage.
     expect(src).not.toMatch(/from\("subscriptions"\)/);
-    expect(src).not.toMatch(/from\("recruiter_billing_profiles"\)/);
     expect(src).not.toMatch(/from\("profiles"\)/);
   });
 
   it('always tags Stripe session + subscription metadata with billing_context="agency"', () => {
-    const matches = src.match(/billing_context:\s*"agency"/g) ?? [];
-    expect(matches.length).toBeGreaterThanOrEqual(3); // customer create + session + subscription_data
+    const shared = read('supabase/functions/_shared/agency-checkout.ts');
+    expect(shared).toMatch(/billing_context:\s*"agency"/);
+    expect(shared).toMatch(/billing_type:\s*"agency"/);
+    expect(shared).toMatch(/agency_id:\s*input\.agencyId/);
+    expect(shared).toMatch(/owner_user_id:\s*input\.ownerUserId/);
+    expect(shared).toMatch(/plan_key:\s*input\.planKey/);
+    // The adapter forwards the same metadata to session + subscription_data.
+    expect(src).toMatch(/subscription_data:\s*\{\s*metadata\s*\}/);
   });
 
   it('uses success/cancel URLs under /agency', () => {
-    expect(src).toMatch(/\/agency\?billing=success/);
-    expect(src).toMatch(/\/agency\?billing=cancelled/);
+    const shared = read('supabase/functions/_shared/agency-checkout.ts');
+    expect(shared).toMatch(/\/agency\?billing=success/);
+    expect(shared).toMatch(/\/agency\?billing=cancelled/);
   });
 });
 
