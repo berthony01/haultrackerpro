@@ -378,7 +378,13 @@ serve(async (req) => {
     }
 
     // begin.kind === "acquired" — this request owns the lease.
-    const captured: CapturedCheckoutSession[] = [];
+    //
+    // Phase 1R-D2-B3-R1: captures are deduplicated by non-empty session ID in
+    // a request-local Map. Exhaustive `listAllSessions` pagination can observe
+    // the very session that `createSession` also captures; without dedup the
+    // identical session would appear twice and resolution would fail as
+    // ambiguous.
+    const captured = new Map<string, CapturedCheckoutSession>();
     const deps = buildAgencyDeps(stripe, supabaseService, optionalEmail, captured);
 
     let result: AgencyCheckoutResult;
@@ -394,13 +400,15 @@ serve(async (req) => {
         deps,
       );
     } catch {
+      // Best-effort, NON-terminal release: an unexpected exception is not
+      // proof of a permanent failure, so the owner may retry.
       await releaseBusinessCheckout(
         {
           userId: user.id,
           context: "agency",
           claimToken: begin.claimToken,
           errorCode: businessCheckoutFailureCode("agency", "internal_error"),
-          terminal: true,
+          terminal: false,
         },
         claimStore,
       );
@@ -414,7 +422,7 @@ serve(async (req) => {
 
     if (result.code === "checkout_ready" && result.url) {
       const identity = resolveCapturedCheckoutSession(
-        captured,
+        [...captured.values()],
         result.url,
         nowSeconds(),
       );
@@ -424,7 +432,10 @@ serve(async (req) => {
             userId: user.id,
             context: "agency",
             claimToken: begin.claimToken,
-            errorCode: businessCheckoutFailureCode("agency", "session_invalid"),
+            errorCode: businessCheckoutFailureCode(
+              "agency",
+              "session_identity_missing",
+            ),
             terminal: true,
           },
           claimStore,
@@ -451,13 +462,12 @@ serve(async (req) => {
         log("checkout_result", { code: result.code, status: result.status });
         return jsonResponse(result);
       }
-      if (done === "transient") {
-        return jsonResponse({
-          status: 503,
-          code: "transient_error",
-          message: "Temporary billing error. Please try again.",
-        });
-      }
+      // Phase 1R-D2-B3-R1: a real Stripe Checkout Session exists but the claim
+      // could not be recorded as ready (rejected) or the RPC outcome is unknown
+      // (transient). Releasing here would be unsafe — it could free the lease
+      // while a live session is outstanding. Report processing and never leak
+      // the URL.
+      log("claim_complete_unconfirmed", { code: "checkout_processing" });
       return jsonResponse({
         status: 409,
         code: "checkout_processing",
