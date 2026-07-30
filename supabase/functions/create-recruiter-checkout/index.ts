@@ -718,3 +718,16 @@ function toCapturedSession(s: StripeSessionLike): CapturedCheckoutSession {
     metadata: s.metadata,
   };
 }
+
+// Phase 1R-D2-B3-R1 — request-local dedup by non-empty session ID. Sessions
+// without a usable ID are dropped entirely (fail closed); the latest observed
+// projection of a given ID wins, so a retrieve-then-create pair for the same
+// session yields exactly one candidate.
+function captureSession(
+  captured: Map<string, CapturedCheckoutSession>,
+  s: StripeSessionLike,
+): void {
+  const projected = toCapturedSession(s);
+  if (typeof projected.id !== "string" || projected.id === "") return;
+  captured.set(projected.id, projected);
+}
