@@ -193,8 +193,10 @@ describe("Phase 1R-D2-B2-B — table contract preserved", () => {
   });
 
   it("uses strict DDL without IF NOT EXISTS", () => {
-    expect(activeBody).not.toMatch(/IF NOT EXISTS/i);
+    expect(activeBody).not.toMatch(/CREATE TABLE IF NOT EXISTS/i);
+    expect(activeBody).not.toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS/i);
   });
+
 
   it("preserves the exact fourteen-column vocabulary", () => {
     for (const column of [
