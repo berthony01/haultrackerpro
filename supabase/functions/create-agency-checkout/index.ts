@@ -510,7 +510,7 @@ function buildAgencyDeps(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseService: any,
   optionalEmail: string | undefined,
-  captured: CapturedCheckoutSession[],
+  captured: Map<string, CapturedCheckoutSession>,
 ): AgencyCheckoutDeps {
   const store: AgencyEntitlementStore = {
     async loadCustomerId({ agencyId }) {
