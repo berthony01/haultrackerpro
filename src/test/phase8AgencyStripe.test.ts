@@ -324,6 +324,65 @@ describe('Phase 8B — Plan & Limits card billing UI', () => {
     expect(card).toMatch(/sanitizeAgencyPlanKey/);
     expect(card).toMatch(/ALL_AGENCY_PLAN_KEYS/);
   });
+
+  // --- Phase 1R-D1 safe client contracts ----------------------------------
+
+  it('imports the safe agency checkout parser and exact URL validator', () => {
+    expect(card).toMatch(/from\s+'@\/lib\/agencyCheckoutMessages'/);
+    expect(card).toContain('parseAgencyCheckoutError');
+    expect(card).toContain('isSafeAgencyStripeCheckoutUrl');
+  });
+
+  it('redirects only through the exact Stripe Checkout URL validator', () => {
+    expect(card).toMatch(/if\s*\(isSafeAgencyStripeCheckoutUrl\(data\?\.url\)\)/);
+  });
+
+  it('never displays raw server content in the checkout handler', () => {
+    const start = card.indexOf('const startCheckout');
+    const end = card.indexOf('const openPortal');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const handler = card.slice(start, end);
+    expect(handler).not.toMatch(/e\?\.message/);
+    expect(handler).not.toMatch(/data\?\.error/);
+    expect(handler).not.toMatch(/new Error\(/);
+  });
+
+  it('guards against duplicate checkout clicks with a single busy state', () => {
+    expect(card).toContain('if (busy) return;');
+    expect(card).toMatch(/disabled=\{busy\}/);
+  });
+
+  it('leaves the portal flow unchanged in this phase', () => {
+    expect(card).toMatch(/supabase\.functions\.invoke\(\s*['\"]agency-customer-portal['\"]/);
+  });
+});
+
+describe('Phase 1R-D1 — safe agency checkout client messages', () => {
+  const src = read('src/lib/agencyCheckoutMessages.ts');
+
+  it('parses Supabase FunctionsError context JSON safely', () => {
+    expect(src).toContain('context');
+    expect(src).toContain('json()');
+    expect(src).toContain('parseAgencyCheckoutError');
+  });
+
+  it('uses exact-host Stripe Checkout validation, never suffix matching', () => {
+    expect(src).toContain("u.hostname.toLowerCase() === 'checkout.stripe.com'");
+    expect(src).not.toMatch(/endsWith\(\s*['\"]\.?stripe\.com/);
+  });
+
+  it('defines the required cross-context and subscription messages verbatim', () => {
+    expect(src).toContain(
+      'You already have recruiter premium billing. Manage or end that subscription before starting agency billing.',
+    );
+    expect(src).toContain(
+      'We could not safely confirm your existing business billing. Please contact support.',
+    );
+    expect(src).toContain(
+      'Agency billing already exists. Use Manage Billing to review it.',
+    );
+  });
 });
 
 describe('Phase 8B — Pricing page CTA routes', () => {
