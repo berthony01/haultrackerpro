@@ -563,7 +563,7 @@ export function useRecruiterBilling() {
     prepareTab,
     refresh,
 
-    // Capability layer (unchanged)
+    // Capability layer (now resolved from the EFFECTIVE recruiter tier)
     capabilities,
     capabilityTier: capabilities.tier,
     isPaidRecruiterPlanActive: isRecruiterPaidPlanActive(plan, status),
