@@ -17,12 +17,21 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 import {
-  evaluateAgencyCheckoutCrossContext,
-  isCrossContextBlock,
-} from "../_shared/business-checkout-guard.ts";
+  beginBusinessCheckout,
+  businessCheckoutFailureCode,
+  completeBusinessCheckout,
+  createBusinessCheckoutClaimStore,
+  isRetryableCheckoutCode,
+  releaseBusinessCheckout,
+  resolveCapturedCheckoutSession,
+  validateReadyBusinessCheckoutSession,
+  type CapturedCheckoutSession,
+} from "../_shared/business-checkout-claim.ts";
 import {
+  agencySessionMetadata,
   isAgencyPlanKey,
   isAllowedAgencyOrigin,
+  isSafeAgencyCheckoutUrl,
   runAgencyCheckout,
   type AgencyCheckoutDeps,
   type AgencyCheckoutResult,
@@ -34,6 +43,31 @@ import {
   type AgencyStripeGateway,
   type AgencySubscriptionLike,
 } from "../_shared/agency-checkout.ts";
+
+/** Deterministic mapping from a claim block reason to the public response. */
+function agencyBlockedResult(reason: string): AgencyCheckoutResult {
+  switch (reason) {
+    case "recruiter_subscription_exists":
+      return {
+        status: 403,
+        code: "recruiter_subscription_exists",
+        message: "This account already has recruiter billing.",
+      };
+    case "opposing_claim_active":
+    case "same_context_claim_active":
+      return {
+        status: 409,
+        code: "in_progress",
+        message: "A checkout is already in progress. Please try again shortly.",
+      };
+    default:
+      return {
+        status: 409,
+        code: "opposing_entitlement_unknown",
+        message: "Billing state could not be confirmed. Please contact support.",
+      };
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -209,67 +243,228 @@ serve(async (req) => {
       });
     }
 
-    // Phase 1R-D1 — cross-context recruiter billing precheck. Runs BEFORE any
-    // Stripe construction or orchestrator call.
-    const { data: recruiterProfile, error: rpErr } = await supabaseService
-      .from("recruiter_profiles")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (rpErr) {
+    // Phase 1R-D2-B3 — atomic cross-context checkout claim. Replaces the old
+    // Phase 1R-D1 read-then-decide precheck with the authoritative PostgreSQL
+    // state machine. Runs BEFORE any Stripe construction or orchestrator call.
+    const claimStore = createBusinessCheckoutClaimStore(supabaseService);
+    const nowSeconds = () => Math.floor(Date.now() / 1000);
+
+    const begin = await beginBusinessCheckout(
+      {
+        userId: user.id,
+        context: "agency",
+        subjectId: agencyId,
+        planKey,
+      },
+      claimStore,
+      nowSeconds(),
+    );
+
+    if (begin.kind === "transient") {
+      log("claim_transient", { code: "transient_error" });
       return jsonResponse({
         status: 503,
         code: "transient_error",
         message: "Temporary billing error. Please try again.",
       });
     }
+    if (begin.kind === "not_owner") {
+      return jsonResponse({
+        status: 403,
+        code: "not_owner",
+        message: "Only the agency owner can manage billing.",
+      });
+    }
+    if (begin.kind === "blocked") {
+      const blocked = agencyBlockedResult(begin.reason);
+      log("claim_blocked", { code: blocked.code });
+      return jsonResponse(blocked);
+    }
+    if (begin.kind === "in_progress") {
+      return jsonResponse({
+        status: 409,
+        code: "in_progress",
+        message: "A checkout is already in progress. Please try again shortly.",
+      });
+    }
 
-    if (recruiterProfile?.id) {
-      const { data: recruiterBilling, error: rbErr } = await supabaseService
-        .from("recruiter_billing_profiles")
-        .select("plan, status")
-        .eq("recruiter_id", recruiterProfile.id)
-        .eq("user_id", user.id)
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+
+    if (begin.kind === "ready") {
+      // A ready claim is only honored after exact revalidation of the stored
+      // Checkout Session against Stripe.
+      const { data: ent, error: entErr } = await supabaseService
+        .from("agency_entitlements")
+        .select("stripe_customer_id")
+        .eq("agency_id", agencyId)
         .maybeSingle();
-      if (rbErr) {
+      if (entErr) {
         return jsonResponse({
           status: 503,
           code: "transient_error",
           message: "Temporary billing error. Please try again.",
         });
       }
-      const decision = evaluateAgencyCheckoutCrossContext({
-        hasRow: !!recruiterBilling,
-        plan: recruiterBilling?.plan ?? null,
-        status: recruiterBilling?.status ?? null,
-      });
-      if (isCrossContextBlock(decision)) {
-        const code =
-          decision.code === "recruiter_subscription_exists"
-            ? ("recruiter_subscription_exists" as const)
-            : ("opposing_entitlement_unknown" as const);
-        log("cross_context_block", { code });
+      const customerId =
+        typeof ent?.stripe_customer_id === "string" ? ent.stripe_customer_id : "";
+      if (customerId === "") {
         return jsonResponse({
-          status: decision.status,
-          code,
-          message: decision.message,
+          status: 409,
+          code: "checkout_processing",
+          message: "Your checkout is still being prepared. Please try again.",
         });
       }
+
+      let capturedReady: CapturedCheckoutSession | null = null;
+      try {
+        capturedReady = toCapturedSession(
+          normalizeSession(
+            await stripe.checkout.sessions.retrieve(begin.sessionId),
+          ),
+        );
+      } catch {
+        return jsonResponse({
+          status: 503,
+          code: "transient_error",
+          message: "Temporary billing error. Please try again.",
+        });
+      }
+
+      const validation = validateReadyBusinessCheckoutSession({
+        session: capturedReady,
+        expectedSessionId: begin.sessionId,
+        claimExpiresAt: begin.checkoutExpiresAt,
+        expectedCustomerId: customerId,
+        expectedMetadata: agencySessionMetadata({
+          agencyId,
+          ownerUserId: user.id,
+          planKey,
+        }),
+        nowSeconds: nowSeconds(),
+        isSafeUrl: isSafeAgencyCheckoutUrl,
+      });
+
+      if (validation.kind === "ready") {
+        log("checkout_result", { code: "checkout_ready", status: 200 });
+        return jsonResponse({
+          status: 200,
+          code: "checkout_ready",
+          message: "Checkout session ready.",
+          url: validation.url,
+        });
+      }
+      if (validation.kind === "processing") {
+        return jsonResponse({
+          status: 409,
+          code: "checkout_processing",
+          message: "Your checkout is still being processed.",
+        });
+      }
+      return jsonResponse({
+        status: 409,
+        code: "session_invalid",
+        message: "Checkout session is no longer valid. Please try again.",
+      });
     }
 
-    // Build adapters.
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const deps = buildAgencyDeps(stripe, supabaseService, optionalEmail);
+    // begin.kind === "acquired" — this request owns the lease.
+    const captured: CapturedCheckoutSession[] = [];
+    const deps = buildAgencyDeps(stripe, supabaseService, optionalEmail, captured);
 
-    const result = await runAgencyCheckout(
+    let result: AgencyCheckoutResult;
+    try {
+      result = await runAgencyCheckout(
+        {
+          agencyId,
+          ownerUserId: user.id,
+          planKey,
+          priceId,
+          origin: reqOrigin,
+        },
+        deps,
+      );
+    } catch {
+      await releaseBusinessCheckout(
+        {
+          userId: user.id,
+          context: "agency",
+          claimToken: begin.claimToken,
+          errorCode: businessCheckoutFailureCode("agency", "internal_error"),
+          terminal: true,
+        },
+        claimStore,
+      );
+      log("request_failed", { code: "unexpected_error" });
+      return jsonResponse({
+        status: 500,
+        code: "internal_error",
+        message: "Unexpected billing error.",
+      });
+    }
+
+    if (result.code === "checkout_ready" && result.url) {
+      const identity = resolveCapturedCheckoutSession(
+        captured,
+        result.url,
+        nowSeconds(),
+      );
+      if (!identity) {
+        await releaseBusinessCheckout(
+          {
+            userId: user.id,
+            context: "agency",
+            claimToken: begin.claimToken,
+            errorCode: businessCheckoutFailureCode("agency", "session_invalid"),
+            terminal: true,
+          },
+          claimStore,
+        );
+        log("claim_capture_failed", { code: "session_invalid" });
+        return jsonResponse({
+          status: 409,
+          code: "session_invalid",
+          message: "Checkout session is no longer valid. Please try again.",
+        });
+      }
+
+      const done = await completeBusinessCheckout(
+        {
+          userId: user.id,
+          context: "agency",
+          claimToken: begin.claimToken,
+          sessionId: identity.sessionId,
+          checkoutExpiresAt: identity.checkoutExpiresAt,
+        },
+        claimStore,
+      );
+      if (done === "completed") {
+        log("checkout_result", { code: result.code, status: result.status });
+        return jsonResponse(result);
+      }
+      if (done === "transient") {
+        return jsonResponse({
+          status: 503,
+          code: "transient_error",
+          message: "Temporary billing error. Please try again.",
+        });
+      }
+      return jsonResponse({
+        status: 409,
+        code: "checkout_processing",
+        message: "Your checkout is still being processed.",
+      });
+    }
+
+    // Any non-ready orchestrator outcome releases the claim.
+    await releaseBusinessCheckout(
       {
-        agencyId,
-        ownerUserId: user.id,
-        planKey,
-        priceId,
-        origin: reqOrigin,
+        userId: user.id,
+        context: "agency",
+        claimToken: begin.claimToken,
+        errorCode: businessCheckoutFailureCode("agency", result.code),
+        terminal: !isRetryableCheckoutCode(result.code),
       },
-      deps,
+      claimStore,
     );
 
     log("checkout_result", { code: result.code, status: result.status });
@@ -295,6 +490,7 @@ function buildAgencyDeps(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseService: any,
   optionalEmail: string | undefined,
+  captured: CapturedCheckoutSession[],
 ): AgencyCheckoutDeps {
   const store: AgencyEntitlementStore = {
     async loadCustomerId({ agencyId }) {
@@ -389,7 +585,11 @@ function buildAgencyDeps(
           limit: 100,
           starting_after: startingAfter,
         });
-        for (const s of page.data) acc.push(normalizeSession(s));
+        for (const s of page.data) {
+          const n = normalizeSession(s);
+          captured.push(toCapturedSession(n));
+          acc.push(n);
+        }
         if (!page.has_more) break;
         startingAfter = page.data[page.data.length - 1]?.id;
         if (!startingAfter) break;
@@ -405,20 +605,23 @@ function buildAgencyDeps(
       expiresAt,
       idempotencyKey,
     }) {
-      const s = await stripe.checkout.sessions.create(
-        {
-          customer: customerId,
-          line_items: [{ price: priceId, quantity: 1 }],
-          mode: "subscription",
-          success_url: successUrl,
-          cancel_url: cancelUrl,
-          expires_at: expiresAt,
-          metadata,
-          subscription_data: { metadata },
-        },
-        { idempotencyKey },
+      const s = normalizeSession(
+        await stripe.checkout.sessions.create(
+          {
+            customer: customerId,
+            line_items: [{ price: priceId, quantity: 1 }],
+            mode: "subscription",
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            expires_at: expiresAt,
+            metadata,
+            subscription_data: { metadata },
+          },
+          { idempotencyKey },
+        ),
       );
-      return normalizeSession(s);
+      captured.push(toCapturedSession(s));
+      return s;
     },
   };
 
@@ -445,5 +648,18 @@ function normalizeSession(s: any): AgencySessionLike {
     customer,
     expires_at: typeof s?.expires_at === "number" ? s.expires_at : 0,
     metadata: (s?.metadata ?? {}) as Record<string, string>,
+  };
+}
+
+// Phase 1R-D2-B3 — capture shape for the atomic claim coordinator. Purely a
+// field projection of the already fail-closed normalized session.
+function toCapturedSession(s: AgencySessionLike): CapturedCheckoutSession {
+  return {
+    id: s.id,
+    status: s.status,
+    url: s.url,
+    customer: s.customer,
+    expiresAtSeconds: s.expires_at,
+    metadata: s.metadata,
   };
 }
