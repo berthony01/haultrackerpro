@@ -485,7 +485,7 @@ describe("Phase 1R-D2-B2-A — schema and security posture", () => {
     expect(fns.rows).toHaveLength(3);
     expect(fns.rows.map((r) => `${r.proname}(${r.args})`)).toEqual([
       "claim_business_checkout(_user_id uuid, _context text, _subject_id uuid, _plan_key text, _request_key text)",
-      "complete_business_checkout_claim(_user_id uuid, _context text, _claim_token uuid, _session_id text, _checkout_expires_at timestamptz)",
+      "complete_business_checkout_claim(_user_id uuid, _context text, _claim_token uuid, _session_id text, _checkout_expires_at timestamp with time zone)",
       "release_business_checkout_claim(_user_id uuid, _context text, _claim_token uuid, _error_code text, _terminal boolean)",
     ]);
   });
