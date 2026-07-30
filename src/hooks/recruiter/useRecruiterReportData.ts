@@ -21,14 +21,18 @@ export function useRecruiterReportData(range: RecruiterReportRange | null, enabl
   const recruiterId = profile?.id ?? null;
   const isReady = !!user && !!recruiterId && !!range && enabled;
 
-  // Server-side eligibility (defence-in-depth on top of UI gating):
-  // only Growth/Fleet & active or trialing-status recruiters can build reports. // trial-allowlist
-  const planEligible =
-    (billing.plan === 'growth' || billing.plan === 'fleet') && billing.isBillingActive;
+  // Phase 1R-C: eligibility is the EFFECTIVE recruiter capability, which may
+  // be granted either by a recruiter subscription or by an included agency
+  // entitlement. Raw recruiter plan/status is no longer consulted here.
+  const planEligible = billing.canExportRecruiterReports === true;
+  const entitlementSource = billing.entitlementSource;
+  const effectivePlan = billing.effectiveRecruiterPlan;
+  const isAgencyIncluded = entitlementSource === 'agency_included';
 
   const query = useQuery({
     queryKey: ['recruiter-report-data', recruiterId, range?.from, range?.to],
     enabled: isReady && planEligible,
+
     queryFn: async (): Promise<RecruiterReportInput> => {
       if (!recruiterId || !range || !profile) throw new Error('Not ready');
 
