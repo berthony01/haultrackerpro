@@ -311,6 +311,21 @@ async function seedBoth(): Promise<{
   return { userId, recruiterId: r.recruiterId, agencyId: a.agencyId };
 }
 
+/**
+ * Seeds two DISTINCT agencies owned by the same user, each with its own exact
+ * active agency_owner membership. Production allows at most one entitlement row
+ * per agency, so multi-entitlement precedence must use two agencies.
+ */
+async function seedTwoAgencies(userId = randomUUID()): Promise<{
+  userId: string;
+  agencyA: string;
+  agencyB: string;
+}> {
+  const a = await seedAgency(userId);
+  const b = await seedAgency(userId);
+  return { userId, agencyA: a.agencyId, agencyB: b.agencyId };
+}
+
 async function setRecruiterBilling(
   recruiterId: string,
   userId: string,
@@ -333,7 +348,11 @@ async function setAgencyEntitlement(
 ): Promise<void> {
   await pool.query(
     `INSERT INTO public.agency_entitlements (agency_id, plan_key, status, source)
-     VALUES ($1,$2,$3,$4)`,
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (agency_id) DO UPDATE
+       SET plan_key = EXCLUDED.plan_key,
+           status = EXCLUDED.status,
+           source = EXCLUDED.source`,
     [agencyId, planKey, status, source],
   );
 }
