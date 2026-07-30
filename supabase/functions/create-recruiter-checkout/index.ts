@@ -302,10 +302,14 @@ serve(async (req) => {
           ? billing.stripe_customer_id
           : "";
       if (customerId === "") {
+        // Phase 1R-D2-B3-R1: a ready claim without a canonical recruiter
+        // customer is an inconsistent state that retrying cannot repair, so
+        // it is surfaced as support_required rather than checkout_processing.
+        log("ready_customer_missing", { code: "support_required" });
         return jsonResponse({
           status: 409,
-          code: "checkout_processing",
-          message: "Your checkout is still being prepared. Please try again.",
+          code: "support_required",
+          message: "Billing state could not be confirmed. Please contact support.",
         });
       }
 
