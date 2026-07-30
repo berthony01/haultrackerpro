@@ -1106,3 +1106,289 @@ describe('Phase 1R-C — agency-included recruiter premium access', () => {
     expect(supabaseMocks.invoke).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1R-C-R1 — DIRECT real-hook contract tests for `useRecruiterBilling`.
+//
+// These exercise the production hook itself (not a rendered panel and not a
+// mocked hook), proving the raw-versus-effective output contract, fail-closed
+// behavior, posting truth, refresh invalidation, and input non-mutation.
+// ---------------------------------------------------------------------------
+
+type BillingHookResult = ReturnType<typeof useRecruiterBilling>;
+
+function renderBillingHook() {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  const rendered = renderHook(() => useRecruiterBilling(), {
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    ),
+  });
+  return { qc, result: rendered.result, unmount: rendered.unmount };
+}
+
+async function settledHook() {
+  const h = renderBillingHook();
+  await waitFor(() => expect(h.result.current.isLoading).toBe(false));
+  await waitFor(() =>
+    expect(h.result.current.businessEntitlementState).not.toBe('loading'),
+  );
+  return h;
+}
+
+describe('Phase 1R-C-R1 — real useRecruiterBilling raw vs effective contract', () => {
+  it('no recruiter billing row + active stripe agency_starter owner yields included starter premium', async () => {
+    withAgency('agency_starter', 'active', 'stripe');
+    const { result } = await settledHook();
+    const r = result.current as BillingHookResult;
+
+    expect(r.plan).toBe('none');
+    expect(r.status).toBe('inactive');
+    expect(r.billing).toBeNull();
+    expect(r.effectiveRecruiterPlan).toBe('starter');
+    expect(r.effectiveRecruiterTier).toBe('starter');
+    expect(r.capabilityTier).toBe('starter');
+    expect(r.entitlementSource).toBe('agency_included');
+    expect(r.billingManagementContext).toBe('agency');
+    expect(r.businessEntitlementState).toBe('resolved');
+    expect(r.hasEffectivePremiumRecruiterAccess).toBe(true);
+    expect(r.canStartCheckout).toBe(false);
+    expect(r.isPaidRecruiterPlanActive).toBe(false);
+  });
+
+  const AGENCY_TIER_MATRIX: ReadonlyArray<{
+    agencyPlan: string;
+    recruiterPlan: 'starter' | 'growth' | 'fleet';
+  }> = [
+    { agencyPlan: 'agency_starter', recruiterPlan: 'starter' },
+    { agencyPlan: 'agency_team', recruiterPlan: 'growth' },
+    { agencyPlan: 'agency_growth', recruiterPlan: 'fleet' },
+  ];
+
+  // trial-allowlist: Stripe subscription status literals, not user-facing copy
+  const PREMIUM_AGENCY_STATUSES = ['active', 'trialing'] as const;
+
+  for (const status of PREMIUM_AGENCY_STATUSES) {
+    for (const { agencyPlan, recruiterPlan } of AGENCY_TIER_MATRIX) {
+      it(`maps ${agencyPlan} (${status}) to recruiter ${recruiterPlan}`, async () => {
+        withAgency(agencyPlan, status, 'stripe');
+        const { result } = await settledHook();
+        const r = result.current as BillingHookResult;
+        expect(r.effectiveRecruiterTier).toBe(recruiterPlan);
+        expect(r.effectiveRecruiterPlan).toBe(recruiterPlan);
+        expect(r.effectiveAgencyPlan).toBe(agencyPlan);
+        expect(r.entitlementSource).toBe('agency_included');
+        expect(r.plan).toBe('none');
+        expect(r.canStartCheckout).toBe(false);
+      });
+    }
+  }
+
+  it('active explicit recruiter plan with no includable agency preserves raw and effective recruiter values', async () => {
+    withBilling({
+      recruiter_id: 'rec-1',
+      plan: 'growth',
+      status: 'active',
+      stripe_customer_id: 'cus_1',
+      stripe_subscription_id: 'sub_1',
+    });
+    const { result } = await settledHook();
+    const r = result.current as BillingHookResult;
+
+    expect(r.plan).toBe('growth');
+    expect(r.status).toBe('active');
+    expect(r.effectiveRecruiterPlan).toBe('growth');
+    expect(r.effectiveRecruiterTier).toBe('growth');
+    expect(r.entitlementSource).toBe('recruiter_subscription');
+    expect(r.billingManagementContext).toBe('recruiter');
+    expect(r.effectiveAgencyPlan).toBeNull();
+    expect(r.businessEntitlementState).toBe('resolved');
+    expect(r.hasEffectivePremiumRecruiterAccess).toBe(true);
+    expect(r.isPaidRecruiterPlanActive).toBe(true);
+  });
+
+  for (const role of ['agency_admin', 'agency_member'] as const) {
+    it(`agency role ${role} never receives included recruiter premium`, async () => {
+      withAgency('agency_growth', 'active', 'stripe', role);
+      const { result } = await settledHook();
+      const r = result.current as BillingHookResult;
+      expect(r.effectiveRecruiterTier).toBe('free_verified');
+      expect(r.effectiveRecruiterPlan).toBe('none');
+      expect(r.entitlementSource).toBe('free_standard');
+      expect(r.hasEffectivePremiumRecruiterAccess).toBe(false);
+    });
+  }
+
+  it('agency entitlement with hasRow=false grants nothing', async () => {
+    agencyMocks.agency = { id: 'agency-1', my_role: 'agency_owner' };
+    agencyMocks.hasRow = false;
+    const { result } = await settledHook();
+    const r = result.current as BillingHookResult;
+    expect(r.effectiveRecruiterTier).toBe('free_verified');
+    expect(r.entitlementSource).toBe('free_standard');
+    expect(r.hasEffectivePremiumRecruiterAccess).toBe(false);
+  });
+
+  it('manual_beta agency grants no premium but preserves the effective agency plan', async () => {
+    withAgency('agency_team', 'manual_beta', 'manual');
+    const { result } = await settledHook();
+    const r = result.current as BillingHookResult;
+    expect(r.effectiveRecruiterTier).toBe('free_verified');
+    expect(r.effectiveAgencyPlan).toBe('agency_team');
+    expect(r.entitlementSource).toBe('free_standard');
+    expect(r.billingManagementContext).toBe('none');
+  });
+
+  it('past_due agency grants no premium and keeps an agency billing context', async () => {
+    withAgency('agency_team', 'past_due', 'stripe');
+    const { result } = await settledHook();
+    const r = result.current as BillingHookResult;
+    expect(r.effectiveRecruiterTier).toBe('free_verified');
+    expect(r.hasEffectivePremiumRecruiterAccess).toBe(false);
+    expect(r.billingManagementContext).toBe('agency');
+  });
+
+  it('unknown agency entitlement source fails closed', async () => {
+    withAgency('agency_growth', 'active', 'mystery_source');
+    const { result } = await settledHook();
+    const r = result.current as BillingHookResult;
+    expect(r.effectiveRecruiterTier).toBe('free_verified');
+    expect(r.effectiveAgencyPlan).toBeNull();
+    expect(r.entitlementSource).toBe('free_standard');
+    expect(r.hasEffectivePremiumRecruiterAccess).toBe(false);
+  });
+
+  it('agency source loading fails closed while loading', async () => {
+    withAgency('agency_growth', 'active', 'stripe');
+    agencyMocks.entLoading = true;
+    const { result } = renderBillingHook();
+    await waitFor(() =>
+      expect(result.current.businessEntitlementState).toBe('loading'),
+    );
+    expect(result.current.effectiveRecruiterTier).toBe('free_verified');
+    expect(result.current.isBusinessEntitlementLoading).toBe(true);
+    expect(result.current.hasEffectivePremiumRecruiterAccess).toBe(false);
+    expect(result.current.canStartCheckout).toBe(false);
+  });
+
+  it('agency source error fails closed', async () => {
+    withAgency('agency_growth', 'active', 'stripe');
+    agencyMocks.entError = true;
+    const { result } = renderBillingHook();
+    await waitFor(() =>
+      expect(result.current.businessEntitlementState).toBe('error'),
+    );
+    expect(result.current.effectiveRecruiterTier).toBe('free_verified');
+    expect(result.current.hasEffectivePremiumRecruiterAccess).toBe(false);
+    expect(result.current.canStartCheckout).toBe(false);
+  });
+
+  for (const source of ['manual', 'admin_seed'] as const) {
+    it(`active ${source} included access maps the tier but reports billing context none`, async () => {
+      withAgency('agency_team', 'active', source);
+      const { result } = await settledHook();
+      const r = result.current as BillingHookResult;
+      expect(r.effectiveRecruiterTier).toBe('growth');
+      expect(r.entitlementSource).toBe('agency_included');
+      expect(r.billingManagementContext).toBe('none');
+      expect(r.canStartCheckout).toBe(false);
+    });
+  }
+
+  it('active stripe included access reports billing context agency', async () => {
+    withAgency('agency_team', 'active', 'stripe');
+    const { result } = await settledHook();
+    expect(result.current.billingManagementContext).toBe('agency');
+  });
+
+  it('recruiter subscription + includable agency is an explicit fail-closed conflict', async () => {
+    withBilling({
+      recruiter_id: 'rec-1',
+      plan: 'starter',
+      status: 'active',
+      stripe_customer_id: 'cus_1',
+      stripe_subscription_id: 'sub_1',
+    });
+    withAgency('agency_team', 'active', 'stripe');
+    const { result } = await settledHook();
+    const r = result.current as BillingHookResult;
+
+    expect(r.businessEntitlementState).toBe('conflict');
+    expect(r.businessEntitlementConflictReason).toBe(
+      'dual_paid_business_entitlement',
+    );
+    expect(r.effectiveRecruiterTier).toBe('free_verified');
+    expect(r.effectiveRecruiterPlan).toBe('none');
+    expect(r.effectiveAgencyPlan).toBeNull();
+    expect(r.entitlementSource).toBe('none');
+    expect(r.billingManagementContext).toBe('conflict');
+    expect(r.hasEffectivePremiumRecruiterAccess).toBe(false);
+    expect(r.canStartCheckout).toBe(false);
+    // Raw recruiter billing is untouched by the conflict.
+    expect(r.plan).toBe('starter');
+    expect(r.status).toBe('active');
+  });
+});
+
+describe('Phase 1R-C-R1 — real hook posting truth', () => {
+  it('complete, non-suspended, unverified recruiter can still post standard opportunities', async () => {
+    profileMocks.profile = {
+      ...COMPLETE_PROFILE,
+      verification_status: 'pending',
+    };
+    const { result } = await settledHook();
+    expect(result.current.canPostStandardOpportunitiesCapability).toBe(true);
+  });
+
+  it('incomplete profile cannot post standard opportunities', async () => {
+    profileMocks.profile = { ...COMPLETE_PROFILE, company_name: '' };
+    const { result } = await settledHook();
+    expect(result.current.canPostStandardOpportunitiesCapability).toBe(false);
+  });
+
+  it('suspended profile cannot post but keeps its effective paid tier', async () => {
+    profileMocks.isSuspended = true;
+    withAgency('agency_growth', 'active', 'stripe');
+    const { result } = await settledHook();
+    expect(result.current.canPostStandardOpportunitiesCapability).toBe(false);
+    expect(result.current.effectiveRecruiterTier).toBe('fleet');
+    expect(result.current.effectiveRecruiterPlan).toBe('fleet');
+  });
+});
+
+describe('Phase 1R-C-R1 — real hook refresh invalidation and input purity', () => {
+  it('refresh() invalidates exactly the recruiter and agency query-key prefixes', async () => {
+    const { qc, result } = await settledHook();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    act(() => {
+      result.current.refresh();
+    });
+    const keys = spy.mock.calls.map(
+      (c) => (c[0] as { queryKey: unknown[] }).queryKey[0],
+    );
+    expect(keys).toEqual([
+      'recruiter_billing',
+      'recruiter_active_opportunity_count',
+      'recruiter_profile',
+      'my-agency',
+      'agency-entitlement',
+    ]);
+    spy.mockRestore();
+  });
+
+  it('does not mutate the agency/profile source objects during resolution', async () => {
+    withAgency('agency_team', 'active', 'stripe');
+    const agencySnapshot = JSON.stringify(agencyMocks.agency);
+    const entitlementSnapshot = JSON.stringify(agencyMocks.entitlement);
+    const profileSnapshot = JSON.stringify(profileMocks.profile);
+
+    const { result } = await settledHook();
+    expect(result.current.entitlementSource).toBe('agency_included');
+
+    expect(JSON.stringify(agencyMocks.agency)).toBe(agencySnapshot);
+    expect(JSON.stringify(agencyMocks.entitlement)).toBe(entitlementSnapshot);
+    expect(JSON.stringify(profileMocks.profile)).toBe(profileSnapshot);
+  });
+});
