@@ -30,7 +30,9 @@ import {
   type StripeSessionLike,
   type StripeSubscriptionLike,
 } from "../../supabase/functions/_shared/recruiter-checkout";
-import { evaluateRecruiterCheckoutCrossContext } from "../../supabase/functions/_shared/business-checkout-guard";
+// Phase 1R-D2-B3-R2: the retired Phase 1R-D1 edge guard is no longer imported
+// here. The pure historical guard keeps its own dedicated coverage in
+// src/test/phase1rD1BusinessCheckoutGuard.test.ts.
 import {
   RECRUITER_CHECKOUT_MESSAGES,
   RECRUITER_SUPPORT_CODES,
