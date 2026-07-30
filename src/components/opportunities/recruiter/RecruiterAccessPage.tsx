@@ -73,7 +73,21 @@ interface Props {
 
 export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onApplications }: Props) {
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
-  const { isBillingActive, plan, status, isLoading: billingLoading } = useRecruiterBilling();
+  const billing = useRecruiterBilling();
+  const { isBillingActive, plan, status, isLoading: billingLoading } = billing;
+  // Phase 1R-C: premium presentation follows the EFFECTIVE entitlement,
+  // which may be an explicit recruiter subscription or agency-included
+  // access. Read defensively so narrow legacy mocks keep working.
+  const hasPremiumAccess =
+    billing.hasEffectivePremiumRecruiterAccess ?? isBillingActive;
+  const entitlementSource =
+    billing.entitlementSource ??
+    (isBillingActive ? 'recruiter_subscription' : 'free_standard');
+  const isAgencyIncluded = entitlementSource === 'agency_included';
+  const effectiveRecruiterPlan = billing.effectiveRecruiterPlan ?? plan;
+  const effectiveAgencyPlan = billing.effectiveAgencyPlan ?? null;
+  const canUsePriorityPlacement = billing.canUsePriorityPlacement ?? false;
+
   const { opportunities, isLoading: oppsLoading } = useRecruiterOpportunities();
   const { recruiterApplications, isLoadingRecruiter } = useOpportunityApplications({ recruiterId: profile?.id ?? undefined });
   const { intentRecruiter } = useUserRole();
