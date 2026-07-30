@@ -110,8 +110,12 @@ export function useRecruiterReportData(range: RecruiterReportRange | null, enabl
     refetch: query.refetch,
     recruiterId,
     planEligible,
-    planLabel: RECRUITER_PLAN_LABELS[billing.plan],
+    planLabel: RECRUITER_PLAN_LABELS[effectivePlan],
+    // Raw recruiter billing plan preserved for compatibility.
     billingPlan: billing.plan,
     billingStatus: billing.status,
+    effectivePlan,
+    entitlementSource,
   };
+
 }
