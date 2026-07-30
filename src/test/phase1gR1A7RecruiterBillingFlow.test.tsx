@@ -979,3 +979,122 @@ describe('safe messaging', () => {
     expect(text).not.toMatch(/cus_leaky_777|DatabaseException/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1R-C — effective business entitlement rendering in the production panel
+// ---------------------------------------------------------------------------
+
+function withAgency(
+  planKey: string,
+  status: string,
+  source: string,
+  role = 'agency_owner',
+) {
+  agencyMocks.agency = { id: 'agency-1', my_role: role };
+  agencyMocks.hasRow = true;
+  agencyMocks.entitlement = {
+    agencyId: 'agency-1',
+    planKey,
+    status,
+    source,
+    activeClientLimit: null,
+    memberLimit: null,
+    servicePackageLimit: null,
+    currentPeriodEnd: null,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+  };
+}
+
+describe('Phase 1R-C — agency-included recruiter premium access', () => {
+  it('stripe agency_team owner: renders included access, hides recruiter upgrade actions', async () => {
+    withAgency('agency_team', 'active', 'stripe');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-agency-included-access'),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByTestId('recruiter-agency-included-access').textContent,
+    ).toMatch(/Growth/);
+    expect(screen.queryByTestId('recruiter-plan-button-starter')).toBeNull();
+    expect(screen.queryByTestId('recruiter-plan-button-growth')).toBeNull();
+    expect(screen.queryByTestId('recruiter-plan-button-fleet')).toBeNull();
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it('admin_seed agency_growth owner: included at Fleet with no recruiter billing action', async () => {
+    withAgency('agency_growth', 'active', 'admin_seed');
+    renderPanel();
+    const card = await screen.findByTestId('recruiter-agency-included-access');
+    expect(card.textContent).toMatch(/Fleet/);
+    expect(card.textContent).toMatch(/No recruiter billing action is required/i);
+    expect(screen.queryByTestId('recruiter-plan-button-growth')).toBeNull();
+  });
+
+  it('manual_beta agency: no inclusion — recruiter upgrade actions remain available', async () => {
+    withAgency('agency_starter', 'manual_beta', 'manual');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('recruiter-agency-included-access')).toBeNull();
+    expect(
+      screen.getByTestId('recruiter-plan-button-starter'),
+    ).not.toBeDisabled();
+  });
+
+  it('non-owner member of a paid stripe agency: no inclusion granted', async () => {
+    withAgency('agency_team', 'active', 'stripe', 'agency_member');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('recruiter-agency-included-access')).toBeNull();
+  });
+
+  it('agency sources still loading: checkout is blocked fail-closed', async () => {
+    agencyMocks.agency = { id: 'agency-1', my_role: 'agency_owner' };
+    agencyMocks.agencyLoading = true;
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).toBeDisabled(),
+    );
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it('agency source error: renders error card and blocks checkout', async () => {
+    agencyMocks.agency = { id: 'agency-1', my_role: 'agency_owner' };
+    agencyMocks.hasRow = true;
+    agencyMocks.entError = true;
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-business-entitlement-error'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('recruiter-plan-button-starter')).toBeDisabled();
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it('recruiter subscription + agency inclusion: conflict card, premium paused, checkout blocked', async () => {
+    withBilling({ plan: 'starter', status: 'active', current_period_end: null });
+    withAgency('agency_team', 'active', 'stripe');
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-business-entitlement-conflict'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('recruiter-agency-included-access')).toBeNull();
+    expect(screen.getByTestId('recruiter-plan-button-growth')).toBeDisabled();
+    expect(supabaseMocks.invoke).not.toHaveBeenCalled();
+  });
+});
