@@ -194,18 +194,106 @@ export function useRecruiterBilling() {
   const legacyCanSubmitMore_DO_NOT_USE_FOR_STANDARD_POSTING =
     isBillingActive && activeCount < limit;
 
-  const capabilities = getRecruiterPlanCapabilities({
-    plan,
-    status,
-    isApprovedRecruiter: isApproved,
-    isSuspended,
+  // ---- Phase 1R-C: effective business entitlement ------------------------
+  //
+  // RAW recruiter billing (above) stays the ONLY source for recruiter Stripe
+  // checkout / portal / subscription fields. The EFFECTIVE entitlement below
+  // may additionally come from an included agency entitlement and is the
+  // source for premium feature capability gates.
+  const myAgency = useMyAgency();
+  const agencyId = myAgency.data?.id ?? null;
+  const agencyEnt = useAgencyEntitlement(agencyId);
+  const hasRealAgency = !!agencyId;
+
+  const recruiterSourceState: 'ready' | 'loading' | 'error' = billingQuery.isError
+    ? 'error'
+    : profileLoading || billingQuery.isLoading
+      ? 'loading'
+      : 'ready';
+
+  const agencySourceState: 'ready' | 'loading' | 'error' =
+    myAgency.isError || (hasRealAgency && agencyEnt.isError)
+      ? 'error'
+      : myAgency.isLoading || (hasRealAgency && agencyEnt.isLoading)
+        ? 'loading'
+        : 'ready';
+
+  // `get_my_agency` joins agency_members with `am.status = 'active'`, so a
+  // returned row proves the caller is an ACTIVE member of that agency.
+  const agencyMembershipStatus = myAgency.data ? 'active' : null;
+  const agencyMembershipRole = myAgency.data?.my_role ?? null;
+
+  const agencyEntitlementRow = agencyEnt.entitlement;
+  const agencyHasRow = agencyEnt.hasRow;
+
+  const effectiveBusinessEntitlement: EffectiveBusinessEntitlement = useMemo(
+    () =>
+      resolveEffectiveBusinessEntitlement({
+        sourceState: {
+          recruiterBilling: recruiterSourceState,
+          agencyEntitlement: agencySourceState,
+        },
+        recruiterBilling: {
+          hasRow: !!billing,
+          plan: billing?.plan ?? null,
+          status: billing?.status ?? null,
+        },
+        agencyEntitlement: {
+          hasRow: agencyHasRow,
+          planKey: agencyHasRow ? agencyEntitlementRow.planKey : null,
+          status: agencyHasRow ? agencyEntitlementRow.status : null,
+          source: agencyHasRow ? agencyEntitlementRow.source : null,
+        },
+        agencyMembership: {
+          role: agencyMembershipRole,
+          status: agencyMembershipStatus,
+        },
+        recruiterProfile: {
+          exists: !!profile,
+          readyToPost: isProfileComplete,
+          suspended: isSuspended,
+        },
+      }),
+    [
+      recruiterSourceState,
+      agencySourceState,
+      billing,
+      agencyHasRow,
+      agencyEntitlementRow.planKey,
+      agencyEntitlementRow.status,
+      agencyEntitlementRow.source,
+      agencyMembershipRole,
+      agencyMembershipStatus,
+      profile,
+      isProfileComplete,
+      isSuspended,
+    ],
+  );
+
+  const effectiveRecruiterTier = effectiveBusinessEntitlement.effectiveRecruiterTier;
+  const effectiveRecruiterPlan: RecruiterPlan =
+    effectiveRecruiterTier === 'free_verified' ? 'none' : effectiveRecruiterTier;
+  const hasEffectivePremiumRecruiterAccess =
+    effectiveBusinessEntitlement.state === 'resolved' &&
+    effectiveRecruiterTier !== 'free_verified';
+  const isBusinessEntitlementLoading =
+    effectiveBusinessEntitlement.state === 'loading';
+
+  const capabilities = getRecruiterCapabilitiesForTier({
+    tier: effectiveRecruiterTier,
+    canPostStandardOpportunities:
+      effectiveBusinessEntitlement.canPostStandardOpportunities,
   });
 
   const refetchBilling = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['recruiter_billing'] });
     qc.invalidateQueries({ queryKey: ['recruiter_active_opportunity_count'] });
     qc.invalidateQueries({ queryKey: ['recruiter_profile'] });
+    // Phase 1R-C: effective entitlement also depends on agency state.
+    qc.invalidateQueries({ queryKey: ['my-agency'] });
+    qc.invalidateQueries({ queryKey: ['agency-entitlement'] });
   }, [qc]);
+
 
   // ---- Server-progress + error state (drives the UI state machine) ------
 
