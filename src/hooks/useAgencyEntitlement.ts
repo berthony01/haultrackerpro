@@ -22,8 +22,13 @@ export interface UseAgencyEntitlementResult {
   /** True when a real DB row backs the entitlement; false for fallback. */
   hasRow: boolean;
   isLoading: boolean;
+  /** Phase 1R-C — surfaced so entitlement consumers can fail closed. */
+  isError: boolean;
+  /** Phase 1R-C — surfaced so entitlement consumers can fail closed. */
+  error: Error | null;
   refetch: () => void;
 }
+
 
 interface EntitlementRow {
   id: string;
