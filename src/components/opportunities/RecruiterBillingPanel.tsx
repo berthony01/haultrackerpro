@@ -94,6 +94,19 @@ export function RecruiterBillingPanel() {
   const headline = hook.headline ?? null;
   const checkServerStatus = hook.checkServerStatus ?? (() => {});
 
+  // Phase 1R-C: additive effective-entitlement fields, read defensively so
+  // narrow legacy mocks that omit them never throw.
+  const entitlementSource = hook.entitlementSource ?? 'free_standard';
+  const businessEntitlementState = hook.businessEntitlementState ?? 'resolved';
+  const billingManagementContext = hook.billingManagementContext ?? 'none';
+  const effectiveRecruiterPlan = hook.effectiveRecruiterPlan ?? 'none';
+  const isAgencyIncluded = entitlementSource === 'agency_included';
+  const isEntitlementConflict = businessEntitlementState === 'conflict';
+  const isEntitlementError = businessEntitlementState === 'error';
+  const entitlementBlocksCheckout =
+    isAgencyIncluded || isEntitlementConflict || isEntitlementError;
+
+
   const [pendingPlan, setPendingPlan] = useState<PaidPlan | null>(null);
   // Phase 1G-R1A7-R1: real-Chromium rapid-double-click testing proved that
   // React Query's `isPending` flag is NOT synchronously available between
