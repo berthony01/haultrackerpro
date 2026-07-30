@@ -145,7 +145,7 @@ function normalizeClaimRow(data: unknown): BusinessCheckoutClaimRow {
 }
 
 function normalizeSimpleRow(data: unknown): BusinessCheckoutSimpleRow {
-  const row = firstRow(data);
+  const row = singleRow(data);
   return {
     outcome: str(row?.outcome) ?? "unknown",
     reason: str(row?.reason),
