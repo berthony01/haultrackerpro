@@ -26,13 +26,13 @@ if (!DATABASE_URL) {
   );
 }
 
-const CANDIDATE_PATH = fileURLToPath(
+const ACTIVE_MIGRATION_PATH = fileURLToPath(
   new URL(
-    "../../supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql",
+    "../../supabase/migrations/20260730060000_phase1r_d2_b1_recruiter_checkout_intents.sql",
     import.meta.url,
   ),
 );
-const CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, "utf8");
+const ACTIVE_MIGRATION_SQL = readFileSync(ACTIVE_MIGRATION_PATH, "utf8");
 
 const BOOTSTRAP_SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -383,9 +383,9 @@ class LatchedStripeFake implements StripeGateway {
 
 beforeAll(async () => {
   await pool.query(BOOTSTRAP_SQL);
-  // The exact repository candidate is applied verbatim. It remains outside
-  // supabase/migrations and is never sent to the connected production project.
-  await pool.query(CANDIDATE_SQL);
+  // The exact repository active migration is applied verbatim to this isolated
+  // local PostgreSQL database. It is never sent to the connected production project.
+  await pool.query(ACTIVE_MIGRATION_SQL);
 }, 60_000);
 
 beforeEach(async () => {
@@ -397,10 +397,10 @@ afterAll(async () => {
 });
 
 describe("Phase 1G-R1A3 — real PostgreSQL checkout intent state machine", () => {
-  it("applies the exact candidate outside managed migrations", () => {
-    expect(CANDIDATE_PATH).toContain("supabase/migration-candidates/");
-    expect(CANDIDATE_PATH).not.toContain("supabase/migrations/");
-    expect(CANDIDATE_SQL).toContain("CREATE TABLE public.recruiter_checkout_intents");
+  it("applies the exact active managed migration", () => {
+    expect(ACTIVE_MIGRATION_PATH).toContain("supabase/migrations/");
+    expect(ACTIVE_MIGRATION_PATH).not.toContain("supabase/migration-candidates/");
+    expect(ACTIVE_MIGRATION_SQL).toContain("CREATE TABLE public.recruiter_checkout_intents");
   });
 
   it("gives simultaneous claim calls one winner and one in-progress loser", async () => {
@@ -681,12 +681,12 @@ describe("Phase 1G-R1A3 — customer, index, and privilege integrity", () => {
     expect(rows[0].n).toBe(2);
   });
 
-  it("preserves compatible pre-existing billing rows when the candidate is applied", async () => {
-    // The candidate was applied once in beforeAll. This assertion pins the
+  it("preserves compatible pre-existing billing rows when the active migration is applied", async () => {
+    // The active migration was applied once in beforeAll. This assertion pins the
     // migration's data-preserving contract by checking that its SQL contains
     // no rewrite/delete statements against the billing table.
-    expect(CANDIDATE_SQL).not.toMatch(/DELETE\s+FROM\s+public\.recruiter_billing_profiles/i);
-    expect(CANDIDATE_SQL).not.toMatch(/UPDATE\s+public\.recruiter_billing_profiles/i);
+    expect(ACTIVE_MIGRATION_SQL).not.toMatch(/DELETE\s+FROM\s+public\.recruiter_billing_profiles/i);
+    expect(ACTIVE_MIGRATION_SQL).not.toMatch(/UPDATE\s+public\.recruiter_billing_profiles/i);
   });
 
   it("enables RLS, creates no client policies, and denies client table/RPC access", async () => {
