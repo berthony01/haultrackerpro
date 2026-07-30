@@ -563,9 +563,7 @@ describe("Phase 1R-D2-B2-A-R2 — Repair D/E: proof fidelity and hygiene", () =>
       ["toMatchInlineSn", "apshot("],
     ].map(([a, b]) => a + b);
 
-    const selfSource = readRepoFile(
-      path.join("src", "test", "phase1rD2B2BusinessCheckoutClaimCandidateContract.test.ts"),
-    );
+    const selfSource = readRepoFile(SELF_REL);
 
     for (const token of forbiddenTokens) {
       expect(selfSource).not.toContain(token);
