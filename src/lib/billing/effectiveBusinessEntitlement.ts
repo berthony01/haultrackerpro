@@ -118,6 +118,17 @@ const PAID_RECRUITER_PLANS: readonly Exclude<
   'free_verified'
 >[] = ['starter', 'growth', 'fleet'];
 
+/**
+ * Recognized agency entitlement source vocabulary. Any other value — unknown,
+ * empty, whitespace-padded, differently cased, null, undefined, or non-string —
+ * is malformed and fails closed.
+ */
+const RECOGNIZED_AGENCY_SOURCES: readonly string[] = [
+  'stripe',
+  'manual',
+  'admin_seed',
+];
+
 /** Statuses that count as "currently paying" in either context. */
 const PREMIUM_STATUSES: readonly string[] = [
   'active',
