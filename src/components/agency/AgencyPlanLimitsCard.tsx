@@ -16,6 +16,12 @@ import { useAgencyMembers, useMyAgency } from '@/hooks/useAgency';
 import { useAgencyClients, useAgencyPackages } from '@/hooks/useAgencyWorkflow';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AGENCY_CHECKOUT_MESSAGES,
+  agencyCheckoutMessageForCode,
+  isSafeAgencyStripeCheckoutUrl,
+  parseAgencyCheckoutError,
+} from '@/lib/agencyCheckoutMessages';
 
 interface Props {
   agencyId: string;
