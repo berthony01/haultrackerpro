@@ -210,6 +210,14 @@ beforeEach(() => {
   profileMocks.isApproved = true;
   profileMocks.isSuspended = false;
   profileMocks.isLoading = false;
+  agencyMocks.agency = null;
+  agencyMocks.agencyLoading = false;
+  agencyMocks.agencyError = false;
+  agencyMocks.entitlement = null;
+  agencyMocks.hasRow = false;
+  agencyMocks.entLoading = false;
+  agencyMocks.entError = false;
+
   supabaseMocks.invoke.mockReset();
   supabaseMocks.fromMaybeSingle.mockReset();
   supabaseMocks.fromMaybeSingle.mockResolvedValue({ data: null, error: null });
