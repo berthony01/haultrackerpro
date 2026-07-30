@@ -6,9 +6,13 @@ import { describe, expect, it } from "vitest";
  * Phase 1R-D2-B2-A — static contract proof for the atomic business checkout
  * claim CANDIDATE. Node file reads only: no database, no network.
  *
- * This phase deliberately does NOT create an active migration. The candidate
- * lives under supabase/migration-candidates/ and B2-B promotion is separate.
+ * This file still proves the accepted B2-A candidate exactly as tested. Phase
+ * 1R-D2-B2-B separately created an active migration whose executable body was
+ * promoted from this candidate; that promotion has its own dedicated contract
+ * test, which owns the body-equality proof. The candidate itself was neither
+ * moved nor applied: it remains candidate-only at its original path.
  */
+
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
