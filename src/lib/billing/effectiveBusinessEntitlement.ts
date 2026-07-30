@@ -271,7 +271,8 @@ export function resolveEffectiveBusinessEntitlement(
   } else if (agencyIncludedTier !== null) {
     effectiveRecruiterTier = agencyIncludedTier;
     entitlementSource = 'agency_included';
-    billingManagementContext = 'agency';
+    // Repair B — only a Stripe-sourced entitlement has a portal to manage.
+    billingManagementContext = agencySourceStripe ? 'agency' : 'none';
   } else {
     entitlementSource = recruiterProfile.exists === true ? 'free_standard' : 'none';
 
