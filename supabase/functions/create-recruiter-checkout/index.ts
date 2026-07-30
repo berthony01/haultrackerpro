@@ -626,7 +626,7 @@ function buildDeps(
     },
     async retrieveSession(id) {
       const s = normalizeSession(await stripe.checkout.sessions.retrieve(id));
-      captured.push(toCapturedSession(s));
+      captureSession(captured, s);
       return s;
     },
     async createSession({
