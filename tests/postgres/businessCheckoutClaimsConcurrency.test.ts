@@ -49,10 +49,17 @@ const CANDIDATE_PATH = fileURLToPath(
 );
 const CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, "utf8");
 
-// Minimal isolated bootstrap: only the roles and the ownership/billing columns
-// the candidate RPCs actually read. The isolated recruiter billing table
-// intentionally accepts the FULL Phase 1R-D1 status vocabulary so the durable
-// policy branches can be exercised; production tables are untouched.
+// Isolated bootstrap mirroring the repository PRODUCTION constraints that are
+// relevant to this proof:
+//   * recruiter_profiles.user_id UNIQUE
+//       (20260513003741_07f20f7a-242b-44d6-bd4b-4d91849cc847.sql)
+//   * recruiter_billing_profiles.recruiter_id UNIQUE, and NO user_id uniqueness
+//       (20260523023143_9b418a9e-92de-4f62-adc5-ca3f5169669e.sql)
+//   * agency_entitlements.agency_id UNIQUE
+//       (20260630001239_aacd1acb-dd6f-4fc5-9645-7f430b807820.sql)
+// Only the ownership/billing columns the candidate RPCs actually read are
+// created. Status/plan/source columns stay text so the isolated fixtures can
+// exercise malformed fail-closed branches; production tables are untouched.
 const BOOTSTRAP_SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -73,15 +80,18 @@ DROP TABLE IF EXISTS public.agency_members CASCADE;
 DROP TABLE IF EXISTS public.agency_profiles CASCADE;
 DROP TABLE IF EXISTS public.recruiter_profiles CASCADE;
 
+-- production-fidelity: recruiter_profiles.user_id UNIQUE
 CREATE TABLE public.recruiter_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL UNIQUE,
+  user_id uuid NOT NULL,
   status text NOT NULL DEFAULT 'active',
   verification_status text NOT NULL DEFAULT 'approved',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT recruiter_profiles_user_unique UNIQUE (user_id)
 );
 
+-- production-fidelity: recruiter_billing_profiles.recruiter_id UNIQUE only
 CREATE TABLE public.recruiter_billing_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recruiter_id uuid NOT NULL REFERENCES public.recruiter_profiles(id) ON DELETE CASCADE,
@@ -113,6 +123,7 @@ CREATE TABLE public.agency_members (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- production-fidelity: agency_entitlements.agency_id UNIQUE
 CREATE TABLE public.agency_entitlements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   agency_id uuid NOT NULL REFERENCES public.agency_profiles(id) ON DELETE CASCADE,
@@ -120,7 +131,8 @@ CREATE TABLE public.agency_entitlements (
   status text NOT NULL DEFAULT 'active',
   source text NOT NULL DEFAULT 'stripe',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT agency_entitlements_agency_id_key UNIQUE (agency_id)
 );
 
 GRANT ALL ON public.recruiter_profiles, public.recruiter_billing_profiles,
@@ -299,6 +311,21 @@ async function seedBoth(): Promise<{
   return { userId, recruiterId: r.recruiterId, agencyId: a.agencyId };
 }
 
+/**
+ * Seeds two DISTINCT agencies owned by the same user, each with its own exact
+ * active agency_owner membership. Production allows at most one entitlement row
+ * per agency, so multi-entitlement precedence must use two agencies.
+ */
+async function seedTwoAgencies(userId = randomUUID()): Promise<{
+  userId: string;
+  agencyA: string;
+  agencyB: string;
+}> {
+  const a = await seedAgency(userId);
+  const b = await seedAgency(userId);
+  return { userId, agencyA: a.agencyId, agencyB: b.agencyId };
+}
+
 async function setRecruiterBilling(
   recruiterId: string,
   userId: string,
@@ -321,7 +348,11 @@ async function setAgencyEntitlement(
 ): Promise<void> {
   await pool.query(
     `INSERT INTO public.agency_entitlements (agency_id, plan_key, status, source)
-     VALUES ($1,$2,$3,$4)`,
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (agency_id) DO UPDATE
+       SET plan_key = EXCLUDED.plan_key,
+           status = EXCLUDED.status,
+           source = EXCLUDED.source`,
     [agencyId, planKey, status, source],
   );
 }
@@ -1426,70 +1457,121 @@ describe("Phase 1R-D2-B2-A — structured input validation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Phase 1R-D2-B2-A-R1 repairs
+// 7. Phase 1R-D2-B2-A-R2 repairs
 // ---------------------------------------------------------------------------
 
 const LOCK_NAMESPACE = "7218926914894380123";
 
-describe("Phase 1R-D2-B2-A-R1 — Repair A: namespaced lock and post-lock clock", () => {
-  it("uses the 64-bit namespaced advisory key in all three RPCs", async () => {
-    const { rows } = await pool.query(
-      `SELECT p.proname, p.prosrc
-         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname='public'
-          AND p.proname IN ('claim_business_checkout',
-                            'complete_business_checkout_claim',
-                            'release_business_checkout_claim')
-        ORDER BY p.proname`,
-    );
-    expect(rows).toHaveLength(3);
-    for (const row of rows) {
-      const src = row.prosrc as string;
+async function functionSource(name: string): Promise<string> {
+  const { rows } = await pool.query(
+    `SELECT p.prosrc
+       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = $1`,
+    [name],
+  );
+  expect(rows).toHaveLength(1);
+  return rows[0].prosrc as string;
+}
+
+const RPC_NAMES = [
+  "claim_business_checkout",
+  "complete_business_checkout_claim",
+  "release_business_checkout_claim",
+];
+
+describe("Phase 1R-D2-B2-A-R2 — Repair A: lock namespace and post-lock clock", () => {
+  it("declares the namespace constant and locks through it in all three RPCs", async () => {
+    for (const name of RPC_NAMES) {
+      const src = await functionSource(name);
       expect(src).toContain(
+        `v_lock_namespace constant bigint := ${LOCK_NAMESPACE};`,
+      );
+      expect(src).toContain(
+        "hashtextextended(_user_id::text, v_lock_namespace)",
+      );
+      expect(src).not.toContain(
         `hashtextextended(_user_id::text, ${LOCK_NAMESPACE})`,
       );
       expect(src).not.toContain("hashtext('bcc:'");
-      expect(src).toContain("v_now := clock_timestamp();");
     }
   });
 
-  it("derives the lease from wall-clock time read AFTER the lock wait", async () => {
-    const seed = await seedRecruiter();
-    const holder = await pool.connect();
-    const waiter = await pool.connect();
-    try {
-      await holder.query("BEGIN");
-      await holder.query(
-        `SELECT pg_advisory_xact_lock(hashtextextended($1::text, ${LOCK_NAMESPACE}))`,
-        [seed.userId],
-      );
-
-      const startedAt = Date.now();
-      const pending = claim(waiter, {
-        userId: seed.userId,
-        context: "recruiter",
-        subjectId: seed.recruiterId,
-        planKey: "growth",
-        requestKey: "req-lockwait",
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await holder.query("COMMIT");
-
-      const acquired = await pending;
-      expect(acquired.outcome).toBe("acquired");
-      const leaseMs = (acquired.lease_expires_at as Date).getTime();
-      // A transaction-fixed now() would place the lease ~300s after startedAt.
-      // A post-lock clock_timestamp() must place it beyond the lock wait.
-      expect(leaseMs - startedAt).toBeGreaterThan(300_000 + 1_000);
-    } finally {
-      holder.release();
-      waiter.release();
+  it("declares v_now without an initializer in all three RPCs", async () => {
+    for (const name of RPC_NAMES) {
+      const src = await functionSource(name);
+      expect(src).toMatch(/v_now\s+timestamptz;/);
+      expect(src).not.toMatch(/v_now\s+timestamptz\s*:=/);
+      expect(src).not.toMatch(/v_now[^\n]*:=\s*now\(\)/);
     }
+  });
+
+  it("reads clock_timestamp() into v_now only AFTER the advisory lock", async () => {
+    for (const name of RPC_NAMES) {
+      const src = await functionSource(name);
+      const lockAt = src.indexOf("pg_advisory_xact_lock(");
+      const clockAt = src.indexOf("v_now := clock_timestamp();");
+      expect(lockAt).toBeGreaterThan(0);
+      expect(clockAt).toBeGreaterThan(lockAt);
+    }
+  });
+
+  it("refreshes the clock again after policy evaluation and before the durable row select", async () => {
+    const src = await functionSource("claim_business_checkout");
+    const lockAt = src.indexOf("pg_advisory_xact_lock(");
+    const first = src.indexOf("v_now := clock_timestamp();", lockAt);
+    const second = src.indexOf("v_now := clock_timestamp();", first + 1);
+    const selectAt = src.indexOf(
+      "SELECT * INTO v_row FROM public.business_checkout_claims",
+    );
+    expect(second).toBeGreaterThan(first);
+    expect(selectAt).toBeGreaterThan(second);
+    expect(
+      (src.match(/v_now := clock_timestamp\(\);/g) ?? []).length,
+    ).toBe(2);
+  });
+
+  it("revalidates checkout expiry after the lock and before the durable row select", async () => {
+    const src = await functionSource("complete_business_checkout_claim");
+    const lockAt = src.indexOf("pg_advisory_xact_lock(");
+    const clockAt = src.indexOf("v_now := clock_timestamp();", lockAt);
+    const revalidateAt = src.indexOf(
+      "IF NOT (_checkout_expires_at IS NOT NULL AND _checkout_expires_at > v_now) THEN",
+    );
+    const selectAt = src.indexOf(
+      "SELECT * INTO v_row FROM public.business_checkout_claims",
+    );
+    expect(revalidateAt).toBeGreaterThan(clockAt);
+    expect(selectAt).toBeGreaterThan(revalidateAt);
+  });
+
+  it("uses only post-lock v_now for release lease validity", async () => {
+    const src = await functionSource("release_business_checkout_claim");
+    const clockAt = src.indexOf("v_now := clock_timestamp();");
+    const leaseAt = src.indexOf("v_row.lease_expires_at <= v_now");
+    expect(leaseAt).toBeGreaterThan(clockAt);
+  });
+
+  it("still issues an approximately 300 second lease on acquisition", async () => {
+    const seed = await seedRecruiter();
+    const acquired = await claim(pool, {
+      userId: seed.userId,
+      context: "recruiter",
+      subjectId: seed.recruiterId,
+      planKey: "growth",
+      requestKey: "req-lease",
+    });
+    const row = (await claimRow(seed.userId))!;
+    const deltaSeconds =
+      ((row.lease_expires_at as Date).getTime() -
+        (row.updated_at as Date).getTime()) /
+      1000;
+    expect(acquired.outcome).toBe("acquired");
+    expect(deltaSeconds).toBeGreaterThanOrEqual(299);
+    expect(deltaSeconds).toBeLessThanOrEqual(301);
   });
 });
 
-describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", () => {
+describe("Phase 1R-D2-B2-A-R2 — Repair B: strict null and shape validation", () => {
   it("rejects a NULL plan key as invalid input rather than falling through", async () => {
     const seed = await seedRecruiter();
     const { rows } = await pool.query(
@@ -1503,7 +1585,7 @@ describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", (
     expect(await claimRowCount(seed.userId)).toBe(0);
   });
 
-  it("rejects a NULL terminal flag before any state transition", async () => {
+  it("rejects a NULL terminal flag with terminal_flag_invalid", async () => {
     const seed = await seedRecruiter();
     const acquired = await claim(pool, {
       userId: seed.userId,
@@ -1518,13 +1600,20 @@ describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", (
     );
     expect(rows[0]).toMatchObject({
       outcome: "invalid_input",
-      reason: "terminal_flag_missing",
+      reason: "terminal_flag_invalid",
     });
     expect((await claimRow(seed.userId))!.state).toBe("processing");
   });
 
   it("enforces strict snake_case error codes", async () => {
-    const rejected = ["_leading", "trailing_", "double__underscore", "9start", "Upper_case"];
+    const rejected = [
+      "_leading",
+      "trailing_",
+      "double__underscore",
+      "123first",
+      "UpperCase",
+      "has space",
+    ];
     for (const errorCode of rejected) {
       const seed = await seedRecruiter();
       const acquired = await claim(pool, {
@@ -1580,53 +1669,147 @@ describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", (
   });
 });
 
-describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => {
-  it("blocks when ANY agency entitlement row is live, regardless of row order", async () => {
-    const seed = await seedBoth();
-    await setAgencyEntitlement(seed.agencyId, "agency_starter", "cancelled", "stripe");
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "active", "stripe");
-
-    expect(
-      await claim(pool, {
-        userId: seed.userId,
-        context: "recruiter",
-        subjectId: seed.recruiterId,
-        planKey: "growth",
-        requestKey: "req-setwise-agency",
-      }),
-    ).toMatchObject({ outcome: "blocked", reason: "agency_entitlement_exists" });
-    expect(await claimRowCount(seed.userId)).toBe(0);
+describe("Phase 1R-D2-B2-A-R2 — Repair C: setwise fail-closed agency precedence", () => {
+  it("removes the v_has_owner gate and evaluates ownership inside the aggregate join", async () => {
+    const src = await functionSource("claim_business_checkout");
+    expect(src).not.toContain("v_has_owner");
+    expect(src).toContain(
+      "INTO v_unknown, v_live, v_past_due_stripe, v_past_due_other",
+    );
+    const unknownAt = src.indexOf("IF v_unknown > 0 THEN");
+    const liveAt = src.indexOf("ELSIF v_live > 0 THEN", unknownAt);
+    const otherAt = src.indexOf("ELSIF v_past_due_other > 0 THEN", liveAt);
+    const stripeAt = src.indexOf("ELSIF v_past_due_stripe > 0 THEN", otherAt);
+    expect(unknownAt).toBeGreaterThan(0);
+    expect(liveAt).toBeGreaterThan(unknownAt);
+    expect(otherAt).toBeGreaterThan(liveAt);
+    expect(stripeAt).toBeGreaterThan(otherAt);
   });
 
-  it("prefers unknown over every other agency precedence tier", async () => {
-    const seed = await seedBoth();
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "active", "stripe");
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "past_due", "stripe");
-    await setAgencyEntitlement(seed.agencyId, "not_a_plan", "active", "stripe");
+  it("blocks a same-context claim for a DIFFERENT agency the same user owns", async () => {
+    const { userId, agencyA, agencyB } = await seedTwoAgencies();
+
+    const first = await claim(pool, {
+      userId,
+      context: "agency",
+      subjectId: agencyA,
+      planKey: "agency_team",
+      requestKey: "req-a",
+    });
+    expect(first.outcome).toBe("acquired");
+
+    const second = await claim(pool, {
+      userId,
+      context: "agency",
+      subjectId: agencyB,
+      planKey: "agency_team",
+      requestKey: "req-b",
+    });
+    expect(second).toMatchObject({
+      outcome: "blocked",
+      reason: "same_context_claim_active",
+    });
+    expect(second.claim_token).toBeNull();
+    expect(await claimRowCount(userId)).toBe(1);
+    expect((await claimRow(userId))!.subject_id).toBe(agencyA);
+  });
+
+  it.each([
+    { order: "inert first", inertFirst: true },
+    { order: "live first", inertFirst: false },
+  ])(
+    "blocks a recruiter claim when any owned agency is live ($order)",
+    async ({ inertFirst }) => {
+      const userId = randomUUID();
+      const recruiter = await seedRecruiter(userId);
+      const { agencyA, agencyB } = await seedTwoAgencies(userId);
+
+      if (inertFirst) {
+        await setAgencyEntitlement(agencyA, "agency_starter", "manual_beta", "manual");
+        await setAgencyEntitlement(agencyB, "agency_team", "active", "stripe");
+      } else {
+        await setAgencyEntitlement(agencyA, "agency_team", "active", "stripe");
+        await setAgencyEntitlement(agencyB, "agency_starter", "manual_beta", "manual");
+      }
+
+      expect(
+        await claim(pool, {
+          userId,
+          context: "recruiter",
+          subjectId: recruiter.recruiterId,
+          planKey: "growth",
+          requestKey: "req-multi-live",
+        }),
+      ).toMatchObject({ outcome: "blocked", reason: "agency_entitlement_exists" });
+      expect(await claimRowCount(userId)).toBe(0);
+    },
+  );
+
+  it("fails closed as unknown when any owned agency row is malformed", async () => {
+    const userId = randomUUID();
+    const recruiter = await seedRecruiter(userId);
+    const { agencyA, agencyB } = await seedTwoAgencies(userId);
+    await setAgencyEntitlement(agencyA, "agency_team", "active", "stripe");
+    await setAgencyEntitlement(agencyB, "not_a_plan", "bogus_status", "mystery");
+
+    const entitlementsBefore = (
+      await pool.query(`SELECT * FROM public.agency_entitlements ORDER BY id`)
+    ).rows;
 
     expect(
       await claim(pool, {
-        userId: seed.userId,
+        userId,
         context: "recruiter",
-        subjectId: seed.recruiterId,
+        subjectId: recruiter.recruiterId,
         planKey: "growth",
-        requestKey: "req-setwise-unknown",
+        requestKey: "req-multi-unknown",
       }),
     ).toMatchObject({ outcome: "blocked", reason: "opposing_entitlement_unknown" });
+    expect(await claimRowCount(userId)).toBe(0);
+    expect(
+      (await pool.query(`SELECT * FROM public.agency_entitlements ORDER BY id`)).rows,
+    ).toEqual(entitlementsBefore);
   });
 
-  it("prefers stripe past_due management over a non-stripe past_due row", async () => {
-    const seed = await seedBoth();
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "cancelled", "manual");
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "past_due", "stripe");
+  it.each([
+    { other: "manual" },
+    { other: "admin_seed" },
+  ])(
+    "fails closed when stripe past_due mixes with $other past_due",
+    async ({ other }) => {
+      const userId = randomUUID();
+      const recruiter = await seedRecruiter(userId);
+      const { agencyA, agencyB } = await seedTwoAgencies(userId);
+      await setAgencyEntitlement(agencyA, "agency_team", "past_due", "stripe");
+      await setAgencyEntitlement(agencyB, "agency_team", "past_due", other);
+
+      expect(
+        await claim(pool, {
+          userId,
+          context: "recruiter",
+          subjectId: recruiter.recruiterId,
+          planKey: "growth",
+          requestKey: "req-multi-pastdue",
+        }),
+      ).toMatchObject({ outcome: "blocked", reason: "opposing_entitlement_unknown" });
+      expect(await claimRowCount(userId)).toBe(0);
+    },
+  );
+
+  it("still reports stripe past_due management when no other past_due exists", async () => {
+    const userId = randomUUID();
+    const recruiter = await seedRecruiter(userId);
+    const { agencyA, agencyB } = await seedTwoAgencies(userId);
+    await setAgencyEntitlement(agencyA, "agency_team", "past_due", "stripe");
+    await setAgencyEntitlement(agencyB, "agency_starter", "cancelled", "stripe");
 
     expect(
       await claim(pool, {
-        userId: seed.userId,
+        userId,
         context: "recruiter",
-        subjectId: seed.recruiterId,
+        subjectId: recruiter.recruiterId,
         planKey: "growth",
-        requestKey: "req-setwise-pastdue",
+        requestKey: "req-multi-stripe-pastdue",
       }),
     ).toMatchObject({
       outcome: "blocked",
@@ -1634,78 +1817,91 @@ describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => 
     });
   });
 
-  it("fails closed on a non-stripe past_due row evaluated setwise", async () => {
-    const seed = await seedBoth();
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "cancelled", "stripe");
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "past_due", "manual");
+  it("allows a recruiter claim when every owned agency row is inert", async () => {
+    const userId = randomUUID();
+    const recruiter = await seedRecruiter(userId);
+    const { agencyA, agencyB } = await seedTwoAgencies(userId);
+    await setAgencyEntitlement(agencyA, "agency_starter", "manual_beta", "manual");
+    await setAgencyEntitlement(agencyB, "agency_team", "cancelled", "stripe");
 
     expect(
       await claim(pool, {
-        userId: seed.userId,
+        userId,
         context: "recruiter",
-        subjectId: seed.recruiterId,
+        subjectId: recruiter.recruiterId,
         planKey: "growth",
-        requestKey: "req-setwise-manual",
-      }),
-    ).toMatchObject({ outcome: "blocked", reason: "opposing_entitlement_unknown" });
-  });
-
-  it("allows when every agency entitlement row is inert", async () => {
-    const seed = await seedBoth();
-    await setAgencyEntitlement(seed.agencyId, "agency_team", "cancelled", "stripe");
-    await setAgencyEntitlement(seed.agencyId, "agency_starter", "manual_beta", "manual");
-
-    expect(
-      await claim(pool, {
-        userId: seed.userId,
-        context: "recruiter",
-        subjectId: seed.recruiterId,
-        planKey: "growth",
-        requestKey: "req-setwise-inert",
+        requestKey: "req-multi-inert",
       }),
     ).toMatchObject({ outcome: "acquired" });
   });
+});
 
-  it("blocks when ANY recruiter billing row for the user is live", async () => {
-    const seed = await seedBoth();
-    const other = await seedRecruiter();
-    await setRecruiterBilling(seed.recruiterId, seed.userId, "none", "inactive");
-    await setRecruiterBilling(other.recruiterId, seed.userId, "fleet", "active");
-
+describe("Phase 1R-D2-B2-A-R2 — Repair D: production-fidelity fixtures", () => {
+  it("mirrors the production UNIQUE constraint on agency_entitlements.agency_id", async () => {
+    const { rows } = await pool.query(
+      `SELECT indexdef FROM pg_indexes
+        WHERE schemaname='public' AND tablename='agency_entitlements'`,
+    );
+    const defs = rows.map((r) => r.indexdef as string);
     expect(
-      await claim(pool, {
-        userId: seed.userId,
-        context: "agency",
-        subjectId: seed.agencyId,
-        planKey: "agency_team",
-        requestKey: "req-setwise-recruiter",
-      }),
-    ).toMatchObject({ outcome: "blocked", reason: "recruiter_subscription_exists" });
-    expect(await claimRowCount(seed.userId)).toBe(0);
+      defs.some((d) => /UNIQUE INDEX .* \(agency_id\)$/.test(d)),
+    ).toBe(true);
+
+    const { agencyA } = await seedTwoAgencies();
+    await setAgencyEntitlement(agencyA, "agency_team", "active", "stripe");
+    await expectSqlState(
+      pool.query(
+        `INSERT INTO public.agency_entitlements (agency_id, plan_key, status, source)
+         VALUES ($1,'agency_starter','active','stripe')`,
+        [agencyA],
+      ),
+      "23505",
+    );
   });
 
-  it("fails closed when ANY recruiter billing row is unrecognised", async () => {
-    const seed = await seedBoth();
-    const other = await seedRecruiter();
-    await setRecruiterBilling(seed.recruiterId, seed.userId, "fleet", "active");
-    await setRecruiterBilling(other.recruiterId, seed.userId, "fleet", "weird_status");
-
-    expect(
-      await claim(pool, {
-        userId: seed.userId,
-        context: "agency",
-        subjectId: seed.agencyId,
-        planKey: "agency_team",
-        requestKey: "req-setwise-recruiter-unknown",
-      }),
-    ).toMatchObject({ outcome: "blocked", reason: "opposing_entitlement_unknown" });
+  it("mirrors production recruiter uniqueness: unique recruiter_id, no user_id uniqueness", async () => {
+    const { rows } = await pool.query(
+      `SELECT indexdef FROM pg_indexes
+        WHERE schemaname='public' AND tablename='recruiter_billing_profiles'`,
+    );
+    const defs = rows.map((r) => r.indexdef as string);
+    expect(defs.some((d) => /UNIQUE INDEX .* \(recruiter_id\)$/.test(d))).toBe(true);
+    expect(defs.some((d) => /UNIQUE INDEX .* \(user_id\)$/.test(d))).toBe(false);
   });
 
-  it("allows when every recruiter billing row is terminal", async () => {
+  it("proves multiple coherent recruiter billing rows per user are structurally impossible", async () => {
+    // Production recruiter_profiles enforces UNIQUE(user_id), so a user can own
+    // at most one recruiter profile, and recruiter_billing_profiles enforces
+    // UNIQUE(recruiter_id). A second COHERENT billing row for the same user is
+    // therefore impossible without fabricating cross-user linkage.
+    const { rows } = await pool.query(
+      `SELECT indexdef FROM pg_indexes
+        WHERE schemaname='public' AND tablename='recruiter_profiles'`,
+    );
+    expect(
+      rows.some((r) => /UNIQUE INDEX .* \(user_id\)$/.test(r.indexdef as string)),
+    ).toBe(true);
+
+    const seed = await seedRecruiter();
+    await expectSqlState(
+      pool.query(
+        `INSERT INTO public.recruiter_profiles (user_id) VALUES ($1)`,
+        [seed.userId],
+      ),
+      "23505",
+    );
+  });
+
+  it("keeps every clean recruiter billing fixture owner-coherent", async () => {
     const seed = await seedBoth();
-    const other = await seedRecruiter();
-    await setRecruiterBilling(seed.recruiterId, seed.userId, "growth", "canceled");
-    await setRecruiterBilling(other.recruiterId, seed.userId, "none", "inactive");
+    await setRecruiterBilling(seed.recruiterId, seed.userId, "growth", "active");
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS n
+         FROM public.recruiter_billing_profiles rbp
+         JOIN public.recruiter_profiles rp ON rp.id = rbp.recruiter_id
+        WHERE rbp.user_id IS DISTINCT FROM rp.user_id`,
+    );
+    expect(rows[0].n).toBe(0);
 
     expect(
       await claim(pool, {
@@ -1713,8 +1909,11 @@ describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => 
         context: "agency",
         subjectId: seed.agencyId,
         planKey: "agency_team",
-        requestKey: "req-setwise-recruiter-terminal",
+        requestKey: "req-coherent",
       }),
-    ).toMatchObject({ outcome: "acquired" });
+    ).toMatchObject({
+      outcome: "blocked",
+      reason: "recruiter_subscription_exists",
+    });
   });
 });
