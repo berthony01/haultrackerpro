@@ -401,11 +401,12 @@ describe("Phase 1R-D2-B2-B — structured outcome vocabulary", () => {
 
   it("preserves the exact D1 agency and recruiter status vocabularies", () => {
     expect(activeBody).toContain(
-      "('manual_beta','trialing','active','past_due','cancelled')",
+      "('manual_beta','trialing','active','past_due','cancelled')", // trial-allowlist: Stripe subscription status literal
     );
     expect(activeBody).toContain(
-      "('active','trialing','past_due','unpaid','incomplete','paused')",
+      "('active','trialing','past_due','unpaid','incomplete','paused')", // trial-allowlist: Stripe subscription status literal
     );
+
     expect(activeBody).toContain("('canceled','incomplete_expired','inactive')");
     expect(activeBody).toContain(
       "('agency_starter','agency_team','agency_growth')",
