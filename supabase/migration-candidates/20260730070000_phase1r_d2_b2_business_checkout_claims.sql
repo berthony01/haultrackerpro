@@ -385,7 +385,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_now timestamptz := clock_timestamp();
+  v_lock_namespace constant bigint := 7218926914894380123;
+  v_now timestamptz;
   v_row public.business_checkout_claims%ROWTYPE;
 BEGIN
   IF _user_id IS NULL THEN
@@ -400,16 +401,22 @@ BEGIN
   IF _session_id IS NULL OR btrim(_session_id) = '' THEN
     outcome := 'invalid_input'; reason := 'session_id_invalid'; RETURN NEXT; RETURN;
   END IF;
-  IF _checkout_expires_at IS NULL OR _checkout_expires_at <= v_now THEN
+  -- Preliminary expiry screen before any lock wait.
+  IF _checkout_expires_at IS NULL OR _checkout_expires_at <= clock_timestamp() THEN
     outcome := 'invalid_input'; reason := 'checkout_expiry_invalid'; RETURN NEXT; RETURN;
   END IF;
 
   PERFORM pg_advisory_xact_lock(
-    hashtextextended(_user_id::text, 7218926914894380123)
+    hashtextextended(_user_id::text, v_lock_namespace)
   );
 
   -- Fresh wall-clock time after the lock wait.
   v_now := clock_timestamp();
+
+  -- Revalidate expiry against post-lock time before selecting or mutating.
+  IF NOT (_checkout_expires_at IS NOT NULL AND _checkout_expires_at > v_now) THEN
+    outcome := 'invalid_input'; reason := 'checkout_expiry_invalid'; RETURN NEXT; RETURN;
+  END IF;
 
   SELECT * INTO v_row FROM public.business_checkout_claims
     WHERE user_id = _user_id FOR UPDATE;
