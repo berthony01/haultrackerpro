@@ -486,13 +486,90 @@ describe('Phase 1R-B — free standard, none, and source semantics', () => {
     expect(result.effectiveRecruiterTier).toBe('free_verified');
   });
 
-  it('26b. non-Stripe admin_seed active agency still includes recruiter premium when every inclusion condition is met', () => {
+  it('26b. non-Stripe admin_seed active agency still includes recruiter premium when every inclusion condition is met, with no Stripe portal context', () => {
     const result = resolveEffectiveBusinessEntitlement(
       makeInput(agencyOwner('agency_team', 'active', 'admin_seed')),
     );
     expect(result.entitlementSource).toBe('agency_included');
     expect(result.effectiveRecruiterTier).toBe('growth');
     expect(result.effectiveAgencyPlan).toBe('agency_team');
+    expect(result.billingManagementContext).toBe('none');
+  });
+
+  it('26c. non-Stripe manual active agency includes recruiter premium with billing context exactly none', () => {
+    const result = resolveEffectiveBusinessEntitlement(
+      makeInput(agencyOwner('agency_growth', 'active', 'manual')),
+    );
+    expect(result.entitlementSource).toBe('agency_included');
+    expect(result.effectiveRecruiterTier).toBe('fleet');
+    expect(result.effectiveAgencyPlan).toBe('agency_growth');
+    expect(result.billingManagementContext).toBe('none');
+  });
+
+  it('26d. active Stripe-sourced included agency still returns billing context agency', () => {
+    const result = resolveEffectiveBusinessEntitlement(
+      makeInput(agencyOwner('agency_starter', 'active', 'stripe')),
+    );
+    expect(result.entitlementSource).toBe('agency_included');
+    expect(result.effectiveRecruiterTier).toBe('starter');
+    expect(result.billingManagementContext).toBe('agency');
+  });
+
+  it.each([
+    ['unknown string source', 'wat'],
+    ['empty string source', ''],
+    ['whitespace-padded source', ' stripe '],
+    ['uppercase source', 'STRIPE'],
+    ['null source', null],
+    ['undefined source', undefined],
+  ])(
+    '26e. %s on an otherwise includable active owner row fails closed entirely',
+    (_label, source) => {
+      const result = resolveEffectiveBusinessEntitlement(
+        makeInput({
+          agencyEntitlement: {
+            hasRow: true,
+            planKey: 'agency_team',
+            status: 'active',
+            source: source as never,
+          },
+          agencyMembership: { role: 'agency_owner', status: 'active' },
+        }),
+      );
+      expect(result.effectiveAgencyPlan).toBeNull();
+      expect(result.effectiveRecruiterTier).toBe('free_verified');
+      expect(result.entitlementSource).not.toBe('agency_included');
+      expect(result.entitlementSource).toBe('free_standard');
+      expect(result.billingManagementContext).toBe('none');
+    },
+  );
+
+  it('26f. recognized-source manual_beta preserves the agency plan with no premium and no billing context', () => {
+    const result = resolveEffectiveBusinessEntitlement(
+      makeInput(agencyOwner('agency_team', 'manual_beta', 'admin_seed')),
+    );
+    expect(result.effectiveAgencyPlan).toBe('agency_team');
+    expect(result.effectiveRecruiterTier).toBe('free_verified');
+    expect(result.entitlementSource).toBe('free_standard');
+    expect(result.billingManagementContext).toBe('none');
+  });
+
+  it('26g. dual recruiter premium + includable admin_seed agency remains an exact fail-closed conflict', () => {
+    const result = resolveEffectiveBusinessEntitlement(
+      makeInput({
+        ...agencyOwner('agency_team', 'active', 'admin_seed'),
+        recruiterBilling: { hasRow: true, plan: 'starter', status: 'active' },
+      }),
+    );
+    expect(result).toEqual({
+      state: 'conflict',
+      effectiveRecruiterTier: 'free_verified',
+      effectiveAgencyPlan: null,
+      entitlementSource: 'none',
+      billingManagementContext: 'conflict',
+      canPostStandardOpportunities: true,
+      conflictReason: 'dual_paid_business_entitlement',
+    });
   });
 });
 
