@@ -317,6 +317,68 @@ export function RecruiterBillingPanel() {
         </p>
       </Card>
 
+      {isAgencyIncluded && (
+        <Card
+          className="p-4 border-primary/40 bg-primary/5 space-y-2"
+          data-testid="recruiter-agency-included-access"
+        >
+          <div className="flex items-center gap-2">
+            <BadgeCheck className="h-4 w-4 text-primary" aria-hidden="true" />
+            <h3 className="text-sm font-bold text-foreground">
+              Premium Recruiter Access Included
+            </h3>
+            <Badge variant="default" className="capitalize">
+              {RECRUITER_PLAN_LABELS[effectiveRecruiterPlan]}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Premium recruiter tools are included through your agency
+            entitlement. No separate recruiter subscription is required.
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {billingManagementContext === 'agency'
+              ? 'Agency billing is managed from Agency Operations.'
+              : 'No recruiter billing action is required.'}
+          </p>
+        </Card>
+      )}
+
+      {isEntitlementConflict && (
+        <Card
+          className="p-4 border-destructive/50 bg-destructive/5 space-y-1"
+          role="alert"
+          data-testid="recruiter-business-entitlement-conflict"
+        >
+          <h3 className="text-sm font-bold text-foreground">
+            Overlapping Business Subscriptions
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            We found both a recruiter subscription and an agency entitlement on
+            this account. Premium recruiter tools are paused and no new
+            recruiter subscription can be started until this is resolved.
+            Please contact support.
+          </p>
+        </Card>
+      )}
+
+      {isEntitlementError && (
+        <Card
+          className="p-4 border-destructive/50 bg-destructive/5 space-y-1"
+          role="alert"
+          data-testid="recruiter-business-entitlement-error"
+        >
+          <h3 className="text-sm font-bold text-foreground">
+            Plan Access Could Not Be Verified
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            We couldn't confirm your business plan access right now. Premium
+            recruiter tools and new subscriptions are unavailable until this
+            check succeeds. Please refresh and try again.
+          </p>
+        </Card>
+      )}
+
+
       <Card className="p-4 border-border/60">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-bold text-foreground">Standard Recruiter Access</h3>
