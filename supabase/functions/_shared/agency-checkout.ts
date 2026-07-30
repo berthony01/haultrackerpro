@@ -505,7 +505,15 @@ async function scanExistingSessions(
   for (const s of exact) {
     const status = typeof s.status === "string" ? s.status : "";
     if (status === "complete") {
-      sawComplete = true;
+      // A completed session only represents an in-flight finalization while it
+      // is still current. Malformed expiry or a foreign customer fails closed.
+      if (typeof s.expires_at !== "number" || s.expires_at <= 0) {
+        return { kind: "invalid" };
+      }
+      if (s.customer !== customerId) return { kind: "invalid" };
+      // Historical completed session (expired): ignore it so a later billing
+      // restart is never permanently blocked.
+      if (s.expires_at > now) sawComplete = true;
       continue;
     }
     if (status === "expired") continue;
@@ -522,6 +530,7 @@ async function scanExistingSessions(
     if (!isSafeAgencyCheckoutUrl(s.url)) return { kind: "invalid" };
     openValid.push(s);
   }
+
 
   if (openValid.length > 1) return { kind: "support" };
   if (openValid.length === 1) {

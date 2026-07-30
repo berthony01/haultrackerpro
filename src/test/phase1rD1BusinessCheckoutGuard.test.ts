@@ -123,7 +123,32 @@ describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () 
     );
   });
 
+  for (const source of ["manual", "admin_seed"] as const) {
+    it(`fails closed for a ${source}-sourced past_due agency row`, () => {
+      const d = evaluateRecruiterCheckoutCrossContext(
+        agencyFacts({ source, status: "past_due" }),
+      );
+      expect(d.allowed).toBe(false);
+      const b = blocked(d);
+      expect(b.code).toBe("opposing_entitlement_unknown");
+      expect(b.status).toBe(409);
+      expect(b.message).toBe(
+        CROSS_CONTEXT_MESSAGES.opposing_entitlement_unknown,
+      );
+    });
+  }
+
+  it("does not mutate input facts when evaluating a past_due row", () => {
+    for (const source of AGENCY_SOURCES) {
+      const facts = agencyFacts({ source, status: "past_due" });
+      const snapshot = JSON.stringify(facts);
+      evaluateRecruiterCheckoutCrossContext(facts);
+      expect(JSON.stringify(facts)).toBe(snapshot);
+    }
+  });
+
   it("allows manual_beta", () => {
+
     expect(
       evaluateRecruiterCheckoutCrossContext(
         agencyFacts({ status: "manual_beta", source: "manual" }),
