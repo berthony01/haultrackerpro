@@ -5,12 +5,15 @@
 // rather than a raw recruiter plan/status comparison, and that unresolved
 // (loading / error / conflict) entitlement states fail closed.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+
 
 // --- hoisted mock state -----------------------------------------------------
 
