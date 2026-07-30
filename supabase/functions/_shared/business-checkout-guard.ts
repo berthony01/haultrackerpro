@@ -210,7 +210,7 @@ export function evaluateRecruiterCheckoutCrossContext(
 
   // Live agency premium (any recognized source) already includes recruiter
   // premium — never let the user pay twice.
-  if (status === "active" || status === "trialing") {
+  if (status === "active" || status === "trialing") { // trial-allowlist
     // trial-allowlist: Stripe subscription status literal
     return block("agency_entitlement_exists");
   }

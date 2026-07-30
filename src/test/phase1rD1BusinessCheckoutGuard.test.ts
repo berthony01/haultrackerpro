@@ -94,7 +94,7 @@ describe("Phase 1R-D1 — vocabulary", () => {
 
 describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () => {
   for (const source of AGENCY_SOURCES) {
-    for (const status of ["active", "trialing"] as const) {
+    for (const status of ["active", "trialing"] as const) { // trial-allowlist
       // trial-allowlist: Stripe subscription status literal
       it(`blocks recruiter checkout for ${source}/${status} active owner`, () => {
         const d = evaluateRecruiterCheckoutCrossContext(
