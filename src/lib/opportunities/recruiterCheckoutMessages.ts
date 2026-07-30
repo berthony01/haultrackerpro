@@ -22,6 +22,10 @@ export type RecruiterCheckoutCode =
   | 'session_invalid'
   | 'transient_error'
   | 'support_required'
+  // Phase 1R-D1 — cross-context business billing guard codes.
+  | 'agency_entitlement_exists'
+  | 'agency_billing_requires_management'
+  | 'opposing_entitlement_unknown'
   | 'internal_error';
 
 export interface ParsedCheckoutError {
