@@ -206,7 +206,7 @@ BEGIN
   -- lock. The durable row below is still the long-lived cross-request
   -- coordination mechanism.
   PERFORM pg_advisory_xact_lock(
-    hashtextextended(_user_id::text, 7218926914894380123)
+    hashtextextended(_user_id::text, v_lock_namespace)
   );
 
   -- Wall-clock time must be re-read AFTER the lock is acquired: now() is fixed
@@ -215,52 +215,42 @@ BEGIN
 
   -- (d) Exact Phase 1R-D1 opposing durable-billing policy, evaluated SETWISE
   -- across every matching row with deterministic precedence:
-  -- unknown > live > past_due(stripe) > past_due(non-stripe, fail closed).
+  -- unknown > live > past_due(non-stripe, fail closed) > past_due(stripe).
   IF _context = 'recruiter' THEN
-    v_has_owner := EXISTS (
-      SELECT 1
-        FROM public.agency_profiles ap
-        JOIN public.agency_members am ON am.agency_id = ap.id
-       WHERE ap.owner_user_id = _user_id
-         AND am.member_user_id = _user_id
-         AND am.role::text = 'agency_owner'
-         AND am.status::text = 'active'
-    );
+    -- Ownership linkage is expressed inside the aggregate join itself: zero
+    -- joined rows naturally yields all-zero counts, which allows checkout.
+    SELECT
+      count(*) FILTER (WHERE
+           COALESCE(ae.plan_key::text,'') NOT IN ('agency_starter','agency_team','agency_growth')
+        OR COALESCE(ae.source::text,'')   NOT IN ('stripe','manual','admin_seed')
+        OR COALESCE(ae.status::text,'')   NOT IN ('manual_beta','trialing','active','past_due','cancelled')),
+      count(*) FILTER (WHERE ae.status::text IN ('active','trialing')),
+      count(*) FILTER (WHERE ae.status::text = 'past_due' AND ae.source::text = 'stripe'),
+      count(*) FILTER (WHERE ae.status::text = 'past_due' AND ae.source::text IS DISTINCT FROM 'stripe')
+      INTO v_unknown, v_live, v_past_due_stripe, v_past_due_other
+      FROM public.agency_entitlements ae
+      JOIN public.agency_profiles ap ON ap.id = ae.agency_id
+      JOIN public.agency_members am
+        ON am.agency_id = ap.id
+       AND am.member_user_id = _user_id
+       AND am.role::text = 'agency_owner'
+       AND am.status::text = 'active'
+     WHERE ap.owner_user_id = _user_id;
 
-    IF v_has_owner THEN
-      SELECT
-        count(*) FILTER (WHERE
-             COALESCE(ae.plan_key::text,'') NOT IN ('agency_starter','agency_team','agency_growth')
-          OR COALESCE(ae.source::text,'')   NOT IN ('stripe','manual','admin_seed')
-          OR COALESCE(ae.status::text,'')   NOT IN ('manual_beta','trialing','active','past_due','cancelled')),
-        count(*) FILTER (WHERE ae.status::text IN ('active','trialing')),
-        count(*) FILTER (WHERE ae.status::text = 'past_due' AND ae.source::text = 'stripe'),
-        count(*) FILTER (WHERE ae.status::text = 'past_due' AND ae.source::text IS DISTINCT FROM 'stripe')
-        INTO v_unknown, v_live, v_past_due_stripe, v_past_due_other
-        FROM public.agency_entitlements ae
-        JOIN public.agency_profiles ap ON ap.id = ae.agency_id
-        JOIN public.agency_members am
-          ON am.agency_id = ap.id
-         AND am.member_user_id = _user_id
-         AND am.role::text = 'agency_owner'
-         AND am.status::text = 'active'
-       WHERE ap.owner_user_id = _user_id;
-
-      IF v_unknown > 0 THEN
-        outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
-        RETURN NEXT; RETURN;
-      ELSIF v_live > 0 THEN
-        outcome := 'blocked'; reason := 'agency_entitlement_exists';
-        RETURN NEXT; RETURN;
-      ELSIF v_past_due_stripe > 0 THEN
-        outcome := 'blocked'; reason := 'agency_billing_requires_management';
-        RETURN NEXT; RETURN;
-      ELSIF v_past_due_other > 0 THEN
-        outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
-        RETURN NEXT; RETURN;
-      END IF;
-      -- manual_beta and cancelled confer no live agency premium → allow.
+    IF v_unknown > 0 THEN
+      outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
+      RETURN NEXT; RETURN;
+    ELSIF v_live > 0 THEN
+      outcome := 'blocked'; reason := 'agency_entitlement_exists';
+      RETURN NEXT; RETURN;
+    ELSIF v_past_due_other > 0 THEN
+      outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
+      RETURN NEXT; RETURN;
+    ELSIF v_past_due_stripe > 0 THEN
+      outcome := 'blocked'; reason := 'agency_billing_requires_management';
+      RETURN NEXT; RETURN;
     END IF;
+    -- manual_beta and cancelled confer no live agency premium → allow.
   ELSE
     SELECT
       count(*) FILTER (WHERE rbp.status IS NULL OR btrim(rbp.status::text) = ''),
@@ -288,7 +278,10 @@ BEGIN
     -- canceled / incomplete_expired / inactive are terminal → allow.
   END IF;
 
-  -- (e) Durable row under row lock.
+  -- (e) Durable row under row lock. Wall-clock time is refreshed once more so
+  -- lease comparison and any new lease use time read after policy evaluation.
+  v_now := clock_timestamp();
+
   SELECT * INTO v_row FROM public.business_checkout_claims
     WHERE user_id = _user_id FOR UPDATE;
   v_found := FOUND;
