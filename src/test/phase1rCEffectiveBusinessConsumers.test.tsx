@@ -20,12 +20,21 @@ import type { ReactNode } from 'react';
 const billingMocks = vi.hoisted(() => ({
   value: {} as Record<string, unknown>,
 }));
+const RECRUITER_PROFILE_FIXTURE = {
+  id: 'rec-1',
+  company_name: 'Real Freight LLC',
+  recruiter_name: 'Real Recruiter',
+  verification_status: 'approved',
+} as const;
 const profileMocks = vi.hoisted(() => ({
-  profile: { id: 'rec-1', company_name: 'Real Freight LLC' } as Record<
-    string,
-    unknown
-  > | null,
+  profile: {
+    id: 'rec-1',
+    company_name: 'Real Freight LLC',
+    recruiter_name: 'Real Recruiter',
+    verification_status: 'approved',
+  } as Record<string, unknown> | null,
 }));
+
 const appsMocks = vi.hoisted(() => ({
   lastRecruiterId: undefined as string | undefined,
 }));
