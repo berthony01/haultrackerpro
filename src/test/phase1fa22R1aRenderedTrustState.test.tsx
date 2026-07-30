@@ -74,6 +74,9 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { RecruiterAccessPage } from '@/components/opportunities/recruiter/RecruiterAccessPage';
 import { RecruiterOnboarding } from '@/components/opportunities/RecruiterOnboarding';
+import { getRecruiterCapabilitiesForTier } from '@/lib/recruiterCapabilities';
+import type { EffectiveBusinessEntitlement } from '@/lib/billing/effectiveBusinessEntitlement';
+
 
 // ---------------------------------------------------------------------------
 // Fixture helpers.
@@ -122,6 +125,133 @@ const incomplete = (overrides: Partial<RecruiterProfile> = {}) =>
 type ProfileHook = ReturnType<typeof useRecruiterProfile>;
 type BillingHook = ReturnType<typeof useRecruiterBilling>;
 
+/**
+ * Phase 1R-C-R1 — type-complete `useRecruiterBilling` mock factory.
+ *
+ * The object below is validated with `satisfies BillingHook`, so the compiler
+ * fails if the real hook adds, removes, or retypes ANY returned field. No
+ * `unknown`/`any` cast hides a missing member.
+ */
+function makeIdleCheckoutMutation(): BillingHook['startCheckout'] {
+  return {
+    data: undefined,
+    error: null,
+    variables: undefined,
+    context: undefined,
+    failureCount: 0,
+    failureReason: null,
+    isError: false,
+    isIdle: true,
+    isPaused: false,
+    isPending: false,
+    isSuccess: false,
+    status: 'idle',
+    submittedAt: 0,
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(async () => ({
+      code: 'checkout_ready' as const,
+      plan: 'starter' as const,
+    })),
+    reset: vi.fn(),
+  };
+}
+
+function makeIdlePortalMutation(): BillingHook['openPortal'] {
+  return {
+    data: undefined,
+    error: null,
+    variables: undefined,
+    context: undefined,
+    failureCount: 0,
+    failureReason: null,
+    isError: false,
+    isIdle: true,
+    isPaused: false,
+    isPending: false,
+    isSuccess: false,
+    status: 'idle',
+    submittedAt: 0,
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(async () => ({ code: 'portal_ready' as const })),
+    reset: vi.fn(),
+  };
+}
+
+function makeBillingHookMock(
+  overrides: Partial<BillingHook> = {},
+): BillingHook {
+  const capabilities = getRecruiterCapabilitiesForTier({
+    tier: 'free_verified',
+    canPostStandardOpportunities: true,
+  });
+
+  const effectiveBusinessEntitlement: EffectiveBusinessEntitlement = {
+    state: 'resolved',
+    effectiveRecruiterTier: 'free_verified',
+    effectiveAgencyPlan: null,
+    entitlementSource: 'free_standard',
+    billingManagementContext: 'none',
+    canPostStandardOpportunities: true,
+    conflictReason: null,
+  };
+
+  const base = {
+    // Raw recruiter billing
+    billing: null,
+    plan: 'none',
+    status: 'inactive',
+    limit: 0,
+    activeCount: 0,
+    isBillingActive: false,
+    canSubmitMore: false,
+    isLoading: false,
+
+    // Effective business entitlement (additive contract)
+    effectiveBusinessEntitlement,
+    businessEntitlementState: effectiveBusinessEntitlement.state,
+    businessEntitlementConflictReason: null,
+    effectiveRecruiterTier: 'free_verified',
+    effectiveRecruiterPlan: 'none',
+    effectiveAgencyPlan: null,
+    entitlementSource: 'free_standard',
+    billingManagementContext: 'none',
+    hasEffectivePremiumRecruiterAccess: false,
+    isBusinessEntitlementLoading: false,
+
+    // Discriminated UI state
+    uiState: { kind: 'eligible_idle' },
+    canStartCheckout: false,
+    showManageBilling: false,
+    checkStatus: { visible: false, clickable: false },
+    headline: null,
+    checkServerStatus: vi.fn(),
+
+    // Mutations + popup coordination
+    startCheckout: makeIdleCheckoutMutation(),
+    openPortal: makeIdlePortalMutation(),
+    prepareTab: vi.fn(),
+    refresh: vi.fn(),
+
+    // Capability layer
+    capabilities,
+    capabilityTier: capabilities.tier,
+    isPaidRecruiterPlanActive: false,
+    canPostStandardOpportunitiesCapability:
+      capabilities.canPostStandardOpportunities,
+    canUsePriorityPlacement: capabilities.canUsePriorityPlacement,
+    canUseFeaturedListings: capabilities.canUseFeaturedListings,
+    canExportRecruiterReports: capabilities.canExportRecruiterReports,
+    canViewAdvancedRecruiterReports:
+      capabilities.canViewAdvancedRecruiterReports,
+    canUseContractWorkflowTools: capabilities.canUseContractWorkflowTools,
+    canUseReferralTracking: capabilities.canUseReferralTracking,
+    canUseTeamSeats: capabilities.canUseTeamSeats,
+    canUseBulkOpportunityTools: capabilities.canUseBulkOpportunityTools,
+  } satisfies BillingHook;
+
+  return { ...base, ...overrides };
+}
+
 function installHooks({
   profile,
   isBillingActive = true,
@@ -155,24 +285,48 @@ function installHooks({
     suspendRecruiter: { mutate: vi.fn() },
   } as unknown as ProfileHook);
 
-  vi.mocked(useRecruiterBilling).mockReturnValue({
-    isBillingActive,
-    plan: 'none',
-    status: isBillingActive ? 'active' : 'inactive',
-    isLoading: false,
-    // Phase 1R-C additive effective-entitlement contract. A recruiter with
-    // no agency resolves to their own subscription (or free standard).
-    businessEntitlementState: 'resolved',
-    effectiveRecruiterTier: isBillingActive ? 'starter' : 'free_verified',
-    effectiveRecruiterPlan: isBillingActive ? 'starter' : 'none',
-    effectiveAgencyPlan: null,
-    entitlementSource: isBillingActive
-      ? 'recruiter_subscription'
-      : 'free_standard',
-    billingManagementContext: isBillingActive ? 'recruiter' : 'none',
-    hasEffectivePremiumRecruiterAccess: isBillingActive,
-    isBusinessEntitlementLoading: false,
-  } as unknown as BillingHook);
+  const activeCapabilities = getRecruiterCapabilitiesForTier({
+    tier: isBillingActive ? 'starter' : 'free_verified',
+    canPostStandardOpportunities: true,
+  });
+
+  // Phase 1R-C additive effective-entitlement contract. A recruiter with
+  // no agency resolves to their own subscription (or free standard).
+  vi.mocked(useRecruiterBilling).mockReturnValue(
+    makeBillingHookMock({
+      isBillingActive,
+      plan: 'none',
+      status: isBillingActive ? 'active' : 'inactive',
+      isLoading: false,
+      businessEntitlementState: 'resolved',
+      effectiveRecruiterTier: isBillingActive ? 'starter' : 'free_verified',
+      effectiveRecruiterPlan: isBillingActive ? 'starter' : 'none',
+      effectiveAgencyPlan: null,
+      entitlementSource: isBillingActive
+        ? 'recruiter_subscription'
+        : 'free_standard',
+      billingManagementContext: isBillingActive ? 'recruiter' : 'none',
+      hasEffectivePremiumRecruiterAccess: isBillingActive,
+      isBusinessEntitlementLoading: false,
+      isPaidRecruiterPlanActive: isBillingActive,
+      capabilities: activeCapabilities,
+      capabilityTier: activeCapabilities.tier,
+      canPostStandardOpportunitiesCapability:
+        activeCapabilities.canPostStandardOpportunities,
+      canUsePriorityPlacement: activeCapabilities.canUsePriorityPlacement,
+      canUseFeaturedListings: activeCapabilities.canUseFeaturedListings,
+      canExportRecruiterReports: activeCapabilities.canExportRecruiterReports,
+      canViewAdvancedRecruiterReports:
+        activeCapabilities.canViewAdvancedRecruiterReports,
+      canUseContractWorkflowTools:
+        activeCapabilities.canUseContractWorkflowTools,
+      canUseReferralTracking: activeCapabilities.canUseReferralTracking,
+      canUseTeamSeats: activeCapabilities.canUseTeamSeats,
+      canUseBulkOpportunityTools:
+        activeCapabilities.canUseBulkOpportunityTools,
+    }),
+  );
+
 
 
   vi.mocked(useRecruiterOpportunities).mockReturnValue({

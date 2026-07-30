@@ -5,6 +5,8 @@
 // rather than a raw recruiter plan/status comparison, and that unresolved
 // (loading / error / conflict) entitlement states fail closed.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -12,17 +14,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
+
 // --- hoisted mock state -----------------------------------------------------
 
 const billingMocks = vi.hoisted(() => ({
   value: {} as Record<string, unknown>,
 }));
+const RECRUITER_PROFILE_FIXTURE = {
+  id: 'rec-1',
+  company_name: 'Real Freight LLC',
+  recruiter_name: 'Real Recruiter',
+  verification_status: 'approved',
+} as const;
 const profileMocks = vi.hoisted(() => ({
-  profile: { id: 'rec-1', company_name: 'Real Freight LLC' } as Record<
-    string,
-    unknown
-  > | null,
+  profile: {
+    id: 'rec-1',
+    company_name: 'Real Freight LLC',
+    recruiter_name: 'Real Recruiter',
+    verification_status: 'approved',
+  } as Record<string, unknown> | null,
 }));
+
 const appsMocks = vi.hoisted(() => ({
   lastRecruiterId: undefined as string | undefined,
 }));
@@ -152,7 +164,7 @@ function renderContracts() {
 }
 
 beforeEach(() => {
-  profileMocks.profile = { id: 'rec-1', company_name: 'Real Freight LLC' };
+  profileMocks.profile = { ...RECRUITER_PROFILE_FIXTURE };
   appsMocks.lastRecruiterId = undefined;
   setBilling({ tier: 'free_verified' });
 });
@@ -303,5 +315,183 @@ describe('Phase 1R-C — useRecruiterReportData effective capability gating', ()
       expect(result.current.planEligible).toBe(false);
       unmount();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1R-C-R1 — report consumer header + cache identity behavior
+// ---------------------------------------------------------------------------
+
+function makeClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+}
+
+function sharedWrapper(qc: QueryClient) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  };
+}
+
+describe('Phase 1R-C-R1 — recruiter report header and cache identity', () => {
+  it('agency-included access produces an effective-plan header marked included_with_agency', async () => {
+    setBilling({ tier: 'growth', source: 'agency_included', plan: 'none' });
+    const qc = makeClient();
+    const { result } = renderHook(() => useRecruiterReportData(RANGE), {
+      wrapper: sharedWrapper(qc),
+    });
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(result.current.data!.header.plan).toBe('growth');
+    expect(result.current.data!.header.planStatus).toBe('included_with_agency');
+    expect(result.current.entitlementSource).toBe('agency_included');
+  });
+
+  it('recruiter-subscription access produces a raw-status header', async () => {
+    setBilling({ tier: 'fleet', source: 'recruiter_subscription', plan: 'fleet' });
+    const qc = makeClient();
+    const { result } = renderHook(() => useRecruiterReportData(RANGE), {
+      wrapper: sharedWrapper(qc),
+    });
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(result.current.data!.header.plan).toBe('fleet');
+    expect(result.current.data!.header.planStatus).toBe('active');
+  });
+
+  it('changing effective plan/source/status for the same recruiter and range creates a new cache entry and header', async () => {
+    const qc = makeClient();
+
+    setBilling({ tier: 'fleet', source: 'recruiter_subscription', plan: 'fleet' });
+    const first = renderHook(() => useRecruiterReportData(RANGE), {
+      wrapper: sharedWrapper(qc),
+    });
+    await waitFor(() => expect(first.result.current.data).not.toBeNull());
+    const firstHeader = first.result.current.data!.header;
+    expect(firstHeader.plan).toBe('fleet');
+    expect(firstHeader.planStatus).toBe('active');
+    const keysAfterFirst = qc
+      .getQueryCache()
+      .getAll()
+      .filter((q) => q.queryKey[0] === 'recruiter-report-data');
+    expect(keysAfterFirst).toHaveLength(1);
+    first.unmount();
+
+    // Same recruiter + same range, different effective plan/source/status.
+    setBilling({ tier: 'growth', source: 'agency_included', plan: 'none' });
+    const second = renderHook(() => useRecruiterReportData(RANGE), {
+      wrapper: sharedWrapper(qc),
+    });
+    await waitFor(() => expect(second.result.current.data).not.toBeNull());
+    const secondHeader = second.result.current.data!.header;
+    expect(secondHeader.plan).toBe('growth');
+    expect(secondHeader.planStatus).toBe('included_with_agency');
+
+    const reportKeys = qc
+      .getQueryCache()
+      .getAll()
+      .filter((q) => q.queryKey[0] === 'recruiter-report-data')
+      .map((q) => JSON.stringify(q.queryKey));
+    expect(reportKeys).toHaveLength(2);
+    expect(new Set(reportKeys).size).toBe(2);
+    second.unmount();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1R-C-R1 — authoritative SQL and production source contract guards
+// ---------------------------------------------------------------------------
+
+const REPO_ROOT = process.cwd();
+
+function readRepoFile(relative: string): string {
+  return fs.readFileSync(path.join(REPO_ROOT, relative), 'utf8');
+}
+
+describe('Phase 1R-C-R1 — authoritative get_my_agency SQL guard', () => {
+  it('the latest get_my_agency definition joins agency_members with an active status filter', () => {
+    const migrationsDir = path.join(REPO_ROOT, 'supabase/migrations');
+    const marker = 'CREATE OR REPLACE FUNCTION public.get_my_agency';
+    const matching = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql'))
+      .sort()
+      .filter((f) =>
+        fs.readFileSync(path.join(migrationsDir, f), 'utf8').includes(marker),
+      );
+
+    expect(matching.length).toBeGreaterThan(0);
+
+    const latest = matching[matching.length - 1];
+    const sql = fs.readFileSync(path.join(migrationsDir, latest), 'utf8');
+    const start = sql.indexOf(marker);
+    expect(start).toBeGreaterThan(-1);
+    const bodyStart = sql.indexOf('$$', start);
+    expect(bodyStart).toBeGreaterThan(-1);
+    const bodyEnd = sql.indexOf('$$;', bodyStart + 2);
+    expect(bodyEnd).toBeGreaterThan(bodyStart);
+    const body = sql.slice(bodyStart, bodyEnd);
+
+    expect(body).toMatch(/public\.agency_members\s+am/);
+    expect(body).toMatch(/am\.member_user_id\s*=\s*auth\.uid\(\)/);
+    expect(body).toMatch(/am\.status\s*=\s*'active'/);
+  });
+});
+
+describe('Phase 1R-C-R1 — production consumer source guards', () => {
+  it('useRecruiterReportData keys the query on effective plan, source, and raw status', () => {
+    const src = readRepoFile('src/hooks/recruiter/useRecruiterReportData.ts');
+    const keyStart = src.indexOf("'recruiter-report-data'");
+    expect(keyStart).toBeGreaterThan(-1);
+    const keyBlock = src.slice(keyStart, src.indexOf('],', keyStart));
+    expect(keyBlock).toContain('effectivePlan');
+    expect(keyBlock).toContain('entitlementSource');
+    expect(keyBlock).toContain('billing.status');
+
+    expect(src).toContain('billing.canExportRecruiterReports === true');
+    expect(src).not.toMatch(/plan\s*===\s*'growth'/);
+    expect(src).not.toMatch(/plan\s*===\s*'fleet'/);
+  });
+
+  it('contract consumers gate on canUseContractWorkflowTools, not a raw recruiter plan', () => {
+    for (const file of [
+      'src/components/contracts/ContractActionsCard.tsx',
+      'src/components/contracts/RecruiterContractsView.tsx',
+    ]) {
+      const src = readRepoFile(file);
+      expect(src).toContain('canUseContractWorkflowTools');
+      expect(src).not.toMatch(/\bplan\s*===\s*'(starter|growth|fleet)'/);
+      expect(src).not.toMatch(/\bstatus\s*===\s*'active'\s*&&\s*plan\b/);
+    }
+  });
+
+  it('RecruiterAccessPage summarizes premium from effective entitlement fields', () => {
+    const src = readRepoFile(
+      'src/components/opportunities/recruiter/RecruiterAccessPage.tsx',
+    );
+    expect(src).toContain('hasEffectivePremiumRecruiterAccess');
+    expect(src).toContain('effectiveRecruiterPlan');
+    expect(src).toContain('canUsePriorityPlacement');
+    expect(src).toContain("=== 'agency_included'");
+  });
+
+  it('useRecruiterBilling composes the real resolver and invalidates both agency prefixes', () => {
+    const src = readRepoFile('src/hooks/opportunities/useRecruiterBilling.ts');
+    expect(src).toContain(
+      "from '@/lib/billing/effectiveBusinessEntitlement'",
+    );
+    expect(src).toContain('resolveEffectiveBusinessEntitlement({');
+    for (const field of [
+      'businessEntitlementState',
+      'effectiveRecruiterTier',
+      'effectiveRecruiterPlan',
+      'entitlementSource',
+      'billingManagementContext',
+      'hasEffectivePremiumRecruiterAccess',
+      'isBusinessEntitlementLoading',
+    ]) {
+      expect(src).toContain(field);
+    }
+    expect(src).toContain("queryKey: ['my-agency']");
+    expect(src).toContain("queryKey: ['agency-entitlement']");
   });
 });

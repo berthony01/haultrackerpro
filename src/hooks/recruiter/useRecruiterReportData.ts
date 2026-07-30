@@ -30,8 +30,22 @@ export function useRecruiterReportData(range: RecruiterReportRange | null, enabl
   const isAgencyIncluded = entitlementSource === 'agency_included';
 
   const query = useQuery({
-    queryKey: ['recruiter-report-data', recruiterId, range?.from, range?.to],
+    // Phase 1R-C-R1: the report header is built from the EFFECTIVE plan,
+    // entitlement source, and raw billing status, so all three must take
+    // part in the cache identity. Without them a recruiter switching
+    // between recruiter-paid and agency-included access (or changing raw
+    // status) for the same recruiter/range would keep a stale header.
+    queryKey: [
+      'recruiter-report-data',
+      recruiterId,
+      range?.from,
+      range?.to,
+      effectivePlan,
+      entitlementSource,
+      billing.status,
+    ],
     enabled: isReady && planEligible,
+
 
     queryFn: async (): Promise<RecruiterReportInput> => {
       if (!recruiterId || !range || !profile) throw new Error('Not ready');
