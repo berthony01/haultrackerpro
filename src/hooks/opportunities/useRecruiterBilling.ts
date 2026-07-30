@@ -77,9 +77,10 @@ export function useRecruiterBilling() {
   const {
     profile,
     isLoading: profileLoading,
-    isApproved,
     isSuspended,
+    isProfileComplete,
   } = useRecruiterProfile();
+
   const recruiterId = profile?.id ?? null;
   const qc = useQueryClient();
 
