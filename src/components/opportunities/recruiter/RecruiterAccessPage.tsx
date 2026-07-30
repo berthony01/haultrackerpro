@@ -750,17 +750,25 @@ function BillingSummary({
   loading,
   plan,
   status,
-  isBillingActive,
+  hasPremiumAccess,
+  isAgencyIncluded,
+  effectiveRecruiterPlan,
+  effectiveAgencyPlan,
+  canUsePriorityPlacement,
   onManagePlan,
 }: {
   loading: boolean;
   plan: keyof typeof RECRUITER_PLAN_LABELS;
   status: string;
-  isBillingActive: boolean;
+  hasPremiumAccess: boolean;
+  isAgencyIncluded: boolean;
+  effectiveRecruiterPlan: keyof typeof RECRUITER_PLAN_LABELS;
+  effectiveAgencyPlan: PaidAgencyPlanKey | null;
+  canUsePriorityPlacement: boolean;
   onManagePlan: () => void;
 }) {
   if (loading) return <Skeleton className="h-40 w-full" />;
-  if (!isBillingActive) {
+  if (!hasPremiumAccess) {
     return (
       <Card className="p-5 border-primary/30 bg-primary/5">
         <div className="flex items-start gap-3">
@@ -776,8 +784,34 @@ function BillingSummary({
       </Card>
     );
   }
-  const priorityPlacement =
-    plan === 'growth' || plan === 'fleet' ? 'Included' : 'Upgrade to Growth';
+  const priorityPlacement = canUsePriorityPlacement ? 'Included' : 'Upgrade to Growth';
+
+  // Phase 1R-C: agency-included premium recruiter access — no recruiter
+  // upgrade or Manage Plan action is offered here.
+  if (isAgencyIncluded) {
+    const agencyLabel = effectiveAgencyPlan
+      ? ASSISTANT_AGENCY_PLANS[effectiveAgencyPlan].label
+      : 'Agency plan';
+    return (
+      <Card className="p-5 border-border/60" data-testid="recruiter-billing-summary-agency-included">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-foreground">Billing</h3>
+          <Badge variant="default">Included with agency</Badge>
+        </div>
+        <div className="space-y-2 text-sm">
+          <Row label="Recruiter plan" value={RECRUITER_PLAN_LABELS[effectiveRecruiterPlan]} />
+          <Row label="Agency plan" value={agencyLabel} />
+          <Row label="Standard posting" value="Unlimited on your recruiter account" />
+          <Row
+            label="Premium tools"
+            value="Included through your agency entitlement"
+          />
+          <Row label="Priority placement" value={priorityPlacement} />
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="p-5 border-border/60">
       <div className="flex items-center justify-between mb-3">
@@ -797,6 +831,7 @@ function BillingSummary({
     </Card>
   );
 }
+
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
