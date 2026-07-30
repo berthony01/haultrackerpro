@@ -53,7 +53,7 @@ CREATE TABLE public.business_checkout_claims (
       AND char_length(btrim(request_key)) BETWEEN 1 AND 200),
   CONSTRAINT business_checkout_claims_error_code_chk
     CHECK (last_error_code IS NULL OR
-      (last_error_code ~ '^[a-z0-9_]+$'
+      (last_error_code ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'
        AND char_length(last_error_code) BETWEEN 1 AND 64)),
   CONSTRAINT business_checkout_claims_processing_coherent_chk
     CHECK (state <> 'processing'
@@ -127,15 +127,17 @@ SET search_path = public
 AS $$
 DECLARE
   v_lease_seconds constant integer := 300;
-  v_now        timestamptz := now();
+  v_now        timestamptz := clock_timestamp();
   v_row        public.business_checkout_claims%ROWTYPE;
   v_new_token  uuid;
   v_active     boolean;
   v_found      boolean;
   v_has_owner  boolean;
-  v_plan       text;
-  v_status     text;
-  v_source     text;
+  v_unknown          bigint := 0;
+  v_live             bigint := 0;
+  v_past_due_stripe  bigint := 0;
+  v_past_due_other   bigint := 0;
+  v_null_status      bigint := 0;
 BEGIN
   -- (a) Input validation. Structured outcomes only; never raw SQL errors.
   IF _user_id IS NULL OR _subject_id IS NULL THEN
@@ -145,6 +147,13 @@ BEGIN
 
   IF _context IS NULL OR _context NOT IN ('recruiter','agency') THEN
     outcome := 'invalid_input'; reason := 'unsupported_context';
+    RETURN NEXT; RETURN;
+  END IF;
+
+  -- A NULL plan key must be rejected explicitly: SQL three-valued logic makes
+  -- NOT (NULL IN (...)) evaluate to NULL, which would otherwise fall through.
+  IF _plan_key IS NULL THEN
+    outcome := 'invalid_input'; reason := 'plan_not_supported';
     RETURN NEXT; RETURN;
   END IF;
 
@@ -193,13 +202,20 @@ BEGIN
     END IF;
   END IF;
 
-  -- (c) Serialize this transaction per user. The durable row below is still
-  -- the long-lived cross-request coordination mechanism.
+  -- (c) Serialize this transaction per user with a 64-bit namespaced advisory
+  -- lock. The durable row below is still the long-lived cross-request
+  -- coordination mechanism.
   PERFORM pg_advisory_xact_lock(
-    hashtext('bcc:' || _user_id::text)::bigint
+    hashtextextended(_user_id::text, 7218926914894380123)
   );
 
-  -- (d) Exact Phase 1R-D1 opposing durable-billing policy.
+  -- Wall-clock time must be re-read AFTER the lock is acquired: now() is fixed
+  -- at transaction start and would be stale by the length of the lock wait.
+  v_now := clock_timestamp();
+
+  -- (d) Exact Phase 1R-D1 opposing durable-billing policy, evaluated SETWISE
+  -- across every matching row with deterministic precedence:
+  -- unknown > live > past_due(stripe) > past_due(non-stripe, fail closed).
   IF _context = 'recruiter' THEN
     v_has_owner := EXISTS (
       SELECT 1
@@ -212,9 +228,15 @@ BEGIN
     );
 
     IF v_has_owner THEN
-      v_plan := NULL; v_status := NULL; v_source := NULL;
-      SELECT ae.plan_key, ae.status, ae.source
-        INTO v_plan, v_status, v_source
+      SELECT
+        count(*) FILTER (WHERE
+             COALESCE(ae.plan_key::text,'') NOT IN ('agency_starter','agency_team','agency_growth')
+          OR COALESCE(ae.source::text,'')   NOT IN ('stripe','manual','admin_seed')
+          OR COALESCE(ae.status::text,'')   NOT IN ('manual_beta','trialing','active','past_due','cancelled')),
+        count(*) FILTER (WHERE ae.status::text IN ('active','trialing')),
+        count(*) FILTER (WHERE ae.status::text = 'past_due' AND ae.source::text = 'stripe'),
+        count(*) FILTER (WHERE ae.status::text = 'past_due' AND ae.source::text IS DISTINCT FROM 'stripe')
+        INTO v_unknown, v_live, v_past_due_stripe, v_past_due_other
         FROM public.agency_entitlements ae
         JOIN public.agency_profiles ap ON ap.id = ae.agency_id
         JOIN public.agency_members am
@@ -222,63 +244,48 @@ BEGIN
          AND am.member_user_id = _user_id
          AND am.role::text = 'agency_owner'
          AND am.status::text = 'active'
-       WHERE ap.owner_user_id = _user_id
-       LIMIT 1;
+       WHERE ap.owner_user_id = _user_id;
 
-      IF FOUND THEN
-        IF COALESCE(v_plan,'') NOT IN ('agency_starter','agency_team','agency_growth')
-           OR COALESCE(v_source,'') NOT IN ('stripe','manual','admin_seed')
-           OR COALESCE(v_status,'') NOT IN ('manual_beta','trialing','active','past_due','cancelled') THEN
-          outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
-          RETURN NEXT; RETURN;
-        END IF;
-
-        IF v_status IN ('active','trialing') THEN
-          outcome := 'blocked'; reason := 'agency_entitlement_exists';
-          RETURN NEXT; RETURN;
-        END IF;
-
-        IF v_status = 'past_due' THEN
-          IF v_source = 'stripe' THEN
-            outcome := 'blocked'; reason := 'agency_billing_requires_management';
-          ELSE
-            outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
-          END IF;
-          RETURN NEXT; RETURN;
-        END IF;
-        -- manual_beta and cancelled confer no live agency premium → allow.
-      END IF;
-    END IF;
-  ELSE
-    v_plan := NULL; v_status := NULL;
-    SELECT rbp.plan, rbp.status
-      INTO v_plan, v_status
-      FROM public.recruiter_billing_profiles rbp
-     WHERE rbp.user_id = _user_id
-     LIMIT 1;
-
-    IF FOUND THEN
-      IF v_status IS NULL OR v_status = '' THEN
+      IF v_unknown > 0 THEN
+        outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
+        RETURN NEXT; RETURN;
+      ELSIF v_live > 0 THEN
+        outcome := 'blocked'; reason := 'agency_entitlement_exists';
+        RETURN NEXT; RETURN;
+      ELSIF v_past_due_stripe > 0 THEN
+        outcome := 'blocked'; reason := 'agency_billing_requires_management';
+        RETURN NEXT; RETURN;
+      ELSIF v_past_due_other > 0 THEN
         outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
         RETURN NEXT; RETURN;
       END IF;
-
-      IF v_status NOT IN ('canceled','incomplete_expired','inactive') THEN
-        IF v_status NOT IN ('active','trialing','past_due','unpaid','incomplete','paused') THEN
-          outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
-          RETURN NEXT; RETURN;
-        END IF;
-
-        IF COALESCE(v_plan,'') NOT IN ('starter','growth','fleet') THEN
-          outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
-          RETURN NEXT; RETURN;
-        END IF;
-
-        outcome := 'blocked'; reason := 'recruiter_subscription_exists';
-        RETURN NEXT; RETURN;
-      END IF;
-      -- canceled / incomplete_expired / inactive are terminal → allow.
+      -- manual_beta and cancelled confer no live agency premium → allow.
     END IF;
+  ELSE
+    SELECT
+      count(*) FILTER (WHERE rbp.status IS NULL OR btrim(rbp.status::text) = ''),
+      count(*) FILTER (WHERE rbp.status IS NOT NULL
+        AND btrim(rbp.status::text) <> ''
+        AND rbp.status::text NOT IN ('canceled','incomplete_expired','inactive')
+        AND (
+             rbp.status::text NOT IN ('active','trialing','past_due','unpaid','incomplete','paused')
+          OR COALESCE(rbp.plan::text,'') NOT IN ('starter','growth','fleet')
+        )),
+      count(*) FILTER (WHERE
+             rbp.status::text IN ('active','trialing','past_due','unpaid','incomplete','paused')
+         AND COALESCE(rbp.plan::text,'') IN ('starter','growth','fleet'))
+      INTO v_null_status, v_unknown, v_live
+      FROM public.recruiter_billing_profiles rbp
+     WHERE rbp.user_id = _user_id;
+
+    IF v_null_status > 0 OR v_unknown > 0 THEN
+      outcome := 'blocked'; reason := 'opposing_entitlement_unknown';
+      RETURN NEXT; RETURN;
+    ELSIF v_live > 0 THEN
+      outcome := 'blocked'; reason := 'recruiter_subscription_exists';
+      RETURN NEXT; RETURN;
+    END IF;
+    -- canceled / incomplete_expired / inactive are terminal → allow.
   END IF;
 
   -- (e) Durable row under row lock.
@@ -385,7 +392,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_now timestamptz := now();
+  v_now timestamptz := clock_timestamp();
   v_row public.business_checkout_claims%ROWTYPE;
 BEGIN
   IF _user_id IS NULL THEN
@@ -405,8 +412,11 @@ BEGIN
   END IF;
 
   PERFORM pg_advisory_xact_lock(
-    hashtext('bcc:' || _user_id::text)::bigint
+    hashtextextended(_user_id::text, 7218926914894380123)
   );
+
+  -- Fresh wall-clock time after the lock wait.
+  v_now := clock_timestamp();
 
   SELECT * INTO v_row FROM public.business_checkout_claims
     WHERE user_id = _user_id FOR UPDATE;
@@ -475,7 +485,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_now  timestamptz := now();
+  v_now  timestamptz := clock_timestamp();
   v_row  public.business_checkout_claims%ROWTYPE;
   v_next text;
 BEGIN
@@ -488,15 +498,21 @@ BEGIN
   IF _claim_token IS NULL THEN
     outcome := 'invalid_input'; reason := 'missing_claim_token'; RETURN NEXT; RETURN;
   END IF;
+  IF _terminal IS NULL THEN
+    outcome := 'invalid_input'; reason := 'terminal_flag_missing'; RETURN NEXT; RETURN;
+  END IF;
   IF _error_code IS NULL
-     OR _error_code !~ '^[a-z0-9_]+$'
+     OR _error_code !~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'
      OR char_length(_error_code) > 64 THEN
     outcome := 'invalid_input'; reason := 'error_code_malformed'; RETURN NEXT; RETURN;
   END IF;
 
   PERFORM pg_advisory_xact_lock(
-    hashtext('bcc:' || _user_id::text)::bigint
+    hashtextextended(_user_id::text, 7218926914894380123)
   );
+
+  -- Fresh wall-clock time after the lock wait.
+  v_now := clock_timestamp();
 
   SELECT * INTO v_row FROM public.business_checkout_claims
     WHERE user_id = _user_id FOR UPDATE;

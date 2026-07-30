@@ -140,7 +140,10 @@ describe("Phase 1R-D2-B2-A — table contract", () => {
     expect(candidateSql).toContain(
       "char_length(btrim(request_key)) BETWEEN 1 AND 200",
     );
-    expect(candidateSql).toContain("last_error_code ~ '^[a-z0-9_]+$'");
+    expect(candidateSql).toContain(
+      "last_error_code ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'",
+    );
+    expect(candidateSql).not.toContain("'^[a-z0-9_]+$'");
     expect(candidateSql).toContain(
       "char_length(last_error_code) BETWEEN 1 AND 64",
     );
@@ -307,20 +310,121 @@ describe("Phase 1R-D2-B2-A — exactly three RPCs", () => {
   });
 });
 
-describe("Phase 1R-D2-B2-A — coordination and D1 policy vocabulary", () => {
-  it("uses a durable row plus a per-user advisory transaction lock", () => {
+describe("Phase 1R-D2-B2-A-R1 — Repair A: lock namespace and post-lock clock", () => {
+  it("uses a durable row plus a 64-bit namespaced per-user advisory lock", () => {
     const locks = candidateSql.match(/pg_advisory_xact_lock\(/g) ?? [];
     expect(locks).toHaveLength(3);
-    expect(candidateSql).toContain("hashtext('bcc:' || _user_id::text)::bigint");
+    const namespaced =
+      candidateSql.match(
+        /hashtextextended\(_user_id::text, 7218926914894380123\)/g,
+      ) ?? [];
+    expect(namespaced).toHaveLength(3);
+    expect(candidateSql).not.toContain("hashtext('bcc:'");
+    expect(candidateSql).not.toContain("::bigint\n  );");
     expect(candidateSql).toContain(
       "SELECT * INTO v_row FROM public.business_checkout_claims\n    WHERE user_id = _user_id FOR UPDATE",
     );
+  });
+
+  it("never seeds wall-clock state from transaction-fixed now()", () => {
+    expect(candidateSql).not.toMatch(/v_now\s*(timestamptz)?\s*:=\s*now\(\)/);
+    const declared =
+      candidateSql.match(/v_now\s+timestamptz := clock_timestamp\(\);/g) ?? [];
+    expect(declared).toHaveLength(3);
+  });
+
+  it("re-reads clock_timestamp() after every advisory lock acquisition", () => {
+    const reReads = candidateSql.match(/v_now := clock_timestamp\(\);/g) ?? [];
+    expect(reReads).toHaveLength(3);
+    // Each lock acquisition is immediately followed by a fresh clock read.
+    const segments = candidateSql.split("pg_advisory_xact_lock(").slice(1);
+    expect(segments).toHaveLength(3);
+    for (const segment of segments) {
+      const lockEnd = segment.indexOf(");");
+      const after = segment.slice(lockEnd, lockEnd + 240);
+      expect(after).toContain("v_now := clock_timestamp();");
+    }
   });
 
   it("uses the fixed 300-second processing lease", () => {
     expect(candidateSql).toContain("v_lease_seconds constant integer := 300");
     expect(candidateSql).toContain("make_interval(secs => v_lease_seconds)");
   });
+});
+
+describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", () => {
+  it("rejects a NULL plan key explicitly before three-valued logic applies", () => {
+    expect(candidateSql).toContain("IF _plan_key IS NULL THEN");
+    const planNullAt = candidateSql.indexOf("IF _plan_key IS NULL THEN");
+    const planMatrixAt = candidateSql.indexOf(
+      "(_context = 'recruiter' AND _plan_key IN ('starter','growth','fleet'))",
+    );
+    expect(planNullAt).toBeGreaterThan(0);
+    expect(planNullAt).toBeLessThan(planMatrixAt);
+  });
+
+  it("rejects a NULL terminal flag before deriving the release state", () => {
+    expect(candidateSql).toContain("IF _terminal IS NULL THEN");
+    expect(candidateSql).toContain("'terminal_flag_missing'");
+    expect(candidateSql.indexOf("IF _terminal IS NULL THEN")).toBeLessThan(
+      candidateSql.indexOf("v_next := CASE WHEN _terminal THEN"),
+    );
+  });
+
+  it("enforces strict snake_case error codes in the release RPC", () => {
+    expect(candidateSql).toContain(
+      "OR _error_code !~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'",
+    );
+    const strict =
+      candidateSql.match(/\^\[a-z\]\[a-z0-9\]\*\(_\[a-z0-9\]\+\)\*\$/g) ?? [];
+    expect(strict).toHaveLength(2);
+  });
+});
+
+describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => {
+  it("removes every single-row LIMIT 1 shortcut from the policy reads", () => {
+    expect(candidateSql).not.toContain("LIMIT 1");
+    expect(candidateSql).not.toContain("IF FOUND THEN");
+  });
+
+  it("evaluates all agency entitlement rows with deterministic precedence", () => {
+    expect(candidateSql).toContain(
+      "INTO v_unknown, v_live, v_past_due_stripe, v_past_due_other",
+    );
+    const order = [
+      "IF v_unknown > 0 THEN",
+      "'opposing_entitlement_unknown'",
+      "ELSIF v_live > 0 THEN",
+      "'agency_entitlement_exists'",
+      "ELSIF v_past_due_stripe > 0 THEN",
+      "'agency_billing_requires_management'",
+      "ELSIF v_past_due_other > 0 THEN",
+    ];
+    let cursor = -1;
+    for (const token of order) {
+      const at = candidateSql.indexOf(token, cursor + 1);
+      expect(at).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+  });
+
+  it("evaluates all recruiter billing rows with deterministic precedence", () => {
+    expect(candidateSql).toContain("INTO v_null_status, v_unknown, v_live");
+    expect(candidateSql).toContain("IF v_null_status > 0 OR v_unknown > 0 THEN");
+    expect(candidateSql).toContain(
+      "ELSIF v_live > 0 THEN\n      outcome := 'blocked'; reason := 'recruiter_subscription_exists';",
+    );
+  });
+
+  it("counts setwise with FILTER rather than reading one arbitrary row", () => {
+    const filters = candidateSql.match(/count\(\*\) FILTER \(WHERE/g) ?? [];
+    expect(filters).toHaveLength(7);
+    expect(candidateSql).not.toContain("SELECT ae.plan_key, ae.status, ae.source");
+    expect(candidateSql).not.toContain("SELECT rbp.plan, rbp.status");
+  });
+});
+
+describe("Phase 1R-D2-B2-A — coordination and D1 policy vocabulary", () => {
 
   it("reproduces the exact D1 agency vocabulary and block reasons", () => {
     expect(candidateSql).toContain(
