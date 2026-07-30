@@ -247,11 +247,23 @@ function identityMatches(
   );
 }
 
-function epochSecondsFromIso(raw: string | null): number | null {
-  if (!raw) return null;
+/**
+ * Phase 1R-D2-B3-R1 — strict exact-integer epoch-second parsing.
+ *
+ * A stored checkout expiry MUST round-trip to a whole epoch second. Any value
+ * carrying sub-second precision (or an unparseable/non-finite timestamp) is
+ * rejected instead of being silently floored, because the floored value would
+ * then be compared for exact equality against Stripe's integer `expires_at`
+ * and could accept a session whose real expiry differs from the claim.
+ */
+function exactEpochSecondsFromIso(raw: unknown): number | null {
+  if (typeof raw !== "string" || raw === "") return null;
   const ms = new Date(raw).getTime();
-  if (!Number.isFinite(ms)) return null;
-  return Math.floor(ms / 1000);
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
+  if (ms % 1000 !== 0) return null;
+  const seconds = ms / 1000;
+  if (!Number.isFinite(seconds) || !Number.isInteger(seconds)) return null;
+  return seconds;
 }
 
 export async function beginBusinessCheckout(
