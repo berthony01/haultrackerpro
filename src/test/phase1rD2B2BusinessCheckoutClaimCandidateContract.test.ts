@@ -310,33 +310,38 @@ describe("Phase 1R-D2-B2-A — exactly three RPCs", () => {
   });
 });
 
-describe("Phase 1R-D2-B2-A-R1 — Repair A: lock namespace and post-lock clock", () => {
-  it("uses a durable row plus a 64-bit namespaced per-user advisory lock", () => {
+describe("Phase 1R-D2-B2-A-R2 — Repair A: lock namespace and post-lock clock", () => {
+  it("declares the 64-bit namespace constant in all three RPCs", () => {
+    const declared =
+      candidateSql.match(
+        /v_lock_namespace constant bigint := 7218926914894380123;/g,
+      ) ?? [];
+    expect(declared).toHaveLength(3);
+  });
+
+  it("acquires every advisory lock through the declared constant", () => {
     const locks = candidateSql.match(/pg_advisory_xact_lock\(/g) ?? [];
     expect(locks).toHaveLength(3);
     const namespaced =
       candidateSql.match(
-        /hashtextextended\(_user_id::text, 7218926914894380123\)/g,
+        /hashtextextended\(_user_id::text, v_lock_namespace\)/g,
       ) ?? [];
     expect(namespaced).toHaveLength(3);
+    expect(candidateSql).not.toContain(
+      "hashtextextended(_user_id::text, 7218926914894380123)",
+    );
     expect(candidateSql).not.toContain("hashtext('bcc:'");
     expect(candidateSql).not.toContain("::bigint\n  );");
-    expect(candidateSql).toContain(
-      "SELECT * INTO v_row FROM public.business_checkout_claims\n    WHERE user_id = _user_id FOR UPDATE",
-    );
   });
 
-  it("never seeds wall-clock state from transaction-fixed now()", () => {
-    expect(candidateSql).not.toMatch(/v_now\s*(timestamptz)?\s*:=\s*now\(\)/);
-    const declared =
-      candidateSql.match(/v_now\s+timestamptz := clock_timestamp\(\);/g) ?? [];
+  it("declares v_now with no initializer in all three RPCs", () => {
+    const declared = candidateSql.match(/^  v_now\s+timestamptz;$/gm) ?? [];
     expect(declared).toHaveLength(3);
+    expect(candidateSql).not.toMatch(/v_now\s+timestamptz\s*:=/);
+    expect(candidateSql).not.toMatch(/v_now\s*(timestamptz)?\s*:=\s*now\(\)/);
   });
 
-  it("re-reads clock_timestamp() after every advisory lock acquisition", () => {
-    const reReads = candidateSql.match(/v_now := clock_timestamp\(\);/g) ?? [];
-    expect(reReads).toHaveLength(3);
-    // Each lock acquisition is immediately followed by a fresh clock read.
+  it("re-reads clock_timestamp() immediately after every lock acquisition", () => {
     const segments = candidateSql.split("pg_advisory_xact_lock(").slice(1);
     expect(segments).toHaveLength(3);
     for (const segment of segments) {
@@ -346,13 +351,57 @@ describe("Phase 1R-D2-B2-A-R1 — Repair A: lock namespace and post-lock clock",
     }
   });
 
+  it("refreshes the clock a second time in claim before the durable row select", () => {
+    const claimStart = candidateSql.indexOf(
+      "CREATE OR REPLACE FUNCTION public.claim_business_checkout(",
+    );
+    const claimEnd = candidateSql.indexOf(
+      "COMMENT ON FUNCTION public.claim_business_checkout(",
+    );
+    const claimBody = candidateSql.slice(claimStart, claimEnd);
+    const refreshes = claimBody.match(/v_now := clock_timestamp\(\);/g) ?? [];
+    expect(refreshes).toHaveLength(2);
+
+    const lockAt = claimBody.indexOf("pg_advisory_xact_lock(");
+    const first = claimBody.indexOf("v_now := clock_timestamp();", lockAt);
+    const second = claimBody.indexOf("v_now := clock_timestamp();", first + 1);
+    const selectAt = claimBody.indexOf(
+      "SELECT * INTO v_row FROM public.business_checkout_claims",
+    );
+    expect(second).toBeGreaterThan(first);
+    expect(selectAt).toBeGreaterThan(second);
+  });
+
+  it("revalidates checkout expiry after the lock and before the row select", () => {
+    const start = candidateSql.indexOf(
+      "CREATE OR REPLACE FUNCTION public.complete_business_checkout_claim(",
+    );
+    const end = candidateSql.indexOf(
+      "COMMENT ON FUNCTION public.complete_business_checkout_claim(",
+    );
+    const body = candidateSql.slice(start, end);
+    const lockAt = body.indexOf("pg_advisory_xact_lock(");
+    const clockAt = body.indexOf("v_now := clock_timestamp();", lockAt);
+    const revalidateAt = body.indexOf(
+      "IF NOT (_checkout_expires_at IS NOT NULL AND _checkout_expires_at > v_now) THEN",
+    );
+    const selectAt = body.indexOf(
+      "SELECT * INTO v_row FROM public.business_checkout_claims",
+    );
+    expect(revalidateAt).toBeGreaterThan(clockAt);
+    expect(selectAt).toBeGreaterThan(revalidateAt);
+    expect(body).toContain(
+      "IF _checkout_expires_at IS NULL OR _checkout_expires_at <= clock_timestamp() THEN",
+    );
+  });
+
   it("uses the fixed 300-second processing lease", () => {
     expect(candidateSql).toContain("v_lease_seconds constant integer := 300");
     expect(candidateSql).toContain("make_interval(secs => v_lease_seconds)");
   });
 });
 
-describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", () => {
+describe("Phase 1R-D2-B2-A-R2 — Repair B: strict null and shape validation", () => {
   it("rejects a NULL plan key explicitly before three-valued logic applies", () => {
     expect(candidateSql).toContain("IF _plan_key IS NULL THEN");
     const planNullAt = candidateSql.indexOf("IF _plan_key IS NULL THEN");
@@ -363,9 +412,10 @@ describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", (
     expect(planNullAt).toBeLessThan(planMatrixAt);
   });
 
-  it("rejects a NULL terminal flag before deriving the release state", () => {
+  it("rejects a NULL terminal flag with the exact terminal_flag_invalid reason", () => {
     expect(candidateSql).toContain("IF _terminal IS NULL THEN");
-    expect(candidateSql).toContain("'terminal_flag_missing'");
+    expect(candidateSql).toContain("'terminal_flag_invalid'");
+    expect(candidateSql).not.toContain("terminal_flag_missing");
     expect(candidateSql.indexOf("IF _terminal IS NULL THEN")).toBeLessThan(
       candidateSql.indexOf("v_next := CASE WHEN _terminal THEN"),
     );
@@ -381,24 +431,39 @@ describe("Phase 1R-D2-B2-A-R1 — Repair B: strict null and shape validation", (
   });
 });
 
-describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => {
-  it("removes every single-row LIMIT 1 shortcut from the policy reads", () => {
+describe("Phase 1R-D2-B2-A-R2 — Repair C: fail-closed setwise precedence", () => {
+  it("removes every single-row LIMIT 1 shortcut and the v_has_owner gate", () => {
     expect(candidateSql).not.toContain("LIMIT 1");
     expect(candidateSql).not.toContain("IF FOUND THEN");
+    expect(candidateSql).not.toContain("v_has_owner");
   });
 
-  it("evaluates all agency entitlement rows with deterministic precedence", () => {
+  it("joins ownership and active agency_owner membership inside the aggregate", () => {
     expect(candidateSql).toContain(
       "INTO v_unknown, v_live, v_past_due_stripe, v_past_due_other",
     );
+    const aggregateAt = candidateSql.indexOf(
+      "INTO v_unknown, v_live, v_past_due_stripe, v_past_due_other",
+    );
+    const joinBlock = candidateSql.slice(aggregateAt, aggregateAt + 700);
+    expect(joinBlock).toContain("FROM public.agency_entitlements ae");
+    expect(joinBlock).toContain("JOIN public.agency_profiles ap ON ap.id = ae.agency_id");
+    expect(joinBlock).toContain("AND am.member_user_id = _user_id");
+    expect(joinBlock).toContain("AND am.role::text = 'agency_owner'");
+    expect(joinBlock).toContain("AND am.status::text = 'active'");
+    expect(joinBlock).toContain("WHERE ap.owner_user_id = _user_id");
+  });
+
+  it("orders agency precedence unknown > live > non-stripe past_due > stripe past_due", () => {
     const order = [
       "IF v_unknown > 0 THEN",
       "'opposing_entitlement_unknown'",
       "ELSIF v_live > 0 THEN",
       "'agency_entitlement_exists'",
+      "ELSIF v_past_due_other > 0 THEN",
+      "'opposing_entitlement_unknown'",
       "ELSIF v_past_due_stripe > 0 THEN",
       "'agency_billing_requires_management'",
-      "ELSIF v_past_due_other > 0 THEN",
     ];
     let cursor = -1;
     for (const token of order) {
@@ -406,6 +471,9 @@ describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => 
       expect(at).toBeGreaterThan(cursor);
       cursor = at;
     }
+    expect(candidateSql).toContain(
+      "unknown > live > past_due(non-stripe, fail closed) > past_due(stripe)",
+    );
   });
 
   it("evaluates all recruiter billing rows with deterministic precedence", () => {
@@ -423,6 +491,75 @@ describe("Phase 1R-D2-B2-A-R1 — Repair C: setwise opposing evaluation", () => 
     expect(candidateSql).not.toContain("SELECT rbp.plan, rbp.status");
   });
 });
+
+describe("Phase 1R-D2-B2-A-R2 — Repair D/E: proof fidelity and hygiene", () => {
+  const pgTestSource = readRepoFile(PG_TEST_REL);
+  const pgConfigSource = readRepoFile(PG_CONFIG_REL);
+
+  it("mirrors the exact production uniqueness constraints in the bootstrap", () => {
+    expect(pgTestSource).toContain(
+      "CONSTRAINT agency_entitlements_agency_id_key UNIQUE (agency_id)",
+    );
+    expect(pgTestSource).toContain(
+      "CONSTRAINT recruiter_billing_profiles_recruiter_uq UNIQUE (recruiter_id)",
+    );
+    expect(pgTestSource).toContain(
+      "CONSTRAINT recruiter_profiles_user_unique UNIQUE (user_id)",
+    );
+    expect(pgTestSource).toContain(
+      "-- production-fidelity: agency_entitlements.agency_id UNIQUE",
+    );
+    expect(pgTestSource).toContain(
+      "-- production-fidelity: recruiter_billing_profiles.recruiter_id UNIQUE only",
+    );
+  });
+
+  it("uses real two-agency fixtures for multi-entitlement precedence", () => {
+    expect(pgTestSource).toContain("async function seedTwoAgencies(");
+    expect(pgTestSource).toContain("ON CONFLICT (agency_id) DO UPDATE");
+    expect(pgTestSource).toContain(
+      "blocks a same-context claim for a DIFFERENT agency the same user owns",
+    );
+    expect(pgTestSource).toContain(
+      "fails closed when stripe past_due mixes with $other past_due",
+    );
+  });
+
+  it("contains no sleep, timer, or elapsed-time based proof", () => {
+    for (const forbidden of [
+      "setTimeout",
+      "setInterval",
+      "Date.now()",
+      "startedAt",
+      "lock-wait",
+      "lockwait",
+    ]) {
+      expect(pgTestSource).not.toContain(forbidden);
+    }
+  });
+
+  it("rejects focused, skipped, todo, and snapshot tokens in the proofs", () => {
+    const forbiddenTokens = [
+      [".on", "ly("],
+      [".sk", "ip("],
+      [".to", "do("],
+      ["toMatchSn", "apshot("],
+      ["toMatchInlineSn", "apshot("],
+    ].map(([a, b]) => a + b);
+
+    const selfSource = readRepoFile(
+      path.join("src", "test", "phase1rD2B2BusinessCheckoutClaimCandidateContract.test.ts"),
+    );
+
+    for (const token of forbiddenTokens) {
+      expect(selfSource).not.toContain(token);
+      expect(pgTestSource).not.toContain(token);
+      expect(pgConfigSource).not.toContain(token);
+    }
+    expect(forbiddenTokens).toHaveLength(5);
+  });
+});
+
 
 describe("Phase 1R-D2-B2-A — coordination and D1 policy vocabulary", () => {
 
