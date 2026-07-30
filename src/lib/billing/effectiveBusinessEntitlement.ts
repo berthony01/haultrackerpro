@@ -118,6 +118,17 @@ const PAID_RECRUITER_PLANS: readonly Exclude<
   'free_verified'
 >[] = ['starter', 'growth', 'fleet'];
 
+/**
+ * Recognized agency entitlement source vocabulary. Any other value — unknown,
+ * empty, whitespace-padded, differently cased, null, undefined, or non-string —
+ * is malformed and fails closed.
+ */
+const RECOGNIZED_AGENCY_SOURCES: readonly string[] = [
+  'stripe',
+  'manual',
+  'admin_seed',
+];
+
 /** Statuses that count as "currently paying" in either context. */
 const PREMIUM_STATUSES: readonly string[] = [
   'active',
@@ -199,7 +210,12 @@ export function resolveEffectiveBusinessEntitlement(
   const agencyPlanKey = isPaidAgencyPlanKey(agencyEntitlement.planKey)
     ? agencyEntitlement.planKey
     : null;
-  const agencyRowValid = agencyEntitlement.hasRow === true && agencyPlanKey !== null;
+  // Repair A — an unrecognized/malformed source invalidates the entire row.
+  const agencySourceRecognized =
+    typeof agencyEntitlement.source === 'string' &&
+    RECOGNIZED_AGENCY_SOURCES.includes(agencyEntitlement.source);
+  const agencyRowValid =
+    agencyEntitlement.hasRow === true && agencyPlanKey !== null && agencySourceRecognized;
   const agencyStatusPremium = isPremiumStatus(agencyEntitlement.status);
   const agencyStatusManualBeta = isExactly(agencyEntitlement.status, 'manual_beta');
   const agencyStatusPastDue = isExactly(agencyEntitlement.status, 'past_due');
@@ -255,7 +271,8 @@ export function resolveEffectiveBusinessEntitlement(
   } else if (agencyIncludedTier !== null) {
     effectiveRecruiterTier = agencyIncludedTier;
     entitlementSource = 'agency_included';
-    billingManagementContext = 'agency';
+    // Repair B — only a Stripe-sourced entitlement has a portal to manage.
+    billingManagementContext = agencySourceStripe ? 'agency' : 'none';
   } else {
     entitlementSource = recruiterProfile.exists === true ? 'free_standard' : 'none';
 
