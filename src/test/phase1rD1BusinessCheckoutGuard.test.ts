@@ -19,8 +19,15 @@ import {
   RECRUITER_ALLOWING_STATUSES,
   RECRUITER_BLOCKING_STATUSES,
   type AgencyEntitlementFacts,
+  type CrossContextDecision,
   type RecruiterBillingFacts,
 } from "../../supabase/functions/_shared/business-checkout-guard";
+
+/** Narrow a decision to its blocking member, or fail loudly. */
+function blocked(d: CrossContextDecision) {
+  if (d.allowed) throw new Error("expected a blocking decision");
+  return d;
+}
 
 const AGENCY_SOURCES = ["stripe", "manual", "admin_seed"] as const;
 
@@ -93,10 +100,10 @@ describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () 
           agencyFacts({ source, status }),
         );
         expect(d.allowed).toBe(false);
-        if (d.allowed) throw new Error("unreachable");
-        expect(d.code).toBe("agency_entitlement_exists");
-        expect(d.status).toBe(409);
-        expect(d.message).toBe(
+        const b = blocked(d);
+        expect(b.code).toBe("agency_entitlement_exists");
+        expect(b.status).toBe(409);
+        expect(b.message).toBe(
           CROSS_CONTEXT_MESSAGES.agency_entitlement_exists,
         );
       });
@@ -108,9 +115,9 @@ describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () 
       agencyFacts({ source: "stripe", status: "past_due" }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("agency_billing_requires_management");
-    expect(d.message).toBe(
+    const b = blocked(d);
+    expect(b.code).toBe("agency_billing_requires_management");
+    expect(b.message).toBe(
       CROSS_CONTEXT_MESSAGES.agency_billing_requires_management,
     );
   });
@@ -151,8 +158,8 @@ describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () 
       agencyFacts({ planKey: "agency_ultra" }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("fails closed on an unknown source for a relevant row", () => {
@@ -160,8 +167,8 @@ describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () 
       agencyFacts({ source: "wire_transfer" }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("fails closed on an unknown status for a relevant row", () => {
@@ -169,8 +176,8 @@ describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () 
       agencyFacts({ status: "half_paid" }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("fails closed on null fields for a relevant row", () => {
@@ -178,8 +185,8 @@ describe("Phase 1R-D1 — recruiter checkout blocked by agency entitlement", () 
       agencyFacts({ planKey: null, status: null, source: null }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("does not mutate the input facts object", () => {
@@ -195,10 +202,10 @@ describe("Phase 1R-D1 — agency checkout blocked by recruiter subscription", ()
     it(`blocks agency checkout for recruiter status ${status}`, () => {
       const d = evaluateAgencyCheckoutCrossContext(recruiterFacts({ status }));
       expect(d.allowed).toBe(false);
-      if (d.allowed) throw new Error("unreachable");
-      expect(d.code).toBe("recruiter_subscription_exists");
-      expect(d.status).toBe(409);
-      expect(d.message).toBe(
+      const b = blocked(d);
+      expect(b.code).toBe("recruiter_subscription_exists");
+      expect(b.status).toBe(409);
+      expect(b.message).toBe(
         CROSS_CONTEXT_MESSAGES.recruiter_subscription_exists,
       );
     });
@@ -234,8 +241,8 @@ describe("Phase 1R-D1 — agency checkout blocked by recruiter subscription", ()
       recruiterFacts({ status: "frozen" }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("fails closed on a null recruiter status", () => {
@@ -243,8 +250,8 @@ describe("Phase 1R-D1 — agency checkout blocked by recruiter subscription", ()
       recruiterFacts({ status: null }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("fails closed on a malformed plan in a blocking status", () => {
@@ -252,8 +259,8 @@ describe("Phase 1R-D1 — agency checkout blocked by recruiter subscription", ()
       recruiterFacts({ plan: "enterprise", status: "active" }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("fails closed on a null plan in a blocking status", () => {
@@ -261,8 +268,8 @@ describe("Phase 1R-D1 — agency checkout blocked by recruiter subscription", ()
       recruiterFacts({ plan: null, status: "past_due" }),
     );
     expect(d.allowed).toBe(false);
-    if (d.allowed) throw new Error("unreachable");
-    expect(d.code).toBe("opposing_entitlement_unknown");
+    const b = blocked(d);
+    expect(b.code).toBe("opposing_entitlement_unknown");
   });
 
   it("allows a terminal status even when the dead row's plan is malformed", () => {
