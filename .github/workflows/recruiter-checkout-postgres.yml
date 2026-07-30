@@ -133,6 +133,27 @@ jobs:
         if: steps.postgres_suite.outcome != 'success'
         run: exit 1
 
+      - name: Run real-PostgreSQL Business Checkout Claim suite
+        id: business_checkout_postgres_suite
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run --config vitest.business-checkout-postgres.config.ts --reporter=verbose 2>&1 | tee business-checkout-postgres.log
+
+      - name: Upload Business Checkout PostgreSQL suite log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: business-checkout-postgres-log
+          path: business-checkout-postgres.log
+          if-no-files-found: error
+
+      - name: Enforce Business Checkout PostgreSQL suite result
+        if: steps.business_checkout_postgres_suite.outcome != 'success'
+        run: exit 1
+
+
+
       - name: Run focused Recruiter Checkout orchestrator suite
         run: bunx vitest run src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts
 
