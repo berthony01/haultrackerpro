@@ -607,7 +607,7 @@ function buildAgencyDeps(
         });
         for (const s of page.data) {
           const n = normalizeSession(s);
-          captured.push(toCapturedSession(n));
+          captureSession(captured, n);
           acc.push(n);
         }
         if (!page.has_more) break;
