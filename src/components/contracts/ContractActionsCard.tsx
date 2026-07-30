@@ -70,8 +70,11 @@ function DriverCard({ onOpen }: { onOpen: () => void }) {
 
 function RecruiterCard({ onOpen }: { onOpen: () => void }) {
   const { profile } = useRecruiterProfile();
-  const { plan, isBillingActive } = useRecruiterBilling();
-  const hasContractAccess = isBillingActive && (plan === 'growth' || plan === 'fleet');
+  // Phase 1R-C: effective capability (recruiter subscription OR included
+  // agency entitlement), never a raw recruiter plan comparison.
+  const { canUseContractWorkflowTools } = useRecruiterBilling();
+  const hasContractAccess = canUseContractWorkflowTools === true;
+
   const { recruiterApplications } = useOpportunityApplications({ recruiterId: hasContractAccess ? profile?.id : undefined });
   const apps = (hasContractAccess ? recruiterApplications : []) as any[];
   const appIds = useMemo(() => apps.map((a) => a.id), [apps]);
