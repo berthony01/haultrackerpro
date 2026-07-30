@@ -504,10 +504,8 @@ export function validateReadyBusinessCheckoutSession(
     if (meta[k] !== v) return INVALID;
   }
 
-  const claimExpiry = epochSecondsFromIso(
-    typeof input.claimExpiresAt === "string" ? input.claimExpiresAt : null,
-  );
-  if (claimExpiry === null || !Number.isInteger(claimExpiry)) return INVALID;
+  const claimExpiry = exactEpochSecondsFromIso(input.claimExpiresAt);
+  if (claimExpiry === null) return INVALID;
 
   const sessionExpiry = s.expiresAtSeconds;
   if (
