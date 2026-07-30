@@ -585,6 +585,50 @@ describe("Phase 1R-D1 — agency checkout orchestrator", () => {
     });
   });
 
+  describe("R2 — completed-session identity and finite expiry", () => {
+    for (const [label, id] of [
+      ["empty", ""],
+      ["whitespace-only", "   "],
+    ] as const) {
+      it(`R2-1${label}. fails closed on a completed session with ${label} id`, async () => {
+        seedCanonical();
+        stripe.sessions.push(
+          makeSession({
+            id,
+            status: "complete",
+            url: null,
+            expires_at: NOW + 300,
+          }),
+        );
+        const r = await run();
+        expect(r.code).toBe("session_invalid");
+        expect(stripe.createSessionCalls.length).toBe(0);
+      });
+    }
+
+    for (const [label, expires] of [
+      ["NaN", Number.NaN],
+      ["Infinity", Number.POSITIVE_INFINITY],
+      ["-Infinity", Number.NEGATIVE_INFINITY],
+    ] as const) {
+      it(`R2-2${label}. fails closed on a completed session with ${label} expiry`, async () => {
+        seedCanonical();
+        stripe.sessions.push(
+          makeSession({
+            id: "cs_malformed_expiry",
+            status: "complete",
+            url: null,
+            expires_at: expires,
+          }),
+        );
+        const r = await run();
+        expect(r.code).toBe("session_invalid");
+        expect(stripe.createSessionCalls.length).toBe(0);
+      });
+    }
+  });
+
+
 
   describe("returned-session validation", () => {
     const cases: Array<[string, Partial<AgencySessionLike>]> = [

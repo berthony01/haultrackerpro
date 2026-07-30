@@ -506,11 +506,16 @@ async function scanExistingSessions(
     const status = typeof s.status === "string" ? s.status : "";
     if (status === "complete") {
       // A completed session only represents an in-flight finalization while it
-      // is still current. Malformed expiry or a foreign customer fails closed.
-      if (typeof s.expires_at !== "number" || s.expires_at <= 0) {
+      // is still current. Malformed identity/expiry or a foreign customer fails
+      // closed.
+      if (typeof s.id !== "string" || s.id.trim() === "") {
+        return { kind: "invalid" };
+      }
+      if (!Number.isFinite(s.expires_at) || (s.expires_at as number) <= 0) {
         return { kind: "invalid" };
       }
       if (s.customer !== customerId) return { kind: "invalid" };
+
       // Historical completed session (expired): ignore it so a later billing
       // restart is never permanently blocked.
       if (s.expires_at > now) sawComplete = true;
