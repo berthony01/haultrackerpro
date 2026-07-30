@@ -27,6 +27,9 @@ import {
 } from 'lucide-react';
 import { useRecruiterProfile, type RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunities/useRecruiterBilling';
+import { ASSISTANT_AGENCY_PLANS } from '@/lib/agencyPlans';
+import type { PaidAgencyPlanKey } from '@/lib/billing/effectiveBusinessEntitlement';
+
 import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { useUserRole } from '@/hooks/useUserRole';
