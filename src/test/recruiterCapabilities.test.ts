@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  getRecruiterCapabilitiesForTier,
   getRecruiterPlanCapabilities,
   isRecruiterPaidPlanActive,
   resolveRecruiterCapabilityTier,
@@ -186,5 +187,85 @@ describe('recruiterCapabilities', () => {
     expect(isRecruiterPaidPlanActive(null, null)).toBe(false);
     expect(resolveRecruiterCapabilityTier('fleet', 'active')).toBe('fleet');
     expect(resolveRecruiterCapabilityTier('fleet', 'canceled')).toBe('free_verified');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1R-C — tier-first capability builder
+// ---------------------------------------------------------------------------
+
+describe('getRecruiterCapabilitiesForTier', () => {
+  it('produces the same capabilities as the plan/status path for every tier', () => {
+    const pairs = [
+      { tier: 'free_verified', plan: 'none', status: 'inactive' },
+      { tier: 'starter', plan: 'starter', status: 'active' },
+      { tier: 'growth', plan: 'growth', status: 'active' },
+      { tier: 'fleet', plan: 'fleet', status: 'active' },
+    ] as const;
+    for (const p of pairs) {
+      const viaPlan = getRecruiterPlanCapabilities({
+        plan: p.plan,
+        status: p.status,
+        isApprovedRecruiter: true,
+      });
+      const viaTier = getRecruiterCapabilitiesForTier({
+        tier: p.tier,
+        canPostStandardOpportunities: true,
+      });
+      expect(viaTier).toEqual(viaPlan);
+    }
+  });
+
+  it('agency-included growth tier unlocks growth premium capabilities without a recruiter plan', () => {
+    const caps = getRecruiterCapabilitiesForTier({
+      tier: 'growth',
+      canPostStandardOpportunities: true,
+    });
+    expect(caps.tier).toBe('growth');
+    expect(caps.canUsePriorityPlacement).toBe(true);
+    expect(caps.canExportRecruiterReports).toBe(true);
+    expect(caps.canViewAdvancedRecruiterReports).toBe(true);
+    expect(caps.canUseContractWorkflowTools).toBe(true);
+    expect(caps.canUseTeamSeats).toBe(false);
+  });
+
+  it('preserves the supplied posting boolean exactly and never re-derives it', () => {
+    const blocked = getRecruiterCapabilitiesForTier({
+      tier: 'fleet',
+      canPostStandardOpportunities: false,
+    });
+    expect(blocked.canPostStandardOpportunities).toBe(false);
+    expect(blocked.canUsePrioritySupport).toBe(true);
+
+    const allowed = getRecruiterCapabilitiesForTier({
+      tier: 'free_verified',
+      canPostStandardOpportunities: true,
+    });
+    expect(allowed.canPostStandardOpportunities).toBe(true);
+  });
+
+  it('unknown, malformed, null, and undefined tiers fail closed to free_verified', () => {
+    const inputs = ['enterprise', '', 'GROWTH', null, undefined, 'agency_growth'];
+    for (const tier of inputs) {
+      const caps = getRecruiterCapabilitiesForTier({
+        tier: tier as never,
+        canPostStandardOpportunities: true,
+      });
+      expect(caps.tier).toBe('free_verified');
+      expect(caps.canUsePriorityPlacement).toBe(false);
+      expect(caps.canExportRecruiterReports).toBe(false);
+      expect(caps.canUseContractWorkflowTools).toBe(false);
+    }
+  });
+
+  it('never invents a numeric opportunity ceiling', () => {
+    for (const tier of ['free_verified', 'starter', 'growth', 'fleet'] as const) {
+      const caps = getRecruiterCapabilitiesForTier({
+        tier,
+        canPostStandardOpportunities: true,
+      });
+      expect(caps.activeOpportunityLimit).toBeNull();
+      expect(caps.unlimitedStandardPosts).toBe(true);
+    }
   });
 });
