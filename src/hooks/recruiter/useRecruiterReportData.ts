@@ -84,8 +84,11 @@ export function useRecruiterReportData(range: RecruiterReportRange | null, enabl
           companyName: profile.company_name,
           recruiterName: profile.recruiter_name,
           verificationStatus: profile.verification_status,
-          plan: billing.plan,
-          planStatus: billing.status,
+          // Effective plan so downstream CSV/PDF premium checks work for
+          // agency-included recruiters without changing those modules.
+          plan: effectivePlan,
+          planStatus: isAgencyIncluded ? 'included_with_agency' : billing.status,
+
           activeLimit: billing.limit,
           activeCount: billing.activeCount,
         },
