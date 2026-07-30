@@ -28,6 +28,16 @@ const profileMocks = vi.hoisted(() => ({
   isSuspended: false,
   isLoading: false,
 }));
+// Phase 1R-C: agency sources feeding the effective business entitlement.
+const agencyMocks = vi.hoisted(() => ({
+  agency: null as Record<string, unknown> | null,
+  agencyLoading: false,
+  agencyError: false,
+  entitlement: null as Record<string, unknown> | null,
+  hasRow: false,
+  entLoading: false,
+  entError: false,
+}));
 const supabaseMocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   fromMaybeSingle: vi.fn(async () => ({ data: null, error: null })),
@@ -48,14 +58,55 @@ vi.mock('@/hooks/useAuth', () => ({
 vi.mock('@/hooks/useAdmin', () => ({
   useAdmin: () => ({ isAdmin: adminMocks.isAdmin }),
 }));
-vi.mock('@/hooks/opportunities/useRecruiterProfile', () => ({
-  useRecruiterProfile: () => ({
-    profile: profileMocks.profile,
-    isApproved: profileMocks.isApproved,
-    isSuspended: profileMocks.isSuspended,
-    isLoading: profileMocks.isLoading,
+vi.mock('@/hooks/opportunities/useRecruiterProfile', async () => {
+  const { isProfileCompleteForPosting } = await vi.importActual<
+    typeof import('@/lib/opportunities/recruiterEligibility')
+  >('@/lib/opportunities/recruiterEligibility');
+  return {
+    useRecruiterProfile: () => {
+      const complete = isProfileCompleteForPosting(
+        profileMocks.profile as never,
+      );
+      return {
+        profile: profileMocks.profile,
+        isApproved: profileMocks.isApproved,
+        isSuspended: profileMocks.isSuspended,
+        isLoading: profileMocks.isLoading,
+        isProfileComplete: complete,
+        canPost:
+          !!profileMocks.profile && !profileMocks.isSuspended && complete,
+      };
+    },
+  };
+});
+
+// Phase 1R-C: narrow default agency mocks. With no agency present the
+// effective entitlement resolves exactly as recruiter-only, so every
+// pre-existing test in this file keeps its original behavior.
+vi.mock('@/hooks/useAgency', () => ({
+  useMyAgency: () => ({
+    data: agencyMocks.agency,
+    isLoading: agencyMocks.agencyLoading,
+    isError: agencyMocks.agencyError,
   }),
 }));
+vi.mock('@/hooks/useAgencyEntitlement', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/agencyPlans')>(
+    '@/lib/agencyPlans',
+  );
+  return {
+    useAgencyEntitlement: (agencyId: string | null | undefined) => ({
+      entitlement:
+        agencyMocks.entitlement ?? actual.defaultBetaEntitlement(agencyId ?? ''),
+      hasRow: agencyMocks.hasRow,
+      isLoading: agencyMocks.entLoading,
+      isError: agencyMocks.entError,
+      error: null,
+      refetch: () => {},
+    }),
+  };
+});
+
 
 vi.mock('@/integrations/supabase/client', () => {
   const billingChain = {
