@@ -109,14 +109,26 @@ export type CrossContextBlockCode =
   | "recruiter_subscription_exists"
   | "opposing_entitlement_unknown";
 
-export type CrossContextDecision =
-  | { readonly allowed: true }
-  | {
-      readonly allowed: false;
-      readonly code: CrossContextBlockCode;
-      readonly status: number;
-      readonly message: string;
-    };
+export interface CrossContextAllow {
+  readonly allowed: true;
+}
+
+export interface CrossContextBlock {
+  readonly allowed: false;
+  readonly code: CrossContextBlockCode;
+  readonly status: number;
+  readonly message: string;
+}
+
+export type CrossContextDecision = CrossContextAllow | CrossContextBlock;
+
+/** Explicit type predicate — the only supported way to read a block's
+ *  code/status/message. */
+export function isCrossContextBlock(
+  d: CrossContextDecision,
+): d is CrossContextBlock {
+  return d.allowed === false;
+}
 
 /** Exact, stable, safe public messages. No IDs, URLs, emails, or raw errors. */
 export const CROSS_CONTEXT_MESSAGES: Record<CrossContextBlockCode, string> = {

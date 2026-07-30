@@ -10,6 +10,7 @@ import {
   CROSS_CONTEXT_MESSAGES,
   evaluateAgencyCheckoutCrossContext,
   evaluateRecruiterCheckoutCrossContext,
+  isCrossContextBlock,
   isRecognizedAgencyPlanKey,
   isRecognizedAgencySource,
   isRecognizedAgencyStatus,
@@ -25,7 +26,7 @@ import {
 
 /** Narrow a decision to its blocking member, or fail loudly. */
 function blocked(d: CrossContextDecision) {
-  if (d.allowed) throw new Error("expected a blocking decision");
+  if (!isCrossContextBlock(d)) throw new Error("expected a blocking decision");
   return d;
 }
 

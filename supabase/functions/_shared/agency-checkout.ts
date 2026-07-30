@@ -9,12 +9,14 @@
 
 import {
   evaluateAgencyCheckoutCrossContext,
+  isCrossContextBlock,
   type CrossContextDecision,
   type RecruiterBillingFacts,
 } from "./business-checkout-guard.ts";
 
 export {
   evaluateAgencyCheckoutCrossContext,
+  isCrossContextBlock,
   type CrossContextDecision,
   type RecruiterBillingFacts,
 };
@@ -345,7 +347,7 @@ const resultNotOwner = () =>
 function resultFromCrossContext(
   decision: CrossContextDecision,
 ): AgencyCheckoutResult | null {
-  if (decision.allowed) return null;
+  if (!isCrossContextBlock(decision)) return null;
   if (decision.code === "recruiter_subscription_exists") {
     return r(decision.status, "recruiter_subscription_exists", decision.message);
   }
