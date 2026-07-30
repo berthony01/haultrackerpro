@@ -653,7 +653,7 @@ function buildDeps(
           { idempotencyKey },
         ),
       );
-      captured.push(toCapturedSession(s));
+      captureSession(captured, s);
       return s;
     },
   };
