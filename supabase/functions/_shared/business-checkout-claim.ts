@@ -109,11 +109,23 @@ function intOrNull(v: unknown): number | null {
     : null;
 }
 
-/** Fail-closed array/singleton normalization. Never surfaces raw RPC data. */
-function firstRow(data: unknown): Record<string, unknown> | null {
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row || typeof row !== "object") return null;
-  return row as Record<string, unknown>;
+/**
+ * Fail-closed row normalization. Phase 1R-D2-B3-R1 removes the permissive
+ * "first row wins" behavior: an array is accepted ONLY when it holds exactly
+ * one element and that element is a plain object. Empty arrays, multi-row
+ * arrays, primitives, null, and unknown shapes all normalize to null so the
+ * caller sees `outcome: "unknown"` and fails closed. Raw RPC payloads are
+ * never surfaced.
+ */
+function singleRow(data: unknown): Record<string, unknown> | null {
+  if (Array.isArray(data)) {
+    if (data.length !== 1) return null;
+    const only = data[0];
+    if (!only || typeof only !== "object" || Array.isArray(only)) return null;
+    return only as Record<string, unknown>;
+  }
+  if (!data || typeof data !== "object") return null;
+  return data as Record<string, unknown>;
 }
 
 function normalizeClaimRow(data: unknown): BusinessCheckoutClaimRow {
