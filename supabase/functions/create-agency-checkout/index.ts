@@ -44,12 +44,18 @@ import {
   type AgencySubscriptionLike,
 } from "../_shared/agency-checkout.ts";
 
-/** Deterministic mapping from a claim block reason to the public response. */
+/**
+ * Deterministic mapping from a claim block reason to the public response.
+ *
+ * Phase 1R-D2-B3-R1: every block reason is a conflict with existing billing
+ * state, not an authorization failure, so all of them are HTTP 409. Only the
+ * distinct `not_owner` claim outcome (handled by the caller) remains 403.
+ */
 function agencyBlockedResult(reason: string): AgencyCheckoutResult {
   switch (reason) {
     case "recruiter_subscription_exists":
       return {
-        status: 403,
+        status: 409,
         code: "recruiter_subscription_exists",
         message: "This account already has recruiter billing.",
       };
