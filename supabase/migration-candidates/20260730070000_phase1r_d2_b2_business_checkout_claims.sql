@@ -127,12 +127,12 @@ SET search_path = public
 AS $$
 DECLARE
   v_lease_seconds constant integer := 300;
-  v_now        timestamptz := clock_timestamp();
+  v_lock_namespace constant bigint := 7218926914894380123;
+  v_now        timestamptz;
   v_row        public.business_checkout_claims%ROWTYPE;
   v_new_token  uuid;
   v_active     boolean;
   v_found      boolean;
-  v_has_owner  boolean;
   v_unknown          bigint := 0;
   v_live             bigint := 0;
   v_past_due_stripe  bigint := 0;
