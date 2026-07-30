@@ -74,6 +74,9 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { RecruiterAccessPage } from '@/components/opportunities/recruiter/RecruiterAccessPage';
 import { RecruiterOnboarding } from '@/components/opportunities/RecruiterOnboarding';
+import { getRecruiterCapabilitiesForTier } from '@/lib/recruiterCapabilities';
+import type { EffectiveBusinessEntitlement } from '@/lib/billing/effectiveBusinessEntitlement';
+
 
 // ---------------------------------------------------------------------------
 // Fixture helpers.
