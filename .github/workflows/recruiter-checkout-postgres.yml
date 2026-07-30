@@ -11,6 +11,10 @@ on:
       - 'supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql'
       - 'supabase/migrations/20260730060000_phase1r_d2_b1_recruiter_checkout_intents.sql'
       - 'src/test/phase1rD2B1RecruiterCheckoutIntentMigrationPromotion.test.ts'
+      - 'supabase/migration-candidates/20260730070000_phase1r_d2_b2_business_checkout_claims.sql'
+      - 'src/test/phase1rD2B2BusinessCheckoutClaimCandidateContract.test.ts'
+      - 'tests/postgres/businessCheckoutClaimsConcurrency.test.ts'
+      - 'vitest.business-checkout-postgres.config.ts'
       - 'supabase/functions/_shared/recruiter-checkout.ts'
       - 'supabase/functions/create-recruiter-checkout/index.ts'
       - 'src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts'
@@ -36,6 +40,10 @@ on:
       - 'supabase/migration-candidates/20260717235300_phase1g_r1a1_recruiter_checkout_intents.sql'
       - 'supabase/migrations/20260730060000_phase1r_d2_b1_recruiter_checkout_intents.sql'
       - 'src/test/phase1rD2B1RecruiterCheckoutIntentMigrationPromotion.test.ts'
+      - 'supabase/migration-candidates/20260730070000_phase1r_d2_b2_business_checkout_claims.sql'
+      - 'src/test/phase1rD2B2BusinessCheckoutClaimCandidateContract.test.ts'
+      - 'tests/postgres/businessCheckoutClaimsConcurrency.test.ts'
+      - 'vitest.business-checkout-postgres.config.ts'
       - 'supabase/functions/_shared/recruiter-checkout.ts'
       - 'supabase/functions/create-recruiter-checkout/index.ts'
       - 'src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts'
@@ -78,6 +86,7 @@ jobs:
 
     env:
       RECRUITER_CHECKOUT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recruiter_checkout
+      BUSINESS_CHECKOUT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/recruiter_checkout
       VITE_SUPABASE_URL: https://phase1g-r1a4-test.supabase.co
       VITE_SUPABASE_PUBLISHABLE_KEY: phase1g-r1a4-isolated-test-key
 
@@ -123,6 +132,27 @@ jobs:
       - name: Enforce PostgreSQL suite result
         if: steps.postgres_suite.outcome != 'success'
         run: exit 1
+
+      - name: Run real-PostgreSQL Business Checkout Claim suite
+        id: business_checkout_postgres_suite
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bunx vitest run --config vitest.business-checkout-postgres.config.ts --reporter=verbose 2>&1 | tee business-checkout-postgres.log
+
+      - name: Upload Business Checkout PostgreSQL suite log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: business-checkout-postgres-log
+          path: business-checkout-postgres.log
+          if-no-files-found: error
+
+      - name: Enforce Business Checkout PostgreSQL suite result
+        if: steps.business_checkout_postgres_suite.outcome != 'success'
+        run: exit 1
+
+
 
       - name: Run focused Recruiter Checkout orchestrator suite
         run: bunx vitest run src/test/phase1gR1A2RecruiterCheckoutOrchestrator.test.ts
