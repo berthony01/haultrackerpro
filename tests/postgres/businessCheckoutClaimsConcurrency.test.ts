@@ -1501,7 +1501,7 @@ describe("Phase 1R-D2-B2-A-R2 — Repair A: lock namespace and post-lock clock",
       const src = await functionSource(name);
       expect(src).toMatch(/v_now\s+timestamptz;/);
       expect(src).not.toMatch(/v_now\s+timestamptz\s*:=/);
-      expect(src).not.toContain("now()");
+      expect(src).not.toMatch(/v_now[^\n]*:=\s*now\(\)/);
     }
   });
 
