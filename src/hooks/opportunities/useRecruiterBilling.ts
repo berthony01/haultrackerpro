@@ -5,10 +5,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRecruiterProfile } from './useRecruiterProfile';
 import type { Tables } from '@/integrations/supabase/types';
 import {
-  getRecruiterPlanCapabilities,
+  getRecruiterCapabilitiesForTier,
   isRecruiterPaidPlanActive,
   resolveRecruiterCapabilityTier,
 } from '@/lib/recruiterCapabilities';
+import { useMyAgency } from '@/hooks/useAgency';
+import { useAgencyEntitlement } from '@/hooks/useAgencyEntitlement';
+import {
+  resolveEffectiveBusinessEntitlement,
+  type EffectiveBusinessEntitlement,
+} from '@/lib/billing/effectiveBusinessEntitlement';
+
 import {
   isSafeStripeCheckoutUrl,
   isSafeStripeBillingPortalUrl,
