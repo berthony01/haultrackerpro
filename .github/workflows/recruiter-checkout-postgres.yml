@@ -44,7 +44,10 @@ on:
       - 'supabase/migrations/20260730060000_phase1r_d2_b1_recruiter_checkout_intents.sql'
       - 'src/test/phase1rD2B1RecruiterCheckoutIntentMigrationPromotion.test.ts'
       - 'supabase/migration-candidates/20260730070000_phase1r_d2_b2_business_checkout_claims.sql'
+      - 'supabase/migrations/20260730070000_phase1r_d2_b2_business_checkout_claims.sql'
       - 'src/test/phase1rD2B2BusinessCheckoutClaimCandidateContract.test.ts'
+      - 'src/test/phase1rD2B2BusinessCheckoutClaimMigrationPromotion.test.ts'
+
       - 'tests/postgres/businessCheckoutClaimsConcurrency.test.ts'
       - 'vitest.business-checkout-postgres.config.ts'
       - 'supabase/functions/_shared/recruiter-checkout.ts'
