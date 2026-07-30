@@ -640,7 +640,7 @@ function buildAgencyDeps(
           { idempotencyKey },
         ),
       );
-      captured.push(toCapturedSession(s));
+      captureSession(captured, s);
       return s;
     },
   };
