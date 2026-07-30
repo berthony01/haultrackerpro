@@ -498,7 +498,7 @@ function buildDeps(
   stripe: Stripe,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabaseService: any,
-  captured: CapturedCheckoutSession[],
+  captured: Map<string, CapturedCheckoutSession>,
 ): RecruiterCheckoutDeps {
   const intents: IntentStore = {
     async claim({ recruiterId, userId, plan }) {
