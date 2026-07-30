@@ -332,66 +332,74 @@ export function RecruiterBillingPanel() {
         </ul>
       </Card>
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-          <h3 className="text-sm font-bold text-foreground">
-            Upgrade for premium recruiting tools
-          </h3>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Premium visibility, reports, contract tools, analytics, and
-          recruiting workflow features.
-        </p>
-      </div>
+      {!isAgencyIncluded && (
+        <>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+              <h3 className="text-sm font-bold text-foreground">
+                Upgrade for premium recruiting tools
+              </h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Premium visibility, reports, contract tools, analytics, and
+              recruiting workflow features.
+            </p>
+          </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {PLANS.map((p) => {
-          const isCurrent = isBillingActive && plan === p.key;
-          const disabled =
-            isPending || isCurrent || !canStartCheckout;
-          return (
-            <Card
-              key={p.key}
-              className={`p-4 border-border/60 ${isCurrent ? 'ring-2 ring-primary' : ''}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold text-foreground">
-                  {RECRUITER_PLAN_LABELS[p.key]}
-                </h3>
-                {isCurrent && <Badge variant="default">Current</Badge>}
-              </div>
-              <p className="text-xs text-muted-foreground mb-1">{p.price}</p>
-              <p className="text-[11px] text-muted-foreground mb-3">{p.tagline}</p>
-              <ul className="space-y-1 mb-3">
-                {p.perks.map((perk, i) => (
-                  <PerkItem key={i} perk={perk} />
-                ))}
-              </ul>
-              <Button
-                size="sm"
-                className="w-full"
-                variant={isCurrent ? 'outline' : 'default'}
-                disabled={disabled}
-                aria-busy={pendingPlan === p.key || undefined}
-                data-testid={`recruiter-plan-button-${p.key}`}
-                onClick={() => handleUpgrade(p.key)}
-              >
-                {pendingPlan === p.key ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    <span>Preparing…</span>
-                  </>
-                ) : isCurrent ? (
-                  'Active'
-                ) : (
-                  `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
-                )}
-              </Button>
-            </Card>
-          );
-        })}
-      </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {PLANS.map((p) => {
+              const isCurrent = isBillingActive && plan === p.key;
+              const disabled =
+                isPending ||
+                isCurrent ||
+                !canStartCheckout ||
+                entitlementBlocksCheckout;
+              return (
+                <Card
+                  key={p.key}
+                  className={`p-4 border-border/60 ${isCurrent ? 'ring-2 ring-primary' : ''}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-sm font-bold text-foreground">
+                      {RECRUITER_PLAN_LABELS[p.key]}
+                    </h3>
+                    {isCurrent && <Badge variant="default">Current</Badge>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1">{p.price}</p>
+                  <p className="text-[11px] text-muted-foreground mb-3">{p.tagline}</p>
+                  <ul className="space-y-1 mb-3">
+                    {p.perks.map((perk, i) => (
+                      <PerkItem key={i} perk={perk} />
+                    ))}
+                  </ul>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant={isCurrent ? 'outline' : 'default'}
+                    disabled={disabled}
+                    aria-busy={pendingPlan === p.key || undefined}
+                    data-testid={`recruiter-plan-button-${p.key}`}
+                    onClick={() => handleUpgrade(p.key)}
+                  >
+                    {pendingPlan === p.key ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        <span>Preparing…</span>
+                      </>
+                    ) : isCurrent ? (
+                      'Active'
+                    ) : (
+                      `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
+                    )}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+
 
       {showManageBilling && (
         <Button
