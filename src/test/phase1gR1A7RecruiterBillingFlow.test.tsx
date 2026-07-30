@@ -1168,7 +1168,7 @@ describe('Phase 1R-C-R1 — real useRecruiterBilling raw vs effective contract',
   ];
 
   // trial-allowlist: Stripe subscription status literals, not user-facing copy
-  const PREMIUM_AGENCY_STATUSES = ['active', 'trialing'] as const;
+  const PREMIUM_AGENCY_STATUSES = ['active', 'trialing'] as const; // trial-allowlist — Stripe status literal, not user-facing copy
 
   for (const status of PREMIUM_AGENCY_STATUSES) {
     for (const { agencyPlan, recruiterPlan } of AGENCY_TIER_MATRIX) {
