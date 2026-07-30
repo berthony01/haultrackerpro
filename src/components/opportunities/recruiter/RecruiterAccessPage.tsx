@@ -351,9 +351,14 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               loading={billingLoading}
               plan={plan}
               status={status}
-              isBillingActive={isBillingActive}
+              hasPremiumAccess={hasPremiumAccess}
+              isAgencyIncluded={isAgencyIncluded}
+              effectiveRecruiterPlan={effectiveRecruiterPlan}
+              effectiveAgencyPlan={effectiveAgencyPlan}
+              canUsePriorityPlacement={canUsePriorityPlacement}
               onManagePlan={() => scrollTo(billingRef)}
             />
+
           </div>
         </div>
       )}
