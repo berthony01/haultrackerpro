@@ -109,15 +109,27 @@ function intOrNull(v: unknown): number | null {
     : null;
 }
 
-/** Fail-closed array/singleton normalization. Never surfaces raw RPC data. */
-function firstRow(data: unknown): Record<string, unknown> | null {
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row || typeof row !== "object") return null;
-  return row as Record<string, unknown>;
+/**
+ * Fail-closed row normalization. Phase 1R-D2-B3-R1 removes the permissive
+ * "first row wins" behavior: an array is accepted ONLY when it holds exactly
+ * one element and that element is a plain object. Empty arrays, multi-row
+ * arrays, primitives, null, and unknown shapes all normalize to null so the
+ * caller sees `outcome: "unknown"` and fails closed. Raw RPC payloads are
+ * never surfaced.
+ */
+function singleRow(data: unknown): Record<string, unknown> | null {
+  if (Array.isArray(data)) {
+    if (data.length !== 1) return null;
+    const only = data[0];
+    if (!only || typeof only !== "object" || Array.isArray(only)) return null;
+    return only as Record<string, unknown>;
+  }
+  if (!data || typeof data !== "object") return null;
+  return data as Record<string, unknown>;
 }
 
 function normalizeClaimRow(data: unknown): BusinessCheckoutClaimRow {
-  const row = firstRow(data);
+  const row = singleRow(data);
   return {
     outcome: str(row?.outcome) ?? "unknown",
     reason: str(row?.reason),
@@ -133,7 +145,7 @@ function normalizeClaimRow(data: unknown): BusinessCheckoutClaimRow {
 }
 
 function normalizeSimpleRow(data: unknown): BusinessCheckoutSimpleRow {
-  const row = firstRow(data);
+  const row = singleRow(data);
   return {
     outcome: str(row?.outcome) ?? "unknown",
     reason: str(row?.reason),
@@ -235,11 +247,23 @@ function identityMatches(
   );
 }
 
-function epochSecondsFromIso(raw: string | null): number | null {
-  if (!raw) return null;
+/**
+ * Phase 1R-D2-B3-R1 — strict exact-integer epoch-second parsing.
+ *
+ * A stored checkout expiry MUST round-trip to a whole epoch second. Any value
+ * carrying sub-second precision (or an unparseable/non-finite timestamp) is
+ * rejected instead of being silently floored, because the floored value would
+ * then be compared for exact equality against Stripe's integer `expires_at`
+ * and could accept a session whose real expiry differs from the claim.
+ */
+function exactEpochSecondsFromIso(raw: unknown): number | null {
+  if (typeof raw !== "string" || raw === "") return null;
   const ms = new Date(raw).getTime();
-  if (!Number.isFinite(ms)) return null;
-  return Math.floor(ms / 1000);
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
+  if (ms % 1000 !== 0) return null;
+  const seconds = ms / 1000;
+  if (!Number.isFinite(seconds) || !Number.isInteger(seconds)) return null;
+  return seconds;
 }
 
 export async function beginBusinessCheckout(
@@ -290,7 +314,7 @@ export async function beginBusinessCheckout(
       if (row.claim_state === "ready") {
         const sessionId = row.stripe_checkout_session_id;
         if (!sessionId) return TRANSIENT;
-        const expiry = epochSecondsFromIso(row.checkout_expires_at);
+        const expiry = exactEpochSecondsFromIso(row.checkout_expires_at);
         if (expiry === null) return TRANSIENT;
         if (!(expiry > nowSeconds)) return TRANSIENT;
         return {
@@ -480,10 +504,8 @@ export function validateReadyBusinessCheckoutSession(
     if (meta[k] !== v) return INVALID;
   }
 
-  const claimExpiry = epochSecondsFromIso(
-    typeof input.claimExpiresAt === "string" ? input.claimExpiresAt : null,
-  );
-  if (claimExpiry === null || !Number.isInteger(claimExpiry)) return INVALID;
+  const claimExpiry = exactEpochSecondsFromIso(input.claimExpiresAt);
+  if (claimExpiry === null) return INVALID;
 
   const sessionExpiry = s.expiresAtSeconds;
   if (
