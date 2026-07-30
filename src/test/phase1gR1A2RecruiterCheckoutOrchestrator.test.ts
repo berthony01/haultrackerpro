@@ -848,67 +848,115 @@ describe("Phase 1G-R1A2 — recruiter checkout orchestrator", () => {
     });
   });
 
-  describe("Phase 1R-D1 — cross-context business guard precheck (source contract)", () => {
+  describe("Phase 1R-D2-B3 — atomic business checkout edge contract", () => {
     const edgeSrc = readFileSync(
       resolve(__dirname, "../../supabase/functions/create-recruiter-checkout/index.ts"),
       "utf8",
     );
 
-    it("28. imports the pure cross-context guard module", () => {
+    /** Source of `function recruiterBlockedResult`, by brace counting. */
+    const blockedResultSrc = (() => {
+      const start = edgeSrc.indexOf("function recruiterBlockedResult(");
+      const open = edgeSrc.indexOf("{", start);
+      let depth = 0;
+      for (let i = open; i < edgeSrc.length; i += 1) {
+        if (edgeSrc[i] === "{") depth += 1;
+        else if (edgeSrc[i] === "}") {
+          depth -= 1;
+          if (depth === 0) return edgeSrc.slice(start, i + 1);
+        }
+      }
+      throw new Error("recruiterBlockedResult not found");
+    })();
+
+    it("28. imports the shared atomic claim coordinator", () => {
       expect(edgeSrc).toMatch(
-        /from\s+"\.\.\/_shared\/business-checkout-guard\.ts"/,
+        /from\s+"\.\.\/_shared\/business-checkout-claim\.ts"/,
       );
-      expect(edgeSrc).toContain("evaluateRecruiterCheckoutCrossContext");
+      for (const symbol of [
+        "createBusinessCheckoutClaimStore",
+        "beginBusinessCheckout",
+        "completeBusinessCheckout",
+        "releaseBusinessCheckout",
+      ]) {
+        expect(edgeSrc).toContain(symbol);
+      }
     });
 
-    it("29. evaluates the guard BEFORE runRecruiterCheckout, Stripe, and any intent RPC", () => {
-      const guardIdx = edgeSrc.indexOf("evaluateRecruiterCheckoutCrossContext(");
-      const orchestratorIdx = edgeSrc.indexOf("await runRecruiterCheckout(");
-      const stripeIdx = edgeSrc.indexOf("new Stripe(stripeKey");
-      const depsIdx = edgeSrc.indexOf("buildDeps(stripe");
-      expect(guardIdx).toBeGreaterThan(-1);
-      expect(orchestratorIdx).toBeGreaterThan(-1);
-      expect(stripeIdx).toBeGreaterThan(-1);
-      expect(depsIdx).toBeGreaterThan(-1);
-      expect(guardIdx).toBeLessThan(stripeIdx);
-      expect(guardIdx).toBeLessThan(depsIdx);
-      expect(guardIdx).toBeLessThan(orchestratorIdx);
+    it("29. retired the Phase 1R-D1 guard and its cross-context reads", () => {
+      expect(edgeSrc).not.toContain("business-checkout-guard.ts");
+      expect(edgeSrc).not.toContain("evaluateRecruiterCheckoutCrossContext");
+      // The PostgreSQL claim state machine is now the only cross-context
+      // authority; the edge performs no opposing-context reads of its own.
+      expect(edgeSrc).not.toContain('from("agency_members")');
+      expect(edgeSrc).not.toContain('from("agency_entitlements")');
     });
 
-    it("30. reads owner memberships and entitlements with the exact scoped columns", () => {
-      expect(edgeSrc).toContain('from("agency_members")');
-      expect(edgeSrc).toContain('.eq("role", "agency_owner")');
-      expect(edgeSrc).toContain('.eq("status", "active")');
-      expect(edgeSrc).toContain('from("agency_entitlements")');
-      expect(edgeSrc).toContain('.select("agency_id, plan_key, status, source")');
+    it("30. claims atomically after validation and before Stripe, deps, orchestrator, and intent RPC", () => {
+      const beginIdx = edgeSrc.indexOf("await beginBusinessCheckout(");
+      expect(beginIdx).toBeGreaterThan(-1);
+      for (const before of [
+        "if (!isRecruiterPlan(plan))",
+        '.from("recruiter_profiles")',
+        'recruiter.verification_status !== "approved"',
+        "if (!isAllowedRecruiterOrigin(reqOrigin))",
+      ]) {
+        const idx = edgeSrc.indexOf(before);
+        expect(idx).toBeGreaterThan(-1);
+        expect(idx).toBeLessThan(beginIdx);
+      }
+      for (const after of [
+        "new Stripe(stripeKey",
+        "buildDeps(stripe",
+        "await runRecruiterCheckout(",
+        "claim_recruiter_checkout_intent",
+      ]) {
+        const idx = edgeSrc.indexOf(after);
+        expect(idx).toBeGreaterThan(-1);
+        expect(idx).toBeGreaterThan(beginIdx);
+      }
     });
 
-    it("31. returns 503 transient_error on either cross-context read failure", () => {
-      const guardStart = edgeSrc.indexOf('from("agency_members")');
-      const guardEnd = edgeSrc.indexOf("new Stripe(stripeKey");
-      const block = edgeSrc.slice(guardStart, guardEnd);
-      const transientHits = block.match(/code:\s*"transient_error"/g) ?? [];
-      expect(transientHits.length).toBeGreaterThanOrEqual(2);
-      expect(block).toContain("status: 503");
+    it("31. supplies the exact server-derived claim identity", () => {
+      const beginIdx = edgeSrc.indexOf("await beginBusinessCheckout(");
+      const claimInput = edgeSrc.slice(beginIdx, beginIdx + 400);
+      expect(claimInput).toContain("userId: user.id");
+      expect(claimInput).toContain('context: "recruiter"');
+      expect(claimInput).toContain("subjectId: recruiter.id");
+      expect(claimInput).toContain("planKey: plan");
     });
 
-    it("32. surfaces only the three stable cross-context codes", () => {
-      expect(edgeSrc).toContain('"agency_entitlement_exists"');
-      expect(edgeSrc).toContain('"agency_billing_requires_management"');
-      expect(edgeSrc).toContain('"opposing_entitlement_unknown"');
+    it("32. maps every block reason to HTTP 409 and reserves 403 for not_owner", () => {
+      for (const code of [
+        "agency_entitlement_exists",
+        "agency_billing_requires_management",
+        "opposing_entitlement_unknown",
+        "in_progress",
+      ]) {
+        expect(blockedResultSrc).toContain(`code: "${code}"`);
+      }
+      expect(blockedResultSrc).not.toContain("status: 403");
+      const notOwnerStart = edgeSrc.indexOf('if (begin.kind === "not_owner")');
+      const notOwnerEnd = edgeSrc.indexOf('if (begin.kind === "blocked")');
+      expect(notOwnerStart).toBeGreaterThan(-1);
+      expect(notOwnerEnd).toBeGreaterThan(notOwnerStart);
+      const notOwnerBranch = edgeSrc.slice(notOwnerStart, notOwnerEnd);
+      expect(notOwnerBranch).toContain("status: 403");
+      expect(notOwnerBranch).toContain('code: "not_owner"');
     });
 
-    it("33. the guard blocks without any dependency work (direct pure behaviour)", () => {
-      const blockedDecision = evaluateRecruiterCheckoutCrossContext({
-        hasRow: true,
-        planKey: "agency_team",
-        status: "active",
-        source: "stripe",
-        hasActiveOwnerMembership: true,
-      });
-      expect(blockedDecision.allowed).toBe(false);
-      // The pure guard performs no I/O at all — it has no injected deps.
-      expect(evaluateRecruiterCheckoutCrossContext.length).toBe(1);
+    it("33. revalidates the exact stored session in the ready branch without the orchestrator", () => {
+      const readyStart = edgeSrc.indexOf('if (begin.kind === "ready")');
+      const readyEnd = edgeSrc.indexOf('// begin.kind === "acquired"');
+      expect(readyStart).toBeGreaterThan(-1);
+      expect(readyEnd).toBeGreaterThan(readyStart);
+      const readyBranch = edgeSrc.slice(readyStart, readyEnd);
+      expect(readyBranch).toContain(
+        "stripe.checkout.sessions.retrieve(begin.sessionId)",
+      );
+      expect(readyBranch).toContain("validateReadyBusinessCheckoutSession({");
+      expect(readyBranch).toContain("expectedSessionId: begin.sessionId");
+      expect(readyBranch).not.toContain("runRecruiterCheckout(");
     });
 
     it("34. blocked codes are part of the recruiter public code union + client messages", () => {
