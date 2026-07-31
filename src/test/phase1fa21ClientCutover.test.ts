@@ -116,6 +116,10 @@ vi.mock('@/integrations/supabase/client', () => {
     if (fn === 'get_my_recruiter_profile_safe') {
       return Promise.resolve({ data: safeProfileRpcRows, error: safeProfileRpcError });
     }
+    if (fn === 'persist_my_recruiter_profile') {
+      return Promise.resolve({ data: persistProfileRpcRows, error: persistProfileRpcError });
+    }
+
     const err = rpcNextError;
     const data = rpcNextData;
     rpcNextError = null;
