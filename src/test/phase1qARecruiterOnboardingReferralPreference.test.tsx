@@ -734,7 +734,191 @@ describe('Phase 1Q-A — Recruiter onboarding referral preference (component)', 
     };
     expect(call.details.payment_trigger).toBeNull();
   });
+
+  // -------------------------------------------------------------------
+  // Phase 1R-D2-B6-A-R3 — deterministic post-save transition.
+  // -------------------------------------------------------------------
+
+  it('R3 success: profile save → fresh refetch → referral save → invalidate ["user-capabilities"] → onBack exactly once', async () => {
+    const freshProfile = makeProfile({ id: 'rp-fresh' });
+    const refetch = vi.fn(async () => freshProfile);
+    const { saveMock } = installProfileHook({
+      profile: makeProfile(),
+      refetchProfile: refetch,
+    });
+    const { mutateAsync } = installReferralHook({ settings: null });
+    const { invalidateQueries } = installQueryClient();
+    const onBack = vi.fn();
+
+    render(<RecruiterOnboarding onBack={onBack} />);
+    await submit();
+
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries.mock.calls[0][0]).toEqual({
+      queryKey: ['user-capabilities'],
+    });
+
+    // Exact ordering.
+    const order = [
+      saveMock.mock.invocationCallOrder[0],
+      refetch.mock.invocationCallOrder[0],
+      mutateAsync.mock.invocationCallOrder[0],
+      invalidateQueries.mock.invocationCallOrder[0],
+      onBack.mock.invocationCallOrder[0],
+    ];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it('R3 guard: submit stays disabled during a pending capability refresh and a second click produces no second profile/referral write', async () => {
+    let releaseInvalidate: (() => void) | null = null;
+    const deferred = new Promise<void>((resolve) => {
+      releaseInvalidate = resolve;
+    });
+
+    const freshProfile = makeProfile({ id: 'rp-fresh' });
+    const { saveMock } = installProfileHook({
+      profile: makeProfile(),
+      refetchProfile: vi.fn(async () => freshProfile),
+    });
+    const { mutateAsync } = installReferralHook({ settings: null });
+    const { invalidateQueries } = installQueryClient(async () => {
+      await deferred;
+    });
+    const onBack = vi.fn();
+
+    render(<RecruiterOnboarding onBack={onBack} />);
+    const btn = await submit();
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(1));
+    // Still transitioning: button disabled, navigation not yet performed.
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(true));
+    expect(onBack).not.toHaveBeenCalled();
+
+    // Second click while the guard is active.
+    fireEvent.click(btn);
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+
+    releaseInvalidate!();
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+  });
+
+  it('R3 referral-save failure: exact partial warning, capabilities still refreshed, onBack once', async () => {
+    installProfileHook({ profile: makeProfile() });
+    const impl = vi.fn(async () => {
+      throw new Error('boom');
+    });
+    installReferralHook({ settings: null, saveDecisionImpl: impl });
+    const { invalidateQueries } = installQueryClient();
+    const onBack = vi.fn();
+
+    render(<RecruiterOnboarding onBack={onBack} />);
+    fireEvent.click(screen.getByTestId('referral-decision-no'));
+    await submit();
+
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+    expect(toast.error).toHaveBeenCalledWith(PARTIAL_WARNING);
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries.mock.calls[0][0]).toEqual({
+      queryKey: ['user-capabilities'],
+    });
+  });
+
+  it('R3 fresh-refetch failure: partial warning, capabilities still refreshed, onBack once', async () => {
+    const refetch = vi.fn(async () => {
+      throw new Error('network');
+    });
+    installProfileHook({
+      profile: makeProfile({ id: 'rp-stale' }),
+      refetchProfile: refetch,
+    });
+    const { mutateAsync } = installReferralHook({ settings: null });
+    const { invalidateQueries } = installQueryClient();
+    const onBack = vi.fn();
+
+    render(<RecruiterOnboarding onBack={onBack} />);
+    await submit();
+
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+    expect(toast.error).toHaveBeenCalledWith(PARTIAL_WARNING);
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+  });
+
+  it('R3 capability-refresh failure never traps the user: onBack still called once', async () => {
+    installProfileHook({ profile: makeProfile() });
+    installReferralHook({ settings: null });
+    const { invalidateQueries } = installQueryClient(async () => {
+      throw new Error('cache exploded');
+    });
+    const onBack = vi.fn();
+
+    render(<RecruiterOnboarding onBack={onBack} />);
+    await submit();
+
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+  });
+
+  it('R3 ordinary profile-save failure: no capability refresh, no onBack, submit becomes available again', async () => {
+    const saveMock = vi.fn((_p, cbs?: { onError?: (e: Error) => void }) => {
+      cbs?.onError?.(new Error('validation exploded'));
+    });
+    installProfileHook({ profile: makeProfile(), saveMock });
+    installReferralHook({ settings: null });
+    const { invalidateQueries } = installQueryClient();
+    const onBack = vi.fn();
+
+    render(<RecruiterOnboarding onBack={onBack} />);
+    const btn = await submit();
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('validation exploded'),
+    );
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
+
+    // Guard released: a subsequent click is accepted again.
+    fireEvent.click(btn);
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('R3 rejected-resubmit RPC failure: no capability refresh, no onBack, submit becomes available again', async () => {
+    const rejected = makeProfile({ verification_status: 'rejected' });
+    const refetch = vi.fn(async () => rejected);
+    const { saveMock } = installProfileHook({
+      profile: rejected,
+      refetchProfile: refetch,
+    });
+    const { mutateAsync } = installReferralHook({ settings: null });
+    const { invalidateQueries } = installQueryClient();
+    const onBack = vi.fn();
+
+    supabaseState.rpcResult = { data: null, error: { message: 'rpc failed' } };
+
+    render(<RecruiterOnboarding onBack={onBack} />);
+    const btn = await submit();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('rpc failed'));
+    expect(refetch).not.toHaveBeenCalled();
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(invalidateQueries).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
+
+    fireEvent.click(btn);
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+  });
 });
+
 
 // ---------------------------------------------------------------------------
 // Real-hook coverage — exercise the ACTUAL `useRecruiterReferralSettings`
