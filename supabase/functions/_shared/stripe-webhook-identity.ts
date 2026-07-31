@@ -79,7 +79,15 @@ export type RejectReason =
   | "target_relationship_mismatch"
   | "cross_context_customer_collision"
   | "metadata_context_conflict"
-  | "unknown_price_context";
+  | "unknown_price_context"
+  // Phase 1R-D2-B4 — stable reasons produced by the webhook-side opposing
+  // business reconciliation guard. validateWebhookIdentity itself never
+  // returns these; they are declared here so the webhook can preserve the
+  // existing { ok: false, decision } result shape.
+  | "business_owner_unresolved"
+  | "opposing_business_subscription_active"
+  | "opposing_business_state_unknown";
+
 
 export type IdentityDecision =
   | {

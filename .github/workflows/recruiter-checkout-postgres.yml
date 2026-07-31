@@ -19,6 +19,10 @@ on:
       - 'vitest.business-checkout-postgres.config.ts'
       - 'supabase/functions/_shared/business-checkout-claim.ts'
       - 'src/test/phase1rD2B3BusinessCheckoutIntegration.test.ts'
+      - 'supabase/functions/_shared/business-subscription-reconciliation.ts'
+      - 'supabase/functions/stripe-webhook/index.ts'
+      - 'supabase/functions/_shared/stripe-webhook-identity.ts'
+      - 'src/test/phase1rD2B4BusinessSubscriptionWebhook.test.ts'
       - 'supabase/functions/_shared/recruiter-checkout.ts'
       - 'supabase/functions/create-recruiter-checkout/index.ts'
       - 'supabase/functions/create-agency-checkout/index.ts'
@@ -53,6 +57,10 @@ on:
       - 'vitest.business-checkout-postgres.config.ts'
       - 'supabase/functions/_shared/business-checkout-claim.ts'
       - 'src/test/phase1rD2B3BusinessCheckoutIntegration.test.ts'
+      - 'supabase/functions/_shared/business-subscription-reconciliation.ts'
+      - 'supabase/functions/stripe-webhook/index.ts'
+      - 'supabase/functions/_shared/stripe-webhook-identity.ts'
+      - 'src/test/phase1rD2B4BusinessSubscriptionWebhook.test.ts'
       - 'supabase/functions/_shared/recruiter-checkout.ts'
       - 'supabase/functions/create-recruiter-checkout/index.ts'
       - 'supabase/functions/create-agency-checkout/index.ts'
@@ -178,6 +186,9 @@ jobs:
 
       - name: Run DEF-04 identity validation
         run: bunx vitest run src/test/phase1cWebhookIdentityValidator.test.ts
+
+      - name: Run Phase 1R-D2-B4 business webhook reconciliation
+        run: bunx vitest run src/test/phase1rD2B4BusinessSubscriptionWebhook.test.ts
 
       - name: Run DEF-23 webhook idempotency
         run: bunx vitest run src/test/phase1cWebhookIdempotencyRetry.test.ts src/test/phase1c2WebhookIdempotencyStateMachine.test.ts
