@@ -262,11 +262,26 @@ async function submit() {
 const PARTIAL_WARNING =
   'Recruiter profile saved, but your referral preference could not be saved. Please retry or update it later in Driver Referrals.';
 
+/**
+ * Phase 1R-D2-B6-A-R3 — install a component-scoped query client whose only
+ * used surface is `invalidateQueries`. Returns the spy so tests can assert
+ * the exact `['user-capabilities']` key and call ordering.
+ */
+function installQueryClient(
+  impl: (...args: unknown[]) => unknown = async () => undefined,
+) {
+  const invalidateQueries = vi.fn(impl);
+  queryClientOverride.current = { invalidateQueries };
+  return { invalidateQueries };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetSupabaseState();
+  queryClientOverride.current = null;
   cleanup();
 });
+
 
 describe('Phase 1Q-A — Recruiter onboarding referral preference (component)', () => {
   it('renders exact primary question, all three choices, defaults to Decide later when no settings row exists', () => {
