@@ -698,6 +698,23 @@ describe('Phase 1R-D2-B4 — contract vocabulary', () => {
     expect([...TERMINAL_STATUSES].sort()).toEqual(['canceled', 'incomplete_expired', 'unpaid']);
   });
 
+  it('matches the canonical revoke writer, which sets recruiter plan none', () => {
+    // Phase 1R-D2-B4-R2 compatibility contract, proven statically: the webhook
+    // revoke writer stamps recruiter_billing_profiles.plan = "none" alongside a
+    // terminal status, so the reconciliation guard must recognize plan "none" as
+    // the canonical non-paid recruiter plan rather than an arbitrary unknown.
+    const revokeStart = webhookSource.indexOf('recruiter_billing_profiles").update({');
+    expect(revokeStart).toBeGreaterThan(-1);
+    const revokeBlock = webhookSource.slice(revokeStart, revokeStart + 200);
+    expect(revokeBlock).toContain('plan: "none"');
+    expect(revokeBlock).toContain('status:');
+
+    expect(reconciliationCode).toContain('if (plan === "none")');
+    expect(reconciliationCode).toContain(
+      'return NON_BILLING_RECRUITER_STATUSES.has(status) ? "allow" : "unknown";',
+    );
+  });
+
   it('contains no focused, skipped, or deferred tests', () => {
     const dot = '.';
     for (const marker of [
