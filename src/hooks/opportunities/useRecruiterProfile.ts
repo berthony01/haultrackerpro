@@ -79,6 +79,36 @@ function normalize(v: unknown): string {
   return typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim();
 }
 
+/**
+ * Phase 1R-D2-B6-A-R2 — ordinary scalar fields accepted by the
+ * `persist_my_recruiter_profile` SECURITY DEFINER RPC. Identity, status,
+ * moderation, timestamp, and posting-consent columns are deliberately
+ * absent: the function derives the caller from auth.uid() and never
+ * accepts or writes protected fields.
+ */
+const SAFE_PERSIST_SCALAR_FIELDS = [
+  'recruiter_name',
+  'recruiter_email',
+  'recruiter_phone',
+  'company_name',
+  'company_type',
+  'company_website',
+  'company_phone',
+  'company_address',
+  'company_city',
+  'company_state',
+  'dot_number',
+  'mc_number',
+] as const;
+
+const SAFE_PERSIST_LIST_FIELDS = [
+  'hiring_states',
+  'equipment_types',
+  'driver_types_hired',
+] as const;
+
+
+
 
 export function useRecruiterProfile() {
   const { user } = useAuth();
@@ -239,12 +269,58 @@ export function useRecruiterProfile() {
         .select('*');
       if (error) throw error;
       const rows = (updatedRows ?? []) as Array<Record<string, unknown>>;
+      if (rows.length === 0) {
+        // Phase 1R-D2-B6-A-R2 — recruiters own an UPDATE policy but have no
+        // direct SELECT policy, so PostgREST can legitimately return zero
+        // rows for a successful write. Fall back exactly once to the
+        // caller-bound SECURITY DEFINER persistence RPC, which derives
+        // identity from auth.uid() and returns a narrow verification row.
+        const current = (profileQuery.data ?? null) as Record<string, unknown> | null;
+        const args: Record<string, unknown> = {};
+        for (const key of SAFE_PERSIST_SCALAR_FIELDS) {
+          args[`_${key}`] = Object.prototype.hasOwnProperty.call(safe, key)
+            ? (safe[key] ?? null)
+            : (current?.[key] ?? null);
+        }
+        for (const key of SAFE_PERSIST_LIST_FIELDS) {
+          const submitted = Object.prototype.hasOwnProperty.call(safe, key)
+            ? safe[key]
+            : undefined;
+          const fallback = current?.[key];
+          args[`_${key}`] = Array.isArray(submitted)
+            ? submitted
+            : Array.isArray(fallback)
+              ? fallback
+              : [];
+        }
+
+        const { data: persistedRows, error: persistErr } = await (supabase as unknown as {
+          rpc: (
+            fn: string,
+            a: Record<string, unknown>,
+          ) => Promise<{ data: Array<Record<string, unknown>> | null; error: Error | null }>;
+        }).rpc('persist_my_recruiter_profile', args);
+        if (persistErr) throw persistErr;
+        const persisted = (persistedRows ?? []) as Array<Record<string, unknown>>;
+        if (persisted.length !== 1) {
+          throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
+        }
+        const persistedRow = persisted[0];
+        const persistedId = persistedRow?.id;
+        if (typeof persistedId !== 'string' || !persistedId) {
+          throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
+        }
+        verifyRow(persistedRow);
+        knownProfileRef.current = { userId: user.id, profileId: persistedId };
+        return;
+      }
       if (rows.length !== 1) {
         throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
       }
       verifyRow(rows[0]);
       return;
     }
+
     const { data: inserted, error } = await supabase
       .from('recruiter_profiles')
       .insert({ ...(safe as RecruiterProfileUpsert), user_id: user.id } as never)

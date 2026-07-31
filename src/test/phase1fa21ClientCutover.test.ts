@@ -42,9 +42,16 @@ let insertReturnsEmpty = false;
 // RPC (get_my_recruiter_profile_safe).
 let safeProfileRpcRows: Array<{ id: string }> | null = [];
 let safeProfileRpcError: Error | null = null;
+// Phase 1R-D2-B6-A-R2: allow tests to simulate a successful UPDATE that
+// returns zero rows (recruiters have UPDATE but no direct SELECT policy),
+// plus configurable data/error for the safe persistence RPC.
+let updateReturnsZeroRows = false;
+let persistProfileRpcRows: Array<Record<string, unknown>> | null = [];
+let persistProfileRpcError: Error | null = null;
+
 
 // Controls whether useQuery reports an existing profile.
-let currentProfile: { id: string } | null = null;
+let currentProfile: (Record<string, unknown> & { id: string }) | null = null;
 
 // Phase 1F-A.2.1A-R4: mutable authenticated identity so tests can simulate
 // a user switch on the same hook lifecycle. `vi.hoisted` is required
@@ -62,8 +69,11 @@ vi.mock('@/integrations/supabase/client', () => {
         // Phase 1P-A1: .update().eq().eq().select('*') returns the affected
         // rows so the hook can verify persistence. Echo the payload as the
         // single affected row unless an error is queued.
-        const data = err ? null : [{ ...payload }];
+        // Phase 1R-D2-B6-A-R2: tests may force a zero-row (no SELECT policy)
+        // successful UPDATE response.
+        const data = err ? null : updateReturnsZeroRows ? [] : [{ ...payload }];
         return Promise.resolve({ data, error: err });
+
       };
       const chain = {
         eq(col: string, v: unknown) {
@@ -106,6 +116,10 @@ vi.mock('@/integrations/supabase/client', () => {
     if (fn === 'get_my_recruiter_profile_safe') {
       return Promise.resolve({ data: safeProfileRpcRows, error: safeProfileRpcError });
     }
+    if (fn === 'persist_my_recruiter_profile') {
+      return Promise.resolve({ data: persistProfileRpcRows, error: persistProfileRpcError });
+    }
+
     const err = rpcNextError;
     const data = rpcNextData;
     rpcNextError = null;
@@ -186,6 +200,10 @@ beforeEach(() => {
   insertReturnsEmpty = false;
   safeProfileRpcRows = [];
   safeProfileRpcError = null;
+  updateReturnsZeroRows = false;
+  persistProfileRpcRows = [];
+  persistProfileRpcError = null;
+
   authState.userId = 'client-user-1';
   resetRefStore();
 });
@@ -481,4 +499,239 @@ describe('Phase 1F-A.2.1A-R1 client cutover', () => {
     // No success invalidation.
     expect(invalidateCalls.length).toBe(0);
   });
+
+  // -------------------------------------------------------------------------
+  // Phase 1R-D2-B6-A-R2 — safe persistence fallback when the caller-owned
+  // UPDATE succeeds but PostgREST returns zero rows (no recruiter SELECT
+  // policy exists by design).
+  // -------------------------------------------------------------------------
+
+  it('46. existing profile + zero-row UPDATE → persist_my_recruiter_profile fallback with only ordinary args, before terms acceptance', async () => {
+    currentProfile = {
+      id: 'existing-rp-zero',
+      recruiter_name: 'Loaded Name',
+      recruiter_email: 'loaded@x.example',
+      recruiter_phone: '555-0000',
+      company_name: 'Loaded Co',
+      company_type: 'carrier',
+      company_website: 'https://loaded.example',
+      company_phone: '555-1111',
+      company_address: '1 Loaded St',
+      company_city: 'Loadville',
+      company_state: 'TX',
+      dot_number: '9999999',
+      mc_number: 'MC-LOADED',
+      hiring_states: ['TX', 'OK'],
+      equipment_types: ['dry_van'],
+      driver_types_hired: ['company_driver'],
+    };
+    updateReturnsZeroRows = true;
+    persistProfileRpcRows = [
+      {
+        id: 'existing-rp-zero',
+        recruiter_name: 'Alice',
+        company_name: 'Acme',
+        recruiter_email: 'a@x.example',
+        company_type: 'carrier',
+        dot_number: '1234567',
+        mc_number: 'MC-LOADED',
+      },
+    ];
+
+    const hook = useRecruiterProfile();
+    await hook.saveRecruiterProfile.mutateAsync({
+      ...baseData,
+      company_website: null,
+    } as never);
+
+    // Direct UPDATE still attempted exactly once; fallback RPC exactly once.
+    expect(updateCalls.length).toBe(1);
+    expect(insertCalls.length).toBe(0);
+    const persistIdx = rpcCalls.findIndex((c) => c.fn === 'persist_my_recruiter_profile');
+    const termsIdx = rpcCalls.findIndex((c) => c.fn === 'accept_recruiter_posting_terms');
+    expect(rpcCalls.filter((c) => c.fn === 'persist_my_recruiter_profile').length).toBe(1);
+    expect(persistIdx).toBeGreaterThan(-1);
+    // Safe persistence must occur BEFORE terms acceptance.
+    expect(termsIdx).toBeGreaterThan(persistIdx);
+
+    const args = rpcCalls[persistIdx].args;
+    // Exactly the 15 ordinary arguments — no identity or protected fields.
+    expect(Object.keys(args).sort()).toEqual(
+      [
+        '_company_address',
+        '_company_city',
+        '_company_name',
+        '_company_phone',
+        '_company_state',
+        '_company_type',
+        '_company_website',
+        '_dot_number',
+        '_driver_types_hired',
+        '_equipment_types',
+        '_hiring_states',
+        '_mc_number',
+        '_recruiter_email',
+        '_recruiter_name',
+        '_recruiter_phone',
+      ].sort(),
+    );
+    for (const forbidden of [
+      'id',
+      '_id',
+      'user_id',
+      '_user_id',
+      'profile_id',
+      '_profile_id',
+      '_status',
+      '_verification_status',
+      '_verified_at',
+      '_verified_by',
+      '_admin_notes',
+      '_created_at',
+      '_updated_at',
+      '_posting_terms_accepted_at',
+      '_posting_terms_version',
+      '_legacy_terms_grandfathered_at',
+    ]) {
+      expect(args).not.toHaveProperty(forbidden);
+    }
+
+    // Submitted values win, including an explicit null clear.
+    expect(args._recruiter_name).toBe('Alice');
+    expect(args._recruiter_email).toBe('a@x.example');
+    expect(args._company_name).toBe('Acme');
+    expect(args._dot_number).toBe('1234567');
+    expect(args._company_website).toBeNull();
+
+    // Absent fields preserve the currently loaded safe profile values.
+    expect(args._recruiter_phone).toBe('555-0000');
+    expect(args._company_type).toBe('carrier');
+    expect(args._company_phone).toBe('555-1111');
+    expect(args._company_address).toBe('1 Loaded St');
+    expect(args._company_city).toBe('Loadville');
+    expect(args._company_state).toBe('TX');
+    expect(args._mc_number).toBe('MC-LOADED');
+    expect(args._hiring_states).toEqual(['TX', 'OK']);
+    expect(args._equipment_types).toEqual(['dry_van']);
+    expect(args._driver_types_hired).toEqual(['company_driver']);
+
+    // Both query keys invalidate only after complete success.
+    const keys = invalidateCalls
+      .map((c) => (c[0] as { queryKey?: unknown[] })?.queryKey?.[0])
+      .filter(Boolean);
+    expect(keys).toContain('recruiter_profile');
+    expect(keys).toContain('user-role-recruiter-check');
+  });
+
+  it('47. fallback RPC error or malformed return aborts before terms acceptance with no success invalidation', async () => {
+    // A. RPC error.
+    currentProfile = { id: 'existing-rp-zero-a' };
+    updateReturnsZeroRows = true;
+    persistProfileRpcError = new Error('persist boom');
+    const hookA = useRecruiterProfile();
+    await expect(
+      hookA.saveRecruiterProfile.mutateAsync({ ...baseData } as never),
+    ).rejects.toThrow(/persist boom/);
+    expect(rpcCalls.some((c) => c.fn === 'accept_recruiter_posting_terms')).toBe(false);
+    expect(invalidateCalls.length).toBe(0);
+
+    // B. Malformed return (zero rows).
+    rpcCalls.length = 0;
+    invalidateCalls.length = 0;
+    resetRefStore();
+    persistProfileRpcError = null;
+    persistProfileRpcRows = [];
+    updateReturnsZeroRows = true;
+    currentProfile = { id: 'existing-rp-zero-b' };
+    const hookB = useRecruiterProfile();
+    await expect(
+      hookB.saveRecruiterProfile.mutateAsync({ ...baseData } as never),
+    ).rejects.toThrow(/Your recruiter profile changes were not saved\./);
+    expect(rpcCalls.some((c) => c.fn === 'accept_recruiter_posting_terms')).toBe(false);
+    expect(invalidateCalls.length).toBe(0);
+
+    // C. Malformed return (row missing a usable id).
+    rpcCalls.length = 0;
+    invalidateCalls.length = 0;
+    resetRefStore();
+    persistProfileRpcRows = [{ recruiter_name: 'Alice' }];
+    updateReturnsZeroRows = true;
+    currentProfile = { id: 'existing-rp-zero-c' };
+    const hookC = useRecruiterProfile();
+    await expect(
+      hookC.saveRecruiterProfile.mutateAsync({ ...baseData } as never),
+    ).rejects.toThrow(/Your recruiter profile changes were not saved\./);
+    expect(rpcCalls.some((c) => c.fn === 'accept_recruiter_posting_terms')).toBe(false);
+    expect(invalidateCalls.length).toBe(0);
+
+    // D. Field mismatch in the verified read-back.
+    rpcCalls.length = 0;
+    invalidateCalls.length = 0;
+    resetRefStore();
+    persistProfileRpcRows = [{ id: 'existing-rp-zero-d', recruiter_name: 'WRONG' }];
+    updateReturnsZeroRows = true;
+    currentProfile = { id: 'existing-rp-zero-d' };
+    const hookD = useRecruiterProfile();
+    await expect(
+      hookD.saveRecruiterProfile.mutateAsync({ ...baseData } as never),
+    ).rejects.toThrow(/Your recruiter profile changes were not saved\./);
+    expect(rpcCalls.some((c) => c.fn === 'accept_recruiter_posting_terms')).toBe(false);
+    expect(invalidateCalls.length).toBe(0);
+  });
+
+  it('48. persist_my_recruiter_profile migration is caller-bound, least-privilege, and adds no policy', () => {
+    const sql = readFileSync(
+      resolve(
+        __dirname,
+        '../../supabase/migrations/20260731203000_phase1r_d2_b6_a_r2_recruiter_profile_safe_persistence.sql',
+      ),
+      'utf8',
+    );
+    expect(sql).toMatch(/SECURITY DEFINER/);
+    expect(sql).toMatch(/SET search_path = public/);
+    // Identity derives only from auth.uid().
+    expect(sql).toMatch(/auth\.uid\(\)/);
+    // No identity arguments in the parameter list.
+    const params = sql.slice(
+      sql.indexOf('persist_my_recruiter_profile('),
+      sql.indexOf('RETURNS TABLE'),
+    );
+    expect(params).not.toMatch(/_user_id/);
+    expect(params).not.toMatch(/_profile_id\s+uuid/);
+    for (const protectedField of [
+      '_status',
+      '_verification_status',
+      '_verified_at',
+      '_verified_by',
+      '_admin_notes',
+      '_created_at',
+      '_updated_at',
+      '_posting_terms_accepted_at',
+      '_posting_terms_version',
+      '_legacy_terms_grandfathered_at',
+    ]) {
+      expect(params).not.toContain(protectedField);
+    }
+    // Protected columns never appear in the UPDATE SET list.
+    const updateSet = sql.slice(sql.indexOf('UPDATE public.recruiter_profiles'), sql.indexOf('GET DIAGNOSTICS _affected = ROW_COUNT;\n  END IF;'));
+    for (const protectedCol of [
+      'verification_status',
+      'verified_at',
+      'verified_by',
+      'admin_notes',
+      'posting_terms_accepted_at',
+      'posting_terms_version',
+      'legacy_terms_grandfathered_at',
+    ]) {
+      expect(updateSet).not.toMatch(new RegExp(`\\n\\s+${protectedCol}\\s+=`));
+    }
+    // Least-privilege EXECUTE.
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION[\s\S]*FROM PUBLIC;/);
+    expect(sql).toMatch(/REVOKE EXECUTE ON FUNCTION[\s\S]*FROM anon;/);
+    expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION[\s\S]*TO authenticated, service_role;/);
+    // No RLS policy change.
+    expect(sql).not.toMatch(/CREATE POLICY/i);
+    expect(sql).not.toMatch(/ALTER POLICY/i);
+  });
 });
+
