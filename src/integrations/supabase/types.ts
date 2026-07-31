@@ -724,6 +724,57 @@ export type Database = {
         }
         Relationships: []
       }
+      business_checkout_claims: {
+        Row: {
+          checkout_expires_at: string | null
+          claim_token: string | null
+          context: string
+          created_at: string
+          generation: number
+          last_error_code: string | null
+          lease_expires_at: string | null
+          plan_key: string
+          request_key: string
+          state: string
+          stripe_checkout_session_id: string | null
+          subject_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checkout_expires_at?: string | null
+          claim_token?: string | null
+          context: string
+          created_at?: string
+          generation?: number
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          plan_key: string
+          request_key: string
+          state: string
+          stripe_checkout_session_id?: string | null
+          subject_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checkout_expires_at?: string | null
+          claim_token?: string | null
+          context?: string
+          created_at?: string
+          generation?: number
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          plan_key?: string
+          request_key?: string
+          state?: string
+          stripe_checkout_session_id?: string | null
+          subject_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       contract_audit_log: {
         Row: {
           action: string
@@ -3008,6 +3059,68 @@ export type Database = {
           },
         ]
       }
+      recruiter_checkout_intents: {
+        Row: {
+          checkout_expires_at: string | null
+          checkout_url: string | null
+          claim_token: string | null
+          created_at: string
+          generation: number
+          id: string
+          last_error_code: string | null
+          lease_expires_at: string | null
+          plan: string
+          recruiter_id: string
+          state: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checkout_expires_at?: string | null
+          checkout_url?: string | null
+          claim_token?: string | null
+          created_at?: string
+          generation?: number
+          id?: string
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          plan: string
+          recruiter_id: string
+          state: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checkout_expires_at?: string | null
+          checkout_url?: string | null
+          claim_token?: string | null
+          created_at?: string
+          generation?: number
+          id?: string
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          plan?: string
+          recruiter_id?: string
+          state?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_checkout_intents_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: true
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruiter_contact_requests: {
         Row: {
           application_id: string
@@ -4035,6 +4148,13 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_capability_status"]
       }
+      bind_recruiter_checkout_customer: {
+        Args: { _claim_token: string; _customer_id: string; _intent_id: string }
+        Returns: {
+          outcome: string
+          reason: string
+        }[]
+      }
       build_application_submission_snapshot: {
         Args: {
           _attestations?: Json
@@ -4046,6 +4166,42 @@ export type Database = {
       build_lane_key: {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
+      }
+      claim_business_checkout: {
+        Args: {
+          _context: string
+          _plan_key: string
+          _request_key: string
+          _subject_id: string
+          _user_id: string
+        }
+        Returns: {
+          checkout_expires_at: string
+          claim_context: string
+          claim_plan_key: string
+          claim_state: string
+          claim_subject_id: string
+          claim_token: string
+          generation: number
+          lease_expires_at: string
+          outcome: string
+          reason: string
+          stripe_checkout_session_id: string
+        }[]
+      }
+      claim_recruiter_checkout_intent: {
+        Args: { _plan: string; _recruiter_id: string; _user_id: string }
+        Returns: {
+          checkout_expires_at: string
+          checkout_url: string
+          claim_token: string
+          generation: number
+          intent_id: string
+          outcome: string
+          reason: string
+          stripe_checkout_session_id: string
+          stripe_customer_id: string
+        }[]
       }
       claim_stripe_webhook_event: {
         Args: {
@@ -4060,6 +4216,33 @@ export type Database = {
         }[]
       }
       clean_assistant_permissions: { Args: { _p: Json }; Returns: Json }
+      complete_business_checkout_claim: {
+        Args: {
+          _checkout_expires_at: string
+          _claim_token: string
+          _context: string
+          _session_id: string
+          _user_id: string
+        }
+        Returns: {
+          outcome: string
+          reason: string
+        }[]
+      }
+      complete_recruiter_checkout_intent: {
+        Args: {
+          _checkout_expires_at: string
+          _checkout_url: string
+          _claim_token: string
+          _customer_id: string
+          _intent_id: string
+          _session_id: string
+        }
+        Returns: {
+          outcome: string
+          reason: string
+        }[]
+      }
       complete_stripe_webhook_event: {
         Args: {
           p_claim_token: string
@@ -4267,6 +4450,18 @@ export type Database = {
         }[]
       }
       expire_stale_contact_requests: { Args: never; Returns: number }
+      fail_recruiter_checkout_intent: {
+        Args: {
+          _claim_token: string
+          _error_code: string
+          _intent_id: string
+          _terminal: boolean
+        }
+        Returns: {
+          outcome: string
+          reason: string
+        }[]
+      }
       fail_stripe_webhook_event: {
         Args: {
           p_claim_token: string
@@ -4915,6 +5110,19 @@ export type Database = {
         Returns: boolean
       }
       referral_status_rank: { Args: { _s: string }; Returns: number }
+      release_business_checkout_claim: {
+        Args: {
+          _claim_token: string
+          _context: string
+          _error_code: string
+          _terminal: boolean
+          _user_id: string
+        }
+        Returns: {
+          outcome: string
+          reason: string
+        }[]
+      }
       request_driver_contact: {
         Args: { application_id: string; recruiter_note?: string }
         Returns: string
