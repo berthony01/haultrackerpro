@@ -433,6 +433,26 @@ describe('Phase 1R-D2-B4 — precedence, owner resolution, determinism', () => {
     }
   });
 
+  it('treats a plan "none" row as unknown and outranks a valid active paid row', async () => {
+    const active = recruiterRow({ plan: 'fleet', status: 'active' });
+    const nonePlan = recruiterRow({ recruiter_id: 'recruiter-2', plan: 'none', status: 'canceled' });
+
+    // Alone, the `none` row is unknown.
+    const alone = makeHarness({ recruiterRows: [nonePlan] });
+    expect(
+      await reconcileBusinessSubscriptionActivation(makeInput({ context: 'agency' }, alone.gateway)),
+    ).toEqual({ kind: 'reject', reason: 'opposing_business_state_unknown' });
+
+    // Combined with a genuinely active paid row, unknown still wins in both orders.
+    for (const rows of [[active, nonePlan], [nonePlan, active]]) {
+      const h = makeHarness({ recruiterRows: rows });
+      expect(
+        await reconcileBusinessSubscriptionActivation(makeInput({ context: 'agency' }, h.gateway)),
+      ).toEqual({ kind: 'reject', reason: 'opposing_business_state_unknown' });
+    }
+  });
+
+
   it('returns business_owner_unresolved when owner resolution yields nothing', async () => {
     for (const ownerUserId of [null, '']) {
       for (const context of ['recruiter', 'agency'] as const) {
