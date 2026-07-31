@@ -42,6 +42,13 @@ let insertReturnsEmpty = false;
 // RPC (get_my_recruiter_profile_safe).
 let safeProfileRpcRows: Array<{ id: string }> | null = [];
 let safeProfileRpcError: Error | null = null;
+// Phase 1R-D2-B6-A-R2: allow tests to simulate a successful UPDATE that
+// returns zero rows (recruiters have UPDATE but no direct SELECT policy),
+// plus configurable data/error for the safe persistence RPC.
+let updateReturnsZeroRows = false;
+let persistProfileRpcRows: Array<Record<string, unknown>> | null = [];
+let persistProfileRpcError: Error | null = null;
+
 
 // Controls whether useQuery reports an existing profile.
 let currentProfile: { id: string } | null = null;
