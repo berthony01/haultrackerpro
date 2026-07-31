@@ -14,11 +14,18 @@ import {
   TERMINAL_STATUSES,
 } from "../_shared/stripe-webhook-identity.ts";
 import {
+  reconcileBusinessSubscriptionActivation,
+  type AgencyEntitlementRowShape,
+  type BusinessReconciliationGateway,
+  type RecruiterBillingRowShape,
+} from "../_shared/business-subscription-reconciliation.ts";
+import {
   createSupabaseLedgerClient,
   withIdempotency,
   DEFAULT_LEASE_SECONDS,
   type TerminalResult,
 } from "../_shared/stripe-webhook-idempotency.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -176,6 +183,123 @@ function buildGateway(supabase: any): WebhookDataGateway {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Phase 1R-D2-B4 — opposing-business reconciliation gateway.
+//
+// READ-ONLY. This gateway performs `select` queries exclusively; it contains
+// no insert, update, upsert, delete, or rpc call. All entitlement writes
+// remain confined to applyEntitlement / applyRevoke.
+//
+// Raw Supabase error text is never propagated: every read failure throws a
+// stable internal error, which the pure reconciliation module converts into
+// the `opposing_business_state_unknown` fail-closed decision.
+// ---------------------------------------------------------------------------
+
+function reconciliationReadFailure(): Error {
+  return new Error("business_reconciliation_read_failed");
+}
+
+function buildBusinessReconciliationGateway(supabase: any): BusinessReconciliationGateway {
+  return {
+    async resolveOwnerUserId(context, entityKey) {
+      if (context === "driver") return null;
+      if (!entityKey) return null;
+
+      if (context === "recruiter") {
+        const { data, error } = await supabase
+          .from("recruiter_profiles")
+          .select("user_id")
+          .eq("id", entityKey)
+          .maybeSingle();
+        if (error) throw reconciliationReadFailure();
+        const ownerUserId = data?.user_id ?? null;
+        return typeof ownerUserId === "string" && ownerUserId.length > 0 ? ownerUserId : null;
+      }
+
+      // agency — canonical owner is agency_profiles.owner_user_id, and that
+      // same user must additionally hold an ACTIVE agency_owner membership.
+      const { data: agency, error: agencyError } = await supabase
+        .from("agency_profiles")
+        .select("owner_user_id")
+        .eq("id", entityKey)
+        .maybeSingle();
+      if (agencyError) throw reconciliationReadFailure();
+      const ownerUserId = agency?.owner_user_id ?? null;
+      if (typeof ownerUserId !== "string" || ownerUserId.length === 0) return null;
+
+      const { data: membership, error: membershipError } = await supabase
+        .from("agency_members")
+        .select("member_user_id")
+        .eq("agency_id", entityKey)
+        .eq("member_user_id", ownerUserId)
+        .eq("role", "agency_owner")
+        .eq("status", "active")
+        .maybeSingle();
+      if (membershipError) throw reconciliationReadFailure();
+      if (!membership?.member_user_id) return null;
+      return ownerUserId;
+    },
+
+    async loadRecruiterBillingRows(ownerUserId) {
+      const { data, error } = await supabase
+        .from("recruiter_billing_profiles")
+        .select("recruiter_id, plan, status")
+        .eq("user_id", ownerUserId);
+      if (error) throw reconciliationReadFailure();
+      return ((data ?? []) as RecruiterBillingRowShape[]).map((row) => ({
+        recruiter_id: row?.recruiter_id ?? null,
+        plan: row?.plan ?? null,
+        status: row?.status ?? null,
+      }));
+    },
+
+    async loadOwnedAgencyEntitlementRows(ownerUserId) {
+      // Ownership is the intersection of (a) active agency_owner membership and
+      // (b) agency_profiles.owner_user_id — membership alone is insufficient,
+      // and email is never used.
+      const { data: memberships, error: membershipError } = await supabase
+        .from("agency_members")
+        .select("agency_id")
+        .eq("member_user_id", ownerUserId)
+        .eq("role", "agency_owner")
+        .eq("status", "active");
+      if (membershipError) throw reconciliationReadFailure();
+
+      const memberAgencyIds = ((memberships ?? []) as Array<{ agency_id?: string | null }>)
+        .map((row) => row?.agency_id ?? null)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      if (memberAgencyIds.length === 0) return [];
+
+      const { data: ownedAgencies, error: ownedError } = await supabase
+        .from("agency_profiles")
+        .select("id")
+        .eq("owner_user_id", ownerUserId)
+        .in("id", memberAgencyIds);
+      if (ownedError) throw reconciliationReadFailure();
+
+      const ownedAgencyIds = ((ownedAgencies ?? []) as Array<{ id?: string | null }>)
+        .map((row) => row?.id ?? null)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      if (ownedAgencyIds.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from("agency_entitlements")
+        .select("agency_id, plan_key, status, source")
+        .in("agency_id", ownedAgencyIds);
+      if (error) throw reconciliationReadFailure();
+
+      return ((data ?? []) as AgencyEntitlementRowShape[]).map((row) => ({
+        agency_id: row?.agency_id ?? null,
+        plan_key: row?.plan_key ?? null,
+        status: row?.status ?? null,
+        source: row?.source ?? null,
+      }));
+    },
+  };
+}
+
+
+
 function metadataFromMap(m: Record<string, string> | undefined | null): WebhookMetadata {
   const raw = m ?? {};
   let declared: BillingContext | null = null;
@@ -207,11 +331,13 @@ export async function processValidatedSubscriptionEvent(params: {
   eventType: WebhookEventType;
   priceResolver: PriceResolver;
   gateway: WebhookDataGateway;
+  reconciliationGateway: BusinessReconciliationGateway;
 }): Promise<{ ok: true; decision: IdentityDecision } | { ok: false; decision: IdentityDecision }> {
-  const { supabase, subscription, sessionMetadata, eventType, priceResolver, gateway } = params;
+  const { supabase, subscription, sessionMetadata, eventType, priceResolver, gateway, reconciliationGateway } = params;
   const meta = metadataFromMap({ ...(sessionMetadata ?? {}), ...(subscription.metadata ?? {}) } as Record<string, string>);
   const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
 
+  // Step 1 — canonical identity validation always runs first.
   const decision = await validateWebhookIdentity({
     eventType,
     incomingCustomerId: subscription.customer as string,
@@ -232,14 +358,37 @@ export async function processValidatedSubscriptionEvent(params: {
     return { ok: false, decision };
   }
 
+  // Step 2 — terminal revocation applies immediately. Reconciliation must
+  // never be able to block a revoke against the exact canonical binding.
   if (decision.kind === "allow_revoke") {
     await applyRevoke(supabase, decision.context, decision.entity_key, subscription);
     return { ok: true, decision };
   }
 
+  // Step 3 — Phase 1R-D2-B4 opposing-business reconciliation runs BEFORE any
+  // entitlement mutation, for allow_initial_binding and allow_existing_binding.
+  const reconciliation = await reconcileBusinessSubscriptionActivation({
+    context: decision.context,
+    entityKey: decision.entity_key,
+    eventType,
+    incomingStatus: subscription.status ?? null,
+    gateway: reconciliationGateway,
+  });
+
+  if (reconciliation.kind === "reject") {
+    logStep("Rejected — business subscription reconciliation", {
+      reason: reconciliation.reason,
+      context: decision.context,
+      event_type: eventType,
+    });
+    return { ok: false, decision: { kind: "reject", reason: reconciliation.reason } };
+  }
+
+  // Step 4 — only a reconciliation allow may reach the entitlement writer.
   await applyEntitlement(supabase, decision.context, decision.entity_key, decision.resolvedPrice, subscription);
   return { ok: true, decision };
 }
+
 
 async function applyEntitlement(
   supabase: any,
@@ -481,6 +630,7 @@ async function handleAgencySubscription(
     eventType: "customer.subscription.updated",
     priceResolver: buildPriceResolver(),
     gateway: buildGateway(supabaseClient),
+    reconciliationGateway: buildBusinessReconciliationGateway(supabaseClient),
   });
 }
 void handleAgencySubscription;
@@ -498,6 +648,7 @@ async function handleAgencySubscriptionDeleted(
     eventType: "customer.subscription.deleted",
     priceResolver: buildPriceResolver(),
     gateway: buildGateway(supabaseClient),
+    reconciliationGateway: buildBusinessReconciliationGateway(supabaseClient),
   });
 }
 void handleAgencySubscriptionDeleted;
@@ -524,6 +675,7 @@ async function handleRecruiterSubscription(
     eventType: "customer.subscription.updated",
     priceResolver: buildPriceResolver(),
     gateway: buildGateway(supabaseClient),
+    reconciliationGateway: buildBusinessReconciliationGateway(supabaseClient),
   });
 }
 void handleRecruiterSubscription;
@@ -584,6 +736,7 @@ serve(async (req) => {
   const ledger = createSupabaseLedgerClient(supabaseClient);
   const priceResolver = buildPriceResolver();
   const gateway = buildGateway(supabaseClient);
+  const reconciliationGateway = buildBusinessReconciliationGateway(supabaseClient);
 
   const outcome = await withIdempotency<Record<string, unknown>>({
     ledger,
@@ -596,7 +749,7 @@ serve(async (req) => {
       return "transient_processing_error";
     },
     process: async () => processEvent(event, {
-      stripe, supabaseClient, priceResolver, gateway,
+      stripe, supabaseClient, priceResolver, gateway, reconciliationGateway,
     }),
   });
 
@@ -644,9 +797,10 @@ async function processEvent(
     supabaseClient: any;
     priceResolver: PriceResolver;
     gateway: WebhookDataGateway;
+    reconciliationGateway: BusinessReconciliationGateway;
   },
 ): Promise<{ result: TerminalResult; body: Record<string, unknown> }> {
-  const { stripe, supabaseClient, priceResolver, gateway } = ctx;
+  const { stripe, supabaseClient, priceResolver, gateway, reconciliationGateway } = ctx;
 
   switch (event.type) {
     case "checkout.session.completed": {
@@ -676,7 +830,7 @@ async function processEvent(
         subscription,
         sessionMetadata: (session.metadata ?? null) as Record<string, string> | null,
         eventType: "checkout.session.completed",
-        priceResolver, gateway,
+        priceResolver, gateway, reconciliationGateway,
       });
       if (!result.ok) {
         return {
@@ -698,7 +852,7 @@ async function processEvent(
       const result = await processValidatedSubscriptionEvent({
         supabase: supabaseClient, subscription, sessionMetadata: null,
         eventType: event.type as WebhookEventType,
-        priceResolver, gateway,
+        priceResolver, gateway, reconciliationGateway,
       });
       if (!result.ok) {
         return {
@@ -714,7 +868,7 @@ async function processEvent(
       const result = await processValidatedSubscriptionEvent({
         supabase: supabaseClient, subscription, sessionMetadata: null,
         eventType: "customer.subscription.deleted",
-        priceResolver, gateway,
+        priceResolver, gateway, reconciliationGateway,
       });
       if (!result.ok) {
         return {
