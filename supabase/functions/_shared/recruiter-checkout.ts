@@ -260,7 +260,12 @@ export const RECRUITER_ALLOWED_ORIGINS: readonly string[] = [
   "https://haultrackerpro.com",
   "https://www.haultrackerpro.com",
   "https://haultrackerpro.lovable.app",
+  // Phase 1R-D2-B6-B1 — exact trusted Lovable project preview origin. Exact
+  // string match only: no wildcard preview hosts, no arbitrary id-preview--*,
+  // no localhost, no lovable.dev editor origins, no suffix matching.
+  "https://id-preview--6d28fa14-57dc-418b-9196-19e144f0e8df.lovable.app",
 ];
+
 
 export function isAllowedRecruiterOrigin(origin: string): boolean {
   return RECRUITER_ALLOWED_ORIGINS.includes(origin);
