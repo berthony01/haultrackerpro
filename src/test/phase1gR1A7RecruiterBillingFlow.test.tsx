@@ -1392,3 +1392,101 @@ describe('Phase 1R-C-R1 — real hook refresh invalidation and input purity', ()
     expect(JSON.stringify(profileMocks.profile)).toBe(profileSnapshot);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1R-D2-B6-B1 — eligibility alignment + hostile popup containment
+// ---------------------------------------------------------------------------
+
+function makeHostileWindow() {
+  return {
+    get closed(): boolean {
+      throw new DOMException('cross-origin', 'SecurityError');
+    },
+    set opener(_v: unknown) {
+      throw new DOMException('cross-origin', 'SecurityError');
+    },
+    get opener(): unknown {
+      throw new DOMException('cross-origin', 'SecurityError');
+    },
+    get location(): { href: string } {
+      throw new DOMException('cross-origin', 'SecurityError');
+    },
+    close: vi.fn(() => {
+      throw new DOMException('cross-origin', 'SecurityError');
+    }),
+  };
+}
+
+describe('Phase 1R-D2-B6-B1 — pending verification remains client-eligible', () => {
+  it('complete profile with verification_status=pending navigates to the validated Stripe URL', async () => {
+    profileMocks.profile = {
+      ...COMPLETE_PROFILE,
+      verification_status: 'pending',
+    };
+    profileMocks.isApproved = false;
+    const w = makeWindow();
+    openSpy.mockReturnValue(w as unknown as Window);
+    supabaseMocks.invoke.mockResolvedValue({
+      data: { code: 'checkout_ready', url: CHECKOUT_URL },
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPanel();
+
+    const starter = screen.getByTestId('recruiter-plan-button-starter');
+    await waitFor(() => expect(starter).not.toBeDisabled());
+    await user.click(starter);
+
+    await waitFor(() => expect(w.location.href).toBe(CHECKOUT_URL));
+    expect(supabaseMocks.invoke).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Phase 1R-D2-B6-B1 — hostile popup containment', () => {
+  it('successful checkout with a throwing popup falls back to the validated link without crashing', async () => {
+    const hostile = makeHostileWindow();
+    openSpy.mockReturnValue(hostile as unknown as Window);
+    supabaseMocks.invoke.mockResolvedValue({
+      data: { code: 'checkout_ready', url: CHECKOUT_URL },
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(screen.getByTestId('recruiter-plan-button-starter'));
+
+    const link = await screen.findByTestId('recruiter-billing-fallback');
+    expect(link).toHaveAttribute('href', CHECKOUT_URL);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(toastMocks.success).not.toHaveBeenCalled();
+    // The panel is still rendered: no full-render exception occurred.
+    expect(screen.getByTestId('recruiter-plan-button-starter')).toBeInTheDocument();
+  });
+
+  it('known server error with a throwing popup shows the controlled error and re-enables the plan button', async () => {
+    const hostile = makeHostileWindow();
+    openSpy.mockReturnValue(hostile as unknown as Window);
+    supabaseMocks.invoke.mockResolvedValueOnce(
+      invokeError(409, 'subscription_exists'),
+    );
+    const user = userEvent.setup();
+    renderPanel();
+    const starter = screen.getByTestId('recruiter-plan-button-starter');
+    await user.click(starter);
+
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith(
+        RECRUITER_CHECKOUT_MESSAGES.subscription_exists,
+      ),
+    );
+    // Panel survived: no full render exception.
+    expect(
+      screen.getByTestId('recruiter-plan-button-starter'),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('recruiter-plan-button-starter'),
+      ).not.toBeDisabled(),
+    );
+  });
+});
