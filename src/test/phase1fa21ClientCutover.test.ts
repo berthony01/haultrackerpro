@@ -51,7 +51,7 @@ let persistProfileRpcError: Error | null = null;
 
 
 // Controls whether useQuery reports an existing profile.
-let currentProfile: { id: string } | null = null;
+let currentProfile: (Record<string, unknown> & { id: string }) | null = null;
 
 // Phase 1F-A.2.1A-R4: mutable authenticated identity so tests can simulate
 // a user switch on the same hook lifecycle. `vi.hoisted` is required
