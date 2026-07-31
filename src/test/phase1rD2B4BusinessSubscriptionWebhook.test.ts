@@ -463,18 +463,49 @@ describe('Phase 1R-D2-B4 — precedence, owner resolution, determinism', () => {
     }
   });
 
-  it('treats a plan "none" row as unknown and outranks a valid active paid row', async () => {
+  it('ranks a revoked none row benign and a contradictory none row above an active paid row', async () => {
     const active = recruiterRow({ plan: 'fleet', status: 'active' });
-    const nonePlan = recruiterRow({ recruiter_id: 'recruiter-2', plan: 'none', status: 'canceled' });
+    const revokedNone = recruiterRow({
+      recruiter_id: 'recruiter-2',
+      plan: 'none',
+      status: 'canceled',
+    });
+    const contradictoryNone = recruiterRow({
+      recruiter_id: 'recruiter-3',
+      plan: 'none',
+      status: 'active',
+    });
 
-    // Alone, the `none` row is unknown.
-    const alone = makeHarness({ recruiterRows: [nonePlan] });
+    // The canonical revoked row is benign and does not block on its own.
+    const alone = makeHarness({ recruiterRows: [revokedNone] });
     expect(
       await reconcileBusinessSubscriptionActivation(makeInput({ context: 'agency' }, alone.gateway)),
+    ).toEqual(ALLOW);
+
+    // Two revoked rows are still benign setwise.
+    const pair = makeHarness({ recruiterRows: [revokedNone, revokedNone] });
+    expect(
+      await reconcileBusinessSubscriptionActivation(makeInput({ context: 'agency' }, pair.gateway)),
+    ).toEqual(ALLOW);
+
+    // A revoked row alongside a genuinely active paid row yields active, not unknown.
+    for (const rows of [[active, revokedNone], [revokedNone, active]]) {
+      const h = makeHarness({ recruiterRows: rows });
+      expect(
+        await reconcileBusinessSubscriptionActivation(makeInput({ context: 'agency' }, h.gateway)),
+      ).toEqual({ kind: 'reject', reason: 'opposing_business_subscription_active' });
+    }
+
+    // A contradictory none row is unknown alone.
+    const contradictoryAlone = makeHarness({ recruiterRows: [contradictoryNone] });
+    expect(
+      await reconcileBusinessSubscriptionActivation(
+        makeInput({ context: 'agency' }, contradictoryAlone.gateway),
+      ),
     ).toEqual({ kind: 'reject', reason: 'opposing_business_state_unknown' });
 
-    // Combined with a genuinely active paid row, unknown still wins in both orders.
-    for (const rows of [[active, nonePlan], [nonePlan, active]]) {
+    // And it outranks a separate valid active paid row in both orders.
+    for (const rows of [[active, contradictoryNone], [contradictoryNone, active]]) {
       const h = makeHarness({ recruiterRows: rows });
       expect(
         await reconcileBusinessSubscriptionActivation(makeInput({ context: 'agency' }, h.gateway)),
