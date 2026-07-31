@@ -69,8 +69,11 @@ vi.mock('@/integrations/supabase/client', () => {
         // Phase 1P-A1: .update().eq().eq().select('*') returns the affected
         // rows so the hook can verify persistence. Echo the payload as the
         // single affected row unless an error is queued.
-        const data = err ? null : [{ ...payload }];
+        // Phase 1R-D2-B6-A-R2: tests may force a zero-row (no SELECT policy)
+        // successful UPDATE response.
+        const data = err ? null : updateReturnsZeroRows ? [] : [{ ...payload }];
         return Promise.resolve({ data, error: err });
+
       };
       const chain = {
         eq(col: string, v: unknown) {
