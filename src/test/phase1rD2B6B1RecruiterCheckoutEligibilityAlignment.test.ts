@@ -24,6 +24,9 @@ const edge = read(EDGE_PATH);
 const shared = read(SHARED_PATH);
 const hook = read(HOOK_PATH);
 
+// Executable portion only (header prose is documentation, not SQL).
+const candidateBody = candidate.slice(candidate.indexOf('\nBEGIN;'));
+
 function countOccurrences(haystack: string, needle: RegExp): number {
   const matches = haystack.match(needle);
   return matches ? matches.length : 0;
@@ -119,9 +122,9 @@ describe('candidate preserves hardening invariants', () => {
   });
 
   it('checks suspension BEFORE readiness', () => {
-    const suspension = candidate.indexOf("reason := 'account_suspended'");
-    const readiness = candidate.indexOf(
-      'recruiter_profile_can_manage_opportunities',
+    const suspension = candidateBody.indexOf("reason := 'account_suspended'");
+    const readiness = candidateBody.indexOf(
+      'IF NOT public.recruiter_profile_can_manage_opportunities(_recruiter_id)',
     );
     expect(suspension).toBeGreaterThan(-1);
     expect(readiness).toBeGreaterThan(-1);
@@ -200,13 +203,13 @@ describe('candidate privileges and prohibited statements', () => {
   });
 
   it('contains no table creation, policy, trigger, DROP or destructive action', () => {
-    expect(candidate).not.toMatch(/CREATE\s+TABLE/i);
-    expect(candidate).not.toMatch(/ALTER\s+TABLE/i);
-    expect(candidate).not.toMatch(/CREATE\s+POLICY/i);
-    expect(candidate).not.toMatch(/CREATE\s+TRIGGER/i);
-    expect(candidate).not.toMatch(/\bDROP\b/i);
-    expect(candidate).not.toMatch(/\bTRUNCATE\b/i);
-    expect(candidate).not.toMatch(/CREATE\s+(UNIQUE\s+)?INDEX/i);
+    expect(candidateBody).not.toMatch(/CREATE\s+TABLE/i);
+    expect(candidateBody).not.toMatch(/ALTER\s+TABLE/i);
+    expect(candidateBody).not.toMatch(/CREATE\s+POLICY/i);
+    expect(candidateBody).not.toMatch(/CREATE\s+TRIGGER/i);
+    expect(candidateBody).not.toMatch(/\bDROP\b/i);
+    expect(candidateBody).not.toMatch(/\bTRUNCATE\b/i);
+    expect(candidateBody).not.toMatch(/CREATE\s+(UNIQUE\s+)?INDEX/i);
   });
 
   it('contains no DML/backfill outside the function body', () => {
