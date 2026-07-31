@@ -133,8 +133,9 @@ describe('Phase 1R-D2-B4 — pure module hygiene', () => {
     for (const marker of ['.insert(', '.update(', '.upsert(', '.delete(', '.rpc(']) {
       expect(reconciliationCode.includes(marker)).toBe(false);
     }
-    const imports = reconciliationCode.match(/from\s+"([^"]+)"/g) ?? [];
+    const imports: string[] = reconciliationCode.match(/from\s+"([^"]+)"/g) ?? [];
     expect(imports.every((line) => line.includes('./stripe-webhook-identity.ts'))).toBe(true);
+
   });
 
   it('exports the exact required concepts', () => {
