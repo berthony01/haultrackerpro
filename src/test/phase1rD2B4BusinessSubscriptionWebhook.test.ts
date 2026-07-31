@@ -346,11 +346,20 @@ describe('Phase 1R-D2-B4 — agency activation vs recruiter rows', () => {
       recruiterRow({ plan: 'enterprise' }),
       recruiterRow({ plan: null }),
       recruiterRow({ plan: '' }),
+      // Phase 1R-D2-B4-R1 — the literal `none` plan is NOT a recognized paid
+      // recruiter plan, so it is unknown for every status, benign or blocking.
+      recruiterRow({ plan: 'none', status: 'canceled' }),
+      recruiterRow({ plan: 'none', status: 'incomplete_expired' }),
+      recruiterRow({ plan: 'none', status: 'inactive' }),
+      recruiterRow({ plan: 'none', status: 'active' }),
+      recruiterRow({ plan: 'none', status: 'trialing' }), // trial-allowlist: Stripe subscription status literal, not user-facing copy
+      recruiterRow({ plan: 'none', status: 'past_due' }),
       null,
       'not-a-row',
       7,
       [],
     ];
+
     for (const row of malformed) {
       const h = makeHarness({ recruiterRows: [row] });
       const decision = await reconcileBusinessSubscriptionActivation(
