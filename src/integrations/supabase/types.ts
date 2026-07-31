@@ -5078,6 +5078,34 @@ export type Database = {
         Args: { o: Database["public"]["Tables"]["opportunities"]["Row"] }
         Returns: string[]
       }
+      persist_my_recruiter_profile: {
+        Args: {
+          _company_address: string
+          _company_city: string
+          _company_name: string
+          _company_phone: string
+          _company_state: string
+          _company_type: string
+          _company_website: string
+          _dot_number: string
+          _driver_types_hired: string[]
+          _equipment_types: string[]
+          _hiring_states: string[]
+          _mc_number: string
+          _recruiter_email: string
+          _recruiter_name: string
+          _recruiter_phone: string
+        }
+        Returns: {
+          company_name: string
+          company_type: string
+          dot_number: string
+          id: string
+          mc_number: string
+          recruiter_email: string
+          recruiter_name: string
+        }[]
+      }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
