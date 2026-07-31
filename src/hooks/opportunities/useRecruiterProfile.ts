@@ -269,12 +269,58 @@ export function useRecruiterProfile() {
         .select('*');
       if (error) throw error;
       const rows = (updatedRows ?? []) as Array<Record<string, unknown>>;
+      if (rows.length === 0) {
+        // Phase 1R-D2-B6-A-R2 — recruiters own an UPDATE policy but have no
+        // direct SELECT policy, so PostgREST can legitimately return zero
+        // rows for a successful write. Fall back exactly once to the
+        // caller-bound SECURITY DEFINER persistence RPC, which derives
+        // identity from auth.uid() and returns a narrow verification row.
+        const current = (profileQuery.data ?? null) as Record<string, unknown> | null;
+        const args: Record<string, unknown> = {};
+        for (const key of SAFE_PERSIST_SCALAR_FIELDS) {
+          args[`_${key}`] = Object.prototype.hasOwnProperty.call(safe, key)
+            ? (safe[key] ?? null)
+            : (current?.[key] ?? null);
+        }
+        for (const key of SAFE_PERSIST_LIST_FIELDS) {
+          const submitted = Object.prototype.hasOwnProperty.call(safe, key)
+            ? safe[key]
+            : undefined;
+          const fallback = current?.[key];
+          args[`_${key}`] = Array.isArray(submitted)
+            ? submitted
+            : Array.isArray(fallback)
+              ? fallback
+              : [];
+        }
+
+        const { data: persistedRows, error: persistErr } = await (supabase as unknown as {
+          rpc: (
+            fn: string,
+            a: Record<string, unknown>,
+          ) => Promise<{ data: Array<Record<string, unknown>> | null; error: Error | null }>;
+        }).rpc('persist_my_recruiter_profile', args);
+        if (persistErr) throw persistErr;
+        const persisted = (persistedRows ?? []) as Array<Record<string, unknown>>;
+        if (persisted.length !== 1) {
+          throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
+        }
+        const persistedRow = persisted[0];
+        const persistedId = persistedRow?.id;
+        if (typeof persistedId !== 'string' || !persistedId) {
+          throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
+        }
+        verifyRow(persistedRow);
+        knownProfileRef.current = { userId: user.id, profileId: persistedId };
+        return;
+      }
       if (rows.length !== 1) {
         throw new Error(PERSISTENCE_MISMATCH_MESSAGE);
       }
       verifyRow(rows[0]);
       return;
     }
+
     const { data: inserted, error } = await supabase
       .from('recruiter_profiles')
       .insert({ ...(safe as RecruiterProfileUpsert), user_id: user.id } as never)
