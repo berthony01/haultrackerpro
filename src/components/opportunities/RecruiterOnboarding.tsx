@@ -121,6 +121,24 @@ export function RecruiterOnboarding({ onBack }: Props) {
     refetchProfile,
   } = useRecruiterProfile();
 
+  const queryClient = useQueryClient();
+
+  // Phase 1R-D2-B6-A-R3 — single local submission/transition guard. The ref
+  // is the synchronous authority (blocks a second click in the same tick);
+  // the state mirror drives the disabled attribute.
+  const transitionRef = useRef(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const beginTransition = () => {
+    transitionRef.current = true;
+    setIsTransitioning(true);
+  };
+  const releaseTransition = () => {
+    transitionRef.current = false;
+    setIsTransitioning(false);
+  };
+
+
+
   const [form, setForm] = useState<FormState>(EMPTY);
   const [agree1, setAgree1] = useState(false);
   const [agree2, setAgree2] = useState(false);
