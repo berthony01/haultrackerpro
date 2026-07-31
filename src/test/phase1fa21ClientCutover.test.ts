@@ -200,6 +200,10 @@ beforeEach(() => {
   insertReturnsEmpty = false;
   safeProfileRpcRows = [];
   safeProfileRpcError = null;
+  updateReturnsZeroRows = false;
+  persistProfileRpcRows = [];
+  persistProfileRpcError = null;
+
   authState.userId = 'client-user-1';
   resetRefStore();
 });
