@@ -114,22 +114,41 @@ export function useRecruiterBilling() {
     }
   }, []);
 
+  // Phase 1R-D2-B6-B1 — every access to the popup WindowProxy (including the
+  // `closed` getter, `opener`, `location`, and `close`) is contained inside
+  // try/catch. In sandboxed/opaque preview windows those property reads can
+  // themselves throw; an uncaught throw here surfaced the full preview error
+  // overlay instead of the controlled checkout fallback UI.
+  const isTabUsable = (w: Window | null): boolean => {
+    if (!w) return false;
+    try {
+      return !w.closed;
+    } catch {
+      return false;
+    }
+  };
+
+  const closeTabBestEffort = (w: Window | null): void => {
+    if (!w) return;
+    try {
+      w.close();
+    } catch {
+      /* ignore */
+    }
+  };
+
   const settleTab = useCallback(
     (validatedUrl: string): { opened: boolean; url: string } => {
       const w = pendingWindowRef.current;
       pendingWindowRef.current = null;
       openingRef.current = false;
-      if (w && !w.closed) {
+      if (isTabUsable(w)) {
         try {
-          (w as { opener: unknown }).opener = null;
-          w.location.href = validatedUrl;
+          (w as unknown as { opener: unknown }).opener = null;
+          (w as Window).location.href = validatedUrl;
           return { opened: true, url: validatedUrl };
         } catch {
-          try {
-            w.close();
-          } catch {
-            /* ignore */
-          }
+          closeTabBestEffort(w);
         }
       }
       return { opened: false, url: validatedUrl };
@@ -141,14 +160,11 @@ export function useRecruiterBilling() {
     const w = pendingWindowRef.current;
     pendingWindowRef.current = null;
     openingRef.current = false;
-    if (w && !w.closed) {
-      try {
-        w.close();
-      } catch {
-        /* ignore */
-      }
+    if (isTabUsable(w)) {
+      closeTabBestEffort(w);
     }
   }, []);
+
 
   // ---- Queries -----------------------------------------------------------
 
