@@ -661,6 +661,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
                     disabled={
                       saveRecruiterProfile.isPending ||
                       referralSettings.saveDecision.isPending ||
+                      isTransitioning ||
                       (!!profile && referralSettings.isLoading) ||
                       isSuspended
                     }
