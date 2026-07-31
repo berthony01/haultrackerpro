@@ -5,6 +5,10 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   test: {
+    // Run test files serially: concurrent files would otherwise boot multiple
+    // in-process PGlite/Postgres-WASM instances at once during the unrestricted
+    // suite, causing startup contention and intermittent beforeAll timeouts.
+    fileParallelism: false,
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
