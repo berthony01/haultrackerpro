@@ -284,6 +284,12 @@ beforeEach(() => {
 
 
 describe('Phase 1Q-A — Recruiter onboarding referral preference (component)', () => {
+  // Component-level tests always get the narrow query-client override.
+  beforeEach(() => {
+    installQueryClient();
+  });
+
+
   it('renders exact primary question, all three choices, defaults to Decide later when no settings row exists', () => {
     installProfileHook({ profile: makeProfile() });
     installReferralHook({ settings: null });
