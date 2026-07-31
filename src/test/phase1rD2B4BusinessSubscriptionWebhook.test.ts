@@ -338,6 +338,34 @@ describe('Phase 1R-D2-B4 — agency activation vs recruiter rows', () => {
     }
   });
 
+  it('allows the canonical revoked recruiter row: plan none with a terminal status', async () => {
+    // Phase 1R-D2-B4-R2 — the webhook revoke writer sets plan "none" alongside a
+    // terminal status. That canonical row must never block a later agency
+    // activation the B2 checkout state machine already permitted.
+    for (const status of ['canceled', 'incomplete_expired', 'inactive']) {
+      const h = makeHarness({ recruiterRows: [recruiterRow({ plan: 'none', status })] });
+      const decision = await reconcileBusinessSubscriptionActivation(
+        makeInput({ context: 'agency' }, h.gateway),
+      );
+      expect(decision, `none/${status}`).toEqual(ALLOW);
+    }
+  });
+
+  it('fails unknown for plan none paired with a live or recoverable status', async () => {
+    // A non-paid plan carrying a live/recoverable status is contradictory state.
+    const contradictory = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused']; // trial-allowlist: Stripe subscription status literal, not user-facing copy
+    for (const status of contradictory) {
+      const h = makeHarness({ recruiterRows: [recruiterRow({ plan: 'none', status })] });
+      const decision = await reconcileBusinessSubscriptionActivation(
+        makeInput({ context: 'agency' }, h.gateway),
+      );
+      expect(decision, `none/${status}`).toEqual({
+        kind: 'reject',
+        reason: 'opposing_business_state_unknown',
+      });
+    }
+  });
+
   it('fails unknown for null/empty/unknown status, unknown or missing plan, and malformed rows', async () => {
     const malformed: unknown[] = [
       recruiterRow({ status: null }),
@@ -346,14 +374,16 @@ describe('Phase 1R-D2-B4 — agency activation vs recruiter rows', () => {
       recruiterRow({ plan: 'enterprise' }),
       recruiterRow({ plan: null }),
       recruiterRow({ plan: '' }),
-      // Phase 1R-D2-B4-R1 — the literal `none` plan is NOT a recognized paid
-      // recruiter plan, so it is unknown for every status, benign or blocking.
-      recruiterRow({ plan: 'none', status: 'canceled' }),
-      recruiterRow({ plan: 'none', status: 'incomplete_expired' }),
-      recruiterRow({ plan: 'none', status: 'inactive' }),
-      recruiterRow({ plan: 'none', status: 'active' }),
-      recruiterRow({ plan: 'none', status: 'trialing' }), // trial-allowlist: Stripe subscription status literal, not user-facing copy
-      recruiterRow({ plan: 'none', status: 'past_due' }),
+      // An unrecognized plan such as `enterprise` stays unknown even when its
+      // status is one of the otherwise benign non-billing statuses.
+      recruiterRow({ plan: 'enterprise', status: 'canceled' }),
+      recruiterRow({ plan: 'enterprise', status: 'incomplete_expired' }),
+      recruiterRow({ plan: 'enterprise', status: 'inactive' }),
+      // Plan none is recognized as non-paid, but an absent or unrecognized
+      // status is still unresolvable and fails closed.
+      recruiterRow({ plan: 'none', status: null }),
+      recruiterRow({ plan: 'none', status: '' }),
+      recruiterRow({ plan: 'none', status: 'weird_status' }),
       null,
       'not-a-row',
       7,
