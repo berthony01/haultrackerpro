@@ -343,6 +343,9 @@ export function RecruiterOnboarding({ onBack }: Props) {
             /* capability refresh failure must not block navigation */
           }
           onBack();
+          // Guard is held through the entire save → capability refresh →
+          // navigation sequence and released only once navigation happened.
+          releaseTransition();
         }
       },
 
