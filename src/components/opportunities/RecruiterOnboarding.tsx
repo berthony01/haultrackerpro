@@ -29,6 +29,7 @@ import {
   Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
   useRecruiterProfile,
@@ -119,6 +120,24 @@ export function RecruiterOnboarding({ onBack }: Props) {
     saveRecruiterProfile,
     refetchProfile,
   } = useRecruiterProfile();
+
+  const queryClient = useQueryClient();
+
+  // Phase 1R-D2-B6-A-R3 — single local submission/transition guard. The ref
+  // is the synchronous authority (blocks a second click in the same tick);
+  // the state mirror drives the disabled attribute.
+  const transitionRef = useRef(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const beginTransition = () => {
+    transitionRef.current = true;
+    setIsTransitioning(true);
+  };
+  const releaseTransition = () => {
+    transitionRef.current = false;
+    setIsTransitioning(false);
+  };
+
+
 
   const [form, setForm] = useState<FormState>(EMPTY);
   const [agree1, setAgree1] = useState(false);
@@ -221,6 +240,10 @@ export function RecruiterOnboarding({ onBack }: Props) {
   };
 
   const handleSave = () => {
+    // Phase 1R-D2-B6-A-R3 — ignore repeated Save calls while a previously
+    // accepted submission is still completing (ref is synchronous so a
+    // double-click in the same tick is also ignored).
+    if (transitionRef.current) return;
     if (isSuspended) {
       toast.error('Recruiter access suspended. Please contact support.');
       return;
@@ -247,12 +270,16 @@ export function RecruiterOnboarding({ onBack }: Props) {
       equipment_types: splitList(form.equipment_types),
       driver_types_hired: splitList(form.driver_types_hired),
     };
+    beginTransition();
     saveRecruiterProfile.mutate(payload, {
       onSuccess: async () => {
         if (isRejected && profile) {
           const { error } = await supabase.rpc('resubmit_recruiter_profile', { profile_id: profile.id });
           if (error) {
             toast.error(error.message);
+            // Rejected-resubmit RPC failure keeps the user on the form:
+            // no capability refresh, no navigation, guard released.
+            releaseTransition();
             return;
           }
           toast.success('Recruiter profile resubmitted for Verified Recruiter badge review.');
@@ -266,43 +293,59 @@ export function RecruiterOnboarding({ onBack }: Props) {
         // Never fall back to the pre-save `profile?.id`.
         const partialSaveWarning =
           'Recruiter profile saved, but your referral preference could not be saved. Please retry or update it later in Driver Referrals.';
-        let freshProfileId: string | null = null;
         try {
-          const fresh = await refetchProfile();
-          const candidate =
-            typeof fresh?.id === 'string' ? fresh.id.trim() : '';
-          if (candidate) freshProfileId = candidate;
-        } catch {
-          freshProfileId = null;
-        }
-        if (!freshProfileId) {
-          toast.error(partialSaveWarning);
-          return;
-        }
-        try {
-          await referralSettings.saveDecision.mutateAsync({
-            recruiterId: freshProfileId,
-            decision: referralDecision,
-            details: {
-              referral_bonus_enabled: referralDecision === 'yes',
-              bonus_amount:
-                referralDecision === 'yes' && refAmount.trim()
-                  ? Number(refAmount)
-                  : null,
-              payment_trigger:
-                referralDecision === 'yes' && refTrigger && refTrigger !== 'none'
-                  ? (refTrigger as PaymentTrigger)
-                  : null,
-              waiting_period_days:
-                referralDecision === 'yes' && refWaitingDays.trim()
-                  ? Number(refWaitingDays)
-                  : null,
-              bonus_terms:
-                referralDecision === 'yes' ? (refTerms.trim() || null) : null,
-            },
-          });
-        } catch {
-          toast.error(partialSaveWarning);
+          let freshProfileId: string | null = null;
+          try {
+            const fresh = await refetchProfile();
+            const candidate =
+              typeof fresh?.id === 'string' ? fresh.id.trim() : '';
+            if (candidate) freshProfileId = candidate;
+          } catch {
+            freshProfileId = null;
+          }
+          if (!freshProfileId) {
+            toast.error(partialSaveWarning);
+            return;
+          }
+          try {
+            await referralSettings.saveDecision.mutateAsync({
+              recruiterId: freshProfileId,
+              decision: referralDecision,
+              details: {
+                referral_bonus_enabled: referralDecision === 'yes',
+                bonus_amount:
+                  referralDecision === 'yes' && refAmount.trim()
+                    ? Number(refAmount)
+                    : null,
+                payment_trigger:
+                  referralDecision === 'yes' && refTrigger && refTrigger !== 'none'
+                    ? (refTrigger as PaymentTrigger)
+                    : null,
+                waiting_period_days:
+                  referralDecision === 'yes' && refWaitingDays.trim()
+                    ? Number(refWaitingDays)
+                    : null,
+                bonus_terms:
+                  referralDecision === 'yes' ? (refTerms.trim() || null) : null,
+              },
+            });
+          } catch {
+            toast.error(partialSaveWarning);
+          }
+        } finally {
+          // Phase 1R-D2-B6-A-R3 — the recruiter profile itself saved, so the
+          // active user-capabilities query must be refreshed immediately
+          // (staleTime 30s would otherwise strand the user on onboarding).
+          // A refresh failure must never trap a saved user: navigate anyway.
+          try {
+            await queryClient.invalidateQueries({ queryKey: ['user-capabilities'] });
+          } catch {
+            /* capability refresh failure must not block navigation */
+          }
+          onBack();
+          // Guard is held through the entire save → capability refresh →
+          // navigation sequence and released only once navigation happened.
+          releaseTransition();
         }
       },
 
@@ -314,9 +357,13 @@ export function RecruiterOnboarding({ onBack }: Props) {
       // verification) without leaking raw objects, SQL, or credentials.
       onError: (e: Error) => {
         toast.error(formatRecruiterProfileError(e));
+        // Ordinary profile-save failure keeps the user on the form:
+        // no capability refresh, no navigation, guard released.
+        releaseTransition();
       },
     });
   };
+
 
 
 
@@ -617,6 +664,7 @@ export function RecruiterOnboarding({ onBack }: Props) {
                     disabled={
                       saveRecruiterProfile.isPending ||
                       referralSettings.saveDecision.isPending ||
+                      isTransitioning ||
                       (!!profile && referralSettings.isLoading) ||
                       isSuspended
                     }
