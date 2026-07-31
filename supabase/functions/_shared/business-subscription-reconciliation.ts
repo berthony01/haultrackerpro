@@ -201,15 +201,23 @@ function evaluateRecruiterRow(row: unknown): RowVerdict {
 
   if (!isNonEmptyString(status)) return "unknown";
 
-  // Only starter/growth/fleet are recognized recruiter paid plans. Every other
-  // value — null, empty, the literal `none`, or anything unrecognized — is
+  // Phase 1R-D2-B4-R2 — `none` is the canonical NON-PAID recruiter plan. The
+  // webhook revoke writer sets recruiter_billing_profiles.plan = "none" together
+  // with a terminal status, and the Phase 1R-D2-B2 checkout state machine allows
+  // agency checkout after that terminal recruiter state. A revoked row must
+  // therefore stay benign, or a paid agency checkout would succeed and then be
+  // rejected at webhook activation. A non-paid plan paired with a live or
+  // recoverable status is contradictory, so it fails closed as unknown.
+  if (plan === "none") {
+    return NON_BILLING_RECRUITER_STATUSES.has(status) ? "allow" : "unknown";
+  }
+
+  // Only starter/growth/fleet are recognized recruiter PAID plans. Every other
+  // value — null, empty, or anything unrecognized such as `enterprise` — is
   // unknown and fails closed, regardless of status.
   if (!isNonEmptyString(plan) || !RECOGNIZED_PAID_RECRUITER_PLANS.has(plan)) {
     return "unknown";
   }
-
-
-
 
   if (BLOCKING_RECRUITER_STATUSES.has(status)) return "active";
   if (NON_BILLING_RECRUITER_STATUSES.has(status)) return "allow";
