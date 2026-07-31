@@ -115,12 +115,35 @@ vi.mock('@/integrations/supabase/client', () => {
   return { supabase: { from, rpc } };
 });
 
+// Phase 1R-D2-B6-A-R3 — NARROW mock of `useQueryClient` only. Every other
+// TanStack export (QueryClient, QueryClientProvider, useQuery, useMutation)
+// remains the ACTUAL implementation so the real-hook describe below still
+// exercises production code. When `queryClientOverride.current` is null the
+// real `useQueryClient` is used verbatim.
+const queryClientOverride = vi.hoisted(() => ({
+  current: null as null | { invalidateQueries: (...args: unknown[]) => unknown },
+}));
+
+vi.mock('@tanstack/react-query', async () => {
+  const actual =
+    await vi.importActual<typeof import('@tanstack/react-query')>(
+      '@tanstack/react-query',
+    );
+  return {
+    ...actual,
+    useQueryClient: (...args: unknown[]) =>
+      queryClientOverride.current ??
+      (actual.useQueryClient as unknown as (...a: unknown[]) => unknown)(...args),
+  };
+});
+
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
   },
 }));
+
 
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useRecruiterReferralSettings } from '@/hooks/opportunities/useRecruiterReferralSettings';
