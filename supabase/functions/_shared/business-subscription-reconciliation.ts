@@ -201,18 +201,14 @@ function evaluateRecruiterRow(row: unknown): RowVerdict {
 
   if (!isNonEmptyString(status)) return "unknown";
 
+  // Only starter/growth/fleet are recognized recruiter paid plans. Every other
+  // value — null, empty, the literal `none`, or anything unrecognized — is
+  // unknown and fails closed, regardless of status.
   if (!isNonEmptyString(plan) || !RECOGNIZED_PAID_RECRUITER_PLANS.has(plan)) {
-    // `none` is the canonical post-revoke recruiter plan. It carries no paid
-    // obligation, so a well-formed `none` row never blocks; an unrecognized
-    // status on it is still malformed and fails closed.
-    if (
-      plan === "none" &&
-      (NON_BILLING_RECRUITER_STATUSES.has(status) || BLOCKING_RECRUITER_STATUSES.has(status))
-    ) {
-      return "allow";
-    }
     return "unknown";
   }
+
+
 
 
   if (BLOCKING_RECRUITER_STATUSES.has(status)) return "active";
