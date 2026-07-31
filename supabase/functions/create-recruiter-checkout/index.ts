@@ -215,13 +215,28 @@ serve(async (req) => {
         message: "Recruiter account suspended.",
       });
     }
-    if (recruiter.verification_status !== "approved") {
+    // Phase 1R-D2-B6-B1 — canonical readiness replaces the obsolete
+    // approved-verification checkout gate. Premium eligibility now follows
+    // the same database helper the rest of the recruiter surface uses.
+    const { data: canManage, error: canManageErr } = await supabaseService.rpc(
+      "recruiter_profile_can_manage_opportunities",
+      { _recruiter_id: recruiter.id },
+    );
+    if (canManageErr) {
+      return jsonResponse({
+        status: 503,
+        code: "transient_error",
+        message: "Temporary billing error. Please try again.",
+      });
+    }
+    if (canManage !== true) {
       return jsonResponse({
         status: 403,
         code: "not_eligible",
-        message: "Recruiter must be approved before subscribing.",
+        message: "Complete your recruiter profile before subscribing.",
       });
     }
+
 
     // Origin allowlist — never reflect arbitrary origins.
     const reqOrigin = req.headers.get("origin") ?? "";
