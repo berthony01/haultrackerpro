@@ -898,7 +898,7 @@ describe("Phase 1G-R1A2 — recruiter checkout orchestrator", () => {
       for (const before of [
         "if (!isRecruiterPlan(plan))",
         '.from("recruiter_profiles")',
-        'recruiter.verification_status !== "approved"',
+        "recruiter_profile_can_manage_opportunities",
         "if (!isAllowedRecruiterOrigin(reqOrigin))",
       ]) {
         const idx = edgeSrc.indexOf(before);
