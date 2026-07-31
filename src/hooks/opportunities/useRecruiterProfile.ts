@@ -79,6 +79,36 @@ function normalize(v: unknown): string {
   return typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim();
 }
 
+/**
+ * Phase 1R-D2-B6-A-R2 — ordinary scalar fields accepted by the
+ * `persist_my_recruiter_profile` SECURITY DEFINER RPC. Identity, status,
+ * moderation, timestamp, and posting-consent columns are deliberately
+ * absent: the function derives the caller from auth.uid() and never
+ * accepts or writes protected fields.
+ */
+const SAFE_PERSIST_SCALAR_FIELDS = [
+  'recruiter_name',
+  'recruiter_email',
+  'recruiter_phone',
+  'company_name',
+  'company_type',
+  'company_website',
+  'company_phone',
+  'company_address',
+  'company_city',
+  'company_state',
+  'dot_number',
+  'mc_number',
+] as const;
+
+const SAFE_PERSIST_LIST_FIELDS = [
+  'hiring_states',
+  'equipment_types',
+  'driver_types_hired',
+] as const;
+
+
+
 
 export function useRecruiterProfile() {
   const { user } = useAuth();
