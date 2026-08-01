@@ -525,7 +525,7 @@ describe('RecruiterOnboarding (production-mounted) — canonical status card', (
   const noop = vi.fn();
 
   function renderOnboarding() {
-    return render(<RecruiterOnboarding onBack={noop} />);
+    return renderWithQueryClient(<RecruiterOnboarding onBack={noop} />);
   }
 
   function statusCard() {
@@ -771,7 +771,7 @@ describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)
 describe('Phase 1J-C2 — RecruiterOnboarding rendered copy (production-mounted)', () => {
   const noop = vi.fn();
   function renderOnboarding() {
-    return render(<RecruiterOnboarding onBack={noop} />);
+    return renderWithQueryClient(<RecruiterOnboarding onBack={noop} />);
   }
 
   beforeEach(() => {
