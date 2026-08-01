@@ -368,7 +368,38 @@ describe('Phase 1R-E1-R1 — Fleet checkout contract', () => {
 // Public copy + webhook alignment
 // ---------------------------------------------------------------------------
 
+describe('Phase 1R-E1-R2 — fail-closed active count and draft clarity', () => {
+  it('requires a settled AND non-errored active-count query before allowing activation', () => {
+    const src = read('src/hooks/opportunities/useRecruiterBilling.ts');
+    expect(src).toContain(
+      'const activeCountUnavailable = activeCountQuery.isError;',
+    );
+    expect(src).toMatch(
+      /const canActivateAnotherOpportunity: boolean =[\s\S]{0,400}?activeCountSettled &&\s*!activeCountUnavailable &&\s*activeCount < effectiveActiveOpportunityLimit;/,
+    );
+    // The controlled, support-safe copy covers the errored-count case too.
+    expect(src).toMatch(
+      /effectiveActiveOpportunityLimit === 0 \|\| activeCountUnavailable/,
+    );
+    // Raw query errors are never surfaced.
+    expect(src).not.toMatch(/activeCountQuery\.error/);
+  });
+
+  it('tells recruiters drafts are unlimited without disabling the post CTA', () => {
+    const src = read(
+      'src/components/opportunities/RecruiterOpportunityManager.tsx',
+    );
+    expect(src).toContain('Drafts are unlimited.');
+    expect(src).toContain('Active opportunities: ${activeUsed} of ${activeLimit}');
+    expect(src).toMatch(
+      /data-testid="post-opportunity-cta"/,
+    );
+    expect(src).not.toMatch(/data-testid="post-opportunity-cta"[\s\S]{0,120}disabled/);
+  });
+});
+
 describe('Phase 1R-E1-R1 — public copy and webhook alignment', () => {
+
   it('uses the canonical ceilings in the stripe webhook', () => {
     const src = read('supabase/functions/stripe-webhook/index.ts');
     expect(src).toMatch(
