@@ -599,34 +599,78 @@ describe('Phase 1R-E1-R1 PGlite — opportunities guard', () => {
 });
 
 describe('Phase 1R-E1-R1 PGlite — narrow backfill', () => {
-  it('(m) corrects only active_opportunity_limit and leaves every other column untouched', async () => {
+  it('(m) corrects only active_opportunity_limit and leaves every other column byte-identical', async () => {
     const db = await boot(false);
-    const { recruiterId: r1 } = await makeRecruiter(db);
-    const { recruiterId: r2 } = await makeRecruiter(db);
-    const { recruiterId: r3 } = await makeRecruiter(db);
+    const a = await makeRecruiter(db);
+    const b = await makeRecruiter(db);
+    const c = await makeRecruiter(db);
 
+    // Phase 1R-E1-R2 — every production-shaped column carries a DISTINCT
+    // seeded value so any collateral write by the backfill is detectable.
     await db.query(
       `INSERT INTO public.recruiter_billing_profiles
-         (recruiter_id, plan, status, active_opportunity_limit, stripe_customer_id, updated_at)
+         (recruiter_id, user_id, plan, status, active_opportunity_limit,
+          stripe_customer_id, stripe_subscription_id, current_period_end, updated_at)
        VALUES
-         ($1,'none','inactive', 0, 'cus_a', '2020-01-01T00:00:00Z'),
-         ($2,'growth','active',  5, 'cus_b', '2020-01-02T00:00:00Z'),
-         ($3,'fleet','canceled', 25,'cus_c', '2020-01-03T00:00:00Z')`,
-      [r1, r2, r3],
+         ($1,$2,'none','inactive',   0, 'cus_a','sub_a','2031-01-01T00:00:00Z','2020-01-01T00:00:00Z'),
+         ($3,$4,'growth','active',   5, 'cus_b','sub_b','2031-02-02T00:00:00Z','2020-01-02T00:00:00Z'),
+         ($5,$6,'fleet','canceled', 25, 'cus_c','sub_c','2031-03-03T00:00:00Z','2020-01-03T00:00:00Z')`,
+      [
+        a.recruiterId,
+        a.userId,
+        b.recruiterId,
+        b.userId,
+        c.recruiterId,
+        c.userId,
+      ],
     );
 
-    const before = await db.query(
-      `SELECT recruiter_id, plan, status, stripe_customer_id, updated_at
-         FROM public.recruiter_billing_profiles ORDER BY stripe_customer_id`,
-    );
+    const SNAPSHOT = `SELECT id, recruiter_id, user_id, plan, status,
+                             stripe_customer_id, stripe_subscription_id,
+                             current_period_end, updated_at
+                        FROM public.recruiter_billing_profiles
+                       ORDER BY stripe_customer_id`;
+
+    const before = await db.query(SNAPSHOT);
 
     await db.exec(CANDIDATE_SQL);
 
-    const after = await db.query(
-      `SELECT recruiter_id, plan, status, stripe_customer_id, updated_at
-         FROM public.recruiter_billing_profiles ORDER BY stripe_customer_id`,
-    );
+    const after = await db.query(SNAPSHOT);
     expect(after.rows).toEqual(before.rows);
+
+    // And the seeded identity/period values are exactly what we wrote.
+    expect(after.rows).toEqual([
+      expect.objectContaining({
+        recruiter_id: a.recruiterId,
+        user_id: a.userId,
+        plan: 'none',
+        status: 'inactive',
+        stripe_customer_id: 'cus_a',
+        stripe_subscription_id: 'sub_a',
+        current_period_end: new Date('2031-01-01T00:00:00Z'),
+        updated_at: new Date('2020-01-01T00:00:00Z'),
+      }),
+      expect.objectContaining({
+        recruiter_id: b.recruiterId,
+        user_id: b.userId,
+        plan: 'growth',
+        status: 'active',
+        stripe_customer_id: 'cus_b',
+        stripe_subscription_id: 'sub_b',
+        current_period_end: new Date('2031-02-02T00:00:00Z'),
+        updated_at: new Date('2020-01-02T00:00:00Z'),
+      }),
+      expect.objectContaining({
+        recruiter_id: c.recruiterId,
+        user_id: c.userId,
+        plan: 'fleet',
+        status: 'canceled',
+        stripe_customer_id: 'cus_c',
+        stripe_subscription_id: 'sub_c',
+        current_period_end: new Date('2031-03-03T00:00:00Z'),
+        updated_at: new Date('2020-01-03T00:00:00Z'),
+      }),
+    ]);
 
     const limits = await db.query<{
       stripe_customer_id: string;
@@ -644,6 +688,7 @@ describe('Phase 1R-E1-R1 PGlite — narrow backfill', () => {
     ]);
 
     // A non-paying fleet row still resolves to the free ceiling at read time.
-    expect(await limitOf(db, r3)).toBe(1);
+    expect(await limitOf(db, c.recruiterId)).toBe(1);
   });
+
 });
