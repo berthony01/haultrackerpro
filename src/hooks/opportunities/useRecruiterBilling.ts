@@ -316,24 +316,40 @@ export function useRecruiterBilling() {
       effectiveBusinessEntitlement.canPostStandardOpportunities,
   });
 
-  // Phase 1R-E1 — effective, entitlement-aware active-opportunity ceiling and
-  // the derived remaining headroom used by the posting UI.
-  const effectiveActiveOpportunityLimit = Math.max(
-    capabilities.activeOpportunityLimit,
-    RECRUITER_PLAN_LIMITS[effectiveRecruiterPlan],
-  );
+  // Phase 1R-E1-R1 — effective, entitlement-aware active-opportunity ceiling.
+  // Fail closed: an unresolved (loading / error) or conflicting business
+  // entitlement grants ZERO activation headroom. It never falls back to the
+  // free ceiling of 1, and it never reads the raw agency DB limit column.
+  const isBusinessEntitlementConflict =
+    effectiveBusinessEntitlement.state === 'conflict';
+  const effectiveActiveOpportunityLimit =
+    effectiveBusinessEntitlement.state === 'resolved'
+      ? RECRUITER_PLAN_LIMITS[effectiveRecruiterPlan]
+      : 0;
   const remainingActiveOpportunities = Math.max(
     0,
     effectiveActiveOpportunityLimit - activeCount,
   );
+  const activeCountSettled = !activeCountQuery.isLoading;
+  const canActivateAnotherOpportunity: boolean =
+    effectiveBusinessEntitlement.state === 'resolved' &&
+    effectiveActiveOpportunityLimit > 0 &&
+    activeCountSettled &&
+    activeCount < effectiveActiveOpportunityLimit;
   const isAtActiveOpportunityLimit =
-    !activeCountQuery.isLoading &&
-    activeCount >= effectiveActiveOpportunityLimit;
-  const activeOpportunityLimitMessage = isAtActiveOpportunityLimit
-    ? `You've reached your plan limit of ${effectiveActiveOpportunityLimit} active ${
-        effectiveActiveOpportunityLimit === 1 ? 'opportunity' : 'opportunities'
-      }. Pause or close a listing, or upgrade your plan, to publish another.`
-    : null;
+    activeCountSettled && !canActivateAnotherOpportunity;
+  const activeOpportunityLimitMessage = !isAtActiveOpportunityLimit
+    ? null
+    : isBusinessEntitlementConflict
+      ? 'We found two paid business subscriptions on your account, so publishing is paused. Contact support to resolve your billing before publishing another opportunity.'
+      : effectiveActiveOpportunityLimit === 0
+        ? 'We could not confirm your plan, so publishing is paused. Refresh in a moment, or contact support if this keeps happening.'
+        : `You've reached your plan limit of ${effectiveActiveOpportunityLimit} active ${
+            effectiveActiveOpportunityLimit === 1
+              ? 'opportunity'
+              : 'opportunities'
+          }. Pause or close a listing, or upgrade your plan, to publish another.`;
+
 
 
   const refetchBilling = useCallback(() => {
