@@ -87,11 +87,15 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     return (
       <RecruiterOpportunityForm
         initial={editing}
+        activeOpportunityLimit={billing.effectiveActiveOpportunityLimit}
+        isAtActiveOpportunityLimit={billing.isAtActiveOpportunityLimit}
+        activeOpportunityLimitMessage={billing.activeOpportunityLimitMessage}
         onBack={() => { setView('list'); setEditing(null); }}
         onSaved={() => { setView('list'); setEditing(null); refetch(); }}
       />
     );
   }
+
 
   if (view === 'referrals' && profile) {
     return (
@@ -115,7 +119,21 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const executeCreate = () => { setEditing(null); setView('form'); };
   const executeActivate = (id: string) => handleStatus(id, 'active');
 
+  // Phase 1R-E1 — canonical active-opportunity ceiling.
+  const activeLimit = billing.effectiveActiveOpportunityLimit ?? 1;
+  const activeUsed = billing.activeCount ?? 0;
+  const atActiveLimit = billing.isAtActiveOpportunityLimit ?? false;
+  const limitMessage =
+    billing.activeOpportunityLimitMessage ??
+    `You've reached your plan limit of ${activeLimit} active ${
+      activeLimit === 1 ? 'opportunity' : 'opportunities'
+    }. Pause or close a listing, or upgrade your plan, to publish another.`;
+
   const gateOrRun = async (action: { kind: 'create' } | { kind: 'activate'; id: string }) => {
+    if (action.kind === 'activate' && atActiveLimit) {
+      toast.error(limitMessage);
+      return;
+    }
     const fresh = await refetchProfile();
     const rr = resolveRecruiterReadiness(fresh);
     if (rr.ready) {
@@ -130,9 +148,10 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const openCreate = () => { void gateOrRun({ kind: 'create' }); };
   const openEdit = (o: Opportunity) => { setEditing(o); setView('form'); };
   const requestActivate = (o: Opportunity) => { void gateOrRun({ kind: 'activate', id: o.id }); };
-  const canActivate = true;
+  const canActivate = !atActiveLimit;
   const deletionPending = deleteOpportunity?.isPending ?? false;
   const busy = setStatus.isPending || deletionPending;
+
 
   const confirmDelete = (event: MouseEvent) => {
     event.preventDefault();
@@ -165,10 +184,25 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
             <p className="text-sm text-muted-foreground">
               Completed Recruiter profiles can post opportunities immediately. Verification adds trust and a badge; it does not control posting access. Each listing shows its driver visibility separately from its lifecycle status.
             </p>
+            <p
+              className="mt-2 text-xs font-semibold text-foreground"
+              data-testid="active-opportunity-usage"
+            >
+              {`Active opportunities: ${activeUsed} of ${activeLimit}`}
+            </p>
+            {atActiveLimit && (
+              <p
+                className="mt-1 text-xs text-destructive"
+                data-testid="active-opportunity-limit-message"
+              >
+                {limitMessage}
+              </p>
+            )}
           </div>
           <Button onClick={openCreate} className="shrink-0" data-testid="post-opportunity-cta">
             <Plus className="h-4 w-4" /> Post Opportunity
           </Button>
+
         </div>
       </Card>
 

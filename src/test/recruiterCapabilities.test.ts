@@ -7,7 +7,7 @@ import {
 } from '@/lib/recruiterCapabilities';
 
 describe('recruiterCapabilities', () => {
-  it('free_verified: approved recruiter with no paid plan can post unlimited standard opportunities', () => {
+  it('free_verified: approved recruiter with no paid plan can post one active standard opportunity', () => {
     const caps = getRecruiterPlanCapabilities({
       plan: 'none',
       status: 'inactive',
@@ -15,8 +15,8 @@ describe('recruiterCapabilities', () => {
     });
     expect(caps.tier).toBe('free_verified');
     expect(caps.canPostStandardOpportunities).toBe(true);
-    expect(caps.unlimitedStandardPosts).toBe(true);
-    expect(caps.activeOpportunityLimit).toBeNull();
+    expect(caps.unlimitedStandardPosts).toBe(false);
+    expect(caps.activeOpportunityLimit).toBe(1);
     expect(caps.canUsePriorityPlacement).toBe(false);
     expect(caps.canUseFeaturedListings).toBe(false);
     expect(caps.canExportRecruiterReports).toBe(false);
@@ -31,8 +31,8 @@ describe('recruiterCapabilities', () => {
   it('starter active: unlocks status history and basic referral tracking; does not unlock unbuilt notes/listing analytics', () => {
     const caps = getRecruiterPlanCapabilities({ plan: 'starter', status: 'active' });
     expect(caps.tier).toBe('starter');
-    expect(caps.unlimitedStandardPosts).toBe(true);
-    expect(caps.activeOpportunityLimit).toBeNull();
+    expect(caps.unlimitedStandardPosts).toBe(false);
+    expect(caps.activeOpportunityLimit).toBe(5);
     expect(caps.canUseApplicantNotes).toBe(false);
     expect(caps.canUseApplicantStatusHistory).toBe(true);
     expect(caps.canUseBasicListingAnalytics).toBe(false);
@@ -119,17 +119,17 @@ describe('recruiterCapabilities', () => {
     expect(caps.canUsePriorityPlacement).toBe(false);
   });
 
-  it('activeOpportunityLimit is null for every tier — no fake unlimited numbers', () => {
+  it('activeOpportunityLimit is the canonical finite ceiling for every tier', () => {
     const plans = [
-      { plan: 'none', status: 'inactive' },
-      { plan: 'starter', status: 'active' },
-      { plan: 'growth', status: 'active' },
-      { plan: 'fleet', status: 'active' },
+      { input: { plan: 'none', status: 'inactive' }, limit: 1 },
+      { input: { plan: 'starter', status: 'active' }, limit: 5 },
+      { input: { plan: 'growth', status: 'active' }, limit: 15 },
+      { input: { plan: 'fleet', status: 'active' }, limit: 25 },
     ] as const;
     for (const p of plans) {
-      const caps = getRecruiterPlanCapabilities(p);
-      expect(caps.activeOpportunityLimit).toBeNull();
-      expect(caps.unlimitedStandardPosts).toBe(true);
+      const caps = getRecruiterPlanCapabilities(p.input);
+      expect(caps.activeOpportunityLimit).toBe(p.limit);
+      expect(caps.unlimitedStandardPosts).toBe(false);
     }
   });
 
@@ -258,14 +258,15 @@ describe('getRecruiterCapabilitiesForTier', () => {
     }
   });
 
-  it('never invents a numeric opportunity ceiling', () => {
+  it('applies the canonical finite ceiling for every resolved tier', () => {
+    const expected = { free_verified: 1, starter: 5, growth: 15, fleet: 25 } as const;
     for (const tier of ['free_verified', 'starter', 'growth', 'fleet'] as const) {
       const caps = getRecruiterCapabilitiesForTier({
         tier,
         canPostStandardOpportunities: true,
       });
-      expect(caps.activeOpportunityLimit).toBeNull();
-      expect(caps.unlimitedStandardPosts).toBe(true);
+      expect(caps.activeOpportunityLimit).toBe(expected[tier]);
+      expect(caps.unlimitedStandardPosts).toBe(false);
     }
   });
 });

@@ -29,6 +29,7 @@ import {
   type Opportunity,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
+
 import {
   buildOpportunityPersistencePayload,
   EMPTY_AUTHORING_STATE,
@@ -58,9 +59,14 @@ import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterR
 
 interface Props {
   initial?: Opportunity | null;
+  /** Phase 1R-E1 — canonical active-opportunity ceiling, supplied by the manager. */
+  activeOpportunityLimit?: number | null;
+  isAtActiveOpportunityLimit?: boolean;
+  activeOpportunityLimitMessage?: string | null;
   onBack: () => void;
   onSaved: () => void;
 }
+
 
 const EMPLOYMENT_OPTIONS: Array<{ value: CanonicalEmploymentModel; label: string }> = [
   { value: 'company_driver', label: 'W-2 Company Driver' },
@@ -272,11 +278,31 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
 
 /* ---------------- form ---------------- */
 
-export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
+export function RecruiterOpportunityForm({
+  initial,
+  activeOpportunityLimit,
+  isAtActiveOpportunityLimit,
+  activeOpportunityLimitMessage,
+  onBack,
+  onSaved,
+}: Props) {
   const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
   const { profile, refetchProfile } = useRecruiterProfile();
   const [readinessOpen, setReadinessOpen] = useState(false);
   const pendingPublishRef = useRef(false);
+
+  // Phase 1R-E1 — publishing a listing that is not already active consumes
+  // one slot against the canonical active-opportunity ceiling.
+  const publishConsumesSlot = initial?.status !== 'active';
+  const activeLimit = activeOpportunityLimit ?? 1;
+  const atActiveLimit = publishConsumesSlot && isAtActiveOpportunityLimit === true;
+  const activeLimitMessage =
+    activeOpportunityLimitMessage ??
+    `You've reached your plan limit of ${activeLimit} active ${
+      activeLimit === 1 ? 'opportunity' : 'opportunities'
+    }. Pause or close a listing, or upgrade your plan, to publish another.`;
+
+
 
   const [state, setState] = useState<State>(() =>
     initial ? normalizeOpportunityForAuthoring(initial) : { ...EMPTY_AUTHORING_STATE },
@@ -330,6 +356,11 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
       toast.error(msg);
       return;
     }
+    if (mode === 'publish' && atActiveLimit) {
+      toast.error(activeLimitMessage);
+      return;
+    }
+
     // Phase 1P-A1 — publish defense-in-depth: refetch the recruiter
     // profile immediately before the mutation and abort into the
     // readiness dialog if the caller no longer satisfies posting
@@ -868,10 +899,21 @@ export function RecruiterOpportunityForm({ initial, onBack, onSaved }: Props) {
                 <Save className="h-4 w-4" /> Save Draft
               </Button>
               <Button onClick={() => save('publish')}
-                disabled={pending || !readiness.canPublish}>
+                data-testid="publish-opportunity"
+                disabled={pending || !readiness.canPublish || atActiveLimit}>
                 <Send className="h-4 w-4" /> Publish Opportunity
+
               </Button>
             </div>
+            {atActiveLimit && (
+              <p
+                className="mt-3 text-xs text-destructive sm:text-right"
+                data-testid="form-active-opportunity-limit-message"
+              >
+                {activeLimitMessage}
+              </p>
+            )}
+
           </Card>
         </div>
       )}

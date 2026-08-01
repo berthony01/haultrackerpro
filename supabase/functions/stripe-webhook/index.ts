@@ -59,9 +59,12 @@ function resolvePlanKey(priceId: string): string | null {
   return null;
 }
 
+// Phase 1R-E1 — canonical recruiter active-opportunity ceilings. `none` is the
+// free Recruiter Standard tier, which now allows exactly 1 active opportunity.
 const RECRUITER_PLAN_LEGACY_LIMITS: Record<string, number> = {
-  none: 0, starter: 1, growth: 5, fleet: 25,
+  none: 1, starter: 5, growth: 15, fleet: 25,
 };
+
 
 const AGENCY_PLAN_ENV: Record<string, string> = {
   agency_starter: "STRIPE_AGENCY_STARTER_PRICE_ID",
@@ -447,7 +450,9 @@ async function applyEntitlement(
 
   if (context === "recruiter") {
     const plan = isActive ? price.planKey : "none";
-    const legacyLimit = RECRUITER_PLAN_LEGACY_LIMITS[plan] ?? 0;
+    const legacyLimit =
+      RECRUITER_PLAN_LEGACY_LIMITS[plan] ?? RECRUITER_PLAN_LEGACY_LIMITS.none;
+
     // Owner user_id is known from the canonical row; we must NOT overwrite it
     // from metadata. Fetch existing to preserve.
     const { data: existing } = await supabase

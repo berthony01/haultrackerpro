@@ -74,7 +74,11 @@ import { useRecruiterOpportunities } from '@/hooks/opportunities/useRecruiterOpp
 import { useOpportunityApplications } from '@/hooks/opportunities/useOpportunityApplications';
 import { RecruiterAccessPage } from '@/components/opportunities/recruiter/RecruiterAccessPage';
 import { RecruiterOnboarding } from '@/components/opportunities/RecruiterOnboarding';
-import { getRecruiterCapabilitiesForTier } from '@/lib/recruiterCapabilities';
+import {
+  getRecruiterCapabilitiesForTier,
+  isRecruiterTierAvailableForNewCheckout,
+} from '@/lib/recruiterCapabilities';
+
 import type { EffectiveBusinessEntitlement } from '@/lib/billing/effectiveBusinessEntitlement';
 
 
@@ -247,6 +251,14 @@ function makeBillingHookMock(
     canUseReferralTracking: capabilities.canUseReferralTracking,
     canUseTeamSeats: capabilities.canUseTeamSeats,
     canUseBulkOpportunityTools: capabilities.canUseBulkOpportunityTools,
+
+    // Phase 1R-E1 — canonical active-opportunity ceiling
+    effectiveActiveOpportunityLimit: capabilities.activeOpportunityLimit,
+    remainingActiveOpportunities: capabilities.activeOpportunityLimit,
+    isAtActiveOpportunityLimit: false,
+    activeOpportunityLimitMessage: null,
+    isRecruiterTierAvailableForNewCheckout,
+
   } satisfies BillingHook;
 
   return { ...base, ...overrides };
