@@ -178,6 +178,7 @@ const whyProPoints = [
 
 const recruiterStandardBullets = [
   '1 active opportunity at a time',
+  'Unlimited drafts',
   'Standard marketplace placement',
   'Basic applicant and contact-request flow',
   'Opportunity management: edit, pause, and close listings',
@@ -196,10 +197,11 @@ const recruiterPaidPlans: Array<{
   {
     name: 'Starter',
     price: '$19',
-    limit: '5 active opportunities',
+    limit: 'Up to 5 active opportunities',
     availableBullets: [
       'Everything in Recruiter Standard',
-      '5 active opportunities at a time',
+      'Up to 5 active opportunities at a time',
+      'Unlimited drafts',
       'Enhanced applicant tracking',
       'Applicant status history',
       'Basic referral tracking view',
@@ -208,11 +210,12 @@ const recruiterPaidPlans: Array<{
   {
     name: 'Growth',
     price: '$49',
-    limit: '15 active opportunities',
+    limit: 'Up to 15 active opportunities',
     highlight: true,
     availableBullets: [
       'Everything in Starter',
-      '15 active opportunities at a time',
+      'Up to 15 active opportunities at a time',
+      'Unlimited drafts',
       'Priority-placement eligibility',
       'Featured-listing eligibility',
       'Recruiter reports (PDF + CSV)',
@@ -226,11 +229,13 @@ const recruiterPaidPlans: Array<{
   {
     name: 'Fleet',
     price: '$149',
-    limit: '25 active opportunities — preview only',
+    limit: 'Up to 25 active opportunities — preview only',
     previewOnly: true,
     availableBullets: [
       'Everything in Growth',
-      '25 active opportunities at a time',
+      'Up to 25 active opportunities at a time for existing Fleet access',
+      'Unlimited drafts',
+      'New standalone Fleet subscriptions are not available yet',
       'Top-placement eligibility',
       'Priority support',
     ],
@@ -242,6 +247,7 @@ const recruiterPaidPlans: Array<{
     ],
   },
 ];
+
 
 
 // ---------------------------------------------------------------------------
@@ -1293,13 +1299,13 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
                     background: 'transparent',
                   }}
                 >
-                  Start Agency Billing <ArrowRight className="h-4 w-4" />
+                  Choose {p.label} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <p
                   className="text-[11px] text-center mt-2"
                   style={{ color: 'hsl(220, 10%, 40%)' }}
                 >
-                  You'll sign in, then start checkout from your agency dashboard.
+                  You&rsquo;ll sign in, then Start Agency Billing from your agency dashboard.
                 </p>
               </div>
             );

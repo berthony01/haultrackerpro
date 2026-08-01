@@ -81,6 +81,21 @@ import {
 
 import type { EffectiveBusinessEntitlement } from '@/lib/billing/effectiveBusinessEntitlement';
 
+// Phase 1R-E1-R1 — minimum harness repair only. `RecruiterOnboarding` now
+// uses `useQueryClient`, so it must be mounted inside a provider. No product
+// expectation or trust-state assertion changes because of this wrapper.
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+function renderWithQueryClient(ui: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
+}
+
+
 
 // ---------------------------------------------------------------------------
 // Fixture helpers.
@@ -256,8 +271,10 @@ function makeBillingHookMock(
     effectiveActiveOpportunityLimit: capabilities.activeOpportunityLimit,
     remainingActiveOpportunities: capabilities.activeOpportunityLimit,
     isAtActiveOpportunityLimit: false,
+    canActivateAnotherOpportunity: true,
     activeOpportunityLimitMessage: null,
     isRecruiterTierAvailableForNewCheckout,
+
 
   } satisfies BillingHook;
 
@@ -508,7 +525,7 @@ describe('RecruiterOnboarding (production-mounted) — canonical status card', (
   const noop = vi.fn();
 
   function renderOnboarding() {
-    return render(<RecruiterOnboarding onBack={noop} />);
+    return renderWithQueryClient(<RecruiterOnboarding onBack={noop} />);
   }
 
   function statusCard() {
@@ -754,7 +771,7 @@ describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)
 describe('Phase 1J-C2 — RecruiterOnboarding rendered copy (production-mounted)', () => {
   const noop = vi.fn();
   function renderOnboarding() {
-    return render(<RecruiterOnboarding onBack={noop} />);
+    return renderWithQueryClient(<RecruiterOnboarding onBack={noop} />);
   }
 
   beforeEach(() => {

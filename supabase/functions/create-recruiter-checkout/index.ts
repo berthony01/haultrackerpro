@@ -185,15 +185,22 @@ serve(async (req) => {
         message: "Unknown recruiter plan.",
       });
     }
-    // Phase 1R-E1 — Fleet is preview-only. Existing Fleet subscriptions keep
-    // their entitlement, but no NEW Fleet checkout may be started.
+    // Phase 1R-E1-R1 — Fleet is preview-only. This rejection happens
+    // immediately after plan parsing and BEFORE any price lookup, business
+    // claim, intent claim, customer creation, or Stripe API call.
     if (PREVIEW_ONLY_RECRUITER_PLANS.has(plan)) {
-      return jsonResponse({
-        status: 400,
-        code: "invalid_plan",
-        message: "That plan is not open for new subscriptions yet.",
-      });
+      return new Response(
+        JSON.stringify({
+          code: "plan_unavailable",
+          message: "Fleet is not available for new subscriptions yet.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
+
 
     const priceId = Deno.env.get(PLAN_TO_ENV[plan]);
     if (!priceId || priceId.trim() === "") {

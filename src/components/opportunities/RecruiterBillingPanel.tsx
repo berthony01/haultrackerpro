@@ -478,7 +478,8 @@ export function RecruiterBillingPanel() {
                     ) : isCurrent ? (
                       'Active'
                     ) : previewOnlyBlocked ? (
-                      'Not available yet'
+                      'Fleet Preview'
+
                     ) : (
                       `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
                     )}
