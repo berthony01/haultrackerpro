@@ -1492,3 +1492,45 @@ describe('Phase 1R-D2-B6-B1 — hostile popup containment', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 1R-E1-R2 — a FAILED active-opportunity count must fail closed.
+// ---------------------------------------------------------------------------
+
+describe('Phase 1R-E1-R2 — active-count query failure fails closed', () => {
+  it('blocks activation, reports at-limit, and exposes only the controlled support-safe message', async () => {
+    withBilling({
+      recruiter_id: 'rec-1',
+      plan: 'growth',
+      status: 'active',
+      stripe_customer_id: 'cus_1',
+      stripe_subscription_id: 'sub_1',
+    });
+    supabaseMocks.fromHeadCount.mockResolvedValue({
+      count: null,
+      error: { message: 'db exploded: connection to 10.0.0.7 refused' },
+    });
+
+    const { result } = await settledHook();
+    await waitFor(() =>
+      expect(
+        (result.current as BillingHookResult).activeOpportunityLimitMessage,
+      ).not.toBeNull(),
+    );
+    const r = result.current as BillingHookResult;
+
+    // The plan itself still resolves — only the count is unavailable.
+    expect(r.effectiveRecruiterTier).toBe('growth');
+    expect(r.effectiveActiveOpportunityLimit).toBe(15);
+
+    // Fail closed.
+    expect(r.canActivateAnotherOpportunity).toBe(false);
+    expect(r.isAtActiveOpportunityLimit).toBe(true);
+
+    // Controlled copy only — no raw error text leaks.
+    expect(r.activeOpportunityLimitMessage).toBe(
+      'We could not confirm your plan, so publishing is paused. Refresh in a moment, or contact support if this keeps happening.',
+    );
+    expect(r.activeOpportunityLimitMessage).not.toMatch(/db exploded|10\.0\.0\.7/);
+  });
+});
