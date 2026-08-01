@@ -606,8 +606,10 @@ export function useRecruiterBilling() {
     effectiveActiveOpportunityLimit,
     remainingActiveOpportunities,
     isAtActiveOpportunityLimit,
+    canActivateAnotherOpportunity,
     activeOpportunityLimitMessage,
     isRecruiterTierAvailableForNewCheckout,
+
 
 
 
