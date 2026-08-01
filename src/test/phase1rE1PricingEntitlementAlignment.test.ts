@@ -347,7 +347,7 @@ describe('Phase 1R-E1-R1 — Fleet checkout contract', () => {
     expect(rejectIdx).toBeGreaterThan(0);
     for (const later of [
       'Deno.env.get(PLAN_TO_ENV[plan])',
-      'createBusinessCheckoutClaimStore',
+      'createBusinessCheckoutClaimStore(supabaseService)',
       'claim_recruiter_checkout_intent',
       'new Stripe(stripeKey',
     ]) {
