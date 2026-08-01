@@ -330,11 +330,17 @@ export function useRecruiterBilling() {
     0,
     effectiveActiveOpportunityLimit - activeCount,
   );
+  // Phase 1R-E1-R2 — the active count must be BOTH settled and successful.
+  // A failed count query previously fell back to 0 and could wrongly grant
+  // activation headroom; it now fails closed exactly like an unresolved
+  // entitlement. The raw query error is never surfaced to the recruiter.
+  const activeCountUnavailable = activeCountQuery.isError;
   const activeCountSettled = !activeCountQuery.isLoading;
   const canActivateAnotherOpportunity: boolean =
     effectiveBusinessEntitlement.state === 'resolved' &&
     effectiveActiveOpportunityLimit > 0 &&
     activeCountSettled &&
+    !activeCountUnavailable &&
     activeCount < effectiveActiveOpportunityLimit;
   const isAtActiveOpportunityLimit =
     activeCountSettled && !canActivateAnotherOpportunity;
@@ -342,13 +348,14 @@ export function useRecruiterBilling() {
     ? null
     : isBusinessEntitlementConflict
       ? 'We found two paid business subscriptions on your account, so publishing is paused. Contact support to resolve your billing before publishing another opportunity.'
-      : effectiveActiveOpportunityLimit === 0
+      : effectiveActiveOpportunityLimit === 0 || activeCountUnavailable
         ? 'We could not confirm your plan, so publishing is paused. Refresh in a moment, or contact support if this keeps happening.'
         : `You've reached your plan limit of ${effectiveActiveOpportunityLimit} active ${
             effectiveActiveOpportunityLimit === 1
               ? 'opportunity'
               : 'opportunities'
           }. Pause or close a listing, or upgrade your plan, to publish another.`;
+
 
 
 

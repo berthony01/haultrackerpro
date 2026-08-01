@@ -81,12 +81,17 @@ CREATE OR REPLACE FUNCTION public.current_user_can_manage_recruiter_opportunitie
 CREATE TABLE public.recruiter_billing_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recruiter_id uuid NOT NULL REFERENCES public.recruiter_profiles(id) ON DELETE CASCADE,
+  -- Phase 1R-E1-R2 — production-shaped identity and Stripe period columns.
+  user_id uuid,
   plan text NOT NULL DEFAULT 'none',
   status text NOT NULL DEFAULT 'inactive',
   active_opportunity_limit integer NOT NULL DEFAULT 0,
   stripe_customer_id text,
+  stripe_subscription_id text,
+  current_period_end timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 
 CREATE TABLE public.agency_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -476,35 +481,94 @@ describe('Phase 1R-E1-R1 PGlite — opportunities guard', () => {
     expect(await activeCount(db, recruiterId)).toBe(4);
   });
 
-  it('(j) pausing frees a slot and re-activating consumes it again', async () => {
+  it('(g2) growth recruiter activates exactly 15 and is blocked at the 16th', async () => {
+    const { userId, recruiterId } = await makeRecruiter(db);
+    await giveRecruiterPlan(db, recruiterId, 'growth', 'active');
+    await setUid(db, userId);
+    await activate(db, recruiterId, 15);
+    expect(await activeCount(db, recruiterId)).toBe(15);
+
+    const err = await expectFailure(() => activate(db, recruiterId, 1));
+    expect(err.code).toBe('23514');
+    expect(err.message).toContain('Active opportunity limit reached.');
+    expect(JSON.parse(err.detail)).toMatchObject({
+      code: 'active_opportunity_limit_reached',
+      limit: 15,
+      active_count: 15,
+    });
+    expect(await activeCount(db, recruiterId)).toBe(15);
+  });
+
+  it('(g3) trialing fleet recruiter activates exactly 25 and is blocked at the 26th', async () => { // trial-allowlist — Stripe status literal, not user-facing copy
+    const { userId, recruiterId } = await makeRecruiter(db);
+    await giveRecruiterPlan(db, recruiterId, 'fleet', 'trialing'); // trial-allowlist — Stripe status literal, not user-facing copy
+
+    await setUid(db, userId);
+    await activate(db, recruiterId, 25);
+    expect(await activeCount(db, recruiterId)).toBe(25);
+
+    const err = await expectFailure(() => activate(db, recruiterId, 1));
+    expect(err.code).toBe('23514');
+    expect(err.message).toContain('Active opportunity limit reached.');
+    expect(JSON.parse(err.detail)).toMatchObject({
+      code: 'active_opportunity_limit_reached',
+      limit: 25,
+      active_count: 25,
+    });
+    expect(await activeCount(db, recruiterId)).toBe(25);
+  });
+
+  it('(j) a paused listing cannot be reactivated once another listing has taken the freed slot', async () => {
     const { userId, recruiterId } = await makeRecruiter(db);
     await setUid(db, userId);
-    await activate(db, recruiterId, 1);
 
-    const draft = await db.query<{ id: string }>(
-      `INSERT INTO public.opportunities(recruiter_id, status) VALUES ($1,'draft') RETURNING id`,
+    const first = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities(recruiter_id, status, title) VALUES ($1,'active','first') RETURNING id`,
       [recruiterId],
     );
-    const draftId = draft.rows[0].id;
+    const firstId = first.rows[0].id;
 
-    const blocked = await expectFailure(() =>
-      db.query(`UPDATE public.opportunities SET status = 'active' WHERE id = $1`, [
-        draftId,
-      ]),
+    const second = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities(recruiter_id, status, title) VALUES ($1,'draft','second') RETURNING id`,
+      [recruiterId],
     );
-    expect(blocked.message).toContain('Active opportunity limit reached.');
+    const secondId = second.rows[0].id;
 
+    // 1) active -> paused frees the single free-tier slot.
     await db.query(
-      `UPDATE public.opportunities SET status = 'paused' WHERE recruiter_id = $1 AND status = 'active'`,
-      [recruiterId],
+      `UPDATE public.opportunities SET status = 'paused' WHERE id = $1`,
+      [firstId],
     );
     expect(await activeCount(db, recruiterId)).toBe(0);
 
-    await db.query(`UPDATE public.opportunities SET status = 'active' WHERE id = $1`, [
-      draftId,
-    ]);
+    // 2) the other listing takes the freed slot.
+    await db.query(
+      `UPDATE public.opportunities SET status = 'active' WHERE id = $1`,
+      [secondId],
+    );
+    expect(await activeCount(db, recruiterId)).toBe(1);
+
+    // 3) paused -> active on the original is blocked while the slot is full.
+    const err = await expectFailure(() =>
+      db.query(`UPDATE public.opportunities SET status = 'active' WHERE id = $1`, [
+        firstId,
+      ]),
+    );
+    expect(err.code).toBe('23514');
+    expect(JSON.parse(err.detail)).toMatchObject({
+      code: 'active_opportunity_limit_reached',
+      limit: 1,
+      active_count: 1,
+    });
+
+    const still = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunities WHERE id = $1`,
+      [firstId],
+    );
+    expect(still.rows[0].status).toBe('paused');
     expect(await activeCount(db, recruiterId)).toBe(1);
   });
+
 
   it('(k) drafts are unlimited for a free recruiter', async () => {
     const { userId, recruiterId } = await makeRecruiter(db);
@@ -535,34 +599,78 @@ describe('Phase 1R-E1-R1 PGlite — opportunities guard', () => {
 });
 
 describe('Phase 1R-E1-R1 PGlite — narrow backfill', () => {
-  it('(m) corrects only active_opportunity_limit and leaves every other column untouched', async () => {
+  it('(m) corrects only active_opportunity_limit and leaves every other column byte-identical', async () => {
     const db = await boot(false);
-    const { recruiterId: r1 } = await makeRecruiter(db);
-    const { recruiterId: r2 } = await makeRecruiter(db);
-    const { recruiterId: r3 } = await makeRecruiter(db);
+    const a = await makeRecruiter(db);
+    const b = await makeRecruiter(db);
+    const c = await makeRecruiter(db);
 
+    // Phase 1R-E1-R2 — every production-shaped column carries a DISTINCT
+    // seeded value so any collateral write by the backfill is detectable.
     await db.query(
       `INSERT INTO public.recruiter_billing_profiles
-         (recruiter_id, plan, status, active_opportunity_limit, stripe_customer_id, updated_at)
+         (recruiter_id, user_id, plan, status, active_opportunity_limit,
+          stripe_customer_id, stripe_subscription_id, current_period_end, updated_at)
        VALUES
-         ($1,'none','inactive', 0, 'cus_a', '2020-01-01T00:00:00Z'),
-         ($2,'growth','active',  5, 'cus_b', '2020-01-02T00:00:00Z'),
-         ($3,'fleet','canceled', 25,'cus_c', '2020-01-03T00:00:00Z')`,
-      [r1, r2, r3],
+         ($1,$2,'none','inactive',   0, 'cus_a','sub_a','2031-01-01T00:00:00Z','2020-01-01T00:00:00Z'),
+         ($3,$4,'growth','active',   5, 'cus_b','sub_b','2031-02-02T00:00:00Z','2020-01-02T00:00:00Z'),
+         ($5,$6,'fleet','canceled', 25, 'cus_c','sub_c','2031-03-03T00:00:00Z','2020-01-03T00:00:00Z')`,
+      [
+        a.recruiterId,
+        a.userId,
+        b.recruiterId,
+        b.userId,
+        c.recruiterId,
+        c.userId,
+      ],
     );
 
-    const before = await db.query(
-      `SELECT recruiter_id, plan, status, stripe_customer_id, updated_at
-         FROM public.recruiter_billing_profiles ORDER BY stripe_customer_id`,
-    );
+    const SNAPSHOT = `SELECT id, recruiter_id, user_id, plan, status,
+                             stripe_customer_id, stripe_subscription_id,
+                             current_period_end, updated_at
+                        FROM public.recruiter_billing_profiles
+                       ORDER BY stripe_customer_id`;
+
+    const before = await db.query(SNAPSHOT);
 
     await db.exec(CANDIDATE_SQL);
 
-    const after = await db.query(
-      `SELECT recruiter_id, plan, status, stripe_customer_id, updated_at
-         FROM public.recruiter_billing_profiles ORDER BY stripe_customer_id`,
-    );
+    const after = await db.query(SNAPSHOT);
     expect(after.rows).toEqual(before.rows);
+
+    // And the seeded identity/period values are exactly what we wrote.
+    expect(after.rows).toEqual([
+      expect.objectContaining({
+        recruiter_id: a.recruiterId,
+        user_id: a.userId,
+        plan: 'none',
+        status: 'inactive',
+        stripe_customer_id: 'cus_a',
+        stripe_subscription_id: 'sub_a',
+        current_period_end: new Date('2031-01-01T00:00:00Z'),
+        updated_at: new Date('2020-01-01T00:00:00Z'),
+      }),
+      expect.objectContaining({
+        recruiter_id: b.recruiterId,
+        user_id: b.userId,
+        plan: 'growth',
+        status: 'active',
+        stripe_customer_id: 'cus_b',
+        stripe_subscription_id: 'sub_b',
+        current_period_end: new Date('2031-02-02T00:00:00Z'),
+        updated_at: new Date('2020-01-02T00:00:00Z'),
+      }),
+      expect.objectContaining({
+        recruiter_id: c.recruiterId,
+        user_id: c.userId,
+        plan: 'fleet',
+        status: 'canceled',
+        stripe_customer_id: 'cus_c',
+        stripe_subscription_id: 'sub_c',
+        current_period_end: new Date('2031-03-03T00:00:00Z'),
+        updated_at: new Date('2020-01-03T00:00:00Z'),
+      }),
+    ]);
 
     const limits = await db.query<{
       stripe_customer_id: string;
@@ -580,6 +688,7 @@ describe('Phase 1R-E1-R1 PGlite — narrow backfill', () => {
     ]);
 
     // A non-paying fleet row still resolves to the free ceiling at read time.
-    expect(await limitOf(db, r3)).toBe(1);
+    expect(await limitOf(db, c.recruiterId)).toBe(1);
   });
+
 });
