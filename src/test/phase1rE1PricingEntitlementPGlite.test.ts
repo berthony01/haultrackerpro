@@ -81,12 +81,17 @@ CREATE OR REPLACE FUNCTION public.current_user_can_manage_recruiter_opportunitie
 CREATE TABLE public.recruiter_billing_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recruiter_id uuid NOT NULL REFERENCES public.recruiter_profiles(id) ON DELETE CASCADE,
+  -- Phase 1R-E1-R2 — production-shaped identity and Stripe period columns.
+  user_id uuid,
   plan text NOT NULL DEFAULT 'none',
   status text NOT NULL DEFAULT 'inactive',
   active_opportunity_limit integer NOT NULL DEFAULT 0,
   stripe_customer_id text,
+  stripe_subscription_id text,
+  current_period_end timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
 
 CREATE TABLE public.agency_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
