@@ -210,15 +210,12 @@ export function useRecruiterBilling() {
 
   const billing = billingQuery.data ?? null;
   const plan = (billing?.plan ?? 'none') as RecruiterPlan;
-  // Phase 1R-E1 — the ceiling is canonical per plan. A stale
-  // `active_opportunity_limit` column value from a pre-1R-E1 row is never
-  // allowed to under-grant below the plan's canonical ceiling.
-  const limit = Math.max(
-    RECRUITER_PLAN_LIMITS[plan],
-    typeof billing?.active_opportunity_limit === 'number'
-      ? billing.active_opportunity_limit
-      : 0,
-  );
+  // Phase 1R-E1-R1 — the raw ceiling is EXACTLY the canonical per-plan value.
+  // A stale `active_opportunity_limit` column value from a pre-1R-E1 row is
+  // never allowed to over-grant (or under-grant) the plan's canonical ceiling.
+  // The raw `billing` row remains exposed separately for callers that need it.
+  const limit = RECRUITER_PLAN_LIMITS[plan] ?? RECRUITER_PLAN_LIMITS.none;
+
 
   const status = billing?.status ?? 'inactive';
   const isBillingActive = status === 'active' || status === 'trialing'; // trial-allowlist
