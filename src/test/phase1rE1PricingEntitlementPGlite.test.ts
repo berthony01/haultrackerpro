@@ -499,10 +499,10 @@ describe('Phase 1R-E1-R1 PGlite — opportunities guard', () => {
     expect(await activeCount(db, recruiterId)).toBe(15);
   });
 
-  it('(g3) trialing fleet recruiter activates exactly 25 and is blocked at the 26th', async () => {
+  it('(g3) trialing fleet recruiter activates exactly 25 and is blocked at the 26th', async () => { // trial-allowlist — Stripe status literal, not user-facing copy
     const { userId, recruiterId } = await makeRecruiter(db);
-    // trial-allowlist: Stripe subscription status literal
-    await giveRecruiterPlan(db, recruiterId, 'fleet', 'trialing');
+    await giveRecruiterPlan(db, recruiterId, 'fleet', 'trialing'); // trial-allowlist — Stripe status literal, not user-facing copy
+
     await setUid(db, userId);
     await activate(db, recruiterId, 25);
     expect(await activeCount(db, recruiterId)).toBe(25);
