@@ -65,6 +65,9 @@ export const RECRUITER_CHECKOUT_MESSAGES: Record<
   not_eligible:
     'Your recruiter profile is not currently eligible for premium checkout.',
   invalid_plan: 'That plan is not available. Please choose a valid plan.',
+  // Phase 1R-E1-R1 — exact server message for preview-only plans.
+  plan_unavailable: 'Fleet is not available for new subscriptions yet.',
+
   invalid_price: 'Pricing is temporarily unavailable. Please try again later.',
   invalid_origin: 'Checkout could not be started from this location.',
   // Phase 1R-D1 — cross-context business billing guard.
