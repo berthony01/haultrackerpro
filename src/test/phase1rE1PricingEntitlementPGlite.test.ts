@@ -481,35 +481,94 @@ describe('Phase 1R-E1-R1 PGlite — opportunities guard', () => {
     expect(await activeCount(db, recruiterId)).toBe(4);
   });
 
-  it('(j) pausing frees a slot and re-activating consumes it again', async () => {
+  it('(g2) growth recruiter activates exactly 15 and is blocked at the 16th', async () => {
+    const { userId, recruiterId } = await makeRecruiter(db);
+    await giveRecruiterPlan(db, recruiterId, 'growth', 'active');
+    await setUid(db, userId);
+    await activate(db, recruiterId, 15);
+    expect(await activeCount(db, recruiterId)).toBe(15);
+
+    const err = await expectFailure(() => activate(db, recruiterId, 1));
+    expect(err.code).toBe('23514');
+    expect(err.message).toContain('Active opportunity limit reached.');
+    expect(JSON.parse(err.detail)).toMatchObject({
+      code: 'active_opportunity_limit_reached',
+      limit: 15,
+      active_count: 15,
+    });
+    expect(await activeCount(db, recruiterId)).toBe(15);
+  });
+
+  it('(g3) trialing fleet recruiter activates exactly 25 and is blocked at the 26th', async () => {
+    const { userId, recruiterId } = await makeRecruiter(db);
+    // trial-allowlist: Stripe subscription status literal
+    await giveRecruiterPlan(db, recruiterId, 'fleet', 'trialing');
+    await setUid(db, userId);
+    await activate(db, recruiterId, 25);
+    expect(await activeCount(db, recruiterId)).toBe(25);
+
+    const err = await expectFailure(() => activate(db, recruiterId, 1));
+    expect(err.code).toBe('23514');
+    expect(err.message).toContain('Active opportunity limit reached.');
+    expect(JSON.parse(err.detail)).toMatchObject({
+      code: 'active_opportunity_limit_reached',
+      limit: 25,
+      active_count: 25,
+    });
+    expect(await activeCount(db, recruiterId)).toBe(25);
+  });
+
+  it('(j) a paused listing cannot be reactivated once another listing has taken the freed slot', async () => {
     const { userId, recruiterId } = await makeRecruiter(db);
     await setUid(db, userId);
-    await activate(db, recruiterId, 1);
 
-    const draft = await db.query<{ id: string }>(
-      `INSERT INTO public.opportunities(recruiter_id, status) VALUES ($1,'draft') RETURNING id`,
+    const first = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities(recruiter_id, status, title) VALUES ($1,'active','first') RETURNING id`,
       [recruiterId],
     );
-    const draftId = draft.rows[0].id;
+    const firstId = first.rows[0].id;
 
-    const blocked = await expectFailure(() =>
-      db.query(`UPDATE public.opportunities SET status = 'active' WHERE id = $1`, [
-        draftId,
-      ]),
+    const second = await db.query<{ id: string }>(
+      `INSERT INTO public.opportunities(recruiter_id, status, title) VALUES ($1,'draft','second') RETURNING id`,
+      [recruiterId],
     );
-    expect(blocked.message).toContain('Active opportunity limit reached.');
+    const secondId = second.rows[0].id;
 
+    // 1) active -> paused frees the single free-tier slot.
     await db.query(
-      `UPDATE public.opportunities SET status = 'paused' WHERE recruiter_id = $1 AND status = 'active'`,
-      [recruiterId],
+      `UPDATE public.opportunities SET status = 'paused' WHERE id = $1`,
+      [firstId],
     );
     expect(await activeCount(db, recruiterId)).toBe(0);
 
-    await db.query(`UPDATE public.opportunities SET status = 'active' WHERE id = $1`, [
-      draftId,
-    ]);
+    // 2) the other listing takes the freed slot.
+    await db.query(
+      `UPDATE public.opportunities SET status = 'active' WHERE id = $1`,
+      [secondId],
+    );
+    expect(await activeCount(db, recruiterId)).toBe(1);
+
+    // 3) paused -> active on the original is blocked while the slot is full.
+    const err = await expectFailure(() =>
+      db.query(`UPDATE public.opportunities SET status = 'active' WHERE id = $1`, [
+        firstId,
+      ]),
+    );
+    expect(err.code).toBe('23514');
+    expect(JSON.parse(err.detail)).toMatchObject({
+      code: 'active_opportunity_limit_reached',
+      limit: 1,
+      active_count: 1,
+    });
+
+    const still = await db.query<{ status: string }>(
+      `SELECT status FROM public.opportunities WHERE id = $1`,
+      [firstId],
+    );
+    expect(still.rows[0].status).toBe('paused');
     expect(await activeCount(db, recruiterId)).toBe(1);
   });
+
 
   it('(k) drafts are unlimited for a free recruiter', async () => {
     const { userId, recruiterId } = await makeRecruiter(db);
