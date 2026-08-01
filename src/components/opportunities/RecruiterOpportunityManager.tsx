@@ -190,6 +190,15 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
             >
               {`Active opportunities: ${activeUsed} of ${activeLimit}`}
             </p>
+            {/* Phase 1R-E1-R2 — the ceiling applies to ACTIVE listings only. */}
+            <p
+              className="mt-1 text-xs text-muted-foreground"
+              data-testid="active-opportunity-drafts-note"
+            >
+              Drafts are unlimited. Only active listings count toward your plan
+              limit.
+            </p>
+
             {atActiveLimit && (
               <p
                 className="mt-1 text-xs text-destructive"
