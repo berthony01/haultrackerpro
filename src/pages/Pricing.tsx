@@ -1305,7 +1305,7 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
                   className="text-[11px] text-center mt-2"
                   style={{ color: 'hsl(220, 10%, 40%)' }}
                 >
-                  You'll sign in, then start checkout from your agency dashboard.
+                  You&rsquo;ll sign in, then Start Agency Billing from your agency dashboard.
                 </p>
               </div>
             );
