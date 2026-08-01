@@ -11,7 +11,10 @@ export type RecruiterCheckoutCode =
   | 'not_owner'
   | 'not_eligible'
   | 'invalid_plan'
+  // Phase 1R-E1-R1 — a recognized plan that is not open for new subscriptions.
+  | 'plan_unavailable'
   | 'invalid_origin'
+
   | 'invalid_price'
   | 'customer_conflict'
   | 'customer_not_found'
