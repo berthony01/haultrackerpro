@@ -191,7 +191,7 @@ describe('Phase 1R-E1-R1 — candidate entitlement semantics', () => {
     expect(sql).toMatch(/am\.role::text = 'agency_owner'/);
     expect(sql).toMatch(/am\.status::text = 'active'/);
     expect(sql).toMatch(/ae\.source IN \('stripe', 'manual', 'admin_seed'\)/);
-    expect(sql).toMatch(/ae\.status IN \('active', 'trialing'\)/);
+    expect(sql).toMatch(/ae\.status IN \('active', 'trialing'\)/); // trial-allowlist: Stripe status literal
     expect(sql).not.toMatch(/'manual_beta'/);
   });
 
