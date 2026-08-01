@@ -1299,7 +1299,7 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
                     background: 'transparent',
                   }}
                 >
-                  Start Agency Billing <ArrowRight className="h-4 w-4" />
+                  Choose {p.label} <ArrowRight className="h-4 w-4" />
                 </Button>
                 <p
                   className="text-[11px] text-center mt-2"
