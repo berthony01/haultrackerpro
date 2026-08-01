@@ -96,6 +96,15 @@ const PLAN_TO_ENV: Record<RecruiterPlan, string> = {
   fleet: "STRIPE_RECRUITER_FLEET_PRICE_ID",
 };
 
+/**
+ * Phase 1R-E1 — recruiter plans that are preview-only. Existing subscriptions
+ * are honored; new checkouts are refused.
+ */
+const PREVIEW_ONLY_RECRUITER_PLANS: ReadonlySet<RecruiterPlan> = new Set<
+  RecruiterPlan
+>(["fleet"]);
+
+
 const log = (s: string, d?: Record<string, unknown>) =>
   console.log(
     `[CREATE-RECRUITER-CHECKOUT] ${s}${d ? ` - ${JSON.stringify(d)}` : ""}`,
@@ -176,6 +185,16 @@ serve(async (req) => {
         message: "Unknown recruiter plan.",
       });
     }
+    // Phase 1R-E1 — Fleet is preview-only. Existing Fleet subscriptions keep
+    // their entitlement, but no NEW Fleet checkout may be started.
+    if (PREVIEW_ONLY_RECRUITER_PLANS.has(plan)) {
+      return jsonResponse({
+        status: 400,
+        code: "invalid_plan",
+        message: "That plan is not open for new subscriptions yet.",
+      });
+    }
+
     const priceId = Deno.env.get(PLAN_TO_ENV[plan]);
     if (!priceId || priceId.trim() === "") {
       return jsonResponse({

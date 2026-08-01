@@ -95,10 +95,12 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       '2 agency members total, including the owner',
       'Up to 5 active driver clients',
       'Up to 3 active service packages',
+      'Includes Recruiter Starter — 5 active opportunities for the agency owner',
       'Private agency request link',
       'Client requests, work queue, audit log',
       'Driver-approved delegation only',
     ],
+
     limitationsCopy:
       'Software access only. HaulTracker Pro does not process service payments between you and your driver clients.',
   },
@@ -121,10 +123,12 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Up to 5 agency members',
       'Up to 25 active driver clients',
       'Up to 25 active service packages',
+      'Includes Recruiter Growth — 15 active opportunities for the agency owner',
       'Shared work queue and notifications',
       'Private agency request link',
       'Full agency audit log',
     ],
+
     limitationsCopy:
       'Software access only. HaulTracker Pro does not process service payments between you and your driver clients.',
   },
@@ -147,10 +151,12 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Up to 15 agency members',
       'Up to 100 active driver clients',
       'Up to 100 active service packages',
+      'Includes Recruiter Fleet — 25 active opportunities for the agency owner',
       'Advanced work queue',
       'Private agency request link',
       'Full agency audit log',
     ],
+
     limitationsCopy:
       'Software access only. HaulTracker Pro does not process service payments between you and your driver clients.',
   },

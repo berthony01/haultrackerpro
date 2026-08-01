@@ -2,18 +2,19 @@
  * Recruiter capability layer.
  *
  * Centralized model of what a recruiter can do based on their plan and
- * billing status. This is the future source of truth for recruiter feature
- * gating. Unlimited standard posting is represented by capability semantics
- * (`unlimitedStandardPosts: true`, `activeOpportunityLimit: null`) — never
- * by a fake numeric ceiling.
+ * billing status. This is the source of truth for recruiter feature gating.
+ *
+ * Phase 1R-E1 — standard posting is NO LONGER unlimited. Every tier carries a
+ * finite active-opportunity ceiling defined once in
+ * `RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS` and nowhere else on the client.
  *
  * This file is intentionally pure (no react-query, no Supabase). It is safe
  * to import from hooks, components, and unit tests.
  *
  * NOTE: Backend enforcement (opportunities_billing_guard, stripe-webhook,
- * recruiter_plan_limit) is unchanged. This layer is consumed by the UI in
- * later phases — Phase 1 only introduces the model + tests.
+ * recruiter_plan_limit) mirrors this same matrix.
  */
+
 
 import type { RecruiterPlan } from '@/hooks/opportunities/useRecruiterBilling';
 
@@ -33,14 +34,43 @@ export type RecruiterCapabilityTier =
 
 export type ReferralTrackingLevel = 'none' | 'basic' | 'full';
 
+/**
+ * Phase 1R-E1 — canonical active-opportunity ceiling per recruiter tier.
+ * This is the ONE client-side definition of the limit matrix.
+ */
+export const RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS: Readonly<
+  Record<RecruiterCapabilityTier, number>
+> = Object.freeze({
+  free_verified: 1,
+  starter: 5,
+  growth: 15,
+  fleet: 25,
+} as const);
+
+/**
+ * Phase 1R-E1 — Fleet is preview-only: existing Fleet subscriptions keep
+ * their entitlement, but no NEW Fleet checkout may be started.
+ */
+export const RECRUITER_PREVIEW_ONLY_TIERS: ReadonlySet<RecruiterCapabilityTier> =
+  new Set<RecruiterCapabilityTier>(['fleet']);
+
+export function isRecruiterTierAvailableForNewCheckout(
+  tier: RecruiterCapabilityTier | string | null | undefined,
+): boolean {
+  if (typeof tier !== 'string') return false;
+  return !RECRUITER_PREVIEW_ONLY_TIERS.has(tier as RecruiterCapabilityTier);
+}
+
 export interface RecruiterCapabilities {
   tier: RecruiterCapabilityTier;
 
   // Standard posting
   canPostStandardOpportunities: boolean;
+  /** Phase 1R-E1: always false — every tier has a finite ceiling. */
   unlimitedStandardPosts: boolean;
-  /** null = unlimited under the new capability model. */
-  activeOpportunityLimit: number | null;
+  /** Finite active-opportunity ceiling for the tier. */
+  activeOpportunityLimit: number;
+
 
   // Visibility / premium placement
   canUsePriorityPlacement: boolean;
@@ -119,8 +149,10 @@ export function resolveRecruiterCapabilityTier(
 function freeVerified(): Omit<RecruiterCapabilities, 'canPostStandardOpportunities'> {
   return {
     tier: 'free_verified',
-    unlimitedStandardPosts: true,
-    activeOpportunityLimit: null,
+    unlimitedStandardPosts: false,
+    activeOpportunityLimit:
+      RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.free_verified,
+
     canUsePriorityPlacement: false,
     canUseFeaturedListings: false,
     canExportRecruiterReports: false,
@@ -145,8 +177,10 @@ function starter(): Omit<RecruiterCapabilities, 'canPostStandardOpportunities'> 
   return {
     ...freeVerified(),
     tier: 'starter',
+    activeOpportunityLimit: RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.starter,
     // canUseApplicantNotes intentionally false until a private notes UI ships.
     canUseApplicantStatusHistory: true,
+
     // canUseBasicListingAnalytics intentionally false — true listing impression
     // analytics are not built; "basic applicant pipeline analytics" is shown
     // in copy only.
@@ -158,7 +192,9 @@ function growth(): Omit<RecruiterCapabilities, 'canPostStandardOpportunities'> {
   return {
     ...starter(),
     tier: 'growth',
+    activeOpportunityLimit: RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.growth,
     canUsePriorityPlacement: true,
+
     canUseFeaturedListings: true,
     canExportRecruiterReports: true,
     canViewAdvancedRecruiterReports: true,
@@ -173,7 +209,9 @@ function fleet(): Omit<RecruiterCapabilities, 'canPostStandardOpportunities'> {
   return {
     ...growth(),
     tier: 'fleet',
+    activeOpportunityLimit: RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.fleet,
     // Coming-soon capabilities. Kept false until the underlying features ship
+
     // so capability checks never silently unlock unbuilt UI.
     canUseTeamSeats: false,
     canUseBulkOpportunityTools: false,

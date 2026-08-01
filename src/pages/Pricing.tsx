@@ -177,7 +177,7 @@ const whyProPoints = [
 // ---------------------------------------------------------------------------
 
 const recruiterStandardBullets = [
-  'Unlimited standard opportunity posts',
+  '1 active opportunity at a time',
   'Standard marketplace placement',
   'Basic applicant and contact-request flow',
   'Opportunity management: edit, pause, and close listings',
@@ -189,15 +189,17 @@ const recruiterPaidPlans: Array<{
   price: string;
   limit: string;
   highlight?: boolean;
+  previewOnly?: boolean;
   availableBullets: string[];
   comingSoonBullets?: string[];
 }> = [
   {
     name: 'Starter',
     price: '$19',
-    limit: 'Applicant workflow essentials',
+    limit: '5 active opportunities',
     availableBullets: [
       'Everything in Recruiter Standard',
+      '5 active opportunities at a time',
       'Enhanced applicant tracking',
       'Applicant status history',
       'Basic referral tracking view',
@@ -206,10 +208,11 @@ const recruiterPaidPlans: Array<{
   {
     name: 'Growth',
     price: '$49',
-    limit: 'Premium visibility & reports',
+    limit: '15 active opportunities',
     highlight: true,
     availableBullets: [
       'Everything in Starter',
+      '15 active opportunities at a time',
       'Priority-placement eligibility',
       'Featured-listing eligibility',
       'Recruiter reports (PDF + CSV)',
@@ -223,9 +226,11 @@ const recruiterPaidPlans: Array<{
   {
     name: 'Fleet',
     price: '$149',
-    limit: 'For larger recruiting operations',
+    limit: '25 active opportunities — preview only',
+    previewOnly: true,
     availableBullets: [
       'Everything in Growth',
+      '25 active opportunities at a time',
       'Top-placement eligibility',
       'Priority support',
     ],
@@ -237,6 +242,7 @@ const recruiterPaidPlans: Array<{
     ],
   },
 ];
+
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -883,11 +889,13 @@ function RecruiterView({
             className="mt-3 text-sm sm:text-base max-w-2xl mx-auto"
             style={{ color: 'hsl(220, 10%, 60%)' }}
           >
-            Complete, active recruiter workspaces post unlimited standard opportunities for free
-            once required recruiter profile fields are filled in and posting terms are accepted.
-            Paid plans add premium visibility, recruiter reports, contract-management with
-            AI-assisted risk review, and pipeline analytics on top. The Verified Recruiter badge
-            shown on driver listings is a separate trust-display review.
+            Complete, active recruiter workspaces post standard opportunities for free — one
+            active opportunity at a time — once required recruiter profile fields are filled in
+            and posting terms are accepted. Paid plans raise the active-opportunity limit and add
+            premium visibility, recruiter reports, contract-management with AI-assisted risk
+            review, and pipeline analytics on top. The Verified Recruiter badge shown on driver
+            listings is a separate trust-display review.
+
           </p>
         </div>
 
@@ -910,7 +918,7 @@ function RecruiterView({
                 Free
               </span>
               <span className="text-xs ml-2" style={{ color: 'hsl(220, 10%, 55%)' }}>
-                unlimited standard posting
+                1 active opportunity
               </span>
             </div>
           </div>
@@ -959,6 +967,16 @@ function RecruiterView({
                   MOST POPULAR
                 </div>
               )}
+              {p.previewOnly && (
+                <div
+                  data-testid={`recruiter-plan-preview-only-${p.name.toLowerCase()}`}
+                  className="absolute -top-3 right-6 px-3 py-1 rounded-full text-[10px] font-bold"
+                  style={{ background: 'hsl(220, 16%, 24%)', color: 'hsl(0, 0%, 90%)' }}
+                >
+                  PREVIEW ONLY
+                </div>
+              )}
+
               <h3 className="text-base font-bold mb-1" style={{ color: 'hsl(0, 0%, 100%)' }}>
                 {p.name}
               </h3>

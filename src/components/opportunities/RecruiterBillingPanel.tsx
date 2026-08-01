@@ -21,12 +21,19 @@ import type { PaidPlan } from '@/lib/opportunities/recruiterBillingState';
 
 type PerkLabel = string | { label: string; tag: 'coming-soon' };
 
-const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[] }[] = [
+const PLANS: {
+  key: PaidPlan;
+  price: string;
+  tagline: string;
+  previewOnly?: boolean;
+  perks: PerkLabel[];
+}[] = [
   {
     key: 'starter',
     price: '$19/mo',
     tagline: 'Better applicant tracking and trust signals.',
     perks: [
+      '5 active opportunities',
       'Enhanced applicant tracking',
       'Applicant status history',
       'Basic applicant pipeline analytics',
@@ -39,6 +46,7 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
     price: '$49/mo',
     tagline: 'Premium visibility and recruiting workflow.',
     perks: [
+      '15 active opportunities',
       'Priority placement',
       'Featured listing eligibility',
       'Recruiter reports (PDF/CSV)',
@@ -51,7 +59,9 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
     key: 'fleet',
     price: '$149/mo',
     tagline: 'Top placement and team-scale recruiting.',
+    previewOnly: true,
     perks: [
+      '25 active opportunities',
       'Top placement eligibility',
       'Advanced analytics',
       'Priority support',
@@ -64,11 +74,12 @@ const PLANS: { key: PaidPlan; price: string; tagline: string; perks: PerkLabel[]
 ];
 
 const STANDARD_ACCESS_PERKS: PerkLabel[] = [
-  'Standard opportunity posting for complete, non-suspended profiles',
+  '1 active opportunity for complete, non-suspended profiles',
   'Basic applicant inbox',
   'Standard marketplace placement',
   'Optional Verified Recruiter badge after verification',
 ];
+
 
 export function RecruiterBillingPanel() {
   const hook = useRecruiterBilling();
@@ -414,9 +425,13 @@ export function RecruiterBillingPanel() {
           <div className="grid gap-3 sm:grid-cols-3">
             {PLANS.map((p) => {
               const isCurrent = isBillingActive && plan === p.key;
+              // Phase 1R-E1 — Fleet is preview-only: existing Fleet
+              // subscribers keep their plan, but no NEW checkout may start.
+              const previewOnlyBlocked = p.previewOnly === true && !isCurrent;
               const disabled =
                 isPending ||
                 isCurrent ||
+                previewOnlyBlocked ||
                 !canStartCheckout ||
                 entitlementBlocksCheckout;
               return (
@@ -428,7 +443,16 @@ export function RecruiterBillingPanel() {
                     <h3 className="text-sm font-bold text-foreground">
                       {RECRUITER_PLAN_LABELS[p.key]}
                     </h3>
-                    {isCurrent && <Badge variant="default">Current</Badge>}
+                    {isCurrent ? (
+                      <Badge variant="default">Current</Badge>
+                    ) : p.previewOnly ? (
+                      <Badge
+                        variant="outline"
+                        data-testid={`recruiter-plan-preview-only-${p.key}`}
+                      >
+                        Preview only
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground mb-1">{p.price}</p>
                   <p className="text-[11px] text-muted-foreground mb-3">{p.tagline}</p>
@@ -453,6 +477,8 @@ export function RecruiterBillingPanel() {
                       </>
                     ) : isCurrent ? (
                       'Active'
+                    ) : previewOnlyBlocked ? (
+                      'Not available yet'
                     ) : (
                       `Choose ${RECRUITER_PLAN_LABELS[p.key]}`
                     )}
@@ -460,6 +486,7 @@ export function RecruiterBillingPanel() {
                 </Card>
               );
             })}
+
           </div>
         </>
       )}

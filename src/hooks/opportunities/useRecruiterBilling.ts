@@ -8,7 +8,10 @@ import {
   getRecruiterCapabilitiesForTier,
   isRecruiterPaidPlanActive,
   resolveRecruiterCapabilityTier,
+  isRecruiterTierAvailableForNewCheckout,
+  RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS,
 } from '@/lib/recruiterCapabilities';
+
 import { useMyAgency } from '@/hooks/useAgency';
 import { useAgencyEntitlement } from '@/hooks/useAgencyEntitlement';
 import {
@@ -41,12 +44,18 @@ import { describeRecruiterEligibility } from '@/lib/opportunities/recruiterEligi
 export type RecruiterBilling = Tables<'recruiter_billing_profiles'>;
 export type RecruiterPlan = 'none' | 'starter' | 'growth' | 'fleet';
 
+/**
+ * Phase 1R-E1 — recruiter plan → active-opportunity ceiling. Derived from the
+ * canonical tier matrix in `@/lib/recruiterCapabilities` so there is exactly
+ * one client-side definition. `none` maps to the free Standard tier.
+ */
 export const RECRUITER_PLAN_LIMITS: Record<RecruiterPlan, number> = {
-  none: 0,
-  starter: 1,
-  growth: 5,
-  fleet: 25,
+  none: RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.free_verified,
+  starter: RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.starter,
+  growth: RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.growth,
+  fleet: RECRUITER_TIER_ACTIVE_OPPORTUNITY_LIMITS.fleet,
 };
+
 
 export const RECRUITER_PLAN_LABELS: Record<RecruiterPlan, string> = {
   none: 'No Plan',
@@ -201,7 +210,16 @@ export function useRecruiterBilling() {
 
   const billing = billingQuery.data ?? null;
   const plan = (billing?.plan ?? 'none') as RecruiterPlan;
-  const limit = billing?.active_opportunity_limit ?? RECRUITER_PLAN_LIMITS[plan];
+  // Phase 1R-E1 — the ceiling is canonical per plan. A stale
+  // `active_opportunity_limit` column value from a pre-1R-E1 row is never
+  // allowed to under-grant below the plan's canonical ceiling.
+  const limit = Math.max(
+    RECRUITER_PLAN_LIMITS[plan],
+    typeof billing?.active_opportunity_limit === 'number'
+      ? billing.active_opportunity_limit
+      : 0,
+  );
+
   const status = billing?.status ?? 'inactive';
   const isBillingActive = status === 'active' || status === 'trialing'; // trial-allowlist
   const activeCount = activeCountQuery.data ?? 0;
@@ -300,6 +318,26 @@ export function useRecruiterBilling() {
     canPostStandardOpportunities:
       effectiveBusinessEntitlement.canPostStandardOpportunities,
   });
+
+  // Phase 1R-E1 — effective, entitlement-aware active-opportunity ceiling and
+  // the derived remaining headroom used by the posting UI.
+  const effectiveActiveOpportunityLimit = Math.max(
+    capabilities.activeOpportunityLimit,
+    RECRUITER_PLAN_LIMITS[effectiveRecruiterPlan],
+  );
+  const remainingActiveOpportunities = Math.max(
+    0,
+    effectiveActiveOpportunityLimit - activeCount,
+  );
+  const isAtActiveOpportunityLimit =
+    !activeCountQuery.isLoading &&
+    activeCount >= effectiveActiveOpportunityLimit;
+  const activeOpportunityLimitMessage = isAtActiveOpportunityLimit
+    ? `You've reached your plan limit of ${effectiveActiveOpportunityLimit} active ${
+        effectiveActiveOpportunityLimit === 1 ? 'opportunity' : 'opportunities'
+      }. Pause or close a listing, or upgrade your plan, to publish another.`
+    : null;
+
 
   const refetchBilling = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['recruiter_billing'] });
@@ -550,6 +588,15 @@ export function useRecruiterBilling() {
       activeCountQuery.isLoading ||
       myAgency.isLoading ||
       (hasRealAgency && agencyEnt.isLoading),
+
+    // Phase 1R-E1: canonical active-opportunity ceiling + headroom
+    effectiveActiveOpportunityLimit,
+    remainingActiveOpportunities,
+    isAtActiveOpportunityLimit,
+    activeOpportunityLimitMessage,
+    isRecruiterTierAvailableForNewCheckout,
+
+
 
     // Phase 1R-C: effective business entitlement (additive, never overwrites
     // the raw recruiter billing fields above)

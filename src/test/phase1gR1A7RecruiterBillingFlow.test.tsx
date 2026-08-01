@@ -391,7 +391,9 @@ describe('eligible checkout happy path', () => {
     renderPanel();
     const starter = screen.getByRole('button', { name: /Choose Starter/i });
     const growth = screen.getByRole('button', { name: /Choose Growth/i });
-    const fleet = screen.getByRole('button', { name: /Choose Fleet/i });
+    // Phase 1R-E1 — Fleet is preview-only, so its button no longer offers checkout.
+    const fleet = screen.getByTestId('recruiter-plan-button-fleet');
+
     await user.click(starter);
     expect(starter).toHaveAttribute('aria-busy', 'true');
     expect(growth).not.toHaveAttribute('aria-busy');
