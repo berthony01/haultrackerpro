@@ -81,6 +81,21 @@ import {
 
 import type { EffectiveBusinessEntitlement } from '@/lib/billing/effectiveBusinessEntitlement';
 
+// Phase 1R-E1-R1 — minimum harness repair only. `RecruiterOnboarding` now
+// uses `useQueryClient`, so it must be mounted inside a provider. No product
+// expectation or trust-state assertion changes because of this wrapper.
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+function renderWithQueryClient(ui: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
+}
+
+
 
 // ---------------------------------------------------------------------------
 // Fixture helpers.
