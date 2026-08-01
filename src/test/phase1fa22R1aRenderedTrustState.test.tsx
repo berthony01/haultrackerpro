@@ -256,8 +256,10 @@ function makeBillingHookMock(
     effectiveActiveOpportunityLimit: capabilities.activeOpportunityLimit,
     remainingActiveOpportunities: capabilities.activeOpportunityLimit,
     isAtActiveOpportunityLimit: false,
+    canActivateAnotherOpportunity: true,
     activeOpportunityLimitMessage: null,
     isRecruiterTierAvailableForNewCheckout,
+
 
   } satisfies BillingHook;
 
