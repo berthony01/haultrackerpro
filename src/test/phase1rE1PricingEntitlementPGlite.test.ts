@@ -692,3 +692,255 @@ describe('Phase 1R-E1-R1 PGlite — narrow backfill', () => {
   });
 
 });
+
+// =====================================================================
+// Phase 1R-E2-C — Production-trigger-aware recruiter limit backfill repair.
+//
+// Models the REAL production trigger posture on
+// public.recruiter_billing_profiles (billing field guard with service-role
+// claim bypass + generic updated_at trigger), reproduces the Phase 1R-E1
+// backfill failure, then proves the Phase 1R-E2-C repair migration corrects
+// only active_opportunity_limit without disturbing any other value, without
+// weakening the field guard, and idempotently.
+// =====================================================================
+
+const REPAIR_REL =
+  '../../supabase/migrations/20260805012000_phase1r_e2_c_recruiter_limit_backfill_guard_bypass.sql';
+
+const REPAIR_SQL = fs.readFileSync(
+  fileURLToPath(new URL(REPAIR_REL, import.meta.url)),
+  'utf8',
+);
+
+// Production-shaped trigger posture. The field guard mirrors production:
+// billing-controlled columns are restored from OLD unless the caller presents
+// a service_role claim or is an admin. The updated-at trigger is the generic
+// public.update_updated_at_column().
+const PRODUCTION_TRIGGER_POSTURE = `
+ALTER TABLE public.recruiter_billing_profiles
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
+CREATE OR REPLACE FUNCTION public.recruiter_billing_field_guard()
+RETURNS trigger LANGUAGE plpgsql AS $fg$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF COALESCE(current_setting('request.jwt.claim.role', true), '') = 'service_role'
+       OR public.is_admin(auth.uid()) THEN
+      RETURN NEW;
+    END IF;
+    -- Billing-controlled fields are restored from OLD for everyone else.
+    NEW.plan                     := OLD.plan;
+    NEW.status                   := OLD.status;
+    NEW.active_opportunity_limit := OLD.active_opportunity_limit;
+    NEW.stripe_customer_id       := OLD.stripe_customer_id;
+    NEW.stripe_subscription_id   := OLD.stripe_subscription_id;
+    NEW.current_period_end       := OLD.current_period_end;
+  END IF;
+  RETURN NEW;
+END
+$fg$;
+
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS trigger LANGUAGE plpgsql AS $uu$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END
+$uu$;
+
+CREATE TRIGGER trg_recruiter_billing_field_guard
+BEFORE INSERT OR UPDATE ON public.recruiter_billing_profiles
+FOR EACH ROW EXECUTE FUNCTION public.recruiter_billing_field_guard();
+
+CREATE TRIGGER trg_recruiter_billing_updated_at
+BEFORE UPDATE ON public.recruiter_billing_profiles
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+`;
+
+const BILLING_SNAPSHOT = `SELECT id, recruiter_id, user_id, plan, status,
+                                 stripe_customer_id, stripe_subscription_id,
+                                 current_period_end, created_at, updated_at
+                            FROM public.recruiter_billing_profiles
+                           ORDER BY stripe_customer_id`;
+
+const LIMITS = `SELECT stripe_customer_id, active_opportunity_limit
+                  FROM public.recruiter_billing_profiles
+                 ORDER BY stripe_customer_id`;
+
+async function triggerPosture(db: AnyPGlite) {
+  const r = await db.query<{ tgname: string; proname: string; tgenabled: string }>(
+    `SELECT t.tgname, p.proname, t.tgenabled
+       FROM pg_trigger t
+       JOIN pg_class c      ON c.oid = t.tgrelid
+       JOIN pg_namespace n  ON n.oid = c.relnamespace
+       JOIN pg_proc p       ON p.oid = t.tgfoid
+      WHERE NOT t.tgisinternal
+        AND n.nspname = 'public'
+        AND c.relname = 'recruiter_billing_profiles'
+      ORDER BY t.tgname`,
+  );
+  return r.rows;
+}
+
+describe('Phase 1R-E2-C PGlite — production-trigger-aware backfill repair', () => {
+  let db: AnyPGlite;
+  let seeded: { a: string; b: string; c: string };
+  let preRepair: unknown[];
+
+  beforeAll(async () => {
+    db = await boot(false);
+    await db.exec(PRODUCTION_TRIGGER_POSTURE);
+    await setAdmin(db, false);
+    await db.query(`SELECT set_config('request.jwt.claim.role', '', false)`);
+
+    const a = await makeRecruiter(db);
+    const b = await makeRecruiter(db);
+    const c = await makeRecruiter(db);
+    seeded = { a: a.recruiterId, b: b.recruiterId, c: c.recruiterId };
+
+    // Every identity / Stripe / period / timestamp field carries a DISTINCT
+    // seeded value, and every limit is a WRONG legacy value.
+    await db.query(
+      `INSERT INTO public.recruiter_billing_profiles
+         (recruiter_id, user_id, plan, status, active_opportunity_limit,
+          stripe_customer_id, stripe_subscription_id, current_period_end,
+          created_at, updated_at)
+       VALUES
+         ($1,$2,'none','inactive',  0,'cus_a','sub_a','2031-01-01T00:00:00Z','2019-01-01T00:00:00Z','2020-01-01T00:00:00Z'),
+         ($3,$4,'growth','active',  5,'cus_b','sub_b','2031-02-02T00:00:00Z','2019-02-02T00:00:00Z','2020-01-02T00:00:00Z'),
+         ($5,$6,'fleet','active',  10,'cus_c','sub_c','2031-03-03T00:00:00Z','2019-03-03T00:00:00Z','2020-01-03T00:00:00Z')`,
+      [
+        a.recruiterId,
+        a.userId,
+        b.recruiterId,
+        b.userId,
+        c.recruiterId,
+        c.userId,
+      ],
+    );
+  });
+
+  it('(n) reproduces the production failure: the E1 backfill is reverted by the field guard while updated_at advances', async () => {
+    const before = await db.query<{ updated_at: Date }>(BILLING_SNAPSHOT);
+
+    await db.exec(CANDIDATE_SQL);
+
+    const limits = await db.query<{
+      stripe_customer_id: string;
+      active_opportunity_limit: number;
+    }>(LIMITS);
+    // Limits are UNCHANGED — the field guard restored the OLD values.
+    expect(limits.rows).toEqual([
+      { stripe_customer_id: 'cus_a', active_opportunity_limit: 0 },
+      { stripe_customer_id: 'cus_b', active_opportunity_limit: 5 },
+      { stripe_customer_id: 'cus_c', active_opportunity_limit: 10 },
+    ]);
+
+    // ...but updated_at was advanced by the updated-at trigger.
+    const after = await db.query<{ updated_at: Date }>(BILLING_SNAPSHOT);
+    for (let i = 0; i < after.rows.length; i++) {
+      expect(after.rows[i].updated_at.getTime()).toBeGreaterThan(
+        before.rows[i].updated_at.getTime(),
+      );
+    }
+
+    preRepair = after.rows;
+  });
+
+  it('(o) the repair migration corrects limits to exactly 1 / 15 / 25', async () => {
+    await db.exec(REPAIR_SQL);
+
+    const limits = await db.query<{
+      stripe_customer_id: string;
+      active_opportunity_limit: number;
+    }>(LIMITS);
+    expect(limits.rows).toEqual([
+      { stripe_customer_id: 'cus_a', active_opportunity_limit: 1 },
+      { stripe_customer_id: 'cus_b', active_opportunity_limit: 15 },
+      { stripe_customer_id: 'cus_c', active_opportunity_limit: 25 },
+    ]);
+  });
+
+  it('(p) every other column, including updated_at and created_at, stays value-identical', async () => {
+    const after = await db.query(BILLING_SNAPSHOT);
+    expect(after.rows).toEqual(preRepair);
+    expect(
+      (after.rows as Array<{ created_at: Date }>).map((r) =>
+        r.created_at.toISOString(),
+      ),
+    ).toEqual([
+      '2019-01-01T00:00:00.000Z',
+      '2019-02-02T00:00:00.000Z',
+      '2019-03-03T00:00:00.000Z',
+    ]);
+  });
+
+  it('(q) both production triggers remain present exactly once and normally enabled', async () => {
+    expect(await triggerPosture(db)).toEqual([
+      {
+        tgname: 'trg_recruiter_billing_field_guard',
+        proname: 'recruiter_billing_field_guard',
+        tgenabled: 'O',
+      },
+      {
+        tgname: 'trg_recruiter_billing_updated_at',
+        proname: 'update_updated_at_column',
+        tgenabled: 'O',
+      },
+    ]);
+  });
+
+  it('(r) a second execution of the repair migration is idempotent', async () => {
+    const before = await db.query(BILLING_SNAPSHOT);
+    const beforeLimits = await db.query(LIMITS);
+
+    await db.exec(REPAIR_SQL);
+
+    expect(await db.query(BILLING_SNAPSHOT)).toMatchObject({
+      rows: before.rows,
+    });
+    expect(await db.query(LIMITS)).toMatchObject({ rows: beforeLimits.rows });
+    expect(await triggerPosture(db)).toHaveLength(2);
+  });
+
+  it('(s) the billing field guard was NOT weakened: a normal client update still cannot alter billing-controlled fields', async () => {
+    await db.query(`SELECT set_config('request.jwt.claim.role', '', false)`);
+    await setAdmin(db, false);
+
+    await db.query(
+      `UPDATE public.recruiter_billing_profiles
+          SET plan = 'fleet',
+              status = 'active',
+              active_opportunity_limit = 99,
+              stripe_customer_id = 'cus_hacked',
+              stripe_subscription_id = 'sub_hacked',
+              current_period_end = '2099-01-01T00:00:00Z'
+        WHERE recruiter_id = $1`,
+      [seeded.a],
+    );
+
+    const row = await db.query<{
+      plan: string;
+      status: string;
+      active_opportunity_limit: number;
+      stripe_customer_id: string;
+      stripe_subscription_id: string;
+      current_period_end: Date;
+    }>(
+      `SELECT plan, status, active_opportunity_limit, stripe_customer_id,
+              stripe_subscription_id, current_period_end
+         FROM public.recruiter_billing_profiles WHERE recruiter_id = $1`,
+      [seeded.a],
+    );
+    expect(row.rows[0]).toMatchObject({
+      plan: 'none',
+      status: 'inactive',
+      active_opportunity_limit: 1,
+      stripe_customer_id: 'cus_a',
+      stripe_subscription_id: 'sub_a',
+    });
+    expect(row.rows[0].current_period_end.toISOString()).toBe(
+      '2031-01-01T00:00:00.000Z',
+    );
+  });
+});
