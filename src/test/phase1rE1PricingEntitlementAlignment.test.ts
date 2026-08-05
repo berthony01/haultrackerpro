@@ -451,3 +451,28 @@ describe('Phase 1R-E1-R1 — public copy and webhook alignment', () => {
     expect(panel).not.toContain("'Not available yet'");
   });
 });
+
+describe('Phase 1R-E2-A — candidate/production migration parity', () => {
+  const readFile = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
+  const CANDIDATE =
+    'supabase/migration-candidates/20260801013000_phase1r_e1_pricing_entitlement_alignment.sql';
+  const PRODUCTION =
+    'supabase/migrations/20260801013000_phase1r_e1_pricing_entitlement_alignment.sql';
+
+  const dropFirstLine = (s: string) => s.slice(s.indexOf('\n') + 1);
+
+  it('uses the exact production header and preserves the candidate header', () => {
+    expect(readFile(PRODUCTION).split('\n')[0]).toBe(
+      '-- PRODUCTION MIGRATION — Phase 1R-E1 pricing and entitlement alignment.',
+    );
+    expect(readFile(CANDIDATE).split('\n')[0]).toBe(
+      '-- CANDIDATE MIGRATION — NOT APPLIED LIVE.',
+    );
+  });
+
+  it('is byte-identical to the accepted candidate after the first line', () => {
+    expect(dropFirstLine(readFile(PRODUCTION))).toBe(
+      dropFirstLine(readFile(CANDIDATE)),
+    );
+  });
+});
