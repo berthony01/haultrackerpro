@@ -4433,6 +4433,14 @@ export type Database = {
         Args: { _id: string; _response: string }
         Returns: string
       }
+      effective_recruiter_active_opportunity_limit: {
+        Args: { _recruiter_id: string }
+        Returns: number
+      }
+      effective_recruiter_tier: {
+        Args: { _recruiter_id: string }
+        Returns: string
+      }
       email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
