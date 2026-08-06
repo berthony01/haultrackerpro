@@ -52,7 +52,7 @@ describe('Phase 1S-A2 — candidate header and transaction', () => {
   });
 });
 
-describe('Phase 1S-A2 — candidate scope is exactly one default + eleven functions', () => {
+describe('Phase 1S-A2 — candidate scope is exactly one default + twelve functions', () => {
   const statementText = CANDIDATE_SQL
     .split('\n')
     .filter((l) => !l.trimStart().startsWith('--'))
