@@ -19,9 +19,20 @@
 --     agency checkout function fills stripe_customer_id and the webhook
 --     upserts plan/status/source/subscription — unchanged.
 --   * A missing entitlement row fails closed as Starter/'cancelled'.
---   * assert_agency_limit() blocks the three billable actions when the
---     effective status is 'cancelled', with one truthful message that is
---     correct for both never-started and previously cancelled billing.
+--   * assert_agency_limit() blocks EVERY paid Agency Workspace action when
+--     the effective status is 'cancelled' — the three numeric capacity
+--     actions (create_service_package, invite_member, activate_client) and
+--     the six non-numeric workflow actions (set_private_request_link,
+--     submit_client_request, progress_client_request,
+--     create_delegation_request, create_work_item, accept_member_invite) —
+--     with one truthful message that is correct for both never-started and
+--     previously cancelled billing.
+--   * Public surfaces (slug resolution, public agency view, public package
+--     listing) expose nothing for an unpaid agency, and the public package
+--     listing additionally requires the agency profile itself to be active.
+--   * Cleanup paths stay open while cancelled: clearing the slug, owner/admin
+--     decline/cancel with no member assignment, and driver self-cancel with
+--     no member assignment.
 --   * The two existing production rows with status 'manual_beta' are
 --     GRANDFATHERED: this candidate contains no UPDATE, DELETE, or backfill
 --     of any kind and never rewrites an existing entitlement row.
