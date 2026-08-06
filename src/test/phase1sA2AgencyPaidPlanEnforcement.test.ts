@@ -10,6 +10,7 @@
 // =====================================================================
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
@@ -52,7 +53,7 @@ describe('Phase 1S-A2 — candidate header and transaction', () => {
   });
 });
 
-describe('Phase 1S-A2 — candidate scope is exactly one default + eleven functions', () => {
+describe('Phase 1S-A2 — candidate scope is exactly one default + twelve functions', () => {
   const statementText = CANDIDATE_SQL
     .split('\n')
     .filter((l) => !l.trimStart().startsWith('--'))
@@ -71,11 +72,12 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + eleven functi
     );
   });
 
-  it('replaces exactly the eleven named functions', () => {
+  it('replaces exactly the twelve named functions', () => {
     const fns = (topLevelText.match(/CREATE OR REPLACE FUNCTION public\.(\w+)/g) ?? []).map(
       (m) => m.replace('CREATE OR REPLACE FUNCTION public.', ''),
     );
     expect(fns.sort()).toEqual([
+      'accept_agency_invite',
       'assert_agency_limit',
       'create_agency',
       'create_agency_delegation_request',
@@ -106,6 +108,7 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + eleven functi
   it('contains no top-level data mutation, schema growth, policy, index, trigger, or grant change', () => {
     for (const forbidden of [
       /\bUPDATE\s+public\./i,
+      /\bINSERT\s+INTO\b/i,
       /\bDELETE\s+FROM\b/i,
       /\bTRUNCATE\b/i,
       /\bCREATE\s+TABLE\b/i,
@@ -189,8 +192,10 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + eleven functi
     expect(progress).toMatch(
       /IF _status NOT IN \('declined','cancelled'\) OR _assigned_member_user_id IS NOT NULL THEN/,
     );
-    // Driver self-cancel stays an unguarded cleanup path.
-    expect(progress).toMatch(/_old\.driver_user_id = _uid AND _status='cancelled' THEN NULL;/);
+    // R2: driver self-cancel is a cleanup path ONLY with no member assignment.
+    expect(progress).toMatch(
+      /_old\.driver_user_id = _uid AND _status='cancelled' AND _assigned_member_user_id IS NULL THEN NULL;/,
+    );
 
     const delegation = body('create_agency_delegation_request');
     expect(
@@ -207,6 +212,61 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + eleven functi
       slug.indexOf('UPDATE public.agency_profiles'),
     );
     expect(slug).toMatch(/IF _normalized IS NOT NULL THEN/);
+  });
+
+  it('R2 — accept_agency_invite checks billing after the pending SELECT and before the UPDATE', () => {
+    const start = CANDIDATE_SQL.indexOf(
+      'CREATE OR REPLACE FUNCTION public.accept_agency_invite',
+    );
+    expect(start).toBeGreaterThan(-1);
+    const accept = CANDIDATE_SQL.slice(start);
+
+    // Live identity preserved.
+    expect(accept).toMatch(
+      /FUNCTION public\.accept_agency_invite\(_token text\)\s*\nRETURNS public\.agency_members\s*\nLANGUAGE plpgsql\s*\nSECURITY DEFINER\s*\nSET search_path TO 'public'/,
+    );
+    expect(accept).toContain("encode(digest(coalesce(_token,''),'sha256'),'hex')");
+    expect(accept).toContain('lower(invite_email)=_em');
+    expect(accept).toContain(
+      "RAISE EXCEPTION 'Invite invalid or not addressed to your email' USING ERRCODE='P0002'",
+    );
+    expect(accept).toContain(
+      "SET member_user_id=_uid, status='active', accepted_at=now()",
+    );
+    expect(accept).toContain('invite_token_hash=NULL, updated_at=now()');
+
+    const select = accept.indexOf('SELECT * INTO _pending FROM public.agency_members');
+    const guard = accept.indexOf(
+      "assert_agency_limit(_pending.agency_id, 'accept_member_invite')",
+    );
+    const update = accept.indexOf('UPDATE public.agency_members SET member_user_id=_uid');
+    expect(select).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(select);
+    expect(update).toBeGreaterThan(guard);
+  });
+
+  it('R2 — public package listing requires both an active profile and an allowed entitlement', () => {
+    const start = CANDIDATE_SQL.indexOf(
+      'CREATE OR REPLACE FUNCTION public.list_agency_packages_public',
+    );
+    const next = CANDIDATE_SQL.indexOf('CREATE OR REPLACE FUNCTION public.', start + 1);
+    const fn = CANDIDATE_SQL.slice(start, next === -1 ? undefined : next);
+    expect(fn).toMatch(
+      /EXISTS \(SELECT 1 FROM public\.agency_profiles ap\s*\n\s*WHERE ap\.id = _agency_id AND ap\.status = 'active'\)/,
+    );
+    expect(fn).toContain("IN ('manual_beta','active','trialing','past_due')"); // trial-allowlist
+  });
+
+  it('R2 — accept_member_invite is a recognized non-numeric paid action', () => {
+    const start = CANDIDATE_SQL.indexOf('CREATE OR REPLACE FUNCTION public.assert_agency_limit');
+    const next = CANDIDATE_SQL.indexOf('CREATE OR REPLACE FUNCTION public.', start + 1);
+    expect(CANDIDATE_SQL.slice(start, next)).toContain("'accept_member_invite'");
+  });
+
+  it('R2 — invite creation, revocation, and listing stay outside this candidate', () => {
+    for (const fn of ['invite_agency_member', 'revoke_agency_member', 'list_agency_members']) {
+      expect(CANDIDATE_SQL).not.toContain(`CREATE OR REPLACE FUNCTION public.${fn}`);
+    }
   });
 });
 
@@ -312,6 +372,15 @@ CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
     SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
   $$;
 
+-- pgcrypto shim: production resolves digest() from pgcrypto on search_path
+-- public. PGlite exposes the PG14+ builtin sha256(bytea) instead.
+CREATE OR REPLACE FUNCTION public.digest(_data text, _algo text) RETURNS bytea
+  LANGUAGE sql IMMUTABLE AS $$
+    SELECT sha256(convert_to(_data, 'UTF8'))
+  $$;
+
+
+
 CREATE TYPE public.agency_client_request_status AS ENUM
   ('pending','approved','declined','cancelled','converted_to_client');
 CREATE TYPE public.agency_work_item_type AS ENUM
@@ -341,7 +410,9 @@ CREATE TABLE public.agency_members (
   status text NOT NULL,
   invited_at timestamptz NOT NULL DEFAULT now(),
   accepted_at timestamptz,
-  revoked_at timestamptz
+  revoked_at timestamptz,
+  invite_token_hash text,
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE public.agency_entitlements (
@@ -761,28 +832,39 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
   describe('R1 — paid workflow surfaces', () => {
     const R1_OWNER = '33333333-3333-4333-8333-333333333333';
     const R1_DRIVER = '44444444-4444-4444-8444-444444444444';
+    const R1_INVITEE = '55555555-5555-4555-8555-555555555555';
+    const INVITE_TOKEN = 'r1-invite-token-abc';
+    const INVITE_HASH = createHash('sha256').update(INVITE_TOKEN, 'utf8').digest('hex');
     const GENERIC_ACTIONS = [
       'set_private_request_link',
       'submit_client_request',
       'progress_client_request',
       'create_delegation_request',
       'create_work_item',
+      'accept_member_invite',
     ];
     let agencyId = '';
     let declinableRequestId = '';
     let driverCancelRequestId = '';
+    let assignmentBypassRequestId = '';
+    let inviteMemberId = '';
     let packageId = '';
 
     const actAs = (uid: string) =>
       db.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [uid]);
 
     beforeAll(async () => {
-      await db.query('INSERT INTO auth.users(id, email) VALUES ($1,$2), ($3,$4)', [
-        R1_OWNER,
-        'r1owner@example.com',
-        R1_DRIVER,
-        'r1driver@example.com',
-      ]);
+      await db.query(
+        'INSERT INTO auth.users(id, email) VALUES ($1,$2), ($3,$4), ($5,$6)',
+        [
+          R1_OWNER,
+          'r1owner@example.com',
+          R1_DRIVER,
+          'r1driver@example.com',
+          R1_INVITEE,
+          'r1invitee@example.com',
+        ],
+      );
       await actAs(R1_OWNER);
       const r = await db.query<{ id: string }>(
         "SELECT (public.create_agency('R1 Agency')).id AS id",
@@ -800,14 +882,23 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       packageId = pkg.rows[0].id;
       const reqs = await db.query<{ id: string }>(
         `INSERT INTO public.agency_client_requests(agency_id, driver_user_id, status)
-         VALUES ($1,$2,'pending'), ($1,$2,'pending') RETURNING id`,
+         VALUES ($1,$2,'pending'), ($1,$2,'pending'), ($1,$2,'pending') RETURNING id`,
         [agencyId, R1_DRIVER],
       );
       declinableRequestId = reqs.rows[0].id;
       driverCancelRequestId = reqs.rows[1].id;
+      assignmentBypassRequestId = reqs.rows[2].id;
+
+      // Pending seat invitation issued before billing lapsed.
+      const invite = await db.query<{ id: string }>(
+        `INSERT INTO public.agency_members(agency_id, invite_email, role, status, invite_token_hash)
+         VALUES ($1,'r1invitee@example.com','agency_member','pending',$2) RETURNING id`,
+        [agencyId, INVITE_HASH],
+      );
+      inviteMemberId = invite.rows[0].id;
     });
 
-    it('R1.1 — cancelled agency: all five generic paid actions raise P0001', async () => {
+    it('R1.1 — cancelled agency: all six generic paid actions raise P0001', async () => {
       for (const action of GENERIC_ACTIONS) {
         const err = await raises(db, 'SELECT public.assert_agency_limit($1, $2)', [
           agencyId,
@@ -818,7 +909,7 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       }
     });
 
-    it('R1.1 — a missing entitlement row blocks the five generic actions too', async () => {
+    it('R1.1 — a missing entitlement row blocks the six generic actions too', async () => {
       const orphan = await db.query<{ id: string }>(
         "INSERT INTO public.agency_profiles(owner_user_id, name) VALUES ($1,'R1 Orphan') RETURNING id",
         [R1_OWNER],
@@ -877,11 +968,14 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       expect(pkgs.rows).toHaveLength(0);
     });
 
-    it('R1.4 — a grandfathered manual_beta agency still resolves and is visible', async () => {
+    it('R1.4/R2 — a grandfathered manual_beta agency resolves its slug and is visible', async () => {
+      // R2: assign a real slug to the beta fixture so resolution is actually
+      // exercised instead of trivially returning NULL.
+      await db.query("UPDATE public.agency_profiles SET slug='beta-agency' WHERE id=$1", [
+        betaAgencyId,
+      ]);
       const beta = await db.query('SELECT public.resolve_agency_slug($1) AS id', ['beta-agency']);
-      // No slug set on the beta fixture, so prove visibility through the
-      // other two public reads instead.
-      expect((beta.rows[0] as { id: string | null }).id).toBeNull();
+      expect((beta.rows[0] as { id: string | null }).id).toBe(betaAgencyId);
       const view = await db.query('SELECT * FROM public.get_agency_public_view($1)', [
         betaAgencyId,
       ]);
@@ -909,7 +1003,7 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
         'SELECT count(*) AS n FROM public.agency_client_requests WHERE agency_id=$1',
         [agencyId],
       );
-      expect(Number(submitted.rows[0].n)).toBe(2);
+      expect(Number(submitted.rows[0].n)).toBe(3);
 
       await actAs(R1_OWNER);
       const approveErr = await raises(
@@ -967,6 +1061,56 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       expect(cancelled.rows[0].status).toBe('cancelled');
     });
 
+    it('R2 — driver self-cancel carrying a member assignment is rejected with 42501', async () => {
+      await actAs(R1_DRIVER);
+      const err = await raises(
+        db,
+        'SELECT public.set_agency_client_request_status($1,$2,$3)',
+        [assignmentBypassRequestId, 'cancelled', R1_OWNER],
+      );
+      expect(err.code).toBe('42501');
+      expect(err.message).toContain('Not allowed');
+      const row = await db.query<{ status: string; assigned_member_user_id: string | null }>(
+        'SELECT status, assigned_member_user_id FROM public.agency_client_requests WHERE id=$1',
+        [assignmentBypassRequestId],
+      );
+      expect(row.rows[0].status).toBe('pending');
+      expect(row.rows[0].assigned_member_user_id).toBeNull();
+    });
+
+    it('R2 — accepting a seat invitation is blocked while billing is cancelled', async () => {
+      await actAs(R1_INVITEE);
+      const err = await raises(db, 'SELECT public.accept_agency_invite($1)', [INVITE_TOKEN]);
+      expect(err.code).toBe('P0001');
+      expect(err.message).toContain('Agency billing is not active.');
+
+      const row = await db.query<{
+        status: string;
+        member_user_id: string | null;
+        invite_token_hash: string | null;
+      }>(
+        'SELECT status, member_user_id, invite_token_hash FROM public.agency_members WHERE id=$1',
+        [inviteMemberId],
+      );
+      expect(row.rows[0].status).toBe('pending');
+      expect(row.rows[0].member_user_id).toBeNull();
+      expect(row.rows[0].invite_token_hash).toBe(INVITE_HASH);
+    });
+
+    it('R2 — an invalid or wrongly-addressed token still raises the original P0002', async () => {
+      await actAs(R1_INVITEE);
+      const bad = await raises(db, 'SELECT public.accept_agency_invite($1)', ['not-a-token']);
+      expect(bad.code).toBe('P0002');
+      expect(bad.message).toContain('Invite invalid or not addressed to your email');
+
+      await actAs(R1_DRIVER);
+      const wrongEmail = await raises(db, 'SELECT public.accept_agency_invite($1)', [
+        INVITE_TOKEN,
+      ]);
+      expect(wrongEmail.code).toBe('P0002');
+      expect(wrongEmail.message).toContain('Invite invalid or not addressed to your email');
+    });
+
     describe('after simulated Stripe activation', () => {
       beforeAll(async () => {
         await db.query(
@@ -978,7 +1122,7 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
         );
       });
 
-      it('R1.2 — all five generic actions succeed', async () => {
+      it('R1.2 — all six generic actions succeed', async () => {
         for (const action of GENERIC_ACTIONS) {
           await expect(
             db.query('SELECT public.assert_agency_limit($1, $2)', [agencyId, action]),
@@ -1037,6 +1181,47 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
           [agencyId, R1_DRIVER, 'Weekly closeout', null, 'other', 'normal', null, null, null],
         );
         expect(item.rows[0].title).toBe('Weekly closeout');
+      });
+
+      it('R2 — a suspended agency profile exposes no public packages even while active', async () => {
+        await db.query("UPDATE public.agency_profiles SET status='suspended' WHERE id=$1", [
+          agencyId,
+        ]);
+        const suspended = await db.query('SELECT * FROM public.list_agency_packages_public($1)', [
+          agencyId,
+        ]);
+        expect(suspended.rows).toHaveLength(0);
+
+        await db.query("UPDATE public.agency_profiles SET status='active' WHERE id=$1", [
+          agencyId,
+        ]);
+        const restored = await db.query('SELECT * FROM public.list_agency_packages_public($1)', [
+          agencyId,
+        ]);
+        expect(restored.rows).toHaveLength(1);
+      });
+
+      it('R2 — the pending seat invitation can now be accepted', async () => {
+        await actAs(R1_INVITEE);
+        const accepted = await db.query<{ status: string }>(
+          'SELECT (public.accept_agency_invite($1)).status AS status',
+          [INVITE_TOKEN],
+        );
+        expect(accepted.rows[0].status).toBe('active');
+
+        const row = await db.query<{
+          status: string;
+          member_user_id: string | null;
+          invite_token_hash: string | null;
+          accepted_at: string | null;
+        }>(
+          'SELECT status, member_user_id, invite_token_hash, accepted_at FROM public.agency_members WHERE id=$1',
+          [inviteMemberId],
+        );
+        expect(row.rows[0].status).toBe('active');
+        expect(row.rows[0].member_user_id).toBe(R1_INVITEE);
+        expect(row.rows[0].invite_token_hash).toBeNull();
+        expect(row.rows[0].accepted_at).toBeTruthy();
       });
     });
   });

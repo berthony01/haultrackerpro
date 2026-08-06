@@ -19,9 +19,20 @@
 --     agency checkout function fills stripe_customer_id and the webhook
 --     upserts plan/status/source/subscription — unchanged.
 --   * A missing entitlement row fails closed as Starter/'cancelled'.
---   * assert_agency_limit() blocks the three billable actions when the
---     effective status is 'cancelled', with one truthful message that is
---     correct for both never-started and previously cancelled billing.
+--   * assert_agency_limit() blocks EVERY paid Agency Workspace action when
+--     the effective status is 'cancelled' — the three numeric capacity
+--     actions (create_service_package, invite_member, activate_client) and
+--     the six non-numeric workflow actions (set_private_request_link,
+--     submit_client_request, progress_client_request,
+--     create_delegation_request, create_work_item, accept_member_invite) —
+--     with one truthful message that is correct for both never-started and
+--     previously cancelled billing.
+--   * Public surfaces (slug resolution, public agency view, public package
+--     listing) expose nothing for an unpaid agency, and the public package
+--     listing additionally requires the agency profile itself to be active.
+--   * Cleanup paths stay open while cancelled: clearing the slug, owner/admin
+--     decline/cancel with no member assignment, and driver self-cancel with
+--     no member assignment.
 --   * The two existing production rows with status 'manual_beta' are
 --     GRANDFATHERED: this candidate contains no UPDATE, DELETE, or backfill
 --     of any kind and never rewrites an existing entitlement row.
@@ -180,16 +191,17 @@ BEGIN
       RAISE EXCEPTION 'Your % plan allows up to % active driver clients. Upgrade your agency plan to take on more.',
         plan_label, lim.active_client_limit USING ERRCODE = 'P0001';
     END IF;
-  -- Phase 1S-A2-R1: non-numeric paid Agency Workspace operations. These do
-  -- not consume a countable seat/package/client slot, so for any non-cancelled
-  -- entitlement they simply succeed. The cancelled block above already
-  -- rejected them for unpaid or missing-row agencies.
+  -- Phase 1S-A2-R1/R2: non-numeric paid Agency Workspace operations. These
+  -- do not consume a countable seat/package/client slot, so for any
+  -- non-cancelled entitlement they simply succeed. The cancelled block above
+  -- already rejected them for unpaid or missing-row agencies.
   ELSIF _action IN (
     'set_private_request_link',
     'submit_client_request',
     'progress_client_request',
     'create_delegation_request',
-    'create_work_item'
+    'create_work_item',
+    'accept_member_invite'
   ) THEN
     RETURN;
 
@@ -249,17 +261,22 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 -- ---------------------------------------------------------------------
--- 8. list_agency_packages_public: same public-visibility allowlist.
+-- 8. list_agency_packages_public: same public-visibility allowlist, plus an
+--    independent requirement that the agency profile itself is active, so a
+--    suspended agency exposes no packages regardless of entitlement status.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.list_agency_packages_public(_agency_id uuid)
 RETURNS SETOF public.agency_service_packages
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT * FROM public.agency_service_packages
    WHERE agency_id = _agency_id AND is_active = true
+     AND EXISTS (SELECT 1 FROM public.agency_profiles ap
+                  WHERE ap.id = _agency_id AND ap.status = 'active')
      AND (SELECT l.status FROM public.get_effective_agency_limits(_agency_id) l)
          IN ('manual_beta','active','trialing','past_due')
    ORDER BY sort_order ASC, created_at ASC;
 $$;
+
 
 -- ---------------------------------------------------------------------
 -- 9. submit_agency_client_request: intake into an unpaid agency is blocked.
@@ -301,7 +318,9 @@ END $$;
 -- ---------------------------------------------------------------------
 -- 10. set_agency_client_request_status: positive progression and assignment
 --     are paid operations. Driver self-cancel and owner/admin
---     decline/cancel remain available cleanup paths.
+--     decline/cancel remain available cleanup paths, but only when no member
+--     assignment is attached — a self-cancel carrying an assignment must not
+--     bypass the paid progression guard.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.set_agency_client_request_status(
   _id uuid, _status public.agency_client_request_status,
@@ -313,7 +332,7 @@ BEGIN
   IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
   SELECT * INTO _old FROM public.agency_client_requests WHERE id = _id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Request not found' USING ERRCODE='42704'; END IF;
-  IF _old.driver_user_id = _uid AND _status='cancelled' THEN NULL;
+  IF _old.driver_user_id = _uid AND _status='cancelled' AND _assigned_member_user_id IS NULL THEN NULL;
   ELSIF public.is_agency_owner_or_admin(_old.agency_id,_uid) THEN
     IF _status NOT IN ('declined','cancelled') OR _assigned_member_user_id IS NOT NULL THEN
       PERFORM public.assert_agency_limit(_old.agency_id, 'progress_client_request');
@@ -423,6 +442,49 @@ BEGIN
   VALUES (_uid,_agency_id,_driver_user_id,_assigned_member_user_id,
           'work_item_created','agency_work_item',_row.id,
           jsonb_build_object('title',_row.title,'type',_row.type,'priority',_row.priority));
+  RETURN _row;
+END $function$;
+
+-- ---------------------------------------------------------------------
+-- 13. accept_agency_invite: activating a pending seat expands paid team
+--     capacity, so billing must be verified BEFORE the row is mutated.
+--     Invite creation/resend, revocation, and listing are untouched.
+--     The live identity, token hashing, email matching, success fields,
+--     and invalid/not-addressed P0002 error are preserved exactly.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.accept_agency_invite(_token text)
+RETURNS public.agency_members
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  _uid uuid := auth.uid();
+  _h text := encode(digest(coalesce(_token,''),'sha256'),'hex');
+  _em text;
+  _pending public.agency_members;
+  _row public.agency_members;
+BEGIN
+  IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
+  SELECT lower(email) INTO _em FROM auth.users WHERE id=_uid;
+
+  SELECT * INTO _pending FROM public.agency_members
+   WHERE invite_token_hash=_h AND status='pending' AND lower(invite_email)=_em
+   LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invite invalid or not addressed to your email' USING ERRCODE='P0002';
+  END IF;
+
+  PERFORM public.assert_agency_limit(_pending.agency_id, 'accept_member_invite');
+
+  UPDATE public.agency_members SET member_user_id=_uid, status='active', accepted_at=now(),
+         invite_token_hash=NULL, updated_at=now()
+   WHERE id=_pending.id AND status='pending'
+  RETURNING * INTO _row;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invite invalid or not addressed to your email' USING ERRCODE='P0002';
+  END IF;
+
   RETURN _row;
 END $function$;
 
