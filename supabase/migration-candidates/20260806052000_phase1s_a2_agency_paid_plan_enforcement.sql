@@ -318,7 +318,9 @@ END $$;
 -- ---------------------------------------------------------------------
 -- 10. set_agency_client_request_status: positive progression and assignment
 --     are paid operations. Driver self-cancel and owner/admin
---     decline/cancel remain available cleanup paths.
+--     decline/cancel remain available cleanup paths, but only when no member
+--     assignment is attached — a self-cancel carrying an assignment must not
+--     bypass the paid progression guard.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.set_agency_client_request_status(
   _id uuid, _status public.agency_client_request_status,
