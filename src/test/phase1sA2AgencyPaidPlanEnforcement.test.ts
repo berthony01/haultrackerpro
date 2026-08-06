@@ -882,11 +882,20 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       packageId = pkg.rows[0].id;
       const reqs = await db.query<{ id: string }>(
         `INSERT INTO public.agency_client_requests(agency_id, driver_user_id, status)
-         VALUES ($1,$2,'pending'), ($1,$2,'pending') RETURNING id`,
+         VALUES ($1,$2,'pending'), ($1,$2,'pending'), ($1,$2,'pending') RETURNING id`,
         [agencyId, R1_DRIVER],
       );
       declinableRequestId = reqs.rows[0].id;
       driverCancelRequestId = reqs.rows[1].id;
+      assignmentBypassRequestId = reqs.rows[2].id;
+
+      // Pending seat invitation issued before billing lapsed.
+      const invite = await db.query<{ id: string }>(
+        `INSERT INTO public.agency_members(agency_id, invite_email, role, status, invite_token_hash)
+         VALUES ($1,'r1invitee@example.com','agency_member','pending',$2) RETURNING id`,
+        [agencyId, INVITE_HASH],
+      );
+      inviteMemberId = invite.rows[0].id;
     });
 
     it('R1.1 — cancelled agency: all five generic paid actions raise P0001', async () => {
