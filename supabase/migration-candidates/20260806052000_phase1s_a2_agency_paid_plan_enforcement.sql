@@ -191,16 +191,17 @@ BEGIN
       RAISE EXCEPTION 'Your % plan allows up to % active driver clients. Upgrade your agency plan to take on more.',
         plan_label, lim.active_client_limit USING ERRCODE = 'P0001';
     END IF;
-  -- Phase 1S-A2-R1: non-numeric paid Agency Workspace operations. These do
-  -- not consume a countable seat/package/client slot, so for any non-cancelled
-  -- entitlement they simply succeed. The cancelled block above already
-  -- rejected them for unpaid or missing-row agencies.
+  -- Phase 1S-A2-R1/R2: non-numeric paid Agency Workspace operations. These
+  -- do not consume a countable seat/package/client slot, so for any
+  -- non-cancelled entitlement they simply succeed. The cancelled block above
+  -- already rejected them for unpaid or missing-row agencies.
   ELSIF _action IN (
     'set_private_request_link',
     'submit_client_request',
     'progress_client_request',
     'create_delegation_request',
-    'create_work_item'
+    'create_work_item',
+    'accept_member_invite'
   ) THEN
     RETURN;
 
