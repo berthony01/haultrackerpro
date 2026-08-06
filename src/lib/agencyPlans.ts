@@ -11,9 +11,13 @@
  *    through the agency checkout edge function.
  *  - Phase 1S-A2: agency plans are paid-only. An agency with no entitlement
  *    row, or a row in `cancelled` status, has NO active billing and cannot
- *    add members, driver clients, or service packages. Only agencies holding
- *    an explicit `manual_beta` row (existing grandfathered beta workspaces)
- *    keep free access at their plan's limits.
+ *    use paid Agency Workspace operations — private request link, public
+ *    agency/package visibility, new client-request intake and positive
+ *    progression, delegation creation, new work items, and adding members,
+ *    driver clients, or service packages. Viewing existing data, cleanup,
+ *    declines/cancellations, revocation, and billing management stay open.
+ *    Only agencies holding an explicit `manual_beta` row (existing
+ *    grandfathered beta workspaces) keep free access at their plan's limits.
  *  - HaulTrackerPro does not process service payments between drivers and
  *    assistants/agencies. Charges defined here are for software access only.
  *  - assistant_free is a capability with no software fee — accepting a
