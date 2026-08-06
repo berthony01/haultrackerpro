@@ -10,6 +10,7 @@
 // =====================================================================
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
