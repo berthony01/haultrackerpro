@@ -254,7 +254,7 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + twelve functi
     expect(fn).toMatch(
       /EXISTS \(SELECT 1 FROM public\.agency_profiles ap\s*\n\s*WHERE ap\.id = _agency_id AND ap\.status = 'active'\)/,
     );
-    expect(fn).toContain("IN ('manual_beta','active','trialing','past_due')");
+    expect(fn).toContain("IN ('manual_beta','active','trialing','past_due')"); // trial-allowlist
   });
 
   it('R2 — accept_member_invite is a recognized non-numeric paid action', () => {
