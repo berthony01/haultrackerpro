@@ -294,9 +294,11 @@ serve(async (req) => {
     }
 
     // ── Server-side Pro gating ───────────────────────────────────────
-    // Free types: parse_expense, parse_ratecon. Pro types require an active
-    // subscription (or admin override). Never trust client-side isPro.
-    const PRO_TYPES = new Set(["lane_advice", "weekly_report", "tax_tips"]);
+    // Pro types require an active subscription (or admin override):
+    // lane_advice, weekly_report, tax_tips, parse_expense, parse_ratecon.
+    // parse_opportunity stays outside this Driver Pro gate — it belongs to
+    // the recruiter opportunity workflow. Never trust client-side isPro.
+    const PRO_TYPES = new Set(["lane_advice", "weekly_report", "tax_tips", "parse_expense", "parse_ratecon"]);
     if (PRO_TYPES.has(type)) {
       const { data: sub } = await supabase
         .from("subscriptions")

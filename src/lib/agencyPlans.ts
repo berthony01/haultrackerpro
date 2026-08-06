@@ -152,7 +152,7 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Up to 100 active driver clients',
       'Up to 100 active service packages',
       'Includes Recruiter Fleet — 25 active opportunities for the agency owner',
-      'Advanced work queue',
+      'Shared work queue and notifications',
       'Private agency request link',
       'Full agency audit log',
     ],

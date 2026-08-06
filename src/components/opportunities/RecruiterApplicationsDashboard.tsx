@@ -111,7 +111,7 @@ function fmtDate(d?: string | null) {
 }
 
 export function RecruiterApplicationsDashboard({ onBack }: Props) {
-  const { profile, isApproved, isSuspended, isLoading: recruiterLoading } = useRecruiterProfile();
+  const { profile, canPost, isSuspended, isLoading: recruiterLoading } = useRecruiterProfile();
   const recruiterBilling = useRecruiterBilling();
   const canUseContractWorkflow = recruiterBilling.canUseContractWorkflowTools === true;
   const {
@@ -235,14 +235,14 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     );
   }
 
-  if (!isApproved) {
+  if (!canPost) {
     return (
       <div className="space-y-5 animate-fade-in">
         {renderHeader}
         <Card className="p-10 border-dashed border-border/60 text-center">
-          <h3 className="text-base font-bold text-foreground mb-1">Awaiting Approval</h3>
+          <h3 className="text-base font-bold text-foreground mb-1">Complete Your Recruiter Profile</h3>
           <p className="text-sm text-muted-foreground">
-            Your recruiter profile must be approved before you can view applications.
+            Complete the required recruiter profile fields and accept the current posting terms before managing applications.
           </p>
         </Card>
       </div>

@@ -29,7 +29,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: Briefcase, title: 'Structured Opportunity Form', description: 'Capture pay model, CPM/percentage/flat, deductions, deadhead, escrow, home time, equipment, and bonuses in a clear schema drivers actually understand.' },
       { icon: ClipboardList, title: 'Opportunity Manager', description: 'Edit, pause, close, or resubmit your opportunities. See active vs draft vs closed status at a glance.' },
       { icon: Eye, title: 'View Counts', description: 'See how many drivers have viewed each opportunity so you know what is resonating.' },
-      { icon: ShieldCheck, title: 'Unlimited Standard Posts (Eligible Recruiters)', description: 'Once your recruiter profile is complete, current posting terms are accepted, and your account is not suspended, you can post unlimited standard opportunities — no per-plan post cap, no paid plan, no Verified Recruiter badge required. Paid plans add premium visibility and recruiting tools on top.' },
+      { icon: ShieldCheck, title: 'Active Opportunity Limits by Plan', description: 'Recruiter Standard includes 1 active opportunity with unlimited drafts. Starter includes 5 active opportunities, Growth includes 15, and Fleet includes 25 active opportunities for existing or included Fleet access — new standalone Fleet checkout is unavailable. Drafts are always unlimited; only active listings count toward your plan limit.' },
     ],
   },
   {
@@ -62,7 +62,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
   {
     category: 'Billing & Account',
     features: [
-      { icon: CreditCard, title: 'Stripe-Powered Subscriptions', description: 'Starter, Growth, and Fleet plans billed monthly through Stripe. No card data ever touches HaulTrackerPro.' },
+      { icon: CreditCard, title: 'Stripe-Powered Subscriptions', description: 'Starter and Growth standalone recruiter subscriptions are available through Stripe, billed monthly. Fleet remains preview-only for new standalone subscriptions. No card data ever touches HaulTrackerPro.' },
       { icon: CreditCard, title: 'In-App Billing Portal', description: 'Update card, change plan, or cancel directly from Recruiter Settings — changes take effect at the end of your current period.' },
       { icon: ShieldCheck, title: 'Secure Account Controls', description: 'Email-verified authentication, password reset, and account deletion controls live in Recruiter Settings.' },
     ],
