@@ -261,17 +261,22 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 -- ---------------------------------------------------------------------
--- 8. list_agency_packages_public: same public-visibility allowlist.
+-- 8. list_agency_packages_public: same public-visibility allowlist, plus an
+--    independent requirement that the agency profile itself is active, so a
+--    suspended agency exposes no packages regardless of entitlement status.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.list_agency_packages_public(_agency_id uuid)
 RETURNS SETOF public.agency_service_packages
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT * FROM public.agency_service_packages
    WHERE agency_id = _agency_id AND is_active = true
+     AND EXISTS (SELECT 1 FROM public.agency_profiles ap
+                  WHERE ap.id = _agency_id AND ap.status = 'active')
      AND (SELECT l.status FROM public.get_effective_agency_limits(_agency_id) l)
          IN ('manual_beta','active','trialing','past_due')
    ORDER BY sort_order ASC, created_at ASC;
 $$;
+
 
 -- ---------------------------------------------------------------------
 -- 9. submit_agency_client_request: intake into an unpaid agency is blocked.
