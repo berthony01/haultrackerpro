@@ -71,11 +71,12 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + twelve functi
     );
   });
 
-  it('replaces exactly the eleven named functions', () => {
+  it('replaces exactly the twelve named functions', () => {
     const fns = (topLevelText.match(/CREATE OR REPLACE FUNCTION public\.(\w+)/g) ?? []).map(
       (m) => m.replace('CREATE OR REPLACE FUNCTION public.', ''),
     );
     expect(fns.sort()).toEqual([
+      'accept_agency_invite',
       'assert_agency_limit',
       'create_agency',
       'create_agency_delegation_request',
