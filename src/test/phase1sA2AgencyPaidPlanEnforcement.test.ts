@@ -191,8 +191,10 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + twelve functi
     expect(progress).toMatch(
       /IF _status NOT IN \('declined','cancelled'\) OR _assigned_member_user_id IS NOT NULL THEN/,
     );
-    // Driver self-cancel stays an unguarded cleanup path.
-    expect(progress).toMatch(/_old\.driver_user_id = _uid AND _status='cancelled' THEN NULL;/);
+    // R2: driver self-cancel is a cleanup path ONLY with no member assignment.
+    expect(progress).toMatch(
+      /_old\.driver_user_id = _uid AND _status='cancelled' AND _assigned_member_user_id IS NULL THEN NULL;/,
+    );
 
     const delegation = body('create_agency_delegation_request');
     expect(
