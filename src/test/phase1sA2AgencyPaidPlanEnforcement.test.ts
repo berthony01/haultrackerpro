@@ -831,16 +831,22 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
   describe('R1 — paid workflow surfaces', () => {
     const R1_OWNER = '33333333-3333-4333-8333-333333333333';
     const R1_DRIVER = '44444444-4444-4444-8444-444444444444';
+    const R1_INVITEE = '55555555-5555-4555-8555-555555555555';
+    const INVITE_TOKEN = 'r1-invite-token-abc';
+    const INVITE_HASH = createHash('sha256').update(INVITE_TOKEN, 'utf8').digest('hex');
     const GENERIC_ACTIONS = [
       'set_private_request_link',
       'submit_client_request',
       'progress_client_request',
       'create_delegation_request',
       'create_work_item',
+      'accept_member_invite',
     ];
     let agencyId = '';
     let declinableRequestId = '';
     let driverCancelRequestId = '';
+    let assignmentBypassRequestId = '';
+    let inviteMemberId = '';
     let packageId = '';
 
     const actAs = (uid: string) =>
