@@ -371,6 +371,15 @@ CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
     SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
   $$;
 
+-- pgcrypto shim: production resolves digest() from pgcrypto on search_path
+-- public. PGlite exposes the PG14+ builtin sha256(bytea) instead.
+CREATE OR REPLACE FUNCTION public.digest(_data text, _algo text) RETURNS bytea
+  LANGUAGE sql IMMUTABLE AS $$
+    SELECT sha256(convert_to(_data, 'UTF8'))
+  $$;
+
+
+
 CREATE TYPE public.agency_client_request_status AS ENUM
   ('pending','approved','declined','cancelled','converted_to_client');
 CREATE TYPE public.agency_work_item_type AS ENUM
