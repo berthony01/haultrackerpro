@@ -12,9 +12,11 @@ import {
   ASSISTANT_AGENCY_PLANS,
   ALL_AGENCY_PLAN_KEYS,
   OUTSIDE_PAYMENTS_DISCLAIMER,
+  AGENCY_BILLING_NOT_ACTIVE_REASON,
   checkAgencyLimit,
-  defaultBetaEntitlement,
+  defaultUnsubscribedEntitlement,
   effectiveLimits,
+  type AgencyEntitlement,
 } from '@/lib/agencyPlans';
 
 const readFile = (rel: string) =>
@@ -54,8 +56,13 @@ describe('Phase 7 — plan definitions', () => {
   });
 });
 
-describe('Phase 7 — limit helper', () => {
-  const ent = defaultBetaEntitlement('agency-1'); // Agency Starter defaults
+describe('Phase 7 / 1S-A2 — limit helper (grandfathered manual_beta row)', () => {
+  // Explicit manual_beta entitlement — the two existing production beta
+  // workspaces. These remain usable at Agency Starter numeric limits.
+  const ent: AgencyEntitlement = {
+    ...defaultUnsubscribedEntitlement('agency-1'),
+    status: 'manual_beta',
+  };
 
   it('blocks creating another service package above plan limit', () => {
     const usage = { members: 1, activeClients: 0, activePackages: 3 };
@@ -80,12 +87,46 @@ describe('Phase 7 — limit helper', () => {
     expect(checkAgencyLimit(ent, 'activate_client', usage).allowed).toBe(false);
   });
 
-  it('treats no entitlement row as Agency Starter / manual_beta (safe default)', () => {
+  it('grandfathered beta keeps Starter numeric limits and stays usable under them', () => {
     expect(ent.status).toBe('manual_beta');
     expect(ent.planKey).toBe('agency_starter');
     const limits = effectiveLimits(ent);
     expect(limits.activeClientLimit).toBe(5);
     expect(limits.memberLimit).toBe(2);
+    expect(limits.servicePackageLimit).toBe(3);
+    const usage = { members: 1, activeClients: 1, activePackages: 1 };
+    expect(checkAgencyLimit(ent, 'invite_member', usage).allowed).toBe(true);
+    expect(checkAgencyLimit(ent, 'activate_client', usage).allowed).toBe(true);
+    expect(checkAgencyLimit(ent, 'create_service_package', usage).allowed).toBe(true);
+  });
+});
+
+describe('Phase 1S-A2 — missing entitlement row fails closed', () => {
+  const ent = defaultUnsubscribedEntitlement('agency-none');
+
+  it('treats no entitlement row as Agency Starter shape in cancelled status', () => {
+    expect(ent.planKey).toBe('agency_starter');
+    expect(ent.status).toBe('cancelled');
+    expect(ent.source).toBe('manual');
+    expect(ent.stripeCustomerId).toBeNull();
+    expect(ent.stripeSubscriptionId).toBeNull();
+    expect(ent.memberLimit).toBeNull();
+    expect(ent.activeClientLimit).toBeNull();
+    expect(ent.servicePackageLimit).toBeNull();
+  });
+
+  it('blocks every billable action because billing is not active', () => {
+    const usage = { members: 0, activeClients: 0, activePackages: 0 };
+    for (const action of ['create_service_package', 'invite_member', 'activate_client'] as const) {
+      const r = checkAgencyLimit(ent, action, usage);
+      expect(r.allowed).toBe(false);
+      expect(r.reason).toBe(AGENCY_BILLING_NOT_ACTIVE_REASON);
+    }
+  });
+
+  it('billing-not-active copy is truthful for never-started and cancelled alike', () => {
+    expect(AGENCY_BILLING_NOT_ACTIVE_REASON).toMatch(/billing is not active/i);
+    expect(AGENCY_BILLING_NOT_ACTIVE_REASON).toMatch(/start or restart/i);
   });
 });
 
@@ -169,11 +210,18 @@ describe('Phase 7C — Plan & Limits member usage accuracy', () => {
   });
 });
 
-describe('Phase 7 Cleanup — Plan & Limits accuracy (legacy)', () => {
+describe('Phase 1S-A2 — Plan & Limits card no longer implies open beta access', () => {
   const card = readFile('src/components/agency/AgencyPlanLimitsCard.tsx');
 
-  it('uses the in-Phase-8 messaging for beta fallback', () => {
-    expect(card).toMatch(/Phase 8/);
+  it('does not claim a missing entitlement row opens the workspace at Starter limits', () => {
+    expect(card).not.toMatch(/your agency workspace is open at Agency Starter limits/i);
+    expect(card).not.toMatch(/\{!hasRow &&/);
+  });
+
+  it('reserves beta copy for explicitly grandfathered manual_beta workspaces', () => {
+    expect(card).toContain('isGrandfatheredBeta');
+    expect(card).toMatch(/Grandfathered beta workspace/);
+    expect(card).toMatch(/New agencies must start a paid plan/);
   });
 });
 

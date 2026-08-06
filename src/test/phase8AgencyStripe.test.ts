@@ -307,18 +307,32 @@ describe('Phase 8B — stripe-webhook agency routing', () => {
   });
 });
 
-describe('Phase 8B — cancelled blocks new billable mutations (migration)', () => {
-  const migrations = fs
-    .readdirSync(path.join(process.cwd(), 'supabase/migrations'))
-    .map((f) => fs.readFileSync(path.join(process.cwd(), 'supabase/migrations', f), 'utf8'))
+describe('Phase 8B / 1S-A2 — cancelled blocks new billable mutations (SQL)', () => {
+  // The Phase 1S-A2 candidate carries the latest definition; production
+  // migrations carry the previous one. Read both so the assertion tracks the
+  // newest authored definition.
+  const migrationsDir = path.join(process.cwd(), 'supabase/migrations');
+  const candidatesDir = path.join(process.cwd(), 'supabase/migration-candidates');
+  const allSql = [migrationsDir, candidatesDir]
+    .flatMap((dir) =>
+      fs
+        .readdirSync(dir)
+        .sort()
+        .map((f) => fs.readFileSync(path.join(dir, f), 'utf8')),
+    )
     .join('\n');
 
-  it('latest assert_agency_limit raises when status is cancelled', () => {
-    const idx = migrations.lastIndexOf('CREATE OR REPLACE FUNCTION public.assert_agency_limit');
+  it('latest assert_agency_limit blocks when status is cancelled', () => {
+    const idx = allSql.lastIndexOf('CREATE OR REPLACE FUNCTION public.assert_agency_limit');
     expect(idx).toBeGreaterThan(-1);
-    const body = migrations.slice(idx, idx + 3000);
+    const body = allSql.slice(idx, idx + 3000);
     expect(body).toMatch(/lim\.status\s*=\s*'cancelled'/);
-    expect(body).toMatch(/Restart your %/);
+    // Phase 1S-A2 replaced the "Restart your %" wording with copy that is
+    // truthful for never-started billing too.
+    expect(body).toMatch(/Agency billing is not active\./);
+    expect(body).toMatch(/Start or restart your %/);
+    expect(body).not.toMatch(/Agency billing is cancelled\. Restart your %/);
+    expect(body).toMatch(/ERRCODE = 'P0001'/);
   });
 });
 
@@ -341,6 +355,42 @@ describe('Phase 8B — Plan & Limits card billing UI', () => {
   it('renders past_due warning and cancelled warning', () => {
     expect(card).toMatch(/past_due/);
     expect(card).toMatch(/Agency billing is cancelled/);
+  });
+
+  // --- Phase 1S-A2 never-started vs previously-cancelled ------------------
+
+  it('derives billingNeverStarted from cancelled status with no Stripe identity', () => {
+    expect(card).toContain('billingNeverStarted');
+    const idx = card.indexOf('const billingNeverStarted');
+    expect(idx).toBeGreaterThan(-1);
+    const decl = card.slice(idx, idx + 260);
+    expect(decl).toMatch(/entitlement\.status === 'cancelled'/);
+    expect(decl).toMatch(/!entitlement\.stripeCustomerId/);
+    expect(decl).toMatch(/!entitlement\.stripeSubscriptionId/);
+  });
+
+  it('shows a "Not active" badge when billing was never started', () => {
+    expect(card).toMatch(/billingNeverStarted[\s\S]{0,160}Not active/);
+  });
+
+  it('says billing has not started and names the blocked actions', () => {
+    expect(card).toMatch(/Agency billing has not been started/);
+    expect(card).toMatch(/agency members/);
+    expect(card).toMatch(/driver clients/);
+    expect(card).toMatch(/service packages/);
+  });
+
+  it('uses Start (never started) vs Restart (previously cancelled) CTAs', () => {
+    expect(card).toContain('previouslyCancelled');
+    expect(card).toMatch(
+      /previouslyCancelled\s*\?\s*`Restart Billing —[\s\S]{0,120}`Start Agency Billing —/,
+    );
+  });
+
+  it('shows explicit grandfathered beta copy only for manual_beta rows', () => {
+    expect(card).toMatch(/const isGrandfatheredBeta\s*=\s*entitlement\.status === 'manual_beta'/);
+    expect(card).toMatch(/Grandfathered beta workspace/);
+    expect(card).not.toMatch(/your agency workspace is open at Agency Starter limits/i);
   });
 
   it('uses Start / Restart / Manage labels (not fake Pay Now / Subscribe Now)', () => {

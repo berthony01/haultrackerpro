@@ -41,16 +41,18 @@ function sanitizeAgencyPlanKey(raw: string | null | undefined): AssistantAgencyP
 }
 
 /**
- * Phase 8B — Plan & Limits card with real Stripe billing CTAs.
+ * Phase 8B / Phase 1S-A2 — Plan & Limits card with real Stripe billing CTAs.
  *
- * - manual_beta / no Stripe customer → "Start Agency Billing" (owner only)
+ * - cancelled + no Stripe identity → billing never started: "Not active"
+ *   badge + "Start Agency Billing" (owner only)
+ * - cancelled + Stripe identity/history → "Restart Billing" (owner only)
+ * - manual_beta → grandfathered beta workspace notice
  * - active / trialing → "Manage Billing"  // trial-allowlist: Stripe subscription status
  * - past_due → warning + "Manage Billing"
- * - cancelled → warning + "Restart Billing"
  * - Non-owners see read-only "Only the agency owner can manage billing."
  */
 export function AgencyPlanLimitsCard({ agencyId }: Props) {
-  const { entitlement, hasRow, isLoading, refetch } = useAgencyEntitlement(agencyId);
+  const { entitlement, isLoading, refetch } = useAgencyEntitlement(agencyId);
   const { data: members } = useAgencyMembers(agencyId);
   const { data: packages } = useAgencyPackages(agencyId);
   const { data: clients } = useAgencyClients(agencyId);
@@ -86,6 +88,16 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
   // `status` field used to silently report 0.
   const usedClients = (clients ?? []).length;
 
+  // Phase 1S-A2 — distinguish "billing never started" from "previously
+  // cancelled". A placeholder entitlement is created with status `cancelled`
+  // and no Stripe identity, so the absence of both Stripe IDs is the signal.
+  const billingNeverStarted =
+    entitlement.status === 'cancelled' &&
+    !entitlement.stripeCustomerId &&
+    !entitlement.stripeSubscriptionId;
+  const previouslyCancelled = entitlement.status === 'cancelled' && !billingNeverStarted;
+  const isGrandfatheredBeta = entitlement.status === 'manual_beta';
+
   const statusBadge: Record<typeof entitlement.status, { label: string; tone: string }> = {
     manual_beta: { label: 'Beta', tone: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
     trialing: { label: 'Trial', tone: 'bg-blue-500/15 text-blue-600 border-blue-500/30' }, // trial-allowlist — Stripe subscription status, not marketing
@@ -93,7 +105,9 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
     past_due: { label: 'Past due', tone: 'bg-destructive/15 text-destructive border-destructive/30' },
     cancelled: { label: 'Cancelled', tone: 'bg-muted text-muted-foreground border-border' },
   };
-  const badge = statusBadge[entitlement.status];
+  const badge = billingNeverStarted
+    ? { label: 'Not active', tone: 'bg-muted text-muted-foreground border-border' }
+    : statusBadge[entitlement.status];
 
   const startCheckout = async (planKey: AssistantAgencyPlanKey) => {
     if (busy) return;
@@ -221,7 +235,17 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
             </span>
           </div>
         )}
-        {entitlement.status === 'cancelled' && (
+        {billingNeverStarted && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
+            <Info className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Agency billing has not been started. Activate a plan to add agency members,
+              driver clients, or service packages. You can still view your workspace and
+              manage what already exists.
+            </span>
+          </div>
+        )}
+        {previouslyCancelled && (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex gap-2">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
@@ -232,12 +256,12 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
           </div>
         )}
 
-        {!hasRow && (
+        {isGrandfatheredBeta && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
             <Info className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
-              Beta access — your agency workspace is open at Agency Starter limits.
-              Start agency billing any time to lock in a paid plan.
+              Grandfathered beta workspace — this agency keeps {plan.label} limits at no
+              charge. New agencies must start a paid plan.
             </span>
           </div>
         )}
@@ -274,7 +298,7 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
                   onClick={() => startCheckout(selectedPlan)}
                 >
                   <CreditCard className="h-4 w-4" />
-                  {entitlement.status === 'cancelled'
+                  {previouslyCancelled
                     ? `Restart Billing — ${ASSISTANT_AGENCY_PLANS[selectedPlan].label}`
                     : `Start Agency Billing — ${ASSISTANT_AGENCY_PLANS[selectedPlan].label}`}
                 </Button>
