@@ -332,7 +332,7 @@ BEGIN
   IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
   SELECT * INTO _old FROM public.agency_client_requests WHERE id = _id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Request not found' USING ERRCODE='42704'; END IF;
-  IF _old.driver_user_id = _uid AND _status='cancelled' THEN NULL;
+  IF _old.driver_user_id = _uid AND _status='cancelled' AND _assigned_member_user_id IS NULL THEN NULL;
   ELSIF public.is_agency_owner_or_admin(_old.agency_id,_uid) THEN
     IF _status NOT IN ('declined','cancelled') OR _assigned_member_user_id IS NOT NULL THEN
       PERFORM public.assert_agency_limit(_old.agency_id, 'progress_client_request');
