@@ -1003,7 +1003,7 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
         'SELECT count(*) AS n FROM public.agency_client_requests WHERE agency_id=$1',
         [agencyId],
       );
-      expect(Number(submitted.rows[0].n)).toBe(2);
+      expect(Number(submitted.rows[0].n)).toBe(3);
 
       await actAs(R1_OWNER);
       const approveErr = await raises(
