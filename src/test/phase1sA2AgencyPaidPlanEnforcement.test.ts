@@ -854,12 +854,17 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       db.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [uid]);
 
     beforeAll(async () => {
-      await db.query('INSERT INTO auth.users(id, email) VALUES ($1,$2), ($3,$4)', [
-        R1_OWNER,
-        'r1owner@example.com',
-        R1_DRIVER,
-        'r1driver@example.com',
-      ]);
+      await db.query(
+        'INSERT INTO auth.users(id, email) VALUES ($1,$2), ($3,$4), ($5,$6)',
+        [
+          R1_OWNER,
+          'r1owner@example.com',
+          R1_DRIVER,
+          'r1driver@example.com',
+          R1_INVITEE,
+          'r1invitee@example.com',
+        ],
+      );
       await actAs(R1_OWNER);
       const r = await db.query<{ id: string }>(
         "SELECT (public.create_agency('R1 Agency')).id AS id",
