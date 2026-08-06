@@ -35,10 +35,10 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
   {
     category: 'Applicant Pipeline',
     features: [
-      { icon: Users, title: 'Driver Requests Dashboard', description: 'Every driver who requests info on your listing lands in your pipeline with their preferences, contact info, and message.' },
-      { icon: ClipboardList, title: 'Status Workflow', description: 'Move applicants through new → contacted → call scheduled → interview → offer sent → hired with a single click.' },
-      { icon: Mail, title: 'Driver Contact Snapshot', description: 'Receive the driver\'s name, email, and phone at the moment they request info so you can respond on your preferred channel.' },
-      { icon: BarChart3, title: 'Response & Conversion Stats', description: 'Track response rate, hires, and interview counts on the Recruiter Dashboard so you can measure what is working.' },
+      { icon: Users, title: 'Driver Requests Dashboard', description: 'Every driver application appears in your pipeline with the driver’s submitted profile details and message. Phone and email are revealed only after the driver approves a separate contact request.' },
+      { icon: ClipboardList, title: 'Status Workflow', description: 'Move applicants through the recruiter-controlled stages available in the dashboard. Hired status remains protected by the contract-approval workflow and cannot be set directly before the required driver decision.' },
+      { icon: Mail, title: 'Driver Contact Snapshot', description: 'Review the driver’s available profile details in the application pipeline. Private phone and email details appear only after the driver approves your contact request.' },
+      { icon: BarChart3, title: 'Response & Conversion Stats', description: 'View Total Applicants, Open Applicants, Hired Drivers, and Hire Rate on the Recruiter Dashboard.' },
     ],
   },
   {
