@@ -1061,6 +1061,56 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       expect(cancelled.rows[0].status).toBe('cancelled');
     });
 
+    it('R2 — driver self-cancel carrying a member assignment is rejected with 42501', async () => {
+      await actAs(R1_DRIVER);
+      const err = await raises(
+        db,
+        'SELECT public.set_agency_client_request_status($1,$2,$3)',
+        [assignmentBypassRequestId, 'cancelled', R1_OWNER],
+      );
+      expect(err.code).toBe('42501');
+      expect(err.message).toContain('Not allowed');
+      const row = await db.query<{ status: string; assigned_member_user_id: string | null }>(
+        'SELECT status, assigned_member_user_id FROM public.agency_client_requests WHERE id=$1',
+        [assignmentBypassRequestId],
+      );
+      expect(row.rows[0].status).toBe('pending');
+      expect(row.rows[0].assigned_member_user_id).toBeNull();
+    });
+
+    it('R2 — accepting a seat invitation is blocked while billing is cancelled', async () => {
+      await actAs(R1_INVITEE);
+      const err = await raises(db, 'SELECT public.accept_agency_invite($1)', [INVITE_TOKEN]);
+      expect(err.code).toBe('P0001');
+      expect(err.message).toContain('Agency billing is not active.');
+
+      const row = await db.query<{
+        status: string;
+        member_user_id: string | null;
+        invite_token_hash: string | null;
+      }>(
+        'SELECT status, member_user_id, invite_token_hash FROM public.agency_members WHERE id=$1',
+        [inviteMemberId],
+      );
+      expect(row.rows[0].status).toBe('pending');
+      expect(row.rows[0].member_user_id).toBeNull();
+      expect(row.rows[0].invite_token_hash).toBe(INVITE_HASH);
+    });
+
+    it('R2 — an invalid or wrongly-addressed token still raises the original P0002', async () => {
+      await actAs(R1_INVITEE);
+      const bad = await raises(db, 'SELECT public.accept_agency_invite($1)', ['not-a-token']);
+      expect(bad.code).toBe('P0002');
+      expect(bad.message).toContain('Invite invalid or not addressed to your email');
+
+      await actAs(R1_DRIVER);
+      const wrongEmail = await raises(db, 'SELECT public.accept_agency_invite($1)', [
+        INVITE_TOKEN,
+      ]);
+      expect(wrongEmail.code).toBe('P0002');
+      expect(wrongEmail.message).toContain('Invite invalid or not addressed to your email');
+    });
+
     describe('after simulated Stripe activation', () => {
       beforeAll(async () => {
         await db.query(
