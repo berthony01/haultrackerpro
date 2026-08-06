@@ -898,7 +898,7 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       inviteMemberId = invite.rows[0].id;
     });
 
-    it('R1.1 — cancelled agency: all five generic paid actions raise P0001', async () => {
+    it('R1.1 — cancelled agency: all six generic paid actions raise P0001', async () => {
       for (const action of GENERIC_ACTIONS) {
         const err = await raises(db, 'SELECT public.assert_agency_limit($1, $2)', [
           agencyId,
@@ -909,7 +909,7 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       }
     });
 
-    it('R1.1 — a missing entitlement row blocks the five generic actions too', async () => {
+    it('R1.1 — a missing entitlement row blocks the six generic actions too', async () => {
       const orphan = await db.query<{ id: string }>(
         "INSERT INTO public.agency_profiles(owner_user_id, name) VALUES ($1,'R1 Orphan') RETURNING id",
         [R1_OWNER],
@@ -1069,7 +1069,7 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
         );
       });
 
-      it('R1.2 — all five generic actions succeed', async () => {
+      it('R1.2 — all six generic actions succeed', async () => {
         for (const action of GENERIC_ACTIONS) {
           await expect(
             db.query('SELECT public.assert_agency_limit($1, $2)', [agencyId, action]),
