@@ -107,6 +107,7 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + twelve functi
   it('contains no top-level data mutation, schema growth, policy, index, trigger, or grant change', () => {
     for (const forbidden of [
       /\bUPDATE\s+public\./i,
+      /\bINSERT\s+INTO\b/i,
       /\bDELETE\s+FROM\b/i,
       /\bTRUNCATE\b/i,
       /\bCREATE\s+TABLE\b/i,
