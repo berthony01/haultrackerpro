@@ -202,7 +202,7 @@ const recruiterPaidPlans: Array<{
       'Everything in Recruiter Standard',
       'Up to 5 active opportunities at a time',
       'Unlimited drafts',
-      'Enhanced applicant tracking',
+      
       'Applicant status history',
       'Basic referral tracking view',
     ],
