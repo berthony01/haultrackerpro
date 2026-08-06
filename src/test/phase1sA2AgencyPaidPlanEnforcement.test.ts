@@ -968,11 +968,14 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
       expect(pkgs.rows).toHaveLength(0);
     });
 
-    it('R1.4 — a grandfathered manual_beta agency still resolves and is visible', async () => {
+    it('R1.4/R2 — a grandfathered manual_beta agency resolves its slug and is visible', async () => {
+      // R2: assign a real slug to the beta fixture so resolution is actually
+      // exercised instead of trivially returning NULL.
+      await db.query("UPDATE public.agency_profiles SET slug='beta-agency' WHERE id=$1", [
+        betaAgencyId,
+      ]);
       const beta = await db.query('SELECT public.resolve_agency_slug($1) AS id', ['beta-agency']);
-      // No slug set on the beta fixture, so prove visibility through the
-      // other two public reads instead.
-      expect((beta.rows[0] as { id: string | null }).id).toBeNull();
+      expect((beta.rows[0] as { id: string | null }).id).toBe(betaAgencyId);
       const view = await db.query('SELECT * FROM public.get_agency_public_view($1)', [
         betaAgencyId,
       ]);
