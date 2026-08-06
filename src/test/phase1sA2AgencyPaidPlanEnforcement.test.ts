@@ -1182,6 +1182,47 @@ describe('Phase 1S-A2 — PGlite runtime proof', () => {
         );
         expect(item.rows[0].title).toBe('Weekly closeout');
       });
+
+      it('R2 — a suspended agency profile exposes no public packages even while active', async () => {
+        await db.query("UPDATE public.agency_profiles SET status='suspended' WHERE id=$1", [
+          agencyId,
+        ]);
+        const suspended = await db.query('SELECT * FROM public.list_agency_packages_public($1)', [
+          agencyId,
+        ]);
+        expect(suspended.rows).toHaveLength(0);
+
+        await db.query("UPDATE public.agency_profiles SET status='active' WHERE id=$1", [
+          agencyId,
+        ]);
+        const restored = await db.query('SELECT * FROM public.list_agency_packages_public($1)', [
+          agencyId,
+        ]);
+        expect(restored.rows).toHaveLength(1);
+      });
+
+      it('R2 — the pending seat invitation can now be accepted', async () => {
+        await actAs(R1_INVITEE);
+        const accepted = await db.query<{ status: string }>(
+          'SELECT (public.accept_agency_invite($1)).status AS status',
+          [INVITE_TOKEN],
+        );
+        expect(accepted.rows[0].status).toBe('active');
+
+        const row = await db.query<{
+          status: string;
+          member_user_id: string | null;
+          invite_token_hash: string | null;
+          accepted_at: string | null;
+        }>(
+          'SELECT status, member_user_id, invite_token_hash, accepted_at FROM public.agency_members WHERE id=$1',
+          [inviteMemberId],
+        );
+        expect(row.rows[0].status).toBe('active');
+        expect(row.rows[0].member_user_id).toBe(R1_INVITEE);
+        expect(row.rows[0].invite_token_hash).toBeNull();
+        expect(row.rows[0].accepted_at).toBeTruthy();
+      });
     });
   });
 
