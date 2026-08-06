@@ -445,4 +445,47 @@ BEGIN
   RETURN _row;
 END $function$;
 
+-- ---------------------------------------------------------------------
+-- 13. accept_agency_invite: activating a pending seat expands paid team
+--     capacity, so billing must be verified BEFORE the row is mutated.
+--     Invite creation/resend, revocation, and listing are untouched.
+--     The live identity, token hashing, email matching, success fields,
+--     and invalid/not-addressed P0002 error are preserved exactly.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.accept_agency_invite(_token text)
+RETURNS public.agency_members
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  _uid uuid := auth.uid();
+  _h text := encode(digest(coalesce(_token,''),'sha256'),'hex');
+  _em text;
+  _pending public.agency_members;
+  _row public.agency_members;
+BEGIN
+  IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
+  SELECT lower(email) INTO _em FROM auth.users WHERE id=_uid;
+
+  SELECT * INTO _pending FROM public.agency_members
+   WHERE invite_token_hash=_h AND status='pending' AND lower(invite_email)=_em
+   LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invite invalid or not addressed to your email' USING ERRCODE='P0002';
+  END IF;
+
+  PERFORM public.assert_agency_limit(_pending.agency_id, 'accept_member_invite');
+
+  UPDATE public.agency_members SET member_user_id=_uid, status='active', accepted_at=now(),
+         invite_token_hash=NULL, updated_at=now()
+   WHERE id=_pending.id AND status='pending'
+  RETURNING * INTO _row;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Invite invalid or not addressed to your email' USING ERRCODE='P0002';
+  END IF;
+
+  RETURN _row;
+END $function$;
+
 COMMIT;
