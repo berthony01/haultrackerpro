@@ -212,6 +212,61 @@ describe('Phase 1S-A2 — candidate scope is exactly one default + twelve functi
     );
     expect(slug).toMatch(/IF _normalized IS NOT NULL THEN/);
   });
+
+  it('R2 — accept_agency_invite checks billing after the pending SELECT and before the UPDATE', () => {
+    const start = CANDIDATE_SQL.indexOf(
+      'CREATE OR REPLACE FUNCTION public.accept_agency_invite',
+    );
+    expect(start).toBeGreaterThan(-1);
+    const accept = CANDIDATE_SQL.slice(start);
+
+    // Live identity preserved.
+    expect(accept).toMatch(
+      /FUNCTION public\.accept_agency_invite\(_token text\)\s*\nRETURNS public\.agency_members\s*\nLANGUAGE plpgsql\s*\nSECURITY DEFINER\s*\nSET search_path TO 'public'/,
+    );
+    expect(accept).toContain("encode(digest(coalesce(_token,''),'sha256'),'hex')");
+    expect(accept).toContain('lower(invite_email)=_em');
+    expect(accept).toContain(
+      "RAISE EXCEPTION 'Invite invalid or not addressed to your email' USING ERRCODE='P0002'",
+    );
+    expect(accept).toContain(
+      "SET member_user_id=_uid, status='active', accepted_at=now()",
+    );
+    expect(accept).toContain('invite_token_hash=NULL, updated_at=now()');
+
+    const select = accept.indexOf('SELECT * INTO _pending FROM public.agency_members');
+    const guard = accept.indexOf(
+      "assert_agency_limit(_pending.agency_id, 'accept_member_invite')",
+    );
+    const update = accept.indexOf('UPDATE public.agency_members SET member_user_id=_uid');
+    expect(select).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(select);
+    expect(update).toBeGreaterThan(guard);
+  });
+
+  it('R2 — public package listing requires both an active profile and an allowed entitlement', () => {
+    const start = CANDIDATE_SQL.indexOf(
+      'CREATE OR REPLACE FUNCTION public.list_agency_packages_public',
+    );
+    const next = CANDIDATE_SQL.indexOf('CREATE OR REPLACE FUNCTION public.', start + 1);
+    const fn = CANDIDATE_SQL.slice(start, next === -1 ? undefined : next);
+    expect(fn).toMatch(
+      /EXISTS \(SELECT 1 FROM public\.agency_profiles ap\s*\n\s*WHERE ap\.id = _agency_id AND ap\.status = 'active'\)/,
+    );
+    expect(fn).toContain("IN ('manual_beta','active','trialing','past_due')");
+  });
+
+  it('R2 — accept_member_invite is a recognized non-numeric paid action', () => {
+    const start = CANDIDATE_SQL.indexOf('CREATE OR REPLACE FUNCTION public.assert_agency_limit');
+    const next = CANDIDATE_SQL.indexOf('CREATE OR REPLACE FUNCTION public.', start + 1);
+    expect(CANDIDATE_SQL.slice(start, next)).toContain("'accept_member_invite'");
+  });
+
+  it('R2 — invite creation, revocation, and listing stay outside this candidate', () => {
+    for (const fn of ['invite_agency_member', 'revoke_agency_member', 'list_agency_members']) {
+      expect(CANDIDATE_SQL).not.toContain(`CREATE OR REPLACE FUNCTION public.${fn}`);
+    }
+  });
 });
 
 describe('Phase 1S-A2 — client source contract', () => {
