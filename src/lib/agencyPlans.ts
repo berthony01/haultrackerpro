@@ -9,6 +9,11 @@
  * IMPORTANT
  *  - Agency Stripe checkout shipped in Phase 8B. Subscribe/Pay CTAs are live
  *    through the agency checkout edge function.
+ *  - Phase 1S-A2: agency plans are paid-only. An agency with no entitlement
+ *    row, or a row in `cancelled` status, has NO active billing and cannot
+ *    add members, driver clients, or service packages. Only agencies holding
+ *    an explicit `manual_beta` row (existing grandfathered beta workspaces)
+ *    keep free access at their plan's limits.
  *  - HaulTrackerPro does not process service payments between drivers and
  *    assistants/agencies. Charges defined here are for software access only.
  *  - assistant_free is a capability with no software fee — accepting a
@@ -190,18 +195,21 @@ export interface AgencyEntitlement {
 }
 
 /**
- * Safe default for agencies without an explicit entitlement row.
+ * Phase 1S-A2 — fail-closed default for agencies with NO entitlement row.
  *
- * Phase 7 ships entitlement-aware UI but does NOT lock existing beta users
- * out. When no row exists we treat the agency as Agency Starter in
- * `manual_beta` status — usable, with starter-level limits — until Phase 8
- * wires real billing.
+ * A missing row means billing was never started, so it is NOT beta access:
+ * we return the Agency Starter *shape* (so plan copy and numeric ceilings
+ * still render) in `cancelled` status with no Stripe identity and no
+ * override limits. Callers must treat this as "billing not active".
+ *
+ * Agencies that hold an explicit `manual_beta` row remain grandfathered and
+ * fully usable at their plan's limits — that path never reaches this helper.
  */
-export function defaultBetaEntitlement(agencyId: string): AgencyEntitlement {
+export function defaultUnsubscribedEntitlement(agencyId: string): AgencyEntitlement {
   return {
     agencyId,
     planKey: 'agency_starter',
-    status: 'manual_beta',
+    status: 'cancelled',
     source: 'manual',
     activeClientLimit: null,
     memberLimit: null,
@@ -231,6 +239,14 @@ export type AgencyLimitedAction =
   | 'activate_client';
 
 /**
+ * Phase 1S-A2 — single truthful reason used when an agency has no active
+ * billing. Worded so it is correct for a never-started placeholder and for a
+ * previously cancelled subscription.
+ */
+export const AGENCY_BILLING_NOT_ACTIVE_REASON =
+  'Agency billing is not active. Start or restart your plan from the Plan & Limits card to continue this action.';
+
+/**
  * Pure helper: does the agency have headroom for `action` given current usage?
  *
  * Returns { allowed, limit, used, reason }. When `limit` is null the plan
@@ -242,6 +258,17 @@ export function checkAgencyLimit(
   usage: { members: number; activeClients: number; activePackages: number },
 ): { allowed: boolean; limit: number | null; used: number; reason?: string } {
   const limits = effectiveLimits(ent);
+  // Phase 1S-A2 — fail closed before any numeric check when billing is not
+  // active. `cancelled` covers both never-started placeholders and lapsed
+  // subscriptions. Grandfathered `manual_beta` rows stay usable.
+  if (ent.status === 'cancelled') {
+    return {
+      allowed: false,
+      limit: null,
+      used: 0,
+      reason: AGENCY_BILLING_NOT_ACTIVE_REASON,
+    };
+  }
   switch (action) {
     case 'create_service_package': {
       const limit = limits.servicePackageLimit;

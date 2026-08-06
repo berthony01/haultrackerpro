@@ -5,17 +5,21 @@ import {
   type AgencyEntitlement,
   type AssistantAgencyPlanKey,
   type AgencyEntitlementStatus,
-  defaultBetaEntitlement,
+  defaultUnsubscribedEntitlement,
   effectiveLimits,
 } from '@/lib/agencyPlans';
 
 /**
- * Phase 7 — Read the entitlement row for an agency.
+ * Phase 7 / Phase 1S-A2 — Read the entitlement row for an agency.
  *
  * Reads via the `get_agency_entitlement(_agency_id)` security-definer RPC,
- * so callers don't need direct table access. When the agency has no
- * entitlement row yet we fall back to a `manual_beta` Agency Starter so
- * existing beta agencies keep working until Phase 8 wires real billing.
+ * so callers don't need direct table access.
+ *
+ * Missing row = fail closed. There is no implicit beta grant: when the
+ * agency has no entitlement row we return an Agency Starter *shape* in
+ * `cancelled` status so limits render, while billing reads as not active.
+ * Agencies holding an explicit `manual_beta` row remain grandfathered and
+ * keep working at their plan's limits.
  */
 export interface UseAgencyEntitlementResult {
   entitlement: AgencyEntitlement;
@@ -76,7 +80,7 @@ export function useAgencyEntitlement(
         stripeCustomerId: row.stripe_customer_id,
         stripeSubscriptionId: row.stripe_subscription_id,
       }
-    : defaultBetaEntitlement(agencyId ?? '');
+    : defaultUnsubscribedEntitlement(agencyId ?? '');
 
   return {
     entitlement,

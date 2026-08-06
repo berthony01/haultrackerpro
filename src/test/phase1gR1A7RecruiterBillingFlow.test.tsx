@@ -99,7 +99,7 @@ vi.mock('@/hooks/useAgencyEntitlement', async () => {
   return {
     useAgencyEntitlement: (agencyId: string | null | undefined) => ({
       entitlement:
-        agencyMocks.entitlement ?? actual.defaultBetaEntitlement(agencyId ?? ''),
+        agencyMocks.entitlement ?? actual.defaultUnsubscribedEntitlement(agencyId ?? ''),
       hasRow: agencyMocks.hasRow,
       isLoading: agencyMocks.entLoading,
       isError: agencyMocks.entError,
