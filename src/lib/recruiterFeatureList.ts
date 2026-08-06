@@ -62,7 +62,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
   {
     category: 'Billing & Account',
     features: [
-      { icon: CreditCard, title: 'Stripe-Powered Subscriptions', description: 'Starter, Growth, and Fleet plans billed monthly through Stripe. No card data ever touches HaulTrackerPro.' },
+      { icon: CreditCard, title: 'Stripe-Powered Subscriptions', description: 'Starter and Growth standalone recruiter subscriptions are available through Stripe, billed monthly. Fleet remains preview-only for new standalone subscriptions. No card data ever touches HaulTrackerPro.' },
       { icon: CreditCard, title: 'In-App Billing Portal', description: 'Update card, change plan, or cancel directly from Recruiter Settings — changes take effect at the end of your current period.' },
       { icon: ShieldCheck, title: 'Secure Account Controls', description: 'Email-verified authentication, password reset, and account deletion controls live in Recruiter Settings.' },
     ],
