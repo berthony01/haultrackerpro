@@ -180,9 +180,250 @@ BEGIN
       RAISE EXCEPTION 'Your % plan allows up to % active driver clients. Upgrade your agency plan to take on more.',
         plan_label, lim.active_client_limit USING ERRCODE = 'P0001';
     END IF;
+  -- Phase 1S-A2-R1: non-numeric paid Agency Workspace operations. These do
+  -- not consume a countable seat/package/client slot, so for any non-cancelled
+  -- entitlement they simply succeed. The cancelled block above already
+  -- rejected them for unpaid or missing-row agencies.
+  ELSIF _action IN (
+    'set_private_request_link',
+    'submit_client_request',
+    'progress_client_request',
+    'create_delegation_request',
+    'create_work_item'
+  ) THEN
+    RETURN;
+
   ELSE
     RAISE EXCEPTION 'Unknown agency limit action: %', _action USING ERRCODE = '22023';
   END IF;
 END $$;
+
+-- ---------------------------------------------------------------------
+-- 5. set_agency_slug: setting a private request link is a paid operation.
+--    Clearing the slug stays available to a cancelled agency so it can
+--    withdraw its public surface during cleanup.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_agency_slug(_agency_id uuid, _slug text)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE
+  _uid uuid := auth.uid();
+  _normalized text;
+BEGIN
+  IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='28000'; END IF;
+  IF NOT public.is_agency_owner(_agency_id, _uid) THEN
+    RAISE EXCEPTION 'Not the agency owner' USING ERRCODE='42501';
+  END IF;
+  _normalized := NULLIF(lower(trim(_slug)), '');
+  IF _normalized IS NOT NULL THEN
+    PERFORM public.assert_agency_limit(_agency_id, 'set_private_request_link');
+  END IF;
+  UPDATE public.agency_profiles
+    SET slug = _normalized, updated_at = now()
+  WHERE id = _agency_id;
+  RETURN _normalized;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- 6. resolve_agency_slug: an unpaid agency must not resolve publicly.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.resolve_agency_slug(_slug text)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT ap.id FROM public.agency_profiles ap
+   WHERE ap.slug = lower(trim(_slug)) AND ap.status = 'active'
+     AND (SELECT l.status FROM public.get_effective_agency_limits(ap.id) l)
+         IN ('manual_beta','active','trialing','past_due')
+   LIMIT 1;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 7. get_agency_public_view: same public-visibility allowlist.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_agency_public_view(_agency_id uuid)
+RETURNS TABLE (id uuid, name text, description text, contact_email text, status text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT ap.id, ap.name, ap.description, ap.contact_email, ap.status::text
+    FROM public.agency_profiles ap
+   WHERE ap.id = _agency_id AND ap.status = 'active'
+     AND (SELECT l.status FROM public.get_effective_agency_limits(ap.id) l)
+         IN ('manual_beta','active','trialing','past_due');
+$$;
+
+-- ---------------------------------------------------------------------
+-- 8. list_agency_packages_public: same public-visibility allowlist.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.list_agency_packages_public(_agency_id uuid)
+RETURNS SETOF public.agency_service_packages
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT * FROM public.agency_service_packages
+   WHERE agency_id = _agency_id AND is_active = true
+     AND (SELECT l.status FROM public.get_effective_agency_limits(_agency_id) l)
+         IN ('manual_beta','active','trialing','past_due')
+   ORDER BY sort_order ASC, created_at ASC;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 9. submit_agency_client_request: intake into an unpaid agency is blocked.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.submit_agency_client_request(
+  _agency_id uuid, _selected_package_id uuid, _message text,
+  _preferred_contact_method text, _phone text, _consent boolean
+) RETURNS public.agency_client_requests
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE _uid uuid := auth.uid(); _row public.agency_client_requests; _rec jsonb;
+BEGIN
+  IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
+  IF NOT COALESCE(_consent,false) THEN RAISE EXCEPTION 'Consent required' USING ERRCODE='22023'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.agency_profiles WHERE id=_agency_id AND status='active') THEN
+    RAISE EXCEPTION 'Agency not available' USING ERRCODE='42704';
+  END IF;
+  PERFORM public.assert_agency_limit(_agency_id, 'submit_client_request');
+  IF _selected_package_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.agency_service_packages
+     WHERE id=_selected_package_id AND agency_id=_agency_id AND is_active=true
+  ) THEN RAISE EXCEPTION 'Selected package is not active' USING ERRCODE='22023'; END IF;
+  SELECT public.clean_assistant_permissions(recommended_permissions) INTO _rec
+    FROM public.agency_service_packages WHERE id = _selected_package_id;
+  INSERT INTO public.agency_client_requests
+    (agency_id, driver_user_id, selected_package_id, message,
+     preferred_contact_method, phone, requested_permissions)
+  VALUES (_agency_id, _uid, _selected_package_id,
+     NULLIF(btrim(coalesce(_message,'')),''),
+     NULLIF(btrim(coalesce(_preferred_contact_method,'')),''),
+     NULLIF(btrim(coalesce(_phone,'')),''),
+     COALESCE(_rec,'{}'::jsonb))
+  RETURNING * INTO _row;
+  INSERT INTO public.agency_audit_log (actor_user_id, agency_id, driver_user_id, action, entity_type, entity_id, metadata)
+  VALUES (_uid, _agency_id, _uid, 'client_request_submitted', 'agency_client_request', _row.id,
+          jsonb_build_object('package_id', _selected_package_id));
+  RETURN _row;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- 10. set_agency_client_request_status: positive progression and assignment
+--     are paid operations. Driver self-cancel and owner/admin
+--     decline/cancel remain available cleanup paths.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_agency_client_request_status(
+  _id uuid, _status public.agency_client_request_status,
+  _assigned_member_user_id uuid DEFAULT NULL
+) RETURNS public.agency_client_requests
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE _uid uuid := auth.uid(); _row public.agency_client_requests; _old public.agency_client_requests;
+BEGIN
+  IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
+  SELECT * INTO _old FROM public.agency_client_requests WHERE id = _id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Request not found' USING ERRCODE='42704'; END IF;
+  IF _old.driver_user_id = _uid AND _status='cancelled' THEN NULL;
+  ELSIF public.is_agency_owner_or_admin(_old.agency_id,_uid) THEN
+    IF _status NOT IN ('declined','cancelled') OR _assigned_member_user_id IS NOT NULL THEN
+      PERFORM public.assert_agency_limit(_old.agency_id, 'progress_client_request');
+    END IF;
+  ELSE RAISE EXCEPTION 'Not allowed' USING ERRCODE='42501'; END IF;
+  IF _assigned_member_user_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.agency_members
+     WHERE agency_id=_old.agency_id AND member_user_id=_assigned_member_user_id AND status='active'
+  ) THEN RAISE EXCEPTION 'Assigned member must be an active agency member' USING ERRCODE='22023'; END IF;
+  UPDATE public.agency_client_requests SET
+    status=_status,
+    assigned_member_user_id=COALESCE(_assigned_member_user_id, assigned_member_user_id),
+    decided_at=now(), decided_by_user_id=_uid
+  WHERE id=_id RETURNING * INTO _row;
+  INSERT INTO public.agency_audit_log (actor_user_id, agency_id, driver_user_id, action, entity_type, entity_id, metadata)
+  VALUES (_uid, _row.agency_id, _row.driver_user_id,
+          'client_request_'||_status::text, 'agency_client_request', _row.id,
+          jsonb_build_object('assigned_member_user_id', _row.assigned_member_user_id));
+  RETURN _row;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- 11. create_agency_delegation_request: creating new delegated access is a
+--     paid operation.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.create_agency_delegation_request(_client_request_id uuid, _member_user_id uuid, _requested_permissions jsonb)
+ RETURNS public.agency_delegation_requests
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE _uid uuid := auth.uid(); _req public.agency_client_requests; _mbr public.agency_members; _clean jsonb; _row public.agency_delegation_requests;
+BEGIN
+  IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
+  SELECT * INTO _req FROM public.agency_client_requests WHERE id=_client_request_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Client request not found' USING ERRCODE='42704'; END IF;
+  IF NOT public.is_agency_owner_or_admin(_req.agency_id,_uid) THEN
+    RAISE EXCEPTION 'Only agency owner/admin can create delegation requests' USING ERRCODE='42501';
+  END IF;
+  PERFORM public.assert_agency_limit(_req.agency_id, 'create_delegation_request');
+  IF _req.status NOT IN ('pending','approved') THEN
+    RAISE EXCEPTION 'Cannot create delegation for a % client request' , _req.status USING ERRCODE='22023';
+  END IF;
+  SELECT * INTO _mbr FROM public.agency_members
+   WHERE agency_id=_req.agency_id AND member_user_id=_member_user_id AND status='active';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Selected member must be an active agency member with a verified account' USING ERRCODE='22023';
+  END IF;
+  _clean := public.clean_assistant_permissions(_requested_permissions);
+  INSERT INTO public.agency_delegation_requests
+    (agency_id, client_request_id, driver_user_id, member_user_id,
+     member_invite_email, requested_permissions, created_by_user_id)
+  VALUES (_req.agency_id, _req.id, _req.driver_user_id, _mbr.member_user_id,
+          _mbr.invite_email, _clean, _uid)
+  RETURNING * INTO _row;
+  UPDATE public.agency_client_requests
+     SET status='approved', decided_at=now(), decided_by_user_id=_uid,
+         assigned_member_user_id=_mbr.member_user_id
+   WHERE id=_req.id AND status IN ('pending','approved');
+  INSERT INTO public.agency_audit_log (actor_user_id, agency_id, driver_user_id, target_user_id, action, entity_type, entity_id, metadata)
+  VALUES (_uid, _req.agency_id, _req.driver_user_id, _mbr.member_user_id,
+          'delegation_request_created', 'agency_delegation_request', _row.id,
+          jsonb_build_object('client_request_id', _req.id, 'permissions', _clean));
+  RETURN _row;
+END $function$;
+
+-- ---------------------------------------------------------------------
+-- 12. create_agency_work_item: creating new work is a paid operation.
+--     update_agency_work_item is intentionally NOT replaced, so a cancelled
+--     agency can still finish work already in flight.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.create_agency_work_item(_agency_id uuid, _driver_user_id uuid, _title text, _description text, _type public.agency_work_item_type, _priority public.agency_work_item_priority, _assigned_member_user_id uuid, _client_request_id uuid, _due_date date)
+ RETURNS public.agency_work_items
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE _uid uuid := auth.uid(); _row public.agency_work_items;
+BEGIN
+  IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE='42501'; END IF;
+  IF NOT public.is_agency_owner_or_admin(_agency_id,_uid) THEN
+    RAISE EXCEPTION 'Only agency owner/admin can create work items' USING ERRCODE='42501';
+  END IF;
+  PERFORM public.assert_agency_limit(_agency_id, 'create_work_item');
+  IF NOT EXISTS (
+    SELECT 1 FROM public.agency_delegation_requests
+     WHERE agency_id=_agency_id
+       AND driver_user_id=_driver_user_id
+       AND status='approved'
+  ) THEN
+    RAISE EXCEPTION 'Driver is not an approved client of this agency' USING ERRCODE='42501';
+  END IF;
+  IF _assigned_member_user_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.agency_members
+     WHERE agency_id=_agency_id AND member_user_id=_assigned_member_user_id AND status='active'
+  ) THEN RAISE EXCEPTION 'Assigned member must be an active agency member' USING ERRCODE='22023'; END IF;
+  INSERT INTO public.agency_work_items
+    (agency_id, driver_user_id, assigned_member_user_id, client_request_id,
+     title, description, type, priority, due_date, created_by_user_id)
+  VALUES (_agency_id,_driver_user_id,_assigned_member_user_id,_client_request_id,
+          btrim(_title), NULLIF(btrim(coalesce(_description,'')),''),
+          COALESCE(_type,'other'::public.agency_work_item_type),
+          COALESCE(_priority,'normal'::public.agency_work_item_priority),
+          _due_date,_uid)
+  RETURNING * INTO _row;
+  INSERT INTO public.agency_audit_log (actor_user_id, agency_id, driver_user_id, target_user_id, action, entity_type, entity_id, metadata)
+  VALUES (_uid,_agency_id,_driver_user_id,_assigned_member_user_id,
+          'work_item_created','agency_work_item',_row.id,
+          jsonb_build_object('title',_row.title,'type',_row.type,'priority',_row.priority));
+  RETURN _row;
+END $function$;
 
 COMMIT;
