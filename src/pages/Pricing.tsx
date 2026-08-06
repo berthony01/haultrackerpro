@@ -108,7 +108,7 @@ const proFeatures = [
   'Get warned when a lane weakens, a broker pays slow, or margin slips',
   'Start-of-week recap: lane to repeat, lane to avoid, broker to watch',
   'Log expenses by voice — hands-free',
-  'Snap a receipt, AI fills in the expense',
+  'Snap a receipt — OCR fills in the expense details',
   'Snap a rate con, AI fills in the load',
   'AI weekly business report on what made and lost money',
   'AI lane advice based on your own load history',
