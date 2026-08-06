@@ -140,7 +140,7 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Tax planning', free: 'Total estimate only', pro: 'Full breakdown + quarterly' },
   { feature: 'Paste Load Parser', free: '5 per week', pro: 'Unlimited' },
   { feature: 'Voice expense logging', free: '—', pro: '✓' },
-  { feature: 'Receipt scanning (AI)', free: '—', pro: '✓' },
+  { feature: 'Receipt scanning (OCR)', free: '—', pro: '✓' },
   { feature: 'Rate con scanning (AI)', free: '—', pro: '✓' },
   { feature: 'AI weekly business report', free: '—', pro: '✓' },
   { feature: 'AI lane advice', free: '—', pro: '✓' },
