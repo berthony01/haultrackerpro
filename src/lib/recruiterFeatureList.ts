@@ -35,10 +35,10 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
   {
     category: 'Applicant Pipeline',
     features: [
-      { icon: Users, title: 'Driver Requests Dashboard', description: 'Every driver who requests info on your listing lands in your pipeline with their preferences, contact info, and message.' },
-      { icon: ClipboardList, title: 'Status Workflow', description: 'Move applicants through new → contacted → call scheduled → interview → offer sent → hired with a single click.' },
-      { icon: Mail, title: 'Driver Contact Snapshot', description: 'Receive the driver\'s name, email, and phone at the moment they request info so you can respond on your preferred channel.' },
-      { icon: BarChart3, title: 'Response & Conversion Stats', description: 'Track response rate, hires, and interview counts on the Recruiter Dashboard so you can measure what is working.' },
+      { icon: Users, title: 'Driver Requests Dashboard', description: 'Every driver application appears in your pipeline with the driver’s submitted profile details and message. Phone and email are revealed only after the driver approves a separate contact request.' },
+      { icon: ClipboardList, title: 'Status Workflow', description: 'Move applicants through the recruiter-controlled stages available in the dashboard. Hired status remains protected by the contract-approval workflow and cannot be set directly before the required driver decision.' },
+      { icon: Mail, title: 'Driver Contact Snapshot', description: 'Review the driver’s available profile details in the application pipeline. Private phone and email details appear only after the driver approves your contact request.' },
+      { icon: BarChart3, title: 'Response & Conversion Stats', description: 'View Total Applicants, Open Applicants, Hired Drivers, and Hire Rate on the Recruiter Dashboard.' },
     ],
   },
   {
@@ -63,7 +63,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
     category: 'Billing & Account',
     features: [
       { icon: CreditCard, title: 'Stripe-Powered Subscriptions', description: 'Starter and Growth standalone recruiter subscriptions are available through Stripe, billed monthly. Fleet remains preview-only for new standalone subscriptions. No card data ever touches HaulTrackerPro.' },
-      { icon: CreditCard, title: 'In-App Billing Portal', description: 'Update card, change plan, or cancel directly from Recruiter Settings — changes take effect at the end of your current period.' },
+      { icon: CreditCard, title: 'In-App Billing Portal', description: 'Open Stripe’s secure customer portal from Recruiter Settings to manage the billing details and subscription actions currently enabled for your account. Available options and timing are controlled by the Stripe portal configuration.' },
       { icon: ShieldCheck, title: 'Secure Account Controls', description: 'Email-verified authentication, password reset, and account deletion controls live in Recruiter Settings.' },
     ],
   },
