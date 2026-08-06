@@ -400,7 +400,9 @@ CREATE TABLE public.agency_members (
   status text NOT NULL,
   invited_at timestamptz NOT NULL DEFAULT now(),
   accepted_at timestamptz,
-  revoked_at timestamptz
+  revoked_at timestamptz,
+  invite_token_hash text,
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE public.agency_entitlements (
