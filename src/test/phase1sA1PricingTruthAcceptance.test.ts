@@ -151,7 +151,10 @@ describe('Phase 1S-A1 — F. Unchanged canonical pricing facts', () => {
     expect(PRICING).toContain('$49');
   });
 
-  it('agency plan economics untouched', () => {
-    expect(AGENCY_PLANS).toContain('included_recruiter_tier');
+  it('agency included recruiter tiers untouched', () => {
+    expect(AGENCY_PLANS).toContain('Includes Recruiter Starter — 5 active opportunities for the agency owner');
+    expect(AGENCY_PLANS).toContain('Includes Recruiter Growth — 15 active opportunities for the agency owner');
+    expect(AGENCY_PLANS).toContain('Includes Recruiter Fleet — 25 active opportunities for the agency owner');
   });
+
 });
