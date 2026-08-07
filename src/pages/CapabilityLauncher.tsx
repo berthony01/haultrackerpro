@@ -96,7 +96,11 @@ export default function CapabilityLauncher() {
             <button
               key={t.id}
               data-capability={t.id}
-              onClick={() => navigate(t.to)}
+              onClick={() => {
+                recordWorkspaceIntent(t.id);
+                navigate(t.to);
+              }}
+
               className="group text-left rounded-2xl border p-5 transition-all hover:border-white/20"
               style={{ background: NAVY_CARD, borderColor: NAVY_BORDER }}
             >
