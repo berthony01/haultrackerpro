@@ -109,6 +109,23 @@ export default function Auth() {
     } catch {}
   }, [capability]);
 
+  // Phase 1S-A8 — transient workspace choice hint consumed once by
+  // `useViewMode` after capabilities resolve. Preference ONLY: it never
+  // grants access and never rewrites `profiles.intended_role`. Written
+  // eagerly so it survives both email/password sign-in and the Google
+  // OAuth round-trip in the same tab. Assistant/Agency clear it so a
+  // stale Driver/Recruiter choice cannot override their continuation.
+  useEffect(() => {
+    try {
+      if (capability === 'driver' || capability === 'recruiter') {
+        sessionStorage.setItem('htp_workspace_intent', capability);
+      } else {
+        sessionStorage.removeItem('htp_workspace_intent');
+      }
+    } catch {}
+  }, [capability]);
+
+
   // Compute effective `next` for this capability. Manual capability switch
   // (e.g. user lands without ?next= and clicks Agency) overrides default.
   const effectiveNext: string | null = useMemo(() => {
