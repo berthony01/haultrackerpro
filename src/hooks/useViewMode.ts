@@ -12,6 +12,9 @@ import type { UserCapabilitiesView, UserCapabilityRow } from '@/lib/userCapabili
 
 const LEGACY_UNSCOPED_KEY = 'htp_view_mode';
 const STORAGE_PREFIX = 'htp_view_mode:';
+/** Phase 1S-A8 — transient, one-shot workspace choice hint written by
+ *  `/auth` and `/start`. Preference ONLY: never grants capability access. */
+const WORKSPACE_INTENT_KEY = 'htp_workspace_intent';
 
 function scopedKey(userId: string): string {
   return `${STORAGE_PREFIX}${userId}`;
@@ -33,6 +36,22 @@ function writeStored(key: string, v: WorkspaceRole) {
 function clearStored(key: string) {
   try { localStorage.removeItem(key); } catch {}
 }
+
+/** Read the transient workspace intent. Only `driver`/`recruiter` are
+ *  accepted; anything else (including a forged value) is treated as null. */
+function readWorkspaceIntent(): WorkspaceRole | null {
+  try {
+    const v = sessionStorage.getItem(WORKSPACE_INTENT_KEY);
+    return v === 'driver' || v === 'recruiter' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearWorkspaceIntent() {
+  try { sessionStorage.removeItem(WORKSPACE_INTENT_KEY); } catch {}
+}
+
 
 /**
  * Phase 1J-B1 — Capability-driven, user-bound view mode with a
