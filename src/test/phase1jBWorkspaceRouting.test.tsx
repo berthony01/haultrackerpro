@@ -329,10 +329,12 @@ describe('plan / billing independence', () => {
 describe('useViewMode hook', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     authMock = () => ({ user: null, loading: false });
     capMock = () => ({ rows: [], isLoading: false, error: null });
     roleMock = () => ({ role: null, isLoading: false });
   });
+
 
   it('no user id → effectiveRole null; nothing written to storage', () => {
     const { result } = renderHook(() => useViewMode());
