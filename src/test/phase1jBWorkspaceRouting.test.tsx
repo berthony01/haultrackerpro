@@ -329,10 +329,12 @@ describe('plan / billing independence', () => {
 describe('useViewMode hook', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     authMock = () => ({ user: null, loading: false });
     capMock = () => ({ rows: [], isLoading: false, error: null });
     roleMock = () => ({ role: null, isLoading: false });
   });
+
 
   it('no user id → effectiveRole null; nothing written to storage', () => {
     const { result } = renderHook(() => useViewMode());
@@ -577,7 +579,58 @@ describe('useViewMode hook', () => {
     expect(result.current.effectiveRole).toBeNull();
     expect(result.current.error).toBeInstanceOf(Error);
   });
+
+  // ------------------------------------------------------------------
+  // Phase 1S-A8 — transient workspace intent (`htp_workspace_intent`).
+  // Preference hint only: validated against the CURRENT capability rows,
+  // consumed exactly once, and never a source of access.
+  // ------------------------------------------------------------------
+  it('transient driver intent beats stored recruiter AND preferredRole recruiter', () => {
+    localStorage.setItem('htp_view_mode:u1', 'recruiter');
+    sessionStorage.setItem('htp_workspace_intent', 'driver');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    roleMock = () => ({ role: 'recruiter', isLoading: false });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+    expect(localStorage.getItem('htp_view_mode:u1')).toBe('driver');
+    expect(sessionStorage.getItem('htp_workspace_intent')).toBeNull();
+  });
+
+  it('transient recruiter intent beats stored driver AND preferredRole driver', () => {
+    localStorage.setItem('htp_view_mode:u1', 'driver');
+    sessionStorage.setItem('htp_workspace_intent', 'recruiter');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    roleMock = () => ({ role: 'driver', isLoading: false });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('recruiter');
+    expect(localStorage.getItem('htp_view_mode:u1')).toBe('recruiter');
+    expect(sessionStorage.getItem('htp_workspace_intent')).toBeNull();
+  });
+
+  it('forged recruiter intent on a driver-only account is rejected and cleared', () => {
+    sessionStorage.setItem('htp_workspace_intent', 'recruiter');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', null), isLoading: false, error: null });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('driver');
+    expect(result.current.canSwitch).toBe(false);
+    expect(result.current.recruiterHubAllowed).toBe(false);
+    expect(localStorage.getItem('htp_view_mode:u1')).toBeNull();
+    expect(sessionStorage.getItem('htp_workspace_intent')).toBeNull();
+  });
+
+  it('bogus transient intent values are ignored and do not alter resolution', () => {
+    sessionStorage.setItem('htp_workspace_intent', 'admin');
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    roleMock = () => ({ role: 'recruiter', isLoading: false });
+    const { result } = renderHook(() => useViewMode());
+    expect(result.current.effectiveRole).toBe('recruiter');
+  });
 });
+
 
 
 

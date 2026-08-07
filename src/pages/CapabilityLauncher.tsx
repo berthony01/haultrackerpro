@@ -48,10 +48,26 @@ const TILES: Tile[] = [
   },
 ];
 
+/**
+ * Phase 1S-A8 — record the transient workspace choice before navigating.
+ * Preference hint ONLY: `useViewMode` validates it against server-derived
+ * capability rows and is the sole authorization boundary.
+ */
+function recordWorkspaceIntent(id: Tile['id']) {
+  try {
+    if (id === 'driver' || id === 'recruiter') {
+      sessionStorage.setItem('htp_workspace_intent', id);
+    } else {
+      sessionStorage.removeItem('htp_workspace_intent');
+    }
+  } catch {}
+}
+
 export default function CapabilityLauncher() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen px-4 py-10" style={{ background: NAVY_BG }}>
+
       <SEOHead
         title="Choose your workspace | HaulTrackerPro"
         description="Pick how you want to use HaulTrackerPro."
@@ -80,7 +96,11 @@ export default function CapabilityLauncher() {
             <button
               key={t.id}
               data-capability={t.id}
-              onClick={() => navigate(t.to)}
+              onClick={() => {
+                recordWorkspaceIntent(t.id);
+                navigate(t.to);
+              }}
+
               className="group text-left rounded-2xl border p-5 transition-all hover:border-white/20"
               style={{ background: NAVY_CARD, borderColor: NAVY_BORDER }}
             >

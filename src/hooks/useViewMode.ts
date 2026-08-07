@@ -12,6 +12,9 @@ import type { UserCapabilitiesView, UserCapabilityRow } from '@/lib/userCapabili
 
 const LEGACY_UNSCOPED_KEY = 'htp_view_mode';
 const STORAGE_PREFIX = 'htp_view_mode:';
+/** Phase 1S-A8 — transient, one-shot workspace choice hint written by
+ *  `/auth` and `/start`. Preference ONLY: never grants capability access. */
+const WORKSPACE_INTENT_KEY = 'htp_workspace_intent';
 
 function scopedKey(userId: string): string {
   return `${STORAGE_PREFIX}${userId}`;
@@ -33,6 +36,22 @@ function writeStored(key: string, v: WorkspaceRole) {
 function clearStored(key: string) {
   try { localStorage.removeItem(key); } catch {}
 }
+
+/** Read the transient workspace intent. Only `driver`/`recruiter` are
+ *  accepted; anything else (including a forged value) is treated as null. */
+function readWorkspaceIntent(): WorkspaceRole | null {
+  try {
+    const v = sessionStorage.getItem(WORKSPACE_INTENT_KEY);
+    return v === 'driver' || v === 'recruiter' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearWorkspaceIntent() {
+  try { sessionStorage.removeItem(WORKSPACE_INTENT_KEY); } catch {}
+}
+
 
 /**
  * Phase 1J-B1 — Capability-driven, user-bound view mode with a
@@ -97,6 +116,15 @@ export function useViewMode() {
     if (!userId) return null;
     if (!trustedView) return null;
 
+    // Transient one-shot workspace intent (explicit Driver/Recruiter
+    // choice on /auth or /start) takes precedence over stored preference
+    // and preferredRole — but ONLY when the CURRENT validated capability
+    // rows allow it. A forged/stale intent grants nothing.
+    const intent = readWorkspaceIntent();
+    if (intent && isWorkspaceAllowed(trustedView, intent)) {
+      return intent;
+    }
+
     // Honor an explicit in-memory selection only if it is still allowed
     // by the CURRENT validated rows (not last render's rows).
     if (selection && isWorkspaceAllowed(trustedView, selection)) {
@@ -127,6 +155,20 @@ export function useViewMode() {
       return;
     }
     const key = scopedKey(userId);
+
+    // Consume the transient workspace intent exactly once, after
+    // capabilities have resolved. Allowed → persist + normalize.
+    // Rejected → discard silently and fall through to existing behavior.
+    const intent = readWorkspaceIntent();
+    if (intent) {
+      clearWorkspaceIntent();
+      if (isWorkspaceAllowed(trustedView, intent)) {
+        writeStored(key, intent);
+        if (selection !== intent) setSelection(intent);
+        return;
+      }
+    }
+
     const stored = readStored(key);
     if (stored && !isWorkspaceAllowed(trustedView, stored)) {
       clearStored(key);
@@ -136,6 +178,7 @@ export function useViewMode() {
       setSelection(null);
     }
   }, [isLoading, userId, trustedView, selection]);
+
 
   const setViewMode = useCallback(
     (next: WorkspaceRole) => {
