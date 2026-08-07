@@ -65,8 +65,9 @@ function recordWorkspaceIntent(id: Tile['id']) {
 
 export default function CapabilityLauncher() {
   const navigate = useNavigate();
-
+  return (
     <div className="min-h-screen px-4 py-10" style={{ background: NAVY_BG }}>
+
       <SEOHead
         title="Choose your workspace | HaulTrackerPro"
         description="Pick how you want to use HaulTrackerPro."
