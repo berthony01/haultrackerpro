@@ -602,10 +602,7 @@ describe('Phase 1T-B1 — foreign keys, indexes, and cascade behavior', () => {
       'carrier_driver_relationships.recruiter_id': 'c',
       'carrier_driver_relationships.driver_user_id': 'c',
       'driver_settlements.driver_user_id': 'c',
-      'driver_settlements.carrier_recruiter_profile_id': 'n',
-      'driver_settlements.carrier_driver_relationship_id': 'n',
-      'driver_settlements.agency_id': 'n',
-      'driver_settlements.supersedes_settlement_id': 'r',
+      'driver_settlements.supersedes_settlement_id': 'c',
       'driver_settlement_items.settlement_id': 'c',
       'driver_settlement_matches.settlement_item_id': 'c',
       'driver_settlement_matches.driver_load_id': 'c',
@@ -613,6 +610,14 @@ describe('Phase 1T-B1 — foreign keys, indexes, and cascade behavior', () => {
     };
     for (const [key, action] of Object.entries(expected)) {
       expect(map.get(key), key).toBe(action);
+    }
+    // Historical provenance columns must NOT be foreign keys at all.
+    for (const key of [
+      'driver_settlements.carrier_recruiter_profile_id',
+      'driver_settlements.carrier_driver_relationship_id',
+      'driver_settlements.agency_id',
+    ]) {
+      expect(map.has(key), key).toBe(false);
     }
     expect(map.size).toBe(Object.keys(expected).length);
   });
