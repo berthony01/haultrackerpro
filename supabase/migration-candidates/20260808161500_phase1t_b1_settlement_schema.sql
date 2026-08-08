@@ -68,9 +68,18 @@ CREATE TABLE public.driver_settlements (
   driver_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   source text NOT NULL,
   status text NOT NULL DEFAULT 'draft',
-  carrier_recruiter_profile_id uuid NULL REFERENCES public.recruiter_profiles(id) ON DELETE SET NULL,
-  carrier_driver_relationship_id uuid NULL REFERENCES public.carrier_driver_relationships(id) ON DELETE SET NULL,
-  agency_id uuid NULL REFERENCES public.agency_profiles(id) ON DELETE SET NULL,
+  -- Historical provenance snapshots, intentionally NOT foreign keys: these three
+  -- UUIDs preserve the canonical business identity value of the issuer/preparer
+  -- even after the live recruiter profile, carrier relationship, or agency
+  -- profile is deleted. A settlement statement is a historical financial record
+  -- and must remain readable and attributable to its driver. Phase 1T-B2 must
+  -- validate that these ids reference live, authorized objects on CREATE/MANAGE;
+  -- already-stored historical rows do not depend on those objects continuing to
+  -- exist, and business/account deletion must never be blocked or silently
+  -- rewrite provenance to NULL.
+  carrier_recruiter_profile_id uuid NULL,
+  carrier_driver_relationship_id uuid NULL,
+  agency_id uuid NULL,
   period_start date NOT NULL,
   period_end date NOT NULL,
   pay_date date NULL,
