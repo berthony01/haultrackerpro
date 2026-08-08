@@ -372,6 +372,22 @@ beforeAll(async () => {
     [U.driverFree, U.assistant, U.driverPro, U.assistantBad, U.stranger],
   );
 
+  // ---- agency-GENERATED assistant rows (non-null agency_delegation_id) --------
+  // These must never satisfy the DIRECT assistant path.
+  await db.query(
+    `INSERT INTO public.driver_assistants
+       (driver_user_id,assistant_user_id,status,permissions,agency_delegation_id) VALUES
+      ($1,$2,'active','{"settlements_view":true,"settlements_manage":true,"settlements_finalize":true}'::jsonb,$4::uuid),
+      ($3,$2,'active','{"settlements_view":true,"settlements_manage":true,"settlements_finalize":true}'::jsonb,$4::uuid)`,
+    [
+      U.driverFree,
+      U.agencyGenAssistant,
+      U.driverPro,
+      '11111111-2222-3333-4444-555555555555',
+    ],
+  );
+
+
   // ---- carrier relationships -------------------------------------------------
   const mkRel = async (rid: string, drv: string, status: string, creator: string) => {
     const r = await db.query<{ id: string }>(
