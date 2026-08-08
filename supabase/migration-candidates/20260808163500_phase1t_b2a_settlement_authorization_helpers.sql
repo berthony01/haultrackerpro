@@ -143,7 +143,10 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 4) settlement_current_user_can_assist_driver(_driver_user_id, _permission,
 --    _require_pro)
---    Direct driver-granted assistant delegation. The permission vocabulary is an
+--    DIRECT driver-granted assistant context ONLY: the qualifying row must have
+--    agency_delegation_id IS NULL. An agency-generated driver_assistants row (a
+--    non-null agency_delegation_id) must go through the agency authorization
+--    path and can never satisfy this helper. The permission vocabulary is an
 --    exact allowlist and the stored permission must be JSON boolean true exactly
 --    — the string "true", the number 1, null, and a missing key all fail closed.
 --    When _require_pro is true the TARGET driver (never the assistant) must hold
@@ -170,8 +173,9 @@ AS $$
        WHERE da.driver_user_id = _driver_user_id
          AND da.assistant_user_id = auth.uid()
          AND da.status = 'active'
-         AND jsonb_typeof(da.permissions -> _permission) = 'boolean'
-         AND (da.permissions -> _permission) = to_jsonb(true)
+          AND da.agency_delegation_id IS NULL
+          AND jsonb_typeof(da.permissions -> _permission) = 'boolean'
+          AND (da.permissions -> _permission) = to_jsonb(true)
      )
      AND (
        _require_pro IS NOT TRUE
@@ -359,11 +363,14 @@ AS $$
           )
           AND (
             EXISTS (
+              -- DIRECT assistant context only; agency-generated rows must use
+              -- the agency_delegation_requests branch below.
               SELECT 1
               FROM public.driver_assistants da
               WHERE da.driver_user_id = ds.driver_user_id
                 AND da.assistant_user_id = auth.uid()
                 AND da.status = 'active'
+                AND da.agency_delegation_id IS NULL
                 AND jsonb_typeof(da.permissions -> 'settlements_view') = 'boolean'
                 AND (da.permissions -> 'settlements_view') = to_jsonb(true)
             )
