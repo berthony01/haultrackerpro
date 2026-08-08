@@ -1899,7 +1899,7 @@ describe('Phase 1T-B2C3A-R1 — header RPCs reject non-finite reported amounts',
   });
 
   it('source contract: all four RPC bodies carry explicit finite guards for both reported inputs (proof R1)', () => {
-    const bodies = CANDIDATE_SQL.split(/CREATE FUNCTION public\./).slice(1);
+    const bodies = B2C2A_SQL.split(/CREATE FUNCTION public\./).slice(1);
     expect(bodies).toHaveLength(4);
     for (const body of bodies) {
       const name = body.slice(0, body.indexOf('('));
@@ -1920,7 +1920,7 @@ describe('Phase 1T-B2C3A-R1 — header RPCs reject non-finite reported amounts',
       expect(body, `${name} net bounds`).toMatch(/_reported_net_amount < -999999999999\.99/);
     }
     // no helper function, dynamic SQL, float coercion or isfinite() shortcut
-    expect(CANDIDATE_SQL).not.toMatch(/isfinite/i);
-    expect(CANDIDATE_SQL).not.toMatch(/::\s*(float|double precision|real)/i);
+    expect(B2C2A_SQL).not.toMatch(/isfinite/i);
+    expect(B2C2A_SQL).not.toMatch(/::\s*(float|double precision|real)/i);
   });
 });
