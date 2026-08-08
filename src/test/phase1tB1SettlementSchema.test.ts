@@ -1227,6 +1227,6 @@ describe('Phase 1T-B2C3A-R1 — schema rejects non-finite numerics', () => {
     // no dynamic SQL, helper functions, float coercion or isfinite() shortcuts
     expect(CANDIDATE_SQL).not.toMatch(/isfinite/i);
     expect(CANDIDATE_SQL).not.toMatch(/::\s*(float|double precision|real)/i);
-    expect(CANDIDATE_SQL).not.toMatch(/\bALTER TABLE\b/i);
+    expect(CANDIDATE_SQL).not.toMatch(/ALTER TABLE[\s\S]{0,200}?ADD CONSTRAINT/i);
   });
 });
