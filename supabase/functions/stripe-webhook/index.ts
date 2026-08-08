@@ -454,19 +454,32 @@ async function applyEntitlement(
       RECRUITER_PLAN_LEGACY_LIMITS[plan] ?? RECRUITER_PLAN_LEGACY_LIMITS.none;
 
     // Owner user_id is known from the canonical row; we must NOT overwrite it
-    // from metadata. Fetch existing to preserve.
+    // from metadata, and it is NEVER derived from any email. Fetch existing to
+    // preserve, and fall back to recruiter_profiles.id -> user_id for the
+    // initial binding. Fail closed when no owner can be resolved.
     const { data: existing } = await supabase
       .from("recruiter_billing_profiles")
       .select("user_id")
       .eq("recruiter_id", entityKey)
       .maybeSingle();
-    if (!existing?.user_id) {
+    let ownerUserId: string | null =
+      typeof existing?.user_id === "string" && existing.user_id.length > 0
+        ? existing.user_id
+        : null;
+    if (!ownerUserId) {
       // Initial binding: recruiter ownership was validated by gateway; safe to derive from recruiter_profiles.
-      const { data: rp } = await supabase.from("recruiter_profiles").select("user_id").eq("id", entityKey).maybeSingle();
-      if (!rp?.user_id) throw new Error("recruiter owner missing during initial binding");
-      existing && (existing.user_id = rp.user_id);
+      const { data: rp, error: rpError } = await supabase
+        .from("recruiter_profiles")
+        .select("user_id")
+        .eq("id", entityKey)
+        .maybeSingle();
+      if (rpError) throw new Error("recruiter owner missing during initial binding");
+      const resolved = rp?.user_id ?? null;
+      if (typeof resolved !== "string" || resolved.length === 0) {
+        throw new Error("recruiter owner missing during initial binding");
+      }
+      ownerUserId = resolved;
     }
-    const ownerUserId = existing?.user_id;
     const { error } = await supabase.from("recruiter_billing_profiles").upsert(
       {
         recruiter_id: entityKey,
