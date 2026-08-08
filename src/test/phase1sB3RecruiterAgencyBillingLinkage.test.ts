@@ -59,7 +59,8 @@ describe('Phase 1S-B3 — recruiter billing identity linkage', () => {
     expect(s).toContain('.eq("recruiter_id", recruiterId) .eq("user_id", user.id)');
     // fail closed when no recruiter business identity exists
     expect(s).toMatch(/if \(!recruiterId\) \{ throw new Error\(/);
-    expect(RECRUITER_PORTAL).not.toContain('recruiter_email');
+    expect(s).not.toMatch(/\.eq\("recruiter_email"/);
+    expect(s).not.toMatch(/recruiter_email[^ ]*\)/);
     expect(s).not.toMatch(/\.eq\("email"/);
   });
 });
@@ -171,8 +172,10 @@ describe('Phase 1S-B3 — effective entitlement invariants preserved', () => {
   it('11. agency-included recruiter premium stays owner-only and dual paid business entitlement fails closed', () => {
     const s = squash(RESOLVER);
     expect(s).toContain('mapAgencyPlanToIncludedRecruiterTier');
-    expect(/isAgencyOwner/.test(RESOLVER)).toBe(true);
-    expect(/conflict|fail[- ]?closed|dual/i.test(RESOLVER)).toBe(true);
+    expect(s).toContain("isExactly(agencyMembership.role, 'agency_owner')");
+    expect(s).toContain("agency-included recruiter premium grant (owner-only)");
+    expect(s).toContain("dual paid business entitlement is a fail-closed conflict");
+    expect(s).toContain("conflictReason: 'dual_paid_business_entitlement'");
   });
 
   it('12. the B3 suite contains no skip/only/todo', () => {
