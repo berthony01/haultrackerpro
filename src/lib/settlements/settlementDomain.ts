@@ -131,8 +131,13 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function isNullish(value: unknown): boolean {
-  return value === null || value === undefined;
+/**
+ * Explicit-null semantics: a business id that does not apply to the record's
+ * source MUST be exactly `null`. `undefined` (or any other value) is malformed
+ * and fails closed — absent and explicitly-not-applicable are not the same.
+ */
+function isExactlyNull(value: unknown): boolean {
+  return value === null;
 }
 
 /**
@@ -177,7 +182,7 @@ export function validateSettlementIdentity(
         reason: 'carrier_issued_requires_carrier_recruiter_profile_id',
       };
     }
-    if (!isNullish(agencyId)) {
+    if (!isExactlyNull(agencyId)) {
       return { valid: false, reason: 'carrier_issued_forbids_agency_id' };
     }
     return { valid: true };
@@ -187,7 +192,7 @@ export function validateSettlementIdentity(
     if (!hasAgencyId) {
       return { valid: false, reason: 'agency_prepared_requires_agency_id' };
     }
-    if (!isNullish(carrierId)) {
+    if (!isExactlyNull(carrierId)) {
       return {
         valid: false,
         reason: 'agency_prepared_forbids_carrier_recruiter_profile_id',
@@ -197,7 +202,7 @@ export function validateSettlementIdentity(
   }
 
   // driver_imported
-  if (!isNullish(carrierId) || !isNullish(agencyId)) {
+  if (!isExactlyNull(carrierId) || !isExactlyNull(agencyId)) {
     return { valid: false, reason: 'driver_imported_forbids_business_identity' };
   }
   return { valid: true };
@@ -234,6 +239,15 @@ export interface SettlementCapabilities {
 
 const PRO_PLAN_KEYS: readonly string[] = ['pro_monthly', 'pro_yearly'];
 const PAID_RECRUITER_TIERS: readonly string[] = ['starter', 'growth', 'fleet'];
+/**
+ * Exact allowlist of resolved paid agency plan keys. Any other runtime value —
+ * forged, misspelled, whitespace-padded, or differently cased — fails closed.
+ */
+const PAID_AGENCY_PLAN_KEYS: readonly string[] = Object.freeze([
+  'agency_starter',
+  'agency_team',
+  'agency_growth',
+]);
 
 function hasPermission(
   permissions: unknown,
@@ -336,7 +350,7 @@ export function resolveSettlementCapabilities(
       !!be &&
       be.state === 'resolved' &&
       typeof be.effectiveAgencyPlan === 'string' &&
-      be.effectiveAgencyPlan.length > 0;
+      PAID_AGENCY_PLAN_KEYS.includes(be.effectiveAgencyPlan);
     // Driver Free/Pro never gates a paid agency's preparation capability.
     const prepare = paidAgency && delegationActive && canManage;
     capabilities.canPrepareAgencySettlement = prepare;
