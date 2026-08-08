@@ -1024,4 +1024,75 @@ describe('Phase 1T-B2C1 — source contract', () => {
     );
     expect(inviteBody).not.toMatch(/SET\s+status = 'active'/);
   });
+
+  it('invite inserts atomically on the canonical unique pair with a fixed concurrency error (proof 32)', () => {
+    const inviteBody = B2C1_CODE.slice(
+      B2C1_CODE.indexOf('CREATE FUNCTION public.settlement_invite_carrier_driver('),
+      B2C1_CODE.indexOf(
+        'CREATE FUNCTION public.settlement_accept_my_carrier_relationship(',
+      ),
+    );
+
+    // The only INSERT into the relationship table is conflict-safe.
+    const inserts =
+      B2C1_CODE.match(/INSERT INTO public\.carrier_driver_relationships/g)?.length ?? 0;
+    expect(inserts).toBe(1);
+    expect(inviteBody).toContain(
+      'ON CONFLICT (recruiter_id, driver_user_id) DO NOTHING',
+    );
+    expect(
+      inviteBody.match(/ON CONFLICT \(recruiter_id, driver_user_id\) DO NOTHING/g)
+        ?.length,
+    ).toBe(1);
+
+    // Conflict loser re-reads the exact canonical pair under a row lock.
+    expect(inviteBody.match(/FOR UPDATE/g)?.length).toBe(2);
+    expect(
+      inviteBody.match(
+        /WHERE r\.recruiter_id = _recruiter_id\s*\n\s*AND r\.driver_user_id = _driver_user_id\s*\n\s*FOR UPDATE;/g,
+      )?.length,
+    ).toBe(2);
+
+    // Fixed machine-readable fallback, never raw database internals.
+    expect(inviteBody).toContain(
+      "RAISE EXCEPTION 'settlement_relationship_concurrent_write_failed'",
+    );
+    expect(inviteBody).not.toMatch(/unique_violation|SQLSTATE|sqlerrm|sqlstate/i);
+    expect(inviteBody).not.toMatch(/carrier_driver_relationships_[a-z_]*_key/i);
+    // No dynamic SQL, retry loop, or advisory lock was introduced.
+    expect(inviteBody).not.toMatch(/\bLOOP\b|advisory_(xact_)?lock|\bEXECUTE\b/i);
+
+    // The raced row falls through to the shared canonical status handling.
+    expect(inviteBody.match(/v_row\.status = 'invited' OR v_row\.status = 'active'/g)
+      ?.length).toBe(1);
+    expect(inviteBody.match(/v_row\.status = 'inactive' OR v_row\.status = 'ended'/g)
+      ?.length).toBe(1);
+    expect(inviteBody).toContain("RAISE EXCEPTION 'settlement_relationship_invalid_state'");
+  });
 });
+
+// =====================================================================
+describe('Phase 1T-B2C1 — existing-pair re-read is idempotent', () => {
+  it('an already-created exact-pair row is re-read and returned unchanged (proof 33)', async () => {
+    const drv = await freshDriver();
+    const first = await asRole('authenticated', U.paidCarrier, () =>
+      invite(recruiterPaid, drv),
+    );
+    const second = await asRole('authenticated', U.paidCarrier, () =>
+      invite(recruiterPaid, drv),
+    );
+
+    expect(second.id).toBe(first.id);
+    expect(second.status).toBe('invited');
+    expect(second.accepted_at).toBeNull();
+    expect(second.created_by_user_id).toBe(first.created_by_user_id);
+
+    const count = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM public.carrier_driver_relationships
+        WHERE recruiter_id = $1 AND driver_user_id = $2`,
+      [recruiterPaid, drv],
+    );
+    expect(Number(count.rows[0].n)).toBe(1);
+  });
+});
+
