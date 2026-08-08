@@ -482,9 +482,10 @@ export function AdminRecruitersPanel() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => copyToClipboard(detail.recruiter_email!, 'Email')}
+                    onClick={() => copyToClipboard(detail.recruiter_email!, 'Contact email')}
                   >
-                    <Copy className="h-4 w-4" /> Copy Email
+                    <Copy className="h-4 w-4" /> Copy Contact Email
+
                   </Button>
                 )}
                 {(detail.recruiter_phone ?? detail.company_phone) && (
