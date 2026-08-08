@@ -203,6 +203,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [acknowledgedTodayDate, setAcknowledgedTodayDate] = useState(false);
   const initialTodayRef = useRef<string>(localTodayYMD());
 
+  // Phase 1S-B1: paste session provenance — which paste-managed values the last
+  // paste imported, plus the parser-added Trip ID note.
+  const pasteSessionRef = useRef<PasteSession>(createPasteSession());
+
+
   // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
   // user changes anything that could move the load into or out of the risky
   // missing-final-stop-date state. Without this, once a user dismisses the
