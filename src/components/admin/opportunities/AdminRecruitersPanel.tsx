@@ -408,9 +408,10 @@ export function AdminRecruitersPanel() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => copyToClipboard(r.recruiter_email!, 'Email')}
+                        onClick={() => copyToClipboard(r.recruiter_email!, 'Contact email')}
                       >
-                        <Copy className="h-4 w-4" /> Copy Email
+                        <Copy className="h-4 w-4" /> Copy Contact Email
+
                       </Button>
                     )}
                     {phone && (
