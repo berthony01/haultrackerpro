@@ -157,7 +157,10 @@ BEGIN
   END IF;
 
   -- ---- reported amount (validated, never recalculated) --------------------
-  IF _amount IS NULL OR _amount < 0 OR _amount > 999999999999.99 THEN
+  IF _amount IS NULL
+     OR _amount::text IN ('NaN', 'Infinity', '-Infinity')
+     OR _amount < 0
+     OR _amount > 999999999999.99 THEN
     RAISE EXCEPTION 'settlement_invalid_item_amount';
   END IF;
 
@@ -179,16 +182,24 @@ BEGIN
   END IF;
 
   -- ---- nullable numeric bounds -------------------------------------------
-  IF (_quantity IS NOT NULL AND (_quantity < 0 OR _quantity > 9999999999.9999))
-     OR (_rate IS NOT NULL AND (_rate < 0 OR _rate > 99999999.999999))
+  IF (_quantity IS NOT NULL
+       AND (_quantity::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _quantity < 0 OR _quantity > 9999999999.9999))
+     OR (_rate IS NOT NULL
+       AND (_rate::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _rate < 0 OR _rate > 99999999.999999))
      OR (_loaded_miles_snapshot IS NOT NULL
-          AND (_loaded_miles_snapshot < 0 OR _loaded_miles_snapshot > 9999999999.99))
+          AND (_loaded_miles_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _loaded_miles_snapshot < 0 OR _loaded_miles_snapshot > 9999999999.99))
      OR (_deadhead_miles_snapshot IS NOT NULL
-          AND (_deadhead_miles_snapshot < 0 OR _deadhead_miles_snapshot > 9999999999.99))
+          AND (_deadhead_miles_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _deadhead_miles_snapshot < 0 OR _deadhead_miles_snapshot > 9999999999.99))
      OR (_payable_miles_snapshot IS NOT NULL
-          AND (_payable_miles_snapshot < 0 OR _payable_miles_snapshot > 9999999999.99))
+          AND (_payable_miles_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _payable_miles_snapshot < 0 OR _payable_miles_snapshot > 9999999999.99))
      OR (_eligible_revenue_snapshot IS NOT NULL
-          AND (_eligible_revenue_snapshot < 0
+          AND (_eligible_revenue_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _eligible_revenue_snapshot < 0
                OR _eligible_revenue_snapshot > 999999999999.99)) THEN
     RAISE EXCEPTION 'settlement_invalid_item_numeric';
   END IF;
@@ -452,7 +463,10 @@ BEGIN
   END IF;
 
   -- ---- reported amount (validated, never recalculated) --------------------
-  IF _amount IS NULL OR _amount < 0 OR _amount > 999999999999.99 THEN
+  IF _amount IS NULL
+     OR _amount::text IN ('NaN', 'Infinity', '-Infinity')
+     OR _amount < 0
+     OR _amount > 999999999999.99 THEN
     RAISE EXCEPTION 'settlement_invalid_item_amount';
   END IF;
 
@@ -474,16 +488,24 @@ BEGIN
   END IF;
 
   -- ---- nullable numeric bounds -------------------------------------------
-  IF (_quantity IS NOT NULL AND (_quantity < 0 OR _quantity > 9999999999.9999))
-     OR (_rate IS NOT NULL AND (_rate < 0 OR _rate > 99999999.999999))
+  IF (_quantity IS NOT NULL
+       AND (_quantity::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _quantity < 0 OR _quantity > 9999999999.9999))
+     OR (_rate IS NOT NULL
+       AND (_rate::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _rate < 0 OR _rate > 99999999.999999))
      OR (_loaded_miles_snapshot IS NOT NULL
-          AND (_loaded_miles_snapshot < 0 OR _loaded_miles_snapshot > 9999999999.99))
+          AND (_loaded_miles_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _loaded_miles_snapshot < 0 OR _loaded_miles_snapshot > 9999999999.99))
      OR (_deadhead_miles_snapshot IS NOT NULL
-          AND (_deadhead_miles_snapshot < 0 OR _deadhead_miles_snapshot > 9999999999.99))
+          AND (_deadhead_miles_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _deadhead_miles_snapshot < 0 OR _deadhead_miles_snapshot > 9999999999.99))
      OR (_payable_miles_snapshot IS NOT NULL
-          AND (_payable_miles_snapshot < 0 OR _payable_miles_snapshot > 9999999999.99))
+          AND (_payable_miles_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _payable_miles_snapshot < 0 OR _payable_miles_snapshot > 9999999999.99))
      OR (_eligible_revenue_snapshot IS NOT NULL
-          AND (_eligible_revenue_snapshot < 0
+          AND (_eligible_revenue_snapshot::text IN ('NaN', 'Infinity', '-Infinity')
+               OR _eligible_revenue_snapshot < 0
                OR _eligible_revenue_snapshot > 999999999999.99)) THEN
     RAISE EXCEPTION 'settlement_invalid_item_numeric';
   END IF;

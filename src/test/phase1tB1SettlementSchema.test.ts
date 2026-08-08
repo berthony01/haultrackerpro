@@ -1013,3 +1013,220 @@ describe('Phase 1T-B1-R1 — historical provenance and deletion compatibility', 
     }
   });
 });
+
+// ---------------------------------------------------------------------
+// Phase 1T-B2C3A-R1 — finite numeric defense in depth (schema level)
+// ---------------------------------------------------------------------
+describe('Phase 1T-B2C3A-R1 — schema rejects non-finite numerics', () => {
+  const SPECIALS = ['NaN', 'Infinity', '-Infinity'] as const;
+
+  it('driver_settlements.reported_gross_amount rejects NaN/Infinity/-Infinity', async () => {
+    for (const v of SPECIALS) {
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlements
+             (driver_user_id, source, period_start, period_end,
+              created_by_user_id, reported_gross_amount)
+           VALUES ($1, 'driver_imported', '2026-08-01', '2026-08-07', $1, '${v}'::numeric)`,
+          [ids.driver],
+        ),
+        v,
+      ).toBeTruthy();
+    }
+    // finite values still accepted, including 0
+    for (const v of ['0', '1234.56']) {
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlements
+             (driver_user_id, source, period_start, period_end,
+              created_by_user_id, reported_gross_amount)
+           VALUES ($1, 'driver_imported', '2026-08-01', '2026-08-07', $1, ${v})`,
+          [ids.driver],
+        ),
+        v,
+      ).toBeNull();
+    }
+    // negative gross still rejected
+    expect(
+      await failure(
+        `INSERT INTO public.driver_settlements
+           (driver_user_id, source, period_start, period_end,
+            created_by_user_id, reported_gross_amount)
+         VALUES ($1, 'driver_imported', '2026-08-01', '2026-08-07', $1, -0.01)`,
+        [ids.driver],
+      ),
+    ).toBeTruthy();
+  });
+
+  it('driver_settlements.reported_net_amount rejects specials but keeps signed finite values', async () => {
+    for (const v of SPECIALS) {
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlements
+             (driver_user_id, source, period_start, period_end,
+              created_by_user_id, reported_net_amount)
+           VALUES ($1, 'driver_imported', '2026-08-01', '2026-08-07', $1, '${v}'::numeric)`,
+          [ids.driver],
+        ),
+        v,
+      ).toBeTruthy();
+    }
+    for (const v of ['-2500.75', '0', '2500.75']) {
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlements
+             (driver_user_id, source, period_start, period_end,
+              created_by_user_id, reported_net_amount)
+           VALUES ($1, 'driver_imported', '2026-08-01', '2026-08-07', $1, ${v})`,
+          [ids.driver],
+        ),
+        v,
+      ).toBeNull();
+    }
+  });
+
+  it('driver_settlement_items.amount rejects NaN/Infinity/-Infinity and keeps 0/positive', async () => {
+    const s = await insertSettlement();
+    for (const v of SPECIALS) {
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlement_items
+             (settlement_id, item_type, amount, created_by_user_id)
+           VALUES ($1, 'earning', '${v}'::numeric, $2)`,
+          [s, ids.driver],
+        ),
+        v,
+      ).toBeTruthy();
+    }
+    for (const v of ['0', '10.00']) {
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlement_items
+             (settlement_id, item_type, amount, created_by_user_id)
+           VALUES ($1, 'earning', ${v}, $2)`,
+          [s, ids.driver],
+        ),
+        v,
+      ).toBeNull();
+    }
+  });
+
+  it('every nullable numeric item column rejects specials when supplied', async () => {
+    const s = await insertSettlement();
+    const columns = [
+      'quantity',
+      'rate',
+      'expected_amount_snapshot',
+      'loaded_miles_snapshot',
+      'deadhead_miles_snapshot',
+      'payable_miles_snapshot',
+      'eligible_revenue_snapshot',
+    ] as const;
+    for (const col of columns) {
+      for (const v of SPECIALS) {
+        expect(
+          await failure(
+            `INSERT INTO public.driver_settlement_items
+               (settlement_id, item_type, amount, created_by_user_id, ${col})
+             VALUES ($1, 'earning', 10, $2, '${v}'::numeric)`,
+            [s, ids.driver],
+          ),
+          `${col}=${v}`,
+        ).toBeTruthy();
+      }
+      // finite value on the same column is accepted
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlement_items
+             (settlement_id, item_type, amount, created_by_user_id, ${col})
+           VALUES ($1, 'earning', 10, $2, 1)`,
+          [s, ids.driver],
+        ),
+        col,
+      ).toBeNull();
+    }
+  });
+
+  it('UPDATE cannot smuggle a special value into a stored item', async () => {
+    const s = await insertSettlement();
+    const item = await insertItem(s, { amount: 25 });
+    for (const v of SPECIALS) {
+      expect(
+        await failure(
+          `UPDATE public.driver_settlement_items SET amount = '${v}'::numeric WHERE id = $1`,
+          [item],
+        ),
+        v,
+      ).toBeTruthy();
+      expect(
+        await failure(
+          `UPDATE public.driver_settlement_items SET rate = '${v}'::numeric WHERE id = $1`,
+          [item],
+        ),
+        v,
+      ).toBeTruthy();
+    }
+    const kept = await db.query<{ amount: string }>(
+      `SELECT amount::text AS amount FROM public.driver_settlement_items WHERE id = $1`,
+      [item],
+    );
+    expect(kept.rows[0].amount).toBe('25.00');
+  });
+
+  it('driver_settlement_matches.confidence rejects specials and keeps the 0..1 range', async () => {
+    const s = await insertSettlement();
+    const item = await insertItem(s);
+    for (const v of SPECIALS) {
+      expect(
+        await failure(
+          `INSERT INTO public.driver_settlement_matches
+             (settlement_item_id, driver_load_id, match_state, confidence)
+           VALUES ($1, $2, 'likely', '${v}'::numeric)`,
+          [item, ids.load],
+        ),
+        v,
+      ).toBeTruthy();
+    }
+    expect(
+      await failure(
+        `INSERT INTO public.driver_settlement_matches
+           (settlement_item_id, driver_load_id, match_state, confidence)
+         VALUES ($1, $2, 'likely', 0.5)`,
+        [item, ids.load],
+      ),
+    ).toBeNull();
+  });
+
+  it('source contract locks the explicit finite text guards into the candidate CHECKs', () => {
+    const guarded = [
+      'reported_gross_amount',
+      'reported_net_amount',
+      'amount',
+      'quantity',
+      'rate',
+      'expected_amount_snapshot',
+      'loaded_miles_snapshot',
+      'deadhead_miles_snapshot',
+      'payable_miles_snapshot',
+      'eligible_revenue_snapshot',
+      'confidence',
+    ];
+    for (const col of guarded) {
+      expect(
+        CANDIDATE_SQL,
+        col,
+      ).toMatch(
+        new RegExp(
+          `${col}::text NOT IN \\('NaN', 'Infinity', '-Infinity'\\)`,
+        ),
+      );
+    }
+    expect(CANDIDATE_SQL).toMatch(
+      /CONSTRAINT driver_settlements_reported_net_finite_check/,
+    );
+    // no dynamic SQL, helper functions, float coercion or isfinite() shortcuts
+    expect(CANDIDATE_SQL).not.toMatch(/isfinite/i);
+    expect(CANDIDATE_SQL).not.toMatch(/::\s*(float|double precision|real)/i);
+    expect(CANDIDATE_SQL).not.toMatch(/ALTER TABLE[\s\S]{0,200}?ADD CONSTRAINT/i);
+  });
+});

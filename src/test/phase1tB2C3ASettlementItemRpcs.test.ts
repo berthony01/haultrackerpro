@@ -766,6 +766,7 @@ describe('Phase 1T-B2C3A — catalog and ACL contract', () => {
 // =====================================================================
 describe('Phase 1T-B2C3A — source authorization', () => {
   it('active Pro recipient can add, update and delete on own driver_imported draft (proof 5)', async () => {
+    let deletedItemId: string | null = null;
     await asRole('authenticated', U.driverPro, async () => {
       const item = await addItem(S.driver, {
         itemType: 'earning',
@@ -785,8 +786,10 @@ describe('Phase 1T-B2C3A — source authorization', () => {
 
       const deleted = await deleteItem(item.id);
       expect(deleted).toBe(item.id);
+      deletedItemId = item.id;
     });
-    expect(await itemById(S.driver)).toBeUndefined();
+    expect(deletedItemId).not.toBeNull();
+    expect(await itemById(deletedItemId as string)).toBeUndefined();
   });
 
   it('Free / downgraded recipient cannot mutate driver_imported draft items (proof 6)', async () => {
@@ -1763,5 +1766,190 @@ describe('Phase 1T-B2C3A — source contract', () => {
       expect(msg).not.toMatch(/%/);
     }
     expect(CODE).not.toMatch(/SQLERRM|SQLSTATE/);
+  });
+});
+
+// =====================================================================
+// Phase 1T-B2C3A-R1 — finite numeric contract in the item RPCs
+// =====================================================================
+describe('Phase 1T-B2C3A-R1 — item RPCs reject non-finite numerics', () => {
+  const SPECIALS = ['NaN', 'Infinity', '-Infinity'] as const;
+  const OPTIONAL_NUMERICS = [
+    'quantity',
+    'rate',
+    'loadedMiles',
+    'deadheadMiles',
+    'payableMiles',
+    'eligibleRevenue',
+  ] as const;
+
+  it('add rejects special amounts with the fixed item-amount error and persists nothing', async () => {
+    const beforeItems = await itemCount();
+    const beforeEvents = await eventCount();
+    await asRole('authenticated', U.driverPro, async () => {
+      for (const v of SPECIALS) {
+        expect(
+          await failureMessage(() => addItem(S.driverValidation, { amount: v })),
+          v,
+        ).toContain(ERR.itemAmount);
+      }
+    });
+    expect(await itemCount()).toBe(beforeItems);
+    expect(await eventCount()).toBe(beforeEvents);
+  });
+
+  it('update rejects special amounts and leaves the stored item and events untouched', async () => {
+    let itemId = '';
+    await asRole('authenticated', U.driverPro, async () => {
+      const created = await addItem(S.driverValidation, { amount: '42.00' });
+      itemId = created.id;
+    });
+    const beforeEvents = (await eventsFor(S.driverValidation)).length;
+    await asRole('authenticated', U.driverPro, async () => {
+      for (const v of SPECIALS) {
+        expect(
+          await failureMessage(() => updateItem(itemId, { amount: v })),
+          v,
+        ).toContain(ERR.itemAmount);
+      }
+    });
+    const stored = await itemById(itemId);
+    expect(stored?.amount).toBe('42.00');
+    expect((await eventsFor(S.driverValidation)).length).toBe(beforeEvents);
+    await asRole('authenticated', U.driverPro, () => deleteItem(itemId));
+  });
+
+  it('every optional numeric input rejects specials on add and update with the fixed numeric error', async () => {
+    let itemId = '';
+    await asRole('authenticated', U.driverPro, async () => {
+      const created = await addItem(S.driverValidation, { amount: '10.00' });
+      itemId = created.id;
+    });
+    const beforeItems = await itemCount();
+    const beforeEvents = await eventCount();
+
+    await asRole('authenticated', U.driverPro, async () => {
+      for (const field of OPTIONAL_NUMERICS) {
+        for (const v of SPECIALS) {
+          expect(
+            await failureMessage(() =>
+              addItem(S.driverValidation, { amount: '10.00', [field]: v }),
+            ),
+            `add ${field}=${v}`,
+          ).toContain(ERR.itemNumeric);
+          expect(
+            await failureMessage(() =>
+              updateItem(itemId, { amount: '10.00', [field]: v }),
+            ),
+            `update ${field}=${v}`,
+          ).toContain(ERR.itemNumeric);
+        }
+      }
+    });
+
+    expect(await itemCount()).toBe(beforeItems);
+    expect(await eventCount()).toBe(beforeEvents);
+    const stored = await itemById(itemId);
+    expect(stored?.quantity).toBeNull();
+    expect(stored?.rate).toBeNull();
+    await asRole('authenticated', U.driverPro, () => deleteItem(itemId));
+  });
+
+  it('per_mile and percentage shapes cannot smuggle a special rate, miles or revenue value', async () => {
+    const beforeItems = await itemCount();
+    await asRole('authenticated', U.driverPro, async () => {
+      for (const v of SPECIALS) {
+        expect(
+          await failureMessage(() =>
+            addItem(S.driverValidation, {
+              itemType: 'load_pay',
+              payMethod: 'per_mile',
+              amount: '500.00',
+              rate: v,
+              payableMiles: '400',
+            }),
+          ),
+          `per_mile rate ${v}`,
+        ).toContain(ERR.itemNumeric);
+        expect(
+          await failureMessage(() =>
+            addItem(S.driverValidation, {
+              itemType: 'load_pay',
+              payMethod: 'per_mile',
+              amount: '500.00',
+              rate: '1.25',
+              payableMiles: v,
+            }),
+          ),
+          `per_mile miles ${v}`,
+        ).toContain(ERR.itemNumeric);
+        expect(
+          await failureMessage(() =>
+            addItem(S.driverValidation, {
+              itemType: 'load_pay',
+              payMethod: 'percentage',
+              amount: '500.00',
+              rate: '70',
+              eligibleRevenue: v,
+            }),
+          ),
+          `percentage revenue ${v}`,
+        ).toContain(ERR.itemNumeric);
+      }
+    });
+    expect(await itemCount()).toBe(beforeItems);
+  });
+
+  it('special-value item errors never leak constraint, SQLSTATE or overflow detail', async () => {
+    const msgs: string[] = [];
+    await asRole('authenticated', U.driverPro, async () => {
+      for (const v of SPECIALS) {
+        msgs.push(await failureMessage(() => addItem(S.driverValidation, { amount: v })));
+        msgs.push(
+          await failureMessage(() =>
+            addItem(S.driverValidation, { amount: '10.00', rate: v }),
+          ),
+        );
+      }
+    });
+    expect(msgs).toHaveLength(6);
+    for (const m of msgs) {
+      expect(m).not.toMatch(LEAK);
+      expect(m).not.toMatch(/overflow|22003|22P02/i);
+    }
+  });
+
+  it('source contract: both mutating RPC bodies lock the finite guards in place (proof R1)', () => {
+    const bodies = CODE.split(/CREATE FUNCTION public\./).slice(1);
+    const mutating = bodies.filter((b) => b.includes('_amount numeric'));
+    expect(mutating).toHaveLength(2);
+    for (const body of mutating) {
+      expect(body).toMatch(/_amount::text IN \('NaN', 'Infinity', '-Infinity'\)/);
+      for (const p of [
+        '_quantity',
+        '_rate',
+        '_loaded_miles_snapshot',
+        '_deadhead_miles_snapshot',
+        '_payable_miles_snapshot',
+        '_eligible_revenue_snapshot',
+      ]) {
+        expect(body, p).toMatch(
+          new RegExp(`${p}::text IN \\('NaN', 'Infinity', '-Infinity'\\)`),
+        );
+      }
+      // finite guards run before any table write
+      const guardAt = body.indexOf("::text IN ('NaN'");
+      const writeAt = Math.min(
+        ...['INSERT INTO public.driver_settlement_items', 'UPDATE public.driver_settlement_items']
+          .map((w) => body.indexOf(w))
+          .filter((i) => i >= 0),
+      );
+      expect(guardAt).toBeGreaterThan(-1);
+      expect(guardAt).toBeLessThan(writeAt);
+    }
+    // expected_amount_snapshot is not caller-settable and gains no guard here
+    expect(CODE).not.toMatch(/_expected_amount_snapshot/);
+    expect(CODE).not.toMatch(/isfinite/i);
+    expect(CODE).not.toMatch(/::\s*(float|double precision|real)/i);
   });
 });

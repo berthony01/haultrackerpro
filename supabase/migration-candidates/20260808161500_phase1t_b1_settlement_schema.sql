@@ -112,7 +112,18 @@ CREATE TABLE public.driver_settlements (
   CONSTRAINT driver_settlements_version_number_check
     CHECK (version_number >= 1),
   CONSTRAINT driver_settlements_reported_gross_check
-    CHECK (reported_gross_amount IS NULL OR reported_gross_amount >= 0),
+    CHECK (
+      reported_gross_amount IS NULL
+      OR (
+        reported_gross_amount::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND reported_gross_amount >= 0
+      )
+    ),
+  CONSTRAINT driver_settlements_reported_net_finite_check
+    CHECK (
+      reported_net_amount IS NULL
+      OR reported_net_amount::text NOT IN ('NaN', 'Infinity', '-Infinity')
+    ),
   CONSTRAINT driver_settlements_no_self_supersede_check
     CHECK (supersedes_settlement_id IS NULL OR supersedes_settlement_id <> id),
   CONSTRAINT driver_settlements_revision_shape_check
@@ -192,23 +203,68 @@ CREATE TABLE public.driver_settlement_items (
   CONSTRAINT driver_settlement_items_item_type_check
     CHECK (item_type IN ('load_pay', 'earning', 'reimbursement', 'deduction', 'withholding')),
   CONSTRAINT driver_settlement_items_amount_check
-    CHECK (amount >= 0),
+    CHECK (
+      amount::text NOT IN ('NaN', 'Infinity', '-Infinity')
+      AND amount >= 0
+    ),
   CONSTRAINT driver_settlement_items_pay_method_check
     CHECK (pay_method IS NULL OR pay_method IN ('per_mile', 'percentage', 'flat_rate', 'manual')),
   CONSTRAINT driver_settlement_items_quantity_check
-    CHECK (quantity IS NULL OR quantity >= 0),
+    CHECK (
+      quantity IS NULL
+      OR (
+        quantity::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND quantity >= 0
+      )
+    ),
   CONSTRAINT driver_settlement_items_rate_check
-    CHECK (rate IS NULL OR rate >= 0),
+    CHECK (
+      rate IS NULL
+      OR (
+        rate::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND rate >= 0
+      )
+    ),
   CONSTRAINT driver_settlement_items_expected_amount_check
-    CHECK (expected_amount_snapshot IS NULL OR expected_amount_snapshot >= 0),
+    CHECK (
+      expected_amount_snapshot IS NULL
+      OR (
+        expected_amount_snapshot::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND expected_amount_snapshot >= 0
+      )
+    ),
   CONSTRAINT driver_settlement_items_loaded_miles_check
-    CHECK (loaded_miles_snapshot IS NULL OR loaded_miles_snapshot >= 0),
+    CHECK (
+      loaded_miles_snapshot IS NULL
+      OR (
+        loaded_miles_snapshot::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND loaded_miles_snapshot >= 0
+      )
+    ),
   CONSTRAINT driver_settlement_items_deadhead_miles_check
-    CHECK (deadhead_miles_snapshot IS NULL OR deadhead_miles_snapshot >= 0),
+    CHECK (
+      deadhead_miles_snapshot IS NULL
+      OR (
+        deadhead_miles_snapshot::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND deadhead_miles_snapshot >= 0
+      )
+    ),
   CONSTRAINT driver_settlement_items_payable_miles_check
-    CHECK (payable_miles_snapshot IS NULL OR payable_miles_snapshot >= 0),
+    CHECK (
+      payable_miles_snapshot IS NULL
+      OR (
+        payable_miles_snapshot::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND payable_miles_snapshot >= 0
+      )
+    ),
   CONSTRAINT driver_settlement_items_eligible_revenue_check
-    CHECK (eligible_revenue_snapshot IS NULL OR eligible_revenue_snapshot >= 0),
+    CHECK (
+      eligible_revenue_snapshot IS NULL
+      OR (
+        eligible_revenue_snapshot::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND eligible_revenue_snapshot >= 0
+      )
+    ),
   CONSTRAINT driver_settlement_items_sort_order_check
     CHECK (sort_order >= 0)
 );
@@ -236,7 +292,14 @@ CREATE TABLE public.driver_settlement_matches (
   CONSTRAINT driver_settlement_matches_state_check
     CHECK (match_state IN ('exact', 'likely', 'possible', 'confirmed', 'rejected')),
   CONSTRAINT driver_settlement_matches_confidence_check
-    CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+    CHECK (
+      confidence IS NULL
+      OR (
+        confidence::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND confidence >= 0
+        AND confidence <= 1
+      )
+    ),
   CONSTRAINT driver_settlement_matches_unique_pair
     UNIQUE (settlement_item_id, driver_load_id)
 );
