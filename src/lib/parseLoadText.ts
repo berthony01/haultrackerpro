@@ -577,9 +577,28 @@ export function parseLoadText(text: string): ParsedLoadData {
     result.pay_model_suggestion = 'manual';
   }
 
+  // --- Accessorial fees (Phase 1S-B1) ---
+  const waitFee = extractFee(t, 'wait|waiting');
+  if (waitFee) result.wait_fee = waitFee;
+  const detentionFee = extractFee(t, 'detention');
+  if (detentionFee) result.detention_fee = detentionFee;
+
   // --- Date ---
-  const dateStr = tryParseDate(t);
-  if (dateStr) result.load_date = dateStr;
+  // Phase 1S-B1: explicit labeled pickup/delivery dates take authority.
+  const dateLines = t.split('\n');
+  const explicitPickupDate = extractLabeledDate(dateLines, PICKUP_DATE_LABEL_RE);
+  const explicitDeliveryDate = extractLabeledDate(dateLines, DELIVERY_DATE_LABEL_RE);
+  if (explicitPickupDate) {
+    result.load_date = explicitPickupDate;
+  } else {
+    // Generic fallback preserved — but a delivery-labeled date line must never
+    // become the pickup date merely because it is the first/only date present.
+    const genericSource = dateLines.filter(l => !DELIVERY_DATE_LABEL_RE.test(l)).join('\n');
+    const dateStr = tryParseDate(genericSource);
+    if (dateStr) result.load_date = dateStr;
+  }
+  if (explicitDeliveryDate) result.dropoff_date = explicitDeliveryDate;
+
 
   // --- Numbered Stop Detection (e.g. "1#:", "2#:", "3#:") ---
   const stopMarkers = t.match(/\b\d+#:\s*/g);
