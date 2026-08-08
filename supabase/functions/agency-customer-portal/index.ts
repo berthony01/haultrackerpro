@@ -49,7 +49,18 @@ serve(async (req) => {
     const agencyId = String(body.agencyId ?? "");
     if (!agencyId) return json({ error: "agencyId is required" }, 400);
 
-    // Owner check (no driver/recruiter customer lookup).
+    // Canonical agency billing owner: agency_profiles.owner_user_id must equal
+    // the authenticated user, AND that user must hold an ACTIVE agency_owner
+    // membership for the same agency. Email is never an ownership key.
+    const { data: agency } = await supabaseService
+      .from("agency_profiles")
+      .select("id, owner_user_id")
+      .eq("id", agencyId)
+      .maybeSingle();
+    if (!agency || agency.owner_user_id !== user.id) {
+      return json({ error: "Only the agency owner can manage billing" }, 403);
+    }
+
     const { data: ownerRow } = await supabaseService
       .from("agency_members")
       .select("role, status")

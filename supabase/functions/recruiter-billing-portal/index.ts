@@ -31,9 +31,22 @@ serve(async (req) => {
     const user = userData.user;
     if (!user) throw new Error("Not authenticated");
 
+    // Resolve the caller's recruiter BUSINESS identity from the auth user id.
+    // recruiter_email / auth email are never ownership or lookup keys.
+    const { data: recruiter } = await supabase
+      .from("recruiter_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const recruiterId = recruiter?.id ?? null;
+    if (!recruiterId) {
+      throw new Error("Recruiter profile not found. Please complete recruiter setup first.");
+    }
+
     const { data: billing } = await supabase
       .from("recruiter_billing_profiles")
       .select("stripe_customer_id")
+      .eq("recruiter_id", recruiterId)
       .eq("user_id", user.id)
       .maybeSingle();
 
