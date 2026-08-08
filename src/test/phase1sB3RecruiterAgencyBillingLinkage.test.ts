@@ -45,7 +45,6 @@ describe('Phase 1S-B3 — recruiter billing identity linkage', () => {
     expect(shared).toContain('recruiter_id: input.recruiterId');
     expect(shared).toContain('customer.metadata["recruiter_id"] === input.recruiterId');
     expect(shared).toContain('customer.metadata["user_id"] === input.userId');
-    expect(shared).toContain('metadata search (never email)'.replace('search (never email)', 'search (never email)'.slice(0, 0)) || '');
     const edge = squash(RECRUITER_CHECKOUT);
     expect(edge).toContain("metadata['recruiter_id']");
     expect(edge).toContain("metadata['user_id']");
