@@ -515,7 +515,7 @@ export function AdminRecruitersPanel() {
                 )}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <KV k="Email" v={detail.recruiter_email ?? '—'} />
+                <KV k="Contact email" v={detail.recruiter_email ?? '—'} />
                 <KV k="Phone" v={detail.recruiter_phone ?? '—'} />
                 <KV k="DOT" v={detail.dot_number ?? '—'} />
                 <KV k="MC" v={detail.mc_number ?? '—'} />
