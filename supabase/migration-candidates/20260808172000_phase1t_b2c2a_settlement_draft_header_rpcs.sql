@@ -98,10 +98,12 @@ BEGIN
   END IF;
 
   IF (_reported_gross_amount IS NOT NULL
-       AND (_reported_gross_amount < 0
+       AND (_reported_gross_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_gross_amount < 0
             OR _reported_gross_amount > 999999999999.99))
      OR (_reported_net_amount IS NOT NULL
-       AND (_reported_net_amount < -999999999999.99
+       AND (_reported_net_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_net_amount < -999999999999.99
             OR _reported_net_amount > 999999999999.99)) THEN
     RAISE EXCEPTION 'settlement_invalid_amount';
   END IF;
@@ -239,10 +241,12 @@ BEGIN
   END IF;
 
   IF (_reported_gross_amount IS NOT NULL
-       AND (_reported_gross_amount < 0
+       AND (_reported_gross_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_gross_amount < 0
             OR _reported_gross_amount > 999999999999.99))
      OR (_reported_net_amount IS NOT NULL
-       AND (_reported_net_amount < -999999999999.99
+       AND (_reported_net_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_net_amount < -999999999999.99
             OR _reported_net_amount > 999999999999.99)) THEN
     RAISE EXCEPTION 'settlement_invalid_amount';
   END IF;
@@ -380,10 +384,12 @@ BEGIN
   END IF;
 
   IF (_reported_gross_amount IS NOT NULL
-       AND (_reported_gross_amount < 0
+       AND (_reported_gross_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_gross_amount < 0
             OR _reported_gross_amount > 999999999999.99))
      OR (_reported_net_amount IS NOT NULL
-       AND (_reported_net_amount < -999999999999.99
+       AND (_reported_net_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_net_amount < -999999999999.99
             OR _reported_net_amount > 999999999999.99)) THEN
     RAISE EXCEPTION 'settlement_invalid_amount';
   END IF;
@@ -547,10 +553,12 @@ BEGIN
   END IF;
 
   IF (_reported_gross_amount IS NOT NULL
-       AND (_reported_gross_amount < 0
+       AND (_reported_gross_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_gross_amount < 0
             OR _reported_gross_amount > 999999999999.99))
      OR (_reported_net_amount IS NOT NULL
-       AND (_reported_net_amount < -999999999999.99
+       AND (_reported_net_amount::text IN ('NaN', 'Infinity', '-Infinity')
+            OR _reported_net_amount < -999999999999.99
             OR _reported_net_amount > 999999999999.99)) THEN
     RAISE EXCEPTION 'settlement_invalid_amount';
   END IF;
