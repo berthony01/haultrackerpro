@@ -52,6 +52,8 @@ import { ScanLoadModal } from '@/components/ScanLoadModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
 import { resolveImportedLoadDate, resolveImportedDropoffDate } from '@/lib/sourceDate';
+import { mergePasteIntoForm, createPasteSession, type PasteSession } from '@/lib/loadPasteMerge';
+
 import { useProfitCheck } from '@/hooks/useProfitCheck';
 import { ProfitCheckCard } from '@/components/ProfitCheckCard';
 
