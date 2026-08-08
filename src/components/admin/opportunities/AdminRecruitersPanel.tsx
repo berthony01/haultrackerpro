@@ -385,7 +385,7 @@ export function AdminRecruitersPanel() {
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">{r.company_name}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                      <Mini label="Email" value={r.recruiter_email ?? '—'} />
+                      <Mini label="Contact email" value={r.recruiter_email ?? '—'} />
                       <Mini label="Phone" value={r.recruiter_phone ?? '—'} />
                       <Mini label="DOT" value={r.dot_number ?? '—'} />
                       <Mini label="MC" value={r.mc_number ?? '—'} />
