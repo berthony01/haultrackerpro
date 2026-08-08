@@ -68,9 +68,18 @@ CREATE TABLE public.driver_settlements (
   driver_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   source text NOT NULL,
   status text NOT NULL DEFAULT 'draft',
-  carrier_recruiter_profile_id uuid NULL REFERENCES public.recruiter_profiles(id) ON DELETE SET NULL,
-  carrier_driver_relationship_id uuid NULL REFERENCES public.carrier_driver_relationships(id) ON DELETE SET NULL,
-  agency_id uuid NULL REFERENCES public.agency_profiles(id) ON DELETE SET NULL,
+  -- Historical provenance snapshots, intentionally NOT foreign keys: these three
+  -- UUIDs preserve the canonical business identity value of the issuer/preparer
+  -- even after the live recruiter profile, carrier relationship, or agency
+  -- profile is deleted. A settlement statement is a historical financial record
+  -- and must remain readable and attributable to its driver. Phase 1T-B2 must
+  -- validate that these ids reference live, authorized objects on CREATE/MANAGE;
+  -- already-stored historical rows do not depend on those objects continuing to
+  -- exist, and business/account deletion must never be blocked or silently
+  -- rewrite provenance to NULL.
+  carrier_recruiter_profile_id uuid NULL,
+  carrier_driver_relationship_id uuid NULL,
+  agency_id uuid NULL,
   period_start date NOT NULL,
   period_end date NOT NULL,
   pay_date date NULL,
@@ -82,7 +91,11 @@ CREATE TABLE public.driver_settlements (
   notes text NULL,
   calculation_version text NOT NULL DEFAULT '1',
   version_number integer NOT NULL DEFAULT 1,
-  supersedes_settlement_id uuid NULL REFERENCES public.driver_settlements(id) ON DELETE RESTRICT,
+  -- CASCADE (not RESTRICT) so an entire revision chain — every version belongs to
+  -- the same driver — can be removed together when that driver explicitly deletes
+  -- their HaulTracker account. This is referential/account-deletion safety only;
+  -- Phase 1T-B2 must still prohibit normal client deletion of finalized history.
+  supersedes_settlement_id uuid NULL REFERENCES public.driver_settlements(id) ON DELETE CASCADE,
   created_by_user_id uuid NOT NULL,
   finalized_by_user_id uuid NULL,
   finalized_at timestamptz NULL,
@@ -112,11 +125,15 @@ CREATE TABLE public.driver_settlements (
       (source = 'carrier_issued'
         AND carrier_recruiter_profile_id IS NOT NULL
         AND carrier_driver_relationship_id IS NOT NULL
-        AND agency_id IS NULL)
+        AND agency_id IS NULL
+        AND source_display_name_snapshot IS NOT NULL
+        AND length(btrim(source_display_name_snapshot, E' \t\r\n')) > 0)
       OR (source = 'agency_prepared'
         AND agency_id IS NOT NULL
         AND carrier_recruiter_profile_id IS NULL
-        AND carrier_driver_relationship_id IS NULL)
+        AND carrier_driver_relationship_id IS NULL
+        AND source_display_name_snapshot IS NOT NULL
+        AND length(btrim(source_display_name_snapshot, E' \t\r\n')) > 0)
       OR (source = 'driver_imported'
         AND carrier_recruiter_profile_id IS NULL
         AND carrier_driver_relationship_id IS NULL

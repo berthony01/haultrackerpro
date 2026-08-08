@@ -111,12 +111,19 @@ async function failure(sql: string, params?: unknown[]): Promise<string | null> 
 async function insertSettlement(
   overrides: Record<string, unknown> = {},
 ): Promise<string> {
+  const source = (overrides.source as string) ?? 'driver_imported';
+  const needsDisplayName =
+    source === 'carrier_issued' || source === 'agency_prepared';
   const row: Record<string, unknown> = {
     driver_user_id: ids.driver,
     source: 'driver_imported',
     period_start: '2026-08-01',
     period_end: '2026-08-07',
     created_by_user_id: ids.driver,
+    ...(needsDisplayName &&
+    !Object.prototype.hasOwnProperty.call(overrides, 'source_display_name_snapshot')
+      ? { source_display_name_snapshot: 'Acme Logistics LLC' }
+      : {}),
     ...overrides,
   };
   const keys = Object.keys(row);
@@ -595,10 +602,7 @@ describe('Phase 1T-B1 — foreign keys, indexes, and cascade behavior', () => {
       'carrier_driver_relationships.recruiter_id': 'c',
       'carrier_driver_relationships.driver_user_id': 'c',
       'driver_settlements.driver_user_id': 'c',
-      'driver_settlements.carrier_recruiter_profile_id': 'n',
-      'driver_settlements.carrier_driver_relationship_id': 'n',
-      'driver_settlements.agency_id': 'n',
-      'driver_settlements.supersedes_settlement_id': 'r',
+      'driver_settlements.supersedes_settlement_id': 'c',
       'driver_settlement_items.settlement_id': 'c',
       'driver_settlement_matches.settlement_item_id': 'c',
       'driver_settlement_matches.driver_load_id': 'c',
@@ -606,6 +610,14 @@ describe('Phase 1T-B1 — foreign keys, indexes, and cascade behavior', () => {
     };
     for (const [key, action] of Object.entries(expected)) {
       expect(map.get(key), key).toBe(action);
+    }
+    // Historical provenance columns must NOT be foreign keys at all.
+    for (const key of [
+      'driver_settlements.carrier_recruiter_profile_id',
+      'driver_settlements.carrier_driver_relationship_id',
+      'driver_settlements.agency_id',
+    ]) {
+      expect(map.has(key), key).toBe(false);
     }
     expect(map.size).toBe(Object.keys(expected).length);
   });
@@ -782,5 +794,222 @@ describe('Phase 1T-B1 — privacy boundary and source contract', () => {
       CANDIDATE_SQL.match(/CREATE TABLE public\.([a-z_]+)/g) ?? []
     ).map((s) => s.replace('CREATE TABLE public.', ''));
     expect(created.sort()).toEqual([...TABLES].sort());
+  });
+});
+
+// ---------------------------------------------------------------------
+// Phase 1T-B1-R1 — historical provenance / account-deletion compatibility
+// ---------------------------------------------------------------------
+describe('Phase 1T-B1-R1 — historical provenance and deletion compatibility', () => {
+  it('requires a non-empty source display name snapshot for carrier_issued', async () => {
+    for (const bad of [null, '', '   ']) {
+      await expect(
+        insertSettlement({
+          source: 'carrier_issued',
+          carrier_recruiter_profile_id: ids.recruiter,
+          carrier_driver_relationship_id: ids.relationship,
+          source_display_name_snapshot: bad,
+        }),
+      ).rejects.toBeTruthy();
+    }
+    await expect(
+      insertSettlement({
+        source: 'carrier_issued',
+        carrier_recruiter_profile_id: ids.recruiter,
+        carrier_driver_relationship_id: ids.relationship,
+        source_display_name_snapshot: 'Blue Line Carrier',
+      }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('requires a non-empty source display name snapshot for agency_prepared', async () => {
+    for (const bad of [null, '', '\t  ']) {
+      await expect(
+        insertSettlement({
+          source: 'agency_prepared',
+          agency_id: ids.agency,
+          source_display_name_snapshot: bad,
+        }),
+      ).rejects.toBeTruthy();
+    }
+    await expect(
+      insertSettlement({
+        source: 'agency_prepared',
+        agency_id: ids.agency,
+        source_display_name_snapshot: 'Northbound Back Office',
+      }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('still accepts driver_imported with a null display name snapshot', async () => {
+    await expect(
+      insertSettlement({ source: 'driver_imported', source_display_name_snapshot: null }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('declares the three historical business uuid columns with zero FK constraints', async () => {
+    const cols = await db.query<{ column_name: string; data_type: string; is_nullable: string }>(
+      `SELECT column_name, data_type, is_nullable FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'driver_settlements'
+          AND column_name = ANY($1::text[])`,
+      [['carrier_recruiter_profile_id', 'carrier_driver_relationship_id', 'agency_id']],
+    );
+    expect(cols.rows.length).toBe(3);
+    for (const row of cols.rows) {
+      expect(row.data_type).toBe('uuid');
+      expect(row.is_nullable).toBe('YES');
+    }
+    const fks = await db.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+         FROM pg_constraint con
+         JOIN pg_class c ON c.oid = con.conrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN unnest(con.conkey) AS k(attnum) ON true
+         JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = k.attnum
+        WHERE con.contype = 'f' AND n.nspname = 'public'
+          AND c.relname = 'driver_settlements'
+          AND a.attname = ANY($1::text[])`,
+      [['carrier_recruiter_profile_id', 'carrier_driver_relationship_id', 'agency_id']],
+    );
+    expect(fks.rows[0].count).toBe('0');
+  });
+
+  it('preserves carrier provenance after the live recruiter profile is deleted', async () => {
+    const rp = await db.query<{ id: string }>(
+      `INSERT INTO public.recruiter_profiles (user_id) VALUES ($1) RETURNING id`,
+      [ids.otherDriver],
+    );
+    const recruiterId = rp.rows[0].id;
+    const rel = await db.query<{ id: string }>(
+      `INSERT INTO public.carrier_driver_relationships
+         (recruiter_id, driver_user_id, status, created_by_user_id)
+       VALUES ($1, $2, 'active', $3) RETURNING id`,
+      [recruiterId, ids.driver, ids.otherDriver],
+    );
+    const relationshipId = rel.rows[0].id;
+    const settlementId = await insertSettlement({
+      source: 'carrier_issued',
+      status: 'finalized',
+      carrier_recruiter_profile_id: recruiterId,
+      carrier_driver_relationship_id: relationshipId,
+      source_display_name_snapshot: 'Deleted Carrier Co',
+    });
+
+    expect(
+      await failure(`DELETE FROM public.recruiter_profiles WHERE id = $1`, [recruiterId]),
+    ).toBeNull();
+
+    const gone = await db.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM public.carrier_driver_relationships WHERE id = $1`,
+      [relationshipId],
+    );
+    expect(gone.rows[0].count).toBe('0');
+
+    const kept = await db.query<{
+      carrier_recruiter_profile_id: string;
+      carrier_driver_relationship_id: string;
+      source_display_name_snapshot: string;
+      status: string;
+    }>(
+      `SELECT carrier_recruiter_profile_id, carrier_driver_relationship_id,
+              source_display_name_snapshot, status
+         FROM public.driver_settlements WHERE id = $1`,
+      [settlementId],
+    );
+    expect(kept.rows.length).toBe(1);
+    expect(kept.rows[0].carrier_recruiter_profile_id).toBe(recruiterId);
+    expect(kept.rows[0].carrier_driver_relationship_id).toBe(relationshipId);
+    expect(kept.rows[0].source_display_name_snapshot).toBe('Deleted Carrier Co');
+    expect(kept.rows[0].status).toBe('finalized');
+  });
+
+  it('preserves agency provenance after the live agency profile is deleted', async () => {
+    const ap = await db.query<{ id: string }>(
+      `INSERT INTO public.agency_profiles (owner_user_id) VALUES ($1) RETURNING id`,
+      [ids.otherDriver],
+    );
+    const agencyId = ap.rows[0].id;
+    const settlementId = await insertSettlement({
+      source: 'agency_prepared',
+      status: 'finalized',
+      agency_id: agencyId,
+      source_display_name_snapshot: 'Deleted Agency LLC',
+    });
+
+    expect(
+      await failure(`DELETE FROM public.agency_profiles WHERE id = $1`, [agencyId]),
+    ).toBeNull();
+
+    const kept = await db.query<{
+      agency_id: string;
+      source_display_name_snapshot: string;
+      status: string;
+    }>(
+      `SELECT agency_id, source_display_name_snapshot, status
+         FROM public.driver_settlements WHERE id = $1`,
+      [settlementId],
+    );
+    expect(kept.rows.length).toBe(1);
+    expect(kept.rows[0].agency_id).toBe(agencyId);
+    expect(kept.rows[0].source_display_name_snapshot).toBe('Deleted Agency LLC');
+    expect(kept.rows[0].status).toBe('finalized');
+  });
+
+  it('deletes an entire revision chain with children when the driver account is deleted', async () => {
+    const u = await db.query<{ id: string }>(
+      `INSERT INTO auth.users DEFAULT VALUES RETURNING id`,
+    );
+    const driverId = u.rows[0].id;
+
+    const v1 = await db.query<{ id: string }>(
+      `INSERT INTO public.driver_settlements
+         (driver_user_id, source, status, period_start, period_end, created_by_user_id)
+       VALUES ($1, 'driver_imported', 'superseded', '2026-07-01', '2026-07-07', $1)
+       RETURNING id`,
+      [driverId],
+    );
+    const v2 = await db.query<{ id: string }>(
+      `INSERT INTO public.driver_settlements
+         (driver_user_id, source, status, period_start, period_end,
+          version_number, supersedes_settlement_id, created_by_user_id)
+       VALUES ($1, 'driver_imported', 'finalized', '2026-07-01', '2026-07-07',
+               2, $2, $1)
+       RETURNING id`,
+      [driverId, v1.rows[0].id],
+    );
+    for (const s of [v1.rows[0].id, v2.rows[0].id]) {
+      await db.query(
+        `INSERT INTO public.driver_settlement_items
+           (settlement_id, item_type, amount, created_by_user_id)
+         VALUES ($1, 'load_pay', 250, $2)`,
+        [s, driverId],
+      );
+      await db.query(
+        `INSERT INTO public.driver_settlement_events (settlement_id, event_type)
+         VALUES ($1, 'created')`,
+        [s],
+      );
+    }
+
+    expect(
+      await failure(`DELETE FROM auth.users WHERE id = $1`, [driverId]),
+    ).toBeNull();
+
+    const settlements = await db.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM public.driver_settlements WHERE driver_user_id = $1`,
+      [driverId],
+    );
+    expect(settlements.rows[0].count).toBe('0');
+    for (const [table, col] of [
+      ['driver_settlement_items', 'settlement_id'],
+      ['driver_settlement_events', 'settlement_id'],
+    ] as const) {
+      const c = await db.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM public.${table}
+          WHERE ${col} = ANY($1::uuid[])`,
+        [[v1.rows[0].id, v2.rows[0].id]],
+      );
+      expect(c.rows[0].count, table).toBe('0');
+    }
   });
 });
