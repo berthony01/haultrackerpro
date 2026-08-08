@@ -53,6 +53,7 @@ const ERR = {
   notFound: 'settlement_relationship_not_found',
   notAuthorized: 'settlement_relationship_not_authorized',
   invalidState: 'settlement_relationship_invalid_state',
+  concurrentWrite: 'settlement_relationship_concurrent_write_failed',
 } as const;
 
 const BOOTSTRAP = `
