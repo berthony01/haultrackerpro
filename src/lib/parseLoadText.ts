@@ -156,6 +156,58 @@ function tryParseDate(raw: string): string | undefined {
   return undefined;
 }
 
+/* ---------------------------------------------------------------------------
+ * Phase 1S-B1: conservative explicit pickup / delivery date labels.
+ * Only labels that unambiguously mean "a date" are accepted. Bare `Pickup:` /
+ * `Delivery:` are intentionally NOT accepted because brokers use them for
+ * locations too.
+ * ------------------------------------------------------------------------- */
+const PICKUP_DATE_LABEL_RE =
+  /\b(?:pick\s*up|pickup|pu)\s*(?:date|appt|appointment)\s*[:=]\s*(.+)/i;
+const DELIVERY_DATE_LABEL_RE =
+  /\b(?:delivery|deliver|del|drop\s*off|dropoff|drop)\s*(?:date|appt|appointment)\s*[:=]\s*(.+)/i;
+
+/** First line matching `re` → parsed ISO date, else undefined. */
+function extractLabeledDate(lines: string[], re: RegExp): string | undefined {
+  for (const line of lines) {
+    const m = line.match(re);
+    if (!m) continue;
+    const d = tryParseDate(m[1]);
+    if (d) return d;
+  }
+  return undefined;
+}
+
+/* ---------------------------------------------------------------------------
+ * Phase 1S-B1: conservative accessorial fee extraction.
+ * Only clearly monetary, explicitly labeled TOTALS are accepted. Per-hour
+ * rates and durations must never auto-fill a total fee.
+ * ------------------------------------------------------------------------- */
+const PER_UNIT_SUFFIX_RE = /^\s*(?:\/|per\b|an?\b)\s*(?:hr|hour|hrs|hours|min|minute|minutes|day|days|stop|stops)\b/i;
+const AMOUNT_SRC = '([\\d,]+(?:\\.\\d{1,2})?)';
+
+function extractFee(t: string, labelSrc: string): string | undefined {
+  // 1) Explicit fee/pay/charge wording — `$` optional.
+  // 2) Bare label — an explicit currency marker is required.
+  const patterns = [
+    new RegExp(`\\b(?:${labelSrc})\\s*(?:time\\s*)?(?:fee|pay|charge)\\s*[:=]?\\s*\\$?\\s*${AMOUNT_SRC}`, 'i'),
+    new RegExp(`\\b(?:${labelSrc})\\s*[:=]?\\s*\\$\\s*${AMOUNT_SRC}`, 'i'),
+  ];
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (!m || m.index === undefined) continue;
+    // Reject per-unit rates: "$25/hr", "$30 per hour", "$25 an hour".
+    const after = t.slice(m.index + m[0].length, m.index + m[0].length + 16);
+    if (PER_UNIT_SUFFIX_RE.test(after)) continue;
+    const v = cleanNum(m[1]);
+    const num = parseFloat(v);
+    if (Number.isFinite(num) && num > 0) return v;
+  }
+  return undefined;
+}
+
+
+
 /**
  * Pattern-first mileage extraction.
  *
