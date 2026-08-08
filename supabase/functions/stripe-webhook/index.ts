@@ -470,15 +470,19 @@ async function applyEntitlement(
     // from metadata, and it is NEVER derived from any email. Fetch existing to
     // preserve, and fall back to recruiter_profiles.id -> user_id for the
     // initial binding. Fail closed when no owner can be resolved.
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from("recruiter_billing_profiles")
       .select("user_id")
       .eq("recruiter_id", entityKey)
       .maybeSingle();
+    // "Absent canonical row" and "canonical row could not be read" are distinct
+    // states: fail closed on read errors before any fallback lookup or upsert.
+    if (existingError) throw new Error("recruiter billing owner read failed");
     let ownerUserId: string | null =
       typeof existing?.user_id === "string" && existing.user_id.length > 0
         ? existing.user_id
         : null;
+
     if (!ownerUserId) {
       // Initial binding: recruiter ownership was validated by gateway; safe to derive from recruiter_profiles.
       const { data: rp, error: rpError } = await supabase
