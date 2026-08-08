@@ -363,11 +363,14 @@ AS $$
           )
           AND (
             EXISTS (
+              -- DIRECT assistant context only; agency-generated rows must use
+              -- the agency_delegation_requests branch below.
               SELECT 1
               FROM public.driver_assistants da
               WHERE da.driver_user_id = ds.driver_user_id
                 AND da.assistant_user_id = auth.uid()
                 AND da.status = 'active'
+                AND da.agency_delegation_id IS NULL
                 AND jsonb_typeof(da.permissions -> 'settlements_view') = 'boolean'
                 AND (da.permissions -> 'settlements_view') = to_jsonb(true)
             )
