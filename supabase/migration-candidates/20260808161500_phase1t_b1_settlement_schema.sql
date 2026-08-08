@@ -127,13 +127,13 @@ CREATE TABLE public.driver_settlements (
         AND carrier_driver_relationship_id IS NOT NULL
         AND agency_id IS NULL
         AND source_display_name_snapshot IS NOT NULL
-        AND length(btrim(source_display_name_snapshot)) > 0)
+        AND length(btrim(source_display_name_snapshot, E' \t\r\n')) > 0)
       OR (source = 'agency_prepared'
         AND agency_id IS NOT NULL
         AND carrier_recruiter_profile_id IS NULL
         AND carrier_driver_relationship_id IS NULL
         AND source_display_name_snapshot IS NOT NULL
-        AND length(btrim(source_display_name_snapshot)) > 0)
+        AND length(btrim(source_display_name_snapshot, E' \t\r\n')) > 0)
       OR (source = 'driver_imported'
         AND carrier_recruiter_profile_id IS NULL
         AND carrier_driver_relationship_id IS NULL
