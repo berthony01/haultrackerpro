@@ -320,7 +320,7 @@ export function AdminRecruitersPanel() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search recruiters, emails, companies, DOT, MC..."
+            placeholder="Search recruiters, contact emails, companies, DOT, MC..."
             className="pl-8"
           />
         </div>
