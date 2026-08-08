@@ -49,9 +49,14 @@ export interface ParsedLoadData {
   flat_rate?: string;
   gross_revenue?: string;
   load_date?: string;
-  /** Phase 6C.6: drop-off / delivery date extracted from source (OCR/AI). Regex parser does not currently extract this. */
+  /** Phase 6C.6: drop-off / delivery date extracted from source (OCR/AI), or an explicit delivery-labeled date line. */
   dropoff_date?: string;
+  /** Phase 1S-B1: explicitly labeled waiting-time total fee (e.g. "Wait pay $50"). Never a per-hour rate. */
+  wait_fee?: string;
+  /** Phase 1S-B1: explicitly labeled detention total fee (e.g. "Detention fee: $75"). Never a per-hour rate. */
+  detention_fee?: string;
   notes?: string;
+
   trip_id?: string;
   multiStopDetected?: boolean;
   detectedStopsCount?: number;
@@ -150,6 +155,58 @@ function tryParseDate(raw: string): string | undefined {
   }
   return undefined;
 }
+
+/* ---------------------------------------------------------------------------
+ * Phase 1S-B1: conservative explicit pickup / delivery date labels.
+ * Only labels that unambiguously mean "a date" are accepted. Bare `Pickup:` /
+ * `Delivery:` are intentionally NOT accepted because brokers use them for
+ * locations too.
+ * ------------------------------------------------------------------------- */
+const PICKUP_DATE_LABEL_RE =
+  /\b(?:pick\s*up|pickup|pu)\s*(?:date|appt|appointment)\s*[:=]\s*(.+)/i;
+const DELIVERY_DATE_LABEL_RE =
+  /\b(?:delivery|deliver|del|drop\s*off|dropoff|drop)\s*(?:date|appt|appointment)\s*[:=]\s*(.+)/i;
+
+/** First line matching `re` → parsed ISO date, else undefined. */
+function extractLabeledDate(lines: string[], re: RegExp): string | undefined {
+  for (const line of lines) {
+    const m = line.match(re);
+    if (!m) continue;
+    const d = tryParseDate(m[1]);
+    if (d) return d;
+  }
+  return undefined;
+}
+
+/* ---------------------------------------------------------------------------
+ * Phase 1S-B1: conservative accessorial fee extraction.
+ * Only clearly monetary, explicitly labeled TOTALS are accepted. Per-hour
+ * rates and durations must never auto-fill a total fee.
+ * ------------------------------------------------------------------------- */
+const PER_UNIT_SUFFIX_RE = /^\s*(?:\/|per\b|an?\b)\s*(?:hr|hour|hrs|hours|min|minute|minutes|day|days|stop|stops)\b/i;
+const AMOUNT_SRC = '([\\d,]+(?:\\.\\d{1,2})?)';
+
+function extractFee(t: string, labelSrc: string): string | undefined {
+  // 1) Explicit fee/pay/charge wording — `$` optional.
+  // 2) Bare label — an explicit currency marker is required.
+  const patterns = [
+    new RegExp(`\\b(?:${labelSrc})\\s*(?:time\\s*)?(?:fee|pay|charge)\\s*[:=]?\\s*\\$?\\s*${AMOUNT_SRC}`, 'i'),
+    new RegExp(`\\b(?:${labelSrc})\\s*[:=]?\\s*\\$\\s*${AMOUNT_SRC}`, 'i'),
+  ];
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (!m || m.index === undefined) continue;
+    // Reject per-unit rates: "$25/hr", "$30 per hour", "$25 an hour".
+    const after = t.slice(m.index + m[0].length, m.index + m[0].length + 16);
+    if (PER_UNIT_SUFFIX_RE.test(after)) continue;
+    const v = cleanNum(m[1]);
+    const num = parseFloat(v);
+    if (Number.isFinite(num) && num > 0) return v;
+  }
+  return undefined;
+}
+
+
 
 /**
  * Pattern-first mileage extraction.
@@ -520,9 +577,28 @@ export function parseLoadText(text: string): ParsedLoadData {
     result.pay_model_suggestion = 'manual';
   }
 
+  // --- Accessorial fees (Phase 1S-B1) ---
+  const waitFee = extractFee(t, 'wait|waiting');
+  if (waitFee) result.wait_fee = waitFee;
+  const detentionFee = extractFee(t, 'detention');
+  if (detentionFee) result.detention_fee = detentionFee;
+
   // --- Date ---
-  const dateStr = tryParseDate(t);
-  if (dateStr) result.load_date = dateStr;
+  // Phase 1S-B1: explicit labeled pickup/delivery dates take authority.
+  const dateLines = t.split('\n');
+  const explicitPickupDate = extractLabeledDate(dateLines, PICKUP_DATE_LABEL_RE);
+  const explicitDeliveryDate = extractLabeledDate(dateLines, DELIVERY_DATE_LABEL_RE);
+  if (explicitPickupDate) {
+    result.load_date = explicitPickupDate;
+  } else {
+    // Generic fallback preserved — but a delivery-labeled date line must never
+    // become the pickup date merely because it is the first/only date present.
+    const genericSource = dateLines.filter(l => !DELIVERY_DATE_LABEL_RE.test(l)).join('\n');
+    const dateStr = tryParseDate(genericSource);
+    if (dateStr) result.load_date = dateStr;
+  }
+  if (explicitDeliveryDate) result.dropoff_date = explicitDeliveryDate;
+
 
   // --- Numbered Stop Detection (e.g. "1#:", "2#:", "3#:") ---
   const stopMarkers = t.match(/\b\d+#:\s*/g);

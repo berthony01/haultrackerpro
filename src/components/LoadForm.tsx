@@ -52,6 +52,8 @@ import { ScanLoadModal } from '@/components/ScanLoadModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ParsedLoadData } from '@/lib/parseLoadText';
 import { resolveImportedLoadDate, resolveImportedDropoffDate } from '@/lib/sourceDate';
+import { mergePasteIntoForm, createPasteSession, type PasteSession } from '@/lib/loadPasteMerge';
+
 import { useProfitCheck } from '@/hooks/useProfitCheck';
 import { ProfitCheckCard } from '@/components/ProfitCheckCard';
 
@@ -200,6 +202,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   const [showTodayConfirm, setShowTodayConfirm] = useState(false);
   const [acknowledgedTodayDate, setAcknowledgedTodayDate] = useState(false);
   const initialTodayRef = useRef<string>(localTodayYMD());
+
+  // Phase 1S-B1: paste session provenance — which paste-managed values the last
+  // paste imported, plus the parser-added Trip ID note.
+  const pasteSessionRef = useRef<PasteSession>(createPasteSession());
+
 
   // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
   // user changes anything that could move the load into or out of the risky
@@ -597,23 +604,63 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 // Atomic apply: always reset mileage fields on a new paste so a
                 // stale "loaded_miles" from a previous paste can't leak into the
                 // new load if this paste only contains deadhead (and vice versa).
-                setForm(prev => ({
-                  ...prev,
-                  pickup_location: norm.pickup_location ?? data.pickup_location ?? prev.pickup_location,
-                  dropoff_location: norm.dropoff_location ?? data.dropoff_location ?? prev.dropoff_location,
-                  loaded_miles: data.loaded_miles ?? '',
-                  deadhead_miles: data.deadhead_miles ?? '',
-                  rate_per_mile: data.rate_per_mile ?? prev.rate_per_mile,
-                  gross_revenue: data.gross_revenue ?? prev.gross_revenue,
-                  load_date: loadRes.value,
-                  dropoff_date: dropRes.value,
-                  // Phase 6C.4: reset total_miles like loaded/deadhead so a
-                  // stale total from a previous paste can't leak into the new load.
-                  total_miles: data.total_miles ?? '',
-                  flat_rate_amount: data.flat_rate ?? prev.flat_rate_amount,
-                  dh_rate_per_mile: data.deadhead_rate_per_mile ?? prev.dh_rate_per_mile,
-                  pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : prev.pay_model,
-                }));
+                setForm(prev => {
+                  // Phase 1S-B1: paste-managed fields go through the pure merge
+                  // helper so stale imported values from a previous paste are
+                  // removed while manual edits survive.
+                  const merged = mergePasteIntoForm({
+                    session: pasteSessionRef.current,
+                    current: {
+                      pickup_location: prev.pickup_location,
+                      dropoff_location: prev.dropoff_location,
+                      rate_per_mile: prev.rate_per_mile,
+                      gross_revenue: prev.gross_revenue,
+                      flat_rate_amount: prev.flat_rate_amount,
+                      dh_rate_per_mile: prev.dh_rate_per_mile,
+                      wait_fee: prev.wait_fee,
+                      detention_fee: prev.detention_fee,
+                      pay_model: prev.pay_model,
+                    },
+                    notes: prev.notes,
+                    incoming: {
+                      pickup_location: norm.pickup_location ?? data.pickup_location,
+                      dropoff_location: norm.dropoff_location ?? data.dropoff_location,
+                      rate_per_mile: data.rate_per_mile,
+                      gross_revenue: data.gross_revenue,
+                      flat_rate_amount: data.flat_rate,
+                      dh_rate_per_mile: data.deadhead_rate_per_mile,
+                      wait_fee: data.wait_fee,
+                      detention_fee: data.detention_fee,
+                      pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : undefined,
+                    },
+                    fallbacks: {
+                      pickup_location: '',
+                      dropoff_location: '',
+                      rate_per_mile: settings?.default_rate_per_mile?.toString() ?? '',
+                      gross_revenue: '',
+                      flat_rate_amount: '',
+                      dh_rate_per_mile: '',
+                      wait_fee: '0',
+                      detention_fee: '0',
+                      pay_model: resolvePayModel(null, (settings as any)?.default_pay_model),
+                    },
+                    tripId: data.trip_id,
+                  });
+                  pasteSessionRef.current = merged.session;
+                  return {
+                    ...prev,
+                    ...merged.values,
+                    pay_model: merged.values.pay_model as PayModel,
+                    notes: merged.notes,
+                    loaded_miles: data.loaded_miles ?? '',
+                    deadhead_miles: data.deadhead_miles ?? '',
+                    load_date: loadRes.value,
+                    dropoff_date: dropRes.value,
+                    // Phase 6C.4: reset total_miles like loaded/deadhead so a
+                    // stale total from a previous paste can't leak into the new load.
+                    total_miles: data.total_miles ?? '',
+                  };
+                });
                 // Phase 6: surface a confirmation summary so the user can verify
                 // detected miles + DH + trip ID before saving. DH defaults to "Unpaid".
                 setParserDetected({
@@ -621,12 +668,6 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   deadhead_miles: data.deadhead_miles,
                   trip_id: data.trip_id,
                 });
-                if (data.trip_id) {
-                  // Append trip ID into notes (only once) so it persists with the load.
-                  setForm(prev => prev.notes.includes(data.trip_id!)
-                    ? prev
-                    : { ...prev, notes: prev.notes ? `${prev.notes}\nTrip ID: ${data.trip_id}` : `Trip ID: ${data.trip_id}` });
-                }
                 // Phase 29B: interior stops only go into stops state.
                 // When no interior stops exist (single-stop or [Pickup,Drop]),
                 // clear stale stop state from any previous multi-stop parse.
@@ -646,6 +687,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   setMultiStopBanner(null);
                 }
               }}
+
             />
           )}
 

@@ -471,3 +471,89 @@ Atlanta, GA 30301`;
   });
 });
 
+
+describe('parseLoadText — Phase 1S-B1 explicit pickup/delivery dates', () => {
+  it('Pickup Date + Delivery Date map to load_date / dropoff_date separately', () => {
+    const r = parseLoadText('Pickup Date: 05/29/2026\nDelivery Date: 05/31/2026');
+    expect(r.load_date).toBe('2026-05-29');
+    expect(r.dropoff_date).toBe('2026-05-31');
+  });
+
+  it('PU Date + DEL Date variants map separately', () => {
+    const r = parseLoadText('PU Date: 2026-06-01\nDEL Date: 2026-06-03');
+    expect(r.load_date).toBe('2026-06-01');
+    expect(r.dropoff_date).toBe('2026-06-03');
+  });
+
+  it('appointment wording maps separately', () => {
+    const r = parseLoadText('Pickup Appointment: 06/10/2026\nDelivery Appt: 06/12/2026');
+    expect(r.load_date).toBe('2026-06-10');
+    expect(r.dropoff_date).toBe('2026-06-12');
+  });
+
+  it('Drop Off Date populates dropoff_date', () => {
+    const r = parseLoadText('Drop Off Date: 07/04/2026');
+    expect(r.dropoff_date).toBe('2026-07-04');
+  });
+
+  it('delivery-only labeled date does NOT populate load_date', () => {
+    const r = parseLoadText('Delivery Date: 05/31/2026');
+    expect(r.dropoff_date).toBe('2026-05-31');
+    expect(r.load_date).toBeUndefined();
+  });
+
+  it('existing unlabeled/general date fallback still works', () => {
+    const r = parseLoadText('Dallas TX to Atlanta GA on 05/29/2026, 780 mi');
+    expect(r.load_date).toBe('2026-05-29');
+  });
+
+  it('bare Pickup:/Delivery: location labels are not treated as dates', () => {
+    const r = parseLoadText('Pickup: Dallas, TX\nDelivery: Atlanta, GA');
+    expect(r.load_date).toBeUndefined();
+    expect(r.dropoff_date).toBeUndefined();
+  });
+});
+
+describe('parseLoadText — Phase 1S-B1 accessorial fees', () => {
+  it('Detention fee: $75 extracts 75', () => {
+    expect(parseLoadText('Detention fee: $75').detention_fee).toBe('75');
+  });
+
+  it('Detention pay $75 extracts 75', () => {
+    expect(parseLoadText('Detention pay $75').detention_fee).toBe('75');
+  });
+
+  it('Waiting fee: $50 extracts 50', () => {
+    expect(parseLoadText('Waiting fee: $50').wait_fee).toBe('50');
+  });
+
+  it('Wait pay $50 extracts 50', () => {
+    expect(parseLoadText('Wait pay $50').wait_fee).toBe('50');
+  });
+
+  it('Detention fee: 75 (no $) is accepted', () => {
+    expect(parseLoadText('Detention fee: 75').detention_fee).toBe('75');
+  });
+
+  it('bare Detention: $75 with currency marker is accepted', () => {
+    expect(parseLoadText('Detention: $75').detention_fee).toBe('75');
+  });
+
+  it('Detention $25/hr after 2 hrs does NOT extract a detention total', () => {
+    expect(parseLoadText('Detention $25/hr after 2 hrs').detention_fee).toBeUndefined();
+  });
+
+  it('Wait pay $30 per hour does NOT extract a wait total', () => {
+    expect(parseLoadText('Wait pay $30 per hour').wait_fee).toBeUndefined();
+  });
+
+  it('120 detention minutes does NOT extract a detention total', () => {
+    expect(parseLoadText('120 detention minutes').detention_fee).toBeUndefined();
+  });
+
+  it('Late PU: $1000 does not create either fee', () => {
+    const r = parseLoadText('❌Late PU: $1000\n❌Late DEL: $700');
+    expect(r.detention_fee).toBeUndefined();
+    expect(r.wait_fee).toBeUndefined();
+  });
+});
