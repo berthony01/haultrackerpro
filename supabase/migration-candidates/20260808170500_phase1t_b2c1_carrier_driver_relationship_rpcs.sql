@@ -81,6 +81,10 @@ BEGIN
   FOR UPDATE;
 
   IF NOT FOUND THEN
+    -- Atomic insert-if-absent on the canonical unique pair. A concurrent
+    -- authorized invite for the same pair can no longer surface a raw
+    -- unique_violation: the loser gets no row back and re-reads the winner's
+    -- row, then falls through to the SAME canonical status handling below.
     INSERT INTO public.carrier_driver_relationships (
       recruiter_id,
       driver_user_id,
@@ -101,10 +105,24 @@ BEGIN
       NULL,
       now()
     )
+    ON CONFLICT (recruiter_id, driver_user_id) DO NOTHING
     RETURNING * INTO v_row;
 
-    RETURN v_row;
+    IF FOUND THEN
+      RETURN v_row;
+    END IF;
+
+    SELECT r.* INTO v_row
+    FROM public.carrier_driver_relationships r
+    WHERE r.recruiter_id = _recruiter_id
+      AND r.driver_user_id = _driver_user_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'settlement_relationship_concurrent_write_failed';
+    END IF;
   END IF;
+
 
   IF v_row.status = 'invited' OR v_row.status = 'active' THEN
     -- Idempotent: no duplicate row, no acceptance reset, no activation.
