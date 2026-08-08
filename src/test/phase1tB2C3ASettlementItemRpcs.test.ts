@@ -1541,8 +1541,14 @@ describe('Phase 1T-B2C3A — persistence, immutability and events', () => {
     expect(src.rows).toHaveLength(1);
     expect(src.rows[0].n).not.toMatch(/settlement/i);
     expect(src.rows[0].n.replace(/\s+/g, ' ')).toBe(
-      'uuid, text, text, text, numeric, text, numeric, numeric, text, text, ' +
-        'date, date, text, text, numeric, numeric, numeric, numeric, integer',
+      '_item_id uuid, _item_type text, _category text, _description text, ' +
+        '_amount numeric, _pay_method text, _quantity numeric, _rate numeric, ' +
+        '_unit_label text, _load_reference_snapshot text, ' +
+        '_pickup_date_snapshot date, _delivery_date_snapshot date, ' +
+        '_origin_snapshot text, _destination_snapshot text, ' +
+        '_loaded_miles_snapshot numeric, _deadhead_miles_snapshot numeric, ' +
+        '_payable_miles_snapshot numeric, _eligible_revenue_snapshot numeric, ' +
+        '_sort_order integer',
     );
     expect(CODE).not.toMatch(/SET[\s\S]{0,400}?settlement_id\s*=/);
   });
