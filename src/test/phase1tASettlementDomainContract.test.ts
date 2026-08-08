@@ -392,6 +392,91 @@ describe('Phase 1T-A — agency capabilities', () => {
         .canFinalizeManagedSettlement,
     ).toBe(true);
   });
+
+  it('R1-D. forged/unknown agency plan values fail closed', () => {
+    for (const forged of [
+      'agency_enterprise',
+      '   ',
+      '',
+      'Agency_Starter',
+      ' agency_starter ',
+    ]) {
+      const caps = agency(
+        ['settlements_manage', 'settlements_finalize'],
+        true,
+        forged as unknown as 'agency_starter',
+      );
+      expect(caps.canPrepareAgencySettlement).toBe(false);
+      expect(caps.canFinalizeManagedSettlement).toBe(false);
+    }
+  });
+
+  it('R1-E. agency_starter / agency_team / agency_growth still grant preparation', () => {
+    for (const plan of ['agency_starter', 'agency_team', 'agency_growth']) {
+      expect(
+        agency(
+          ['settlements_manage'],
+          true,
+          plan as unknown as 'agency_starter',
+        ).canPrepareAgencySettlement,
+      ).toBe(true);
+    }
+  });
+});
+
+describe('Phase 1T-A-R1 — explicit null identity semantics', () => {
+  it('R1-A. carrier_issued rejects agencyId === undefined', () => {
+    const result = validateSettlementIdentity(
+      identity({
+        source: 'carrier_issued',
+        carrierRecruiterProfileId: 'recruiter-profile-1',
+        agencyId: undefined as unknown as null,
+      }),
+    );
+    expect(result).toEqual({
+      valid: false,
+      reason: 'carrier_issued_forbids_agency_id',
+    });
+  });
+
+  it('R1-B. agency_prepared rejects carrierRecruiterProfileId === undefined', () => {
+    const result = validateSettlementIdentity(
+      identity({
+        source: 'agency_prepared',
+        agencyId: 'agency-1',
+        carrierRecruiterProfileId: undefined as unknown as null,
+      }),
+    );
+    expect(result).toEqual({
+      valid: false,
+      reason: 'agency_prepared_forbids_carrier_recruiter_profile_id',
+    });
+  });
+
+  it('R1-C. driver_imported rejects undefined for either business id', () => {
+    expect(
+      validateSettlementIdentity(
+        identity({
+          source: 'driver_imported',
+          carrierRecruiterProfileId: undefined as unknown as null,
+        }),
+      ),
+    ).toEqual({
+      valid: false,
+      reason: 'driver_imported_forbids_business_identity',
+    });
+    expect(
+      validateSettlementIdentity(
+        identity({
+          source: 'driver_imported',
+          agencyId: undefined as unknown as null,
+        }),
+      ),
+    ).toEqual({
+      valid: false,
+      reason: 'driver_imported_forbids_business_identity',
+    });
+  });
 });
 
 describe('Phase 1T-A — purity and source contract', () => {
