@@ -962,7 +962,8 @@ describe('Phase 1T-B2C1 — source contract', () => {
     expect(
       B2C1_CODE.match(/RETURNS public\.carrier_driver_relationships/g)?.length,
     ).toBe(4);
-    expect(B2C1_CODE.match(/FOR UPDATE/g)?.length).toBe(4);
+    // Four canonical transition locks + the invite conflict-loser re-read.
+    expect(B2C1_CODE.match(/FOR UPDATE/g)?.length).toBe(5);
   });
 
   it('no prohibited statements or bypass branches (proof 30b)', () => {
