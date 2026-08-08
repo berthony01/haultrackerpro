@@ -292,7 +292,14 @@ CREATE TABLE public.driver_settlement_matches (
   CONSTRAINT driver_settlement_matches_state_check
     CHECK (match_state IN ('exact', 'likely', 'possible', 'confirmed', 'rejected')),
   CONSTRAINT driver_settlement_matches_confidence_check
-    CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+    CHECK (
+      confidence IS NULL
+      OR (
+        confidence::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND confidence >= 0
+        AND confidence <= 1
+      )
+    ),
   CONSTRAINT driver_settlement_matches_unique_pair
     UNIQUE (settlement_item_id, driver_load_id)
 );
