@@ -1527,9 +1527,12 @@ describe('Phase 1T-B2C2A — draft header update', () => {
     const created = await asRole('authenticated', U.driverPro, () =>
       createDriverImported(U.driverPro),
     );
+    // Harness-only: force a malformed runtime source the CHECKs normally prevent.
     await db.exec(
       `ALTER TABLE public.driver_settlements
-         DROP CONSTRAINT driver_settlements_source_check;`,
+         DROP CONSTRAINT driver_settlements_source_check;
+       ALTER TABLE public.driver_settlements
+         DROP CONSTRAINT driver_settlements_source_identity_check;`,
     );
     await db.query(`UPDATE public.driver_settlements SET source='bogus' WHERE id=$1`, [
       created.id,
@@ -1546,8 +1549,29 @@ describe('Phase 1T-B2C2A — draft header update', () => {
     await db.exec(
       `ALTER TABLE public.driver_settlements
          ADD CONSTRAINT driver_settlements_source_check
-         CHECK (source IN ('carrier_issued', 'agency_prepared', 'driver_imported'));`,
+         CHECK (source IN ('carrier_issued', 'agency_prepared', 'driver_imported'));
+       ALTER TABLE public.driver_settlements
+         ADD CONSTRAINT driver_settlements_source_identity_check
+         CHECK (
+           (source = 'carrier_issued'
+             AND carrier_recruiter_profile_id IS NOT NULL
+             AND carrier_driver_relationship_id IS NOT NULL
+             AND agency_id IS NULL
+             AND source_display_name_snapshot IS NOT NULL
+             AND length(btrim(source_display_name_snapshot, E' \\t\\r\\n')) > 0)
+           OR (source = 'agency_prepared'
+             AND agency_id IS NOT NULL
+             AND carrier_recruiter_profile_id IS NULL
+             AND carrier_driver_relationship_id IS NULL
+             AND source_display_name_snapshot IS NOT NULL
+             AND length(btrim(source_display_name_snapshot, E' \\t\\r\\n')) > 0)
+           OR (source = 'driver_imported'
+             AND carrier_recruiter_profile_id IS NULL
+             AND carrier_driver_relationship_id IS NULL
+             AND agency_id IS NULL)
+         );`,
     );
+
   });
 
   it('strangers, other carriers, other agencies and unprivileged assistants cannot create or update (proof 30)', async () => {
