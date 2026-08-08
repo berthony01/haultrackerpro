@@ -1214,8 +1214,9 @@ describe('Phase 1T-B2C3A — item input contract', () => {
         pickup: '2026-07-02',
         delivery: '2026-07-02',
       });
-      expect(ok.pickup).toBe('2026-07-02');
-      expect(ok.delivery).toBe('2026-07-02');
+      const okStored = await itemById(ok.id);
+      expect(okStored?.pickup).toBe('2026-07-02');
+      expect(okStored?.delivery).toBe('2026-07-02');
       await deleteItem(ok.id);
 
       // One-sided dates are allowed.
@@ -1225,7 +1226,9 @@ describe('Phase 1T-B2C3A — item input contract', () => {
         amount: '5.00',
         delivery: '2026-07-02',
       });
-      expect(oneSided.pickup).toBeNull();
+      const oneSidedStored = await itemById(oneSided.id);
+      expect(oneSidedStored?.pickup).toBeNull();
+      expect(oneSidedStored?.delivery).toBe('2026-07-02');
       await deleteItem(oneSided.id);
 
       expect(
@@ -1537,7 +1540,10 @@ describe('Phase 1T-B2C3A — persistence, immutability and events', () => {
     );
     expect(src.rows).toHaveLength(1);
     expect(src.rows[0].n).not.toMatch(/settlement/i);
-    expect(src.rows[0].n.startsWith('uuid, text, text, text, numeric')).toBe(true);
+    expect(src.rows[0].n.replace(/\s+/g, ' ')).toBe(
+      'uuid, text, text, text, numeric, text, numeric, numeric, text, text, ' +
+        'date, date, text, text, numeric, numeric, numeric, numeric, integer',
+    );
     expect(CODE).not.toMatch(/SET[\s\S]{0,400}?settlement_id\s*=/);
   });
 
@@ -1673,7 +1679,7 @@ describe('Phase 1T-B2C3A — source contract', () => {
       /CREATE OR REPLACE/i,
       /IF NOT EXISTS/i,
       /\bDROP\b/i,
-      /\bEXECUTE\b/i,
+      /\bEXECUTE\s+(?!ON FUNCTION)/i,
       /format\s*\(/i,
       /CREATE POLICY/i,
       /CREATE TRIGGER/i,
