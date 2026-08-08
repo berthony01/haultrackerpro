@@ -114,12 +114,16 @@ export function mergePasteIntoForm(input: PasteMergeInput): PasteMergeResult {
   if (session.tripId) {
     notes = removeParserTripIdLine(notes, session.tripId);
   }
+  // Ownership means ONLY: this helper appended the exact line during THIS paste.
+  // A pre-existing user-authored identical line is never claimed, so a later
+  // paste can never remove it.
   let tripId: string | null = null;
   if (hasValue(input.tripId)) {
-    tripId = String(input.tripId);
-    const line = tripIdNoteLine(tripId);
+    const id = String(input.tripId);
+    const line = tripIdNoteLine(id);
     if (!notes.split('\n').includes(line)) {
       notes = notes ? `${notes}\n${line}` : line;
+      tripId = id;
     }
   }
 
