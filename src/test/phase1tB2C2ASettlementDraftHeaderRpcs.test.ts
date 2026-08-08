@@ -1766,3 +1766,161 @@ describe('Phase 1T-B2C2A — source contract', () => {
     ).toBe(4);
   });
 });
+
+// =====================================================================
+// Phase 1T-B2C3A-R1 — finite reported-amount contract in the header RPCs
+// =====================================================================
+describe('Phase 1T-B2C3A-R1 — header RPCs reject non-finite reported amounts', () => {
+  const SPECIALS = ['NaN', 'Infinity', '-Infinity'] as const;
+
+  it('every create path rejects special gross and net with the fixed amount error and writes nothing', async () => {
+    const beforeSettlements = await settlementCount();
+    const beforeEvents = await eventCount();
+
+    for (const v of SPECIALS) {
+      await asRole('authenticated', U.driverPro, async () => {
+        expect(
+          await failureMessage(() =>
+            createDriverImported(U.driverPro, P1, P2, null, null, null, v, null),
+          ),
+          `driver gross ${v}`,
+        ).toContain(ERR.amount);
+        expect(
+          await failureMessage(() =>
+            createDriverImported(U.driverPro, P1, P2, null, null, null, null, v),
+          ),
+          `driver net ${v}`,
+        ).toContain(ERR.amount);
+      });
+
+      await asRole('authenticated', U.paidCarrier, async () => {
+        expect(
+          await failureMessage(() =>
+            createCarrier(R.paid, RELS.active, U.carrierDriver, P1, P2, null, null, v, null),
+          ),
+          `carrier gross ${v}`,
+        ).toContain(ERR.amount);
+        expect(
+          await failureMessage(() =>
+            createCarrier(R.paid, RELS.active, U.carrierDriver, P1, P2, null, null, null, v),
+          ),
+          `carrier net ${v}`,
+        ).toContain(ERR.amount);
+      });
+
+      await asRole('authenticated', U.agencyMember, async () => {
+        expect(
+          await failureMessage(() =>
+            createAgency(A.paid, U.agencyDriver, P1, P2, null, null, null, v, null),
+          ),
+          `agency gross ${v}`,
+        ).toContain(ERR.amount);
+        expect(
+          await failureMessage(() =>
+            createAgency(A.paid, U.agencyDriver, P1, P2, null, null, null, null, v),
+          ),
+          `agency net ${v}`,
+        ).toContain(ERR.amount);
+      });
+    }
+
+    expect(await settlementCount()).toBe(beforeSettlements);
+    expect(await eventCount()).toBe(beforeEvents);
+  });
+
+  it('the generic update path rejects special gross and net and leaves the row and events untouched', async () => {
+    const created = await asRole('authenticated', U.driverPro, () =>
+      createDriverImported(U.driverPro, P1, P2, null, 'ref-finite', null, '100.00', '90.00'),
+    );
+    const before = (await settlementById(created.id))!;
+    const beforeEvents = await eventsFor(created.id);
+
+    for (const v of SPECIALS) {
+      await asRole('authenticated', U.driverPro, async () => {
+        expect(
+          await failureMessage(() =>
+            updateHeader(created.id, P1, P2, null, 'ref-finite', null, v, null),
+          ),
+          `update gross ${v}`,
+        ).toContain(ERR.amount);
+        expect(
+          await failureMessage(() =>
+            updateHeader(created.id, P1, P2, null, 'ref-finite', null, null, v),
+          ),
+          `update net ${v}`,
+        ).toContain(ERR.amount);
+      });
+    }
+
+    const after = (await settlementById(created.id))!;
+    expect(after.reported_gross_amount).toStrictEqual(before.reported_gross_amount);
+    expect(after.reported_net_amount).toStrictEqual(before.reported_net_amount);
+    expect(after.statement_reference).toBe('ref-finite');
+    expect(await eventsFor(created.id)).toHaveLength(beforeEvents.length);
+  });
+
+  it('finite signed values still persist through create and update', async () => {
+    const created = await asRole('authenticated', U.driverPro, () =>
+      createDriverImported(U.driverPro, P1, P2, null, null, null, '0', '-125.50'),
+    );
+    const row = (await settlementById(created.id))!;
+    expect(String(row.reported_gross_amount)).toBe('0.00');
+    expect(String(row.reported_net_amount)).toBe('-125.50');
+
+    await asRole('authenticated', U.driverPro, () =>
+      updateHeader(created.id, P1, P2, null, null, null, '10.25', '9.75'),
+    );
+    const updated = (await settlementById(created.id))!;
+    expect(String(updated.reported_gross_amount)).toBe('10.25');
+    expect(String(updated.reported_net_amount)).toBe('9.75');
+  });
+
+  it('special-value errors never leak constraint, SQLSTATE or numeric-overflow detail', async () => {
+    const msgs: string[] = [];
+    await asRole('authenticated', U.driverPro, async () => {
+      for (const v of SPECIALS) {
+        msgs.push(
+          await failureMessage(() =>
+            createDriverImported(U.driverPro, P1, P2, null, null, null, v, null),
+          ),
+        );
+        msgs.push(
+          await failureMessage(() =>
+            createDriverImported(U.driverPro, P1, P2, null, null, null, null, v),
+          ),
+        );
+      }
+    });
+    expect(msgs).toHaveLength(6);
+    for (const m of msgs) {
+      expect(m).toContain(ERR.amount);
+      expect(m).not.toMatch(/overflow|constraint|violates|22P02|22003|driver_settlements_/i);
+    }
+  });
+
+  it('source contract: all four RPC bodies carry explicit finite guards for both reported inputs (proof R1)', () => {
+    const bodies = CANDIDATE_SQL.split(/CREATE FUNCTION public\./).slice(1);
+    expect(bodies).toHaveLength(4);
+    for (const body of bodies) {
+      const name = body.slice(0, body.indexOf('('));
+      expect(
+        body,
+        `${name} gross finite guard`,
+      ).toMatch(
+        /_reported_gross_amount::text IN \('NaN', 'Infinity', '-Infinity'\)/,
+      );
+      expect(
+        body,
+        `${name} net finite guard`,
+      ).toMatch(
+        /_reported_net_amount::text IN \('NaN', 'Infinity', '-Infinity'\)/,
+      );
+      // existing bounds preserved
+      expect(body, `${name} gross bounds`).toMatch(/_reported_gross_amount < 0/);
+      expect(body, `${name} net bounds`).toMatch(/_reported_net_amount < -999999999999\.99/);
+    }
+    // no helper function, dynamic SQL, float coercion or isfinite() shortcut
+    expect(CANDIDATE_SQL).not.toMatch(/isfinite/i);
+    expect(CANDIDATE_SQL).not.toMatch(/::\s*(float|double precision|real)/i);
+  });
+});
