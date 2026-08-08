@@ -405,9 +405,13 @@ export function RecruiterOnboarding({ onBack }: Props) {
             <Field label="Recruiter Name *">
               <Input value={form.recruiter_name} onChange={(e) => set('recruiter_name', e.target.value)} />
             </Field>
-            <Field label="Recruiter Email *">
+            <Field label="Recruiter Contact Email *">
               <Input type="email" value={form.recruiter_email} onChange={(e) => set('recruiter_email', e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">
+                Contact email drivers and recruiting workflows may use to reach you. Your sign-in / account email is managed separately in account settings.
+              </p>
             </Field>
+
             <Field label="Recruiter Phone">
               <Input value={form.recruiter_phone} onChange={(e) => set('recruiter_phone', e.target.value)} />
             </Field>

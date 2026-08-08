@@ -123,7 +123,9 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
               <Field label="MC number" value={profile.mc_number} />
               <Field label="Company phone" value={profile.company_phone} />
               <Field label="Recruiter contact phone" value={profile.recruiter_phone} />
+              <Field label="Recruiter contact email" value={profile.recruiter_email} />
               <Field label="Account email" value={user?.email ?? '—'} />
+
               <Field label="Address" value={profile.company_address} className="sm:col-span-2" />
               <Field label="Hiring states" value={(profile.hiring_states ?? []).join(', ') || '—'} className="sm:col-span-2" />
               <Field label="Equipment types" value={(profile.equipment_types ?? []).join(', ') || '—'} className="sm:col-span-2" />

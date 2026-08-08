@@ -97,7 +97,7 @@ function safeWebsiteUrl(raw: string): string {
 }
 
 const CSV_HEADERS = [
-  'Recruiter Name', 'Recruiter Email', 'Recruiter Phone', 'Company Name',
+  'Recruiter Name', 'Recruiter Contact Email', 'Recruiter Phone', 'Company Name',
   'Company Phone', 'Company Website', 'DOT Number', 'MC Number',
   'Company Address', 'Company City', 'Company State', 'Hiring States',
   'Equipment Types', 'Driver Types Hired', 'Verification Status',
@@ -320,7 +320,7 @@ export function AdminRecruitersPanel() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search recruiters, emails, companies, DOT, MC..."
+            placeholder="Search recruiters, contact emails, companies, DOT, MC..."
             className="pl-8"
           />
         </div>
@@ -385,7 +385,7 @@ export function AdminRecruitersPanel() {
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">{r.company_name}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                      <Mini label="Email" value={r.recruiter_email ?? '—'} />
+                      <Mini label="Contact email" value={r.recruiter_email ?? '—'} />
                       <Mini label="Phone" value={r.recruiter_phone ?? '—'} />
                       <Mini label="DOT" value={r.dot_number ?? '—'} />
                       <Mini label="MC" value={r.mc_number ?? '—'} />
@@ -408,9 +408,10 @@ export function AdminRecruitersPanel() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => copyToClipboard(r.recruiter_email!, 'Email')}
+                        onClick={() => copyToClipboard(r.recruiter_email!, 'Contact email')}
                       >
-                        <Copy className="h-4 w-4" /> Copy Email
+                        <Copy className="h-4 w-4" /> Copy Contact Email
+
                       </Button>
                     )}
                     {phone && (
@@ -481,9 +482,10 @@ export function AdminRecruitersPanel() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => copyToClipboard(detail.recruiter_email!, 'Email')}
+                    onClick={() => copyToClipboard(detail.recruiter_email!, 'Contact email')}
                   >
-                    <Copy className="h-4 w-4" /> Copy Email
+                    <Copy className="h-4 w-4" /> Copy Contact Email
+
                   </Button>
                 )}
                 {(detail.recruiter_phone ?? detail.company_phone) && (
@@ -513,7 +515,7 @@ export function AdminRecruitersPanel() {
                 )}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <KV k="Email" v={detail.recruiter_email ?? '—'} />
+                <KV k="Contact email" v={detail.recruiter_email ?? '—'} />
                 <KV k="Phone" v={detail.recruiter_phone ?? '—'} />
                 <KV k="DOT" v={detail.dot_number ?? '—'} />
                 <KV k="MC" v={detail.mc_number ?? '—'} />
