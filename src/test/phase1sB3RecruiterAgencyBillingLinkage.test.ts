@@ -137,6 +137,20 @@ describe('Phase 1S-B3 — webhook canonical binding linkage', () => {
     expect(s).toContain('recruiter_id: entityKey, user_id: ownerUserId,');
     // the legacy no-op assignment that could leave ownerUserId undefined is gone
     expect(s).not.toContain('existing && (existing.user_id = rp.user_id)');
+    // fail-closed: an unreadable canonical billing-owner row is not "absent".
+    expect(s).toContain('const { data: existing, error: existingError } = await supabase .from("recruiter_billing_profiles") .select("user_id") .eq("recruiter_id", entityKey) .maybeSingle();');
+    expect(s).toContain('if (existingError) throw new Error("recruiter billing owner read failed");');
+    const readIdx = s.indexOf('error: existingError } = await supabase .from("recruiter_billing_profiles")');
+    const guardIdx = s.indexOf('if (existingError) throw new Error("recruiter billing owner read failed");');
+    const fallbackIdx = s.indexOf('.from("recruiter_profiles").select("user_id").eq("id", entityKey)');
+    const upsertIdx = s.indexOf('.from("recruiter_billing_profiles").upsert(');
+    expect(readIdx).toBeGreaterThan(-1);
+    expect(fallbackIdx).toBeGreaterThan(-1);
+    expect(upsertIdx).toBeGreaterThan(-1);
+    expect(guardIdx).toBeGreaterThan(readIdx);
+    expect(guardIdx).toBeLessThan(fallbackIdx);
+    expect(guardIdx).toBeLessThan(upsertIdx);
+
   });
 
   it('9. webhook agency ownership requires agency_profiles.owner_user_id plus active agency_owner membership', () => {
