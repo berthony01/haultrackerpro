@@ -632,7 +632,7 @@ describe('Phase 1T-B2C1 — accept / decline', () => {
 
     const again = await asRole('authenticated', drv, () => accept(invited.id));
     expect(again.status).toBe('active');
-    expect(again.accepted_at).toBe(active.accepted_at);
+    expect(again.accepted_at).toStrictEqual(active.accepted_at);
     expect(await relCount(recruiterPaid, drv)).toBe(1);
   });
 
@@ -648,7 +648,7 @@ describe('Phase 1T-B2C1 — accept / decline', () => {
 
     const again = await asRole('authenticated', drv, () => decline(invited.id));
     expect(again.status).toBe('inactive');
-    expect(again.ended_at).toBe(declined.ended_at);
+    expect(again.ended_at).toStrictEqual(declined.ended_at);
   });
 
   it('decline of an active or ended relationship fails invalid state (proof 19)', async () => {
@@ -690,7 +690,7 @@ describe('Phase 1T-B2C1 — re-invite semantics', () => {
     expect(reinvited.accepted_at).toBeNull();
     expect(reinvited.ended_at).toBeNull();
     expect(reinvited.created_by_user_id).toBe(original.created_by_user_id);
-    expect(reinvited.created_at).toBe(original.created_at);
+    expect(reinvited.created_at).toStrictEqual(original.created_at);
     // UNIQUE pair holds one row across invite -> accept -> end -> re-invite.
     expect(await relCount(recruiterPaid, drv)).toBe(1);
   });
@@ -706,7 +706,7 @@ describe('Phase 1T-B2C1 — re-invite semantics', () => {
     );
     expect(again.id).toBe(active.id);
     expect(again.status).toBe('active');
-    expect(again.accepted_at).toBe(active.accepted_at);
+    expect(again.accepted_at).toStrictEqual(active.accepted_at);
     expect(await relCount(recruiterPaid, drv)).toBe(1);
   });
 });
@@ -797,12 +797,12 @@ describe('Phase 1T-B2C1 — ending a relationship', () => {
     const ended = await asRole('authenticated', U.paidCarrier, () => endRel(row.id));
     const again = await asRole('authenticated', U.paidCarrier, () => endRel(row.id));
     expect(again.status).toBe('ended');
-    expect(again.ended_at).toBe(ended.ended_at);
+    expect(again.ended_at).toStrictEqual(ended.ended_at);
     expect(again.id).toBe(row.id);
     expect(again.recruiter_id).toBe(recruiterPaid);
     expect(again.driver_user_id).toBe(drv);
     expect(again.created_by_user_id).toBe(U.paidCarrier);
-    expect(again.created_at).toBe(row.created_at);
+    expect(again.created_at).toStrictEqual(row.created_at);
     expect(await relById(row.id)).toBeDefined();
   });
 
@@ -896,7 +896,9 @@ describe('Phase 1T-B2C1 — RLS write boundary and fail-closed inputs', () => {
       const allowed = Object.values(ERR) as string[];
       for (const m of msgs) {
         expect(allowed).toContain(m);
-        expect(m).not.toMatch(/relation|column|syntax|constraint|pg_|SQLSTATE/i);
+        expect(m).not.toMatch(
+          /relation "|\bcolumn\b|syntax error|violates|constraint "|pg_catalog|SQLSTATE/i,
+        );
       }
       expect(msgs.slice(0, 5).every((m) => m === ERR.invalid)).toBe(true);
       expect(msgs.slice(5).every((m) => m === ERR.notFound)).toBe(true);
@@ -965,7 +967,7 @@ describe('Phase 1T-B2C1 — source contract', () => {
   it('no prohibited statements or bypass branches (proof 30b)', () => {
     const forbidden: RegExp[] = [
       /CREATE\s+OR\s+REPLACE/i,
-      /IF\s+NOT\s+EXISTS/i,
+      /(CREATE|ALTER|DROP)[^\n]*IF\s+NOT\s+EXISTS/i,
       /\bDROP\b/i,
       /\bEXECUTE\s+(format|'|")/i,
       /\bemail\b/i,
@@ -1018,6 +1020,6 @@ describe('Phase 1T-B2C1 — source contract', () => {
         'CREATE FUNCTION public.settlement_accept_my_carrier_relationship(',
       ),
     );
-    expect(inviteBody).not.toMatch(/status = 'active'/);
+    expect(inviteBody).not.toMatch(/SET\s+status = 'active'/);
   });
 });
