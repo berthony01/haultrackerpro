@@ -1007,3 +1007,73 @@ describe('Phase 1T-B2A — source contract', () => {
     expect(B2A_SQL).not.toMatch(/TO anon/);
   });
 });
+
+// ===========================================================================
+// Phase 1T-B2A-R1 — direct assistant / agency delegation isolation
+// ===========================================================================
+describe('Phase 1T-B2A-R1 — direct vs agency-delegated assistant isolation', () => {
+  it('rejects an agency-generated driver_assistants row on the DIRECT assistant helper', async () => {
+    await setUid(U.agencyGenAssistant);
+    // Row is active with exact JSON boolean true permissions; the ONLY
+    // disqualifier is the non-null agency_delegation_id.
+    expect(await canAssist(U.driverFree, 'settlements_view', false)).toBe(false);
+    expect(await canAssist(U.driverPro, 'settlements_manage', true)).toBe(false);
+    expect(await canAssist(U.driverPro, 'settlements_finalize', true)).toBe(false);
+  });
+
+  it('does not leak read access through the direct branch without a real agency path', async () => {
+    await setUid(U.agencyGenAssistant);
+    // Finalized business-sourced statement: draft status cannot be the reason.
+    expect(await canView(S.carrierFinal)).toBe(false);
+  });
+
+  it('grants read access once the legitimate agency membership + delegation exists', async () => {
+    await db.query(
+      `INSERT INTO public.agency_members (agency_id,member_user_id,role,status)
+       VALUES ($1,$2,'agency_member','active')`,
+      [A.main, U.agencyGenAssistant],
+    );
+    await db.query(
+      `INSERT INTO public.agency_delegation_requests
+         (agency_id,driver_user_id,member_user_id,status,requested_permissions)
+       VALUES ($1,$2,$3,'approved','{"settlements_view":true}'::jsonb)`,
+      [A.main, U.driverFree, U.agencyGenAssistant],
+    );
+
+    await setUid(U.agencyGenAssistant);
+    expect(await canView(S.carrierFinal)).toBe(true);
+    // Direct helper stays closed — the agency path is not a direct grant.
+    expect(await canAssist(U.driverFree, 'settlements_view', false)).toBe(false);
+  });
+
+  it('leaves a genuine direct assistant (agency_delegation_id IS NULL) fully working', async () => {
+    await setUid(U.assistant);
+    expect(await canAssist(U.driverFree, 'settlements_view', false)).toBe(true);
+    expect(await canAssist(U.driverPro, 'settlements_manage', true)).toBe(true);
+    expect(await canAssist(U.driverPro, 'settlements_finalize', true)).toBe(true);
+    expect(await canView(S.carrierFinal)).toBe(true);
+    expect(await canView(S.carrierDraft)).toBe(false);
+    expect(await canView(S.importedDraft)).toBe(true);
+  });
+
+  it('source-contract: both direct driver_assistants queries require agency_delegation_id IS NULL', () => {
+    const occurrences =
+      B2A_CODE.match(/da\.agency_delegation_id\s+IS\s+NULL/gi) ?? [];
+    expect(occurrences).toHaveLength(2);
+
+    const assistFn = B2A_CODE.slice(
+      B2A_CODE.indexOf('CREATE FUNCTION public.settlement_current_user_can_assist_driver'),
+      B2A_CODE.indexOf('CREATE FUNCTION public.settlement_current_user_can_manage_agency'),
+    );
+    expect(assistFn).toMatch(/da\.agency_delegation_id\s+IS\s+NULL/i);
+
+    const viewFn = B2A_CODE.slice(
+      B2A_CODE.indexOf(
+        'CREATE FUNCTION public.settlement_current_user_can_view_settlement',
+      ),
+    );
+    expect(viewFn).toMatch(/FROM public\.driver_assistants da/);
+    expect(viewFn).toMatch(/da\.agency_delegation_id\s+IS\s+NULL/i);
+  });
+});
+
