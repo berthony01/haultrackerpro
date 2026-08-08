@@ -49,9 +49,14 @@ export interface ParsedLoadData {
   flat_rate?: string;
   gross_revenue?: string;
   load_date?: string;
-  /** Phase 6C.6: drop-off / delivery date extracted from source (OCR/AI). Regex parser does not currently extract this. */
+  /** Phase 6C.6: drop-off / delivery date extracted from source (OCR/AI), or an explicit delivery-labeled date line. */
   dropoff_date?: string;
+  /** Phase 1S-B1: explicitly labeled waiting-time total fee (e.g. "Wait pay $50"). Never a per-hour rate. */
+  wait_fee?: string;
+  /** Phase 1S-B1: explicitly labeled detention total fee (e.g. "Detention fee: $75"). Never a per-hour rate. */
+  detention_fee?: string;
   notes?: string;
+
   trip_id?: string;
   multiStopDetected?: boolean;
   detectedStopsCount?: number;
