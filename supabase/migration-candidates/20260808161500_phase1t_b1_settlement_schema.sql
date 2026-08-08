@@ -112,7 +112,18 @@ CREATE TABLE public.driver_settlements (
   CONSTRAINT driver_settlements_version_number_check
     CHECK (version_number >= 1),
   CONSTRAINT driver_settlements_reported_gross_check
-    CHECK (reported_gross_amount IS NULL OR reported_gross_amount >= 0),
+    CHECK (
+      reported_gross_amount IS NULL
+      OR (
+        reported_gross_amount::text NOT IN ('NaN', 'Infinity', '-Infinity')
+        AND reported_gross_amount >= 0
+      )
+    ),
+  CONSTRAINT driver_settlements_reported_net_finite_check
+    CHECK (
+      reported_net_amount IS NULL
+      OR reported_net_amount::text NOT IN ('NaN', 'Infinity', '-Infinity')
+    ),
   CONSTRAINT driver_settlements_no_self_supersede_check
     CHECK (supersedes_settlement_id IS NULL OR supersedes_settlement_id <> id),
   CONSTRAINT driver_settlements_revision_shape_check
