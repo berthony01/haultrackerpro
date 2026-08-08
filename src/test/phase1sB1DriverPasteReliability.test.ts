@@ -198,27 +198,40 @@ describe('Phase 1S-B1 — parser-added Trip ID provenance', () => {
     const b = applyPaste(a, 'Trip ID: T-BBB222');
     expect(b.notes).toBe(`Reefer at 34F\n${tripIdNoteLine('T-BBB222')}`);
   });
+
+  it('a pre-existing user-authored identical Trip ID line is never parser-owned', () => {
+    const start = initialState({ notes: tripIdNoteLine('T-USER123') });
+    const a = applyPaste(start, 'Trip ID: T-USER123\nLoaded miles: 300');
+    expect(a.notes).toBe(tripIdNoteLine('T-USER123'));
+    expect(a.notes.split('\n').filter(l => l.startsWith('Trip ID:')).length).toBe(1);
+    expect(a.session.tripId).toBeNull();
+
+    const b = applyPaste(a, PASTE_B_MINIMAL);
+    expect(b.notes).toBe(tripIdNoteLine('T-USER123'));
+  });
 });
 
 describe('Phase 1S-B1 — parsed dates flow through source-date resolution', () => {
+  const DATE_TEST_NOW = new Date('2026-08-08T12:00:00');
+
   it('explicit pickup/delivery dates resolve without stale carryover', () => {
     const a = parseLoadText('Pickup Date: 08/07/2026\nDelivery Date: 08/09/2026');
-    const loadA = resolveImportedLoadDate('', a.load_date, false);
-    const dropA = resolveImportedDropoffDate('', a.dropoff_date, false);
+    const loadA = resolveImportedLoadDate('', a.load_date, false, DATE_TEST_NOW);
+    const dropA = resolveImportedDropoffDate('', a.dropoff_date, false, DATE_TEST_NOW);
     expect(loadA.value).toBe('2026-08-07');
     expect(dropA.value).toBe('2026-08-09');
 
     // Second paste with no dates must not keep the imported ones.
     const b = parseLoadText('Loaded miles: 300');
-    const loadB = resolveImportedLoadDate(loadA.value, b.load_date, false);
-    const dropB = resolveImportedDropoffDate(dropA.value, b.dropoff_date, false);
+    const loadB = resolveImportedLoadDate(loadA.value, b.load_date, false, DATE_TEST_NOW);
+    const dropB = resolveImportedDropoffDate(dropA.value, b.dropoff_date, false, DATE_TEST_NOW);
     expect(loadB.value).not.toBe('2026-08-07');
     expect(dropB.value).toBe('');
   });
 
   it('a manually set drop-off date is preserved when the new paste omits it', () => {
     const b = parseLoadText('Loaded miles: 300');
-    const dropB = resolveImportedDropoffDate('2026-08-15', b.dropoff_date, true);
+    const dropB = resolveImportedDropoffDate('2026-08-15', b.dropoff_date, true, DATE_TEST_NOW);
     expect(dropB.value).toBe('2026-08-15');
     expect(dropB.kept).toBe('manual');
   });
