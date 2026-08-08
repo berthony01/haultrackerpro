@@ -206,10 +206,11 @@ serve(async (req) => {
       });
     }
 
-    // Agency must exist.
+    // Agency must exist, and the caller must be the CANONICAL owner
+    // (agency_profiles.owner_user_id). Email is never an ownership key.
     const { data: agency, error: aErr } = await supabaseService
       .from("agency_profiles")
-      .select("id")
+      .select("id, owner_user_id")
       .eq("id", agencyId)
       .maybeSingle();
     if (aErr) {
@@ -219,7 +220,7 @@ serve(async (req) => {
         message: "Temporary billing error. Please try again.",
       });
     }
-    if (!agency) {
+    if (!agency || agency.owner_user_id !== user.id) {
       return jsonResponse({
         status: 403,
         code: "not_owner",
@@ -227,7 +228,7 @@ serve(async (req) => {
       });
     }
 
-    // Caller must be an ACTIVE agency owner.
+    // Caller must ALSO be an ACTIVE agency owner member.
     const { data: ownerRow, error: mErr } = await supabaseService
       .from("agency_members")
       .select("id, role, status")
