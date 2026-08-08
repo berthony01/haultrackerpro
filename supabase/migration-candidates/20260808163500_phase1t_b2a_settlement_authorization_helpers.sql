@@ -173,8 +173,9 @@ AS $$
        WHERE da.driver_user_id = _driver_user_id
          AND da.assistant_user_id = auth.uid()
          AND da.status = 'active'
-         AND jsonb_typeof(da.permissions -> _permission) = 'boolean'
-         AND (da.permissions -> _permission) = to_jsonb(true)
+          AND da.agency_delegation_id IS NULL
+          AND jsonb_typeof(da.permissions -> _permission) = 'boolean'
+          AND (da.permissions -> _permission) = to_jsonb(true)
      )
      AND (
        _require_pro IS NOT TRUE
