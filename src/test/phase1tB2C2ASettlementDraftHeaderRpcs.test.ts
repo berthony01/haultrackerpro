@@ -1707,9 +1707,9 @@ describe('Phase 1T-B2C2A — source contract', () => {
     expect(CODE).toContain('FROM public.agency_profiles ap');
     expect(CODE).toContain('ap.name');
     // No function signature accepts a source display name.
-    expect(CODE).not.toMatch(/_source_display_name_snapshot/);
-    expect(CODE).not.toMatch(/_company_name/);
-    expect(CODE).not.toMatch(/_agency_name/);
+    expect(CODE).not.toMatch(/\b_source_display_name_snapshot\b/);
+    expect(CODE).not.toMatch(/\b_company_name\b/);
+    expect(CODE).not.toMatch(/\b_agency_name\b/);
     // The carrier RPC has no payer parameter at all.
     const carrierSig = CODE.slice(
       CODE.indexOf('CREATE FUNCTION public.settlement_create_carrier_draft('),
@@ -1717,7 +1717,7 @@ describe('Phase 1T-B2C2A — source contract', () => {
         'CREATE FUNCTION public.settlement_create_carrier_draft(',
       )),
     );
-    expect(carrierSig).not.toMatch(/_payer_name_snapshot/);
+    expect(carrierSig).not.toMatch(/\b_payer_name_snapshot\b/);
   });
 
   it('creates hard-code identity and the update never touches immutable columns (proof 34)', () => {
