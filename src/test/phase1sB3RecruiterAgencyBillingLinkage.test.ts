@@ -142,7 +142,7 @@ describe('Phase 1S-B3 — webhook canonical binding linkage', () => {
     expect(s).toContain('if (existingError) throw new Error("recruiter billing owner read failed");');
     const readIdx = s.indexOf('error: existingError } = await supabase .from("recruiter_billing_profiles")');
     const guardIdx = s.indexOf('if (existingError) throw new Error("recruiter billing owner read failed");');
-    const fallbackIdx = s.indexOf('.from("recruiter_profiles").select("user_id").eq("id", entityKey)');
+    const fallbackIdx = s.indexOf('const { data: rp, error: rpError } = await supabase .from("recruiter_profiles")');
     const upsertIdx = s.indexOf('.from("recruiter_billing_profiles").upsert(');
     expect(readIdx).toBeGreaterThan(-1);
     expect(fallbackIdx).toBeGreaterThan(-1);
