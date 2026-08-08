@@ -97,7 +97,7 @@ function safeWebsiteUrl(raw: string): string {
 }
 
 const CSV_HEADERS = [
-  'Recruiter Name', 'Recruiter Email', 'Recruiter Phone', 'Company Name',
+  'Recruiter Name', 'Recruiter Contact Email', 'Recruiter Phone', 'Company Name',
   'Company Phone', 'Company Website', 'DOT Number', 'MC Number',
   'Company Address', 'Company City', 'Company State', 'Hiring States',
   'Equipment Types', 'Driver Types Hired', 'Verification Status',
