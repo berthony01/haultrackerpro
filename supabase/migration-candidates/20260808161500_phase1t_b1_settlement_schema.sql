@@ -91,7 +91,11 @@ CREATE TABLE public.driver_settlements (
   notes text NULL,
   calculation_version text NOT NULL DEFAULT '1',
   version_number integer NOT NULL DEFAULT 1,
-  supersedes_settlement_id uuid NULL REFERENCES public.driver_settlements(id) ON DELETE RESTRICT,
+  -- CASCADE (not RESTRICT) so an entire revision chain — every version belongs to
+  -- the same driver — can be removed together when that driver explicitly deletes
+  -- their HaulTracker account. This is referential/account-deletion safety only;
+  -- Phase 1T-B2 must still prohibit normal client deletion of finalized history.
+  supersedes_settlement_id uuid NULL REFERENCES public.driver_settlements(id) ON DELETE CASCADE,
   created_by_user_id uuid NOT NULL,
   finalized_by_user_id uuid NULL,
   finalized_at timestamptz NULL,
