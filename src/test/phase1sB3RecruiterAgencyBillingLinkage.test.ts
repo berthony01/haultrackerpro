@@ -35,8 +35,12 @@ describe('Phase 1S-B3 — recruiter billing identity linkage', () => {
     expect(s).toMatch(/\.select\("id, user_id[^"]*"\) \.eq\("user_id", user\.id\)/);
     // recruiter business identity flows as recruiter.id, not user.id / email.
     expect(s).toContain('_recruiter_id: recruiter.id');
+    // the business checkout claim subject is the recruiter business identity
+    expect(s).toContain('context: "recruiter", subjectId: recruiter.id,');
+    expect(s).not.toMatch(/subjectId: user\.id/);
     expect(s).not.toMatch(/\.eq\("recruiter_email"/);
     expect(s).not.toMatch(/customers\.list\(\s*\{\s*email/);
+
   });
 
   it('2. recruiter Stripe customer metadata carries both user_id and recruiter_id; lookup is metadata-exact, never email', () => {
