@@ -111,12 +111,19 @@ async function failure(sql: string, params?: unknown[]): Promise<string | null> 
 async function insertSettlement(
   overrides: Record<string, unknown> = {},
 ): Promise<string> {
+  const source = (overrides.source as string) ?? 'driver_imported';
+  const needsDisplayName =
+    source === 'carrier_issued' || source === 'agency_prepared';
   const row: Record<string, unknown> = {
     driver_user_id: ids.driver,
     source: 'driver_imported',
     period_start: '2026-08-01',
     period_end: '2026-08-07',
     created_by_user_id: ids.driver,
+    ...(needsDisplayName &&
+    !Object.prototype.hasOwnProperty.call(overrides, 'source_display_name_snapshot')
+      ? { source_display_name_snapshot: 'Acme Logistics LLC' }
+      : {}),
     ...overrides,
   };
   const keys = Object.keys(row);
