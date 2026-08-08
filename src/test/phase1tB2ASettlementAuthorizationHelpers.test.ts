@@ -237,6 +237,7 @@ beforeAll(async () => {
     'agencyFinalizerUser',
     'agencyBMember',
     'betaMember',
+    'agencyGenAssistant',
     'stranger',
   ]) {
     U[k] = await newUser();
