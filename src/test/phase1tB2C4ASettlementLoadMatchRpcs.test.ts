@@ -1226,3 +1226,131 @@ describe('Phase 1T-B2C4A — rematch, clear and idempotency', () => {
     });
   });
 });
+
+// =====================================================================
+// Phase 1T-B2C4A-R1 — same-pair suggestion promotion hardening.
+describe('Phase 1T-B2C4A-R1 — same-pair suggestion promotion', () => {
+  it('promotes an existing likely row for the SELECTED pair in place (proof 17)', async () => {
+    // pre-seed a suggestion for the EXACT pair that will be confirmed, plus an
+    // unrelated suggestion on the same item that must survive untouched.
+    const seeded = await db.query<MatchRow>(
+      `INSERT INTO public.driver_settlement_matches
+         (settlement_item_id, driver_load_id, match_state, confidence)
+       VALUES ($1,$2,'likely',0.7100), ($1,$3,'possible',0.4200)
+       RETURNING *`,
+      [I.promoLikely, L.promoSelected, L.promoOther],
+    );
+    const selectedBefore = seeded.rows.find(
+      (r) => r.driver_load_id === L.promoSelected,
+    ) as MatchRow;
+    const otherBefore = seeded.rows.find(
+      (r) => r.driver_load_id === L.promoOther,
+    ) as MatchRow;
+
+    const itemBefore = await itemById(I.promoLikely);
+    const loadBefore = await loadById(L.promoSelected);
+    const otherLoadBefore = await loadById(L.promoOther);
+
+    const returned = await asRole('authenticated', U.carrierDriver, () =>
+      confirm(I.promoLikely, L.promoSelected),
+    );
+
+    // no duplicate-key / constraint leak, promoted in place
+    expect(returned.id).toBe(selectedBefore.id);
+    expect(returned.match_state).toBe('confirmed');
+    expect(returned.confidence).toBeNull();
+    expect(returned.matched_by_user_id).toBe(U.carrierDriver);
+
+    const rows = await matchesFor(I.promoLikely);
+    const accepted = rows.filter((r) => ['exact', 'confirmed'].includes(r.match_state));
+    expect(accepted.length).toBe(1);
+    expect(accepted[0].id).toBe(selectedBefore.id);
+
+    // the unrelated suggestion survives byte-identical
+    const otherAfter = rows.find((r) => r.driver_load_id === L.promoOther);
+    expect(otherAfter).toEqual(otherBefore);
+
+    const itemAfter = await itemById(I.promoLikely);
+    expect(itemAfter?.expected_amount_snapshot).toBe('1305.75');
+    expect(itemAfter?.amount).toBe(itemBefore?.amount);
+    expect(itemAfter?.amount).toBe('1310.00');
+
+    // zero load writes on either load
+    expect(await loadById(L.promoSelected)).toEqual(loadBefore);
+    expect(await loadById(L.promoOther)).toEqual(otherLoadBefore);
+  });
+
+  it('re-confirming the already-confirmed pair keeps one row, same id (proof 18)', async () => {
+    await asRole('authenticated', U.carrierDriver, () =>
+      confirm(I.promoReconfirm, L.promoReconfirm),
+    );
+    const first = (await matchesFor(I.promoReconfirm)).filter((r) =>
+      ['exact', 'confirmed'].includes(r.match_state),
+    );
+    expect(first.length).toBe(1);
+
+    const itemBefore = await itemById(I.promoReconfirm);
+    const loadBefore = await loadById(L.promoReconfirm);
+    const eventsBefore = (await eventsFor(S.carrierFinal)).length;
+
+    const again = await asRole('authenticated', U.carrierDriver, () =>
+      confirm(I.promoReconfirm, L.promoReconfirm),
+    );
+    expect(again.id).toBe(first[0].id);
+    expect(again.match_state).toBe('confirmed');
+    expect(again.confidence).toBeNull();
+
+    const after = (await matchesFor(I.promoReconfirm)).filter((r) =>
+      ['exact', 'confirmed'].includes(r.match_state),
+    );
+    expect(after.length).toBe(1);
+    expect(after[0].id).toBe(first[0].id);
+
+    // exactly one event per explicit successful action; no item/load drift
+    const evts = await eventsFor(S.carrierFinal);
+    expect(evts.length).toBe(eventsBefore + 1);
+    expect(evts[evts.length - 1].event_type).toBe('match_confirmed');
+    expect((await itemById(I.promoReconfirm))?.amount).toBe(itemBefore?.amount);
+    expect((await itemById(I.promoReconfirm))?.expected_amount_snapshot).toBe('1318.40');
+    expect(await loadById(L.promoReconfirm)).toEqual(loadBefore);
+  });
+
+  it('source contract: selected-pair FOR UPDATE lookup precedes accepted mutation (proof 19)', () => {
+    const lookup = CODE.indexOf('FROM public.driver_settlement_matches dsm');
+    expect(lookup).toBeGreaterThan(-1);
+    // the selected pair is located by BOTH keys and locked
+    expect(
+      /FROM public\.driver_settlement_matches dsm\s+WHERE dsm\.settlement_item_id = v_item\.id\s+AND dsm\.driver_load_id = _driver_load_id\s+FOR UPDATE/.test(
+        CODE,
+      ),
+    ).toBe(true);
+    expect(CODE).toContain('v_existing_pair public.driver_settlement_matches');
+
+    // the lookup happens BEFORE any accepted-state delete/insert
+    expect(lookup).toBeLessThan(
+      CODE.indexOf('DELETE FROM public.driver_settlement_matches'),
+    );
+    expect(lookup).toBeLessThan(
+      CODE.indexOf('INSERT INTO public.driver_settlement_matches'),
+    );
+
+    // UPDATE-in-place branch for the existing pair
+    expect(
+      /UPDATE public\.driver_settlement_matches dsm\s+SET match_state = 'confirmed',\s+confidence = NULL,\s+matched_by_user_id = v_actor,\s+matched_at = now\(\)\s+WHERE dsm\.id = v_existing_pair\.id\s+RETURNING \* INTO v_match/.test(
+        CODE,
+      ),
+    ).toBe(true);
+
+    // other accepted rows are excluded by row id, never the selected pair
+    expect(CODE).toContain('AND dsm.id <> v_existing_pair.id');
+
+    // still no schema workaround, no exception handler, no raw error surfacing
+    expect(/\bEXCEPTION\s+WHEN\b/i.test(CODE)).toBe(false);
+    expect(/SQLERRM|SQLSTATE/i.test(CODE)).toBe(false);
+    expect(/CREATE (UNIQUE )?INDEX|ALTER TABLE|DROP INDEX/i.test(CODE)).toBe(false);
+    // still zero writes to public.loads
+    expect(/UPDATE public\.loads|INSERT INTO public\.loads|DELETE FROM public\.loads/i.test(CODE)).toBe(
+      false,
+    );
+  });
+});
