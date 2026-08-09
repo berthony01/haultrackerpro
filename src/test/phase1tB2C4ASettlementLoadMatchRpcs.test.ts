@@ -644,6 +644,9 @@ beforeAll(async () => {
     '701.00',
   );
   I.driverVoided = await addItem(S.driverVoided, U.driverPro, 'load_pay', '900.00');
+  // Dedicated R1 fixtures — never touched by any earlier proof.
+  I.promoLikely = await addItem(S.carrierFinal, U.paidCarrier, 'load_pay', '1310.00');
+  I.promoReconfirm = await addItem(S.carrierFinal, U.paidCarrier, 'load_pay', '1320.00');
 
   await finalize(S.carrierFinal);
   await finalize(S.agencyFinal);
