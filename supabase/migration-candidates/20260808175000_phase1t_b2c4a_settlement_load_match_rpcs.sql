@@ -187,29 +187,58 @@ BEGIN
   END IF;
 
   -- ---- deterministic manual rematch ---------------------------------------
-  -- Only an ACCEPTED prior state is replaced. Suggestion/rejection history
-  -- ('likely', 'possible', 'rejected') is never destroyed by a manual action.
-  DELETE FROM public.driver_settlement_matches dsm
+  -- The selected (item, load) pair is located and locked FIRST, because B1
+  -- also enforces UNIQUE (settlement_item_id, driver_load_id): a pre-existing
+  -- suggestion row for THIS pair must be promoted in place, never duplicated.
+  SELECT dsm.* INTO v_existing_pair
+  FROM public.driver_settlement_matches dsm
   WHERE dsm.settlement_item_id = v_item.id
-    AND dsm.match_state IN ('exact', 'confirmed');
+    AND dsm.driver_load_id = _driver_load_id
+  FOR UPDATE;
 
-  INSERT INTO public.driver_settlement_matches (
-    settlement_item_id,
-    driver_load_id,
-    match_state,
-    confidence,
-    matched_by_user_id,
-    matched_at
-  )
-  VALUES (
-    v_item.id,
-    _driver_load_id,
-    'confirmed',
-    NULL,
-    v_actor,
-    now()
-  )
-  RETURNING * INTO v_match;
+  IF FOUND THEN
+    -- Preserve one-accepted-per-item: drop OTHER accepted rows only.
+    DELETE FROM public.driver_settlement_matches dsm
+    WHERE dsm.settlement_item_id = v_item.id
+      AND dsm.id <> v_existing_pair.id
+      AND dsm.match_state IN ('exact', 'confirmed');
+
+    -- Manual confirmation overrides the prior state of the SELECTED pair,
+    -- whatever it was ('exact', 'likely', 'possible', 'confirmed',
+    -- 'rejected'). Non-selected suggestion/rejection history is untouched.
+    UPDATE public.driver_settlement_matches dsm
+    SET match_state = 'confirmed',
+        confidence = NULL,
+        matched_by_user_id = v_actor,
+        matched_at = now()
+    WHERE dsm.id = v_existing_pair.id
+    RETURNING * INTO v_match;
+  ELSE
+    -- Only an ACCEPTED prior state is replaced. Suggestion/rejection history
+    -- ('likely', 'possible', 'rejected') is never destroyed by a manual action.
+    DELETE FROM public.driver_settlement_matches dsm
+    WHERE dsm.settlement_item_id = v_item.id
+      AND dsm.match_state IN ('exact', 'confirmed');
+
+    INSERT INTO public.driver_settlement_matches (
+      settlement_item_id,
+      driver_load_id,
+      match_state,
+      confidence,
+      matched_by_user_id,
+      matched_at
+    )
+    VALUES (
+      v_item.id,
+      _driver_load_id,
+      'confirmed',
+      NULL,
+      v_actor,
+      now()
+    )
+    RETURNING * INTO v_match;
+  END IF;
+
 
   -- ---- reconciliation metadata ONLY on the item ---------------------------
   -- amount, item_type, pay_method, quantity/rate, statement snapshots,
