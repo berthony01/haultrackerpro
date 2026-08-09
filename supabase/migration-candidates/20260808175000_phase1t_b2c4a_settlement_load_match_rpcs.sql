@@ -87,6 +87,7 @@ DECLARE
   v_item public.driver_settlement_items;
   v_expected numeric;
   v_load_status text;
+  v_existing_pair public.driver_settlement_matches;
   v_match public.driver_settlement_matches;
 BEGIN
   IF v_actor IS NULL OR _settlement_item_id IS NULL OR _driver_load_id IS NULL THEN
