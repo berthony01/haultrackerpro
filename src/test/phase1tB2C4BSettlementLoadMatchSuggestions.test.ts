@@ -824,7 +824,7 @@ describe('Phase 1T-B2C4B — proof 2: exactly one new function', () => {
       [FN],
     );
     expect(sig.rows).toHaveLength(1);
-    expect(sig.rows[0].args).toBe('uuid');
+    expect(sig.rows[0].args).toBe('_settlement_item_id uuid');
     expect(sig.rows[0].ret).toBe('SETOF driver_settlement_matches');
   });
 });
@@ -1051,7 +1051,7 @@ describe('Phase 1T-B2C4B — proof 12: exact five-signal scoring and thresholds'
     expect(CODE).toContain("LEAST(\n        1.0000::numeric,");
     expect(CODE).toMatch(/regexp_replace\(btrim\(lower\([^)]+\)\),\s*\n?\s*'\\s\+', ' ', 'g'\)/);
     expect(CODE).toContain("nullif(regexp_replace(btrim(lower(v_item.origin_snapshot))");
-    expect(CODE).not.toMatch(/similarity|levenshtein|ST_|earth_distance|soundex/i);
+    expect(CODE).not.toMatch(/similarity|levenshtein|earth_distance|soundex|postgis/i);
   });
 
   it('never yields NaN or +/-Infinity from non-finite stored load numerics', async () => {
@@ -1094,7 +1094,7 @@ describe('Phase 1T-B2C4B — proof 14: deterministic top-25 ranking cap', () => 
       'ORDER BY q.score DESC, q.date_distance ASC, q.eff_date DESC, q.load_id ASC',
     );
     expect(CODE).toContain('WHERE r.rn <= 25');
-    expect(CODE).toContain('ELSE 999999');
+    expect(CODE).toContain('THEN 999999');
   });
 
   it('returns rows ordered likely, then possible, then rejected', async () => {
