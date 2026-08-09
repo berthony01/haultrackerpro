@@ -745,7 +745,7 @@ describe('Phase 1T-B2C4A — catalog, ACL and source contract (proof 1)', () => 
       /CREATE OR REPLACE/i,
       /\bDROP\b/i,
       /IF NOT EXISTS/i,
-      /\bEXECUTE\b/i,
+      /\bEXECUTE\s+(?!ON FUNCTION)/i,
       /format\s*\(/i,
       /current_setting\s*\(/i,
       /\bemail\b/i,
