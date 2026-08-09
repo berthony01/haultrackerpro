@@ -941,31 +941,41 @@ describe('1T-B2C5B — unauthorized actors fail closed', () => {
     expect(await eventsFor(sid)).toHaveLength(1);
   });
 
-  it('16. manage-only delegation cannot void an agency record', async () => {
+  it('16. manage-only delegation cannot void an agency record finalized through the real B2C5A RPC', async () => {
     const sid = await mkAgencySettlement(
       U.dAgencyManageOnly,
       agencyId,
       U.agencyFinalizer,
     );
-    // finalize with the driver-scoped finalizer is impossible here, so the
-    // record is finalized by the only actor B2C5A authorizes: none. Seed the
-    // finalized state through the accepted RPC using a delegation-scoped
-    // finalizer for this driver is deliberately absent, so prove the
-    // manage-only actor cannot even reach void on a finalized record.
+    // Fidelity repair: the finalized state is produced by the ACCEPTED B2C5A
+    // RPC, never by a direct table UPDATE. An independent finalize-capable
+    // delegation is granted to U.agencyFinalizer for this same driver so the
+    // real lifecycle path can run; the manage-only actor keeps only
+    // settlements_manage and must still be refused at void time.
     await db.query(
-      `UPDATE public.driver_settlements
-          SET status='finalized', finalized_by_user_id=$2, finalized_at=now()
-        WHERE id=$1`,
-      [sid, U.agencyManager],
+      `INSERT INTO public.agency_delegation_requests
+         (agency_id, driver_user_id, member_user_id, status, requested_permissions)
+       VALUES ($1,$2,$3,'approved',
+               '{"settlements_manage":true,"settlements_finalize":true}'::jsonb)`,
+      [agencyId, U.dAgencyManageOnly, U.agencyFinalizer],
     );
+    const fin = await finalize(U.agencyFinalizer, sid);
+    expect(fin.status).toBe('finalized');
+    expect(fin.finalized_by_user_id).toBe(U.agencyFinalizer);
+
     const beforeRow = await settlementRow(sid);
+    const events = await eventsFor(sid);
+    expect(events.map((e) => e.event_type)).toEqual(['finalized']);
 
     expect(
       await failureMessage(() => voidSettlement(U.agencyManager, sid)),
     ).toContain(ERR.agency);
     expect(await settlementRow(sid)).toEqual(beforeRow);
-    expect(await eventsFor(sid)).toHaveLength(0);
+    expect((await eventsFor(sid)).map((e) => e.event_type)).toEqual([
+      'finalized',
+    ]);
   });
+
 
   it('17. manage-only, view-only, agency-generated, inactive assistants and the recipient driver cannot void an import', async () => {
     const sid = await mkDriverSettlement(U.dImport, 'draft');
