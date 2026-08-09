@@ -679,7 +679,9 @@ describe('1T-B2C4C — chain, catalog and source shape', () => {
       [FN],
     );
     expect(r.rows).toHaveLength(1);
-    expect(r.rows[0].args).toBe('uuid, uuid');
+    expect(r.rows[0].args).toBe(
+      '_settlement_item_id uuid, _driver_load_id uuid',
+    );
     expect(r.rows[0].ret).toBe('driver_settlement_matches');
   });
 
