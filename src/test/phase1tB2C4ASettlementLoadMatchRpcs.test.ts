@@ -781,7 +781,7 @@ describe('Phase 1T-B2C4A — catalog, ACL and source contract (proof 1)', () => 
     );
     // suggestion states are never authored here
     expect(/'(likely|possible|rejected)'\s*(,|\))/.test(CODE)).toBe(false);
-    expect(CODE).toContain("'confirmed',\n    NULL,");
+    expect(/'confirmed',\n\s+NULL,/.test(CODE)).toBe(true);
     // candidate never lands under supabase/migrations
     expect(
       fs.existsSync(
