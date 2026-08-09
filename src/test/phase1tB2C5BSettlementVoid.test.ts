@@ -918,7 +918,115 @@ describe('1T-B2C5B — CURRENT authorization is re-evaluated at void time', () =
     expect(await settlementRow(sid)).toEqual(beforeRow);
     expect(await eventsFor(sid)).toHaveLength(1);
   });
+
+  it('36. an agency entitlement that ceases to be eligible AFTER finalization cannot void', async () => {
+    // Isolated agency context so the shared fixture entitlement is untouched.
+    const owner = await newUser();
+    const finalizer = await newUser();
+    const driver = await newUser();
+    const lapseAgencyId = (
+      await db.query<{ id: string }>(
+        `INSERT INTO public.agency_profiles (owner_user_id, name, status)
+         VALUES ($1,'Lapsing Back Office','active') RETURNING id`,
+        [owner],
+      )
+    ).rows[0].id;
+    await db.query(
+      `INSERT INTO public.agency_entitlements (agency_id, plan_key, status)
+       VALUES ($1,'agency_team','active')`,
+      [lapseAgencyId],
+    );
+    await db.query(
+      `INSERT INTO public.agency_members (agency_id, member_user_id, role, status)
+       VALUES ($1,$2,'agency_owner','active'), ($1,$3,'agency_member','active')`,
+      [lapseAgencyId, owner, finalizer],
+    );
+    await db.query(
+      `INSERT INTO public.agency_delegation_requests
+         (agency_id, driver_user_id, member_user_id, status, requested_permissions)
+       VALUES ($1,$2,$3,'approved',
+               '{"settlements_manage":true,"settlements_finalize":true}'::jsonb)`,
+      [lapseAgencyId, driver, finalizer],
+    );
+
+    const sid = await mkAgencySettlement(driver, lapseAgencyId, finalizer);
+    const fin = await finalize(finalizer, sid);
+    expect(fin.status).toBe('finalized');
+    const beforeRow = await settlementRow(sid);
+    expect((await eventsFor(sid)).map((e) => e.event_type)).toEqual([
+      'finalized',
+    ]);
+
+    // Entitlement cessation expressed exactly as the accepted helper reads it:
+    // status must be one of active / trialing / manual_beta.
+    await db.query(
+      `UPDATE public.agency_entitlements SET status='canceled' WHERE agency_id=$1`,
+      [lapseAgencyId],
+    );
+
+    expect(
+      await failureMessage(() => voidSettlement(finalizer, sid)),
+    ).toContain(ERR.agency);
+    expect(await settlementRow(sid)).toEqual(beforeRow);
+    expect((await eventsFor(sid)).map((e) => e.event_type)).toEqual([
+      'finalized',
+    ]);
+  });
+
+  it('37. an assistant who loses settlements_finalize AFTER finalization cannot void', async () => {
+    const driver = await newUser();
+    const assistant = await newUser();
+    await db.query(
+      `INSERT INTO public.subscriptions (user_id, plan_key, status)
+       VALUES ($1,'pro_monthly','active')`,
+      [driver],
+    );
+    await db.query(
+      `INSERT INTO public.driver_assistants
+         (driver_user_id, assistant_user_id, status, permissions, agency_delegation_id)
+       VALUES ($1,$2,'active',
+               '{"settlements_view":true,"settlements_manage":true,"settlements_finalize":true}'::jsonb,
+               NULL)`,
+      [driver, assistant],
+    );
+
+    const sid = await mkDriverSettlement(driver, 'draft');
+    const fin = await finalize(assistant, sid);
+    expect(fin.status).toBe('finalized');
+    const beforeRow = await settlementRow(sid);
+    expect((await eventsFor(sid)).map((e) => e.event_type)).toEqual([
+      'finalized',
+    ]);
+
+    // Remove ONLY settlements_finalize; relationship stays active and the
+    // target driver stays active-Pro.
+    await db.query(
+      `UPDATE public.driver_assistants
+          SET permissions = permissions - 'settlements_finalize'
+        WHERE driver_user_id=$1 AND assistant_user_id=$2`,
+      [driver, assistant],
+    );
+    const still = await db.query<{ s: string; pro: number }>(
+      `SELECT da.status AS s,
+              (SELECT count(*)::int FROM public.subscriptions s
+                WHERE s.user_id=$1 AND s.plan_key='pro_monthly' AND s.status='active') AS pro
+         FROM public.driver_assistants da
+        WHERE da.driver_user_id=$1 AND da.assistant_user_id=$2`,
+      [driver, assistant],
+    );
+    expect(still.rows[0].s).toBe('active');
+    expect(Number(still.rows[0].pro)).toBe(1);
+
+    expect(
+      await failureMessage(() => voidSettlement(assistant, sid)),
+    ).toContain(ERR.driverImport);
+    expect(await settlementRow(sid)).toEqual(beforeRow);
+    expect((await eventsFor(sid)).map((e) => e.event_type)).toEqual([
+      'finalized',
+    ]);
+  });
 });
+
 
 // ---------------------------------------------------------------------------
 describe('1T-B2C5B — unauthorized actors fail closed', () => {
