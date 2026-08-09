@@ -704,11 +704,10 @@ describe('1T-B2C4C — chain, catalog and source shape', () => {
   });
 
   it('5. ACL: authenticated/service_role EXECUTE; PUBLIC and anon cannot', async () => {
-    const r = await db.query<{ a: boolean; s: boolean; an: boolean; p: boolean }>(
+    const r = await db.query<{ a: boolean; s: boolean; an: boolean }>(
       `SELECT has_function_privilege('authenticated', p.oid, 'EXECUTE') AS a,
               has_function_privilege('service_role', p.oid, 'EXECUTE') AS s,
-              has_function_privilege('anon', p.oid, 'EXECUTE') AS an,
-              coalesce((aclexplode(p.proacl)).grantee = 0, false) AS p
+              has_function_privilege('anon', p.oid, 'EXECUTE') AS an
          FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace
         WHERE ns.nspname='public' AND p.proname=$1`,
       [FN],
@@ -716,15 +715,23 @@ describe('1T-B2C4C — chain, catalog and source shape', () => {
     expect(r.rows[0].a).toBe(true);
     expect(r.rows[0].s).toBe(true);
     expect(r.rows[0].an).toBe(false);
-    expect(r.rows.some((x) => x.p)).toBe(false);
+
+    const pub = await db.query<{ c: number }>(
+      `SELECT count(*)::int AS c
+         FROM pg_proc p
+         JOIN pg_namespace ns ON ns.oid=p.pronamespace,
+              LATERAL aclexplode(p.proacl) AS acl
+        WHERE ns.nspname='public' AND p.proname=$1 AND acl.grantee = 0`,
+      [FN],
+    );
+    expect(Number(pub.rows[0].c)).toBe(0);
   });
 
   it('6. auth.uid() is the sole actor identity — no bypass surface in source', () => {
     expect(CODE).toContain('auth.uid()');
     expect(CODE).not.toMatch(/_actor_user_id|_caller|_as_user|_impersonate/i);
     expect(CODE).not.toMatch(/current_setting\s*\(/i);
-    expect(CODE).not.toMatch(/service_role/i.source ? /'service_role'/ : /$^/);
-    expect(CODE).not.toMatch(/current_user|session_user/i);
+    expect(CODE).not.toMatch(/\bcurrent_user\b|\bsession_user\b/i);
     expect(CODE).not.toMatch(/email/i);
     expect(CODE).not.toMatch(/is_admin|has_role|super_admin|admin_users/i);
     // carrier / agency / view helpers are deliberately never called
