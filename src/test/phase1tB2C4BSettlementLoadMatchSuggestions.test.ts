@@ -335,8 +335,9 @@ async function mkItem(
       snap.destination ?? null,
       snap.miles ?? null,
       creator,
-
+    ],
   );
+
   return r.rows[0].id;
 }
 
