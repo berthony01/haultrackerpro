@@ -669,6 +669,10 @@ beforeAll(async () => {
   L.driverDownA = await mkLoad(U.driverDown, 'completed', '599.00');
   L.driverDownB = await mkLoad(U.driverDown, 'completed', '598.00');
   L.strangerA = await mkLoad(U.stranger, 'completed', '111.00');
+  // Dedicated R1 loads — never referenced by any earlier proof.
+  L.promoSelected = await mkLoad(U.carrierDriver, 'completed', '1305.75');
+  L.promoOther = await mkLoad(U.carrierDriver, 'completed', '1299.00');
+  L.promoReconfirm = await mkLoad(U.carrierDriver, 'completed', '1318.40');
 
   // driverDown loses Pro AFTER all fixtures exist.
   await db.query(
