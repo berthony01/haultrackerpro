@@ -307,7 +307,7 @@ export function CarrierSettlementsPanel({ onManagePlan }: CarrierSettlementsPane
             <div className="flex flex-wrap items-center gap-2">
               <select
                 id="carrier-candidate"
-                className="h-10 min-w-[14rem] flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                className="h-10 w-full min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm sm:min-w-[14rem]"
                 value={selectedCandidateId}
                 onChange={(e) => setSelectedCandidateId(e.target.value)}
                 data-testid="carrier-candidate-select"
@@ -360,7 +360,7 @@ export function CarrierSettlementsPanel({ onManagePlan }: CarrierSettlementsPane
                 >
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-medium">
+                      <span className="min-w-0 max-w-full truncate text-sm font-medium">
                         {candidateLabels.get(row.driver_user_id) ?? 'Connected driver'}
                       </span>
                       <Badge variant="outline">
