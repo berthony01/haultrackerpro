@@ -519,3 +519,189 @@ describe('E1 · copy truthfulness', () => {
     }
   });
 });
+
+/* --------------------------------------- 11. safe source / payer identity */
+
+describe('E1 · safe source and payer identity', () => {
+  const identity = (over: Record<string, unknown>) =>
+    ({
+      source: 'carrier_issued',
+      source_display_name_snapshot: null,
+      payer_name_snapshot: null,
+      ...over,
+    }) as never;
+
+  it('prefers the server-captured snapshots', () => {
+    expect(
+      resolveBusinessSourceLabel(
+        identity({ source_display_name_snapshot: 'Blue Ridge Carriers' }),
+      ),
+    ).toBe('Blue Ridge Carriers');
+    expect(
+      resolveBusinessPayerLabel(identity({ payer_name_snapshot: 'Blue Ridge LLC' })),
+    ).toBe('Blue Ridge LLC');
+  });
+
+  it('falls back per source, never to an identifier', () => {
+    expect(resolveBusinessSourceLabel(identity({ source: 'carrier_issued' }))).toBe(
+      'Carrier statement',
+    );
+    expect(resolveBusinessSourceLabel(identity({ source: 'agency_prepared' }))).toBe(
+      'Agency-prepared statement',
+    );
+    expect(resolveBusinessSourceLabel(identity({ source: 'driver_imported' }))).toBe(
+      'Driver-imported statement',
+    );
+    expect(resolveBusinessSourceLabel(identity({ source: 'something_else' }))).toBe(
+      'Settlement statement',
+    );
+  });
+
+  it('treats blank snapshots as missing', () => {
+    expect(
+      resolveBusinessSourceLabel(identity({ source_display_name_snapshot: '   ' })),
+    ).toBe('Carrier statement');
+    expect(
+      resolveBusinessPayerLabel(
+        identity({ source: 'agency_prepared', payer_name_snapshot: '  ' }),
+      ),
+    ).toBe('Payer not listed');
+  });
+
+  it('states a missing payer plainly instead of substituting an id', () => {
+    const row = identity({ source: 'agency_prepared', id: 'set-abc-123' });
+    expect(resolveBusinessPayerLabel(row)).toBe('Payer not listed');
+    expect(resolveBusinessPayerLabel(row)).not.toMatch(/set-abc-123/);
+    // Carrier-issued statements: the carrier IS the payer.
+    expect(
+      resolveBusinessPayerLabel(
+        identity({ source_display_name_snapshot: 'Blue Ridge Carriers' }),
+      ),
+    ).toBe('Blue Ridge Carriers');
+  });
+
+  it('renders both safe labels in the statement summary', () => {
+    expect(managerSrc).toMatch(/resolveBusinessSourceLabel\(settlement\)/);
+    expect(managerSrc).toMatch(/resolveBusinessPayerLabel\(settlement\)/);
+  });
+});
+
+/* ----------------------------------------------- 12. event vocabulary --- */
+
+describe('E1 · settlement event vocabulary', () => {
+  it('labels exactly the accepted backend event types', () => {
+    const block = managerSrc.slice(
+      managerSrc.indexOf('const SETTLEMENT_EVENT_LABELS'),
+      managerSrc.indexOf('function SummaryLine'),
+    );
+    for (const type of [
+      'created',
+      'updated',
+      'finalized',
+      'superseded',
+      'voided',
+      'match_confirmed',
+      'exported',
+    ]) {
+      expect(block).toMatch(new RegExp(`\\b${type}:`));
+    }
+    for (const invented of [
+      'item_added',
+      'item_updated',
+      'item_deleted',
+      'correction_created',
+    ]) {
+      expect(block).not.toMatch(new RegExp(`\\b${invented}:`));
+    }
+  });
+});
+
+/* --------------------------------- 13. rendered draft-open interaction --- */
+
+function fullRow(over: Partial<BusinessSettlementLike> = {}): BusinessSettlementLike {
+  return {
+    id: 's-new',
+    status: 'draft',
+    source: 'carrier_issued',
+    carrier_recruiter_profile_id: RECRUITER_ID,
+    agency_id: null,
+    driver_user_id: 'drv-1',
+    period_start: '2026-08-03',
+    period_end: '2026-08-09',
+    pay_date: '2026-08-15',
+    reported_gross_amount: 4200,
+    reported_net_amount: -125.5,
+    statement_reference: 'STMT-77',
+    payer_name_snapshot: null,
+    source_display_name_snapshot: null,
+    notes: null,
+    version_number: 1,
+    ...over,
+  } as BusinessSettlementLike;
+}
+
+describe('E1 · rendered draft creation opens the returned statement', () => {
+  beforeEach(() => {
+    hookState.settlements = [];
+    hookState.createdRow = null;
+    createCarrierMutate.mockClear();
+  });
+
+  const renderManager = () =>
+    render(
+      <BusinessSettlementManager
+        mode="carrier"
+        businessId={RECRUITER_ID}
+        driverOptions={[
+          { driverUserId: 'drv-1', relationshipId: 'rel-1', label: 'Dana Hauler' },
+        ]}
+        canManage
+      />,
+    );
+
+  it('opens the exact returned draft even while the list cache is stale', async () => {
+    hookState.createdRow = fullRow();
+    renderManager();
+
+    fireEvent.click(screen.getByTestId('business-settlement-new'));
+    const form = await screen.findByTestId('business-settlement-draft-form');
+    expect(form).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/period start/i), {
+      target: { value: '2026-08-03' },
+    });
+    fireEvent.change(screen.getByLabelText(/period end/i), {
+      target: { value: '2026-08-09' },
+    });
+    fireEvent.click(screen.getByTestId('business-settlement-create'));
+
+    // The list query still returns nothing; the detail must still open.
+    await waitFor(() =>
+      expect(screen.getByTestId('business-settlement-source-label')).toBeTruthy(),
+    );
+    expect(screen.getByTestId('business-settlement-source-label').textContent).toBe(
+      'Carrier statement',
+    );
+    expect(screen.getByTestId('business-settlement-payer-label').textContent).toBe(
+      'Carrier statement',
+    );
+  });
+
+  it('never opens a returned row that fails the provenance/ownership filter', async () => {
+    hookState.createdRow = fullRow({ carrier_recruiter_profile_id: 'other-rec' });
+    renderManager();
+
+    fireEvent.click(screen.getByTestId('business-settlement-new'));
+    await screen.findByTestId('business-settlement-draft-form');
+    fireEvent.change(screen.getByLabelText(/period start/i), {
+      target: { value: '2026-08-03' },
+    });
+    fireEvent.change(screen.getByLabelText(/period end/i), {
+      target: { value: '2026-08-09' },
+    });
+    fireEvent.click(screen.getByTestId('business-settlement-create'));
+
+    await waitFor(() => expect(createCarrierMutate).toHaveBeenCalled());
+    expect(screen.queryByTestId('business-settlement-source-label')).toBeNull();
+  });
+});
